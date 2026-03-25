@@ -5,7 +5,7 @@ import {
   Loader2, Upload, Check, AlertCircle, Wand2,
 } from 'lucide-react';
 import type { FixContext } from '../App';
-import { seoSuggestions } from '../api/seo';
+import { seoSuggestions, keywords } from '../api/seo';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
@@ -62,9 +62,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
-  const [variations, setVariations] = useState<Record<string, { field: string; options: string[] }>>({});
+  const [variations, setVariations] = useState<Record<string, { field: string; options: string[]; descOptions?: string[] }>>({});
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
+  const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
+  const [analyzedPages, setAnalyzedPages] = useState<Set<string>>(new Set());
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // SEO Suggestions (persistent bulk rewrite variations)
@@ -239,13 +241,20 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     }
   };
 
-  const aiRewrite = async (pageId: string, field: 'title' | 'description') => {
+  const aiRewrite = async (pageId: string, field: 'title' | 'description' | 'both') => {
     const page = pages.find(p => p.id === pageId);
     if (!page) return;
     const edit = edits[pageId];
     setAiLoading(prev => ({ ...prev, [pageId]: field }));
     try {
-      const data = await post<{ text?: string; variations?: string[] }>('/api/webflow/seo-rewrite', {
+      const data = await post<{
+        text?: string;
+        field: string;
+        variations?: string[];
+        pairs?: Array<{ title: string; description: string }>;
+        titleVariations?: string[];
+        descriptionVariations?: string[];
+      }>('/api/webflow/seo-rewrite', {
         pageTitle: page.title,
         currentSeoTitle: edit?.seoTitle || page.seo?.title,
         currentDescription: edit?.seoDescription || page.seo?.description,
@@ -253,8 +262,16 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         workspaceId,
         pagePath: `/${page.slug || ''}`,
       });
-      if (data.variations && data.variations.length > 1) {
-        // Show variation picker — auto-select the first one
+
+      if (field === 'both' && data.pairs && data.pairs.length > 0) {
+        // Paired mode — auto-select first pair and show variation picker
+        updateField(pageId, 'seoTitle', data.pairs[0].title);
+        updateField(pageId, 'seoDescription', data.pairs[0].description);
+        setVariations(prev => ({
+          ...prev,
+          [pageId]: { field: 'both', options: data.pairs!.map(p => p.title), descOptions: data.pairs!.map(p => p.description) },
+        }));
+      } else if (data.variations && data.variations.length > 1) {
         const key = field === 'title' ? 'seoTitle' : 'seoDescription';
         updateField(pageId, key, data.variations[0]);
         setVariations(prev => ({ ...prev, [pageId]: { field, options: data.variations! } }));
@@ -266,6 +283,65 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       console.error('AI rewrite failed:', err);
     } finally {
       setAiLoading(prev => { const n = { ...prev }; delete n[pageId]; return n; });
+    }
+  };
+
+  // Fetch keyword strategy to know which pages already have persisted analysis
+  const { data: strategyData } = useQuery({
+    queryKey: ['keyword-strategy', workspaceId],
+    queryFn: () => keywords.webflowStrategy(workspaceId!) as Promise<{ pageMap?: Array<{ pagePath: string; analysisGeneratedAt?: string }> }>,
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
+
+  // Build set of page slugs that have persisted analysis
+  useEffect(() => {
+    if (!strategyData?.pageMap) return;
+    const analyzed = new Set<string>();
+    for (const entry of strategyData.pageMap) {
+      if (entry.analysisGeneratedAt) {
+        // Match by slug — pageMap stores paths like "/slug"
+        const slug = entry.pagePath.replace(/^\//, '');
+        const match = pages.find(p => p.slug === slug || entry.pagePath.includes(p.slug));
+        if (match) analyzed.add(match.id);
+      }
+    }
+    setAnalyzedPages(analyzed);
+  }, [strategyData, pages]);
+
+  const analyzePage = async (pageId: string) => {
+    const page = pages.find(p => p.id === pageId);
+    if (!page || !workspaceId) return;
+    const edit = edits[pageId];
+
+    setAnalyzing(prev => new Set(prev).add(pageId));
+    try {
+      // Step 1: Run keyword analysis
+      const analysis = await keywords.analyze({
+        pageTitle: page.title,
+        seoTitle: edit?.seoTitle || page.seo?.title || '',
+        metaDescription: edit?.seoDescription || page.seo?.description || '',
+        slug: page.slug,
+        workspaceId,
+      }) as Record<string, unknown>;
+
+      if (analysis && !analysis.error) {
+        // Step 2: Persist analysis to workspace keyword strategy
+        await keywords.persistAnalysis({
+          workspaceId,
+          pagePath: `/${page.slug || ''}`,
+          analysis,
+        });
+
+        // Mark page as analyzed
+        setAnalyzedPages(prev => new Set(prev).add(pageId));
+        // Refresh strategy query so UI updates
+        queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+      }
+    } catch (err) {
+      console.error('Page analysis failed:', err);
+    } finally {
+      setAnalyzing(prev => { const n = new Set(prev); n.delete(pageId); return n; });
     }
   };
 
@@ -372,10 +448,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   // ── Bulk AI Rewrite (generates 3 variations per page, stored server-side) ──
-  const bulkAiRewrite = async (field: 'title' | 'description') => {
+  const bulkAiRewrite = async (field: 'title' | 'description' | 'both') => {
     const selectedPages = Array.from(approvalSelected).map(id => pages.find(p => p.id === id)).filter(Boolean) as PageMeta[];
     if (selectedPages.length === 0) return;
-    setBulkField(field);
+    setBulkField(field === 'both' ? 'title' : field);
     setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: selectedPages.length });
     try {
@@ -388,7 +464,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         `/api/webflow/seo-bulk-rewrite/${siteId}`,
         { pages: pagesPayload, field, workspaceId }
       );
-      setBulkResults(`Generated ${data.generated}/${data.total} ${field} suggestions. Review and select below.`);
+      const fieldLabel = field === 'both' ? 'title + description' : field;
+      const pageCount = field === 'both' ? Math.floor(data.generated / 2) : data.generated;
+      setBulkResults(`Generated ${pageCount}/${data.total} ${fieldLabel} suggestions. Review and select below.`);
       refetchSuggestions();
       setBulkMode('idle');
       setTimeout(() => setBulkResults(null), 8000);
@@ -703,6 +781,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             errorState={errorStates[page.id] || null}
             showPreview={previewExpanded.has(page.id)}
             onTogglePreview={togglePreview}
+            onAnalyzePage={workspaceId ? analyzePage : undefined}
+            hasAnalysis={analyzedPages.has(page.id)}
+            isAnalyzing={analyzing.has(page.id)}
           />
         ))}
       </div>

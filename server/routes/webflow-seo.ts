@@ -15,7 +15,7 @@ import {
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from '../seo-context.js';
 import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
 import {
@@ -203,7 +203,8 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   };
 
   try {
-    const maxLen = field === 'description' ? 160 : 60;
+    // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
+    const pageAnalysisBlock = buildPageAnalysisContext(workspaceId, pagePath);
 
     // Assemble all context blocks
     const contextBlocks = [
@@ -213,7 +214,72 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
       knowledgeBlock,
       gscBlock,
       auditBlock,
+      pageAnalysisBlock,
     ].filter(Boolean).join('');
+
+    // ── "both" mode: generate paired title + description in one call ──
+    if (field === 'both') {
+      const prompt = `You are an elite SEO copywriter. Write 3 paired SEO title + meta description sets for this page. Each pair must feel unified — the title and description should complement each other in tone, angle, and messaging.
+
+PAGE CONTEXT:
+- Page title: ${pageTitle}
+- Current SEO title: ${currentSeoTitle || '(none)'}
+- Current meta description: ${currentDescription || '(none)'}
+- Site context: ${siteContext || 'N/A'}
+${headingsBlock}
+- Page content: ${resolvedPageContent || 'N/A'}
+${contextBlocks}
+
+CRAFT GUIDELINES:
+- TITLE: 50-60 characters (NEVER exceed 60). Front-load primary keyword.
+- DESCRIPTION: 150-160 characters (NEVER exceed 160). Expand on the title's promise with specific details.
+- The title hooks attention; the description closes the click. They must tell a coherent story together.
+- If GSC queries are provided, incorporate the exact language searchers use
+- If audience personas are provided, write to their specific pain points and goals
+${brandName ? `- Brand: "${brandName}" — use this exact name` : ''}
+- LOCATION RULE: If the page keyword targets a specific city/region, use THAT location exactly
+- Each pair must take a genuinely different angle
+
+PAIR ANGLES:
+1. Keyword-intent: Primary keyword + specific outcome. Description expands with proof/details.
+2. Differentiator: What makes this business unique. Description reinforces with specifics.
+3. Searcher-match: Mirror exact phrasing from GSC queries/personas. Description addresses their need directly.
+
+Return ONLY a JSON array of 3 objects, each with "title" and "description" keys. No explanation.`;
+
+      const aiText = await callCreativeAI({
+        systemPrompt: 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 objects with "title" and "description" keys. No markdown, no explanation, no code fences.',
+        userPrompt: prompt,
+        maxTokens: 800,
+        feature: 'seo-rewrite-both',
+        workspaceId: workspaceId || '',
+      });
+
+      let pairs: Array<{ title: string; description: string }>;
+      try {
+        const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+        pairs = Array.isArray(parsed)
+          ? parsed.map((p: { title?: string; description?: string }) => ({
+              title: enforceLimit(String(p.title || ''), 60),
+              description: enforceLimit(String(p.description || ''), 160),
+            }))
+          : [];
+      } catch {
+        pairs = [];
+      }
+      while (pairs.length < 3 && pairs.length > 0) pairs.push(pairs[0]);
+
+      res.json({
+        field: 'both',
+        pairs,
+        titleVariations: pairs.map(p => p.title),
+        descriptionVariations: pairs.map(p => p.description),
+      });
+      return;
+    }
+
+    // ── Single-field mode (title or description) ──
+    const maxLen = field === 'description' ? 160 : 60;
 
     let prompt: string;
     if (field === 'description') {
@@ -467,7 +533,7 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFrom
 router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { pages, field, workspaceId } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>;
-    field: 'title' | 'description';
+    field: 'title' | 'description' | 'both';
     workspaceId?: string;
   };
   if (!pages?.length || !field) return res.status(400).json({ error: 'pages, field required' });
@@ -489,7 +555,8 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   }
 
   const inlineBrandName = getBrandName(ws);
-  const maxLen = field === 'description' ? 160 : 60;
+  const isBothMode = field === 'both';
+  const maxLen = field === 'description' ? 160 : 60; // only used in single-field mode
   const CONCURRENCY = 3;
   const resolvedWsId = workspaceId || ws?.id || '';
 
@@ -514,15 +581,16 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   // Prevents generating duplicate/similar titles across the site
   const siblingTitles: Record<string, string[]> = {};
   for (const p of pages) {
-    const currentTitle = field === 'title'
-      ? (p.currentSeoTitle || p.title || '')
-      : (p.currentDescription || '');
-    if (currentTitle) {
+    // For 'both' mode, include both title and description as sibling context
+    const siblingValues = isBothMode
+      ? [p.currentSeoTitle || p.title || '', p.currentDescription || ''].filter(Boolean)
+      : [field === 'title' ? (p.currentSeoTitle || p.title || '') : (p.currentDescription || '')].filter(Boolean);
+    for (const val of siblingValues) {
       for (const other of pages) {
         if (other.pageId === p.pageId) continue;
         if (!siblingTitles[other.pageId]) siblingTitles[other.pageId] = [];
         if (siblingTitles[other.pageId].length < 8) {
-          siblingTitles[other.pageId].push(currentTitle);
+          siblingTitles[other.pageId].push(val);
         }
       }
     }
@@ -591,14 +659,64 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       let siblingBlock = '';
       const siblings = siblingTitles[page.pageId];
       if (siblings && siblings.length > 0) {
-        siblingBlock = `\n\nOTHER ${field === 'title' ? 'TITLES' : 'DESCRIPTIONS'} ON THIS SITE (do NOT repeat similar phrasing — differentiate this page):\n${siblings.map(t => `- "${t}"`).join('\n')}`;
+        siblingBlock = `\n\nOTHER TITLES/DESCRIPTIONS ON THIS SITE (do NOT repeat similar phrasing — differentiate this page):\n${siblings.map(t => `- "${t}"`).join('\n')}`;
       }
+
+      // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
+      const rwPageAnalysis = buildPageAnalysisContext(resolvedWsId, page.slug ? `/${page.slug}` : undefined);
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
       const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
-      const rwExtraContext = [rwPersonasBlock, rwKnowledgeBlock, gscBlock, ctrFlag, siblingBlock].filter(Boolean).join('');
+      const rwExtraContext = [rwPersonasBlock, rwKnowledgeBlock, gscBlock, ctrFlag, siblingBlock, rwPageAnalysis].filter(Boolean).join('');
 
+      // ── "both" mode: paired title + description in one AI call ──
+      if (isBothMode) {
+        const oldTitle = page.currentSeoTitle || '';
+        const oldDesc = page.currentDescription || '';
+
+        const prompt = `Write 3 paired SEO title + meta description sets for a page titled "${page.title}". Current title: "${oldTitle}". Current description: "${oldDesc}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- TITLE: 50-60 characters (NEVER exceed 60). Front-load primary keyword.\n- DESCRIPTION: 150-160 characters (NEVER exceed 160). Expand on the title's promise.\n- Each pair must feel unified — title hooks attention, description closes the click.\n- If GSC queries are provided, incorporate the exact language searchers use\n- Each pair must take a genuinely different angle${locationRule}\n\nPair angles:\n1. Keyword-intent: Primary keyword + outcome. Description expands with proof.\n2. Differentiator: What makes this unique. Description reinforces with specifics.\n3. Searcher-match: Mirror GSC query phrasing. Description addresses their need.\n\nReturn ONLY a JSON array of 3 objects with "title" and "description" keys. No explanation.`;
+
+        const aiText = await callCreativeAI({
+          systemPrompt: 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 objects with "title" and "description" keys. No markdown, no explanation, no code fences.',
+          userPrompt: prompt,
+          maxTokens: 800,
+          feature: 'seo-bulk-rewrite-both',
+          workspaceId: resolvedWsId,
+        });
+
+        let pairs: Array<{ title: string; description: string }>;
+        try {
+          const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+          pairs = Array.isArray(parsed)
+            ? parsed.map((p: { title?: string; description?: string }) => ({
+                title: enforceLimit(String(p.title || ''), 60),
+                description: enforceLimit(String(p.description || ''), 160),
+              }))
+            : [];
+        } catch {
+          pairs = [];
+        }
+        if (!pairs.length) return { savedSuggestions: [] as SeoSuggestion[], pageId: page.pageId, error: 'Empty AI response' };
+        while (pairs.length < 3) pairs.push(pairs[0]);
+
+        // Save two aligned rows: one for title, one for description
+        const titleSugg = saveSuggestion({
+          workspaceId: resolvedWsId, siteId, pageId: page.pageId,
+          pageTitle: page.title, pageSlug: page.slug || '',
+          field: 'title', currentValue: oldTitle,
+          variations: pairs.map(p => p.title),
+        });
+        const descSugg = saveSuggestion({
+          workspaceId: resolvedWsId, siteId, pageId: page.pageId,
+          pageTitle: page.title, pageSlug: page.slug || '',
+          field: 'description', currentValue: oldDesc,
+          variations: pairs.map(p => p.description),
+        });
+        return { savedSuggestions: [titleSugg, descSugg], pageId: page.pageId, error: '' };
+      }
+
+      // ── Single-field mode ──
       const oldValue = field === 'title' ? (page.currentSeoTitle || '') : (page.currentDescription || '');
 
       const prompt = field === 'description'
@@ -625,7 +743,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
         variations = single ? [single] : [];
       }
 
-      if (!variations.length) return { suggestion: null as SeoSuggestion | null, pageId: page.pageId, error: 'Empty AI response' };
+      if (!variations.length) return { savedSuggestions: [] as SeoSuggestion[], pageId: page.pageId, error: 'Empty AI response' };
 
       // Pad to 3 if AI returned fewer
       while (variations.length < 3) variations.push(variations[0]);
@@ -637,19 +755,19 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
         pageId: page.pageId,
         pageTitle: page.title,
         pageSlug: page.slug || '',
-        field,
+        field: field as 'title' | 'description',
         currentValue: oldValue,
         variations,
       });
 
-      return { suggestion, pageId: page.pageId, error: '' };
+      return { savedSuggestions: [suggestion], pageId: page.pageId, error: '' };
     }));
 
     for (let j = 0; j < batchResults.length; j++) {
       const r = batchResults[j];
       if (r.status === 'fulfilled') {
-        if (r.value.suggestion) suggestions.push(r.value.suggestion);
-        else errors.push({ pageId: r.value.pageId, error: r.value.error });
+        if (r.value.savedSuggestions.length > 0) suggestions.push(...r.value.savedSuggestions);
+        else if (r.value.error) errors.push({ pageId: r.value.pageId, error: r.value.error });
       } else {
         errors.push({ pageId: batch[j]?.pageId || '', error: String(r.reason) });
       }

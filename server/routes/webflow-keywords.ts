@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
+import { getWorkspace, updateWorkspace, type KeywordStrategy } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-keywords');
@@ -104,6 +105,75 @@ Return ONLY valid JSON, no markdown, no explanation.`;
   } catch (err) {
     log.error({ err: err }, 'Keyword analysis error');
     res.status(500).json({ error: 'Keyword analysis failed' });
+  }
+});
+
+// --- Persist Page Analysis to Keyword Strategy ---
+router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQuery(), async (req, res) => {
+  const { workspaceId, pagePath, analysis } = req.body as {
+    workspaceId: string;
+    pagePath: string;
+    analysis: {
+      primaryKeyword?: string;
+      secondaryKeywords?: string[];
+      searchIntent?: string;
+      optimizationIssues?: string[];
+      recommendations?: string[];
+      contentGaps?: string[];
+      optimizationScore?: number;
+    };
+  };
+
+  if (!workspaceId || !pagePath || !analysis) {
+    return res.status(400).json({ error: 'workspaceId, pagePath, and analysis are required' });
+  }
+
+  try {
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    const strategy: KeywordStrategy = ws.keywordStrategy || { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: new Date().toISOString() };
+    const pageMap = strategy.pageMap || [];
+
+    // Find or create the page entry
+    const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
+    const entry = pageMap.find(p =>
+      p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized)
+    );
+
+    if (entry) {
+      // Update existing entry with analysis data
+      if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword;
+      if (analysis.secondaryKeywords?.length) entry.secondaryKeywords = analysis.secondaryKeywords;
+      if (analysis.searchIntent) entry.searchIntent = analysis.searchIntent;
+      entry.optimizationIssues = analysis.optimizationIssues || [];
+      entry.recommendations = analysis.recommendations || [];
+      entry.contentGaps = analysis.contentGaps || [];
+      entry.optimizationScore = analysis.optimizationScore;
+      entry.analysisGeneratedAt = new Date().toISOString();
+    } else {
+      // Create new entry
+      pageMap.push({
+        pagePath: normalized,
+        pageTitle: '', // will be filled by caller if known
+        primaryKeyword: analysis.primaryKeyword || '',
+        secondaryKeywords: analysis.secondaryKeywords || [],
+        searchIntent: analysis.searchIntent,
+        optimizationIssues: analysis.optimizationIssues || [],
+        recommendations: analysis.recommendations || [],
+        contentGaps: analysis.contentGaps || [],
+        optimizationScore: analysis.optimizationScore,
+        analysisGeneratedAt: new Date().toISOString(),
+      });
+    }
+
+    strategy.pageMap = pageMap;
+    updateWorkspace(workspaceId, { keywordStrategy: strategy });
+    log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
+    res.json({ success: true, pagePath: normalized, hasAnalysis: true });
+  } catch (err) {
+    log.error({ err }, 'Failed to persist page analysis');
+    res.status(500).json({ error: 'Failed to persist page analysis' });
   }
 });
 

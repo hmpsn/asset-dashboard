@@ -35,6 +35,12 @@ export interface PageKeywordMap {
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   metricsSource?: 'exact' | 'partial_match' | 'bulk_lookup';
   validated?: boolean;
+  // Persisted page analysis (generated via keyword analysis, feeds into AI rewrites)
+  optimizationIssues?: string[];
+  recommendations?: string[];
+  contentGaps?: string[];
+  optimizationScore?: number;
+  analysisGeneratedAt?: string;
 }
 
 export interface KeywordGapItem {

@@ -4,7 +4,7 @@
  */
 import {
   Loader2, Save, Sparkles, ChevronDown, ChevronRight,
-  Check, AlertTriangle, CheckSquare, Square, Send, X,
+  Check, AlertTriangle, CheckSquare, Square, Send, X, Search,
 } from 'lucide-react';
 import { StatusBadge, CharacterCounter, SerpPreview, SocialPreview } from '../ui';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -49,7 +49,7 @@ export interface PageEditRowProps {
   isSelected: boolean;
   pageRecs: Recommendation[];
   pageState: PageState | undefined;
-  variations: { field: string; options: string[] } | undefined;
+  variations: { field: string; options: string[]; descOptions?: string[] } | undefined;
   showApprovalCheckbox: boolean;
   isSendingToClient: boolean;
   isSentToClient: boolean;
@@ -60,13 +60,16 @@ export interface PageEditRowProps {
   onUpdateField: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
   onSave: (pageId: string) => void;
   onSaveDraft?: (pageId: string) => void;
-  onAiRewrite: (pageId: string, field: 'title' | 'description') => void;
+  onAiRewrite: (pageId: string, field: 'title' | 'description' | 'both') => void;
   onSelectVariation: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
   onClearVariations: (pageId: string) => void;
   onClearTracking?: (pageId: string) => void;
   errorState?: { type: string; message: string } | null;
   showPreview?: boolean;
   onTogglePreview?: (pageId: string) => void;
+  onAnalyzePage?: (pageId: string) => void;
+  hasAnalysis?: boolean;
+  isAnalyzing?: boolean;
 }
 
 export function PageEditRow({
@@ -75,7 +78,7 @@ export function PageEditRow({
   isSendingToClient, isSentToClient, hasChanges, onSendToClient,
   onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, onSaveDraft,
   onAiRewrite, onSelectVariation, onClearVariations, onClearTracking, errorState,
-  showPreview, onTogglePreview,
+  showPreview, onTogglePreview, onAnalyzePage, hasAnalysis, isAnalyzing,
 }: PageEditRowProps) {
   const hasSeoTitle = !!(page.seo?.title);
   const hasSeoDesc = !!(page.seo?.description);
@@ -176,6 +179,75 @@ export function PageEditRow({
             </div>
           )}
 
+          {/* Analyze + Generate buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {onAnalyzePage && (
+                <button
+                  onClick={() => onAnalyzePage(page.id)}
+                  disabled={isAnalyzing}
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-violet-600/80 hover:bg-violet-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
+                  title={hasAnalysis ? 'Re-analyze page (update recommendations)' : 'Run page analysis to generate optimization recommendations'}
+                >
+                  {isAnalyzing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Search className="w-2.5 h-2.5" />}
+                  {hasAnalysis ? 'Re-analyze' : 'Analyze Page'}
+                </button>
+              )}
+              {hasAnalysis && (
+                <span className="text-[10px] text-green-400/70 flex items-center gap-1">
+                  <Check className="w-2.5 h-2.5" /> Analysis on file
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => onAiRewrite(page.id, 'both')}
+              disabled={!!isAiLoading}
+              className="flex items-center gap-1 px-2 py-1 text-[11px] bg-teal-600 hover:bg-teal-500 text-white font-medium rounded transition-colors disabled:opacity-50"
+              title={hasAnalysis ? 'Generate paired title + description (using page analysis)' : 'Generate paired title + description'}
+            >
+              {isAiLoading === 'both' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
+              AI Generate Both
+            </button>
+          </div>
+
+          {/* Paired variation picker (when both were generated together) */}
+          {variations?.field === 'both' && variations.options.length > 1 && variations.descOptions && (
+            <div className="space-y-1.5 border border-teal-500/20 bg-teal-500/5 rounded-lg p-3">
+              <div className="text-[11px] text-teal-400 font-medium">Pick a paired title + description:</div>
+              {variations.options.map((titleV, i) => {
+                const descV = variations.descOptions![i] || '';
+                const isSelected = edit.seoTitle === titleV && edit.seoDescription === descV;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      onSelectVariation(page.id, 'seoTitle', titleV);
+                      onSelectVariation(page.id, 'seoDescription', descV);
+                      onClearVariations(page.id);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs border transition-colors ${
+                      isSelected
+                        ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+                        : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-300 hover:border-teal-500/30 hover:bg-teal-600/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-zinc-500 font-bold">{i + 1}.</span>
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">Title</span>
+                      <span className="flex-1">{titleV}</span>
+                      <CharacterCounter current={titleV.length} max={60} size="sm" />
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">Desc</span>
+                      <span className="flex-1 text-zinc-400">{descV}</span>
+                      <CharacterCounter current={descV.length} max={160} size="sm" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* SEO Title */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -186,7 +258,7 @@ export function PageEditRow({
                   onClick={() => onAiRewrite(page.id, 'title')}
                   disabled={!!isAiLoading}
                   className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
-                  title="AI rewrite"
+                  title="AI rewrite title only"
                 >
                   {isAiLoading === 'title' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
                   AI
@@ -231,7 +303,7 @@ export function PageEditRow({
                   onClick={() => onAiRewrite(page.id, 'description')}
                   disabled={!!isAiLoading}
                   className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] bg-teal-600/50 hover:bg-teal-500/50 rounded transition-colors disabled:opacity-50"
-                  title="AI rewrite"
+                  title="AI rewrite description only"
                 >
                   {isAiLoading === 'description' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Sparkles className="w-2.5 h-2.5" />}
                   AI

@@ -226,6 +226,40 @@ export function buildPersonasContext(workspaceId?: string): string {
 }
 
 /**
+ * Build a page-specific analysis context block for AI rewrite prompts.
+ * Pulls persisted optimizationIssues + recommendations from the keyword strategy pageMap.
+ * This ensures AI rewrites address the platform's own recommendations.
+ */
+export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string): string {
+  if (!workspaceId || !pagePath) return '';
+  const ws = getWorkspace(workspaceId);
+  const pageMap = ws?.keywordStrategy?.pageMap;
+  if (!pageMap?.length) return '';
+
+  const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
+  const entry = pageMap.find(
+    p => p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized)
+  );
+  if (!entry) return '';
+
+  const parts: string[] = [];
+
+  if (entry.optimizationIssues?.length) {
+    parts.push(`ISSUES IDENTIFIED:\n${entry.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
+  }
+  if (entry.recommendations?.length) {
+    parts.push(`RECOMMENDATIONS:\n${entry.recommendations.map(r => `- ${r}`).join('\n')}`);
+  }
+  if (entry.contentGaps?.length) {
+    parts.push(`CONTENT GAPS:\n${entry.contentGaps.map(g => `- ${g}`).join('\n')}`);
+  }
+
+  if (parts.length === 0) return '';
+
+  return `\n\nPAGE ANALYSIS (address these issues in your rewrite — this is what our platform flagged for this page):\n${parts.join('\n')}`;
+}
+
+/**
  * Build a full keyword map string for prompts that need cross-page awareness
  * (e.g., internal links, content briefs to avoid cannibalization).
  */

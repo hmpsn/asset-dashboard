@@ -104,6 +104,9 @@ export const keywords = {
   analyze: (body: Record<string, unknown>) =>
     post<unknown>('/api/webflow/keyword-analysis', body),
 
+  persistAnalysis: (body: { workspaceId: string; pagePath: string; analysis: Record<string, unknown> }) =>
+    post<{ success: boolean; pagePath: string; hasAnalysis: boolean }>('/api/webflow/keyword-analysis/persist', body),
+
   strategy: (wsId: string) =>
     getOptional<unknown>(`/api/public/seo-strategy/${wsId}`),
 

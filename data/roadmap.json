@@ -3137,6 +3137,24 @@
           "priority": "P1",
           "notes": "Shipped — Migrated AnomalyAlerts, ContentPipeline, and SeoEditor from manual useEffect to React Query. Fixed type mismatches, replaced fetchPages() calls with queryClient.invalidateQueries(), removed 40% of data fetching boilerplate. All simple patterns now standardized. Complex components (ContentCalendar, CmsEditor) remain for future work.",
           "status": "done"
+        },
+        {
+          "id": 343,
+          "title": "Persisted Page Analysis → AI Rewrite Integration",
+          "source": "USER REQUEST",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — Page Analysis (optimizationIssues, recommendations, contentGaps) now persisted to keywordStrategy.pageMap. New persist endpoint, buildPageAnalysisContext() helper, wired into single + bulk rewrite prompts. SEO Editor 'Analyze Page' button runs keyword analysis + auto-persists. Green indicator when analysis exists. Feature #163.",
+          "status": "done"
+        },
+        {
+          "id": 344,
+          "title": "Unified Title + Description Generation ('Generate Both')",
+          "source": "USER REQUEST",
+          "est": "1.5h",
+          "priority": "P0",
+          "notes": "Shipped — field='both' mode for single + bulk SEO rewrite. AI generates 3 paired title/description sets per page. Frontend: 'AI Generate Both' button, paired variation picker, bulk 'AI Rewrite Both'. Feature #164.",
+          "status": "done"
         }
       ]
     }
