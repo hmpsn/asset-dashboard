@@ -41,6 +41,7 @@ import {
 } from '../webflow.js';
 import { buildSeoContext } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
+import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -1505,10 +1506,16 @@ Rules:
       siteKeywordMetrics.sort((a, b) => b.volume - a.volume);
     }
 
-    // 7. Save to workspace
+    // 7. Save to workspace — pageMap goes to page_keywords table, rest to workspace blob
     sendProgress('complete', 'Strategy complete!', 1.0);
+    const pageMap = strategy.pageMap || [];
+    // Save pageMap to dedicated table (replaces all existing entries)
+    replaceAllPageKeywords(ws.id, pageMap);
+
+    // Strategy-level data (no pageMap) goes to workspace JSON blob
+    const { pageMap: _stripPageMap, ...strategyMeta } = strategy;
     const keywordStrategy = {
-      ...strategy,
+      ...strategyMeta,
       siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
       keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
       topicClusters: topicClusters.length > 0 ? topicClusters : undefined,
@@ -1533,7 +1540,7 @@ Rules:
     try {
       const seedKeywords = new Set<string>();
       for (const kw of keywordStrategy.siteKeywords || []) seedKeywords.add(kw.toLowerCase().trim());
-      for (const pm of keywordStrategy.pageMap || []) {
+      for (const pm of pageMap) {
         if (pm.primaryKeyword) seedKeywords.add(pm.primaryKeyword.toLowerCase().trim());
       }
       for (const kw of seedKeywords) addTrackedKeyword(ws.id, kw);
@@ -1544,11 +1551,13 @@ Rules:
 
     if (keepalive) clearInterval(keepalive);
 
+    // Reassemble for response (frontend expects pageMap in the strategy object)
+    const responseStrategy = { ...keywordStrategy, pageMap };
     if (wantsStream) {
-      res.write(`data: ${JSON.stringify({ done: true, strategy: keywordStrategy })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, strategy: responseStrategy })}\n\n`);
       return res.end();
     }
-    res.json(keywordStrategy);
+    res.json(responseStrategy);
   } catch (err) {
     if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);
@@ -1562,11 +1571,15 @@ Rules:
   }
 });
 
-// Get stored keyword strategy
+// Get stored keyword strategy (reassembles pageMap from page_keywords table)
 router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  res.json(ws.keywordStrategy || null);
+  const strategy = ws.keywordStrategy;
+  if (!strategy) return res.json(null);
+  // Reassemble pageMap from dedicated table
+  const pageMap = listPageKeywords(ws.id);
+  res.json({ ...strategy, pageMap });
 });
 
 // Update keyword strategy (manual edits)
@@ -1587,9 +1600,17 @@ const patchStrategySchema = z.object({
 router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrategySchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const updated = { ...(ws.keywordStrategy || {}), ...req.body, generatedAt: new Date().toISOString() };
+  // If pageMap is being updated, save to dedicated table
+  if (req.body.pageMap) {
+    replaceAllPageKeywords(ws.id, req.body.pageMap);
+  }
+  // Save non-pageMap fields to workspace blob
+  const { pageMap: _pm, ...rest } = req.body;
+  const updated = { ...(ws.keywordStrategy || {}), ...rest, generatedAt: new Date().toISOString() };
   updateWorkspace(ws.id, { keywordStrategy: updated });
-  res.json(updated);
+  // Respond with reassembled strategy
+  const responsePageMap = listPageKeywords(ws.id);
+  res.json({ ...updated, pageMap: responsePageMap });
 });
 
 // ── Keyword Feedback (approve/decline) ──────────────────────────

@@ -7,7 +7,7 @@
  * Returns conflict objects with severity (high/medium/low) based on
  * how closely the keywords match.
  */
-import { getWorkspace } from './workspaces.js';
+import { listPageKeywords } from './page-keywords.js';
 import { listMatrices } from './content-matrices.js';
 import { createLogger } from './logger.js';
 
@@ -172,9 +172,8 @@ export function detectMatrixCannibalization(
 
   // Build target sets
   const existingPageTargets: Array<{ keyword: string; type: 'existing_page'; identifier: string; label?: string }> = [];
-  const ws = getWorkspace(workspaceId);
-  const pageMap = ws?.keywordStrategy?.pageMap;
-  if (pageMap?.length) {
+  const pageMap = listPageKeywords(workspaceId);
+  if (pageMap.length) {
     for (const p of pageMap) {
       if (p.primaryKeyword) {
         existingPageTargets.push({
@@ -267,10 +266,9 @@ export function checkKeywordCannibalization(
   const targets: Array<{ keyword: string; type: CannibalizationConflict['conflictsWith']['type']; identifier: string; label?: string }> = [];
 
   // Existing pages
-  const ws = getWorkspace(workspaceId);
-  const pageMap = ws?.keywordStrategy?.pageMap;
-  if (pageMap?.length) {
-    for (const p of pageMap) {
+  const pkPages = listPageKeywords(workspaceId);
+  if (pkPages.length) {
+    for (const p of pkPages) {
       if (p.primaryKeyword) {
         targets.push({ keyword: p.primaryKeyword, type: 'existing_page', identifier: p.pagePath, label: p.pagePath });
       }

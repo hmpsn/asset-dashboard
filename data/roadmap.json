@@ -3319,6 +3319,15 @@
           "status": "done"
         },
         {
+          "id": 364,
+          "title": "Normalize pageMap into dedicated page_keywords SQLite table",
+          "source": "TECH DEBT",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — Extracted keywordStrategy.pageMap from workspace JSON blob into indexed page_keywords table. O(1) per-page reads/writes instead of full blob deserialization. 13 reader/writer call sites updated. Migration function runs idempotently on startup. Feature #176.",
+          "status": "done"
+        },
+        {
           "id": 362,
           "title": "Page analysis race condition + performance fixes",
           "source": "BUG FIX",

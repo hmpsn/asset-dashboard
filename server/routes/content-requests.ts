@@ -28,6 +28,7 @@ import {
 } from '../webflow.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
 import { resolvePagePath } from '../helpers.js';
+import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
@@ -102,16 +103,15 @@ router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('
 });
 
 // --- Helper: fetch all published site pages for content brief internal linking ---
-export async function getAllSitePages(ws: { webflowSiteId?: string; liveDomain?: string; keywordStrategy?: { pageMap?: { pagePath: string; primaryKeyword?: string }[] } }): Promise<string[]> {
+export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; liveDomain?: string }): Promise<string[]> {
   const pageMap = new Map<string, string>(); // path -> "path — title"
 
-  // 1. Keyword strategy pages (always available, have keyword context)
-  if (ws.keywordStrategy?.pageMap) {
-    for (const p of ws.keywordStrategy.pageMap) {
-      const path = p.pagePath.startsWith('/') ? p.pagePath : `/${p.pagePath}`;
-      const label = p.primaryKeyword ? `${path} — targets: "${p.primaryKeyword}"` : path;
-      pageMap.set(path.toLowerCase(), label);
-    }
+  // 1. Keyword strategy pages from page_keywords table (indexed, have keyword context)
+  const kwPages = listPageKeywords(ws.id);
+  for (const p of kwPages) {
+    const path = p.pagePath.startsWith('/') ? p.pagePath : `/${p.pagePath}`;
+    const label = p.primaryKeyword ? `${path} — targets: "${p.primaryKeyword}"` : path;
+    pageMap.set(path.toLowerCase(), label);
   }
 
   // 2. Webflow API pages (static pages with titles)

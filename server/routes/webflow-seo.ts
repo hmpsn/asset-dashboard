@@ -27,7 +27,7 @@ import {
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { addActivity } from '../activity-log.js';
-import { findPageMapEntry } from '../helpers.js';
+import { getPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-seo');
@@ -918,7 +918,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   // Build full context: keywords + brand voice + keyword map
-  const { keywordBlock, brandVoiceBlock, strategy } = buildSeoContext(workspaceId, pagePath);
+  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
   // If no page content was passed, try to fetch it from the live site
@@ -958,7 +958,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   }
 
   // Find this page's keyword data
-  const pageKw = strategy?.pageMap ? findPageMapEntry(strategy.pageMap, pagePath) : undefined;
+  const pageKw = getPageKeyword(workspaceId, pagePath);
 
   // Resolve brand name
   const copyWs = getWorkspace(workspaceId);

@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getWorkspace } from './workspaces.js';
+import { countPageKeywords } from './page-keywords.js';
 import { getUploadRoot } from './data-dir.js';
 import { isSemrushConfigured } from './semrush.js';
 
@@ -133,8 +134,8 @@ export function checkAIContext(workspaceId: string): ContextCompleteness {
   });
 
   // 7. Keyword Strategy
-  const hasStrategy = !!ws.keywordStrategy?.pageMap?.length;
-  const pageCount = ws.keywordStrategy?.pageMap?.length || 0;
+  const pageCount = countPageKeywords(ws.id);
+  const hasStrategy = pageCount > 0;
   sources.push({
     key: 'keyword-strategy',
     label: 'Keyword Strategy',

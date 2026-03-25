@@ -8,6 +8,7 @@ import {
   getSiteSubdomain,
 } from './webflow.js';
 import { getWorkspace } from './workspaces.js';
+import { listPageKeywords } from './page-keywords.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
 import { resolvePagePath } from './helpers.js';
@@ -281,16 +282,17 @@ export async function analyzeInternalLinks(
 
   // Get keyword strategy for extra context (including topic clusters for intra-cluster linking)
   let kwContext = '';
-  if (ws?.keywordStrategy?.pageMap) {
-    const kwMap = ws.keywordStrategy.pageMap.map(
-      (pm: { pagePath: string; primaryKeyword: string; topicCluster?: string }) =>
+  const kwPages = listPageKeywords(ws?.id || '');
+  if (kwPages.length > 0) {
+    const kwMap = kwPages.map(
+      (pm) =>
         `${pm.pagePath}: "${pm.primaryKeyword}"${pm.topicCluster ? ` [cluster: ${pm.topicCluster}]` : ''}`
     ).join('\n');
     kwContext = `\n\nKeyword targets per page:\n${kwMap}`;
 
     // Build cluster summary for AI to prioritize intra-cluster links
     const clusters = new Map<string, string[]>();
-    for (const pm of ws.keywordStrategy.pageMap) {
+    for (const pm of kwPages) {
       if (pm.topicCluster) {
         if (!clusters.has(pm.topicCluster)) clusters.set(pm.topicCluster, []);
         clusters.get(pm.topicCluster)!.push(pm.pagePath);

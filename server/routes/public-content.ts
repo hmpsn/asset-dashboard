@@ -17,7 +17,8 @@ import {
   addComment,
 } from '../content-requests.js';
 import { notifyTeamContentRequest } from '../email.js';
-import { sanitizeString, validateEnum, findPageMapEntry } from '../helpers.js';
+import { sanitizeString, validateEnum } from '../helpers.js';
+import { getPageKeyword, listPageKeywords } from '../page-keywords.js';
 import { getClientActor } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
@@ -31,11 +32,13 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   if (!ws.seoClientView) return res.status(403).json({ error: 'SEO strategy view is not enabled' });
   const strategy = ws.keywordStrategy;
   if (!strategy) return res.json(null);
+  // Reassemble pageMap from page_keywords table
+  const fullPageMap = listPageKeywords(ws.id);
   // Return client-safe subset (no semrushMode, no internal-only fields)
   res.json({
     siteKeywords: strategy.siteKeywords || [],
     siteKeywordMetrics: strategy.siteKeywordMetrics || undefined,
-    pageMap: (strategy.pageMap || []).map(p => ({
+    pageMap: fullPageMap.map(p => ({
       pagePath: p.pagePath,
       pageTitle: p.pageTitle,
       primaryKeyword: p.primaryKeyword,
@@ -291,10 +294,8 @@ router.post('/api/public/content-request/:workspaceId/from-audit', async (req, r
 
   // Also check keyword strategy for this page's target keyword
   let strategyKeyword = '';
-  if (ws.keywordStrategy?.pageMap) {
-    const match = findPageMapEntry(ws.keywordStrategy.pageMap, pageSlug);
-    if (match && 'primaryKeyword' in match) strategyKeyword = (match as { primaryKeyword?: string }).primaryKeyword || '';
-  }
+  const kwMatch = getPageKeyword(ws.id, pageSlug);
+  if (kwMatch?.primaryKeyword) strategyKeyword = kwMatch.primaryKeyword;
 
   // Build the target keyword: prefer strategy keyword, then top GSC query, then page name
   const targetKeyword = strategyKeyword || (topKeywords.length > 0 ? topKeywords[0].query : pageName.replace(/-/g, ' '));

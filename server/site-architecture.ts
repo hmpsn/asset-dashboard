@@ -12,6 +12,7 @@
 import { listPages, filterPublishedPages, buildStaticPathSet, discoverCmsUrls, getSiteSubdomain } from './webflow-pages.js';
 import { listMatrices } from './content-matrices.js';
 import { getWorkspace } from './workspaces.js';
+import { listPageKeywords } from './page-keywords.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
@@ -357,8 +358,9 @@ export async function buildSiteArchitecture(workspaceId: string): Promise<SiteAr
   }
 
   // 3. Strategy page assignments (keyword map)
-  if (ws.keywordStrategy?.pageMap) {
-    for (const pm of ws.keywordStrategy.pageMap) {
+  const kwPages = listPageKeywords(ws.id);
+  if (kwPages.length > 0) {
+    for (const pm of kwPages) {
       const pagePath = pm.pagePath.startsWith('/') ? pm.pagePath : `/${pm.pagePath}`;
       if (pagePath === '/') continue;
       // Only add if not already in tree as existing/planned

@@ -12,7 +12,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, buildSchemaContext, findPageMapEntry, resolvePagePath } from '../helpers.js';
+import { applySuppressionsToAudit, buildSchemaContext, resolvePagePath } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import {
   createJob,
@@ -52,9 +52,8 @@ import {
   getClientPortalUrl,
   updatePageState,
   getBrandName,
-  updateWorkspace,
-  type KeywordStrategy,
 } from '../workspaces.js';
+import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPageKeywords, countAnalyzedPages } from '../page-keywords.js';
 // SEMRush imports removed — bulk analysis skips SEMRush to conserve API credits.
 // Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
 import { buildKeywordMapContext } from '../seo-context.js';
@@ -664,29 +663,14 @@ router.post('/api/jobs', async (req, res) => {
             let toAnalyze: PageItem[];
             if (forceRefresh) {
               toAnalyze = pages;
-              // Clear stale analysis fields from ALL existing pageMap entries.
+              // Clear stale analysis fields from ALL page_keywords rows.
               // Keeps keyword assignments (primaryKeyword, secondaryKeywords, searchIntent, etc.)
               // but resets analysis results so removed pages don't retain stale scores.
-              const freshWs = getWorkspace(paWsId);
-              if (freshWs?.keywordStrategy?.pageMap) {
-                const analysisFields = [
-                  'optimizationScore', 'analysisGeneratedAt', 'optimizationIssues',
-                  'recommendations', 'contentGaps', 'primaryKeywordPresence',
-                  'longTailKeywords', 'competitorKeywords', 'estimatedDifficulty',
-                  'keywordDifficulty', 'monthlyVolume', 'topicCluster', 'searchIntentConfidence',
-                ] as const;
-                for (const entry of freshWs.keywordStrategy.pageMap) {
-                  for (const field of analysisFields) {
-                    delete (entry as unknown as Record<string, unknown>)[field];
-                  }
-                }
-                updateWorkspace(paWsId, { keywordStrategy: freshWs.keywordStrategy });
-                log.info({ cleared: freshWs.keywordStrategy.pageMap.length }, 'Page analysis: cleared stale analysis fields for re-analyze');
-              }
+              const cleared = clearAnalysisFields(paWsId);
+              log.info({ cleared }, 'Page analysis: cleared stale analysis fields for re-analyze');
             } else {
-              const existingMap = paWs?.keywordStrategy?.pageMap || [];
               toAnalyze = pages.filter(p => {
-                const existing = findPageMapEntry(existingMap, p.path);
+                const existing = getPageKeyword(paWsId, p.path);
                 return !existing?.optimizationScore || existing.optimizationScore <= 0;
               });
             }
@@ -813,63 +797,43 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                 }
               }));
 
-              // Persist ALL batch results in a single atomic write (no race condition)
+              // Persist ALL batch results via page_keywords table (single transaction)
               if (batchResults.length > 0) {
-                const ws = getWorkspace(paWsId);
-                if (!ws) { log.error({ paWsId }, 'Page analysis: workspace not found during persistence!'); }
-                if (ws) {
-                  const strategy: KeywordStrategy = ws.keywordStrategy || { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: new Date().toISOString() };
-                  const pageMap = strategy.pageMap || [];
-                  const pageMapBefore = pageMap.length;
-                  const now = new Date().toISOString();
-
-                  for (const { page, analysis } of batchResults) {
-                    const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
-                    const entry = findPageMapEntry(pageMap, normalized);
-                    if (entry) {
-                      if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword as string;
-                      if ((analysis.secondaryKeywords as string[])?.length) entry.secondaryKeywords = analysis.secondaryKeywords as string[];
-                      if (analysis.searchIntent) entry.searchIntent = analysis.searchIntent as string;
-                      entry.optimizationIssues = (analysis.optimizationIssues as string[]) || [];
-                      entry.recommendations = (analysis.recommendations as string[]) || [];
-                      entry.contentGaps = (analysis.contentGaps as string[]) || [];
-                      entry.optimizationScore = analysis.optimizationScore as number;
-                      entry.analysisGeneratedAt = now;
-                      if (analysis.primaryKeywordPresence) entry.primaryKeywordPresence = analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
-                      if (analysis.longTailKeywords) entry.longTailKeywords = analysis.longTailKeywords as string[];
-                      if (analysis.competitorKeywords) entry.competitorKeywords = analysis.competitorKeywords as string[];
-                      if (analysis.estimatedDifficulty) entry.estimatedDifficulty = analysis.estimatedDifficulty as string;
-                      if (analysis.keywordDifficulty !== undefined) entry.keywordDifficulty = analysis.keywordDifficulty as number;
-                      if (analysis.monthlyVolume !== undefined) entry.monthlyVolume = analysis.monthlyVolume as number;
-                      if (analysis.topicCluster) entry.topicCluster = analysis.topicCluster as string;
-                      if (analysis.searchIntentConfidence !== undefined) entry.searchIntentConfidence = analysis.searchIntentConfidence as number;
-                    } else {
-                      pageMap.push({
-                        pagePath: normalized,
-                        pageTitle: page.title,
-                        primaryKeyword: (analysis.primaryKeyword as string) || '',
-                        secondaryKeywords: (analysis.secondaryKeywords as string[]) || [],
-                        searchIntent: analysis.searchIntent as string,
-                        optimizationIssues: (analysis.optimizationIssues as string[]) || [],
-                        recommendations: (analysis.recommendations as string[]) || [],
-                        contentGaps: (analysis.contentGaps as string[]) || [],
-                        optimizationScore: analysis.optimizationScore as number,
-                        analysisGeneratedAt: now,
-                        primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean },
-                        longTailKeywords: (analysis.longTailKeywords as string[]) || [],
-                        competitorKeywords: (analysis.competitorKeywords as string[]) || [],
-                        estimatedDifficulty: analysis.estimatedDifficulty as string,
-                        keywordDifficulty: analysis.keywordDifficulty as number,
-                        monthlyVolume: analysis.monthlyVolume as number,
-                        topicCluster: analysis.topicCluster as string,
-                        searchIntentConfidence: analysis.searchIntentConfidence as number,
-                      });
-                    }
-                  }
-                  strategy.pageMap = pageMap;
-                  log.info({ pageMapBefore, pageMapAfter: pageMap.length, withScores: pageMap.filter(p => p.optimizationScore && p.optimizationScore > 0).length }, 'Page analysis: batch persisted');
-                  updateWorkspace(paWsId, { keywordStrategy: strategy });
-                }
+                const now = new Date().toISOString();
+                const entries = batchResults.map(({ page, analysis }) => {
+                  const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
+                  // Merge with existing entry if present (preserves keyword assignments)
+                  const existing = getPageKeyword(paWsId, normalized);
+                  return {
+                    pagePath: normalized,
+                    pageTitle: page.title,
+                    primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
+                    secondaryKeywords: (analysis.secondaryKeywords as string[])?.length ? (analysis.secondaryKeywords as string[]) : existing?.secondaryKeywords || [],
+                    searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+                    optimizationIssues: (analysis.optimizationIssues as string[]) || [],
+                    recommendations: (analysis.recommendations as string[]) || [],
+                    contentGaps: (analysis.contentGaps as string[]) || [],
+                    optimizationScore: analysis.optimizationScore as number,
+                    analysisGeneratedAt: now,
+                    primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean },
+                    longTailKeywords: (analysis.longTailKeywords as string[]) || [],
+                    competitorKeywords: (analysis.competitorKeywords as string[]) || [],
+                    estimatedDifficulty: analysis.estimatedDifficulty as string,
+                    keywordDifficulty: analysis.keywordDifficulty as number,
+                    monthlyVolume: analysis.monthlyVolume as number,
+                    topicCluster: analysis.topicCluster as string,
+                    searchIntentConfidence: analysis.searchIntentConfidence as number,
+                    // Preserve enrichment fields from existing entry
+                    ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
+                    ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
+                    ...(existing?.clicks != null ? { clicks: existing.clicks } : {}),
+                    ...(existing?.gscKeywords ? { gscKeywords: existing.gscKeywords } : {}),
+                    ...(existing?.volume != null ? { volume: existing.volume } : {}),
+                    ...(existing?.difficulty != null ? { difficulty: existing.difficulty } : {}),
+                  };
+                });
+                upsertPageKeywordsBatch(paWsId, entries);
+                log.info({ batchSize: entries.length, totalPages: countPageKeywords(paWsId), withScores: countAnalyzedPages(paWsId) }, 'Page analysis: batch persisted');
               }
 
               done += batch.length;

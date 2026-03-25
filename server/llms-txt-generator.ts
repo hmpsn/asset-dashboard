@@ -13,6 +13,7 @@
  */
 import { listPages, filterPublishedPages, getSiteSubdomain, discoverCmsUrls, buildStaticPathSet } from './webflow-pages.js';
 import { getWorkspace } from './workspaces.js';
+import { listPageKeywords } from './page-keywords.js';
 import { listMatrices } from './content-matrices.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
@@ -105,8 +106,9 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
 
   // Enrich with keyword strategy data
   const keywordMap = new Map<string, { keyword: string; intent?: string }>();
-  if (ws.keywordStrategy?.pageMap) {
-    for (const pm of ws.keywordStrategy.pageMap) {
+  const kwPages = listPageKeywords(ws.id);
+  if (kwPages.length > 0) {
+    for (const pm of kwPages) {
       const path = pm.pagePath.startsWith('/') ? pm.pagePath : `/${pm.pagePath}`;
       keywordMap.set(path.toLowerCase(), {
         keyword: pm.primaryKeyword || '',

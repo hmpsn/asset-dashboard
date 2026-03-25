@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getWorkspace, type KeywordStrategy } from './workspaces';
-import { findPageMapEntry } from './helpers.js';
+import { getPageKeyword, listPageKeywords } from './page-keywords.js';
 import { getUploadRoot } from './data-dir.js';
 
 /**
@@ -73,8 +73,8 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
   }
 
   // Page-specific keywords (if pagePath provided) — these OVERRIDE general context
-  if (pagePath && strategy.pageMap?.length) {
-    const pageKw = findPageMapEntry(strategy.pageMap, pagePath);
+  if (pagePath) {
+    const pageKw = getPageKeyword(workspaceId, pagePath);
     if (pageKw) {
       keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
       keywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
@@ -231,11 +231,8 @@ export function buildPersonasContext(workspaceId?: string): string {
  */
 export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string): string {
   if (!workspaceId || !pagePath) return '';
-  const ws = getWorkspace(workspaceId);
-  const pageMap = ws?.keywordStrategy?.pageMap;
-  if (!pageMap?.length) return '';
 
-  const entry = findPageMapEntry(pageMap, pagePath);
+  const entry = getPageKeyword(workspaceId, pagePath);
   if (!entry) return '';
 
   const parts: string[] = [];
@@ -285,9 +282,8 @@ export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string
  */
 export function buildKeywordMapContext(workspaceId?: string): string {
   if (!workspaceId) return '';
-  const ws = getWorkspace(workspaceId);
-  const pageMap = ws?.keywordStrategy?.pageMap;
-  if (!pageMap?.length) return '';
+  const pageMap = listPageKeywords(workspaceId);
+  if (!pageMap.length) return '';
 
   const mapStr = pageMap.map(
     p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}`

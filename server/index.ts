@@ -30,6 +30,10 @@ initSentry();
 // Run pending SQLite migrations before anything touches the database
 runMigrations();
 
+// Migrate pageMap data from workspace JSON blobs into the page_keywords table (idempotent)
+import { migrateFromJsonBlob } from './page-keywords.js';
+migrateFromJsonBlob();
+
 // Create and configure the Express app (middleware + routes)
 const app = createApp();
 

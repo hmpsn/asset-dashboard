@@ -5,8 +5,8 @@ import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
-import { getWorkspace, updateWorkspace, type KeywordStrategy } from '../workspaces.js';
-import { findPageMapEntry } from '../helpers.js';
+import { getWorkspace } from '../workspaces.js';
+import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-keywords');
@@ -141,59 +141,38 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
     const ws = getWorkspace(workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-    const strategy: KeywordStrategy = ws.keywordStrategy || { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: new Date().toISOString() };
-    const pageMap = strategy.pageMap || [];
-
-    // Find or create the page entry
     const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
-    const entry = findPageMapEntry(pageMap, normalized);
-
     const now = new Date().toISOString();
-    if (entry) {
-      // Update existing entry with analysis data
-      if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword;
-      if (analysis.secondaryKeywords?.length) entry.secondaryKeywords = analysis.secondaryKeywords;
-      if (analysis.searchIntent) entry.searchIntent = analysis.searchIntent;
-      entry.optimizationIssues = analysis.optimizationIssues || [];
-      entry.recommendations = analysis.recommendations || [];
-      entry.contentGaps = analysis.contentGaps || [];
-      entry.optimizationScore = analysis.optimizationScore;
-      entry.analysisGeneratedAt = now;
-      // Extended analysis fields
-      if (analysis.primaryKeywordPresence) entry.primaryKeywordPresence = analysis.primaryKeywordPresence;
-      if (analysis.longTailKeywords) entry.longTailKeywords = analysis.longTailKeywords;
-      if (analysis.competitorKeywords) entry.competitorKeywords = analysis.competitorKeywords;
-      if (analysis.estimatedDifficulty) entry.estimatedDifficulty = analysis.estimatedDifficulty;
-      if (analysis.keywordDifficulty !== undefined) entry.keywordDifficulty = analysis.keywordDifficulty;
-      if (analysis.monthlyVolume !== undefined) entry.monthlyVolume = analysis.monthlyVolume;
-      if (analysis.topicCluster) entry.topicCluster = analysis.topicCluster;
-      if (analysis.searchIntentConfidence !== undefined) entry.searchIntentConfidence = analysis.searchIntentConfidence;
-    } else {
-      // Create new entry
-      pageMap.push({
-        pagePath: normalized,
-        pageTitle: '', // will be filled by caller if known
-        primaryKeyword: analysis.primaryKeyword || '',
-        secondaryKeywords: analysis.secondaryKeywords || [],
-        searchIntent: analysis.searchIntent,
-        optimizationIssues: analysis.optimizationIssues || [],
-        recommendations: analysis.recommendations || [],
-        contentGaps: analysis.contentGaps || [],
-        optimizationScore: analysis.optimizationScore,
-        analysisGeneratedAt: now,
-        primaryKeywordPresence: analysis.primaryKeywordPresence,
-        longTailKeywords: analysis.longTailKeywords || [],
-        competitorKeywords: analysis.competitorKeywords || [],
-        estimatedDifficulty: analysis.estimatedDifficulty,
-        keywordDifficulty: analysis.keywordDifficulty,
-        monthlyVolume: analysis.monthlyVolume,
-        topicCluster: analysis.topicCluster,
-        searchIntentConfidence: analysis.searchIntentConfidence,
-      });
-    }
 
-    strategy.pageMap = pageMap;
-    updateWorkspace(workspaceId, { keywordStrategy: strategy });
+    // Merge with existing entry (preserves GSC/SEMRush enrichment and keyword assignments)
+    const existing = getPageKeyword(workspaceId, normalized);
+    upsertPageKeyword(workspaceId, {
+      pagePath: normalized,
+      pageTitle: existing?.pageTitle || '',
+      primaryKeyword: analysis.primaryKeyword || existing?.primaryKeyword || '',
+      secondaryKeywords: analysis.secondaryKeywords?.length ? analysis.secondaryKeywords : existing?.secondaryKeywords || [],
+      searchIntent: analysis.searchIntent || existing?.searchIntent,
+      optimizationIssues: analysis.optimizationIssues || [],
+      recommendations: analysis.recommendations || [],
+      contentGaps: analysis.contentGaps || [],
+      optimizationScore: analysis.optimizationScore,
+      analysisGeneratedAt: now,
+      primaryKeywordPresence: analysis.primaryKeywordPresence,
+      longTailKeywords: analysis.longTailKeywords || [],
+      competitorKeywords: analysis.competitorKeywords || [],
+      estimatedDifficulty: analysis.estimatedDifficulty,
+      keywordDifficulty: analysis.keywordDifficulty,
+      monthlyVolume: analysis.monthlyVolume,
+      topicCluster: analysis.topicCluster,
+      searchIntentConfidence: analysis.searchIntentConfidence,
+      // Preserve enrichment fields from existing entry
+      ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
+      ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
+      ...(existing?.clicks != null ? { clicks: existing.clicks } : {}),
+      ...(existing?.gscKeywords ? { gscKeywords: existing.gscKeywords } : {}),
+      ...(existing?.volume != null ? { volume: existing.volume } : {}),
+      ...(existing?.difficulty != null ? { difficulty: existing.difficulty } : {}),
+    });
     log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
     res.json({ success: true, pagePath: normalized, hasAnalysis: true });
   } catch (err) {
