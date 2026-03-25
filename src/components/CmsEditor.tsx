@@ -243,9 +243,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         workspaceId,
       });
       if (data.variations && data.variations.length > 1) {
-        updateField(itemId, fieldSlug, data.variations[0]);
+        // Show variation picker without overwriting current value
         setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations! } }));
       } else if (data.text) {
+        // Single result (no picker) — apply directly
         updateField(itemId, fieldSlug, data.text);
       }
     } catch (err) { console.error('CmsEditor operation failed:', err); } finally {

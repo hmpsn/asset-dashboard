@@ -288,18 +288,16 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
 
       if (field === 'both' && data.pairs && data.pairs.length > 0) {
-        // Paired mode — auto-select first pair and show variation picker
-        updateField(pageId, 'seoTitle', data.pairs[0].title);
-        updateField(pageId, 'seoDescription', data.pairs[0].description);
+        // Paired mode — show variation picker without overwriting current values
         setVariations(prev => ({
           ...prev,
           [pageId]: { field: 'both', options: data.pairs!.map(p => p.title), descOptions: data.pairs!.map(p => p.description) },
         }));
       } else if (data.variations && data.variations.length > 1) {
-        const key = field === 'title' ? 'seoTitle' : 'seoDescription';
-        updateField(pageId, key, data.variations[0]);
+        // Show variation picker without overwriting current values
         setVariations(prev => ({ ...prev, [pageId]: { field, options: data.variations! } }));
       } else if (data.text) {
+        // Single result (no picker) — apply directly
         const key = field === 'title' ? 'seoTitle' : 'seoDescription';
         updateField(pageId, key, data.text);
       }
