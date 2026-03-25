@@ -50,7 +50,6 @@ const LinksPanel = lazy(() => import('./components/LinksPanel').then(m => ({ def
 const RankTracker = lazy(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazy(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
 const ContentCalendar = lazy(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
-const BrandHub = lazy(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
 const ContentSubscriptions = lazy(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 const ContentPipeline = lazy(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const RevenueDashboard = lazy(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
@@ -327,8 +326,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
-    if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
+        if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
     if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} gscPropertyUrl={selected.gscPropertyUrl} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;

@@ -6,7 +6,7 @@ import { NotificationBell } from '../NotificationBell';
 import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
-  Sun, Moon, LayoutDashboard, ChevronRight, Sparkles, Activity, Shield,
+  Sun, Moon, LayoutDashboard, ChevronRight, Activity, Shield,
   Zap, BookOpen, CalendarDays, DollarSign,
 } from 'lucide-react';
 
@@ -72,8 +72,7 @@ function buildNavGroups(hasContentItems: boolean): NavGroup[] {
     { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400',
       activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
-      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: false, desc: 'Brand voice, knowledge base, and audience personas' },
-      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
+            { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
       { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
