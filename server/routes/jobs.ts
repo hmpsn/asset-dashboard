@@ -661,11 +661,13 @@ router.post('/api/jobs', async (req, res) => {
 
             // 2. Skip already-analyzed pages (unless forceRefresh)
             const forceRefresh = !!params.forceRefresh;
+            log.info({ forceRefresh, totalPages: pages.length }, 'Page analysis: filtering pages');
             let toAnalyze: PageItem[];
             if (forceRefresh) {
               toAnalyze = pages;
             } else {
               const existingMap = paWs?.keywordStrategy?.pageMap || [];
+              log.info({ existingMapSize: existingMap.length, withScore: existingMap.filter(e => e.optimizationScore && e.optimizationScore > 0).length }, 'Page analysis: existing pageMap stats');
               toAnalyze = pages.filter(p => {
                 const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
                 const existing = existingMap.find(e =>
@@ -676,6 +678,7 @@ router.post('/api/jobs', async (req, res) => {
             }
 
             const total = toAnalyze.length;
+            log.info({ total, skipped: pages.length - total }, 'Page analysis: pages to analyze');
             updateJob(paJob.id, { message: forceRefresh ? `Re-analyzing all ${total} pages...` : `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
 
             if (total === 0) {
@@ -692,8 +695,10 @@ router.post('/api/jobs', async (req, res) => {
               return;
             }
 
+            log.info('Page analysis: building SEO context...');
             const { fullContext } = buildSeoContext(paWsId);
             const kwMapCtx = buildKeywordMapContext(paWsId);
+            log.info({ fullContextLen: fullContext.length, kwMapCtxLen: kwMapCtx.length }, 'Page analysis: SEO context built');
 
             const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
 
@@ -701,9 +706,11 @@ router.post('/api/jobs', async (req, res) => {
             let webflowSubdomain: string | null = null;
             try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch { /* skip */ }
 
+            log.info({ webflowSubdomain }, 'Page analysis: starting batch loop');
             for (let i = 0; i < toAnalyze.length; i += BATCH) {
               if (isJobCancelled(paJob.id)) break;
               const batch = toAnalyze.slice(i, i + BATCH);
+              log.info({ batchNum: Math.floor(i / BATCH) + 1, batchSize: batch.length, pages: batch.map(p => p.path) }, 'Page analysis: processing batch');
 
               // Collect results from parallel batch — persist AFTER Promise.all to avoid race condition
               const batchResults: Array<{ page: typeof batch[0]; analysis: Record<string, unknown> }> = [];
@@ -867,6 +874,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             }
             addActivity(paWsId, 'page_analysis', `Bulk page analysis completed — ${done} pages`, `${pages.length} total pages, ${total} analyzed`);
           } catch (err) {
+            log.error({ err, jobId: paJob.id }, 'Page analysis job failed');
             if (!isJobCancelled(paJob.id)) {
               updateJob(paJob.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Page analysis failed' });
             }
