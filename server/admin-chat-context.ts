@@ -31,8 +31,6 @@ import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers
 import {
   buildSeoContext,
   buildKeywordMapContext,
-  buildKnowledgeBase,
-  buildPersonasContext,
   RICH_BLOCKS_PROMPT,
 } from './seo-context.js';
 import { scrapeUrl } from './web-scraper.js';
@@ -170,10 +168,8 @@ export async function assembleAdminContext(
   let pageContext: AssembledContext['pageContext'] | undefined;
 
   // ── Always include: strategy, brand voice, knowledge base, personas ──
-  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx } = buildSeoContext(workspaceId);
+  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx, personasBlock: personasContext, knowledgeBlock: knowledgeBase } = buildSeoContext(workspaceId);
   const kwMapContext = buildKeywordMapContext(workspaceId);
-  const personasContext = buildPersonasContext(workspaceId);
-  const knowledgeBase = buildKnowledgeBase(workspaceId);
 
   if (keywordBlock || kwMapContext || bizCtx) {
     const stratParts = [keywordBlock, kwMapContext, bizCtx ? `\nBusiness: ${bizCtx}` : '', brandVoiceBlock].filter(Boolean);

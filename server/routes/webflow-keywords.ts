@@ -20,7 +20,7 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const { keywordBlock, brandVoiceBlock: bvBlock2 } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
+  const { fullContext } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
   // Fetch real SEMRush data for accuracy
@@ -58,7 +58,7 @@ SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
 URL slug: /${slug || ''}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${keywordBlock}${bvBlock2}${kwMapContext}${semrushBlock}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapContext}${semrushBlock}
 
 Provide your analysis as a JSON object with exactly these fields:
 {

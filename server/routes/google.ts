@@ -134,12 +134,12 @@ router.post('/api/google/search-chat/:siteId', async (req, res) => {
 
   // Look up workspace for keyword strategy context
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === req.params.siteId)?.id;
-  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx } = buildSeoContext(wsId);
+  const { fullContext, businessContext: bizCtx } = buildSeoContext(wsId);
   const kwMapContext = buildKeywordMapContext(wsId);
 
   try {
-    const strategySection = (keywordBlock || kwMapContext || bizCtx)
-      ? `\n\nKEYWORD STRATEGY CONTEXT (use this to give strategic, keyword-aware answers):${keywordBlock}${kwMapContext}${bizCtx ? `\nBusiness: ${bizCtx}` : ''}${brandVoiceBlock}`
+    const strategySection = (fullContext || kwMapContext || bizCtx)
+      ? `\n\nKEYWORD STRATEGY CONTEXT (use this to give strategic, keyword-aware answers):${fullContext}${kwMapContext}${bizCtx ? `\nBusiness: ${bizCtx}` : ''}`
       : '';
 
     const systemPrompt = `You are an expert SEO analyst embedded in a search analytics dashboard. The user is a website owner or client asking about their Google Search Console data.

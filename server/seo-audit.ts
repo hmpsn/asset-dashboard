@@ -556,9 +556,9 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           const cachedHtml = htmlCache.get(pageResult.pageId);
           const pageContent = cachedHtml ? extractBodyText(cachedHtml) : '';
 
-          // Build keyword strategy + brand voice context for this page
+          // Build keyword strategy + brand voice + KB + personas context for this page
           const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
-          const { keywordBlock, brandVoiceBlock } = buildSeoContext(wsId, pagePath);
+          const { fullContext } = buildSeoContext(wsId, pagePath);
 
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
 
@@ -567,7 +567,7 @@ URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
-${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${keywordBlock}${brandVoiceBlock}
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}

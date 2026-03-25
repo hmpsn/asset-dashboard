@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { callOpenAI } from '../openai-helpers.js';
-import { buildSeoContext, buildKnowledgeBase } from '../seo-context.js';
+import { buildSeoContext } from '../seo-context.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   addMessage,
@@ -121,10 +121,10 @@ router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceI
       addMessage(ws.id, sessionId, 'admin', 'user', question);
     }
 
-    // Build SEO context
+    // Build SEO context (includes KB + personas)
     const slug = pageUrl ? new URL(pageUrl).pathname.replace(/^\//, '') : '';
     const seoCtx = buildSeoContext(workspaceId, slug);
-    const knowledgeBase = buildKnowledgeBase(workspaceId);
+    const knowledgeBase = seoCtx.knowledgeBlock;
 
     // Build rewriting playbook block
     let playbookBlock = '';
@@ -171,7 +171,7 @@ Answer Engine Optimization (AEO) principles:
 - Include citations and data points
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
-${seoCtx.keywordBlock}${seoCtx.brandVoiceBlock}${knowledgeBase}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
+${seoCtx.keywordBlock}${seoCtx.brandVoiceBlock}${seoCtx.personasBlock}${knowledgeBase}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },

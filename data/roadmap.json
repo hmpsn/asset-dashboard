@@ -3112,6 +3112,15 @@
           "status": "done"
         },
         {
+          "id": 341,
+          "title": "Unified AI Context Architecture — buildSeoContext() as single source of truth",
+          "source": "USER REQUEST",
+          "est": "1.5h",
+          "priority": "P0",
+          "notes": "Shipped — Expanded buildSeoContext() to return personasBlock, knowledgeBlock, and fullContext convenience string. Eliminated all separate buildPersonasContext/buildKnowledgeBase imports across 13 call sites. Wired 5 previously-missing features: seo-audit auto-fix, GSC chat, keyword analysis, content decay, content post AI review. Feature #162.",
+          "status": "done"
+        },
+        {
           "id": 336,
           "title": "React Query Migration - Complete Simple Components",
           "source": "REACT_QUERY_MIGRATION",

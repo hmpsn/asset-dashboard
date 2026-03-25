@@ -1,5 +1,5 @@
 import db from './db/index.js';
-import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, buildPersonasContext } from './seo-context.js';
+import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
@@ -395,8 +395,7 @@ export async function regenerateBrief(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId);
-  const knowledgeBlock = buildKnowledgeBase(workspaceId);
+  const { keywordBlock, brandVoiceBlock, knowledgeBlock } = buildSeoContext(workspaceId);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
@@ -583,10 +582,8 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx } = buildSeoContext(workspaceId);
+  const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx, knowledgeBlock, personasBlock } = buildSeoContext(workspaceId);
   const kwMapContext = buildKeywordMapContext(workspaceId);
-  const knowledgeBlock = buildKnowledgeBase(workspaceId);
-  const personasBlock = buildPersonasContext(workspaceId);
   const bizCtx = context.businessContext || stratBizCtx;
 
   // Reference URL context (competitor/inspiration pages)

@@ -34,6 +34,7 @@ import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { buildSeoContext } from '../seo-context.js';
 
 const log = createLogger('content-posts');
 
@@ -224,6 +225,9 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
 
   const ws = getWorkspace(req.params.workspaceId);
 
+  // Build full business context for brand voice checking
+  const { fullContext } = buildSeoContext(req.params.workspaceId);
+
   // Build a text summary of the post content for AI analysis
   const allContent = [
     post.introduction || '',
@@ -235,6 +239,7 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
   const contentSnippet = allContent.slice(0, 8000);
 
   const prompt = `You are a content quality reviewer. Analyze this blog post and evaluate each checklist item.
+${fullContext}
 Return a JSON object with these keys, each with a boolean "pass" and a brief "reason" string:
 
 1. "factual_accuracy" — Does the content appear factually accurate? Flag any suspicious claims, made-up statistics, or unverifiable statements.

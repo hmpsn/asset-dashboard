@@ -40,7 +40,7 @@ import {
   getSearchTypeBreakdown,
   getSearchPeriodComparison,
 } from '../search-console.js';
-import { buildSeoContext, buildKeywordMapContext, buildKnowledgeBase, RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
@@ -192,7 +192,7 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
 
     // Pre-compute SEO context blocks for the system prompt
     const seoCtx = buildSeoContext(ws.id);
-    const seoContextBlock = seoCtx.keywordBlock + seoCtx.brandVoiceBlock + buildKeywordMapContext(ws.id) + buildKnowledgeBase(ws.id);
+    const seoContextBlock = seoCtx.fullContext + buildKeywordMapContext(ws.id);
 
     // Content plan context (templates + matrices) — fetched server-side
     let contentPlanSection = '';

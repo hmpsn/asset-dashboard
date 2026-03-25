@@ -10,6 +10,7 @@ import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
+import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
 import {
   listWorkspaces,
@@ -59,14 +60,34 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  // Build shared keyword strategy + brand voice context
-  const { keywordBlock: keywordContext, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
+  // Build full context: keyword strategy + brand voice + personas + knowledge base
+  const { keywordBlock: keywordContext, brandVoiceBlock, personasBlock, knowledgeBlock } = buildSeoContext(workspaceId, pagePath);
 
   // Resolve explicit brand name so the AI doesn't guess from the domain
   let brandName = '';
   if (workspaceId) {
     const wsForBrand = getWorkspace(workspaceId);
     brandName = getBrandName(wsForBrand);
+  }
+
+  // Fetch GSC search queries for this specific page (best-effort)
+  let gscBlock = '';
+  if (workspaceId && pagePath) {
+    try {
+      const ws = getWorkspace(workspaceId);
+      if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
+        const queryPageData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
+        // Match queries to this page by slug
+        const slug = pagePath.replace(/^\//, '');
+        const pageQueries = queryPageData
+          .filter(r => r.page.includes(slug) || (slug === '' && r.page.endsWith('/')))
+          .sort((a, b) => b.impressions - a.impressions)
+          .slice(0, 15);
+        if (pageQueries.length > 0) {
+          gscBlock = `\n\nREAL SEARCH QUERIES people use to find this page (from Google Search Console — use these exact phrases for relevance):\n${pageQueries.map(q => `- "${q.query}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position}, CTR ${q.ctr}%)`).join('\n')}`;
+        }
+      }
+    } catch { /* non-critical — continue without GSC data */ }
   }
 
   // Build audit context for this page (if available)
@@ -94,8 +115,9 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
     } catch { /* non-critical */ }
   }
 
-  // Fetch page content server-side if not provided
+  // Fetch page content server-side if not provided — extract headings + body text
   let resolvedPageContent = pageContent || '';
+  let headingsBlock = '';
   if (!resolvedPageContent && pagePath && workspaceId) {
     try {
       const ws = getWorkspace(workspaceId);
@@ -114,6 +136,19 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
           const html = await htmlRes.text();
           const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
           const body = bodyMatch ? bodyMatch[1] : html;
+
+          // Extract heading structure for better understanding
+          const headings: string[] = [];
+          const headingRegex = /<h([1-3])[^>]*>([\s\S]*?)<\/h\1>/gi;
+          let match;
+          while ((match = headingRegex.exec(body)) !== null && headings.length < 10) {
+            const text = match[2].replace(/<[^>]+>/g, '').trim();
+            if (text) headings.push(`H${match[1]}: ${text}`);
+          }
+          if (headings.length > 0) {
+            headingsBlock = `\nPage heading structure:\n${headings.join('\n')}`;
+          }
+
           resolvedPageContent = body
             .replace(/<script[\s\S]*?<\/script>/gi, '')
             .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -132,13 +167,11 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   const enforceLimit = (text: string, maxLen: number): string => {
     const t = text.replace(/^["']|["']$/g, '').trim();
     if (t.length > maxLen) {
-      // First try to end at a space, but don't go too far back
       const truncated = t.slice(0, maxLen);
       const lastSpace = truncated.lastIndexOf(' ');
       const lastPeriod = truncated.lastIndexOf('.');
       const lastExclamation = truncated.lastIndexOf('!');
       
-      // Prefer ending at punctuation if it's close enough, otherwise space
       let cutPoint = maxLen;
       if (lastSpace > maxLen * 0.7) cutPoint = lastSpace;
       else if (lastPeriod > maxLen * 0.7) cutPoint = lastPeriod + 1;
@@ -151,64 +184,81 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
 
   try {
     const maxLen = field === 'description' ? 160 : 60;
+
+    // Assemble all context blocks
+    const contextBlocks = [
+      keywordContext,
+      brandVoiceBlock,
+      personasBlock,
+      knowledgeBlock,
+      gscBlock,
+      auditBlock,
+    ].filter(Boolean).join('');
+
     let prompt: string;
     if (field === 'description') {
-      prompt = `You are an expert SEO copywriter. Write 3 different compelling meta descriptions for this web page. Each should take a different angle.
+      prompt = `You are an elite SEO copywriter who writes meta descriptions that dramatically outperform competitors in click-through rate. Write 3 compelling, differentiated meta descriptions for this page.
 
-Page title: ${pageTitle}
-Current meta description: ${currentDescription || '(none)'}
-Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
+PAGE CONTEXT:
+- Page title: ${pageTitle}
+- Current meta description: ${currentDescription || '(none)'}
+- Site context: ${siteContext || 'N/A'}
+${headingsBlock}
+- Page content: ${resolvedPageContent || 'N/A'}
+${contextBlocks}
 
-Requirements for EACH variation:
-- STRICTLY 150-160 characters (HARD LIMIT: 160 - NO EXCEPTIONS)
-- Include a clear call to action or value proposition
-- Natural, not keyword-stuffed
-- Compelling enough to increase click-through rate from search results
-- If keyword strategy is provided, naturally incorporate the primary keyword
-- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context. The page keyword is the authoritative location signal.
-${brandName ? `- The brand name is "${brandName}" — use this exact name if referencing the brand (never use a shortened/abbreviated version)` : ''}
-- Each variation must be meaningfully different, not just a word swap
-- CRITICAL: Count characters carefully - NEVER exceed 160 characters
+CRAFT GUIDELINES:
+- HARD LIMIT: 150-160 characters (NEVER exceed 160)
+- Write like a human expert, not a template — avoid generic phrases like "Learn more", "Find out", "Discover how"
+- Use specific details from the page content and knowledge base — mention real services, outcomes, or differentiators
+- If GSC queries are provided, mirror the language real searchers use
+- If audience personas are provided, write to their specific pain points and goals
+- Address the searcher's intent directly — what problem does this page solve?
+- LOCATION RULE: If the page keyword targets a specific city/region, use THAT location exactly
+${brandName ? `- Brand name: "${brandName}" — use this exact name when referencing the brand` : ''}
+- Each variation must take a genuinely different angle, not just rephrase
 
-Variation approaches:
-1. Benefit-focused: Lead with the key value proposition
-2. Action-focused: Lead with a strong call-to-action
-3. Question/curiosity: Lead with a question or curiosity hook
+VARIATION ANGLES:
+1. Pain-point: Address the specific problem or need the searcher has, then promise the solution
+2. Proof/specificity: Lead with a concrete number, result, or unique differentiator from the business
+3. Direct-address: Speak directly to the target persona using "you/your" language with a clear value proposition
 
-Return ONLY a JSON array of 3 strings, e.g. ["desc1","desc2","desc3"]. No explanation.`;
+Return ONLY a JSON array of 3 strings. No explanation.`;
     } else {
-      prompt = `You are an expert SEO copywriter. Write 3 different optimized SEO title tags for this web page. Each should take a different angle.
+      prompt = `You are an elite SEO copywriter who writes title tags that stand out in search results and earn clicks. Write 3 optimized, differentiated SEO title tags for this page.
 
-Page title: ${pageTitle}
-Current SEO title: ${currentSeoTitle || '(none)'}
-Current meta description: ${currentDescription || '(none)'}
-Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${resolvedPageContent || 'N/A'}${keywordContext}${brandVoiceBlock}${auditBlock}
+PAGE CONTEXT:
+- Page title: ${pageTitle}
+- Current SEO title: ${currentSeoTitle || '(none)'}
+- Current meta description: ${currentDescription || '(none)'}
+- Site context: ${siteContext || 'N/A'}
+${headingsBlock}
+- Page content: ${resolvedPageContent || 'N/A'}
+${contextBlocks}
 
-Requirements for EACH variation:
-- STRICTLY 50-60 characters (HARD LIMIT: 60 - NO EXCEPTIONS)
-- Front-load the most important keywords
-${brandName ? `- Brand name is "${brandName}" — use this exact name (NOT a shortened/abbreviated version) at the end with a pipe separator when appropriate` : '- Include brand name at end if appropriate (use pipe separator: |)'}
-- Compelling and descriptive
-- If keyword strategy is provided, front-load the primary keyword
-- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context. The page keyword is the authoritative location signal.
-- Each variation must be meaningfully different, not just a word swap
-- CRITICAL: Count characters carefully - NEVER exceed 60 characters
+CRAFT GUIDELINES:
+- HARD LIMIT: 50-60 characters (NEVER exceed 60)
+- Front-load the primary keyword from the strategy
+- Use specific, concrete language — avoid vague words like "Best", "Top", "Quality", "Professional" unless justified by context
+- If GSC queries are provided, incorporate the exact language searchers use
+- If audience personas are provided, use terminology that resonates with them
+${brandName ? `- Brand: "${brandName}" — append with pipe separator (|) only if space permits` : ''}
+- LOCATION RULE: If the page keyword targets a specific city/region, use THAT location exactly
+- Each variation must take a genuinely different angle
 
-Variation approaches:
-1. Keyword-forward: Primary keyword first, then context
-2. Benefit-forward: Lead with the value/benefit, keyword second
-3. Page-specific: Emphasize what makes THIS specific page unique based on the content
+VARIATION ANGLES:
+1. Keyword-intent: Primary keyword + the specific outcome or service this page delivers
+2. Differentiator: Lead with what makes this business unique (from knowledge base/brand context)
+3. Searcher-match: Mirror the exact phrasing from top GSC queries or persona language
 
-Return ONLY a JSON array of 3 strings, e.g. ["title1","title2","title3"]. No explanation.`;
+Return ONLY a JSON array of 3 strings. No explanation.`;
     }
 
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
-      maxTokens: 300,
-      temperature: 0.6,
+      maxTokens: 400,
+      temperature: 0.7,
       feature: 'seo-rewrite',
       workspaceId,
     });
@@ -259,7 +309,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
   const results = [];
   for (const page of pages) {
     try {
-      const { keywordBlock, brandVoiceBlock: bvBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
+      const { keywordBlock, brandVoiceBlock: bvBlock, personasBlock: bulkPersonasBlock, knowledgeBlock: bulkKnowledgeBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
 
       // Fetch page content if not provided and we have a base URL
       let contentExcerpt = page.pageContent || '';
@@ -285,10 +335,11 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
-      const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location. Never substitute the business HQ or a different city from the general business context.`;
+      const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
+      const extraContext = [bulkPersonasBlock, bulkKnowledgeBlock].filter(Boolean).join('');
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- STRICTLY 150-160 characters (HARD LIMIT: 160 - NO EXCEPTIONS)\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided${locationRule}\n- CRITICAL: Count characters carefully - NEVER exceed 160 characters\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- STRICTLY 50-60 characters (HARD LIMIT: 60 - NO EXCEPTIONS)\n- Front-load the primary keyword\n- Match the brand voice if provided${locationRule}\n- CRITICAL: Count characters carefully - NEVER exceed 60 characters\nReturn ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
 
       const aiResult = await callOpenAI({
         model: 'gpt-4.1-mini',
@@ -429,7 +480,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   for (let i = 0; i < pages.length; i += CONCURRENCY) {
     const batch = pages.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.allSettled(batch.map(async (page) => {
-      const { keywordBlock, brandVoiceBlock: bvBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
+      const { keywordBlock, brandVoiceBlock: bvBlock, personasBlock: rwPersonasBlock, knowledgeBlock: rwKnowledgeBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
@@ -456,11 +507,12 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
       const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
+      const rwExtraContext = [rwPersonasBlock, rwKnowledgeBlock].filter(Boolean).join('');
 
       const oldValue = field === 'title' ? (page.currentSeoTitle || '') : (page.currentDescription || '');
       const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 150-160 characters, hard limit 160\n- Include primary keyword naturally\n- Include a call-to-action or value proposition\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${brandNote}\n\nRules:\n- 50-60 characters, hard limit 60\n- Front-load the primary keyword\n- Match the brand voice if provided${locationRule}\nReturn ONLY the text.`;
+        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
+        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
 
       const aiResult = await callOpenAI({
         model: 'gpt-4.1-mini',

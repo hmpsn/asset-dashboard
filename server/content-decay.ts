@@ -209,7 +209,7 @@ export async function generateRefreshRecommendation(
   ws: Workspace,
   page: DecayingPage,
 ): Promise<string> {
-  const seoContext = await buildSeoContext(ws.id, page.page);
+  const { fullContext } = buildSeoContext(ws.id, page.page);
 
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.
 
@@ -218,7 +218,7 @@ Click decline: ${page.clickDeclinePct}% (from ${page.previousClicks} to ${page.c
 Impression change: ${page.impressionChangePct}%
 Position change: ${page.positionChange > 0 ? '+' : ''}${page.positionChange} (now ${page.currentPosition})
 
-${seoContext ? `SEO Context:\n${seoContext}\n` : ''}
+${fullContext ? `SEO Context:\n${fullContext}\n` : ''}
 
 Provide a concise, actionable content refresh plan (3-5 bullet points). Focus on:
 1. What's likely causing the decline (algorithm changes, fresher competitors, outdated info)

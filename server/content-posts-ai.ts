@@ -3,7 +3,7 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { buildSeoContext, buildKnowledgeBase, buildKeywordMapContext, buildPersonasContext } from './seo-context.js';
+import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import type { ContentBrief } from './content-brief.js';
@@ -69,11 +69,9 @@ export async function callCreativeAI(opts: {
 }
 
 export function buildVoiceContext(workspaceId: string): string {
-  const { brandVoiceBlock, keywordBlock } = buildSeoContext(workspaceId);
-  const knowledgeBlock = buildKnowledgeBase(workspaceId);
+  const { fullContext } = buildSeoContext(workspaceId);
   const kwMapBlock = buildKeywordMapContext(workspaceId);
-  const personasBlock = buildPersonasContext(workspaceId);
-  return `${brandVoiceBlock}${keywordBlock}${knowledgeBlock}${kwMapBlock}${personasBlock}`;
+  return `${fullContext}${kwMapBlock}`;
 }
 
 // --- Page-type-specific writing instructions ---

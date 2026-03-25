@@ -39,7 +39,7 @@ import {
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
-import { buildKnowledgeBase } from '../seo-context.js';
+import { buildSeoContext } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
@@ -559,9 +559,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (businessContext) {
       businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
     }
-    const knowledgeBlock = buildKnowledgeBase(ws.id);
-    if (knowledgeBlock) {
-      businessSection += knowledgeBlock + '\n';
+    const { knowledgeBlock: kbBlock, personasBlock: persBlock } = buildSeoContext(ws.id);
+    if (kbBlock) {
+      businessSection += kbBlock + '\n';
+    }
+    if (persBlock) {
+      businessSection += persBlock + '\n';
     }
 
     // Inject client-declined keywords so AI avoids them

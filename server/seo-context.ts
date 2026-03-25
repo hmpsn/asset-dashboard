@@ -15,6 +15,12 @@ export interface SeoContext {
   brandVoiceBlock: string;
   /** Business context string (industry, location, services) */
   businessContext: string;
+  /** Audience personas block for AI prompts */
+  personasBlock: string;
+  /** Knowledge base block for AI prompts */
+  knowledgeBlock: string;
+  /** All context blocks joined — drop this into any prompt for full business awareness */
+  fullContext: string;
   /** Full strategy object (for direct access if needed) */
   strategy: KeywordStrategy | undefined;
 }
@@ -25,7 +31,7 @@ export interface SeoContext {
  * @param pagePath - optional page path to find page-specific keywords
  */
 export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoContext {
-  const empty: SeoContext = { keywordBlock: '', brandVoiceBlock: '', businessContext: '', strategy: undefined };
+  const empty: SeoContext = { keywordBlock: '', brandVoiceBlock: '', businessContext: '', personasBlock: '', knowledgeBlock: '', fullContext: '', strategy: undefined };
   if (!workspaceId) return empty;
 
   const ws = getWorkspace(workspaceId);
@@ -44,7 +50,14 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
     brandVoiceBlock = `\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${voiceParts.join('\n\n')}`;
   }
 
-  if (!strategy) return { keywordBlock: '', brandVoiceBlock, businessContext: '', strategy: undefined };
+  // Build personas + knowledge base (always, even without strategy)
+  const personasBlock = buildPersonasContext(workspaceId);
+  const knowledgeBlock = buildKnowledgeBase(workspaceId);
+
+  if (!strategy) {
+    const fullContext = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
+    return { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+  }
 
   let keywordBlock = '';
 
@@ -80,7 +93,8 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
     keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
   }
 
-  return { keywordBlock, brandVoiceBlock, businessContext, strategy };
+  const fullContext = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
+  return { keywordBlock, brandVoiceBlock, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
 }
 
 /**
