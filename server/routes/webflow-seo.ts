@@ -8,6 +8,11 @@ const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
 import { callCreativeAI } from '../content-posts-ai.js';
+import {
+  type SeoSuggestion,
+  saveSuggestion, listSuggestions, selectVariation,
+  getSelectedSuggestions, markApplied, dismissSuggestions, getSuggestionCounts,
+} from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
@@ -86,6 +91,20 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
           .slice(0, 15);
         if (pageQueries.length > 0) {
           gscBlock = `\n\nREAL SEARCH QUERIES people use to find this page (from Google Search Console — use these exact phrases for relevance):\n${pageQueries.map(q => `- "${q.query}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position}, CTR ${q.ctr}%)`).join('\n')}`;
+
+          // CTR performance flag
+          const totalImpr = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
+          const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
+          const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
+          const avgPos = pageQueries.reduce((sum, q) => sum + q.position * q.impressions, 0) / (totalImpr || 1);
+          if (totalImpr >= 50) {
+            const expectedCtr = avgPos <= 3 ? 8 : avgPos <= 5 ? 5 : avgPos <= 10 ? 2.5 : 1;
+            if (avgCtr < expectedCtr * 0.7) {
+              gscBlock += `\n\n⚠️ CTR UNDERPERFORMANCE: This page gets ${totalImpr} impressions/month but only ${avgCtr.toFixed(1)}% CTR (expected ~${expectedCtr}% for position ${avgPos.toFixed(0)}). The current ${field} is failing to convert searchers into clicks — make it significantly more compelling.`;
+            } else if (avgCtr >= expectedCtr * 1.3) {
+              gscBlock += `\n\n✅ CTR OUTPERFORMER: This page has ${avgCtr.toFixed(1)}% CTR (above average for position ${avgPos.toFixed(0)}). Preserve the elements that are working — focus on keyword optimization while keeping the compelling angle.`;
+            }
+          }
         }
       }
     } catch { /* non-critical — continue without GSC data */ }
@@ -342,16 +361,15 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
         ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${page.currentDescription || 'none'}".${contentSection}${keywordBlock}${bvBlock}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
         : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
 
-      const aiResult = await callOpenAI({
-        model: 'gpt-4.1-mini',
-        messages: [{ role: 'user', content: prompt }],
+      const aiText = await callCreativeAI({
+        systemPrompt: 'You are an elite SEO copywriter. Return ONLY the requested text — no quotes, no explanation, no markdown.',
+        userPrompt: prompt,
         maxTokens: 150,
-        temperature: 0.7,
         feature: 'seo-bulk-fix',
-        workspaceId: workspaceId || ws?.id,
+        workspaceId: workspaceId || ws?.id || '',
       });
 
-      let text = aiResult.text.replace(/^["']|["']$/g, '');
+      let text = aiText.replace(/^["']|["']$/g, '');
       const maxLen = field === 'description' ? 160 : 60;
       if (text.length > maxLen) {
         const truncated = text.slice(0, maxLen);
@@ -445,13 +463,12 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFrom
   res.json({ results, field, action });
 });
 
-// --- Bulk AI Rewrite (selected pages, concurrency-limited) ---
+// --- Bulk AI Rewrite (generates 3 variations per page, persists to SQLite) ---
 router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pages, field, workspaceId, dryRun } = req.body as {
+  const { pages, field, workspaceId } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>;
     field: 'title' | 'description';
     workspaceId?: string;
-    dryRun?: boolean; // preview only, don't push to Webflow
   };
   if (!pages?.length || !field) return res.status(400).json({ error: 'pages, field required' });
 
@@ -474,14 +491,51 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   const inlineBrandName = getBrandName(ws);
   const maxLen = field === 'description' ? 160 : 60;
   const CONCURRENCY = 3;
+  const resolvedWsId = workspaceId || ws?.id || '';
 
-  const results: Array<{ pageId: string; oldValue: string; newValue: string; applied: boolean; error?: string }> = [];
+  // Fetch ALL GSC query data once, then match per page by slug (no N+1 API calls)
+  let allGscData: Array<{ query: string; page: string; clicks: number; impressions: number; ctr: number; position: number }> = [];
+  if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
+    try {
+      allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
+    } catch { /* non-critical */ }
+  }
+
+  // Enforce character limits helper
+  const enforceLimit = (text: string, max: number): string => {
+    const t = text.replace(/^["']|["']$/g, '').trim();
+    if (t.length <= max) return t;
+    const truncated = t.slice(0, max);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return lastSpace > max * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+  };
+
+  // Build sibling title map so each page knows what other pages in this batch use
+  // Prevents generating duplicate/similar titles across the site
+  const siblingTitles: Record<string, string[]> = {};
+  for (const p of pages) {
+    const currentTitle = field === 'title'
+      ? (p.currentSeoTitle || p.title || '')
+      : (p.currentDescription || '');
+    if (currentTitle) {
+      for (const other of pages) {
+        if (other.pageId === p.pageId) continue;
+        if (!siblingTitles[other.pageId]) siblingTitles[other.pageId] = [];
+        if (siblingTitles[other.pageId].length < 8) {
+          siblingTitles[other.pageId].push(currentTitle);
+        }
+      }
+    }
+  }
+
+  const suggestions: SeoSuggestion[] = [];
+  const errors: Array<{ pageId: string; error: string }> = [];
 
   // Process in concurrent batches for performance
   for (let i = 0; i < pages.length; i += CONCURRENCY) {
     const batch = pages.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.allSettled(batch.map(async (page) => {
-      const { keywordBlock, brandVoiceBlock: bvBlock, personasBlock: rwPersonasBlock, knowledgeBlock: rwKnowledgeBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
+      const { keywordBlock, brandVoiceBlock: bvBlock, personasBlock: rwPersonasBlock, knowledgeBlock: rwKnowledgeBlock } = buildSeoContext(resolvedWsId, page.slug ? `/${page.slug}` : undefined);
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
@@ -505,59 +559,181 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
         } catch { /* best-effort */ }
       }
 
-      const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
-      const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
-      const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
-      const rwExtraContext = [rwPersonasBlock, rwKnowledgeBlock].filter(Boolean).join('');
+      // Match GSC queries to this page by slug (top 15 by impressions)
+      let gscBlock = '';
+      let ctrFlag = '';
+      if (allGscData.length > 0 && page.slug) {
+        const pageQueries = allGscData
+          .filter(r => r.page.includes(page.slug!) || (page.slug === '' && r.page.endsWith('/')))
+          .sort((a, b) => b.impressions - a.impressions)
+          .slice(0, 15);
+        if (pageQueries.length > 0) {
+          gscBlock = `\n\nREAL SEARCH QUERIES people use to find this page (from Google Search Console — use these exact phrases for relevance):\n${pageQueries.map(q => `- "${q.query}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%)`).join('\n')}`;
 
-      const oldValue = field === 'title' ? (page.currentSeoTitle || '') : (page.currentDescription || '');
-      const prompt = field === 'description'
-        ? `Write a compelling meta description (150-160 chars max) for a page titled "${page.title}". Current description: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 160 characters\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally${locationRule}\nReturn ONLY the text.`
-        : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
-
-      const aiResult = await callOpenAI({
-        model: 'gpt-4.1-mini',
-        messages: [{ role: 'user', content: prompt }],
-        maxTokens: 200,
-        temperature: 0.7,
-        feature: 'seo-bulk-rewrite',
-        workspaceId: workspaceId || ws?.id,
-      });
-
-      let text = aiResult.text.replace(/^["']|["']$/g, '');
-      if (text.length > maxLen) {
-        const truncated = text.slice(0, maxLen);
-        const lastSpace = truncated.lastIndexOf(' ');
-        text = lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated;
-      }
-
-      if (!text) return { pageId: page.pageId, oldValue, newValue: '', applied: false, error: 'Empty AI response' };
-
-      if (!dryRun) {
-        const seoFields = field === 'description'
-          ? { seo: { description: text } }
-          : { seo: { title: text } };
-        await updatePageSeo(page.pageId, seoFields, token);
-        if (ws) {
-          updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-rewrite', fields: [field], updatedBy: 'admin' });
-          recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-rewrite');
+          // CTR performance flag — highlight underperforming pages
+          const totalImpr = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
+          const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
+          const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
+          const avgPos = pageQueries.reduce((sum, q) => sum + q.position * q.impressions, 0) / (totalImpr || 1);
+          if (totalImpr >= 50) {
+            // Expected CTR benchmarks by position (approximate)
+            const expectedCtr = avgPos <= 3 ? 8 : avgPos <= 5 ? 5 : avgPos <= 10 ? 2.5 : 1;
+            if (avgCtr < expectedCtr * 0.7) {
+              ctrFlag = `\n\n⚠️ CTR UNDERPERFORMANCE: This page gets ${totalImpr} impressions/month but only ${avgCtr.toFixed(1)}% CTR (expected ~${expectedCtr}% for position ${avgPos.toFixed(0)}). The current ${field} is failing to convert searchers into clicks — make it significantly more compelling.`;
+            } else if (avgCtr >= expectedCtr * 1.3) {
+              ctrFlag = `\n\n✅ CTR OUTPERFORMER: This page has ${avgCtr.toFixed(1)}% CTR (above average for position ${avgPos.toFixed(0)}). Preserve the elements that are working — focus on keyword optimization while keeping the compelling angle.`;
+            }
+          }
         }
       }
 
-      return { pageId: page.pageId, oldValue, newValue: text, applied: !dryRun };
+      // Sibling titles — so Claude can differentiate from other pages on the same site
+      let siblingBlock = '';
+      const siblings = siblingTitles[page.pageId];
+      if (siblings && siblings.length > 0) {
+        siblingBlock = `\n\nOTHER ${field === 'title' ? 'TITLES' : 'DESCRIPTIONS'} ON THIS SITE (do NOT repeat similar phrasing — differentiate this page):\n${siblings.map(t => `- "${t}"`).join('\n')}`;
+      }
+
+      const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
+      const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
+      const locationRule = `\n- LOCATION RULE: If this page's primary keyword targets a specific city/region, ALWAYS use THAT location.`;
+      const rwExtraContext = [rwPersonasBlock, rwKnowledgeBlock, gscBlock, ctrFlag, siblingBlock].filter(Boolean).join('');
+
+      const oldValue = field === 'title' ? (page.currentSeoTitle || '') : (page.currentDescription || '');
+
+      const prompt = field === 'description'
+        ? `Write 3 compelling, differentiated meta descriptions for a page titled "${page.title}". Current description: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 150-160 characters each (NEVER exceed 160)\n- Use specific details from the knowledge base — mention real services, outcomes, or differentiators\n- If GSC queries are provided, mirror the language real searchers use\n- Write to the target persona's pain points if personas are provided\n- Include primary keyword naturally\n- Each variation must take a genuinely different angle${locationRule}\n\nVariation angles:\n1. Pain-point: Address the specific problem the searcher has, then promise the solution\n2. Proof/specificity: Lead with a concrete result or differentiator from the business\n3. Direct-address: Speak directly to the target persona using "you/your" language\n\nReturn ONLY a JSON array of 3 strings. No explanation.`
+        : `Write 3 optimized, differentiated SEO title tags for a page titled "${page.title}". Current SEO title: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 50-60 characters each (NEVER exceed 60)\n- Front-load the primary keyword\n- If GSC queries are provided, incorporate the exact language searchers use\n- Use specific language from the knowledge base, not generic filler\n- Each variation must take a genuinely different angle${locationRule}\n\nVariation angles:\n1. Keyword-intent: Primary keyword + the specific outcome this page delivers\n2. Differentiator: Lead with what makes this business unique (from knowledge base)\n3. Searcher-match: Mirror the exact phrasing from top GSC queries\n\nReturn ONLY a JSON array of 3 strings. No explanation.`;
+
+      const aiText = await callCreativeAI({
+        systemPrompt: 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 strings. No markdown, no explanation, no code fences.',
+        userPrompt: prompt,
+        maxTokens: 400,
+        feature: 'seo-bulk-rewrite',
+        workspaceId: resolvedWsId,
+      });
+
+      // Parse 3 variations
+      let variations: string[];
+      try {
+        const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+        variations = Array.isArray(parsed)
+          ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
+          : [enforceLimit(String(parsed), maxLen)];
+      } catch {
+        const single = enforceLimit(aiText, maxLen);
+        variations = single ? [single] : [];
+      }
+
+      if (!variations.length) return { suggestion: null as SeoSuggestion | null, pageId: page.pageId, error: 'Empty AI response' };
+
+      // Pad to 3 if AI returned fewer
+      while (variations.length < 3) variations.push(variations[0]);
+
+      // Persist to SQLite
+      const suggestion = saveSuggestion({
+        workspaceId: resolvedWsId,
+        siteId,
+        pageId: page.pageId,
+        pageTitle: page.title,
+        pageSlug: page.slug || '',
+        field,
+        currentValue: oldValue,
+        variations,
+      });
+
+      return { suggestion, pageId: page.pageId, error: '' };
     }));
 
-    for (const r of batchResults) {
+    for (let j = 0; j < batchResults.length; j++) {
+      const r = batchResults[j];
       if (r.status === 'fulfilled') {
-        results.push(r.value);
+        if (r.value.suggestion) suggestions.push(r.value.suggestion);
+        else errors.push({ pageId: r.value.pageId, error: r.value.error });
       } else {
-        results.push({ pageId: batch[results.length % batch.length]?.pageId || '', oldValue: '', newValue: '', applied: false, error: String(r.reason) });
+        errors.push({ pageId: batch[j]?.pageId || '', error: String(r.reason) });
       }
     }
   }
 
-  log.info(`Bulk rewrite: ${results.filter(r => r.applied).length}/${pages.length} ${field}s ${dryRun ? 'previewed' : 'updated'}`);
-  res.json({ results, field, dryRun: !!dryRun });
+  log.info(`Bulk rewrite: ${suggestions.length}/${pages.length} ${field} suggestions generated (${errors.length} errors)`);
+  res.json({ suggestions, errors, field, generated: suggestions.length, total: pages.length });
+});
+
+// --- SEO Suggestions: List pending suggestions ---
+router.get('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
+  const { workspaceId } = req.params;
+  const field = req.query.field as 'title' | 'description' | undefined;
+  const suggestions = listSuggestions(workspaceId, field);
+  const counts = getSuggestionCounts(workspaceId);
+  res.json({ suggestions, counts });
+});
+
+// --- SEO Suggestions: Select a variation ---
+router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', async (req, res) => {
+  const { suggestionId } = req.params;
+  const { selectedIndex } = req.body as { selectedIndex: number };
+  if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
+    return res.status(400).json({ error: 'selectedIndex must be 0, 1, or 2' });
+  }
+  const ok = selectVariation(suggestionId, selectedIndex);
+  if (!ok) return res.status(404).json({ error: 'Suggestion not found or already applied' });
+  res.json({ ok: true });
+});
+
+// --- SEO Suggestions: Apply selected suggestions to Webflow ---
+router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) => {
+  const { workspaceId } = req.params;
+  const { suggestionIds } = req.body as { suggestionIds?: string[] };
+
+  // Get suggestions to apply — either specific IDs or all selected
+  let toApply = getSelectedSuggestions(workspaceId);
+  if (suggestionIds?.length) {
+    const idSet = new Set(suggestionIds);
+    toApply = toApply.filter(s => idSet.has(s.id));
+  }
+
+  if (!toApply.length) return res.status(400).json({ error: 'No suggestions with selected variations to apply' });
+
+  const results: Array<{ pageId: string; field: string; text: string; applied: boolean; error?: string }> = [];
+
+  for (const s of toApply) {
+    try {
+      const text = s.variations[s.selectedIndex!];
+      if (!text) { results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: 'No text at selected index' }); continue; }
+
+      const token = getTokenForSite(s.siteId) || undefined;
+      const seoFields = s.field === 'description'
+        ? { seo: { description: text } }
+        : { seo: { title: text } };
+      await updatePageSeo(s.pageId, seoFields, token);
+
+      const ws = getWorkspace(workspaceId);
+      if (ws) {
+        updatePageState(ws.id, s.pageId, { status: 'live', source: 'bulk-rewrite', fields: [s.field], updatedBy: 'admin' });
+        recordSeoChange(ws.id, s.pageId, s.pageSlug, s.pageTitle, [s.field], 'bulk-rewrite');
+      }
+
+      results.push({ pageId: s.pageId, field: s.field, text, applied: true });
+    } catch (err) {
+      results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: String(err) });
+    }
+  }
+
+  // Mark applied suggestions
+  const appliedIds = results.filter(r => r.applied).map(r => toApply.find(s => s.pageId === r.pageId)?.id).filter(Boolean) as string[];
+  if (appliedIds.length) markApplied(appliedIds);
+
+  log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
+  res.json({ results, applied: appliedIds.length, total: toApply.length });
+});
+
+// --- SEO Suggestions: Dismiss suggestions ---
+router.delete('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
+  const { workspaceId } = req.params;
+  const { suggestionIds } = req.body as { suggestionIds?: string[] } || {};
+  const dismissed = dismissSuggestions(workspaceId, suggestionIds);
+  res.json({ dismissed });
 });
 
 // --- Fetch page HTML body text (for keyword analysis) ---

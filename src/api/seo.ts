@@ -234,6 +234,42 @@ export const webflow = {
     getOptional<unknown>(`/api/webflow/internal-links-snapshot/${siteId}`),
 };
 
+// ── SEO Suggestions (persistent bulk rewrite variations) ────────
+export interface SeoSuggestionClient {
+  id: string;
+  workspaceId: string;
+  siteId: string;
+  pageId: string;
+  pageTitle: string;
+  pageSlug: string;
+  field: 'title' | 'description';
+  currentValue: string;
+  variations: string[];
+  selectedIndex: number | null;
+  status: 'pending' | 'applied' | 'dismissed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const seoSuggestions = {
+  list: (wsId: string, field?: 'title' | 'description') =>
+    get<{ suggestions: SeoSuggestionClient[]; counts: { pending: number; selected: number; total: number } }>(
+      `/api/webflow/seo-suggestions/${wsId}${field ? `?field=${field}` : ''}`
+    ),
+
+  select: (wsId: string, suggestionId: string, selectedIndex: number) =>
+    patch<{ ok: boolean }>(`/api/webflow/seo-suggestions/${wsId}/${suggestionId}`, { selectedIndex }),
+
+  apply: (wsId: string, suggestionIds?: string[]) =>
+    post<{ results: Array<{ pageId: string; field: string; text: string; applied: boolean; error?: string }>; applied: number; total: number }>(
+      `/api/webflow/seo-suggestions/${wsId}/apply`,
+      { suggestionIds }
+    ),
+
+  dismiss: (wsId: string, suggestionIds?: string[]) =>
+    del(`/api/webflow/seo-suggestions/${wsId}`, { suggestionIds }),
+};
+
 // ── Content performance ─────────────────────────────────────────
 export const contentPerformance = {
   get: (wsId: string, days?: number) =>

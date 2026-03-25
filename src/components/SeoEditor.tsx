@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { put, post } from '../api/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Upload, Check, AlertCircle, Wand2,
 } from 'lucide-react';
 import type { FixContext } from '../App';
+import { seoSuggestions } from '../api/seo';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
@@ -13,6 +14,7 @@ import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
 import { PendingApprovals } from './PendingApprovals';
+import { SeoSuggestionsPanel } from './editor/SeoSuggestionsPanel';
 
 interface PageMeta {
   id: string;
@@ -64,6 +66,14 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
+
+  // SEO Suggestions (persistent bulk rewrite variations)
+  const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
+    queryKey: ['seo-suggestions', workspaceId],
+    queryFn: () => seoSuggestions.list(workspaceId!),
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+  });
 
   // Bulk operations state
   const [bulkMode, setBulkMode] = useState<'idle' | 'pattern' | 'rewrite-preview' | 'rewriting'>('idle');
@@ -361,12 +371,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     finally { setBulkMode('idle'); setBulkPreview([]); setPatternText(''); setTimeout(() => setBulkResults(null), 5000); }
   };
 
-  // ── Bulk AI Rewrite ──
-  const bulkAiRewrite = async (field: 'title' | 'description', dryRun: boolean) => {
+  // ── Bulk AI Rewrite (generates 3 variations per page, stored server-side) ──
+  const bulkAiRewrite = async (field: 'title' | 'description') => {
     const selectedPages = Array.from(approvalSelected).map(id => pages.find(p => p.id === id)).filter(Boolean) as PageMeta[];
     if (selectedPages.length === 0) return;
     setBulkField(field);
-    if (dryRun) setBulkMode('rewriting');
+    setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: selectedPages.length });
     try {
       const pagesPayload = selectedPages.map(p => ({
@@ -374,21 +384,14 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         currentSeoTitle: edits[p.id]?.seoTitle || p.seo?.title,
         currentDescription: edits[p.id]?.seoDescription || p.seo?.description,
       }));
-      const data = await post<{ results: Array<{ pageId: string; oldValue: string; newValue: string; applied: boolean }> }>(
+      const data = await post<{ suggestions: unknown[]; errors: unknown[]; generated: number; total: number }>(
         `/api/webflow/seo-bulk-rewrite/${siteId}`,
-        { pages: pagesPayload, field, workspaceId, dryRun }
+        { pages: pagesPayload, field, workspaceId }
       );
-      if (dryRun) {
-        setBulkPreview(data.results?.filter(r => r.newValue) || []);
-        setBulkSource('ai');
-        setBulkMode('rewrite-preview');
-      } else {
-        const applied = data.results?.filter(r => r.applied).length || 0;
-        setBulkResults(`AI rewrote ${applied}/${selectedPages.length} ${field === 'title' ? 'titles' : 'descriptions'}.`);
-        queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
-        setBulkMode('idle');
-        setTimeout(() => setBulkResults(null), 5000);
-      }
+      setBulkResults(`Generated ${data.generated}/${data.total} ${field} suggestions. Review and select below.`);
+      refetchSuggestions();
+      setBulkMode('idle');
+      setTimeout(() => setBulkResults(null), 8000);
     } catch { setBulkResults('Bulk rewrite failed.'); setBulkMode('idle'); setTimeout(() => setBulkResults(null), 5000); }
   };
 
@@ -647,6 +650,17 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">
           <AlertCircle className="w-3.5 h-3.5" /> You have unsaved changes. Save individual pages then publish to go live.
         </div>
+      )}
+
+      {/* Persistent SEO Suggestions Panel */}
+      {workspaceId && suggestionsData && suggestionsData.suggestions.length > 0 && (
+        <SeoSuggestionsPanel
+          workspaceId={workspaceId}
+          suggestions={suggestionsData.suggestions}
+          counts={suggestionsData.counts}
+          onRefresh={() => refetchSuggestions()}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] })}
+        />
       )}
 
       <BulkOperations

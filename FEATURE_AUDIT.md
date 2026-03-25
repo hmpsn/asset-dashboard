@@ -992,7 +992,8 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 
 ### OpenAI Model Upgrades
 - ~~All models upgraded to GPT-4.1 series~~: ✅ Shipped (March 10, 2026) — gpt-4o → gpt-4.1, gpt-4o-mini → gpt-4.1-mini across all endpoints (SEO rewrite, content briefs, content posts, schema, audit, anomaly detection, chat memory, strategy, keyword analysis, seo-copy, internal links). Alt text generation uses gpt-4.1-nano for cost savings on trivial tasks. Brand name context injected into all AI prompts that generate client-facing copy.
-- ~~Single-page SEO rewrite → Claude primary~~: ✅ Shipped (March 24, 2026) — `/api/webflow/seo-rewrite` now uses `callCreativeAI()` (Claude Sonnet primary, GPT-4.1 fallback) for richer, more natural title/meta description language. Bulk fix and bulk rewrite remain on GPT-4.1-mini for speed/cost.
+- ~~All SEO rewrites → Claude primary~~: ✅ Shipped (March 24, 2026) — `/api/webflow/seo-rewrite`, `/api/webflow/seo-bulk-fix`, and `/api/webflow/seo-bulk-rewrite` now use `callCreativeAI()` (Claude Sonnet primary, GPT-4.1 fallback) for richer, more natural title/meta description language.
+- ~~Persistent bulk SEO suggestions with 3 variations~~: ✅ Shipped (March 24, 2026) — Bulk AI rewrite generates 3 differentiated variations per page, stored in SQLite (`seo_suggestions` table). Suggestions persist across refreshes. Users select preferred variation per page, then apply to Webflow in one action. Migration `023-seo-suggestions.sql`.
 
 ### Schema Generator Enhancements
 - ~~Bulk publish~~: ✅ Shipped — Publish to Webflow per-page via Custom Code API.

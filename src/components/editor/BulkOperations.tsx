@@ -32,7 +32,7 @@ export interface BulkOperationsProps {
   onPreviewPattern: () => void;
   onApplyPattern: () => void;
   onApplyBulkRewrite: () => void;
-  onBulkAiRewrite: (field: 'title' | 'description', dryRun: boolean) => void;
+  onBulkAiRewrite: (field: 'title' | 'description') => void;
   onClearPreview: () => void;
 }
 
@@ -57,10 +57,10 @@ export function BulkOperations({
             <button onClick={() => { onSetBulkField('title'); onSetBulkMode('pattern'); }} className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors">
               <Type className="w-3 h-3" /> Pattern Apply
             </button>
-            <button onClick={() => onBulkAiRewrite('title', true)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/80 hover:bg-teal-500 text-xs text-white transition-colors">
+            <button onClick={() => onBulkAiRewrite('title')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/80 hover:bg-teal-500 text-xs text-white transition-colors">
               <Sparkles className="w-3 h-3" /> AI Rewrite Titles
             </button>
-            <button onClick={() => onBulkAiRewrite('description', true)} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/80 hover:bg-teal-500 text-xs text-white transition-colors">
+            <button onClick={() => onBulkAiRewrite('description')} className="flex items-center gap-1 px-2 py-1 rounded bg-teal-600/80 hover:bg-teal-500 text-xs text-white transition-colors">
               <Sparkles className="w-3 h-3" /> AI Rewrite Descriptions
             </button>
           </>

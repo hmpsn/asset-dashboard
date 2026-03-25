@@ -3112,6 +3112,15 @@
           "status": "done"
         },
         {
+          "id": 342,
+          "title": "Claude for all SEO rewrites + persistent bulk suggestions with 3 variations",
+          "source": "USER REQUEST",
+          "est": "2h",
+          "priority": "P0",
+          "notes": "Shipped — All SEO rewrite endpoints (single, bulk-fix, bulk-rewrite) now use callCreativeAI() (Claude primary, GPT fallback). Bulk rewrite generates 3 differentiated variations per page, stored in SQLite seo_suggestions table (migration 023). Suggestions persist across refreshes. SeoSuggestionsPanel component lets user select preferred variation per page, then apply to Webflow in batch. API: GET/PATCH/POST/DELETE /api/webflow/seo-suggestions/:wsId.",
+          "status": "done"
+        },
+        {
           "id": 341,
           "title": "Unified AI Context Architecture — buildSeoContext() as single source of truth",
           "source": "USER REQUEST",
