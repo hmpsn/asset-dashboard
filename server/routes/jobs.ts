@@ -658,18 +658,24 @@ router.post('/api/jobs', async (req, res) => {
               } catch { /* CMS discovery failed — continue with static pages */ }
             }
 
-            // 2. Skip already-analyzed pages
-            const existingMap = paWs?.keywordStrategy?.pageMap || [];
-            const toAnalyze = pages.filter(p => {
-              const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
-              const existing = existingMap.find(e =>
-                e.pagePath === normalized || normalized.includes(e.pagePath) || e.pagePath.includes(normalized)
-              );
-              return !existing?.optimizationScore || existing.optimizationScore <= 0;
-            });
+            // 2. Skip already-analyzed pages (unless forceRefresh)
+            const forceRefresh = !!params.forceRefresh;
+            let toAnalyze: PageItem[];
+            if (forceRefresh) {
+              toAnalyze = pages;
+            } else {
+              const existingMap = paWs?.keywordStrategy?.pageMap || [];
+              toAnalyze = pages.filter(p => {
+                const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
+                const existing = existingMap.find(e =>
+                  e.pagePath === normalized || normalized.includes(e.pagePath) || e.pagePath.includes(normalized)
+                );
+                return !existing?.optimizationScore || existing.optimizationScore <= 0;
+              });
+            }
 
             const total = toAnalyze.length;
-            updateJob(paJob.id, { message: `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
+            updateJob(paJob.id, { message: forceRefresh ? `Re-analyzing all ${total} pages...` : `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
 
             if (total === 0) {
               updateJob(paJob.id, { status: 'done', message: `All ${pages.length} pages already analyzed`, progress: pages.length, total: pages.length });

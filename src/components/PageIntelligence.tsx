@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
@@ -299,15 +299,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     return result;
   })();
 
-  // Hydrate analyses state from persisted strategy data on load
-  const hydratedRef = useRef(false);
-  useEffect(() => {
-    if (hydratedRef.current || unifiedPages.length === 0) return;
-    const hydrated: Record<string, KeywordData> = {};
+  // Derive effective analyses: always hydrate from persisted strategy data (keyed by
+  // current page IDs), then overlay any fresh in-session analyses on top.
+  const effectiveAnalyses = useMemo(() => {
+    const fromStrategy: Record<string, KeywordData> = {};
     for (const page of unifiedPages) {
       const sp = page.strategy;
-      if (sp?.analysisGeneratedAt && sp.optimizationScore && !analyses[page.id]) {
-        hydrated[page.id] = {
+      if (sp?.analysisGeneratedAt && (sp.optimizationScore != null)) {
+        fromStrategy[page.id] = {
           primaryKeyword: sp.primaryKeyword,
           primaryKeywordPresence: sp.primaryKeywordPresence || { inTitle: false, inMeta: false, inContent: false, inSlug: false },
           secondaryKeywords: sp.secondaryKeywords || [],
@@ -316,7 +315,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           searchIntentConfidence: sp.searchIntentConfidence ?? 0.5,
           contentGaps: sp.contentGaps || [],
           competitorKeywords: sp.competitorKeywords || [],
-          optimizationScore: sp.optimizationScore,
+          optimizationScore: sp.optimizationScore ?? 0,
           optimizationIssues: sp.optimizationIssues || [],
           recommendations: sp.recommendations || [],
           estimatedDifficulty: sp.estimatedDifficulty || 'medium',
@@ -326,12 +325,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         };
       }
     }
-    if (Object.keys(hydrated).length > 0) {
-      hydratedRef.current = true;
-      setAnalyses(prev => ({ ...hydrated, ...prev }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unifiedPages]);
+    // Fresh in-session analyses take precedence over persisted data
+    return { ...fromStrategy, ...analyses };
+  }, [unifiedPages, analyses]);
 
   // ── AI Analysis ──
   const analyzePage = async (page: UnifiedPage) => {
@@ -410,10 +406,10 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   };
 
   // ── Bulk Analysis via Background Job ──
-  const analyzeAllPages = async () => {
+  const analyzeAllPages = async (forceRefresh = false) => {
     cancelBulkRef.current = false;
     setBulkProgress({ done: 0, total: unifiedPages.length });
-    const jobId = await startJob('page-analysis', { siteId, workspaceId });
+    const jobId = await startJob('page-analysis', { siteId, workspaceId, forceRefresh });
     if (jobId) {
       bulkJobIdRef.current = jobId;
     } else {
@@ -515,8 +511,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         case 'position': cmp = (sa?.currentPosition || 999) - (sb?.currentPosition || 999); break;
         case 'volume': cmp = (sb?.volume || 0) - (sa?.volume || 0); break;
         case 'score': {
-          const scoreA = analyses[a.id]?.optimizationScore ?? sa?.optimizationScore ?? -1;
-          const scoreB = analyses[b.id]?.optimizationScore ?? sb?.optimizationScore ?? -1;
+          const scoreA = effectiveAnalyses[a.id]?.optimizationScore ?? sa?.optimizationScore ?? -1;
+          const scoreB = effectiveAnalyses[b.id]?.optimizationScore ?? sb?.optimizationScore ?? -1;
           cmp = scoreB - scoreA;
           break;
         }
@@ -530,14 +526,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     });
 
   // ── Stats ──
-  const analyzedCount = Object.keys(analyses).length + unifiedPages.filter(p => p.strategy?.analysisGeneratedAt && !analyses[p.id]).length;
+  const analyzedCount = Object.keys(effectiveAnalyses).length;
   const cmsCount = unifiedPages.filter(p => p.source === 'cms').length;
   const withStrategy = unifiedPages.filter(p => p.strategy).length;
 
   // ── Fix Queue: score × traffic impact ranking ──
   const fixQueue = unifiedPages
     .map(p => {
-      const score = analyses[p.id]?.optimizationScore ?? p.strategy?.optimizationScore;
+      const score = effectiveAnalyses[p.id]?.optimizationScore ?? p.strategy?.optimizationScore;
       const impressions = p.strategy?.impressions || 0;
       if (score === undefined || score === null) return null;
       // Impact = traffic potential lost due to poor optimization
@@ -582,18 +578,30 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
             <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
           </div>
         ) : (
-          <button
-            onClick={analyzeAllPages}
-            disabled={analyzing.size > 0 || analyzedCount === unifiedPages.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            {analyzedCount === unifiedPages.length && unifiedPages.length > 0
-              ? 'All Analyzed'
-              : analyzedCount > 0
-                ? `Analyze Remaining (${unifiedPages.length - analyzedCount})`
-                : 'Analyze All Pages'}
-          </button>
+          <div className="flex items-center gap-2">
+            {analyzedCount > 0 && analyzedCount < unifiedPages.length && (
+              <button
+                onClick={() => analyzeAllPages(false)}
+                disabled={analyzing.size > 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Analyze Remaining ({unifiedPages.length - analyzedCount})
+              </button>
+            )}
+            <button
+              onClick={() => analyzeAllPages(analyzedCount > 0)}
+              disabled={analyzing.size > 0}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 ${
+                analyzedCount > 0
+                  ? 'bg-zinc-700 hover:bg-zinc-600 text-zinc-200'
+                  : 'bg-violet-600/80 hover:bg-violet-500/80 text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {analyzedCount > 0 ? 'Re-analyze All' : 'Analyze All Pages'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -664,7 +672,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);
-          const kw = analyses[page.id];
+          const kw = effectiveAnalyses[page.id];
           const cs = contentScores[page.id];
           const sp = page.strategy;
           const isEditing = editingPageId === page.id;
