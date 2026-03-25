@@ -262,9 +262,10 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
     // Start with all webflow pages, enriched with strategy data (exact match only)
     for (const page of allPages) {
-      const pagePath = `/${page.slug || ''}`;
+      const slugPath = `/${page.slug || ''}`;
+      const pagePath = page.publishedPath || slugPath;
       const strategyMatch = strategyByPath.get(pagePath)
-        || (page.slug ? strategyByPath.get(`/${page.slug}`) : undefined)
+        || strategyByPath.get(slugPath)
         || (page.publishedPath ? strategyByPath.get(page.publishedPath) : undefined);
       result.push({
         id: page.id,
