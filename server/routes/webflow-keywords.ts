@@ -121,6 +121,14 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       recommendations?: string[];
       contentGaps?: string[];
       optimizationScore?: number;
+      primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
+      longTailKeywords?: string[];
+      competitorKeywords?: string[];
+      estimatedDifficulty?: string;
+      keywordDifficulty?: number;
+      monthlyVolume?: number;
+      topicCluster?: string;
+      searchIntentConfidence?: number;
     };
   };
 
@@ -141,6 +149,7 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized)
     );
 
+    const now = new Date().toISOString();
     if (entry) {
       // Update existing entry with analysis data
       if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword;
@@ -150,7 +159,16 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       entry.recommendations = analysis.recommendations || [];
       entry.contentGaps = analysis.contentGaps || [];
       entry.optimizationScore = analysis.optimizationScore;
-      entry.analysisGeneratedAt = new Date().toISOString();
+      entry.analysisGeneratedAt = now;
+      // Extended analysis fields
+      if (analysis.primaryKeywordPresence) entry.primaryKeywordPresence = analysis.primaryKeywordPresence;
+      if (analysis.longTailKeywords) entry.longTailKeywords = analysis.longTailKeywords;
+      if (analysis.competitorKeywords) entry.competitorKeywords = analysis.competitorKeywords;
+      if (analysis.estimatedDifficulty) entry.estimatedDifficulty = analysis.estimatedDifficulty;
+      if (analysis.keywordDifficulty !== undefined) entry.keywordDifficulty = analysis.keywordDifficulty;
+      if (analysis.monthlyVolume !== undefined) entry.monthlyVolume = analysis.monthlyVolume;
+      if (analysis.topicCluster) entry.topicCluster = analysis.topicCluster;
+      if (analysis.searchIntentConfidence !== undefined) entry.searchIntentConfidence = analysis.searchIntentConfidence;
     } else {
       // Create new entry
       pageMap.push({
@@ -163,7 +181,15 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
         recommendations: analysis.recommendations || [],
         contentGaps: analysis.contentGaps || [],
         optimizationScore: analysis.optimizationScore,
-        analysisGeneratedAt: new Date().toISOString(),
+        analysisGeneratedAt: now,
+        primaryKeywordPresence: analysis.primaryKeywordPresence,
+        longTailKeywords: analysis.longTailKeywords || [],
+        competitorKeywords: analysis.competitorKeywords || [],
+        estimatedDifficulty: analysis.estimatedDifficulty,
+        keywordDifficulty: analysis.keywordDifficulty,
+        monthlyVolume: analysis.monthlyVolume,
+        topicCluster: analysis.topicCluster,
+        searchIntentConfidence: analysis.searchIntentConfidence,
       });
     }
 

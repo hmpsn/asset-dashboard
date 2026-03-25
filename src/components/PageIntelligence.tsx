@@ -44,6 +44,14 @@ interface StrategyPage {
   recommendations?: string[];
   contentGaps?: string[];
   analysisGeneratedAt?: string;
+  primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
+  longTailKeywords?: string[];
+  competitorKeywords?: string[];
+  estimatedDifficulty?: string;
+  keywordDifficulty?: number;
+  monthlyVolume?: number;
+  topicCluster?: string;
+  searchIntentConfidence?: number;
 }
 
 interface KeywordPresence {
@@ -66,6 +74,8 @@ interface KeywordData {
   optimizationIssues: string[];
   recommendations: string[];
   estimatedDifficulty: string;
+  keywordDifficulty: number;
+  monthlyVolume: number;
   topicCluster: string;
 }
 
@@ -286,6 +296,40 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     return result;
   })();
 
+  // Hydrate analyses state from persisted strategy data on load
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || unifiedPages.length === 0) return;
+    const hydrated: Record<string, KeywordData> = {};
+    for (const page of unifiedPages) {
+      const sp = page.strategy;
+      if (sp?.analysisGeneratedAt && sp.optimizationScore && !analyses[page.id]) {
+        hydrated[page.id] = {
+          primaryKeyword: sp.primaryKeyword,
+          primaryKeywordPresence: sp.primaryKeywordPresence || { inTitle: false, inMeta: false, inContent: false, inSlug: false },
+          secondaryKeywords: sp.secondaryKeywords || [],
+          longTailKeywords: sp.longTailKeywords || [],
+          searchIntent: sp.searchIntent || 'informational',
+          searchIntentConfidence: sp.searchIntentConfidence ?? 0.5,
+          contentGaps: sp.contentGaps || [],
+          competitorKeywords: sp.competitorKeywords || [],
+          optimizationScore: sp.optimizationScore,
+          optimizationIssues: sp.optimizationIssues || [],
+          recommendations: sp.recommendations || [],
+          estimatedDifficulty: sp.estimatedDifficulty || 'medium',
+          keywordDifficulty: sp.keywordDifficulty ?? 0,
+          monthlyVolume: sp.monthlyVolume ?? 0,
+          topicCluster: sp.topicCluster || '',
+        };
+      }
+    }
+    if (Object.keys(hydrated).length > 0) {
+      hydratedRef.current = true;
+      setAnalyses(prev => ({ ...hydrated, ...prev }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unifiedPages]);
+
   // ── AI Analysis ──
   const analyzePage = async (page: UnifiedPage) => {
     setAnalyzing(prev => new Set(prev).add(page.id));
@@ -330,6 +374,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               recommendations: kwData.recommendations,
               contentGaps: kwData.contentGaps,
               optimizationScore: kwData.optimizationScore,
+              primaryKeywordPresence: kwData.primaryKeywordPresence,
+              longTailKeywords: kwData.longTailKeywords,
+              competitorKeywords: kwData.competitorKeywords,
+              estimatedDifficulty: kwData.estimatedDifficulty,
+              keywordDifficulty: kwData.keywordDifficulty,
+              monthlyVolume: kwData.monthlyVolume,
+              topicCluster: kwData.topicCluster,
+              searchIntentConfidence: kwData.searchIntentConfidence,
             },
           });
           // Invalidate strategy cache so persisted data shows up

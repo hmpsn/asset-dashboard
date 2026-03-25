@@ -41,6 +41,15 @@ export interface PageKeywordMap {
   contentGaps?: string[];
   optimizationScore?: number;
   analysisGeneratedAt?: string;
+  // Extended analysis fields (persisted for full report hydration)
+  primaryKeywordPresence?: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean };
+  longTailKeywords?: string[];
+  competitorKeywords?: string[];
+  estimatedDifficulty?: string;
+  keywordDifficulty?: number;
+  monthlyVolume?: number;
+  topicCluster?: string;
+  searchIntentConfidence?: number;
 }
 
 export interface KeywordGapItem {
