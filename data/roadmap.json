@@ -3299,6 +3299,24 @@
           "priority": "P0",
           "notes": "Shipped — After deploys, Vite chunk hashes change but cached HTML references old filenames → 'Failed to fetch dynamically imported module' errors. New lazyWithRetry() utility wraps React.lazy() with try/catch + single auto-reload via sessionStorage flag. Applied to all ~43 lazy imports across App.tsx, SeoAudit.tsx, ContentPipeline.tsx, ClientDashboard.tsx. Feature #173.",
           "status": "done"
+        },
+        {
+          "id": 361,
+          "title": "Fix fuzzy path matching bug across all pageMap lookups",
+          "source": "BUG FIX",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — includes()-based path matching caused every page to match '/' (homepage) since all paths contain '/'. Broke page analysis persistence (only 7/256 pages saved) AND all AI features received homepage keywords instead of page-specific ones. Fixed 5 instances in 4 server files + frontend path display for nested pages. Feature #174.",
+          "status": "done"
+        },
+        {
+          "id": 362,
+          "title": "Page analysis race condition + performance fixes",
+          "source": "BUG FIX",
+          "est": "0.5h",
+          "priority": "P0",
+          "notes": "Shipped — Three fixes: (1) Race condition: concurrent updateWorkspace calls inside Promise.all caused read-modify-write data loss. Fixed by collecting batch results then persisting atomically. (2) getSiteSubdomain called per-page (~256 redundant Webflow API calls) — moved outside loop. (3) Added 10s timeout to HTML fetches to prevent job hangs.",
+          "status": "done"
         }
       ]
     }
