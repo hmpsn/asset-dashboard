@@ -10,7 +10,7 @@ import {
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
   Map, Rocket, FileSearch, Clock, DollarSign, Flag,
-  TrendingDown, MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
+  MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
@@ -48,7 +48,6 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   // Derive data from query result
   const data = overviewData?.workspaces ?? [];
   const recentActivity = overviewData?.recentActivity ?? [];
-  const anomalies = overviewData?.anomalies ?? [];
   const feedback = overviewData?.feedback ?? [];
   const timeSaved = overviewData?.timeSaved ?? null;
   // Prefer live WebSocket presence, fall back to query snapshot
@@ -86,19 +85,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
     ? Math.round(data.filter(w => w.audit).reduce((s, w) => s + (w.audit?.score || 0), 0) / data.filter(w => w.audit).length)
     : null;
 
-  // Anomaly aggregation across workspaces
-  const criticalAnomalies = anomalies.filter(a => a.severity === 'critical');
-  const warningAnomalies = anomalies.filter(a => a.severity === 'warning');
-  const anomalyByWorkspace: Record<string, { critical: number; warning: number; positive: number }> = {};
-  anomalies.forEach(a => {
-    if (!anomalyByWorkspace[a.workspaceId]) anomalyByWorkspace[a.workspaceId] = { critical: 0, warning: 0, positive: 0 };
-    anomalyByWorkspace[a.workspaceId][a.severity]++;
-  });
-
-  // Needs attention items — priority sorted (critical first)
+  // Needs attention items — priority sorted
   const attentionItems: Array<{ label: string; value: string; color: string; icon: typeof Bell; priority: number }> = [];
-  if (criticalAnomalies.length > 0) attentionItems.push({ label: `${criticalAnomalies.length} critical anomal${criticalAnomalies.length > 1 ? 'ies' : 'y'} across ${new Set(criticalAnomalies.map(a => a.workspaceId)).size} workspace${new Set(criticalAnomalies.map(a => a.workspaceId)).size > 1 ? 's' : ''}`, value: 'Anomalies', color: 'text-red-400', icon: TrendingDown, priority: 0 });
-  if (warningAnomalies.length > 0) attentionItems.push({ label: `${warningAnomalies.length} warning anomal${warningAnomalies.length > 1 ? 'ies' : 'y'} detected`, value: 'Anomalies', color: 'text-amber-400', icon: TrendingDown, priority: 1 });
   if (totalNewRequests > 0) attentionItems.push({ label: `${totalNewRequests} new client request${totalNewRequests > 1 ? 's' : ''}`, value: 'Requests', color: 'text-red-400', icon: Bell, priority: 2 });
   if (totalPendingApprovals > 0) attentionItems.push({ label: `${totalPendingApprovals} pending approval${totalPendingApprovals > 1 ? 's' : ''}`, value: 'Approvals', color: 'text-teal-400', icon: ClipboardCheck, priority: 3 });
   if (totalPendingContent > 0) attentionItems.push({ label: `${totalPendingContent} content brief${totalPendingContent > 1 ? 's' : ''} awaiting review`, value: 'Content', color: 'text-amber-400', icon: FileText, priority: 4 });
@@ -137,38 +125,6 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           </div>
         }
       />
-
-      {/* ── Global Anomaly Banner ── */}
-      {(criticalAnomalies.length > 0 || warningAnomalies.length > 0) && (
-        <SectionCard noPadding>
-          <div className={`p-4 flex items-center gap-3 ${criticalAnomalies.length > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20'} border rounded-xl`}>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${criticalAnomalies.length > 0 ? 'bg-red-500/15' : 'bg-amber-500/15'}`}>
-              <TrendingDown className={`w-4 h-4 ${criticalAnomalies.length > 0 ? 'text-red-400' : 'text-amber-400'}`} />
-            </div>
-            <div className="flex-1">
-              <h3 className={`text-sm font-semibold ${criticalAnomalies.length > 0 ? 'text-red-300' : 'text-amber-300'}`}>
-                {criticalAnomalies.length > 0 ? 'Critical anomalies detected' : 'Warning anomalies detected'}
-              </h3>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
-                {criticalAnomalies.length > 0 
-                  ? `${criticalAnomalies.length} critical issue${criticalAnomalies.length > 1 ? 's' : ''} across ${new Set(criticalAnomalies.map(a => a.workspaceId)).size} workspace${new Set(criticalAnomalies.map(a => a.workspaceId)).size > 1 ? 's' : ''} - immediate attention required`
-                  : `${warningAnomalies.length} warning${warningAnomalies.length > 1 ? 's' : ''} detected across ${new Set(warningAnomalies.map(a => a.workspaceId)).size} workspace${new Set(warningAnomalies.map(a => a.workspaceId)).size > 1 ? 's' : ''}`
-                }
-              </p>
-            </div>
-            <button 
-              onClick={() => {
-                // Navigate to the first workspace with anomalies
-                const firstAnomalyWorkspace = criticalAnomalies.length > 0 ? criticalAnomalies[0].workspaceId : warningAnomalies[0].workspaceId;
-                onSelectWorkspace(firstAnomalyWorkspace);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${criticalAnomalies.length > 0 ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-amber-600 hover:bg-amber-500 text-white'}`}
-            >
-              View Anomalies
-            </button>
-          </div>
-        </SectionCard>
-      )}
 
       {/* ── Needs Attention ── */}
       {attentionItems.length > 0 && (
@@ -246,8 +202,6 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
           {data.map(ws => {
             const hasAlerts = ws.requests.new > 0 || ws.approvals.pending > 0 || (ws.contentRequests?.pending || 0) > 0;
             const scoreDelta = ws.audit && ws.audit.previousScore != null ? ws.audit.score - ws.audit.previousScore : null;
-            const wsAnomalies = anomalyByWorkspace[ws.id];
-            const hasAnomalies = wsAnomalies && (wsAnomalies.critical > 0 || wsAnomalies.warning > 0);
             const isAtRisk = (ws.churnSignals?.critical || 0) > 0 || (ws.churnSignals?.warning || 0) > 0;
             const onlineUsers = presence[ws.id] || [];
 
@@ -255,7 +209,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : hasAnomalies && wsAnomalies?.critical ? 'border-red-500/30' : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30' : hasAlerts || isAtRisk ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30' : hasAlerts || isAtRisk ? 'border-amber-500/30' : 'border-zinc-800'}`}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (
@@ -281,16 +235,6 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <h3 className="text-sm font-semibold truncate group-hover:text-teal-400 transition-colors text-zinc-200">{ws.name}</h3>
-                    {hasAnomalies && (
-                      <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
-                        wsAnomalies.critical > 0
-                          ? 'bg-red-500/15 text-red-400 border-red-500/20'
-                          : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                      }`}>
-                        <TrendingDown className="w-2.5 h-2.5" />
-                        {wsAnomalies.critical > 0 ? `${wsAnomalies.critical} critical` : `${wsAnomalies.warning} warning`}
-                      </span>
-                    )}
                     {isAtRisk && (
                       <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
                         (ws.churnSignals?.critical || 0) > 0
