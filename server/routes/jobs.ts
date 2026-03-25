@@ -697,6 +697,10 @@ router.post('/api/jobs', async (req, res) => {
 
             const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
 
+            // Resolve subdomain ONCE before the loop (was being called per-page — ~256 redundant API calls)
+            let webflowSubdomain: string | null = null;
+            try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch { /* skip */ }
+
             for (let i = 0; i < toAnalyze.length; i += BATCH) {
               if (isJobCancelled(paJob.id)) break;
               const batch = toAnalyze.slice(i, i + BATCH);
@@ -711,11 +715,10 @@ router.post('/api/jobs', async (req, res) => {
                   let html = '';
                   const urls: string[] = [];
                   if (baseUrl) urls.push(`${baseUrl.replace(/\/+$/, '')}${page.path}`);
-                  const sub = await getSiteSubdomain(paSiteId, paToken);
-                  if (sub) urls.push(`https://${sub}.webflow.io${page.path}`);
+                  if (webflowSubdomain) urls.push(`https://${webflowSubdomain}.webflow.io${page.path}`);
                   for (const url of urls) {
                     try {
-                      const r = await fetch(url, { redirect: 'follow', headers: FETCH_HEADERS });
+                      const r = await fetch(url, { redirect: 'follow', headers: FETCH_HEADERS, signal: AbortSignal.timeout(10_000) });
                       if (r.ok) { html = await r.text(); break; }
                     } catch { /* try next */ }
                   }
