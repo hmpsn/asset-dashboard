@@ -4,6 +4,7 @@
  */
 
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('redirect-scanner');
@@ -227,7 +228,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
 
   const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' | 'gsc' }> = published.map(p => {
     // Use publishedPath for full URL (handles nested pages like /about/team)
-    const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+    const pagePath = resolvePagePath(p);
     return {
       url: pagePath ? `${baseUrl}${pagePath}` : baseUrl,
       path: pagePath || '/',

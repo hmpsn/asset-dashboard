@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from './logger.js';
+import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
 
 const log = createLogger('webflow-assets');
@@ -203,7 +204,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
       { url: baseUrl, title: 'Home' },
     ];
     for (const page of pages) {
-      const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+      const pagePath = resolvePagePath(page);
       if (pagePath && pagePath !== '/' && page.slug !== 'index') {
         pageUrls.push({ url: `${baseUrl}${pagePath}`, title: page.title });
       }

@@ -17,7 +17,7 @@ import {
   addComment,
 } from '../content-requests.js';
 import { notifyTeamContentRequest } from '../email.js';
-import { sanitizeString, validateEnum } from '../helpers.js';
+import { sanitizeString, validateEnum, findPageMapEntry } from '../helpers.js';
 import { getClientActor } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
@@ -292,10 +292,7 @@ router.post('/api/public/content-request/:workspaceId/from-audit', async (req, r
   // Also check keyword strategy for this page's target keyword
   let strategyKeyword = '';
   if (ws.keywordStrategy?.pageMap) {
-    const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
-    const match = ws.keywordStrategy.pageMap.find((p: { pagePath: string }) =>
-      p.pagePath.replace(/\/$/, '') === slug.replace(/\/$/, '')
-    );
+    const match = findPageMapEntry(ws.keywordStrategy.pageMap, pageSlug);
     if (match && 'primaryKeyword' in match) strategyKeyword = (match as { primaryKeyword?: string }).primaryKeyword || '';
   }
 

@@ -6,6 +6,7 @@ import { callOpenAI } from '../openai-helpers.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
 import { getWorkspace, updateWorkspace, type KeywordStrategy } from '../workspaces.js';
+import { findPageMapEntry } from '../helpers.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-keywords');
@@ -145,11 +146,7 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
 
     // Find or create the page entry
     const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
-    const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-    const entry = pageMap.find(p => {
-      const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
-      return pNorm === normNoTrail;
-    });
+    const entry = findPageMapEntry(pageMap, normalized);
 
     const now = new Date().toISOString();
     if (entry) {

@@ -1,4 +1,5 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('pagespeed');
@@ -379,7 +380,7 @@ export async function runSiteSpeed(
   // Run sequentially to avoid rate limiting
   for (const page of pagesToTest) {
     // Use publishedPath for full URL (handles nested pages like /about/team)
-    const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+    const pagePath = resolvePagePath(page);
     const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
     log.info(`PageSpeed: testing ${url}...`);
 

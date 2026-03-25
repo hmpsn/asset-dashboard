@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment, SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
 import { callOpenAI } from './openai-helpers.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
@@ -70,7 +71,7 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
     );
 
     pageList = pages.map((p) => {
-      const pagePath = (p.publishedPath || '') || (p.slug ? `/${p.slug}` : '/');
+      const pagePath = resolvePagePath(p);
       const isHomepage = !p.slug || p.slug === '' || p.slug === 'home' || p.slug === 'index';
       const strategyMatch = strategy?.pageMap?.find(
         (pm: PageKeywordMap) => pm.pagePath === pagePath || pm.pagePath === `/${p.slug}`,

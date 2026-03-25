@@ -6,6 +6,7 @@ import {
   Shield, DollarSign, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { scoreColorClass, scoreBgBarClass } from './ui';
+import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 import { useKeywordStrategy } from '../hooks/admin';
@@ -253,20 +254,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     // Build a lookup map for strategy entries by normalized path
     const strategyByPath = new Map<string, StrategyPage>();
     for (const sp of pageMap) {
-      const norm = sp.pagePath.startsWith('/') ? sp.pagePath : `/${sp.pagePath}`;
+      const norm = normalizePath(sp.pagePath);
       if (!strategyByPath.has(norm)) strategyByPath.set(norm, sp);
-      // Also index without trailing slash for matching
-      const noTrail = norm.endsWith('/') && norm.length > 1 ? norm.slice(0, -1) : norm;
-      if (!strategyByPath.has(noTrail)) strategyByPath.set(noTrail, sp);
     }
 
     // Start with all webflow pages, enriched with strategy data (exact match only)
     for (const page of allPages) {
-      const slugPath = `/${page.slug || ''}`;
-      const pagePath = page.publishedPath || slugPath;
-      const strategyMatch = strategyByPath.get(pagePath)
-        || strategyByPath.get(slugPath)
-        || (page.publishedPath ? strategyByPath.get(page.publishedPath) : undefined);
+      const pagePath = resolvePagePath(page);
+      const strategyMatch = strategyByPath.get(normalizePath(pagePath));
       result.push({
         id: page.id,
         title: strategyMatch?.pageTitle || page.title,
@@ -284,8 +279,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     for (const sp of pageMap) {
       if (!usedPaths.has(sp.pagePath)) {
         // Deduplicate: skip if a page with this normalized path already exists
-        const norm = sp.pagePath.startsWith('/') ? sp.pagePath : `/${sp.pagePath}`;
-        if (result.some(r => r.path === norm || r.path === sp.pagePath)) continue;
+        const norm = normalizePath(sp.pagePath);
+        if (result.some(r => normalizePath(r.path) === norm)) continue;
         result.push({
           id: `strategy-${sp.pagePath}`,
           title: sp.pageTitle,

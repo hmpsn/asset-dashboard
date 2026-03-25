@@ -3,6 +3,7 @@
  * Extracted from webflow.ts — pages, SEO, publishing, schema, sitemap discovery.
  */
 import { createLogger } from './logger.js';
+import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
 
 const log = createLogger('webflow-pages');
@@ -420,7 +421,7 @@ export function buildStaticPathSet(pages: WebflowPage[]): Set<string> {
   const paths = new Set<string>();
   paths.add(''); // root
   for (const p of pages) {
-    const path = (p.publishedPath || `/${p.slug || ''}`).replace(/\/$/, '').toLowerCase();
+    const path = resolvePagePath(p).replace(/\/$/, '').toLowerCase();
     paths.add(path);
   }
   return paths;

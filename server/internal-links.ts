@@ -10,6 +10,7 @@ import {
 import { getWorkspace } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('internal-links');
@@ -174,7 +175,7 @@ export async function analyzeInternalLinks(
     const published = filterPublishedPages(allPages);
 
     pageUrls = published.map(p => {
-      const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+      const pagePath = resolvePagePath(p);
       return {
         url: pagePath ? `${baseUrl}${pagePath}` : baseUrl,
         path: pagePath || '/',

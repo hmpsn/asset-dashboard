@@ -12,7 +12,7 @@ import { recordSeoChange } from '../seo-change-tracker.js';
 import { generateAltText } from '../alttext.js';
 import { getDataDir } from '../data-dir.js';
 import { notifyClientRecommendationsReady, notifyClientAuditComplete } from '../email.js';
-import { applySuppressionsToAudit, buildSchemaContext } from '../helpers.js';
+import { applySuppressionsToAudit, buildSchemaContext, findPageMapEntry, resolvePagePath } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import {
   createJob,
@@ -628,7 +628,7 @@ router.post('/api/jobs', async (req, res) => {
               id: p.id,
               title: p.title,
               slug: p.slug || '',
-              path: p.publishedPath || (p.slug ? `/${p.slug}` : '/'),
+              path: resolvePagePath(p),
               source: 'static' as const,
               seoTitle: p.seo?.title || undefined,
               metaDesc: p.seo?.description || undefined,
@@ -664,15 +664,29 @@ router.post('/api/jobs', async (req, res) => {
             let toAnalyze: PageItem[];
             if (forceRefresh) {
               toAnalyze = pages;
+              // Clear stale analysis fields from ALL existing pageMap entries.
+              // Keeps keyword assignments (primaryKeyword, secondaryKeywords, searchIntent, etc.)
+              // but resets analysis results so removed pages don't retain stale scores.
+              const freshWs = getWorkspace(paWsId);
+              if (freshWs?.keywordStrategy?.pageMap) {
+                const analysisFields = [
+                  'optimizationScore', 'analysisGeneratedAt', 'optimizationIssues',
+                  'recommendations', 'contentGaps', 'primaryKeywordPresence',
+                  'longTailKeywords', 'competitorKeywords', 'estimatedDifficulty',
+                  'keywordDifficulty', 'monthlyVolume', 'topicCluster', 'searchIntentConfidence',
+                ] as const;
+                for (const entry of freshWs.keywordStrategy.pageMap) {
+                  for (const field of analysisFields) {
+                    delete (entry as unknown as Record<string, unknown>)[field];
+                  }
+                }
+                updateWorkspace(paWsId, { keywordStrategy: freshWs.keywordStrategy });
+                log.info({ cleared: freshWs.keywordStrategy.pageMap.length }, 'Page analysis: cleared stale analysis fields for re-analyze');
+              }
             } else {
               const existingMap = paWs?.keywordStrategy?.pageMap || [];
               toAnalyze = pages.filter(p => {
-                const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
-                const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-                const existing = existingMap.find(e => {
-                  const eNorm = e.pagePath.length > 1 && e.pagePath.endsWith('/') ? e.pagePath.slice(0, -1) : e.pagePath;
-                  return eNorm === normNoTrail;
-                });
+                const existing = findPageMapEntry(existingMap, p.path);
                 return !existing?.optimizationScore || existing.optimizationScore <= 0;
               });
             }
@@ -811,12 +825,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
 
                   for (const { page, analysis } of batchResults) {
                     const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
-                    // Strip trailing slash for comparison (but keep '/' as-is)
-                    const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-                    const entry = pageMap.find(p => {
-                      const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
-                      return pNorm === normNoTrail;
-                    });
+                    const entry = findPageMapEntry(pageMap, normalized);
                     if (entry) {
                       if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword as string;
                       if ((analysis.secondaryKeywords as string[])?.length) entry.secondaryKeywords = analysis.secondaryKeywords as string[];

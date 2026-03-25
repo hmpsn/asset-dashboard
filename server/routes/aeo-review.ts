@@ -11,6 +11,7 @@ import { getLatestSnapshot } from '../reports.js';
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from '../webflow.js';
 import { isContentPage, isExcludedPage } from '../audit-page.js';
 import { addActivity } from '../activity-log.js';
+import { resolvePagePath } from '../helpers.js';
 import type { SeoIssue } from '../seo-audit.js';
 import { createLogger } from '../logger.js';
 
@@ -127,7 +128,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
       const published = filterPublishedPages(allPages);
       for (const p of published) {
         if (isExcludedPage(p.slug, p.title)) continue;
-        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+        const pagePath = resolvePagePath(p);
         const slug = pagePath.replace(/^\//, '') || p.slug || '';
         allPageUrls.push({ url: `${baseUrl}${pagePath}`, slug, name: p.title });
       }

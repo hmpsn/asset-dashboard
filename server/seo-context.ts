@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getWorkspace, type KeywordStrategy } from './workspaces';
+import { findPageMapEntry } from './helpers.js';
 import { getUploadRoot } from './data-dir.js';
 
 /**
@@ -73,11 +74,7 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
 
   // Page-specific keywords (if pagePath provided) — these OVERRIDE general context
   if (pagePath && strategy.pageMap?.length) {
-    const pageKw = strategy.pageMap.find(p => {
-      const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
-      const qNorm = pagePath.length > 1 && pagePath.endsWith('/') ? pagePath.slice(0, -1) : pagePath;
-      return pNorm === qNorm;
-    });
+    const pageKw = findPageMapEntry(strategy.pageMap, pagePath);
     if (pageKw) {
       keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
       keywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
@@ -238,12 +235,7 @@ export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string
   const pageMap = ws?.keywordStrategy?.pageMap;
   if (!pageMap?.length) return '';
 
-  const normalized = pagePath.startsWith('/') ? pagePath : `/${pagePath}`;
-  const normNoTrail = normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  const entry = pageMap.find(p => {
-    const pNorm = p.pagePath.length > 1 && p.pagePath.endsWith('/') ? p.pagePath.slice(0, -1) : p.pagePath;
-    return pNorm === normNoTrail;
-  });
+  const entry = findPageMapEntry(pageMap, pagePath);
   if (!entry) return '';
 
   const parts: string[] = [];

@@ -12,6 +12,7 @@
 import { listPages, filterPublishedPages, buildStaticPathSet, discoverCmsUrls, getSiteSubdomain } from './webflow-pages.js';
 import { listMatrices } from './content-matrices.js';
 import { getWorkspace } from './workspaces.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('site-architecture');
@@ -305,7 +306,7 @@ export async function buildSiteArchitecture(workspaceId: string): Promise<SiteAr
       const published = filterPublishedPages(allPages);
 
       for (const p of published) {
-        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '/');
+        const pagePath = resolvePagePath(p);
         if (pagePath === '/') continue; // root already exists
         insertIntoTree(root, pagePath, {
           name: p.title || segmentToName(p.slug || ''),

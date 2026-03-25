@@ -16,7 +16,7 @@ import {
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
-import { notifyClientBriefReady, notifyClientContentPublished } from '../email.js';
+import { notifyClientBriefReady, notifyClientContentPublished, notifyTeamContentRequest } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
@@ -27,6 +27,7 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
+import { resolvePagePath } from '../helpers.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
@@ -120,7 +121,7 @@ export async function getAllSitePages(ws: { webflowSiteId?: string; liveDomain?:
       const allPages = await listPages(ws.webflowSiteId, token);
       const published = filterPublishedPages(allPages);
       for (const p of published) {
-        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '/');
+        const pagePath = resolvePagePath(p);
         const key = pagePath.toLowerCase();
         if (!pageMap.has(key)) {
           const title = p.title || p.slug || 'Home';

@@ -3310,6 +3310,15 @@
           "status": "done"
         },
         {
+          "id": 363,
+          "title": "Shared path utilities + clear-on-reanalyze",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P1",
+          "notes": "Shipped — Extracted 4 shared path utilities (normalizePath, matchPagePath, findPageMapEntry, resolvePagePath) into server/helpers.ts + mirrored frontend src/lib/pathUtils.ts. Replaced 7 pageMap.find() call sites and 16 publishedPath||slug patterns across the codebase. Prevents future path matching bugs like #174. Also: 'Re-analyze All' now clears stale analysis fields from all pageMap entries before starting (preserves keyword assignments). Feature #175.",
+          "status": "done"
+        },
+        {
           "id": 362,
           "title": "Page analysis race condition + performance fixes",
           "source": "BUG FIX",

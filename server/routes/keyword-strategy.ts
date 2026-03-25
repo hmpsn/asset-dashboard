@@ -11,7 +11,7 @@ import {
   getGA4LandingPages,
   getGA4OrganicOverview,
 } from '../google-analytics.js';
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from '../helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath } from '../helpers.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
@@ -137,7 +137,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       const allPages = await listPages(ws.webflowSiteId, token);
       const published = filterPublishedPages(allPages);
       for (const p of published) {
-        const pagePath = p.publishedPath || `/${p.slug || ''}`;
+        const pagePath = resolvePagePath(p);
         wfMetaByPath.set(pagePath, {
           title: p.title || p.slug || '',
           seoTitle: p.seo?.title || '',

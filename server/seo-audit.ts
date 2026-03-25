@@ -6,6 +6,7 @@ import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
 import { auditPage, isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
+import { resolvePagePath } from './helpers.js';
 export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-page.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import { createLogger } from './logger.js';
@@ -143,7 +144,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
         // Use publishedPath for full URL (handles nested pages like /services/veneers)
-        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        const pagePath = resolvePagePath(page);
         const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
         const displaySlug = pagePath ? pagePath.replace(/^\//, '') : (page.slug || '');
         const [meta, html] = await Promise.all([

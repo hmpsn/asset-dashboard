@@ -20,7 +20,7 @@ import {
 } from '../client-users.js';
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
-import { applySuppressionsToAudit } from '../helpers.js';
+import { applySuppressionsToAudit, resolvePagePath } from '../helpers.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
@@ -245,7 +245,7 @@ async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPag
   const rest: string[] = [];
 
   for (const p of published) {
-    const pagePath = p.publishedPath || `/${p.slug || ''}`;
+    const pagePath = resolvePagePath(p);
     const url = baseUrl + pagePath;
     if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
     else rest.push(url);

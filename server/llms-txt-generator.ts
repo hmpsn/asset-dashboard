@@ -16,6 +16,7 @@ import { getWorkspace } from './workspaces.js';
 import { listMatrices } from './content-matrices.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('llms-txt');
@@ -76,7 +77,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
       const published = filterPublishedPages(allPages);
 
       for (const p of published) {
-        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '/');
+        const pagePath = resolvePagePath(p);
         pages.push({
           path: pagePath,
           title: p.title || slugToTitle(p.slug || 'Home'),

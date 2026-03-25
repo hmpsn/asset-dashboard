@@ -1,5 +1,6 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 import { callOpenAI } from './openai-helpers.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
 import { getBrief } from './content-brief.js';
@@ -1682,7 +1683,7 @@ export async function generateSchemaSuggestions(
     const chunkResults = await Promise.all(
       chunk.map(async (page) => {
         // Use publishedPath for full URL (handles nested pages like /about/team)
-        const pagePath = page.publishedPath || (page.slug ? `/${page.slug}` : '');
+        const pagePath = resolvePagePath(page);
         const url = (!pagePath || pagePath === '/' || page.slug === 'index') ? baseUrl : `${baseUrl}${pagePath}`;
         const isHomepage = !page.slug || page.slug === '' || page.slug === 'home' || page.slug === 'index';
         const [meta, html] = await Promise.all([

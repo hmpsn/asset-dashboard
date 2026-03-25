@@ -1,4 +1,5 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('link-checker');
@@ -165,7 +166,7 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string, dom
     const htmls = await Promise.all(
       chunk.map(p => {
         // Use publishedPath for full URL (handles nested pages like /about/team)
-        const pagePath = p.publishedPath || (p.slug ? `/${p.slug}` : '');
+        const pagePath = resolvePagePath(p);
         const url = pagePath ? `${baseUrl}${pagePath}` : baseUrl;
         return fetchPublishedHtml(url);
       })
