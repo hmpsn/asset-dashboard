@@ -114,9 +114,14 @@ export function PageEditRow({
               <X className="w-3 h-3" /> clear
             </button>
           )}
-          {hasRecFlag && <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400"><AlertTriangle className="w-3 h-3" />{metaRecs.length} rec{metaRecs.length > 1 ? 's' : ''}</span>}
-          {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
-          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">Missing desc</span>}
+          {hasRecFlag && (
+            <span className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <AlertTriangle className="w-3 h-3" />
+              {metaRecs.length === 1 ? metaRecs[0].title.length > 20 ? `${metaRecs[0].title.slice(0, 20)}...` : metaRecs[0].title : `${metaRecs.length} issues`}
+            </span>
+          )}
+          {!hasSeoTitle && !hasRecFlag && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">Missing title</span>}
+          {!hasSeoDesc && !hasRecFlag && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">Missing meta</span>}
           {edit?.dirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
         </div>
       </button>
@@ -133,14 +138,21 @@ export function PageEditRow({
         <div className="px-4 pb-4 space-y-3 bg-zinc-900/30">
           {/* Recommendation banners */}
           {metaRecs.map(rec => (
-            <div key={rec.id} className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
+            <div key={rec.id} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-amber-300">{rec.title}</div>
-                <div className="text-[11px] text-zinc-400 mt-0.5">{rec.insight}</div>
-                {rec.trafficAtRisk > 0 && (
-                  <div className="text-[11px] text-amber-400/70 mt-1">
-                    {rec.trafficAtRisk.toLocaleString()} clicks at risk · {rec.estimatedGain}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-medium text-amber-300">{rec.title}</div>
+                  {rec.trafficAtRisk > 0 && (
+                    <span className="text-[10px] text-amber-400/70">
+                      {rec.trafficAtRisk.toLocaleString()} clicks at risk
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-zinc-400 mt-1">{rec.insight}</div>
+                {rec.estimatedGain && (
+                  <div className="text-[10px] text-green-400/70 mt-1">
+                    Potential: {rec.estimatedGain}
                   </div>
                 )}
               </div>
@@ -149,7 +161,7 @@ export function PageEditRow({
                 rec.priority === 'fix_soon' ? 'bg-amber-500/15 text-amber-400' :
                 'bg-zinc-500/15 text-zinc-400'
               }`}>
-                {rec.priority.replace('_', ' ')}
+                {rec.priority === 'fix_now' ? 'Now' : rec.priority === 'fix_soon' ? 'Soon' : 'Later'}
               </span>
             </div>
           ))}
