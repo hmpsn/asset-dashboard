@@ -418,20 +418,28 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   };
 
   // Watch background job progress via WebSocket
+  const lastRefreshedAt = useRef(0);
   useEffect(() => {
     if (!bulkJobIdRef.current) return;
     const job = jobs.find(j => j.id === bulkJobIdRef.current);
     if (!job) return;
     if (job.status === 'running' || job.status === 'pending') {
-      setBulkProgress({ done: job.progress || 0, total: job.total || 0 });
+      const progress = job.progress || 0;
+      setBulkProgress({ done: progress, total: job.total || 0 });
+      // Refresh strategy cache periodically so analyzed count updates mid-run
+      if (progress > 0 && progress - lastRefreshedAt.current >= 5) {
+        lastRefreshedAt.current = progress;
+        queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+      }
     } else if (job.status === 'done') {
       setBulkProgress(null);
       bulkJobIdRef.current = null;
-      // Refresh strategy data to pick up persisted results
+      lastRefreshedAt.current = 0;
       queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
     } else if (job.status === 'error' || job.status === 'cancelled') {
       setBulkProgress(null);
       bulkJobIdRef.current = null;
+      lastRefreshedAt.current = 0;
       queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
     }
   }, [jobs, queryClient, workspaceId]);

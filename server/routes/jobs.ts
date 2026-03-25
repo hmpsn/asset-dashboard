@@ -55,7 +55,8 @@ import {
   updateWorkspace,
   type KeywordStrategy,
 } from '../workspaces.js';
-import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
+// SEMRush imports removed — bulk analysis skips SEMRush to conserve API credits.
+// Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
 import { buildKeywordMapContext } from '../seo-context.js';
 import { createLogger } from '../logger.js';
 
@@ -739,29 +740,9 @@ router.post('/api/jobs', async (req, res) => {
                   const effectiveTitle = page.seoTitle || htmlTitle || page.title;
                   const effectiveMeta = page.metaDesc || htmlMeta;
 
-                  // SEMRush enrichment (best-effort)
-                  let semrushBlock = '';
-                  if (isSemrushConfigured()) {
-                    try {
-                      const seed = effectiveTitle || page.title;
-                      const words = seed.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
-                      if (words.length > 0) {
-                        const phrase = words.slice(0, 5).join(' ');
-                        const [metrics, related] = await Promise.all([
-                          getKeywordOverview([phrase], paWsId).catch(() => []),
-                          getRelatedKeywords(phrase, paWsId, 10).catch(() => []),
-                        ]);
-                        if (metrics.length > 0) {
-                          const m = metrics[0];
-                          semrushBlock += `\n\nREAL KEYWORD DATA (from SEMRush — use these exact values):\n- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}`;
-                        }
-                        if (related.length > 0) {
-                          semrushBlock += `\nRELATED KEYWORDS:\n`;
-                          semrushBlock += related.slice(0, 10).map(r => `- "${r.keyword}" (vol: ${r.volume.toLocaleString()}/mo, KD: ${r.difficulty}/100)`).join('\n');
-                        }
-                      }
-                    } catch { /* best-effort */ }
-                  }
+                  // SEMRush enrichment — SKIPPED during bulk analysis to conserve API credits.
+                  // SEMRush data is fetched only for individual page analysis (frontend analyzePage).
+                  const semrushBlock = '';
 
                   // Call OpenAI for keyword analysis
                   const prompt = `You are an expert SEO strategist. Analyze this web page and provide a keyword analysis.

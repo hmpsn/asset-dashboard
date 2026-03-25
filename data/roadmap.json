@@ -3245,6 +3245,51 @@
           "priority": "P0",
           "notes": "Shipped — Webflow API caps at 100 items/request. cms-seo endpoint now paginates through ALL items with do/while loop. Sitemap discovery tries live domain first. CMS URL cap raised to 500. Feature #172.",
           "status": "done"
+        },
+        {
+          "id": 355,
+          "title": "AI Research Mode — Anti-Hallucination Prompt Blocks",
+          "source": "USER REQUEST (Reddit find: Anthropic docs anti-hallucination techniques)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Add toggleable 'research mode' prompt blocks to AI features that make factual claims. Three techniques from Anthropic docs: (1) Allow 'I don't know' — stops confident-sounding fiction. (2) Verify with citations — retract unsourced claims. (3) Direct quotes for factual grounding — extract verbatim before analyzing. Apply to: content briefs (competitor insights, SERP analysis), SEO audit AI recommendations, content post generation, admin chat. Do NOT apply to creative features (SEO rewrites, keyword brainstorming) — research shows citation constraints reduce creative output. Implementation: add researchMode flag to callOpenAI opts, inject prompt blocks conditionally.",
+          "status": "pending"
+        },
+        {
+          "id": 356,
+          "title": "E-E-A-T Asset Library — Personalized Trust Signal Recommendations",
+          "source": "USER REQUEST",
+          "est": "4-6h",
+          "priority": "P2",
+          "notes": "Current E-E-A-T guidance in content briefs is generic per-pillar text ('include case studies'). Gap: no inventory of what assets a client ACTUALLY has. Build: (1) Workspace-level E-E-A-T profile in settings — admin tags existing client assets: testimonials (with quotes + attribution), case studies (with URLs + metrics), certifications/credentials, before/after galleries, team bios/expertise, awards/recognition, data/research, client logos. (2) Content briefs inject specific asset recommendations: 'Add the Dr. Smith testimonial from /reviews' or 'Include the Acme Corp case study showing 40% conversion lift'. (3) Page Intelligence flags pages missing trust signals based on page type (service pages need testimonials, product pages need reviews, etc.). (4) Schema generator uses asset library for author/credential structured data. New DB table: eeat_assets (workspace_id, type, title, url, content, metadata JSON). New UI: settings tab or workspace profile section.",
+          "status": "pending"
+        },
+        {
+          "id": 357,
+          "title": "SEO Editor — Convert Bulk Analyze to Background Job",
+          "source": "TECH DEBT",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "SeoEditor.tsx line 351-358: sequential for-loop calling analyzePage() per page. Same bug PageIntelligence had — navigate away = lost progress. Convert to page-analysis background job or create seo-editor-analyze job type. Should reuse the page-analysis job infrastructure.",
+          "status": "pending"
+        },
+        {
+          "id": 358,
+          "title": "SEO Editor — Convert Bulk Rewrite Apply to Background Job",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "SeoEditor.tsx line 493-504: sequential for-loop pushing SEO changes to Webflow API one page at a time. Blocks UI during apply. Convert to server-side job that applies all previewed changes, reports progress via WebSocket. Lower priority than analyze — individual API calls are fast.",
+          "status": "pending"
+        },
+        {
+          "id": 359,
+          "title": "SEO Audit — Convert Accept All Fixes to Background Job",
+          "source": "TECH DEBT",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "SeoAudit.tsx line 309-319: sequential for-loop pushing fixes to Webflow API. Similar to SeoEditor bulk apply — blocks UI, lose progress on navigation. Convert to server-side job. Uses AbortController currently which is good, but should be a proper cancellable background job.",
+          "status": "pending"
         }
       ]
     }
