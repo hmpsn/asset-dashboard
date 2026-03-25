@@ -7,32 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { get } from '../../api/client.js';
 import { keywords } from '../../api/seo.js';
 import { workspaces } from '../../api/workspaces.js';
-
-interface KeywordStrategy {
-  id: string;
-  workspaceId: string;
-  businessContext?: string;
-  primaryKeywords: Array<{
-    keyword: string;
-    volume: number;
-    difficulty: number;
-    priority: 'high' | 'medium' | 'low';
-    targetPages: string[];
-  }>;
-  contentGaps: Array<{
-    keyword: string;
-    recommendedPageType: string;
-    priority: 'high' | 'medium' | 'low';
-    searchIntent: string;
-  }>;
-  competitorGaps: Array<{
-    keyword: string;
-    competitors: string[];
-    opportunity: 'high' | 'medium' | 'low';
-  }>;
-  lastUpdated: string;
-  status: 'generating' | 'ready' | 'error';
-}
+import type { KeywordStrategy } from '../../shared/types/workspace.ts';
 
 interface WorkspaceData {
   competitorDomains?: string[];
@@ -49,13 +24,13 @@ export function useKeywordStrategy(workspaceId: string) {
     queryKey: ['keyword-strategy', workspaceId],
     queryFn: async (): Promise<KeywordStrategyData> => {
       const [strategyResponse, semrushStatus, workspaceResponse] = await Promise.all([
-        workspaceId ? get<{ data: KeywordStrategy }>(`/api/keyword-strategy/${workspaceId}`).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+        workspaceId ? get<KeywordStrategy>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null) : Promise.resolve(null),
         keywords.semrushStatus().catch(() => ({ configured: false } as { configured?: boolean })),
         workspaceId ? workspaces.getById(workspaceId).catch(() => null) : Promise.resolve(null)
       ]);
       
       return {
-        strategy: strategyResponse.data || null,
+        strategy: strategyResponse || null,
         semrushAvailable: (semrushStatus as { configured?: boolean })?.configured || false,
         workspaceData: workspaceResponse as WorkspaceData | null
       };

@@ -68,8 +68,8 @@ export const schema = {
   remove: (wsId: string, pageId: string) =>
     del(`/api/schema/${wsId}/${pageId}`),
 
-  retract: (siteId: string, pageId: string) =>
-    del(`/api/webflow/schema-retract/${siteId}/${pageId}`),
+  retract: (wsId: string, pageId: string) =>
+    del(`/api/webflow/schema-retract/${wsId}/${pageId}`),
 
   bulkGenerate: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/schema/${wsId}/bulk-generate`, body),
@@ -108,7 +108,7 @@ export const keywords = {
     getOptional<unknown>(`/api/public/seo-strategy/${wsId}`),
 
   updateStrategy: (wsId: string, body: Record<string, unknown>) =>
-    patch<unknown>(`/api/keyword-strategy/${wsId}`, body),
+    patch<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
 
   webflowStrategy: (wsId: string) =>
     get<unknown>(`/api/webflow/keyword-strategy/${wsId}`),

@@ -144,7 +144,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Start SEO site audit',
         icon: Shield,
         type: 'action',
-        action: () => { fetch(`/api/audit-schedule/${selectedWorkspace!.id}`, { method: 'POST' }); addRecent('action:run-audit'); },
+        action: () => { fetch(`/api/audit-schedules/${selectedWorkspace!.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) }); addRecent('action:run-audit'); },
       });
       result.push({
         id: 'action:generate-schema',

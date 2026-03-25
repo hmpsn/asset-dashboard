@@ -26,10 +26,10 @@ export function useContentPipeline(workspaceId: string) {
     queryKey: ['content-pipeline', workspaceId],
     queryFn: async (): Promise<{ summary: PipelineSummary | null; decay: DecaySummary | null }> => {
       const [briefs, posts, matrices, decayData] = await Promise.all([
-        get(`/api/content/briefs/${workspaceId}`).catch(() => []),
-        get(`/api/content/posts/${workspaceId}`).catch(() => []),
-        get(`/api/content/matrices/${workspaceId}`).catch(() => []),
-        get(`/api/content/decay/${workspaceId}`).catch(() => null),
+        get(`/api/content-briefs/${workspaceId}`).catch(() => []),
+        get(`/api/content-posts/${workspaceId}`).catch(() => []),
+        get(`/api/content-matrices/${workspaceId}`).catch(() => []),
+        get(`/api/content-decay/${workspaceId}`).catch(() => null),
       ]);
       
       const briefArr = Array.isArray(briefs) ? briefs : [];
