@@ -175,6 +175,9 @@ export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKe
     primaryKeyword: p.primaryKeyword,
     secondaryKeywords: p.secondaryKeywords || [],
     searchIntent: p.searchIntent,
+    topicCluster: p.topicCluster,
+    contentGaps: p.contentGaps,
+    optimizationScore: p.optimizationScore,
   }));
   return { ctx, pageKeywordMap };
 }

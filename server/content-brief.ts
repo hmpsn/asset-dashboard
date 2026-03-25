@@ -1,5 +1,5 @@
 import db from './db/index.js';
-import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from './seo-context.js';
 import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
@@ -582,9 +582,18 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx, knowledgeBlock, personasBlock } = buildSeoContext(workspaceId);
+  const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx, knowledgeBlock, personasBlock, strategy } = buildSeoContext(workspaceId);
   const kwMapContext = buildKeywordMapContext(workspaceId);
   const bizCtx = context.businessContext || stratBizCtx;
+
+  // Find if any page in the strategy targets this keyword — inject its analysis data
+  const matchedPage = strategy?.pageMap?.find(p =>
+    p.primaryKeyword?.toLowerCase() === targetKeyword.toLowerCase()
+    || p.secondaryKeywords?.some(sk => sk.toLowerCase() === targetKeyword.toLowerCase())
+  );
+  const pageAnalysisBlock = matchedPage
+    ? buildPageAnalysisContext(workspaceId, matchedPage.pagePath)
+    : '';
 
   // Reference URL context (competitor/inspiration pages)
   const referenceBlock = context.scrapedReferences?.length
@@ -671,7 +680,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}
 
 Generate a content brief in the following JSON format:
 {

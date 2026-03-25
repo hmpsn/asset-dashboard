@@ -861,12 +861,33 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
   if (!pagePath) return res.status(400).json({ error: 'path query param required' });
   const token = getTokenForSite(siteId) || undefined;
   try {
+    // Try live domain first (CMS collection pages often only accessible there)
+    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
     const subdomain = await getSiteSubdomain(siteId, token);
-    if (!subdomain) return res.status(400).json({ error: 'Could not resolve site subdomain' });
-    const url = `https://${subdomain}.webflow.io${pagePath}`;
-    const htmlRes = await fetch(url, { redirect: 'follow' });
-    if (!htmlRes.ok) return res.status(htmlRes.status).json({ error: `Failed to fetch page: ${htmlRes.status}` });
-    const html = await htmlRes.text();
+    const urls: string[] = [];
+    if (ws?.liveDomain) {
+      const domain = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+      urls.push(`${domain.replace(/\/+$/, '')}${pagePath}`);
+    }
+    if (subdomain) urls.push(`https://${subdomain}.webflow.io${pagePath}`);
+    if (urls.length === 0) return res.status(400).json({ error: 'Could not resolve site URL' });
+
+    let html = '';
+    for (const url of urls) {
+      try {
+        const htmlRes = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' } });
+        if (htmlRes.ok) { html = await htmlRes.text(); break; }
+      } catch { /* try next URL */ }
+    }
+    if (!html) return res.status(404).json({ error: 'Failed to fetch page from live domain or webflow.io' });
+
+    // Extract title and meta description from HTML (critical for CMS pages that lack Webflow API seo data)
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const seoTitle = titleMatch ? titleMatch[1].trim() : undefined;
+    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+    const metaDescription = metaDescMatch ? metaDescMatch[1].trim() : undefined;
+
     // Extract body text: strip tags, scripts, styles
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const body = bodyMatch ? bodyMatch[1] : html;
@@ -880,7 +901,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 8000);
-    res.json({ text });
+    res.json({ text, seoTitle, metaDescription });
   } catch (e) {
     log.error({ err: e }, 'Page HTML fetch error');
     res.status(500).json({ error: 'Failed to fetch page content' });

@@ -14,6 +14,7 @@ import {
 import {
   getTokenForSite,
   updatePageState,
+  listWorkspaces,
 } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
@@ -69,15 +70,26 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
 
     let sitemapPaths: Set<string> | null = null;
     try {
+      // Try live domain first (CMS pages often only in live sitemap), then webflow.io
+      const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      const sitemapBases: string[] = [];
+      if (ws?.liveDomain) {
+        const domain = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+        sitemapBases.push(domain.replace(/\/+$/, ''));
+      }
       const subdomain = await getSiteSubdomain(req.params.siteId, token);
-      if (subdomain) {
-        const baseUrl = `https://${subdomain}.webflow.io`;
-        const sitemapUrls = await discoverSitemapUrls(baseUrl);
-        if (sitemapUrls.length > 0) {
-          sitemapPaths = new Set(sitemapUrls.map(u => {
-            try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch { return ''; }
-          }).filter(Boolean));
-        }
+      if (subdomain) sitemapBases.push(`https://${subdomain}.webflow.io`);
+
+      for (const base of sitemapBases) {
+        try {
+          const sitemapUrls = await discoverSitemapUrls(base);
+          if (sitemapUrls.length > 0) {
+            sitemapPaths = new Set(sitemapUrls.map(u => {
+              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch { return ''; }
+            }).filter(Boolean));
+            break; // use first successful sitemap
+          }
+        } catch { /* try next base URL */ }
       }
     } catch { /* sitemap fetch is best-effort */ }
 
@@ -102,12 +114,20 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
         return false;
       });
 
-      const limit = parseInt(req.query.limit as string) || 100;
-      const offset = parseInt(req.query.offset as string) || 0;
-      const { items, total } = await listCollectionItems(coll.id, limit, offset, token);
-      if (total === 0) continue;
+      // Paginate through ALL items (Webflow API caps at 100 per request)
+      const PAGE_SIZE = 100;
+      let allItems: Array<Record<string, unknown>> = [];
+      let fetchOffset = 0;
+      let totalItems = 0;
+      do {
+        const { items: batch, total: batchTotal } = await listCollectionItems(coll.id, PAGE_SIZE, fetchOffset, token);
+        totalItems = batchTotal;
+        allItems = allItems.concat(batch);
+        fetchOffset += PAGE_SIZE;
+      } while (fetchOffset < totalItems);
+      if (totalItems === 0) continue;
 
-      const liveItems = items.filter(item => {
+      const liveItems = allItems.filter(item => {
         const draft = item.isDraft as boolean | undefined;
         const archived = item.isArchived as boolean | undefined;
         return !draft && !archived;

@@ -3182,6 +3182,69 @@
           "priority": "P0",
           "notes": "Shipped — Merged Page Keyword Map and Page Analysis into single 'Page Intelligence' sidebar tab. New PageIntelligence.tsx component (790 lines). Strategy tab cleaned to strategy-only (removed per-page detail, PageKeywordMapPanel, Analysis sub-tab). Command Palette updated. Feature #167.",
           "status": "done"
+        },
+        {
+          "id": 348,
+          "title": "Page Intelligence — Full Analysis Persistence + Hydration",
+          "source": "USER REQUEST",
+          "est": "1h",
+          "priority": "P0",
+          "notes": "Shipped — All 15 KeywordData fields now persisted to strategy.pageMap (was 7). Hydration effect restores full analysis reports from persisted data on component load. Extended buildPageAnalysisContext() with optimization score, keyword presence gaps, competitor keywords, topic cluster, and difficulty.",
+          "status": "done"
+        },
+        {
+          "id": 349,
+          "title": "Page Intelligence Data Wired into Schema Generator, Content Briefs, Internal Links",
+          "source": "USER REQUEST",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Schema generator now receives topicCluster, contentGaps, optimizationScore per page via _pageAnalysis context. Content brief generator matches target keyword to pageMap and injects buildPageAnalysisContext(). Internal links now shows topic cluster annotations per page and groups cluster summaries for intra-cluster linking priority.",
+          "status": "done"
+        },
+        {
+          "id": 350,
+          "title": "Page Intelligence — Fix These First Priority Queue",
+          "source": "USER REQUEST",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — Auto-prioritized fix queue at top of Page Intelligence. Ranks pages by impact = impressions × (100 - optimizationScore) / 100. Shows top 5 pages with score badges and impact numbers. Click to expand page detail.",
+          "status": "done"
+        },
+        {
+          "id": 351,
+          "title": "Page Intelligence — Optimization Score History & Trending",
+          "source": "USER REQUEST",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Track optimization score snapshots over time (per page). Show sparkline trend in page list. Enable 'your average page health improved from X → Y this month' reporting. Requires new DB table or JSON snapshot storage.",
+          "status": "pending"
+        },
+        {
+          "id": 352,
+          "title": "Page Analysis — CMS Title/Meta Extraction + Live Domain Fetch",
+          "source": "BUG FIX",
+          "est": "0.5h",
+          "priority": "P0",
+          "notes": "Shipped — page-html endpoint now tries live domain first (CMS pages 404 on webflow.io). Extracts <title> and meta description from HTML and returns them. Frontend uses HTML-extracted values for CMS pages lacking Webflow API seo data. Feature #170.",
+          "status": "done"
+        },
+        {
+          "id": 353,
+          "title": "Page Analysis — Background Job System",
+          "source": "USER REQUEST",
+          "est": "1.5h",
+          "priority": "P0",
+          "notes": "Shipped — Bulk 'Analyze All Pages' moved from frontend loop to server-side job system. Job type page-analysis: discovers pages, fetches HTML, extracts meta, calls GPT-4.1-mini, persists all 15 fields. Batches of 3, cancellable, WebSocket progress. Feature #171.",
+          "status": "done"
+        },
+        {
+          "id": 354,
+          "title": "SEO Editor — Full Collection Item Pagination",
+          "source": "BUG FIX",
+          "est": "0.5h",
+          "priority": "P0",
+          "notes": "Shipped — Webflow API caps at 100 items/request. cms-seo endpoint now paginates through ALL items with do/while loop. Sitemap discovery tries live domain first. CMS URL cap raised to 500. Feature #172.",
+          "status": "done"
         }
       ]
     }

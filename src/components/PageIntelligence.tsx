@@ -11,6 +11,7 @@ import { keywords } from '../api/seo';
 import { useKeywordStrategy } from '../hooks/admin';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import type { FixContext } from '../App';
 
 // ── Types ──
@@ -200,6 +201,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const cancelBulkRef = useRef(false);
+  const { jobs, startJob, cancelJob: cancelBgJob } = useBackgroundTasks();
+  const bulkJobIdRef = useRef<string | null>(null);
 
   // Page list UI state
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -335,26 +338,34 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     setAnalyzing(prev => new Set(prev).add(page.id));
     try {
       let pageContent = '';
+      let htmlSeoTitle: string | undefined;
+      let htmlMetaDesc: string | undefined;
       try {
         const pagePath = page.publishedPath || page.path;
         if (pagePath) {
-          const result = await get<{ text?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
+          const result = await get<{ text?: string; seoTitle?: string; metaDescription?: string }>(`/api/webflow/page-html/${siteId}?path=${encodeURIComponent(pagePath)}`);
           pageContent = result.text || '';
+          htmlSeoTitle = result.seoTitle;
+          htmlMetaDesc = result.metaDescription;
         }
       } catch { /* best-effort */ }
+
+      // Use HTML-extracted title/meta for CMS pages that lack Webflow API seo data
+      const effectiveTitle = page.seo?.title || htmlSeoTitle || page.title;
+      const effectiveMeta = page.seo?.description || htmlMetaDesc;
 
       const [kwData, csData] = await Promise.all([
         post<KeywordData & { error?: string }>('/api/webflow/keyword-analysis', {
           pageTitle: page.title,
-          seoTitle: page.seo?.title,
-          metaDescription: page.seo?.description,
+          seoTitle: effectiveTitle,
+          metaDescription: effectiveMeta,
           slug: page.slug,
           pageContent,
         }),
         post<ContentScore & { error?: string }>('/api/webflow/content-score', {
           pageTitle: page.title,
-          seoTitle: page.seo?.title,
-          metaDescription: page.seo?.description,
+          seoTitle: effectiveTitle,
+          metaDescription: effectiveMeta,
           pageContent,
         }),
       ]);
@@ -398,29 +409,36 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     }
   };
 
-  const CONCURRENCY = 5;
-
+  // ── Bulk Analysis via Background Job ──
   const analyzeAllPages = async () => {
     cancelBulkRef.current = false;
-    // Skip pages already analyzed in this session OR with persisted analysis
-    const toAnalyze = unifiedPages.filter(p =>
-      !analyses[p.id] && !(p.strategy?.optimizationScore && p.strategy.optimizationScore > 0)
-    );
-    setBulkProgress({ done: 0, total: toAnalyze.length });
-
-    // Process in concurrent batches
-    let done = 0;
-    for (let i = 0; i < toAnalyze.length; i += CONCURRENCY) {
-      if (cancelBulkRef.current) break;
-      const batch = toAnalyze.slice(i, i + CONCURRENCY);
-      await Promise.all(batch.map(page => analyzePage(page)));
-      done += batch.length;
-      setBulkProgress({ done: Math.min(done, toAnalyze.length), total: toAnalyze.length });
+    setBulkProgress({ done: 0, total: unifiedPages.length });
+    const jobId = await startJob('page-analysis', { siteId, workspaceId });
+    if (jobId) {
+      bulkJobIdRef.current = jobId;
+    } else {
+      setBulkProgress(null);
     }
-
-    setBulkProgress(prev => prev ? { ...prev, done: prev.total } : null);
-    setTimeout(() => setBulkProgress(null), 3000);
   };
+
+  // Watch background job progress via WebSocket
+  useEffect(() => {
+    if (!bulkJobIdRef.current) return;
+    const job = jobs.find(j => j.id === bulkJobIdRef.current);
+    if (!job) return;
+    if (job.status === 'running' || job.status === 'pending') {
+      setBulkProgress({ done: job.progress || 0, total: job.total || 0 });
+    } else if (job.status === 'done') {
+      setBulkProgress(null);
+      bulkJobIdRef.current = null;
+      // Refresh strategy data to pick up persisted results
+      queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+    } else if (job.status === 'error' || job.status === 'cancelled') {
+      setBulkProgress(null);
+      bulkJobIdRef.current = null;
+      queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+    }
+  }, [jobs, queryClient, workspaceId]);
 
   // ── Keyword Editing ──
   const startEdit = (page: UnifiedPage) => {
@@ -516,6 +534,22 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const cmsCount = unifiedPages.filter(p => p.source === 'cms').length;
   const withStrategy = unifiedPages.filter(p => p.strategy).length;
 
+  // ── Fix Queue: score × traffic impact ranking ──
+  const fixQueue = unifiedPages
+    .map(p => {
+      const score = analyses[p.id]?.optimizationScore ?? p.strategy?.optimizationScore;
+      const impressions = p.strategy?.impressions || 0;
+      if (score === undefined || score === null) return null;
+      // Impact = traffic potential lost due to poor optimization
+      const impact = impressions > 0
+        ? Math.round(impressions * (100 - score) / 100)
+        : Math.max(1, 100 - score); // fallback: pure score gap
+      return { page: p, score, impressions, impact };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null && x.score < 75)
+    .sort((a, b) => b.impact - a.impact)
+    .slice(0, 5);
+
   const loading = strategyLoading || pagesLoading;
 
   if (loading) {
@@ -545,7 +579,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
             <span className="text-xs text-zinc-300">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
-            <button onClick={() => { cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
+            <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
           </div>
         ) : (
           <button
@@ -562,6 +596,40 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           </button>
         )}
       </div>
+
+      {/* Fix These First — impact-ranked priority queue */}
+      {fixQueue.length > 0 && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-semibold text-amber-300">Fix These First</span>
+            <span className="text-[10px] text-zinc-500 ml-auto">ranked by traffic × optimization gap</span>
+          </div>
+          <div className="space-y-1.5">
+            {fixQueue.map((item, i) => (
+              <button
+                key={item.page.id}
+                onClick={() => setExpanded(expanded === item.page.id ? null : item.page.id)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-800/50 transition-colors text-left"
+              >
+                <span className="text-[10px] font-mono text-zinc-500 w-4">{i + 1}.</span>
+                <span className="text-[11px] text-zinc-200 truncate flex-1">{item.page.title || item.page.path}</span>
+                {item.impressions > 0 && (
+                  <span className="text-[10px] text-zinc-500">{item.impressions.toLocaleString()} imp</span>
+                )}
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                  item.score < 40 ? 'text-red-400 bg-red-500/10' :
+                  item.score < 60 ? 'text-amber-400 bg-amber-500/10' :
+                  'text-yellow-400 bg-yellow-500/10'
+                }`}>
+                  {item.score}/100
+                </span>
+                <span className="text-[10px] text-amber-400/70 font-mono w-12 text-right">↑{item.impact}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search + Sort */}
       <div className="flex items-center gap-2">

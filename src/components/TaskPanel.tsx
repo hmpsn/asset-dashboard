@@ -11,6 +11,7 @@ const TYPE_LABELS: Record<string, string> = {
   'sales-report': 'Sales Report',
   'schema-generator': 'Schema Generator',
   'keyword-strategy': 'Keyword Strategy',
+  'page-analysis': 'Page Analysis',
 };
 
 function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: () => void; onCancel: () => void }) {

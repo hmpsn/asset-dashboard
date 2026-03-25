@@ -40,6 +40,10 @@ import {
   updatePageSeo,
   uploadAsset,
   getSiteSubdomain,
+  listPages,
+  filterPublishedPages,
+  discoverCmsUrls,
+  buildStaticPathSet,
 } from '../webflow.js';
 import {
   listWorkspaces,
@@ -48,7 +52,11 @@ import {
   getClientPortalUrl,
   updatePageState,
   getBrandName,
+  updateWorkspace,
+  type KeywordStrategy,
 } from '../workspaces.js';
+import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
+import { buildKeywordMapContext } from '../seo-context.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('jobs');
@@ -590,6 +598,278 @@ router.post('/api/jobs', async (req, res) => {
           } catch (err) {
             if (!isJobCancelled(job.id)) {
               updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Schema generation failed' });
+            }
+          }
+        })();
+        break;
+      }
+
+      case 'page-analysis': {
+        const paSiteId = params.siteId as string;
+        const paWsId = params.workspaceId as string;
+        if (!paSiteId || !paWsId) return res.status(400).json({ error: 'siteId and workspaceId required' });
+        const activePA = hasActiveJob('page-analysis', paWsId);
+        if (activePA) return res.status(409).json({ error: 'Page analysis is already running', jobId: activePA.id });
+        const paToken = getTokenForSite(paSiteId) || undefined;
+        const paJob = createJob('page-analysis', { message: 'Discovering pages...', workspaceId: paWsId });
+        registerAbort(paJob.id);
+        res.json({ jobId: paJob.id });
+
+        (async () => {
+          try {
+            updateJob(paJob.id, { status: 'running', message: 'Discovering pages...' });
+
+            // 1. Discover all pages (static + CMS)
+            const allPages = await listPages(paSiteId, paToken);
+            const published = filterPublishedPages(allPages);
+            interface PageItem { id: string; title: string; slug: string; path: string; source: 'static' | 'cms'; seoTitle?: string; metaDesc?: string }
+            const pages: PageItem[] = published.map(p => ({
+              id: p.id,
+              title: p.title,
+              slug: p.slug || '',
+              path: p.publishedPath || (p.slug ? `/${p.slug}` : '/'),
+              source: 'static' as const,
+              seoTitle: p.seo?.title || undefined,
+              metaDesc: p.seo?.description || undefined,
+            }));
+
+            // Discover CMS pages from sitemap
+            const paWs = getWorkspace(paWsId);
+            let baseUrl = '';
+            if (paWs?.liveDomain) {
+              baseUrl = paWs.liveDomain.startsWith('http') ? paWs.liveDomain : `https://${paWs.liveDomain}`;
+            } else {
+              const sub = await getSiteSubdomain(paSiteId, paToken);
+              if (sub) baseUrl = `https://${sub}.webflow.io`;
+            }
+            if (baseUrl) {
+              try {
+                const staticPaths = buildStaticPathSet(allPages);
+                const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
+                for (const cms of cmsUrls) {
+                  pages.push({
+                    id: `cms-${cms.path.replace(/\//g, '-')}`,
+                    title: cms.pageName,
+                    slug: cms.path.replace(/^\//, ''),
+                    path: cms.path,
+                    source: 'cms',
+                  });
+                }
+              } catch { /* CMS discovery failed — continue with static pages */ }
+            }
+
+            // 2. Skip already-analyzed pages
+            const existingMap = paWs?.keywordStrategy?.pageMap || [];
+            const toAnalyze = pages.filter(p => {
+              const normalized = p.path.startsWith('/') ? p.path : `/${p.path}`;
+              const existing = existingMap.find(e =>
+                e.pagePath === normalized || normalized.includes(e.pagePath) || e.pagePath.includes(normalized)
+              );
+              return !existing?.optimizationScore || existing.optimizationScore <= 0;
+            });
+
+            const total = toAnalyze.length;
+            updateJob(paJob.id, { message: `Analyzing ${total} pages (${pages.length - total} already done)...`, total, progress: 0 });
+
+            if (total === 0) {
+              updateJob(paJob.id, { status: 'done', message: `All ${pages.length} pages already analyzed`, progress: pages.length, total: pages.length });
+              return;
+            }
+
+            // 3. Process pages in batches
+            const BATCH = 3;
+            let done = 0;
+            const openaiKey = process.env.OPENAI_API_KEY;
+            if (!openaiKey) {
+              updateJob(paJob.id, { status: 'error', error: 'OPENAI_API_KEY not configured' });
+              return;
+            }
+
+            const { fullContext } = buildSeoContext(paWsId);
+            const kwMapCtx = buildKeywordMapContext(paWsId);
+
+            const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
+
+            for (let i = 0; i < toAnalyze.length; i += BATCH) {
+              if (isJobCancelled(paJob.id)) break;
+              const batch = toAnalyze.slice(i, i + BATCH);
+
+              await Promise.all(batch.map(async (page) => {
+                if (isJobCancelled(paJob.id)) return;
+                try {
+                  // Fetch HTML from live domain
+                  let html = '';
+                  const urls: string[] = [];
+                  if (baseUrl) urls.push(`${baseUrl.replace(/\/+$/, '')}${page.path}`);
+                  const sub = await getSiteSubdomain(paSiteId, paToken);
+                  if (sub) urls.push(`https://${sub}.webflow.io${page.path}`);
+                  for (const url of urls) {
+                    try {
+                      const r = await fetch(url, { redirect: 'follow', headers: FETCH_HEADERS });
+                      if (r.ok) { html = await r.text(); break; }
+                    } catch { /* try next */ }
+                  }
+
+                  // Extract title, meta desc, body text
+                  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+                  const htmlTitle = titleMatch ? titleMatch[1].trim() : undefined;
+                  const metaMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
+                    || html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+                  const htmlMeta = metaMatch ? metaMatch[1].trim() : undefined;
+
+                  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                  const body = bodyMatch ? bodyMatch[1] : html;
+                  const pageContent = body
+                    .replace(/<script[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[\s\S]*?<\/style>/gi, '')
+                    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+                    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/&[a-z]+;/gi, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .slice(0, 8000);
+
+                  const effectiveTitle = page.seoTitle || htmlTitle || page.title;
+                  const effectiveMeta = page.metaDesc || htmlMeta;
+
+                  // SEMRush enrichment (best-effort)
+                  let semrushBlock = '';
+                  if (isSemrushConfigured()) {
+                    try {
+                      const seed = effectiveTitle || page.title;
+                      const words = seed.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
+                      if (words.length > 0) {
+                        const phrase = words.slice(0, 5).join(' ');
+                        const [metrics, related] = await Promise.all([
+                          getKeywordOverview([phrase], paWsId).catch(() => []),
+                          getRelatedKeywords(phrase, paWsId, 10).catch(() => []),
+                        ]);
+                        if (metrics.length > 0) {
+                          const m = metrics[0];
+                          semrushBlock += `\n\nREAL KEYWORD DATA (from SEMRush — use these exact values):\n- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}`;
+                        }
+                        if (related.length > 0) {
+                          semrushBlock += `\nRELATED KEYWORDS:\n`;
+                          semrushBlock += related.slice(0, 10).map(r => `- "${r.keyword}" (vol: ${r.volume.toLocaleString()}/mo, KD: ${r.difficulty}/100)`).join('\n');
+                        }
+                      }
+                    } catch { /* best-effort */ }
+                  }
+
+                  // Call OpenAI for keyword analysis
+                  const prompt = `You are an expert SEO strategist. Analyze this web page and provide a keyword analysis.
+
+Page title: ${page.title}
+SEO title: ${effectiveTitle || '(same as page title)'}
+Meta description: ${effectiveMeta || '(none)'}
+URL slug: /${page.slug || ''}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}${semrushBlock}
+
+Provide your analysis as a JSON object:
+{
+  "primaryKeyword": "the single best target keyword",
+  "primaryKeywordPresence": { "inTitle": true/false, "inMeta": true/false, "inContent": true/false, "inSlug": true/false },
+  "secondaryKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
+  "longTailKeywords": ["phrase1", "phrase2", "phrase3"],
+  "searchIntent": "informational | transactional | navigational | commercial",
+  "searchIntentConfidence": 0.0-1.0,
+  "contentGaps": ["gap1"],
+  "competitorKeywords": ["comp kw1", "comp kw2"],
+  "optimizationScore": 0-100,
+  "optimizationIssues": ["issue1"],
+  "recommendations": ["rec1", "rec2"],
+  "estimatedDifficulty": "low | medium | high",
+  "keywordDifficulty": 0-100,
+  "monthlyVolume": 0,
+  "topicCluster": "broader topic cluster"
+}
+
+IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONLY valid JSON.`;
+
+                  const aiResult = await callOpenAI({
+                    model: 'gpt-4.1-mini',
+                    messages: [{ role: 'user', content: prompt }],
+                    maxTokens: 1000,
+                    temperature: 0.4,
+                    feature: 'keyword-analysis',
+                    workspaceId: paWsId,
+                  });
+
+                  const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+
+                  // Persist to workspace strategy
+                  const ws = getWorkspace(paWsId);
+                  if (ws) {
+                    const strategy: KeywordStrategy = ws.keywordStrategy || { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: new Date().toISOString() };
+                    const pageMap = strategy.pageMap || [];
+                    const normalized = page.path.startsWith('/') ? page.path : `/${page.path}`;
+                    const entry = pageMap.find(p => p.pagePath === normalized || normalized.includes(p.pagePath) || p.pagePath.includes(normalized));
+                    const now = new Date().toISOString();
+
+                    if (entry) {
+                      if (analysis.primaryKeyword) entry.primaryKeyword = analysis.primaryKeyword;
+                      if (analysis.secondaryKeywords?.length) entry.secondaryKeywords = analysis.secondaryKeywords;
+                      if (analysis.searchIntent) entry.searchIntent = analysis.searchIntent;
+                      entry.optimizationIssues = analysis.optimizationIssues || [];
+                      entry.recommendations = analysis.recommendations || [];
+                      entry.contentGaps = analysis.contentGaps || [];
+                      entry.optimizationScore = analysis.optimizationScore;
+                      entry.analysisGeneratedAt = now;
+                      if (analysis.primaryKeywordPresence) entry.primaryKeywordPresence = analysis.primaryKeywordPresence;
+                      if (analysis.longTailKeywords) entry.longTailKeywords = analysis.longTailKeywords;
+                      if (analysis.competitorKeywords) entry.competitorKeywords = analysis.competitorKeywords;
+                      if (analysis.estimatedDifficulty) entry.estimatedDifficulty = analysis.estimatedDifficulty;
+                      if (analysis.keywordDifficulty !== undefined) entry.keywordDifficulty = analysis.keywordDifficulty;
+                      if (analysis.monthlyVolume !== undefined) entry.monthlyVolume = analysis.monthlyVolume;
+                      if (analysis.topicCluster) entry.topicCluster = analysis.topicCluster;
+                      if (analysis.searchIntentConfidence !== undefined) entry.searchIntentConfidence = analysis.searchIntentConfidence;
+                    } else {
+                      pageMap.push({
+                        pagePath: normalized,
+                        pageTitle: page.title,
+                        primaryKeyword: analysis.primaryKeyword || '',
+                        secondaryKeywords: analysis.secondaryKeywords || [],
+                        searchIntent: analysis.searchIntent,
+                        optimizationIssues: analysis.optimizationIssues || [],
+                        recommendations: analysis.recommendations || [],
+                        contentGaps: analysis.contentGaps || [],
+                        optimizationScore: analysis.optimizationScore,
+                        analysisGeneratedAt: now,
+                        primaryKeywordPresence: analysis.primaryKeywordPresence,
+                        longTailKeywords: analysis.longTailKeywords || [],
+                        competitorKeywords: analysis.competitorKeywords || [],
+                        estimatedDifficulty: analysis.estimatedDifficulty,
+                        keywordDifficulty: analysis.keywordDifficulty,
+                        monthlyVolume: analysis.monthlyVolume,
+                        topicCluster: analysis.topicCluster,
+                        searchIntentConfidence: analysis.searchIntentConfidence,
+                      });
+                    }
+                    strategy.pageMap = pageMap;
+                    updateWorkspace(paWsId, { keywordStrategy: strategy });
+                  }
+                } catch (err) {
+                  log.warn({ err, page: page.path }, 'Page analysis failed for individual page');
+                }
+              }));
+
+              done += batch.length;
+              updateJob(paJob.id, { progress: Math.min(done, total), message: `Analyzed ${Math.min(done, total)}/${total} pages...` });
+
+              // Rate limit between batches
+              if (i + BATCH < toAnalyze.length) await new Promise(r => setTimeout(r, 1500));
+            }
+
+            if (isJobCancelled(paJob.id)) {
+              updateJob(paJob.id, { status: 'cancelled', message: `Cancelled — ${done} of ${total} pages analyzed` });
+            } else {
+              updateJob(paJob.id, { status: 'done', progress: total, total, message: `Done — ${total} pages analyzed` });
+            }
+            addActivity(paWsId, 'page_analysis', `Bulk page analysis completed — ${done} pages`, `${pages.length} total pages, ${total} analyzed`);
+          } catch (err) {
+            if (!isJobCancelled(paJob.id)) {
+              updateJob(paJob.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Page analysis failed' });
             }
           }
         })();

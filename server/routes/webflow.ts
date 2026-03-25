@@ -141,7 +141,7 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
 
       if (baseUrl) {
         const staticPaths = buildStaticPathSet(allPages);
-        const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 100);
+        const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 500);
         for (const cms of cmsUrls) {
           result.push({
             id: `cms-${cms.path.replace(/\//g, '-')}`,

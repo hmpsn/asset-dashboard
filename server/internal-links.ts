@@ -278,13 +278,29 @@ export async function analyzeInternalLinks(
     return `PATH: ${p.path}\nTITLE: ${p.title}\nCONTENT: ${p.contentSnippet.slice(0, 600)}\n${links}`;
   }).join('\n\n---\n\n');
 
-  // Get keyword strategy for extra context
+  // Get keyword strategy for extra context (including topic clusters for intra-cluster linking)
   let kwContext = '';
   if (ws?.keywordStrategy?.pageMap) {
     const kwMap = ws.keywordStrategy.pageMap.map(
-      (pm: { pagePath: string; primaryKeyword: string }) => `${pm.pagePath}: "${pm.primaryKeyword}"`
+      (pm: { pagePath: string; primaryKeyword: string; topicCluster?: string }) =>
+        `${pm.pagePath}: "${pm.primaryKeyword}"${pm.topicCluster ? ` [cluster: ${pm.topicCluster}]` : ''}`
     ).join('\n');
     kwContext = `\n\nKeyword targets per page:\n${kwMap}`;
+
+    // Build cluster summary for AI to prioritize intra-cluster links
+    const clusters = new Map<string, string[]>();
+    for (const pm of ws.keywordStrategy.pageMap) {
+      if (pm.topicCluster) {
+        if (!clusters.has(pm.topicCluster)) clusters.set(pm.topicCluster, []);
+        clusters.get(pm.topicCluster)!.push(pm.pagePath);
+      }
+    }
+    if (clusters.size > 0) {
+      kwContext += `\n\nTOPIC CLUSTERS (prioritize linking between pages in the same cluster):\n`;
+      for (const [cluster, paths] of clusters) {
+        kwContext += `- "${cluster}": ${paths.join(', ')}\n`;
+      }
+    }
   }
 
   // Add business knowledge + personas for better link priority and anchor text

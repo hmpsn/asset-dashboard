@@ -49,6 +49,7 @@ export type ActivityType =
   | 'subscription_cancelled'
   | 'invoice_paid'
   | 'invoice_failed'
+  | 'page_analysis'
   | 'note';
 
 export interface ActivityEntry {

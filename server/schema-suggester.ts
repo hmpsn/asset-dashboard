@@ -96,6 +96,7 @@ export interface SchemaContext {
   _pageNode?: import('./site-architecture.js').SiteNode;            // Current page's node in the tree
   _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
   _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
+  _pageAnalysis?: { topicCluster?: string; contentGaps?: string[]; optimizationScore?: number };  // Internal: from Page Intelligence
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -1305,6 +1306,15 @@ async function aiGenerateUnifiedSchema(
     keywordBlock = `\nTARGET KEYWORDS FOR THIS PAGE:\n- Primary: ${ctx.pageKeywords.primary}\n- Secondary: ${ctx.pageKeywords.secondary.join(', ') || 'none'}`;
     if (ctx.searchIntent) keywordBlock += `\n- Search Intent: ${ctx.searchIntent}`;
   }
+  if (ctx._pageAnalysis?.topicCluster) {
+    keywordBlock += `\n- Topic Cluster: ${ctx._pageAnalysis.topicCluster}`;
+  }
+  if (ctx._pageAnalysis?.contentGaps?.length) {
+    keywordBlock += `\nCONTENT GAPS (consider schema types that address these): ${ctx._pageAnalysis.contentGaps.slice(0, 5).join('; ')}`;
+  }
+  if (ctx._pageAnalysis?.optimizationScore) {
+    keywordBlock += `\n- Page Optimization Score: ${ctx._pageAnalysis.optimizationScore}/100`;
+  }
   if (ctx.siteKeywords?.length) {
     keywordBlock += `\nSITE-LEVEL KEYWORDS: ${ctx.siteKeywords.slice(0, 10).join(', ')}`;
   }
@@ -1612,7 +1622,7 @@ export async function generateSchemaSuggestions(
   siteId: string,
   tokenOverride?: string,
   ctx: SchemaContext = {},
-  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[],
+  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[],
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
   isCancelled?: () => boolean,
 ): Promise<SchemaPageSuggestion[]> {
@@ -1656,6 +1666,13 @@ export async function generateSchemaSuggestions(
     const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
     return pageKeywordMap.find(p => p.pagePath === normalized || p.pagePath === `${normalized}/`)?.searchIntent;
   };
+  const getPageAnalysis = (pathOrSlug: string): SchemaContext['_pageAnalysis'] => {
+    if (!pageKeywordMap) return undefined;
+    const normalized = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
+    const match = pageKeywordMap.find(p => p.pagePath === normalized || p.pagePath === `${normalized}/`);
+    if (!match || (!match.topicCluster && !match.contentGaps?.length && !match.optimizationScore)) return undefined;
+    return { topicCluster: match.topicCluster, contentGaps: match.contentGaps, optimizationScore: match.optimizationScore };
+  };
 
   for (let i = 0; i < pages.length; i += batch) {
     if (isCancelled?.()) { log.info('Cancelled by user'); return results; }
@@ -1685,6 +1702,7 @@ export async function generateSchemaSuggestions(
           pageKeywords: getPageKeywords(lookupPath),
           searchIntent: getPageIntent(lookupPath),
           _planContext: planContext || undefined,
+          _pageAnalysis: getPageAnalysis(lookupPath),
         };
 
         let suggestedSchemas: SchemaSuggestion[];
@@ -1765,6 +1783,7 @@ export async function generateSchemaSuggestions(
             ...ctx,
             pageKeywords: getPageKeywords(slug),
             searchIntent: getPageIntent(slug),
+            _pageAnalysis: getPageAnalysis(slug),
           };
 
           let suggestedSchemas: SchemaSuggestion[];
