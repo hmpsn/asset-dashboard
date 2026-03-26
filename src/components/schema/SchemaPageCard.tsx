@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
-  Loader2, Save, Trash2,
+  Loader2, Save, Trash2, Star,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -19,6 +19,13 @@ interface SchemaSuggestion {
   template: Record<string, unknown>;
 }
 
+interface RichResultEligibility {
+  type: string;
+  eligible: boolean;
+  feature: string;
+  missingFields?: string[];
+}
+
 interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
@@ -28,6 +35,7 @@ interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
 }
 
 interface Recommendation {
@@ -95,6 +103,7 @@ export function SchemaPageCard({
   const hasErrors = (page.validationErrors?.length || 0) > 0;
   const schema = page.suggestedSchemas[0];
   const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
+  const eligibleCount = page.richResultsEligibility?.filter(r => r.eligible).length || 0;
 
   return (
     <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`}>
@@ -121,6 +130,11 @@ export function SchemaPageCard({
               <Sparkles className="w-3 h-3" /> {graphTypes.length} types
             </span>
           )}
+          {eligibleCount > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20" title={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`}>
+              <Star className="w-3 h-3" /> {eligibleCount} rich
+            </span>
+          )}
           {hasErrors && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <AlertCircle className="w-3 h-3" /> {page.validationErrors!.length}
@@ -140,17 +154,23 @@ export function SchemaPageCard({
           >
             <option value="auto">Auto-detect</option>
             <option value="homepage">Homepage</option>
-            <option value="service">Service</option>
-            <option value="pillar">Pillar / Hub</option>
-            <option value="persona">Persona</option>
+            <option value="pillar">Pillar / Product Page</option>
+            <option value="service">Service Page</option>
+            <option value="audience">Audience / Use Case</option>
+            <option value="lead-gen">Lead-Gen / Conversion</option>
             <option value="blog">Blog Post</option>
             <option value="about">About / Team</option>
             <option value="contact">Contact</option>
             <option value="location">Location</option>
             <option value="product">Product</option>
-            <option value="landing">Landing Page</option>
+            <option value="partnership">Partnership</option>
             <option value="faq">FAQ</option>
             <option value="case-study">Case Study</option>
+            <option value="comparison">Comparison</option>
+            <option value="author">Author Profile</option>
+            <option value="howto">How-To / Tutorial</option>
+            <option value="video">Video Page</option>
+            <option value="generic">General Page</option>
           </select>
           <button
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
@@ -228,6 +248,31 @@ export function SchemaPageCard({
             </div>
             <p className="text-[11px] text-zinc-500 mt-1.5">{schema.reason}</p>
           </div>
+
+          {/* Rich Results Eligibility */}
+          {page.richResultsEligibility && page.richResultsEligibility.length > 0 && (
+            <div className="px-4 py-2 border-b border-zinc-800/50">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Star className="w-3 h-3 text-amber-400" />
+                <div className="text-xs font-medium text-zinc-400">Rich Results</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {page.richResultsEligibility.map((r, i) => (
+                  r.eligible ? (
+                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-green-500/10 text-green-400 border border-green-500/20" title={`Eligible for: ${r.feature}`}>
+                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                      {r.type}: {r.feature}
+                    </span>
+                  ) : (
+                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/20" title={`Missing for ${r.feature}: ${r.missingFields?.join(', ')}`}>
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      {r.type}: missing {r.missingFields?.join(', ')}
+                    </span>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Schema preview / diff / editor */}
           <div className="px-4 py-3">

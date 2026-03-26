@@ -16,6 +16,13 @@ function getToken(tokenOverride?: string): string | null {
   return tokenOverride || process.env.WEBFLOW_API_TOKEN || null;
 }
 
+export interface RichResultEligibility {
+  type: string;
+  eligible: boolean;
+  feature: string;
+  missingFields?: string[];
+}
+
 export interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
@@ -25,6 +32,8 @@ export interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
+  savedPageType?: string;  // Persisted page type from DB
 }
 
 export interface SchemaSuggestion {
@@ -81,6 +90,60 @@ export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; s
   video: { primary: ['VideoObject'], secondary: ['Article', 'BreadcrumbList'] },
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
+
+// ── Rich Results Eligibility ──────────────────────────────────────────────────
+
+/** Google-supported rich result types and the fields they require. */
+const RICH_RESULTS_ELIGIBLE: Record<string, { feature: string; required: string[] }> = {
+  FAQPage:       { feature: 'FAQ accordion in search',        required: ['mainEntity'] },
+  HowTo:         { feature: 'How-to steps in search',         required: ['name', 'step'] },
+  VideoObject:   { feature: 'Video carousel',                 required: ['name', 'uploadDate', 'thumbnailUrl'] },
+  Article:       { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
+  NewsArticle:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
+  BlogPosting:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
+  Product:       { feature: 'Product rich result',            required: ['name', 'offers'] },
+  LocalBusiness: { feature: 'Local business panel',           required: ['name', 'address'] },
+  Event:         { feature: 'Event listing',                  required: ['name', 'startDate', 'location'] },
+  Recipe:        { feature: 'Recipe rich result',             required: ['name', 'image', 'recipeIngredient', 'recipeInstructions'] },
+  JobPosting:    { feature: 'Job listing in search',          required: ['title', 'hiringOrganization', 'jobLocation', 'datePosted', 'description'] },
+  BreadcrumbList: { feature: 'Breadcrumb trail in search',    required: ['itemListElement'] },
+  Course:        { feature: 'Course info in search',          required: ['name', 'description', 'provider'] },
+  Speakable:     { feature: 'Speakable for voice assistants', required: ['cssSelector'] },
+};
+
+/**
+ * Check which schema types in a @graph qualify for Google Rich Results,
+ * and what fields are missing for those that don't yet qualify.
+ */
+export function checkRichResultsEligibility(schema: Record<string, unknown>): RichResultEligibility[] {
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph)) return [];
+
+  const results: RichResultEligibility[] = [];
+
+  for (const node of graph) {
+    const type = node['@type'] as string;
+    if (!type || !RICH_RESULTS_ELIGIBLE[type]) continue;
+
+    const { feature, required } = RICH_RESULTS_ELIGIBLE[type];
+    const missingFields = required.filter(field => {
+      const val = node[field];
+      if (val === undefined || val === null) return true;
+      if (Array.isArray(val) && val.length === 0) return true;
+      if (typeof val === 'string' && val.trim() === '') return true;
+      return false;
+    });
+
+    results.push({
+      type,
+      feature,
+      eligible: missingFields.length === 0,
+      missingFields: missingFields.length > 0 ? missingFields : undefined,
+    });
+  }
+
+  return results;
+}
 
 // Context from the workspace/strategy for richer schema generation
 export interface SchemaContext {
@@ -1776,6 +1839,11 @@ export async function generateSchemaForPage(
     validationErrors = validateUnifiedSchema(fallback);
   }
 
+  // Compute Rich Results eligibility from the generated schema
+  const richResultsEligibility = suggestedSchemas[0]?.template
+    ? checkRichResultsEligibility(suggestedSchemas[0].template)
+    : undefined;
+
   return {
     pageId,
     pageTitle: meta.title,
@@ -1785,6 +1853,8 @@ export async function generateSchemaForPage(
     existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
     suggestedSchemas,
     validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+    richResultsEligibility: richResultsEligibility?.length ? richResultsEligibility : undefined,
+    savedPageType: ctx.pageType && ctx.pageType !== 'auto' ? ctx.pageType : undefined,
   };
 }
 

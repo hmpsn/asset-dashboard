@@ -30,6 +30,13 @@ interface SchemaSuggestion {
   template: Record<string, unknown>;
 }
 
+interface RichResultEligibility {
+  type: string;
+  eligible: boolean;
+  feature: string;
+  missingFields?: string[];
+}
+
 interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
@@ -39,6 +46,7 @@ interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
 }
 
 interface CmsTemplatePage {
@@ -141,8 +149,30 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       setData(snapshotData.results as SchemaPageSuggestion[]);
       setSnapshotDate(snapshotData.createdAt);
       setStarted(true);
+      // Hydrate page types from savedPageType on each result (don't overwrite locally-set types)
+      const typesFromSnapshot: Record<string, string> = {};
+      for (const r of snapshotData.results as SchemaPageSuggestion[]) {
+        if ((r as unknown as { savedPageType?: string }).savedPageType) {
+          typesFromSnapshot[r.pageId] = (r as unknown as { savedPageType?: string }).savedPageType!;
+        }
+      }
+      if (Object.keys(typesFromSnapshot).length > 0) {
+        setPageTypes(prev => ({ ...typesFromSnapshot, ...prev }));
+      }
     }
   }, [snapshotData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load persisted page types from server on mount
+  useEffect(() => {
+    if (!siteId) return;
+    getSafe<{ pageTypes: Record<string, string> }>(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageTypes: {} })
+      .then(({ pageTypes: saved }) => {
+        if (saved && Object.keys(saved).length > 0) {
+          setPageTypes(prev => ({ ...saved, ...prev }));
+        }
+      })
+      .catch(() => { /* ignore — page types are non-critical */ });
+  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load all pages — React Query
   const { data: fetchedPages = [] } = useWebflowPages(siteId);
@@ -961,7 +991,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               isHomepage={!page.slug || page.slug === '/' || page.slug === 'index' || page.slug === 'home'}
               savingTemplate={savingTemplate}
               templateSaved={templateSaved}
-              onPageTypeChange={(pid, t) => setPageTypes(prev => ({ ...prev, [pid]: t }))}
+              onPageTypeChange={(pid, t) => {
+                setPageTypes(prev => ({ ...prev, [pid]: t }));
+                // Persist to server (fire-and-forget)
+                put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch(() => {});
+              }}
               onToggleExpand={toggleExpand}
               onRegenerate={regeneratePage}
               onToggleDiff={toggleDiff}

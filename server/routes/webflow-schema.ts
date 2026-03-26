@@ -9,7 +9,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
@@ -58,13 +58,29 @@ router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQue
   res.json(snapshot);
 });
 
+// ── Page Type Persistence ──
+
+router.get('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  res.json({ pageTypes: getPageTypes(req.params.siteId) });
+});
+
+router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const { pageId, pageType } = req.body;
+  if (!pageId || typeof pageId !== 'string') return res.status(400).json({ error: 'pageId required' });
+  if (!pageType || typeof pageType !== 'string') return res.status(400).json({ error: 'pageType required' });
+  savePageType(req.params.siteId, pageId, pageType);
+  res.json({ ok: true });
+});
+
 router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAccessFromQuery(), async (req, res) => {
   const { pageId, pageType } = req.body;
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const { ctx, gscMap, ga4Map } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
-    if (pageType) ctx.pageType = pageType;
+    // Use explicitly-passed pageType, fall back to persisted type for this page
+    const resolvedPageType = pageType || getPageTypes(req.params.siteId)[pageId];
+    if (resolvedPageType) ctx.pageType = resolvedPageType;
     // Enrich with architecture tree for deterministic breadcrumbs
     if (ctx.workspaceId) {
       try {

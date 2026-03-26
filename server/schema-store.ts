@@ -402,6 +402,57 @@ export function updateSchemaPlanRoles(
   return saveSchemaPlan(plan);
 }
 
+// ── Schema Page Types persistence ──
+
+let _pageTypeUpsert: ReturnType<typeof db.prepare> | null = null;
+function pageTypeUpsertStmt() {
+  if (!_pageTypeUpsert) {
+    _pageTypeUpsert = db.prepare(`
+      INSERT OR REPLACE INTO schema_page_types (site_id, page_id, page_type, updated_at)
+      VALUES (@site_id, @page_id, @page_type, @updated_at)
+    `);
+  }
+  return _pageTypeUpsert;
+}
+
+let _pageTypeGetBySite: ReturnType<typeof db.prepare> | null = null;
+function pageTypeGetBySiteStmt() {
+  if (!_pageTypeGetBySite) {
+    _pageTypeGetBySite = db.prepare('SELECT page_id, page_type FROM schema_page_types WHERE site_id = ?');
+  }
+  return _pageTypeGetBySite;
+}
+
+/** Persist a single page type selection for a site. */
+export function savePageType(siteId: string, pageId: string, pageType: string): void {
+  pageTypeUpsertStmt().run({
+    site_id: siteId,
+    page_id: pageId,
+    page_type: pageType,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+/** Get all persisted page types for a site as a pageId → pageType map. */
+export function getPageTypes(siteId: string): Record<string, string> {
+  const rows = pageTypeGetBySiteStmt().all(siteId) as Array<{ page_id: string; page_type: string }>;
+  return Object.fromEntries(rows.map(r => [r.page_id, r.page_type]));
+}
+
+/** Bulk-upsert page types from a Record<pageId, pageType> map. */
+export function savePageTypes(siteId: string, updates: Record<string, string>): void {
+  const now = new Date().toISOString();
+  const upsert = pageTypeUpsertStmt();
+  const entries = Object.entries(updates);
+  if (entries.length === 0) return;
+  const runMany = db.transaction(() => {
+    for (const [pageId, pageType] of entries) {
+      upsert.run({ site_id: siteId, page_id: pageId, page_type: pageType, updated_at: now });
+    }
+  });
+  runMany();
+}
+
 export function patchSiteTemplate(
   siteId: string,
   orgPatch?: Record<string, unknown>,
