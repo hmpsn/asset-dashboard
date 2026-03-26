@@ -143,6 +143,9 @@ export const keywords = {
   semrushStatus: () =>
     getOptional<unknown>('/api/semrush/status'),
 
+  providerStatus: () =>
+    getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo-providers/status'),
+
   discoverCompetitors: (wsId: string) =>
     get<{ competitors: Array<{ domain: string; relevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
 

@@ -18,6 +18,7 @@ import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './strategy/CannibalizationAlert';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { keywords, rankTracking } from '../api/seo';
+import { workspaces } from '../api';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -62,11 +63,23 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
+  const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
+  const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
     rankTracking.keywords(workspaceId)
       .then(kws => setTrackedKeywords(new Set((kws || []).map(k => k.query))))
+      .catch(() => {});
+  }, [workspaceId]);
+
+  // Load provider status + workspace preference
+  useEffect(() => {
+    keywords.providerStatus()
+      .then(data => { if (data?.providers) setProviderList(data.providers); })
+      .catch(() => {});
+    workspaces.getById(workspaceId)
+      .then((ws: Record<string, unknown>) => { if (ws?.seoDataProvider) setActiveProvider(ws.seoDataProvider as string); })
       .catch(() => {});
   }, [workspaceId]);
 
@@ -312,6 +325,42 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         </button>
         {settingsOpen && (
           <div className="px-4 pb-4 space-y-4">
+            {/* SEO Data Provider */}
+            {providerList.filter(p => p.configured).length > 1 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-teal-400" />
+                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">SEO Data Provider</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {providerList.filter(p => p.configured).map(p => (
+                    <button
+                      key={p.name}
+                      onClick={() => {
+                        setActiveProvider(p.name);
+                        workspaces.update(workspaceId, { seoDataProvider: p.name }).catch(() => {});
+                      }}
+                      className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        (activeProvider || 'semrush') === p.name
+                          ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                          : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <div className="font-semibold capitalize">{p.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'}</div>
+                      <div className="text-[10px] mt-0.5 opacity-70">
+                        {p.name === 'dataforseo' ? 'Pay-as-you-go' : 'Subscription'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1.5">
+                  {(activeProvider || 'semrush') === 'dataforseo'
+                    ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
+                    : 'SEMRush: subscription-based. Traditional keyword intelligence provider.'}
+                </p>
+              </div>
+            )}
+
             {/* SEMRush Mode */}
             {semrushAvailable && (
               <div>

@@ -22,16 +22,11 @@ import {
 } from '../search-console.js';
 import { addTrackedKeyword, getTrackedKeywords } from '../rank-tracking.js';
 import {
-  isSemrushConfigured,
-  getKeywordOverview,
-  getDomainOrganicKeywords,
-  getKeywordGap,
-  getRelatedKeywords,
-  getOrganicCompetitors,
-  getQuestionKeywords,
   trendDirection,
   hasSerpOpportunity,
 } from '../semrush.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
+import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from '../seo-data-provider.js';
 import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 import {
   listPages,
@@ -67,6 +62,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const provider = getConfiguredProvider(ws.seoDataProvider);
 
   const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
   const semrushMode = (req.body?.semrushMode as string) || 'none'; // 'quick', 'full', 'none'
@@ -372,14 +369,14 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // 5. SEMRush data gathering (based on mode)
     // The keyword pool paradigm: SEMRush provides the keyword universe, AI assigns them to pages
     let semrushContext = '';
-    let semrushDomainData: Awaited<ReturnType<typeof getDomainOrganicKeywords>> = [];
-    let keywordGaps: Awaited<ReturnType<typeof getKeywordGap>> = [];
-    const relatedKws: Awaited<ReturnType<typeof getRelatedKeywords>> = [];
+    let semrushDomainData: DomainKeyword[] = [];
+    let keywordGaps: KeywordGapEntry[] = [];
+    const relatedKws: RelatedKeyword[] = [];
     const allQuestionKws: { seed: string; questions: { keyword: string; volume: number }[] }[] = [];
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
-    if (semrushMode !== 'none' && isSemrushConfigured()) {
+    if (semrushMode !== 'none' && provider) {
       sendProgress('semrush', 'Fetching SEMRush keyword intelligence...', 0.55);
       // Derive domain from baseUrl so SEMRush always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
@@ -388,7 +385,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // Both quick and full: get domain organic keywords
         try {
           log.info(`Fetching domain organic keywords for ${siteDomain}...`);
-          semrushDomainData = await getDomainOrganicKeywords(siteDomain, ws.id, 200);
+          semrushDomainData = await provider.getDomainKeywords(siteDomain, ws.id, 200);
           log.info(`Got ${semrushDomainData.length} domain keywords`);
 
           if (semrushDomainData.length > 0) {
@@ -405,7 +402,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         if (competitorDomains.length === 0) {
           try {
             sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
-            const discovered = await getOrganicCompetitors(siteDomain, ws.id, 5);
+            const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
             const autoCompetitors = discovered
               .filter(c => !c.domain.includes(siteDomain) && !siteDomain.includes(c.domain))
               .slice(0, 3)
@@ -429,7 +426,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             for (const comp of competitorDomains.slice(0, 3)) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
-                const compKws = await getDomainOrganicKeywords(cleanComp, ws.id, compLimit);
+                const compKws = await provider.getDomainKeywords(cleanComp, ws.id, compLimit);
                 for (const ck of compKws) {
                   competitorKeywordData.push({
                     keyword: ck.keyword,
@@ -466,7 +463,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           try {
             sendProgress('semrush', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
-            keywordGaps = await getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
+            keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
             log.info(`Found ${keywordGaps.length} keyword gaps`);
 
             if (keywordGaps.length > 0) {
@@ -486,7 +483,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             sendProgress('semrush', 'Fetching related keyword ideas...', 0.65);
             const seedKeywords = semrushDomainData.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
             for (const seed of seedKeywords) {
-              const related = await getRelatedKeywords(seed, ws.id, 10);
+              const related = await provider.getRelatedKeywords(seed, ws.id, 10);
               relatedKws.push(...related);
             }
             if (relatedKws.length > 0) {
@@ -505,7 +502,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             sendProgress('semrush', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
             const qSeeds = semrushDomainData.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, 5).map(k => k.keyword);
             for (const seed of qSeeds) {
-              const questions = await getQuestionKeywords(seed, ws.id, 10);
+              const questions = await provider.getQuestionKeywords(seed, ws.id, 10);
               if (questions.length > 0) {
                 allQuestionKws.push({ seed, questions: questions.map(q => ({ keyword: q.keyword, volume: q.volume })) });
               }
@@ -797,7 +794,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
-    if (isSemrushConfigured() && semrushMode !== 'none') {
+    if (provider && semrushMode !== 'none') {
       const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
@@ -833,11 +830,11 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       }
       log.info(`Keyword validation: ${preEnriched} pre-enriched from existing data, ${needsApiLookup.length} need API lookup`);
 
-      // Second pass: fetch remaining from SEMRush API
+      // Second pass: fetch remaining from provider API
       if (needsApiLookup.length > 0) {
         try {
           const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
-          const metrics = await getKeywordOverview(uniqueNeeds.slice(0, 100), ws.id);
+          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
           const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
 
           let unvalidated = 0;
@@ -1161,7 +1158,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     // If we still have keywords without volume data and SEMRush is available, bulk-fetch them
     // Only look up keywords NOT already in the pool (those are "invented" by the AI)
     // Cap at 30 to avoid burning credits on keywords that will mostly return NOTHING FOUND
-    if (isSemrushConfigured() && semrushMode !== 'none') {
+    if (provider && semrushMode !== 'none') {
       const pagesNeedingVolume = strategy.pageMap
         .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume && pm.primaryKeyword);
       // Filter to reasonable keywords only (≤5 words, not too specific)
@@ -1174,7 +1171,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       const needsVolume = uniqueNeeds.slice(0, 30);
       if (needsVolume.length > 0) {
         try {
-          const metrics = await getKeywordOverview(needsVolume as string[], ws.id);
+          const metrics = await provider.getKeywordMetrics(needsVolume as string[], ws.id);
           const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const pm of strategy.pageMap) {
             if (!pm.volume) {
@@ -1207,9 +1204,9 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           missingCgKws.push(cg.targetKeyword);
         }
       }
-      if (missingCgKws.length > 0 && isSemrushConfigured() && semrushMode !== 'none') {
+      if (missingCgKws.length > 0 && provider && semrushMode !== 'none') {
         try {
-          const cgMetrics = await getKeywordOverview(missingCgKws.slice(0, 30), ws.id);
+          const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), ws.id);
           const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const cg of strategy.contentGaps) {
             if (!cg.volume) {
@@ -1525,7 +1522,7 @@ Rules:
 
     // Enrich siteKeywords with volume/difficulty
     let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
-    if (isSemrushConfigured() && semrushMode !== 'none' && strategy.siteKeywords?.length) {
+    if (provider && semrushMode !== 'none' && strategy.siteKeywords?.length) {
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       const found: typeof siteKeywordMetrics = [];
       const missing: string[] = [];
@@ -1539,7 +1536,7 @@ Rules:
       }
       if (missing.length > 0) {
         try {
-          const extra = await getKeywordOverview(missing.slice(0, 15), ws.id);
+          const extra = await provider.getKeywordMetrics(missing.slice(0, 15), ws.id);
           for (const m of extra) {
             found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
           }

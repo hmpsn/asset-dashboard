@@ -91,6 +91,13 @@ import siteArchitectureRoutes from './routes/site-architecture.js';
 import llmsTxtRoutes from './routes/llms-txt.js';
 import competitorSchemaRoutes from './routes/competitor-schema.js';
 import { aiStatsRoutes } from './routes/ai-stats.js';
+import { registerProvider } from './seo-data-provider.js';
+import { SemrushProvider } from './providers/semrush-provider.js';
+import { DataForSeoProvider } from './providers/dataforseo-provider.js';
+
+// ─── Register SEO data providers ───
+registerProvider('semrush', new SemrushProvider());
+registerProvider('dataforseo', new DataForSeoProvider());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

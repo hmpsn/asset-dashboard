@@ -224,6 +224,8 @@ export interface Workspace {
     briefDescription?: string;
     fullPostDescription?: string;
   };
+  // SEO data provider preference
+  seoDataProvider?: 'semrush' | 'dataforseo';
   folder: string;
   createdAt: string;
 }
