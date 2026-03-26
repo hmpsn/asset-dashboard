@@ -62,9 +62,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 4. Dead Link Checker
-**What it does:** Crawls every page (including CMS via sitemap), extracts all links, and checks for 404s, timeouts, and redirect chains. **Auto-restore**: last scan results persist to disk and load on mount — no data loss between navigation, deploys, or restarts.
+**What it does:** Crawls every page (including CMS via sitemap), extracts all links, and checks for 404s, timeouts, and redirect chains. **Auto-restore**: last scan results persist to disk and load on mount — no data loss between navigation, deploys, or restarts. **Audit integration**: dead link scan now runs automatically as part of every site audit (opt-out checkbox in audit trigger UI). Results surface in the audit header as a clickable "Broken Links" stat card. A dedicated dead links panel below site-wide issues shows each broken URL with: status code, type badge (internal/external), source page, anchor text, "Fix in SEO Editor" button (internal links), and inline "Add Redirect" form. Pending redirects can be exported as CSV (broken URL, status, found-on, redirect-to columns).
 
-**Agency value:** Catches broken links before Google does, including ones buried in CMS collection pages.
+**Agency value:** Catches broken links before Google does, including ones buried in CMS collection pages. Now integrated with the site audit flow — no separate tool visit required. One-click redirect creation from audit results speeds up remediation.
 
 **Client value:** No "page not found" experiences for visitors. Protects brand credibility.
 
@@ -1036,6 +1036,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Fix→ routing~~: ✅ Shipped — Each issue maps to the appropriate tool (Schema, SEO Editor, Briefs, Redirects, Performance) with a one-click Fix button.
 - ~~Auto-fix context~~: ✅ Shipped — Fix→ passes page context to target tools: Schema auto-generates, SEO Editor auto-expands, Briefs pre-fill keyword.
 - ~~Traffic intelligence~~: ✅ Shipped — `/api/audit-traffic/:siteId` cross-references GSC clicks/impressions and GA4 pageviews/sessions per page. Traffic badges on page cards. Sort by traffic impact toggle.
+- ~~Auto dead link scan~~: ✅ Shipped — Dead link scan runs automatically with every site audit (opt-out checkbox). Results appear as a "Broken Links" stat card in the audit header and a detailed panel with per-link actions: "Fix in SEO Editor" (internal links), inline redirect form, and CSV export.
 - **Full-site PageSpeed**: Offer a deeper multi-page PSI scan as a separate background job.
 - **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
 - **Historical trend charts**: Track audit score over time per-page, not just site-wide.

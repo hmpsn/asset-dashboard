@@ -105,7 +105,7 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
-            const result = await runSeoAudit(siteId, token, params.workspaceId as string);
+            const result = await runSeoAudit(siteId, token, params.workspaceId as string, params.skipLinkCheck === true);
             // Auto-save snapshot so overview + client dashboard stay in sync
             const ws = getWorkspace(params.workspaceId as string);
             const siteName = getBrandName(ws) || siteId;
