@@ -1,7 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from './seo-context.js';
-import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
+import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
