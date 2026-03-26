@@ -225,6 +225,11 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   // Rank tracking state
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    rankTracking.keywords(workspaceId)
+      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => k.query))))
+      .catch(() => {});
+  }, [workspaceId]);
   const trackKeyword = async (kw: string) => {
     if (!kw || trackedKeywords.has(kw)) return;
     try {

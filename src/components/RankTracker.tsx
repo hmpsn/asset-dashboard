@@ -6,8 +6,8 @@ import {
 import { get, post, patch, del } from '../api/client';
 import { EmptyState } from './ui';
 
-// ── Trend colors (blue-family: data per design system) ──
-const TREND_COLORS = ['#60a5fa', '#38bdf8', '#22d3ee', '#2dd4bf', '#34d399', '#a78bfa', '#818cf8'];
+// ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
+const TREND_COLORS = ['#60a5fa', '#38bdf8', '#22d3ee', '#2dd4bf', '#34d399', '#06b6d4', '#0ea5e9'];
 
 // ── Sparkline: compact position-over-time for a single keyword ──
 function PositionSparkline({ data }: { data: { date: string; position: number }[] }) {

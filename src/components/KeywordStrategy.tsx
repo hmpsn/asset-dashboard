@@ -61,6 +61,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
+
+  // Seed trackedKeywords from server on mount so buttons reflect actual state
+  useEffect(() => {
+    rankTracking.keywords(workspaceId)
+      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => k.query))))
+      .catch(() => {});
+  }, [workspaceId]);
+
   const stepLabels: Record<string, string> = {
     discovery: 'Discovering pages',
     content: 'Fetching page content',
