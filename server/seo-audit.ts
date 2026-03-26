@@ -692,6 +692,9 @@ Respond in this exact JSON format (only include fields that need fixing):
           recommendation: 'Broken links harm user experience and crawlability. Fix or redirect internal broken links immediately; update or remove broken external links.',
           value: `${linkResult.deadLinks.length} broken`,
         });
+        // Update counters — dead link scan runs after initial tally
+        if (internalDead > 0) totalErrors++;
+        else totalWarnings++;
       }
     } catch (err) {
       log.error({ err }, 'Dead link scan failed (non-fatal)');

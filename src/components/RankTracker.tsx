@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Loader2, TrendingUp, Minus, Plus, Trash2, Pin, RefreshCw,
   Target, ArrowUp, ArrowDown, LineChart, ChevronDown,
@@ -182,6 +182,7 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
   const [showTrends, setShowTrends] = useState(false);
   const [trendsData, setTrendsData] = useState<HistoryPoint[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
+  const expandedQueryRef = useRef<string | null>(null);
 
   const load = async () => {
     try {
@@ -235,20 +236,27 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
 
   // Expand a keyword row to show its sparkline
   const toggleExpand = useCallback(async (query: string) => {
-    if (expandedQuery === query) {
+    if (expandedQueryRef.current === query) {
+      expandedQueryRef.current = null;
       setExpandedQuery(null);
       return;
     }
+    expandedQueryRef.current = query;
     setExpandedQuery(query);
     setHistoryLoading(true);
     try {
       const history = await get<HistoryPoint[]>(`/api/rank-tracking/${workspaceId}/history?queries=${encodeURIComponent(query)}`);
+      // Guard against stale response — only update if this query is still expanded
+      if (expandedQueryRef.current !== query) return;
       setQueryHistory(
         (history || []).filter(h => h.positions[query] !== undefined).map(h => ({ date: h.date, position: h.positions[query] }))
       );
-    } catch { setQueryHistory([]); }
+    } catch {
+      if (expandedQueryRef.current !== query) return;
+      setQueryHistory([]);
+    }
     setHistoryLoading(false);
-  }, [expandedQuery, workspaceId]);
+  }, [workspaceId]);
 
   // Load trends data for all pinned keywords
   const loadTrends = useCallback(async () => {
