@@ -298,12 +298,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId });
       setData(prev => {
         if (!prev) return prev;
+        // Full replacement — preserve lastPublishedAt which comes from the
+        // snapshot endpoint annotation, not the generate response.
         return prev.map(p => p.pageId === pageId ? {
-          ...p,
-          suggestedSchemas: result.suggestedSchemas,
-          existingSchemas: result.existingSchemas,
-          validationErrors: result.validationErrors,
-          richResultsEligibility: result.richResultsEligibility,
+          ...result,
+          lastPublishedAt: p.lastPublishedAt,
         } : p);
       });
       setExpanded(prev => new Set(prev).add(pageId));
