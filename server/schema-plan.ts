@@ -13,6 +13,7 @@ import { saveSchemaPlan } from './schema-store.js';
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import type { SiteArchitectureResult } from './site-architecture.js';
 import { flattenTree } from './site-architecture.js';
+import { crawlCompetitorSchemas, compareSchemas } from './competitor-schema.js';
 
 const log = createLogger('schema-plan');
 
@@ -25,6 +26,8 @@ export interface PlanContext {
   strategy?: KeywordStrategy;
   tokenOverride?: string;
   architectureResult?: SiteArchitectureResult;
+  competitorDomains?: string[];  // Competitor domains for schema gap analysis
+  ourSchemaTypes?: string[];     // Current schema types we're already using
 }
 
 /**
@@ -32,7 +35,7 @@ export interface PlanContext {
  * Returns a plan with canonical entities and page role assignments.
  */
 export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePlan> {
-  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult } = ctx;
+  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult, competitorDomains, ourSchemaTypes } = ctx;
 
   let pageList: PageListItem[];
 
@@ -115,8 +118,33 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
     log.info(`Generating schema plan for ${pageList.length} pages (static + CMS) on ${siteUrl}`);
   }
 
+  // Crawl competitor schema types for gap analysis (best-effort, non-blocking)
+  let competitorSchemaGaps: string[] = [];
+  if (competitorDomains && competitorDomains.length > 0) {
+    try {
+      const domainsToCheck = competitorDomains.slice(0, 2); // Limit to 2 competitors
+      const crawlResults = await Promise.allSettled(
+        domainsToCheck.map(domain => crawlCompetitorSchemas(domain, 20)),
+      );
+      const ours = ourSchemaTypes || [];
+      for (const result of crawlResults) {
+        if (result.status === 'fulfilled') {
+          const comparison = compareSchemas(ours, result.value);
+          for (const t of comparison.typesTheyHaveWeNot) {
+            if (!competitorSchemaGaps.includes(t)) competitorSchemaGaps.push(t);
+          }
+        }
+      }
+      if (competitorSchemaGaps.length > 0) {
+        log.info({ gaps: competitorSchemaGaps }, `Competitor schema gaps identified: ${competitorSchemaGaps.join(', ')}`);
+      }
+    } catch (err) {
+      log.warn({ err }, 'Competitor schema crawl failed — proceeding without gap data');
+    }
+  }
+
   // Try AI-generated plan first
-  const aiPlan = await aiGeneratePlan(pageList, siteUrl, companyName, businessContext, strategy, workspaceId);
+  const aiPlan = await aiGeneratePlan(pageList, siteUrl, companyName, businessContext, strategy, workspaceId, competitorSchemaGaps);
 
   const now = new Date().toISOString();
   const plan: SchemaSitePlan = {
@@ -154,6 +182,7 @@ async function aiGeneratePlan(
   businessContext?: string,
   strategy?: KeywordStrategy,
   workspaceId?: string,
+  competitorSchemaGaps?: string[],
 ): Promise<{ canonicalEntities: CanonicalEntity[]; pageRoles: PageRoleAssignment[] } | null> {
   if (!process.env.OPENAI_API_KEY) return null;
 
@@ -223,11 +252,15 @@ async function aiGeneratePlan(
     }
   }
 
+  const competitorGapBlock = competitorSchemaGaps && competitorSchemaGaps.length > 0
+    ? `\nCOMPETITOR SCHEMA GAPS (schema types competitors use that we don't yet — prioritize assigning these types to relevant pages):\n${competitorSchemaGaps.join(', ')}`
+    : '';
+
   const prompt = `You are a Google Structured Data strategist. Analyze this site's pages and produce a schema site plan.
 
 SITE: ${companyName || '(unknown)'} — ${siteUrl}
 ${businessContext ? `BUSINESS: ${businessContext}` : ''}
-${strategy?.siteKeywords?.length ? `SITE KEYWORDS: ${strategy.siteKeywords.slice(0, 10).join(', ')}` : ''}
+${strategy?.siteKeywords?.length ? `SITE KEYWORDS: ${strategy.siteKeywords.slice(0, 10).join(', ')}` : ''}${competitorGapBlock}
 
 PAGES (${pages.length} total):
 ${pageTable}${collectionSummary}

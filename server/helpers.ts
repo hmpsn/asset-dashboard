@@ -162,7 +162,18 @@ export function applySuppressionsToAudit(
 
 // ── Schema Context Builder ──
 
-export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[] } {
+export type SchemaAnalyticsMaps = {
+  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>;
+  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>;
+};
+
+export async function buildSchemaContext(
+  siteId: string,
+  options?: { includeAnalytics?: boolean },
+): Promise<{
+  ctx: SchemaContext;
+  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[];
+} & SchemaAnalyticsMaps> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
   const ctx: SchemaContext = {};
@@ -193,7 +204,37 @@ export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKe
     contentGaps: p.contentGaps,
     optimizationScore: p.optimizationScore,
   }));
-  return { ctx, pageKeywordMap };
+
+  // Fetch analytics maps when requested (for schema generation routes)
+  let gscMap: SchemaAnalyticsMaps['gscMap'];
+  let ga4Map: SchemaAnalyticsMaps['ga4Map'];
+
+  if (options?.includeAnalytics && ws) {
+    const [gscResults, ga4Results] = await Promise.allSettled([
+      ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
+      ws.ga4PropertyId ? getGA4TopPages(ws.ga4PropertyId, 90, 500) : Promise.resolve([]),
+    ]);
+
+    if (gscResults.status === 'fulfilled' && gscResults.value.length > 0) {
+      gscMap = new Map();
+      for (const p of gscResults.value) {
+        try {
+          const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
+          gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
+        } catch { /* skip malformed URLs */ }
+      }
+    }
+
+    if (ga4Results.status === 'fulfilled' && ga4Results.value.length > 0) {
+      ga4Map = new Map();
+      for (const p of ga4Results.value) {
+        const urlPath = (p.path.startsWith('/') ? p.path : `/${p.path}`).replace(/\/$/, '') || '/';
+        ga4Map.set(urlPath, { pageviews: p.pageviews, users: p.users, avgEngagementTime: p.avgEngagementTime });
+      }
+    }
+  }
+
+  return { ctx, pageKeywordMap, gscMap, ga4Map };
 }
 
 // ── Audit Traffic Cache ──

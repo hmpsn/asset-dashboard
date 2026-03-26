@@ -34,7 +34,7 @@ const log = createLogger('webflow-schema');
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, pageKeywordMap } = buildSchemaContext(req.params.siteId);
+    const { ctx, pageKeywordMap, gscMap, ga4Map } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     // Enrich with architecture tree (best-effort — don't block if unavailable)
     if (ctx.workspaceId) {
       try {
@@ -42,7 +42,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
         ctx._architectureTree = arch.tree;
       } catch { /* architecture not available — proceed without */ }
     }
-    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap);
+    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap, undefined, undefined, gscMap, ga4Map);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -63,7 +63,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx } = buildSchemaContext(req.params.siteId);
+    const { ctx, gscMap, ga4Map } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     if (pageType) ctx.pageType = pageType;
     // Enrich with architecture tree for deterministic breadcrumbs
     if (ctx.workspaceId) {
@@ -72,7 +72,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
         ctx._architectureTree = arch.tree;
       } catch { /* proceed without architecture */ }
     }
-    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx);
+    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
   } catch (err) {
@@ -112,7 +112,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
         const orgNode = graph.find((n: Record<string, unknown>) => n['@type'] === 'Organization');
         const wsNode = graph.find((n: Record<string, unknown>) => n['@type'] === 'WebSite');
         if (orgNode) {
-          const { ctx } = buildSchemaContext(req.params.siteId);
+          const { ctx } = await buildSchemaContext(req.params.siteId);
           const websiteNode = wsNode || {
             '@type': 'WebSite', '@id': `${orgNode['url']}/#website`,
             'url': orgNode['url'], 'name': orgNode['name'],
@@ -146,7 +146,7 @@ router.post('/api/webflow/schema-cms-template/:siteId', requireWorkspaceAccessFr
   if (!collectionId) return res.status(400).json({ error: 'collectionId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx } = buildSchemaContext(req.params.siteId);
+    const { ctx } = await buildSchemaContext(req.params.siteId);
     const result = await generateCmsTemplateSchema(req.params.siteId, collectionId, token, ctx);
     if (!result) return res.status(500).json({ error: 'Failed to generate CMS template schema' });
     res.json(result);
@@ -215,9 +215,9 @@ router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceAccessFrom
 // ── Site template endpoints ──
 
 // GET: retrieve the site template (auto-seeds from existing snapshot if needed)
-router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const { ctx } = buildSchemaContext(req.params.siteId);
+    const { ctx } = await buildSchemaContext(req.params.siteId);
     const template = getOrSeedSiteTemplate(req.params.siteId, ctx.workspaceId);
     if (!template) {
       res.status(404).json({ error: 'No site template found. Generate the homepage schema first.' });
@@ -231,14 +231,14 @@ router.get('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQue
 });
 
 // PUT: replace the full site template (Organization + WebSite nodes)
-router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const { organizationNode, websiteNode } = req.body;
     if (!organizationNode || !websiteNode) {
       res.status(400).json({ error: 'Both organizationNode and websiteNode are required' });
       return;
     }
-    const { ctx } = buildSchemaContext(req.params.siteId);
+    const { ctx } = await buildSchemaContext(req.params.siteId);
     const template = saveSiteTemplate(req.params.siteId, ctx.workspaceId || '', organizationNode, websiteNode);
     res.json(template);
   } catch (err) {
@@ -248,11 +248,11 @@ router.put('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQue
 });
 
 // PATCH: update specific fields on the template (e.g. logo URL)
-router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const { organizationNode, websiteNode } = req.body;
     // Auto-seed first if no template exists
-    const { ctx } = buildSchemaContext(req.params.siteId);
+    const { ctx } = await buildSchemaContext(req.params.siteId);
     const existing = getOrSeedSiteTemplate(req.params.siteId, ctx.workspaceId);
     if (!existing) {
       res.status(404).json({ error: 'No site template found to patch. Generate the homepage schema first.' });
@@ -271,7 +271,7 @@ router.patch('/api/webflow/schema-template/:siteId', requireWorkspaceAccessFromQ
 // POST: generate a new schema plan for the site
 router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const { ctx } = buildSchemaContext(req.params.siteId);
+    const { ctx } = await buildSchemaContext(req.params.siteId);
     const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
     if (!ws) return res.status(404).json({ error: 'No workspace found for this site' });
 
@@ -280,6 +280,14 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
     try {
       architectureResult = await getCachedArchitecture(ws.id);
     } catch { /* proceed without — plan will fall back to direct API calls */ }
+
+    // Gather current schema types from existing snapshot for competitor gap analysis
+    const existingSnapshot = getSchemaSnapshot(req.params.siteId);
+    const ourSchemaTypes = existingSnapshot
+      ? [...new Set(existingSnapshot.flatMap(p =>
+          p.suggestedSchemas?.flatMap(s => s.type?.split(' + ') || []) || []
+        ))]
+      : [];
 
     const plan = await generateSchemaPlan({
       siteId: req.params.siteId,
@@ -290,6 +298,8 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
       strategy: ws.keywordStrategy,
       tokenOverride: getTokenForSite(req.params.siteId) || undefined,
       architectureResult,
+      competitorDomains: ws.competitorDomains,
+      ourSchemaTypes,
     });
 
     addActivity(ws.id, 'schema_plan_generated', 'Schema site plan generated', `${plan.pageRoles.length} pages, ${plan.canonicalEntities.length} entities`);

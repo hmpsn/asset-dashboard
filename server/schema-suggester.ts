@@ -99,6 +99,9 @@ export interface SchemaContext {
   _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
   _pageAnalysis?: { topicCluster?: string; contentGaps?: string[]; optimizationScore?: number };  // Internal: from Page Intelligence
   _personasBlock?: string;  // Internal: audience personas for richer schema targeting
+  _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
+  _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
+  _competitorSchemaGaps?: string[];  // Internal: schema types competitors have that we don't yet
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -1374,6 +1377,11 @@ ${info.emails.length ? `- Emails: ${info.emails.join(', ')}` : ''}
 ${info.phones.length ? `- Phones: ${info.phones.join(', ')}` : ''}
 ${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : ''}
 ${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
+${(ctx._gscPageData || ctx._ga4PageData) ? `
+SEARCH PERFORMANCE (this page — use to prioritize richness and breadth of schema):
+${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} impressions/90d | ${ctx._gscPageData.clicks.toLocaleString()} clicks | Avg Position: ${ctx._gscPageData.position.toFixed(1)} | CTR: ${(ctx._gscPageData.ctr * 100).toFixed(2)}%` : ''}
+${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
+High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
 ${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
@@ -1552,6 +1560,8 @@ export async function generateSchemaForPage(
   pageId: string,
   tokenOverride?: string,
   ctx: SchemaContext = {},
+  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
+  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
 ): Promise<SchemaPageSuggestion | null> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -1576,6 +1586,13 @@ export async function generateSchemaForPage(
   if (sitePlan && !ctx._planContext) {
     const pagePath = isHomepage ? '/' : (slug ? `/${slug}` : '/');
     ctx._planContext = buildPlanContextForPage(sitePlan, pagePath) || undefined;
+  }
+
+  // Inject per-page analytics if maps were provided
+  if (gscMap || ga4Map) {
+    const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
+    if (gscMap) ctx._gscPageData = gscMap.get(lookupPath) ?? gscMap.get('/') ?? undefined;
+    if (ga4Map) ctx._ga4PageData = ga4Map.get(lookupPath) ?? ga4Map.get('/') ?? undefined;
   }
 
   // Try AI unified schema first
@@ -1628,6 +1645,8 @@ export async function generateSchemaSuggestions(
   pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[],
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
   isCancelled?: () => boolean,
+  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
+  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
 ): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -1699,6 +1718,7 @@ export async function generateSchemaSuggestions(
 
         // Build page-specific context (use full path for nested pages)
         const lookupPath = pagePath || `/${page.slug}`;
+        const normalizedPath = (isHomepage ? '/' : lookupPath).replace(/\/$/, '') || '/';
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
         const pageCtx: SchemaContext = {
           ...ctx,
@@ -1706,6 +1726,8 @@ export async function generateSchemaSuggestions(
           searchIntent: getPageIntent(lookupPath),
           _planContext: planContext || undefined,
           _pageAnalysis: getPageAnalysis(lookupPath),
+          _gscPageData: gscMap?.get(normalizedPath),
+          _ga4PageData: ga4Map?.get(normalizedPath),
         };
 
         let suggestedSchemas: SchemaSuggestion[];
