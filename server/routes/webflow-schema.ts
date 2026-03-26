@@ -9,7 +9,7 @@ const router = Router();
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
-import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType } from '../schema-store.js';
+import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite } from '../schema-store.js';
 import { generateSchemaSuggestions, generateSchemaForPage, generateCmsTemplateSchema } from '../schema-suggester.js';
 import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
@@ -51,10 +51,15 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
   }
 });
 
-// Load previously saved schema results from disk
+// Load previously saved schema results from disk, annotated with publish dates
 router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
   const snapshot = getSchemaSnapshot(req.params.siteId);
   if (!snapshot) return res.json(null);
+  // Annotate each page result with its last publish date (for stale schema detection)
+  const publishDates = getPublishDatesForSite(req.params.siteId);
+  for (const result of snapshot.results) {
+    (result as Record<string, unknown>).lastPublishedAt = publishDates[result.pageId] || null;
+  }
   res.json(snapshot);
 });
 
@@ -119,6 +124,10 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
 
     // Persist edited schema back to snapshot so it survives reload
     updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
+
+    // Record version history for rollback support
+    const pubWsForHistory = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
 
     // Auto-save site template if this is a homepage publish
     const isHomepage = req.body.isHomepage || false;
@@ -438,6 +447,50 @@ router.delete('/api/webflow/schema-retract/:siteId/:pageId', requireWorkspaceAcc
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema retract error');
     res.status(500).json({ error: `Schema retract failed: ${msg}` });
+  }
+});
+
+// ── Schema Version History + Rollback ──
+
+router.get('/api/webflow/schema-history/:siteId/:pageId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const history = getSchemaPublishHistory(req.params.siteId, req.params.pageId, 20);
+  res.json({ history });
+});
+
+router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
+  const { pageId, historyId } = req.body;
+  if (!pageId || !historyId) return res.status(400).json({ error: 'pageId and historyId required' });
+  try {
+    const entry = getSchemaPublishEntry(historyId);
+    if (!entry) return res.status(404).json({ error: 'History entry not found' });
+    if (entry.pageId !== pageId || entry.siteId !== req.params.siteId) {
+      return res.status(400).json({ error: 'History entry does not match page/site' });
+    }
+
+    // Re-publish the old schema to the Webflow page
+    const token = getTokenForSite(req.params.siteId) || undefined;
+    const result = await publishSchemaToPage(req.params.siteId, pageId, entry.schemaJson, token);
+    if (!result.success) return res.status(500).json(result);
+
+    // Update snapshot with restored schema
+    updatePageSchemaInSnapshot(req.params.siteId, pageId, entry.schemaJson);
+
+    // Record this rollback as a new publish event
+    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    recordSchemaPublish(req.params.siteId, pageId, ws?.id || '', entry.schemaJson);
+
+    // Activity log
+    if (ws) {
+      addActivity(ws.id, 'schema_published', 'Schema rolled back to previous version',
+        `Page ${pageId.slice(0, 8)}… — restored from ${new Date(entry.publishedAt).toLocaleDateString()}`,
+        { pageId, historyId });
+    }
+
+    res.json({ success: true, restoredSchema: entry.schemaJson });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error({ detail: msg, err }, 'Schema rollback error');
+    res.status(500).json({ error: `Schema rollback failed: ${msg}` });
   }
 });
 

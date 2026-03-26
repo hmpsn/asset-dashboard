@@ -47,6 +47,7 @@ interface SchemaPageSuggestion {
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
   richResultsEligibility?: RichResultEligibility[];
+  lastPublishedAt?: string | null;
 }
 
 interface CmsTemplatePage {
@@ -1021,6 +1022,26 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               retracting={retractingPages.has(page.pageId)}
               retracted={retractedPages.has(page.pageId)}
               getEffectiveSchema={getEffectiveSchema}
+              siteId={siteId}
+              onRestore={(pageId, restoredSchema) => {
+                // Update local data with the restored schema
+                setData(prev => {
+                  if (!prev) return prev;
+                  return prev.map(p => {
+                    if (p.pageId !== pageId) return p;
+                    return {
+                      ...p,
+                      suggestedSchemas: [{
+                        ...(p.suggestedSchemas[0] || { type: 'restored', priority: 'high' as const }),
+                        template: restoredSchema,
+                        reason: `Restored from version history (${new Date().toLocaleDateString()})`,
+                      }],
+                      lastPublishedAt: new Date().toISOString(),
+                    };
+                  });
+                });
+                setPublished(prev => new Set(prev).add(pageId));
+              }}
             />
           );
         })}

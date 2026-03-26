@@ -2,15 +2,17 @@
  * SchemaPageCard — Per-page card rendering for schema suggestions.
  * Extracted from SchemaSuggester.tsx per-page rendering logic.
  */
+import { useState } from 'react';
 import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
-  Loader2, Save, Trash2, Star,
+  Loader2, Save, Trash2, Star, History, Clock,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
+import { SchemaVersionHistory } from './SchemaVersionHistory';
 
 interface SchemaSuggestion {
   type: string;
@@ -36,6 +38,7 @@ interface SchemaPageSuggestion {
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
   richResultsEligibility?: RichResultEligibility[];
+  lastPublishedAt?: string | null;
 }
 
 interface Recommendation {
@@ -86,6 +89,8 @@ export interface SchemaPageCardProps {
   retracting: boolean;
   retracted: boolean;
   getEffectiveSchema: (pageId: string, original: Record<string, unknown>) => Record<string, unknown>;
+  siteId: string;
+  onRestore: (pageId: string, schema: Record<string, unknown>) => void;
 }
 
 export function SchemaPageCard({
@@ -98,12 +103,19 @@ export function SchemaPageCard({
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
   onSendToClient, onSaveAsTemplate, onRetract, retracting, retracted,
-  getEffectiveSchema,
+  getEffectiveSchema, siteId, onRestore,
 }: SchemaPageCardProps) {
+  const [showHistory, setShowHistory] = useState(false);
   const hasErrors = (page.validationErrors?.length || 0) > 0;
   const schema = page.suggestedSchemas[0];
   const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
   const eligibleCount = page.richResultsEligibility?.filter(r => r.eligible).length || 0;
+
+  // Stale schema detection: published > 90 days ago
+  const staleDays = page.lastPublishedAt
+    ? Math.floor((Date.now() - new Date(page.lastPublishedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isStale = staleDays !== null && staleDays > 90;
 
   return (
     <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`}>
@@ -133,6 +145,11 @@ export function SchemaPageCard({
           {eligibleCount > 0 && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20" title={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`}>
               <Star className="w-3 h-3" /> {eligibleCount} rich
+            </span>
+          )}
+          {isStale && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20" title={`Published ${staleDays} days ago — consider refreshing`}>
+              <Clock className="w-3 h-3" /> {staleDays}d old
             </span>
           )}
           {hasErrors && (
@@ -446,7 +463,47 @@ export function SchemaPageCard({
                   </button>
                 )
               )}
+              {/* Version History toggle */}
+              <button
+                onClick={() => setShowHistory(h => !h)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  showHistory
+                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                    : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
+                }`}
+                title="View publish version history"
+              >
+                <History className="w-3.5 h-3.5" />
+                History
+              </button>
             </div>
+
+            {/* Stale schema warning */}
+            {isStale && (
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Clock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span className="text-[11px] text-amber-300">
+                  Schema published {staleDays} days ago — consider regenerating to reflect any content changes.
+                </span>
+              </div>
+            )}
+
+            {/* Version history panel */}
+            {showHistory && (
+              <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                <div className="text-xs font-medium text-zinc-400 mb-2 flex items-center gap-1.5">
+                  <History className="w-3 h-3" /> Publish History
+                </div>
+                <SchemaVersionHistory
+                  siteId={siteId}
+                  pageId={page.pageId}
+                  workspaceId={workspaceId}
+                  onRestore={(restoredSchema) => {
+                    onRestore(page.pageId, restoredSchema);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

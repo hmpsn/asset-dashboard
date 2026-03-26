@@ -453,6 +453,125 @@ export function savePageTypes(siteId: string, updates: Record<string, string>): 
   runMany();
 }
 
+// ── Schema Publish History (version tracking) ──
+
+export interface SchemaPublishEntry {
+  id: string;
+  siteId: string;
+  pageId: string;
+  workspaceId: string;
+  schemaJson: Record<string, unknown>;
+  publishedAt: string;
+}
+
+interface PublishHistoryRow {
+  id: string;
+  site_id: string;
+  page_id: string;
+  workspace_id: string;
+  schema_json: string;
+  published_at: string;
+}
+
+let _historyInsert: ReturnType<typeof db.prepare> | null = null;
+function historyInsertStmt() {
+  if (!_historyInsert) {
+    _historyInsert = db.prepare(`
+      INSERT INTO schema_publish_history (id, site_id, page_id, workspace_id, schema_json, published_at)
+      VALUES (@id, @site_id, @page_id, @workspace_id, @schema_json, @published_at)
+    `);
+  }
+  return _historyInsert;
+}
+
+let _historyByPage: ReturnType<typeof db.prepare> | null = null;
+function historyByPageStmt() {
+  if (!_historyByPage) {
+    _historyByPage = db.prepare(`
+      SELECT * FROM schema_publish_history
+      WHERE site_id = ? AND page_id = ?
+      ORDER BY published_at DESC
+      LIMIT ?
+    `);
+  }
+  return _historyByPage;
+}
+
+let _historyById: ReturnType<typeof db.prepare> | null = null;
+function historyByIdStmt() {
+  if (!_historyById) {
+    _historyById = db.prepare('SELECT * FROM schema_publish_history WHERE id = ?');
+  }
+  return _historyById;
+}
+
+let _latestPublishDates: ReturnType<typeof db.prepare> | null = null;
+function latestPublishDatesStmt() {
+  if (!_latestPublishDates) {
+    _latestPublishDates = db.prepare(`
+      SELECT page_id, MAX(published_at) as published_at
+      FROM schema_publish_history
+      WHERE site_id = ?
+      GROUP BY page_id
+    `);
+  }
+  return _latestPublishDates;
+}
+
+function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
+  return {
+    id: row.id,
+    siteId: row.site_id,
+    pageId: row.page_id,
+    workspaceId: row.workspace_id,
+    schemaJson: JSON.parse(row.schema_json),
+    publishedAt: row.published_at,
+  };
+}
+
+/** Record a schema publish event (creates a version history entry). */
+export function recordSchemaPublish(
+  siteId: string, pageId: string, workspaceId: string,
+  schema: Record<string, unknown>,
+): SchemaPublishEntry {
+  const entry: SchemaPublishEntry = {
+    id: `sph-${siteId}-${pageId}-${Date.now()}`,
+    siteId,
+    pageId,
+    workspaceId,
+    schemaJson: schema,
+    publishedAt: new Date().toISOString(),
+  };
+  historyInsertStmt().run({
+    id: entry.id,
+    site_id: siteId,
+    page_id: pageId,
+    workspace_id: workspaceId,
+    schema_json: JSON.stringify(schema),
+    published_at: entry.publishedAt,
+  });
+  log.info(`Recorded schema publish for page ${pageId} on site ${siteId}`);
+  return entry;
+}
+
+/** Get version history for a specific page (newest first). */
+export function getSchemaPublishHistory(siteId: string, pageId: string, limit = 10): SchemaPublishEntry[] {
+  const rows = historyByPageStmt().all(siteId, pageId, limit) as PublishHistoryRow[];
+  return rows.map(rowToPublishEntry);
+}
+
+/** Get a specific publish entry by ID. */
+export function getSchemaPublishEntry(id: string): SchemaPublishEntry | null {
+  const row = historyByIdStmt().get(id) as PublishHistoryRow | undefined;
+  return row ? rowToPublishEntry(row) : null;
+}
+
+/** Get latest publish date per page for a site (for stale schema detection). */
+export function getPublishDatesForSite(siteId: string): Record<string, string> {
+  const rows = latestPublishDatesStmt().all(siteId) as Array<{ page_id: string; published_at: string }>;
+  return Object.fromEntries(rows.map(r => [r.page_id, r.published_at]));
+}
+
 export function patchSiteTemplate(
   siteId: string,
   orgPatch?: Record<string, unknown>,
