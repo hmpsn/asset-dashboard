@@ -688,7 +688,7 @@ export async function scoreVoiceMatch(
   post: GeneratedPost,
   brief: ContentBrief,
   workspaceId: string,
-): Promise<{ voiceScore: number; voiceFeedback: string }> {
+): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
   const voiceCtx = buildVoiceContext(workspaceId);
 
   // Build a text summary of the post content for analysis
@@ -743,7 +743,7 @@ Return ONLY valid JSON in this exact format:
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       log.warn('Voice scoring: no JSON object found in response');
-      return { voiceScore: 0, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
+      return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
     }
     const parsed = JSON.parse(jsonMatch[0]) as { voiceScore: number; voiceFeedback: string };
     const score = Math.max(0, Math.min(100, Math.round(parsed.voiceScore)));
@@ -752,6 +752,6 @@ Return ONLY valid JSON in this exact format:
     return { voiceScore: score, voiceFeedback: feedback };
   } catch (err) {
     log.warn({ err }, 'Failed to parse voice scoring JSON');
-    return { voiceScore: 0, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
+    return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
   }
 }

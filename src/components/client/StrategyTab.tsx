@@ -46,7 +46,7 @@ const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLoca
 
 export interface KeywordFeedback {
   keyword: string;
-  status: 'approved' | 'declined';
+  status: 'approved' | 'declined' | 'requested';
   reason?: string;
   source?: string;
   created_at?: string;
@@ -57,7 +57,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['optimize-existing', 'new-content', 'page-keyword-map']));
 
   // ── Keyword Feedback State ──
-  const [keywordFeedback, setKeywordFeedback] = useState<Map<string, 'approved' | 'declined'>>(new Map());
+  const [keywordFeedback, setKeywordFeedback] = useState<Map<string, 'approved' | 'declined' | 'requested'>>(new Map());
   const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
   const [declineReason, setDeclineReason] = useState<{ keyword: string; source: string } | null>(null);
   const [declineReasonText, setDeclineReasonText] = useState('');
@@ -67,7 +67,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     if (!workspaceId) return;
     kwFeedbackApi.get(workspaceId)
       .then((items) => {
-        const map = new Map<string, 'approved' | 'declined'>();
+        const map = new Map<string, 'approved' | 'declined' | 'requested'>();
         for (const item of items as KeywordFeedback[]) map.set(item.keyword, item.status);
         setKeywordFeedback(map);
       })
@@ -114,7 +114,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   // ── Keyword Request State ──
   const [suggestKeyword, setSuggestKeyword] = useState('');
   const [suggestingKeyword, setSuggestingKeyword] = useState(false);
-  const requestedKeywords = [...keywordFeedback.entries()].filter(([, s]) => s === ('requested' as string)).map(([k]) => k);
+  const requestedKeywords = [...keywordFeedback.entries()].filter(([, s]) => s === 'requested').map(([k]) => k);
 
   const submitKeywordRequest = useCallback(async () => {
     if (!workspaceId || !suggestKeyword.trim()) return;
@@ -122,7 +122,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     setSuggestingKeyword(true);
     try {
       await post(`/api/public/keyword-feedback/${workspaceId}`, { keyword: kw, status: 'requested', source: 'content_gap' });
-      setKeywordFeedback(prev => { const next = new Map(prev); next.set(kw, 'requested' as 'approved'); return next; });
+      setKeywordFeedback(prev => { const next = new Map(prev); next.set(kw, 'requested'); return next; });
       setSuggestKeyword('');
       setToast?.(`"${suggestKeyword.trim()}" submitted — it will be prioritized in your next strategy`);
     } catch {

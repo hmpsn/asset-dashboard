@@ -327,6 +327,9 @@ router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorksp
     if (!brief) return res.status(404).json({ error: 'Brief not found' });
 
     const { voiceScore, voiceFeedback } = await scoreVoiceMatch(post, brief, req.params.workspaceId);
+    if (voiceScore == null) {
+      return res.status(500).json({ error: voiceFeedback || 'Voice scoring failed' });
+    }
     const updated = updatePostField(req.params.workspaceId, req.params.postId, { voiceScore, voiceFeedback });
 
     broadcastToWorkspace(req.params.workspaceId, 'post-updated', { postId: req.params.postId });
