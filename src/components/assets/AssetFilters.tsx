@@ -5,19 +5,20 @@
 import { Search, ChevronDown } from 'lucide-react';
 
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
-type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used';
+type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used' | 'cms-images' | 'cms-missing-alt';
 
 export interface AssetFiltersProps {
   search: string;
   filter: FilterType;
   sort: SortField;
+  hasCmsData?: boolean;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: FilterType) => void;
   onSortChange: (value: SortField) => void;
 }
 
 export function AssetFilters({
-  search, filter, sort,
+  search, filter, sort, hasCmsData,
   onSearchChange, onFilterChange, onSortChange,
 }: AssetFiltersProps) {
   return (
@@ -46,6 +47,8 @@ export function AssetFilters({
           <option value="svg">SVG</option>
           <option value="unused">Unused</option>
           <option value="used">Used</option>
+          {hasCmsData && <option value="cms-images">CMS Images</option>}
+          {hasCmsData && <option value="cms-missing-alt">CMS Missing Alt</option>}
         </select>
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
       </div>

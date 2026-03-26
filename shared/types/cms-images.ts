@@ -5,7 +5,7 @@
 export interface CmsImageField {
   slug: string;
   displayName: string;
-  type: 'Image' | 'MultiImage';
+  type: 'Image' | 'MultiImage' | 'RichText';
 }
 
 export interface CmsImageUsage {
@@ -15,7 +15,7 @@ export interface CmsImageUsage {
   itemName: string;
   fieldSlug: string;
   fieldDisplayName: string;
-  fieldType: 'Image' | 'MultiImage';
+  fieldType: 'Image' | 'MultiImage' | 'RichText';
 }
 
 export interface CmsImageAsset {

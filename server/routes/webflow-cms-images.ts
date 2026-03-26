@@ -13,25 +13,38 @@ const log = createLogger('webflow-cms-images');
 
 const OVERSIZED_THRESHOLD = 500 * 1024; // 500 KB
 
-// Fetch Webflow asset metadata (alt text, size, content type) using the site token
-async function fetchAssetMap(siteId: string, token?: string): Promise<Map<string, { altText?: string; size?: number; contentType?: string }>> {
+// Fetch Webflow asset metadata (alt text, size, content type, hosted URL) using the site token
+async function fetchAssetMap(
+  siteId: string,
+  token?: string,
+): Promise<{
+  byId: Map<string, { altText?: string; size?: number; contentType?: string; hostedUrl?: string }>;
+  byUrl: Map<string, string>; // hostedUrl → assetId
+}> {
   try {
     const { webflowFetch } = await import('../webflow-client.js');
-    const map = new Map<string, { altText?: string; size?: number; contentType?: string }>();
+    const byId = new Map<string, { altText?: string; size?: number; contentType?: string; hostedUrl?: string }>();
+    const byUrl = new Map<string, string>();
     let offset = 0;
     const limit = 100;
     while (true) {
       const res = await webflowFetch(`/sites/${siteId}/assets?limit=${limit}&offset=${offset}`, {}, token);
       if (!res.ok) break;
-      const data = await res.json() as { assets?: Array<{ id: string; altText?: string; size?: number; contentType?: string }> };
+      const data = await res.json() as {
+        assets?: Array<{ id: string; altText?: string; size?: number; contentType?: string; hostedUrl?: string; url?: string }>;
+      };
       const batch = data.assets || [];
-      for (const a of batch) map.set(a.id, { altText: a.altText, size: a.size, contentType: a.contentType });
+      for (const a of batch) {
+        const hostedUrl = a.hostedUrl || a.url;
+        byId.set(a.id, { altText: a.altText, size: a.size, contentType: a.contentType, hostedUrl });
+        if (hostedUrl) byUrl.set(hostedUrl, a.id);
+      }
       if (batch.length < limit) break;
       offset += limit;
     }
-    return map;
+    return { byId, byUrl };
   } catch {
-    return new Map();
+    return { byId: new Map(), byUrl: new Map() };
   }
 }
 
@@ -52,7 +65,7 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
     const collections = await listCollections(siteId, token);
 
     // Step 2: build asset metadata map for enrichment
-    const assetMetaMap = await fetchAssetMap(siteId, token);
+    const { byId: assetMetaMap, byUrl: assetUrlMap } = await fetchAssetMap(siteId, token);
 
     // Step 3: scan each collection for image fields
     const collectionInfos: CmsCollectionImageInfo[] = [];
@@ -60,7 +73,9 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
 
     for (const coll of collections) {
       const schema = await getCollectionSchema(coll.id, token);
-      const imageFields = schema.fields.filter(f => f.type === 'Image' || f.type === 'MultiImage');
+      const imageFields = schema.fields.filter(
+        f => f.type === 'Image' || f.type === 'MultiImage' || f.type === 'RichText',
+      );
       if (imageFields.length === 0) continue;
 
       collectionInfos.push({
@@ -69,7 +84,7 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
         imageFields: imageFields.map(f => ({
           slug: f.slug,
           displayName: f.displayName,
-          type: f.type as 'Image' | 'MultiImage',
+          type: f.type as 'Image' | 'MultiImage' | 'RichText',
         })),
       });
 
@@ -108,7 +123,7 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
               itemName,
               fieldSlug: field.slug,
               fieldDisplayName: field.displayName,
-              fieldType: field.type as 'Image' | 'MultiImage',
+              fieldType: field.type as 'Image' | 'MultiImage' | 'RichText',
             });
           };
 
@@ -128,6 +143,23 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
               for (const img of val) {
                 const imgObj = img as Record<string, unknown>;
                 if (typeof imgObj.fileId === 'string') addUsage(imgObj.fileId);
+              }
+            }
+          } else if (field.type === 'RichText') {
+            // RichText field: HTML string — extract all <img src="..."> URLs
+            if (typeof val === 'string') {
+              const imgSrcRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+              let match: RegExpExecArray | null;
+              while ((match = imgSrcRegex.exec(val)) !== null) {
+                const src = match[1];
+                // Look up by exact URL first, then try extracting ID from CDN path
+                const assetId = assetUrlMap.get(src);
+                if (assetId) {
+                  addUsage(assetId);
+                } else {
+                  const idMatch = src.match(/\/([a-f0-9]{24})\//i);
+                  if (idMatch && assetMetaMap.has(idMatch[1])) addUsage(idMatch[1]);
+                }
               }
             }
           }

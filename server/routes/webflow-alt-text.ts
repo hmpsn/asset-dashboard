@@ -233,6 +233,7 @@ async function repairCmsReferences(
   oldAssetId: string,
   newAssetId: string,
   newHostedUrl: string,
+  oldHostedUrl: string,
   token?: string,
 ): Promise<{ succeeded: number; failed: number }> {
   let succeeded = 0;
@@ -252,10 +253,11 @@ async function repairCmsReferences(
   for (const [key, { collectionId, fields }] of itemMap.entries()) {
     const itemId = key.split(':')[1];
 
-    // Fetch current item to handle MultiImage array updates
+    // Fetch current item to handle MultiImage array updates and RichText replacements
     let currentItem: Record<string, unknown> | null = null;
     const multiImageFields = fields.filter(f => f.fieldType === 'MultiImage');
-    if (multiImageFields.length > 0) {
+    const richTextFields = fields.filter(f => f.fieldType === 'RichText');
+    if (multiImageFields.length > 0 || richTextFields.length > 0) {
       try {
         const { items } = await listCollectionItems(collectionId, 1, 0, token);
         // listCollectionItems doesn't support single-item fetch; use the fieldData we have
@@ -294,6 +296,13 @@ async function repairCmsReferences(
           });
         } else {
           fieldData[fieldSlug] = [{ fileId: newAssetId, url: newHostedUrl }];
+        }
+      } else if (fieldType === 'RichText' && currentItem && oldHostedUrl) {
+        const fd = (currentItem.fieldData || currentItem) as Record<string, unknown>;
+        const htmlString = fd[fieldSlug];
+        if (typeof htmlString === 'string' && htmlString.includes(oldHostedUrl)) {
+          // Replace all occurrences of the old CDN URL with the new one
+          fieldData[fieldSlug] = htmlString.split(oldHostedUrl).join(newHostedUrl);
         }
       }
     }
@@ -430,6 +439,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
         req.params.assetId,
         uploadResult.assetId,
         uploadResult.hostedUrl,
+        imageUrl,
         compressToken,
       );
     }
