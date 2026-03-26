@@ -39,6 +39,10 @@ const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Every 12 hours
 const MIN_SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // Skip startup scan if last scan < 6h ago
 const COMPARISON_DAYS = 28;
 
+// --- Minimum traffic floors — skip anomalies on low-volume pages to reduce noise ---
+const MIN_CLICKS = 200;        // previous period clicks must be ≥200 to trigger click anomaly
+const MIN_IMPRESSIONS = 2000;  // previous period impressions must be ≥2000 to trigger impression anomaly
+
 // --- Thresholds (% change that triggers an anomaly) ---
 const THRESHOLDS = {
   traffic_drop: -20,       // clicks or users down 20%+
@@ -262,7 +266,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
       const { current, previous, changePercent } = cmp;
 
       // Traffic drop (clicks)
-      if (changePercent.clicks <= THRESHOLDS.traffic_drop && !alreadyDetected(ws.id, 'traffic_drop')) {
+      if (changePercent.clicks <= THRESHOLDS.traffic_drop && previous.clicks >= MIN_CLICKS && !alreadyDetected(ws.id, 'traffic_drop')) {
         detected.push(createAnomaly(ws, 'traffic_drop', 'clicks', current.clicks, previous.clicks, changePercent.clicks, 'gsc',
           `Search clicks dropped ${Math.abs(changePercent.clicks)}%`,
           `Clicks fell from ${previous.clicks.toLocaleString()} to ${current.clicks.toLocaleString()} (${changePercent.clicks}%) over the last ${COMPARISON_DAYS} days vs the prior period.`,
@@ -270,7 +274,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
       }
 
       // Traffic spike (clicks)
-      if (changePercent.clicks >= THRESHOLDS.traffic_spike && !alreadyDetected(ws.id, 'traffic_spike')) {
+      if (changePercent.clicks >= THRESHOLDS.traffic_spike && previous.clicks >= MIN_CLICKS && !alreadyDetected(ws.id, 'traffic_spike')) {
         detected.push(createAnomaly(ws, 'traffic_spike', 'clicks', current.clicks, previous.clicks, changePercent.clicks, 'gsc',
           `Search clicks surged ${changePercent.clicks}%`,
           `Clicks rose from ${previous.clicks.toLocaleString()} to ${current.clicks.toLocaleString()} (+${changePercent.clicks}%) over the last ${COMPARISON_DAYS} days.`,
@@ -278,7 +282,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
       }
 
       // Impressions drop
-      if (changePercent.impressions <= THRESHOLDS.impressions_drop && !alreadyDetected(ws.id, 'impressions_drop')) {
+      if (changePercent.impressions <= THRESHOLDS.impressions_drop && previous.impressions >= MIN_IMPRESSIONS && !alreadyDetected(ws.id, 'impressions_drop')) {
         detected.push(createAnomaly(ws, 'impressions_drop', 'impressions', current.impressions, previous.impressions, changePercent.impressions, 'gsc',
           `Search impressions dropped ${Math.abs(changePercent.impressions)}%`,
           `Impressions fell from ${previous.impressions.toLocaleString()} to ${current.impressions.toLocaleString()} — potential visibility loss.`,

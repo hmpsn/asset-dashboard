@@ -465,10 +465,14 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     }
   }
   // Check which audited pages receive zero inbound internal links
+  // Exclude utility pages that are intentionally unlinked (thank-you, confirmation, etc.)
+  const ORPHAN_UTILITY_PATTERNS = /(?:^|\/)(?:thank[-_]?you|thanks|thankyou|confirmation|success|members?[-_]?only|members?[-_]?area|password[-_]?protected|unsubscribe|opt[-_]?out)(?:\/|$|-|_|$)/i;
   const orphanPages: string[] = [];
   for (const r of results) {
     const pagePath = `/${r.slug}`.replace(/\/$/, '').toLowerCase();
     if (pagePath === '/' || pagePath === '') continue; // Homepage always linked
+    if (isExcludedPage(r.slug, r.page)) continue; // Skip utility pages entirely
+    if (ORPHAN_UTILITY_PATTERNS.test(r.slug)) continue; // Skip intentionally unlinked utility pages
     if (!internalLinkTargets.has(pagePath)) {
       orphanPages.push(r.page || r.slug);
     }
@@ -492,6 +496,20 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       recommendation: `These pages won't appear in search results: ${noindexPages.slice(0, 8).map(p => p.page || p.slug).join(', ')}${noindexPages.length > 8 ? ` (+${noindexPages.length - 8} more)` : ''}. Review and remove noindex if they should be indexed.`,
     });
   }
+
+  // Deduplicate site-wide issues — keyed by check+message to prevent exact duplicates
+  // while preserving distinct issues that share the same check name (e.g. robots-txt missing vs blocking)
+  const seenIssueKeys = new Set<string>();
+  const dedupedIssues: typeof siteWideIssues = [];
+  for (const issue of siteWideIssues) {
+    const key = `${issue.check}::${issue.message}`;
+    if (!seenIssueKeys.has(key)) {
+      seenIssueKeys.add(key);
+      dedupedIssues.push(issue);
+    }
+  }
+  siteWideIssues.length = 0;
+  siteWideIssues.push(...dedupedIssues);
 
   // Auto-assign categories to site-wide issues
   for (const issue of siteWideIssues) {

@@ -15,7 +15,7 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact } from './workspace-home';
 import { type Page, adminPath } from '../routes';
-import { useWorkspaceHomeData, useAdminROI } from '../hooks/admin';
+import { useWorkspaceHomeData, useAdminROI, useContentPipeline } from '../hooks/admin';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -47,6 +47,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const { audit } = useAuditSummary(workspaceId);
   const { data: homeData, isLoading: loading, isFetching: refreshing, dataUpdatedAt } = useWorkspaceHomeData(workspaceId);
   const { data: roiData, isLoading: roiLoading } = useAdminROI(workspaceId);
+  const { data: pipelineData } = useContentPipeline(workspaceId);
   const [now, setNow] = useState(() => new Date());
 
   // Tick every 30s so relative timestamps stay fresh
@@ -130,6 +131,17 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       color: signal.severity === 'critical' ? 'red' : 'amber',
       icon: Flag,
       tab: 'workspace-settings',
+    });
+  }
+  const decay = pipelineData?.decay;
+  if (decay && (decay.critical > 0 || decay.warning > 0)) {
+    const total = decay.critical + decay.warning;
+    actions.push({
+      label: `${total} page${total > 1 ? 's' : ''} losing search traffic`,
+      sub: decay.critical > 0 ? `${decay.critical} critical · ${decay.warning} at risk — refresh content` : `${decay.warning} pages declining in clicks`,
+      color: decay.critical > 0 ? 'red' : 'amber',
+      icon: TrendingDown,
+      tab: 'seo-audit',
     });
   }
 

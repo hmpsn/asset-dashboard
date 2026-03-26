@@ -230,11 +230,29 @@ function mapToProduct(recType: RecType, pageCount: number): { productType?: stri
 
 // ─── Insight Text Generators ──────────────────────────────────────
 
+/** Infer the most appropriate schema type(s) from a list of page slugs */
+function inferSchemaTypes(slugs: string[]): string {
+  const types = new Set<string>();
+  for (const slug of slugs) {
+    const s = slug.toLowerCase();
+    if (/(?:^|\/)blog|articles?|news|posts?|guides?|insights?/.test(s)) types.add('Article');
+    if (/(?:^|\/)faq|frequently[-_]asked/.test(s)) types.add('FAQPage');
+    if (/(?:^|\/)contact|reach[-_]us|get[-_]in[-_]touch/.test(s)) types.add('ContactPoint');
+    if (/(?:^|\/)services?|solutions?|offerings?|what[-_]we[-_]do/.test(s)) types.add('Service');
+    if (/(?:^|\/)products?|shop|store/.test(s)) types.add('Product');
+    if (/(?:^|\/)about|team|our[-_]story|who[-_]we[-_]are/.test(s)) types.add('Organization');
+    if (/(?:^|\/)review|testimonials?|case[-_]stud/.test(s)) types.add('Review');
+  }
+  if (types.size === 0) types.add('WebPage');
+  return Array.from(types).join(', ');
+}
+
 function auditInsight(
   check: string,
   _severity: string,
   affectedCount: number,
   trafficAtRisk: number,
+  affectedSlugs?: string[],
 ): string {
   const chk = check.toLowerCase();
   const hasTraffic = trafficAtRisk > 0;
@@ -259,9 +277,13 @@ function auditInsight(
     return `${affectedCount} pages have canonical tag issues. Without proper canonicals, Google may see duplicate content and dilute your rankings across multiple URLs.`;
   }
   if (chk.includes('structured') || chk.includes('schema')) {
+    const schemaTypes = affectedSlugs && affectedSlugs.length > 0
+      ? inferSchemaTypes(affectedSlugs)
+      : null;
+    const schemaHint = schemaTypes ? ` Recommended types for these pages: ${schemaTypes}.` : '';
     return hasTraffic
-      ? `${affectedCount} pages getting ${trafficStr} clicks/mo lack structured data. Adding schema markup can unlock rich snippets (stars, FAQs, breadcrumbs) which typically boost CTR by 20-30%.`
-      : `${affectedCount} pages are missing structured data. Schema markup enables rich snippets in Google — the enhanced listings that stand out and get significantly more clicks.`;
+      ? `${affectedCount} pages getting ${trafficStr} clicks/mo lack structured data. Adding schema markup can unlock rich snippets (stars, FAQs, breadcrumbs) which typically boost CTR by 20-30%.${schemaHint}`
+      : `${affectedCount} pages are missing structured data. Schema markup enables rich snippets in Google — the enhanced listings that stand out and get significantly more clicks.${schemaHint}`;
   }
   if (chk.includes('img-alt') || chk.includes('alt')) {
     return `${affectedCount} pages have images missing alt text. This affects both Google Image Search visibility and accessibility compliance — two quick wins from a single fix.`;
@@ -428,7 +450,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         type: recType,
         title: `${group.check.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — ${group.pages.length} page${group.pages.length !== 1 ? 's' : ''}`,
         description: sortedPages[0].recommendation,
-        insight: auditInsight(group.check, group.severity, group.pages.length, group.totalClicks),
+        insight: auditInsight(group.check, group.severity, group.pages.length, group.totalClicks, sortedPages.map(p => p.slug)),
         impact,
         effort,
         impactScore,

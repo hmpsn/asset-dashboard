@@ -36,7 +36,8 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   
   // Ref for snap-to-section
   const allPagesRef = useRef<HTMLDivElement>(null);
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'all');
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'warning');
+  const [showInfoItems, setShowInfoItems] = useState(false);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [auditSearch, setAuditSearch] = useState('');
   const [requestedPages, setRequestedPages] = useState<Set<string>>(new Set());
@@ -75,7 +76,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
   const filteredPages = auditDetail?.audit.pages.filter(p => {
     if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !toLiveUrl(p.url, liveDomain).toLowerCase().includes(auditSearch.toLowerCase())) return false;
-    if (severityFilter === 'all') return true;
+    if (severityFilter === 'all') {
+      if (!showInfoItems) return p.issues.some(i => i.severity !== 'info');
+      return true;
+    }
+    if (severityFilter === 'info') return p.issues.some(i => i.severity === 'info');
     return p.issues.some(i => i.severity === severityFilter);
   }) || [];
 
@@ -88,6 +93,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
     }));
     return cats;
   })() : {};
+
+  const infoIssueCount = auditDetail
+    ? auditDetail.audit.pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0)
+    : 0;
 
   // Share reports state
   const [shareOpen, setShareOpen] = useState(false);
@@ -238,7 +247,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 })}
               </div>
               {!s.fieldDataAvailable && (
-                <div className="mt-1.5 text-[10px] text-zinc-500 italic">Lab simulation — real data not yet available</div>
+                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-300">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
+                </div>
               )}
             </div>
           );
@@ -492,13 +504,26 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
-              {(['all', 'error', 'warning', 'info'] as const).map(s => (
+              {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} onClick={() => setSeverityFilter(s)}
                   className={`px-3 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors ${
                     severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
-                  }`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
+                  }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
+            {infoIssueCount > 0 && (
+              <button
+                onClick={() => setShowInfoItems(!showInfoItems)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors border ${
+                  showInfoItems
+                    ? 'bg-zinc-700 text-zinc-300 border-zinc-600'
+                    : 'bg-transparent text-zinc-500 border-zinc-700 hover:text-zinc-300'
+                }`}
+              >
+                <Info className="w-3 h-3" />
+                {showInfoItems ? 'Hide' : 'Show'} {infoIssueCount} informational
+              </button>
+            )}
             <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
               className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
             <button onClick={() => toggleSection('all-pages')} className="ml-auto p-1.5 rounded hover:bg-zinc-800 text-zinc-500">
@@ -531,7 +556,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   {isExpanded && (
                     <div className="px-4 pb-3">
                       <div className="space-y-2">
-                        {page.issues.map((issue, i) => {
+                        {page.issues.filter(i => showInfoItems || i.severity !== 'info').map((issue, i) => {
                           const sc = SEV[issue.severity];
                           return (
                             <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
