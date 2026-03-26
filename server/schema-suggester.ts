@@ -122,24 +122,27 @@ export function checkRichResultsEligibility(schema: Record<string, unknown>): Ri
   const results: RichResultEligibility[] = [];
 
   for (const node of graph) {
-    const type = node['@type'] as string;
-    if (!type || !RICH_RESULTS_ELIGIBLE[type]) continue;
+    const rawType = node['@type'];
+    const types = Array.isArray(rawType) ? rawType as string[] : (rawType ? [rawType as string] : []);
+    for (const type of types) {
+      if (!type || !RICH_RESULTS_ELIGIBLE[type]) continue;
 
-    const { feature, required } = RICH_RESULTS_ELIGIBLE[type];
-    const missingFields = required.filter(field => {
-      const val = node[field];
-      if (val === undefined || val === null) return true;
-      if (Array.isArray(val) && val.length === 0) return true;
-      if (typeof val === 'string' && val.trim() === '') return true;
-      return false;
-    });
+      const { feature, required } = RICH_RESULTS_ELIGIBLE[type];
+      const missingFields = required.filter(field => {
+        const val = node[field];
+        if (val === undefined || val === null) return true;
+        if (Array.isArray(val) && val.length === 0) return true;
+        if (typeof val === 'string' && val.trim() === '') return true;
+        return false;
+      });
 
-    results.push({
-      type,
-      feature,
-      eligible: missingFields.length === 0,
-      missingFields: missingFields.length > 0 ? missingFields : undefined,
-    });
+      results.push({
+        type,
+        feature,
+        eligible: missingFields.length === 0,
+        missingFields: missingFields.length > 0 ? missingFields : undefined,
+      });
+    }
   }
 
   return results;

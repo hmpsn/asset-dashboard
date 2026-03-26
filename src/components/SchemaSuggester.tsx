@@ -303,6 +303,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           suggestedSchemas: result.suggestedSchemas,
           existingSchemas: result.existingSchemas,
           validationErrors: result.validationErrors,
+          richResultsEligibility: result.richResultsEligibility,
         } : p);
       });
       setExpanded(prev => new Set(prev).add(pageId));

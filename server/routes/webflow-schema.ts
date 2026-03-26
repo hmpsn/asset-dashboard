@@ -7,6 +7,7 @@ import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
+import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
 import { getSchemaSnapshot, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, getSchemaPlan, updateSchemaPlanStatus, updateSchemaPlanRoles, deleteSchemaPlan, deleteSchemaSnapshot, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite } from '../schema-store.js';
@@ -69,10 +70,13 @@ router.get('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQ
   res.json({ pageTypes: getPageTypes(req.params.siteId) });
 });
 
-router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+const pageTypeSchema = z.object({
+  pageId: z.string().min(1),
+  pageType: z.string().min(1),
+});
+
+router.put('/api/webflow/schema-page-types/:siteId', requireWorkspaceAccessFromQuery(), validate(pageTypeSchema), (req, res) => {
   const { pageId, pageType } = req.body;
-  if (!pageId || typeof pageId !== 'string') return res.status(400).json({ error: 'pageId required' });
-  if (!pageType || typeof pageType !== 'string') return res.status(400).json({ error: 'pageType required' });
   savePageType(req.params.siteId, pageId, pageType);
   res.json({ ok: true });
 });
