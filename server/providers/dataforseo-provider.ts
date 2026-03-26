@@ -205,7 +205,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     return !!getCredentials();
   }
 
-  // ── getKeywordMetrics → keywords_for_keywords ──
+  // ── getKeywordMetrics → search_volume ──
   async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us'): Promise<KeywordMetrics[]> {
     const results: KeywordMetrics[] = [];
     const uncached: string[] = [];
@@ -216,7 +216,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       const cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
       if (cached) {
         results.push(cached);
-        logCreditUsage({ credits: 0, endpoint: 'keywords_for_keywords', query: kw, rowsReturned: 1, workspaceId, cached: true });
+        logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
       } else {
         uncached.push(kw);
       }
@@ -232,7 +232,7 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     for (const batch of batches) {
       try {
-        const json = await apiCall('keywords_data/google_ads/keywords_for_keywords/live', [{
+        const json = await apiCall('keywords_data/google_ads/search_volume/live', [{
           keywords: batch,
           location_code: locationCode(database),
           language_code: 'en',
@@ -265,9 +265,9 @@ export class DataForSeoProvider implements SeoDataProvider {
           writeCache(workspaceId, cacheKey, metrics);
         }
 
-        logCreditUsage({ credits: cost, endpoint: 'keywords_for_keywords', query: batch.join(',').slice(0, 100), rowsReturned: taskResults.length, workspaceId, cached: false });
+        logCreditUsage({ credits: cost, endpoint: 'search_volume', query: batch.join(',').slice(0, 100), rowsReturned: taskResults.length, workspaceId, cached: false });
       } catch (err) {
-        log.error({ err }, 'DataForSEO keywords_for_keywords error');
+        log.error({ err }, 'DataForSEO search_volume error');
       }
     }
 
