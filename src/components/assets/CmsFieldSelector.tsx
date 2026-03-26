@@ -10,21 +10,25 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Database } from 'lucide-react';
 import type { CmsCollectionImageInfo } from '../../../shared/types/cms-images';
 
+/** Patterns that indicate a meta/OG/preview image field (not a content field) */
+const META_PATTERNS = [
+  /\bog[-_]?image/i,    // og-image, og_image, ogImage
+  /\bopen[-_]?graph/i,  // open-graph, opengraph
+  /\bmeta[-_]?image/i,  // meta-image, meta_image
+  /\bthumbnail/i,       // thumbnail
+  /\bthumb/i,           // thumb
+  /\bseo[-_]?image/i,   // seo-image, seo_image
+  /\bsocial[-_]?image/i,// social-image, social_image
+  /\bpreview[-_]?image/i,// preview-image
+  /\bshare[-_]?image/i, // share-image
+  /\bfeatured[-_]?image/i, // featured-image (typically hero/card, not body content)
+  /\bcover[-_]?image/i, // cover-image
+];
+
 /** Returns true for field slugs/names that look like meta/OG/preview images */
 function isMetaField(slug: string, displayName: string): boolean {
-  const lower = `${slug} ${displayName}`.toLowerCase();
-  return (
-    lower.includes('og') ||
-    lower.includes('meta') ||
-    lower.includes('open-graph') ||
-    lower.includes('opengraph') ||
-    lower.includes('thumbnail') ||
-    lower.includes('thumb') ||
-    lower.includes('seo') ||
-    lower.includes('social') ||
-    lower.includes('preview-image') ||
-    lower.includes('share')
-  );
+  const text = `${slug} ${displayName}`;
+  return META_PATTERNS.some(p => p.test(text));
 }
 
 /** Build the default selected field set — content fields in, meta/OG fields out */
@@ -151,7 +155,7 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
                             field.type === 'RichText'
                               ? 'bg-emerald-900/40 text-emerald-500'
                               : field.type === 'MultiImage'
-                              ? 'bg-purple-900/40 text-purple-400'
+                              ? 'bg-blue-900/40 text-blue-400'
                               : 'bg-zinc-800 text-zinc-500'
                           }`}>
                             {field.type}

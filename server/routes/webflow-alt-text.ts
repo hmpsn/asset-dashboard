@@ -259,23 +259,17 @@ async function repairCmsReferences(
     const richTextFields = fields.filter(f => f.fieldType === 'RichText');
     if (multiImageFields.length > 0 || richTextFields.length > 0) {
       try {
-        const { items } = await listCollectionItems(collectionId, 1, 0, token);
-        // listCollectionItems doesn't support single-item fetch; use the fieldData we have
-        // We'll do a fetch of all items and find the one we need
-        const allPages = await (async () => {
-          const all: Array<Record<string, unknown>> = [];
-          let offset = 0;
-          while (true) {
-            const { items: batch, total } = await listCollectionItems(collectionId, 100, offset, token);
-            all.push(...batch);
-            if (all.length >= total) break;
-            offset += 100;
-          }
-          return all;
-        })();
-        currentItem = allPages.find(i => (i.id || (i as Record<string, unknown>)._id) === itemId) || null;
+        // Paginate all items to find the one we need (Webflow CMS API has no single-item GET)
+        const all: Array<Record<string, unknown>> = [];
+        let offset = 0;
+        while (true) {
+          const { items: batch, total } = await listCollectionItems(collectionId, 100, offset, token);
+          all.push(...batch);
+          if (all.length >= total) break;
+          offset += 100;
+        }
+        currentItem = all.find(i => (i.id || (i as Record<string, unknown>)._id) === itemId) || null;
       } catch { /* proceed without current item data */ }
-      void items; // suppress unused warning
     }
 
     const fieldData: Record<string, unknown> = {};

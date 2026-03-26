@@ -51,7 +51,7 @@ async function fetchAssetMap(
 /**
  * GET /api/webflow/cms-images/:siteId
  *
- * Scans all CMS collections for Image/MultiImage fields and returns:
+ * Scans all CMS collections for Image/MultiImage/RichText fields and returns:
  * - collections: list of collections with their image fields (for the field selector UI)
  * - assets: per-asset CMS usage locations
  * - stats: totals for CMS images, missing alt text, and oversized images
@@ -147,18 +147,22 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
             }
           } else if (field.type === 'RichText') {
             // RichText field: HTML string — extract all <img src="..."> URLs
+            // Deduplicate: same asset may appear multiple times in one field
             if (typeof val === 'string') {
               const imgSrcRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+              const seenAssetIds = new Set<string>();
               let match: RegExpExecArray | null;
               while ((match = imgSrcRegex.exec(val)) !== null) {
                 const src = match[1];
                 // Look up by exact URL first, then try extracting ID from CDN path
-                const assetId = assetUrlMap.get(src);
-                if (assetId) {
-                  addUsage(assetId);
-                } else {
+                let resolvedId = assetUrlMap.get(src);
+                if (!resolvedId) {
                   const idMatch = src.match(/\/([a-f0-9]{24})\//i);
-                  if (idMatch && assetMetaMap.has(idMatch[1])) addUsage(idMatch[1]);
+                  if (idMatch && assetMetaMap.has(idMatch[1])) resolvedId = idMatch[1];
+                }
+                if (resolvedId && !seenAssetIds.has(resolvedId)) {
+                  seenAssetIds.add(resolvedId);
+                  addUsage(resolvedId);
                 }
               }
             }

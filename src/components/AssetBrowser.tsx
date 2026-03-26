@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { get, post, patch } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebflowAssets, useAssetAudit, useCmsImages } from '../hooks/admin';
@@ -49,12 +49,15 @@ function AssetBrowser({ siteId }: Props) {
   const { data: cmsImageData } = useCmsImages(siteId, assets.length > 0);
 
   // Build a quick-lookup map: assetId → CmsImageUsage[]
-  const cmsUsageMap = new Map<string, CmsImageUsage[]>();
-  if (cmsImageData) {
-    for (const a of cmsImageData.assets) {
-      cmsUsageMap.set(a.assetId, a.usages);
+  const cmsUsageMap = useMemo(() => {
+    const map = new Map<string, CmsImageUsage[]>();
+    if (cmsImageData) {
+      for (const a of cmsImageData.assets) {
+        map.set(a.assetId, a.usages);
+      }
     }
-  }
+    return map;
+  }, [cmsImageData]);
 
   // CMS field selector state — which fields are included in filter + bulk ops
   const [selectedCmsFields, setSelectedCmsFields] = useState<Set<string>>(new Set());
