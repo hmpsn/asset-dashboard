@@ -18,6 +18,7 @@ export type ActivityType =
   | 'audit_completed'
   | 'request_resolved'
   | 'approval_applied'
+  | 'approval_reverted'
   | 'seo_updated'
   | 'images_optimized'
   | 'links_fixed'

@@ -328,7 +328,7 @@ export function ApprovalsTab({
                                     <div className="flex gap-1.5">
                                       <button
                                         onClick={() => {
-                                          updateApprovalItem(batch.id, item.id, { status: 'rejected', ...(rejectDraft ? { clientNote: rejectDraft } : {}) });
+                                          updateApprovalItem(batch.id, item.id, { status: 'rejected', clientNote: rejectDraft });
                                           setRejectingItem(null);
                                           setRejectDraft('');
                                         }}
