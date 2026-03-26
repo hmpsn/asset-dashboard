@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen, Pencil, Check, X,
-  Shield, DollarSign, ArrowUp, ArrowDown,
+  Shield, DollarSign, ArrowUp, ArrowDown, ArrowUpRight, Code2,
 } from 'lucide-react';
+import { adminPath } from '../routes';
 import { scoreColorClass, scoreBgBarClass } from './ui';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
@@ -188,6 +190,7 @@ function opportunityScore(p: StrategyPage) {
 // ── Component ──
 
 export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: keywordData, isLoading: strategyLoading } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
@@ -1105,6 +1108,37 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       ) : null}
                     </div>
                   )}
+
+                  {/* ── Action bar ── */}
+                  <div className="flex items-center gap-2 pt-3 mt-1 border-t border-zinc-800/60 flex-wrap">
+                    <button
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                    >
+                      <Pencil className="w-3 h-3" /> Fix in SEO Editor
+                    </button>
+                    <button
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                    >
+                      <BookOpen className="w-3 h-3" /> Create Brief
+                    </button>
+                    {(kw?.optimizationIssues?.some(i => /schema|structured data/i.test(i)) || sp?.optimizationIssues?.some(i => /schema|structured data/i.test(i))) && (
+                      <button
+                        onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                      >
+                        <Code2 className="w-3 h-3" /> Add Schema
+                      </button>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'))}
+                      className="flex items-center gap-1 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+                    >
+                      View full analysis <ArrowUpRight className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -31,6 +31,7 @@ interface PageImpact {
 interface SeoChangeImpactProps {
   workspaceId: string;
   hasGsc: boolean;
+  embedded?: boolean;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -70,7 +71,7 @@ function DeltaBadge({ before, after, label, invert }: { before: number; after: n
   );
 }
 
-export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
+export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpactProps) {
   const [changes, setChanges] = useState<SeoChangeEvent[]>([]);
   const [impact, setImpact] = useState<PageImpact[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,21 +102,17 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
 
   if (changes.length === 0) return null;
 
-  return (
-    <SectionCard
-      title="SEO Change Tracker"
-      titleIcon={<Pencil className="w-4 h-4 text-violet-400" />}
-      action={
-        hasGsc && !showImpact ? (
-          <button
-            onClick={loadImpact}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-all"
-          >
-            <TrendingUp className="w-3 h-3" /> Compare GSC Impact
-          </button>
-        ) : null
-      }
+  const actionButton = hasGsc && !showImpact ? (
+    <button
+      onClick={loadImpact}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-all"
     >
+      <TrendingUp className="w-3 h-3" /> Compare GSC Impact
+    </button>
+  ) : null;
+
+  const innerContent = (
+    <>
       {/* Summary */}
       <div className="flex items-center gap-4 mb-3">
         <div className="text-[11px] text-zinc-500">
@@ -205,6 +202,30 @@ export function SeoChangeImpact({ workspaceId, hasGsc }: SeoChangeImpactProps) {
           )}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="border-t border-zinc-800/50 px-4 pt-3 pb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
+            <Pencil className="w-3 h-3 text-violet-400" /> SEO Change Tracker
+          </span>
+          {actionButton}
+        </div>
+        {innerContent}
+      </div>
+    );
+  }
+
+  return (
+    <SectionCard
+      title="SEO Change Tracker"
+      titleIcon={<Pencil className="w-4 h-4 text-violet-400" />}
+      action={actionButton}
+    >
+      {innerContent}
     </SectionCard>
   );
 }
