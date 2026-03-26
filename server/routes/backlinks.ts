@@ -2,7 +2,7 @@
  * backlinks routes — lightweight backlink profile overview via SEO data provider
  */
 import { Router } from 'express';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getBacklinksProvider } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
@@ -14,7 +14,7 @@ router.get('/api/backlinks/:workspaceId', async (req, res) => {
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const provider = getConfiguredProvider(ws.seoDataProvider);
+  const provider = getBacklinksProvider(ws.seoDataProvider);
   if (!provider) {
     return res.status(503).json({ error: 'No SEO data provider configured. Set SEMRUSH_API_KEY or DATAFORSEO_LOGIN to enable backlink data.' });
   }
