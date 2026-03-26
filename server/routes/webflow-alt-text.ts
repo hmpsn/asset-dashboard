@@ -438,7 +438,14 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       );
     }
 
-    await deleteAsset(req.params.assetId, compressToken);
+    // Only delete old asset if there are no failed CMS reference repairs.
+    // When repairs fail, the old asset must remain so CMS items aren't broken.
+    const hasFailedCmsRepairs = cmsUpdates && cmsUpdates.failed > 0;
+    if (!hasFailedCmsRepairs) {
+      await deleteAsset(req.params.assetId, compressToken);
+    } else {
+      log.warn({ assetId: req.params.assetId, failed: cmsUpdates.failed }, 'Skipping old asset deletion — CMS reference repairs had failures');
+    }
 
     res.json({
       success: true,
@@ -449,6 +456,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       savings,
       savingsPercent,
       newFileName,
+      oldAssetPreserved: !!hasFailedCmsRepairs,
       ...(cmsUpdates ? { cmsUpdates } : {}),
     });
   } catch (e) {

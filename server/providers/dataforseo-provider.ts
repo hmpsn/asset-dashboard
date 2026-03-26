@@ -19,6 +19,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
+import { markCapabilityDisabled } from '../seo-data-provider.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -105,7 +106,6 @@ function areCreditsExhausted(): boolean {
 // DataForSEO backlinks is a separate paid subscription (error 40204).
 // Once detected, we mark the capability disabled on the registry so
 // the resolver can fall back to SEMRush for backlink calls.
-import { markCapabilityDisabled, isCapabilityDisabled } from '../seo-data-provider.js';
 
 let backlinkSubscriptionDisabled = false;
 
