@@ -39,6 +39,16 @@ import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('approvals');
 
+/** Derive the correct page-level edit state from all items targeting that page in a batch. */
+function derivePageStatus(batch: import('../../shared/types/approvals').ApprovalBatch, pageId: string): 'in-review' | 'approved' | 'rejected' {
+  const pageItems = batch.items.filter(i => i.pageId === pageId);
+  const statuses = pageItems.map(i => i.status);
+  if (statuses.every(s => s === 'approved' || s === 'applied')) return 'approved';
+  if (statuses.every(s => s === 'rejected')) return 'rejected';
+  // Mix of pending/approved/rejected → still in review
+  return 'in-review';
+}
+
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),
   name: z.string().optional().default('SEO Changes'),
@@ -172,8 +182,10 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   if (status === 'approved' || status === 'rejected') {
     const item = batch.items.find(i => i.id === req.params.itemId);
     if (item) {
+      // Aggregate across all items for this page to avoid last-write-wins on multi-field pages
+      const pageStatus = derivePageStatus(batch, item.pageId);
       const pageStateResult = updatePageState(req.params.workspaceId, item.pageId, {
-        status: status === 'approved' ? 'approved' : 'rejected',
+        status: pageStatus,
         updatedBy: 'client',
         ...(status === 'rejected' && clientNote ? { rejectionNote: clientNote } : {}),
       });
@@ -204,10 +216,12 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   if (status === 'pending') {
     const item = batch.items.find(i => i.id === req.params.itemId);
     if (item?.pageId) {
+      // Aggregate across all items for this page — don't blindly reset to in-review
+      const pageStatus = derivePageStatus(batch, item.pageId);
       updatePageState(req.params.workspaceId, item.pageId, {
-        status: 'in-review',
+        status: pageStatus,
         updatedBy: 'client',
-        rejectionNote: '',
+        ...(pageStatus === 'in-review' ? { rejectionNote: '' } : {}),
       });
       const actorInfo = getClientActor(req, req.params.workspaceId);
       addActivity(req.params.workspaceId, 'approval_reverted',

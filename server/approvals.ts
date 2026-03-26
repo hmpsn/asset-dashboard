@@ -111,7 +111,12 @@ export function updateItem(
   const defined = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
   Object.assign(item, defined, { updatedAt: new Date().toISOString() });
 
-  // Recalculate batch status
+  recalcBatchStatus(batch);
+  return batch;
+}
+
+/** Recalculate batch status from item statuses and persist. */
+function recalcBatchStatus(batch: ApprovalBatch): void {
   const statuses = batch.items.map(i => i.status);
   if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   else if (statuses.every(s => s === 'approved' || s === 'applied')) batch.status = 'approved';
@@ -126,7 +131,6 @@ export function updateItem(
     status: batch.status,
     updated_at: batch.updatedAt,
   });
-  return batch;
 }
 
 export function markBatchApplied(workspaceId: string, batchId: string, itemIds: string[]): ApprovalBatch | null {
@@ -140,15 +144,7 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
     }
   }
 
-  const statuses = batch.items.map(i => i.status);
-  if (statuses.every(s => s === 'applied')) batch.status = 'applied';
-  batch.updatedAt = new Date().toISOString();
-  stmts().update.run({
-    id: batch.id,
-    items: JSON.stringify(batch.items),
-    status: batch.status,
-    updated_at: batch.updatedAt,
-  });
+  recalcBatchStatus(batch);
   return batch;
 }
 
