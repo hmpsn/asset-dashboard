@@ -5,6 +5,7 @@
  */
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages } from './search-console.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext, buildPageAnalysisContext } from './seo-context.js';
@@ -55,29 +56,18 @@ interface DecayRow {
   summary: string;
 }
 
-interface Stmts {
-  select: ReturnType<typeof db.prepare>;
-  upsert: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      select: db.prepare(
-        `SELECT * FROM decay_analyses WHERE workspace_id = ?`,
-      ),
-      upsert: db.prepare(
-        `INSERT INTO decay_analyses (workspace_id, analyzed_at, total_pages, decaying_pages, summary)
+const stmts = createStmtCache(() => ({
+  select: db.prepare(
+    `SELECT * FROM decay_analyses WHERE workspace_id = ?`,
+  ),
+  upsert: db.prepare(
+    `INSERT INTO decay_analyses (workspace_id, analyzed_at, total_pages, decaying_pages, summary)
          VALUES (@workspace_id, @analyzed_at, @total_pages, @decaying_pages, @summary)
          ON CONFLICT(workspace_id) DO UPDATE SET
            analyzed_at = @analyzed_at, total_pages = @total_pages,
            decaying_pages = @decaying_pages, summary = @summary`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+}));
 
 // ── Storage ──
 

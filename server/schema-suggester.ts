@@ -98,6 +98,7 @@ export interface SchemaContext {
   _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
   _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
   _pageAnalysis?: { topicCluster?: string; contentGaps?: string[]; optimizationScore?: number };  // Internal: from Page Intelligence
+  _personasBlock?: string;  // Internal: audience personas for richer schema targeting
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -1375,6 +1376,7 @@ ${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : '
 ${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
+${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
 PAGE CONTENT (excerpt):
 ${pageContent.slice(0, 3000)}
 

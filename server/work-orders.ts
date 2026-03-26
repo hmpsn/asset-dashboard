@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 // --- Types ---
 
@@ -23,34 +24,21 @@ interface OrderRow {
   updated_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, notes, created_at, updated_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO work_orders (id, workspace_id, payment_id, product_type, status, page_ids, issue_checks, quantity, assigned_to, completed_at, notes, created_at, updated_at)
          VALUES (@id, @workspace_id, @payment_id, @product_type, @status, @page_ids, @issue_checks, @quantity, @assigned_to, @completed_at, @notes, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM work_orders WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM work_orders WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`,
+  ),
+}));
 
 function rowToOrder(row: OrderRow): WorkOrder {
   return {

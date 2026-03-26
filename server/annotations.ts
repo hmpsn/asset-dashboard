@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export interface Annotation {
   id: string;
@@ -21,30 +22,18 @@ interface AnnotationRow {
   created_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO annotations (id, workspace_id, date, label, description, color, created_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO annotations (id, workspace_id, date, label, description, color, created_at)
          VALUES (@id, @workspace_id, @date, @label, @description, @color, @created_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM annotations WHERE workspace_id = ? ORDER BY date ASC`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM annotations WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM annotations WHERE workspace_id = ? ORDER BY date ASC`,
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM annotations WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToAnnotation(row: AnnotationRow): Annotation {
   return {

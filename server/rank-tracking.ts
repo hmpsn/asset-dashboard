@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -25,43 +26,29 @@ interface SnapshotRow {
   queries: string;
 }
 
-interface Stmts {
-  getConfig: ReturnType<typeof db.prepare>;
-  upsertConfig: ReturnType<typeof db.prepare>;
-  getSnapshots: ReturnType<typeof db.prepare>;
-  upsertSnapshot: ReturnType<typeof db.prepare>;
-  deleteOldSnapshots: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      getConfig: db.prepare(
-        `SELECT * FROM rank_tracking_config WHERE workspace_id = ?`,
-      ),
-      upsertConfig: db.prepare(
-        `INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
+const stmts = createStmtCache(() => ({
+  getConfig: db.prepare(
+    `SELECT * FROM rank_tracking_config WHERE workspace_id = ?`,
+  ),
+  upsertConfig: db.prepare(
+    `INSERT INTO rank_tracking_config (workspace_id, tracked_keywords)
          VALUES (@workspace_id, @tracked_keywords)
          ON CONFLICT(workspace_id) DO UPDATE SET tracked_keywords = @tracked_keywords`,
-      ),
-      getSnapshots: db.prepare(
-        `SELECT * FROM rank_snapshots WHERE workspace_id = ? ORDER BY date ASC`,
-      ),
-      upsertSnapshot: db.prepare(
-        `INSERT INTO rank_snapshots (workspace_id, date, queries)
+  ),
+  getSnapshots: db.prepare(
+    `SELECT * FROM rank_snapshots WHERE workspace_id = ? ORDER BY date ASC`,
+  ),
+  upsertSnapshot: db.prepare(
+    `INSERT INTO rank_snapshots (workspace_id, date, queries)
          VALUES (@workspace_id, @date, @queries)
          ON CONFLICT(workspace_id, date) DO UPDATE SET queries = @queries`,
-      ),
-      deleteOldSnapshots: db.prepare(
-        `DELETE FROM rank_snapshots WHERE workspace_id = ? AND date NOT IN (
+  ),
+  deleteOldSnapshots: db.prepare(
+    `DELETE FROM rank_snapshots WHERE workspace_id = ? AND date NOT IN (
            SELECT date FROM rank_snapshots WHERE workspace_id = ? ORDER BY date DESC LIMIT 180
          )`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+}));
 
 function readConfig(workspaceId: string): { trackedKeywords: TrackedKeyword[] } {
   const row = stmts().getConfig.get(workspaceId) as ConfigRow | undefined;

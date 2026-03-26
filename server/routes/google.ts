@@ -21,13 +21,15 @@ import {
 import { IS_PROD } from '../middleware.js';
 import { callOpenAI } from '../openai-helpers.js';
 import {
+  fetchSearchOverview,
+  fetchPerformanceTrend,
+  fetchSearchDevices,
+  fetchSearchCountries,
+  fetchSearchTypes,
+  fetchSearchComparison,
+} from '../analytics-data.js';
+import {
   listGscSites,
-  getSearchOverview,
-  getPerformanceTrend,
-  getSearchDeviceBreakdown,
-  getSearchCountryBreakdown,
-  getSearchTypeBreakdown,
-  getSearchPeriodComparison,
 } from '../search-console.js';
 import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { listWorkspaces } from '../workspaces.js';
@@ -182,7 +184,7 @@ router.get('/api/google/search-overview/:siteId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    const overview = await getSearchOverview(req.params.siteId, gscSiteUrl, days);
+    const overview = await fetchSearchOverview(req.params.siteId, gscSiteUrl, days);
     res.json(overview);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -195,7 +197,7 @@ router.get('/api/google/performance-trend/:siteId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    const trend = await getPerformanceTrend(req.params.siteId, gscSiteUrl, days);
+    const trend = await fetchPerformanceTrend(req.params.siteId, gscSiteUrl, days);
     res.json(trend);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -208,7 +210,7 @@ router.get('/api/google/search-devices/:siteId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await getSearchDeviceBreakdown(req.params.siteId, gscSiteUrl, days));
+    res.json(await fetchSearchDevices(req.params.siteId, gscSiteUrl, days));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -220,7 +222,7 @@ router.get('/api/google/search-countries/:siteId', async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 20;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await getSearchCountryBreakdown(req.params.siteId, gscSiteUrl, days, limit));
+    res.json(await fetchSearchCountries(req.params.siteId, gscSiteUrl, days, limit));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -231,7 +233,7 @@ router.get('/api/google/search-types/:siteId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await getSearchTypeBreakdown(req.params.siteId, gscSiteUrl, days));
+    res.json(await fetchSearchTypes(req.params.siteId, gscSiteUrl, days));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -242,7 +244,7 @@ router.get('/api/google/search-comparison/:siteId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await getSearchPeriodComparison(req.params.siteId, gscSiteUrl, days));
+    res.json(await fetchSearchComparison(req.params.siteId, gscSiteUrl, days));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

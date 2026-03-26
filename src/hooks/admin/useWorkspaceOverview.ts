@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { get, getSafe, getOptional } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface WorkspaceSummary {
   id: string;
@@ -80,7 +81,7 @@ export type { WorkspaceSummary, ActivityEntry, FeedbackItem, AnomalySummary, Pre
  */
 export function useWorkspaceOverviewData() {
   return useQuery<WorkspaceOverviewData>({
-    queryKey: ['admin-workspace-overview'],
+    queryKey: queryKeys.admin.workspaceOverview(),
     queryFn: async () => {
       const [workspaces, recentActivity, anomalies, presence, feedback, timeSaved] = await Promise.all([
         get<WorkspaceSummary[]>('/api/workspace-overview'),

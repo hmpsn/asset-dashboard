@@ -8,6 +8,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useWsInvalidation } from './hooks/useWsInvalidation';
+import { ADMIN_EVENTS } from './lib/wsEvents';
 import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY, useHealthCheck, useQueue, QUEUE_KEY } from './hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
 import { ToastProvider } from './components/Toast';
@@ -253,10 +255,13 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [queryClient, urlWorkspaceId, navigate]);
 
   useWebSocket({
-    'queue:update': handleQueueUpdate,
-    'workspace:created': handleWorkspaceCreated,
-    'workspace:deleted': handleWorkspaceDeleted,
+    [ADMIN_EVENTS.QUEUE_UPDATE]: handleQueueUpdate,
+    [ADMIN_EVENTS.WORKSPACE_CREATED]: handleWorkspaceCreated,
+    [ADMIN_EVENTS.WORKSPACE_DELETED]: handleWorkspaceDeleted,
   });
+
+  // Workspace-scoped WS events → cache invalidation
+  useWsInvalidation(urlWorkspaceId);
 
   // Actions via React Query mutations
   const createMutation = useCreateWorkspace();

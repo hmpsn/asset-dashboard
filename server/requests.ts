@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { getUploadRoot } from './data-dir.js';
 
 const UPLOAD_ROOT = getUploadRoot();
@@ -53,45 +54,29 @@ function rowToRequest(row: RequestRow): ClientRequest {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectAll: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  insert: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectAll: db.prepare(
-        'SELECT * FROM requests ORDER BY created_at DESC',
-      ),
-      selectByWorkspace: db.prepare(
-        'SELECT * FROM requests WHERE workspace_id = ? ORDER BY created_at DESC',
-      ),
-      selectById: db.prepare('SELECT * FROM requests WHERE id = ?'),
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectAll: db.prepare(
+    'SELECT * FROM requests ORDER BY created_at DESC',
+  ),
+  selectByWorkspace: db.prepare(
+    'SELECT * FROM requests WHERE workspace_id = ? ORDER BY created_at DESC',
+  ),
+  selectById: db.prepare('SELECT * FROM requests WHERE id = ?'),
+  insert: db.prepare(`
         INSERT INTO requests (id, workspace_id, title, description, category, priority,
           status, submitted_by, page_url, page_id, attachments, notes, created_at, updated_at)
         VALUES (@id, @workspace_id, @title, @description, @category, @priority,
           @status, @submitted_by, @page_url, @page_id, @attachments, @notes, @created_at, @updated_at)
       `),
-      update: db.prepare(`
+  update: db.prepare(`
         UPDATE requests SET title = @title, description = @description, category = @category,
           priority = @priority, status = @status, submitted_by = @submitted_by,
           page_url = @page_url, page_id = @page_id, attachments = @attachments,
           notes = @notes, updated_at = @updated_at
         WHERE id = @id
       `),
-      deleteById: db.prepare('DELETE FROM requests WHERE id = ?'),
-    };
-  }
-  return _stmts;
-}
+  deleteById: db.prepare('DELETE FROM requests WHERE id = ?'),
+}));
 
 // ── CRUD ──
 

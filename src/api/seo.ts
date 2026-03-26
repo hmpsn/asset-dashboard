@@ -25,6 +25,9 @@ export const auditSchedules = {
 
   save: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/audit-schedules/${wsId}`, body),
+
+  enable: (wsId: string) =>
+    put<unknown>(`/api/audit-schedules/${wsId}`, { enabled: true }),
 };
 
 // ── Reports / snapshots ─────────────────────────────────────────
@@ -162,8 +165,17 @@ export const rankTracking = {
     getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
 };
 
+// ── Backlinks ────────────────────────────────────────────────────
+export const backlinks = {
+  get: (wsId: string) =>
+    getOptional<unknown>(`/api/backlinks/${wsId}`),
+};
+
 // ── Webflow ─────────────────────────────────────────────────────
 export const webflow = {
+  sites: (token: string) =>
+    get<unknown[]>(`/api/webflow/sites?token=${encodeURIComponent(token)}`),
+
   pages: (siteId: string) =>
     get<unknown[]>(`/api/webflow/pages/${siteId}`),
 
@@ -277,6 +289,9 @@ export const seoSuggestions = {
 export const contentPerformance = {
   get: (wsId: string, days?: number) =>
     get<unknown>(`/api/content-performance/${wsId}${days ? `?days=${days}` : ''}`),
+
+  publicGet: (wsId: string) =>
+    getOptional<unknown>(`/api/public/content-performance/${wsId}`),
 
   refresh: (wsId: string) =>
     post<unknown>(`/api/content-performance/${wsId}/refresh`),

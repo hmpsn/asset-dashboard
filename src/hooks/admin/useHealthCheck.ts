@@ -1,21 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
 interface HealthStatus {
   hasOpenAIKey: boolean;
   hasWebflowToken: boolean;
 }
 
-const HEALTH_KEY = ['admin-health'] as const;
+export const HEALTH_KEY = queryKeys.admin.health();
 
 export function useHealthCheck() {
   return useQuery<HealthStatus>({
     queryKey: HEALTH_KEY,
     queryFn: () => get<HealthStatus>('/api/health'),
-    staleTime: 120_000,
+    staleTime: STALE_TIMES.STABLE,
     refetchOnWindowFocus: true,
   });
 }
 
-export { HEALTH_KEY };
 export type { HealthStatus };

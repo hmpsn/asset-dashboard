@@ -40,6 +40,9 @@ export const workspaces = {
 
   generatePersonas: (wsId: string) =>
     post<unknown>(`/api/workspaces/${wsId}/generate-personas`),
+
+  deletePageState: (wsId: string, pageId: string) =>
+    del(`/api/workspaces/${wsId}/page-states/${pageId}`),
 };
 
 // ── Public workspace info (client portal) ───────────────────────

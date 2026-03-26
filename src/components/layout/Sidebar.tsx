@@ -1,5 +1,6 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../../api';
 import { type Page, adminPath } from '../../routes';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
@@ -240,7 +241,7 @@ export function Sidebar({
         </button>
         {onLogout && (
           <button
-            onClick={() => { fetch('/api/auth/logout', { method: 'POST' }); onLogout(); }}
+            onClick={() => { auth.logout(); onLogout(); }}
             title="Log out"
             className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
           >

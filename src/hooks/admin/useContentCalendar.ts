@@ -4,7 +4,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { contentBriefs, contentPosts, contentRequests, contentMatrices } from '../../api/content.js';
+import { contentBriefs, contentPosts, contentRequests, contentMatrices } from '../../api/content';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface CalendarBrief {
   id: string;
@@ -49,7 +50,7 @@ interface CalendarItem {
 
 export function useContentCalendar(workspaceId: string) {
   return useQuery({
-    queryKey: ['content-calendar', workspaceId],
+    queryKey: queryKeys.admin.contentCalendar(workspaceId),
     queryFn: async (): Promise<CalendarItem[]> => {
       const [briefsData, postsData, requestsData, matricesData] = await Promise.all([
         contentBriefs.list(workspaceId).catch(() => []),

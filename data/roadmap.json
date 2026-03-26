@@ -1188,6 +1188,13 @@
       "shippedAt": "2026-03",
       "items": [
         {
+          "id": 519,
+          "title": "Platform Unification Phase 4 — Frontend Cache Layer: centralized queryKeys, STALE_TIMES, shared GA4 base hook, WS→cache invalidation registry",
+          "status": "done",
+          "notes": "queryKeys.ts factory for all 70+ queries; GA4 base hook eliminates ~100 lines duplication; useWsInvalidation handles 12 workspace-scoped WS events; ADMIN_EVENTS constants replace string literals in App.tsx. Feature #181.",
+          "shippedAt": "2026-03-25"
+        },
+        {
           "id": 285,
           "title": "AEO page analysis: discover CMS collection pages via sitemap + Webflow API instead of audit-snapshot-only",
           "status": "done",

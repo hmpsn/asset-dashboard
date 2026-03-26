@@ -33,13 +33,13 @@ import { parseDateRange, applySuppressionsToAudit, getAuditTrafficForWorkspace }
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
-  getSearchOverview,
-  getPerformanceTrend,
-  getSearchDeviceBreakdown,
-  getSearchCountryBreakdown,
-  getSearchTypeBreakdown,
-  getSearchPeriodComparison,
-} from '../search-console.js';
+  fetchSearchOverview,
+  fetchPerformanceTrend,
+  fetchSearchDevices,
+  fetchSearchCountries,
+  fetchSearchTypes,
+  fetchSearchComparison,
+} from '../analytics-data.js';
 import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
@@ -52,7 +52,7 @@ router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   const dr = parseDateRange(req.query);
   try {
-    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days, {}, dr);
+    const overview = await fetchSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days, dr);
     res.json(overview);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -65,7 +65,7 @@ router.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    const trend = await getPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query));
+    const trend = await fetchPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -78,7 +78,7 @@ router.get('/api/public/search-devices/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
+    res.json(await fetchSearchDevices(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -90,7 +90,7 @@ router.get('/api/public/search-countries/:workspaceId', async (req, res) => {
   const days = parseInt(req.query.days as string) || 28;
   const limit = parseInt(req.query.limit as string) || 20;
   try {
-    res.json(await getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, limit, parseDateRange(req.query)));
+    res.json(await fetchSearchCountries(ws.webflowSiteId, ws.gscPropertyUrl, days, limit, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -101,7 +101,7 @@ router.get('/api/public/search-types/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getSearchTypeBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
+    res.json(await fetchSearchTypes(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -112,7 +112,7 @@ router.get('/api/public/search-comparison/:workspaceId', async (req, res) => {
   if (!ws?.webflowSiteId || !ws.gscPropertyUrl) return res.status(400).json({ error: 'Search Console not configured' });
   const days = parseInt(req.query.days as string) || 28;
   try {
-    res.json(await getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
+    res.json(await fetchSearchComparison(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

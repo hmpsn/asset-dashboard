@@ -1,18 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { get, getSafe, getOptional } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
 // ── Audit traffic map ────────────────────────────────────────────
 type TrafficMap = Record<string, { clicks: number; impressions: number; sessions: number; pageviews: number }>;
 
 export function useAuditTrafficMap(siteId: string | undefined) {
   return useQuery<TrafficMap>({
-    queryKey: ['admin-audit-traffic', siteId],
+    queryKey: queryKeys.admin.auditTraffic(siteId),
     queryFn: async () => {
       const m = await getOptional<TrafficMap>(`/api/audit-traffic/${siteId}`);
       return (m && typeof m === 'object') ? m : {};
     },
     enabled: !!siteId,
-    staleTime: 5 * 60_000,
+    staleTime: STALE_TIMES.STABLE,
   });
 }
 
@@ -21,7 +23,7 @@ type Suppression = { check: string; pageSlug: string; pagePattern?: string };
 
 export function useAuditSuppressions(workspaceId: string | undefined) {
   return useQuery<Suppression[]>({
-    queryKey: ['admin-audit-suppressions', workspaceId],
+    queryKey: queryKeys.admin.auditSuppressions(workspaceId),
     queryFn: async () => {
       const s = await getSafe<Suppression[]>(`/api/workspaces/${workspaceId}/audit-suppressions`, []);
       return Array.isArray(s) ? s : [];
@@ -42,13 +44,13 @@ export interface AuditSchedule {
 
 export function useAuditSchedule(workspaceId: string | undefined) {
   return useQuery<AuditSchedule | null>({
-    queryKey: ['admin-audit-schedule', workspaceId],
+    queryKey: queryKeys.admin.auditSchedule(workspaceId),
     queryFn: async () => {
       const s = await getOptional<AuditSchedule>(`/api/audit-schedules/${workspaceId}`);
       return s ?? null;
     },
     enabled: !!workspaceId,
-    staleTime: 5 * 60_000,
+    staleTime: STALE_TIMES.STABLE,
   });
 }
 
@@ -71,7 +73,7 @@ export interface SchemaSnapshot {
 
 export function useSchemaSnapshot(siteId: string) {
   return useQuery<SchemaSnapshot | null>({
-    queryKey: ['admin-schema-snapshot', siteId],
+    queryKey: queryKeys.admin.schemaSnapshot(siteId),
     queryFn: async () => {
       try {
         const snapshot = await get<{ results?: SchemaPageSuggestion[]; createdAt?: string }>(`/api/webflow/schema-snapshot/${siteId}`);
@@ -82,7 +84,7 @@ export function useSchemaSnapshot(siteId: string) {
       } catch { return null; }
     },
     enabled: !!siteId,
-    staleTime: 5 * 60_000,
+    staleTime: STALE_TIMES.STABLE,
   });
 }
 
@@ -91,7 +93,7 @@ interface WebflowPage { id: string; title: string; slug: string }
 
 export function useWebflowPages(siteId: string) {
   return useQuery<WebflowPage[]>({
-    queryKey: ['admin-webflow-pages', siteId],
+    queryKey: queryKeys.admin.webflowPages(siteId),
     queryFn: async () => {
       const pages = await getSafe<Array<{ _id?: string; id?: string; title?: string; slug?: string }>>(`/api/webflow/pages/${siteId}`, []);
       if (!Array.isArray(pages)) return [];
@@ -102,6 +104,6 @@ export function useWebflowPages(siteId: string) {
       }));
     },
     enabled: !!siteId,
-    staleTime: 5 * 60_000,
+    staleTime: STALE_TIMES.STABLE,
   });
 }

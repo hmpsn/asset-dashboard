@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auditSchedules, anomalies } from '../api';
 import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
@@ -145,7 +146,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Start SEO site audit',
         icon: Shield,
         type: 'action',
-        action: () => { fetch(`/api/audit-schedules/${selectedWorkspace!.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) }); addRecent('action:run-audit'); },
+        action: () => { auditSchedules.enable(selectedWorkspace!.id); addRecent('action:run-audit'); },
       });
       result.push({
         id: 'action:generate-schema',
@@ -169,7 +170,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Run anomaly detection now',
         icon: Zap,
         type: 'action',
-        action: () => { fetch('/api/anomalies/scan', { method: 'POST' }); addRecent('action:scan-anomalies'); },
+        action: () => { anomalies.scan(); addRecent('action:scan-anomalies'); },
       });
       result.push({
         id: 'action:create-template',

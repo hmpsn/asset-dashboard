@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 
@@ -52,42 +53,27 @@ interface FeedbackRow {
   updated_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-  selectAll: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO feedback (id, workspace_id, type, title, description, status, context, submitted_by, replies, created_at, updated_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO feedback (id, workspace_id, type, title, description, status, context, submitted_by, replies, created_at, updated_at)
          VALUES (@id, @workspace_id, @type, @title, @description, @status, @context, @submitted_by, @replies, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM feedback WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM feedback WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM feedback WHERE id = ? AND workspace_id = ?`,
-      ),
-      selectAll: db.prepare(
-        `SELECT * FROM feedback ORDER BY created_at DESC`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM feedback WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM feedback WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id`,
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM feedback WHERE id = ? AND workspace_id = ?`,
+  ),
+  selectAll: db.prepare(
+    `SELECT * FROM feedback ORDER BY created_at DESC`,
+  ),
+}));
 
 function rowToFeedback(row: FeedbackRow): FeedbackItem {
   return {

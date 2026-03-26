@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { gscAdmin } from '../../api/analytics';
+import { queryKeys } from '../../lib/queryKeys';
 import type {
   SearchOverview, PerformanceTrend, SearchComparison,
   SearchDeviceBreakdown, SearchCountryBreakdown, SearchTypeBreakdown,
@@ -25,37 +26,37 @@ export function useAdminSearch(
   const url = gscSiteUrl ?? '';
 
   const overviewQ = useQuery({
-    queryKey: ['admin-gsc-overview', siteId, url, days],
+    queryKey: queryKeys.admin.gsc(siteId, url, 'overview', days),
     queryFn: () => gscAdmin.overview(siteId, url, days),
     enabled,
   });
 
   const trendQ = useQuery({
-    queryKey: ['admin-gsc-trend', siteId, url, days],
+    queryKey: queryKeys.admin.gsc(siteId, url, 'trend', days),
     queryFn: () => gscAdmin.trend(siteId, url, days),
     enabled,
   });
 
   const devicesQ = useQuery({
-    queryKey: ['admin-gsc-devices', siteId, url, days],
+    queryKey: queryKeys.admin.gsc(siteId, url, 'devices', days),
     queryFn: () => gscAdmin.devices(siteId, url, days),
     enabled,
   });
 
   const countriesQ = useQuery({
-    queryKey: ['admin-gsc-countries', siteId, url, days],
+    queryKey: queryKeys.admin.gsc(siteId, url, 'countries', days),
     queryFn: () => gscAdmin.countries(siteId, url, days),
     enabled,
   });
 
   const typesQ = useQuery({
-    queryKey: ['admin-gsc-types', siteId, url, days],
+    queryKey: queryKeys.admin.gsc(siteId, url, 'types', days),
     queryFn: () => gscAdmin.searchTypes(siteId, url, days),
     enabled,
   });
 
   const comparisonQ = useQuery({
-    queryKey: ['admin-gsc-comparison', siteId, url, days],
+    queryKey: queryKeys.admin.gsc(siteId, url, 'comparison', days),
     queryFn: () => gscAdmin.comparison(siteId, url, days),
     enabled,
   });

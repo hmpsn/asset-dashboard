@@ -39,7 +39,7 @@ import {
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
-import { buildSeoContext } from '../seo-context.js';
+import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
@@ -1574,6 +1574,7 @@ Rules:
       generatedAt: new Date().toISOString(),
     };
     updateWorkspace(ws.id, { keywordStrategy });
+    clearSeoContextCache(ws.id);
     incrementUsage(ws.id, 'strategy_generations');
 
     // Auto-seed rank tracking with strategy keywords (deduplicates internally)
@@ -1648,6 +1649,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   const { pageMap: _pm, ...rest } = req.body;
   const updated = { ...(ws.keywordStrategy || {}), ...rest, generatedAt: new Date().toISOString() };
   updateWorkspace(ws.id, { keywordStrategy: updated });
+  clearSeoContextCache(ws.id);
   // Respond with reassembled strategy
   const responsePageMap = listPageKeywords(ws.id);
   res.json({ ...updated, pageMap: responsePageMap });

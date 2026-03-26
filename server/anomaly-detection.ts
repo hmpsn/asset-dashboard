@@ -16,6 +16,7 @@
 
 import crypto from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, type Workspace } from './workspaces.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison, getGA4Conversions } from './google-analytics.js';
@@ -127,30 +128,12 @@ function rowToAnomaly(row: AnomalyRow): Anomaly {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectAll: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectActiveByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  insert: ReturnType<typeof db.prepare>;
-  dismiss: ReturnType<typeof db.prepare>;
-  acknowledge: ReturnType<typeof db.prepare>;
-  deleteOlderThan: ReturnType<typeof db.prepare>;
-  recentUndismissed: ReturnType<typeof db.prepare>;
-  getLastScan: ReturnType<typeof db.prepare>;
-  setLastScan: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectAll: db.prepare('SELECT * FROM anomalies ORDER BY detected_at DESC'),
-      selectByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? ORDER BY detected_at DESC'),
-      selectActiveByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? AND dismissed_at IS NULL ORDER BY detected_at DESC'),
-      selectById: db.prepare('SELECT * FROM anomalies WHERE id = ?'),
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectAll: db.prepare('SELECT * FROM anomalies ORDER BY detected_at DESC'),
+  selectByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? ORDER BY detected_at DESC'),
+  selectActiveByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? AND dismissed_at IS NULL ORDER BY detected_at DESC'),
+  selectById: db.prepare('SELECT * FROM anomalies WHERE id = ?'),
+  insert: db.prepare(`
         INSERT INTO anomalies (id, workspace_id, workspace_name, type, severity,
           title, description, metric, current_value, previous_value, change_pct,
           ai_summary, detected_at, dismissed_at, acknowledged_at, source)
@@ -158,16 +141,16 @@ function stmts(): Stmts {
           @title, @description, @metric, @current_value, @previous_value, @change_pct,
           @ai_summary, @detected_at, @dismissed_at, @acknowledged_at, @source)
       `),
-      dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ?'),
-      acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ?'),
-      deleteOlderThan: db.prepare('DELETE FROM anomalies WHERE detected_at < ?'),
-      recentUndismissed: db.prepare(`
+  dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ?'),
+  acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ?'),
+  deleteOlderThan: db.prepare('DELETE FROM anomalies WHERE detected_at < ?'),
+  recentUndismissed: db.prepare(`
         SELECT * FROM anomalies
         WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL AND detected_at > ?
         LIMIT 1
       `),
-      getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
-      setLastScan: db.prepare(`
+  getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
+  setLastScan: db.prepare(`
         INSERT OR REPLACE INTO anomalies (id, workspace_id, workspace_name, type, severity,
           title, description, metric, current_value, previous_value, change_pct,
           ai_summary, detected_at, dismissed_at, acknowledged_at, source)
@@ -175,10 +158,7 @@ function stmts(): Stmts {
           'Last scan marker', '', 'last_scan', 0, 0, 0,
           NULL, ?, 'system', NULL, 'gsc')
       `),
-    };
-  }
-  return _stmts;
-}
+}));
 
 /** Get the timestamp of the last successful anomaly scan */
 function getLastScanTime(): Date | null {

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../lib/queryKeys';
 import type {
   WorkspaceInfo, AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
@@ -110,19 +111,19 @@ export function useClientData(workspaceId: string) {
 
   // ── Compatibility setters (update React Query cache directly) ───
   const setAudit = useCallback((val: AuditSummary | null | ((prev: AuditSummary | null) => AuditSummary | null)) => {
-    queryClient.setQueryData(['client-audit-summary', workspaceId], (prev: AuditSummary | null | undefined) => {
+    queryClient.setQueryData(queryKeys.client.auditSummary(workspaceId), (prev: AuditSummary | null | undefined) => {
       return typeof val === 'function' ? val(prev ?? null) : val;
     });
   }, [queryClient, workspaceId]);
 
   const setApprovalBatches = useCallback((val: ApprovalBatch[] | ((prev: ApprovalBatch[]) => ApprovalBatch[])) => {
-    queryClient.setQueryData(['client-approvals', workspaceId], (prev: ApprovalBatch[] | undefined) => {
+    queryClient.setQueryData(queryKeys.client.approvals(workspaceId), (prev: ApprovalBatch[] | undefined) => {
       return typeof val === 'function' ? val(prev ?? []) : val;
     });
   }, [queryClient, workspaceId]);
 
   const setContentRequests = useCallback((val: ClientContentRequest[] | ((prev: ClientContentRequest[]) => ClientContentRequest[])) => {
-    queryClient.setQueryData(['client-content-requests', workspaceId], (prev: ClientContentRequest[] | undefined) => {
+    queryClient.setQueryData(queryKeys.client.contentRequests(workspaceId), (prev: ClientContentRequest[] | undefined) => {
       return typeof val === 'function' ? val(prev ?? []) : val;
     });
   }, [queryClient, workspaceId]);
@@ -142,7 +143,7 @@ export function useClientData(workspaceId: string) {
     if (setPricingData) {
       // When pricing query resolves, pass to the payments hook
       const checkPricing = () => {
-        const cached = queryClient.getQueryData<PricingData | null>(['client-pricing', data.id]);
+        const cached = queryClient.getQueryData<PricingData | null>(queryKeys.client.pricing(data.id));
         if (cached) setPricingData(cached);
       };
       // Check once after a short delay (query will have fired), then observe
@@ -174,12 +175,12 @@ export function useClientData(workspaceId: string) {
   // ── loadRequests / loadApprovals: invalidate queries ────────────
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const loadRequests = useCallback((wsId: string) => {
-    queryClient.invalidateQueries({ queryKey: ['client-requests', workspaceId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
   }, [queryClient, workspaceId]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const loadApprovals = useCallback((wsId: string) => {
-    queryClient.invalidateQueries({ queryKey: ['client-approvals', workspaceId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
   }, [queryClient, workspaceId]);
 
   // ── changeDays / applyCustomRange ───────────────────────────────
@@ -203,16 +204,16 @@ export function useClientData(workspaceId: string) {
   // ── refetchClient: invalidate the appropriate query ─────────────
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const refetchClient = useCallback((key: string, url: string) => {
-    const keyMap: Record<string, string> = {
-      activity: 'client-activity',
-      approvals: 'client-approvals',
-      requests: 'client-requests',
-      content: 'client-content-requests',
-      audit: 'client-audit-summary',
-      'audit-detail': 'client-audit-detail',
+    const keyFns: Record<string, unknown[]> = {
+      activity: queryKeys.client.activity(workspaceId),
+      approvals: queryKeys.client.approvals(workspaceId),
+      requests: queryKeys.client.requests(workspaceId),
+      content: queryKeys.client.contentRequests(workspaceId),
+      audit: queryKeys.client.auditSummary(workspaceId),
+      'audit-detail': queryKeys.client.auditDetail(workspaceId),
     };
-    const qk = keyMap[key];
-    if (qk) queryClient.invalidateQueries({ queryKey: [qk, workspaceId] });
+    const qk = keyFns[key];
+    if (qk) queryClient.invalidateQueries({ queryKey: qk });
   }, [queryClient, workspaceId]);
 
   // ── Content plan derived data ───────────────────────────────────

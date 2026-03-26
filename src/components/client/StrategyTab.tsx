@@ -10,7 +10,7 @@ import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { useBetaMode } from './BetaContext';
 import { PageKeywordMapContent } from './PageKeywordMapContent';
 import { STUDIO_NAME } from '../../constants';
-import { post } from '../../api';
+import { post, keywordFeedback as kwFeedbackApi, businessPriorities as bizPrioritiesApi, trackedKeywords as trackedKwApi } from '../../api';
 
 export interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -65,11 +65,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   // Load existing feedback on mount
   useEffect(() => {
     if (!workspaceId) return;
-    fetch(`/api/public/keyword-feedback/${workspaceId}`)
-      .then(r => r.ok ? r.json() : [])
-      .then((items: KeywordFeedback[]) => {
+    kwFeedbackApi.get(workspaceId)
+      .then((items) => {
         const map = new Map<string, 'approved' | 'declined'>();
-        for (const item of items) map.set(item.keyword, item.status);
+        for (const item of items as KeywordFeedback[]) map.set(item.keyword, item.status);
         setKeywordFeedback(map);
       })
       .catch(() => { /* silent */ });
@@ -99,11 +98,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     const kw = keyword.toLowerCase().trim();
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
-      await fetch(`/api/public/keyword-feedback/${workspaceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: kw, status: 'approved' }),
-      });
+      await kwFeedbackApi.submit(workspaceId, { keyword: kw, status: 'approved' });
       setKeywordFeedback(prev => { const next = new Map(prev); next.delete(kw); return next; });
       setToast?.(`"${keyword}" restored — it will appear in future strategies`);
     } catch {
@@ -131,17 +126,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   // Load business priorities + tracked keywords on mount
   useEffect(() => {
     if (!workspaceId) return;
-    fetch(`/api/public/business-priorities/${workspaceId}`)
-      .then(r => r.ok ? r.json() : { priorities: [] })
-      .then((data: { priorities: { text: string; category: string }[] }) => {
+    bizPrioritiesApi.get(workspaceId)
+      .then((data) => {
         setPriorities(data.priorities || []);
         setPrioritiesLoaded(true);
       })
       .catch(() => setPrioritiesLoaded(true));
 
-    fetch(`/api/public/tracked-keywords/${workspaceId}`)
-      .then(r => r.ok ? r.json() : { keywords: [] })
-      .then((data: { keywords: { query: string; pinned: boolean; addedAt: string }[] }) => {
+    trackedKwApi.get(workspaceId)
+      .then((data) => {
         setTrackedKeywords(data.keywords || []);
       })
       .catch(() => { /* silent */ });
@@ -895,16 +888,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         <button
                           onClick={async () => {
                             try {
-                              const res = await fetch(`/api/public/tracked-keywords/${workspaceId}`, {
-                                method: 'DELETE',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ keyword: tk.query }),
-                              });
-                              if (res.ok) {
-                                const data = await res.json();
-                                setTrackedKeywords(data.keywords || []);
-                                setToast?.(`"${tk.query}" removed from tracking`);
-                              }
+                              const data = await trackedKwApi.remove(workspaceId!, tk.query);
+                              setTrackedKeywords(data.keywords || []);
+                              setToast?.(`"${tk.query}" removed from tracking`);
                             } catch { setToast?.('Failed to remove keyword'); }
                           }}
                           className="text-zinc-500 hover:text-red-400 transition-colors"

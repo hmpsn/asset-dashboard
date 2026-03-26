@@ -4,6 +4,7 @@
  */
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { listContentRequests } from './content-requests.js';
 import { listMatrices } from './content-matrices.js';
@@ -17,30 +18,18 @@ interface SnapshotRow {
   computed_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  pruneOld: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO roi_snapshots (workspace_id, organic_traffic_value, computed_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO roi_snapshots (workspace_id, organic_traffic_value, computed_at)
          VALUES (@workspace_id, @organic_traffic_value, @computed_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM roi_snapshots WHERE workspace_id = ? ORDER BY computed_at ASC`,
-      ),
-      pruneOld: db.prepare(
-        `DELETE FROM roi_snapshots WHERE workspace_id = ? AND computed_at < ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM roi_snapshots WHERE workspace_id = ? ORDER BY computed_at ASC`,
+  ),
+  pruneOld: db.prepare(
+    `DELETE FROM roi_snapshots WHERE workspace_id = ? AND computed_at < ?`,
+  ),
+}));
 
 interface ROISnapshot {
   organicTrafficValue: number;

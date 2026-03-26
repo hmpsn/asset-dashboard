@@ -6,6 +6,7 @@
  */
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import type { ContentSubscription, ContentSubPlan } from '../shared/types/content.js';
@@ -35,22 +36,9 @@ interface SubRow {
 
 // ── Prepared statements (lazy init) ──
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  selectByStripeSubId: ReturnType<typeof db.prepare>;
-  selectActive: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO content_subscriptions
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_subscriptions
            (id, workspace_id, stripe_subscription_id, stripe_price_id, plan,
             posts_per_month, price_usd, status, current_period_start, current_period_end,
             posts_delivered_this_period, topic_source, preferred_page_types, notes,
@@ -60,27 +48,24 @@ function stmts(): Stmts {
             @posts_per_month, @price_usd, @status, @current_period_start, @current_period_end,
             @posts_delivered_this_period, @topic_source, @preferred_page_types, @notes,
             @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        'SELECT * FROM content_subscriptions WHERE workspace_id = ? ORDER BY created_at DESC',
-      ),
-      selectById: db.prepare(
-        'SELECT * FROM content_subscriptions WHERE id = ?',
-      ),
-      selectByStripeSubId: db.prepare(
-        'SELECT * FROM content_subscriptions WHERE stripe_subscription_id = ?',
-      ),
-      selectActive: db.prepare(
-        "SELECT * FROM content_subscriptions WHERE status IN ('active', 'past_due') ORDER BY created_at DESC",
-      ),
-      update: db.prepare(''), // placeholder — built dynamically
-      deleteById: db.prepare(
-        'DELETE FROM content_subscriptions WHERE id = ?',
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    'SELECT * FROM content_subscriptions WHERE workspace_id = ? ORDER BY created_at DESC',
+  ),
+  selectById: db.prepare(
+    'SELECT * FROM content_subscriptions WHERE id = ?',
+  ),
+  selectByStripeSubId: db.prepare(
+    'SELECT * FROM content_subscriptions WHERE stripe_subscription_id = ?',
+  ),
+  selectActive: db.prepare(
+    "SELECT * FROM content_subscriptions WHERE status IN ('active', 'past_due') ORDER BY created_at DESC",
+  ),
+  update: db.prepare(''), // placeholder — built dynamically
+  deleteById: db.prepare(
+    'DELETE FROM content_subscriptions WHERE id = ?',
+  ),
+}));
 
 function rowToSub(row: SubRow): ContentSubscription {
   return {

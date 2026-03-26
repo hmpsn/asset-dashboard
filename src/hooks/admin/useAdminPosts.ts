@@ -2,10 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { contentPosts } from '../../api/content';
 import { workspaces as workspacesApi } from '../../api/workspaces';
 import type { GeneratedPost } from '../../../shared/types/content';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
 export function useAdminPostsList(wsId: string) {
   return useQuery({
-    queryKey: ['admin-posts', wsId],
+    queryKey: queryKeys.admin.posts(wsId),
     queryFn: () => contentPosts.list(wsId),
     refetchInterval: (query) => {
       const data = query.state.data;
@@ -18,7 +20,7 @@ export function useAdminPostsList(wsId: string) {
 
 export function useAdminPost(wsId: string, postId: string) {
   return useQuery({
-    queryKey: ['admin-post', wsId, postId],
+    queryKey: queryKeys.admin.post(wsId, postId),
     queryFn: () => contentPosts.getById(wsId, postId),
     enabled: !!postId,
     refetchInterval: (query) => {
@@ -30,7 +32,7 @@ export function useAdminPost(wsId: string, postId: string) {
 
 export function useAdminPostVersions(wsId: string, postId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['admin-post-versions', wsId, postId],
+    queryKey: queryKeys.admin.postVersions(wsId, postId),
     queryFn: () => contentPosts.versions(wsId, postId),
     enabled,
   });
@@ -38,11 +40,11 @@ export function useAdminPostVersions(wsId: string, postId: string, enabled: bool
 
 export function usePublishTarget(wsId: string) {
   return useQuery({
-    queryKey: ['publish-target', wsId],
+    queryKey: queryKeys.admin.publishTarget(wsId),
     queryFn: async () => {
       const ws = await workspacesApi.getById(wsId) as Record<string, unknown>;
       return !!(ws && 'publishTarget' in ws && ws.publishTarget);
     },
-    staleTime: 5 * 60 * 1000, // publish target rarely changes
+    staleTime: STALE_TIMES.STABLE,
   });
 }

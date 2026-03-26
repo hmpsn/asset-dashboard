@@ -5,6 +5,7 @@
  */
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { getValidToken } from './google-auth.js';
 import { createLogger } from './logger.js';
 
@@ -44,48 +45,32 @@ interface ChangeRow {
   changed_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectByWorkspaceSource: ReturnType<typeof db.prepare>;
-  selectRecentByPage: ReturnType<typeof db.prepare>;
-  updateById: ReturnType<typeof db.prepare>;
-  countByWorkspace: ReturnType<typeof db.prepare>;
-  pruneOldest: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO seo_changes (id, workspace_id, page_id, page_slug, page_title, fields, source, changed_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO seo_changes (id, workspace_id, page_id, page_slug, page_title, fields, source, changed_at)
          VALUES (@id, @workspace_id, @page_id, @page_slug, @page_title, @fields, @source, @changed_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM seo_changes WHERE workspace_id = ? ORDER BY changed_at ASC`,
-      ),
-      selectByWorkspaceSource: db.prepare(
-        `SELECT * FROM seo_changes WHERE workspace_id = ? AND source LIKE ? ORDER BY changed_at ASC`,
-      ),
-      selectRecentByPage: db.prepare(
-        `SELECT * FROM seo_changes WHERE workspace_id = ? AND page_id = ? AND changed_at > ? ORDER BY changed_at DESC LIMIT 1`,
-      ),
-      updateById: db.prepare(
-        `UPDATE seo_changes SET fields = @fields, changed_at = @changed_at WHERE id = @id`,
-      ),
-      countByWorkspace: db.prepare(
-        `SELECT COUNT(*) as cnt FROM seo_changes WHERE workspace_id = ?`,
-      ),
-      pruneOldest: db.prepare(
-        `DELETE FROM seo_changes WHERE workspace_id = ? AND id NOT IN (
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM seo_changes WHERE workspace_id = ? ORDER BY changed_at ASC`,
+  ),
+  selectByWorkspaceSource: db.prepare(
+    `SELECT * FROM seo_changes WHERE workspace_id = ? AND source LIKE ? ORDER BY changed_at ASC`,
+  ),
+  selectRecentByPage: db.prepare(
+    `SELECT * FROM seo_changes WHERE workspace_id = ? AND page_id = ? AND changed_at > ? ORDER BY changed_at DESC LIMIT 1`,
+  ),
+  updateById: db.prepare(
+    `UPDATE seo_changes SET fields = @fields, changed_at = @changed_at WHERE id = @id`,
+  ),
+  countByWorkspace: db.prepare(
+    `SELECT COUNT(*) as cnt FROM seo_changes WHERE workspace_id = ?`,
+  ),
+  pruneOldest: db.prepare(
+    `DELETE FROM seo_changes WHERE workspace_id = ? AND id NOT IN (
            SELECT id FROM seo_changes WHERE workspace_id = ? ORDER BY changed_at DESC LIMIT 500
          )`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+}));
 
 function rowToEvent(row: ChangeRow): SeoChangeEvent {
   return {

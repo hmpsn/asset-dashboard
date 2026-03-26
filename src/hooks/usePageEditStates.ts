@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 import type { PageEditStatus } from '../components/ui/statusConfig';
 
 export interface PageEditState {
@@ -31,7 +32,7 @@ export interface PageEditSummary {
 
 /** React Query key for page edit states */
 export const pageEditStatesKey = (workspaceId: string, isPublic: boolean) =>
-  ['page-edit-states', workspaceId, isPublic ? 'public' : 'admin'] as const;
+  queryKeys.shared.pageEditStates(workspaceId, isPublic);
 
 /**
  * Shared hook for reading unified page edit states.

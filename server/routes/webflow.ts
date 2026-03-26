@@ -72,28 +72,36 @@ router.delete('/api/webflow/assets/:assetId', async (req, res) => {
   res.json(result);
 });
 
+/** Run `fn` over `items` with at most `limit` in-flight at once. */
+async function runConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const settled = await Promise.allSettled(items.slice(i, i + limit).map(fn));
+    results.push(...settled);
+  }
+  return results;
+}
+
 // Bulk update alt text
 router.post('/api/webflow/assets/bulk-alt', async (req, res) => {
   const { updates, siteId } = req.body as { updates: Array<{ assetId: string; altText: string }>; siteId?: string };
   const token = siteId ? getTokenForSite(siteId) : null;
-  const results = [];
-  for (const u of updates) {
-    const r = await updateAsset(u.assetId, { altText: u.altText }, token || undefined);
-    results.push({ assetId: u.assetId, ...r });
-  }
-  res.json(results);
+  const settled = await runConcurrent(updates, 5, u => updateAsset(u.assetId, { altText: u.altText }, token || undefined));
+  res.json(settled.map((r, i) => ({
+    assetId: updates[i].assetId,
+    ...(r.status === 'fulfilled' ? r.value : { error: String(r.reason) }),
+  })));
 });
 
 // Bulk delete assets
 router.post('/api/webflow/assets/bulk-delete', async (req, res) => {
   const { assetIds, siteId } = req.body as { assetIds: string[]; siteId?: string };
   const token = siteId ? getTokenForSite(siteId) : null;
-  const results = [];
-  for (const id of assetIds) {
-    const r = await deleteAsset(id, token || undefined);
-    results.push({ assetId: id, ...r });
-  }
-  res.json(results);
+  const settled = await runConcurrent(assetIds, 5, id => deleteAsset(id, token || undefined));
+  res.json(settled.map((r, i) => ({
+    assetId: assetIds[i],
+    ...(r.status === 'fulfilled' ? r.value : { error: String(r.reason) }),
+  })));
 });
 
 // --- Page SEO Editing ---

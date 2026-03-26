@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { JWT_SECRET } from './jwt-config.js';
 
 export type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
@@ -57,57 +58,34 @@ function rowToClientUser(row: ClientUserRow): ClientUser {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectById: ReturnType<typeof db.prepare>;
-  selectByEmailWs: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  countByWorkspace: ReturnType<typeof db.prepare>;
-  existsByWorkspace: ReturnType<typeof db.prepare>;
-  insert: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-  selectToken: ReturnType<typeof db.prepare>;
-  insertToken: ReturnType<typeof db.prepare>;
-  deleteToken: ReturnType<typeof db.prepare>;
-  deleteTokensByUserWs: ReturnType<typeof db.prepare>;
-  deleteExpiredTokens: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectById: db.prepare('SELECT * FROM client_users WHERE id = ?'),
-      selectByEmailWs: db.prepare('SELECT * FROM client_users WHERE LOWER(email) = LOWER(?) AND workspace_id = ?'),
-      selectByWorkspace: db.prepare('SELECT * FROM client_users WHERE workspace_id = ?'),
-      countByWorkspace: db.prepare('SELECT COUNT(*) as count FROM client_users WHERE workspace_id = ?'),
-      existsByWorkspace: db.prepare('SELECT 1 FROM client_users WHERE workspace_id = ? LIMIT 1'),
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectById: db.prepare('SELECT * FROM client_users WHERE id = ?'),
+  selectByEmailWs: db.prepare('SELECT * FROM client_users WHERE LOWER(email) = LOWER(?) AND workspace_id = ?'),
+  selectByWorkspace: db.prepare('SELECT * FROM client_users WHERE workspace_id = ?'),
+  countByWorkspace: db.prepare('SELECT COUNT(*) as count FROM client_users WHERE workspace_id = ?'),
+  existsByWorkspace: db.prepare('SELECT 1 FROM client_users WHERE workspace_id = ? LIMIT 1'),
+  insert: db.prepare(`
         INSERT INTO client_users (id, email, name, password_hash, role, workspace_id,
           avatar_url, invited_by, last_login_at, created_at, updated_at)
         VALUES (@id, @email, @name, @password_hash, @role, @workspace_id,
           @avatar_url, @invited_by, @last_login_at, @created_at, @updated_at)
       `),
-      update: db.prepare(`
+  update: db.prepare(`
         UPDATE client_users SET email = @email, name = @name, password_hash = @password_hash,
           role = @role, avatar_url = @avatar_url, last_login_at = @last_login_at,
           updated_at = @updated_at
         WHERE id = @id
       `),
-      deleteById: db.prepare('DELETE FROM client_users WHERE id = ?'),
-      selectToken: db.prepare('SELECT * FROM reset_tokens WHERE token = ?'),
-      insertToken: db.prepare(`
+  deleteById: db.prepare('DELETE FROM client_users WHERE id = ?'),
+  selectToken: db.prepare('SELECT * FROM reset_tokens WHERE token = ?'),
+  insertToken: db.prepare(`
         INSERT INTO reset_tokens (token, user_id, workspace_id, email, expires_at)
         VALUES (@token, @user_id, @workspace_id, @email, @expires_at)
       `),
-      deleteToken: db.prepare('DELETE FROM reset_tokens WHERE token = ?'),
-      deleteTokensByUserWs: db.prepare('DELETE FROM reset_tokens WHERE user_id = ? AND workspace_id = ?'),
-      deleteExpiredTokens: db.prepare('DELETE FROM reset_tokens WHERE expires_at <= ?'),
-    };
-  }
-  return _stmts;
-}
+  deleteToken: db.prepare('DELETE FROM reset_tokens WHERE token = ?'),
+  deleteTokensByUserWs: db.prepare('DELETE FROM reset_tokens WHERE user_id = ? AND workspace_id = ?'),
+  deleteExpiredTokens: db.prepare('DELETE FROM reset_tokens WHERE expires_at <= ?'),
+}));
 
 // ── CRUD ──
 
