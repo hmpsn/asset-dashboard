@@ -59,6 +59,28 @@ function AssetBrowser({ siteId }: Props) {
     return map;
   }, [cmsImageData]);
 
+  // CMS assets mapped to the Asset shape for rendering via AssetCard
+  const cmsAssetList = useMemo<Asset[]>(() =>
+    (cmsImageData?.assets ?? []).map(a => ({
+      id: a.assetId,
+      hostedUrl: a.hostedUrl || undefined,
+      altText: a.altText || undefined,
+      size: a.size,
+      contentType: a.contentType,
+      displayName: a.displayName,
+      originalFileName: a.displayName,
+    })),
+  [cmsImageData]);
+
+  // Set of asset IDs that are RichText-only (no backing Webflow asset — compress unavailable)
+  const richTextOnlyIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of cmsImageData?.assets ?? []) {
+      if (a.isRichTextOnly) set.add(a.assetId);
+    }
+    return set;
+  }, [cmsImageData]);
+
   // CMS field selector state — which fields are included in filter + bulk ops
   const [selectedCmsFields, setSelectedCmsFields] = useState<Set<string>>(new Set());
 
@@ -106,12 +128,23 @@ function AssetBrowser({ siteId }: Props) {
   const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
 
-  const filtered = assets
+  const isCmsFilter = filter === 'cms-images' || filter === 'cms-missing-alt';
+  const sourceList = isCmsFilter ? cmsAssetList : assets;
+
+  const filtered = sourceList
     .filter(a => {
       if (search) {
         const q = search.toLowerCase();
         const name = a.displayName || a.originalFileName || '';
         if (!name.toLowerCase().includes(q) && !(a.altText || '').toLowerCase().includes(q)) return false;
+      }
+      if (isCmsFilter) {
+        // Narrow by selected CMS fields
+        const usages = cmsUsageMap.get(a.id);
+        const inSelectedField = usages?.some(u => selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`)) ?? false;
+        if (!inSelectedField) return false;
+        if (filter === 'cms-missing-alt') return !a.altText || a.altText.trim() === '';
+        return true;
       }
       if (filter === 'missing-alt') return !a.altText || a.altText.trim() === '';
       if (filter === 'oversized') return a.size > 500 * 1024;
@@ -119,15 +152,6 @@ function AssetBrowser({ siteId }: Props) {
       if (filter === 'svg') return a.contentType?.includes('svg');
       if (filter === 'unused') return unusedIds ? unusedIds.has(a.id) : false;
       if (filter === 'used') return unusedIds ? !unusedIds.has(a.id) : true;
-      if (filter === 'cms-images' || filter === 'cms-missing-alt') {
-        const usages = cmsUsageMap.get(a.id);
-        if (!usages?.length) return false;
-        // Check if asset is used in any selected field
-        const inSelectedField = usages.some(u => selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`));
-        if (!inSelectedField) return false;
-        if (filter === 'cms-missing-alt') return !a.altText || a.altText.trim() === '';
-        return true;
-      }
       return true;
     })
     .sort((a, b) => {
@@ -678,6 +702,7 @@ function AssetBrowser({ siteId }: Props) {
             renamingId={renamingId === asset.id} renameDraft={renameDraft}
             renameLoading={renameLoading.has(asset.id)} unusedFlag={!!unusedIds?.has(asset.id)}
             cmsUsages={cmsUsageMap.get(asset.id)}
+            compressDisabled={isCmsFilter && richTextOnlyIds.has(asset.id)}
             onToggleSelect={toggleSelect}
             onEditAlt={(id, currentAlt) => { setEditingAlt(id); setAltDraft(currentAlt); }}
             onCancelEditAlt={() => setEditingAlt(null)}

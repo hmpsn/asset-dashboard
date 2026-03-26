@@ -20,6 +20,12 @@ export interface CmsImageUsage {
 
 export interface CmsImageAsset {
   assetId: string;
+  hostedUrl: string;
+  altText: string;
+  size: number;
+  contentType: string;
+  displayName: string;
+  isRichTextOnly?: boolean;
   usages: CmsImageUsage[];
 }
 

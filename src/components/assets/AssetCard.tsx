@@ -37,6 +37,7 @@ export interface AssetCardProps {
   renameLoading: boolean;
   unusedFlag: boolean;
   cmsUsages?: CmsImageUsage[];
+  compressDisabled?: boolean;
   onToggleSelect: (id: string) => void;
   onEditAlt: (assetId: string, currentAlt: string) => void;
   onCancelEditAlt: () => void;
@@ -52,7 +53,7 @@ export interface AssetCardProps {
 
 export function AssetCard({
   asset, selected, editingAlt, altDraft, generatingAlt, compressing,
-  renamingId, renameDraft, renameLoading, unusedFlag, cmsUsages,
+  renamingId, renameDraft, renameLoading, unusedFlag, cmsUsages, compressDisabled,
   onToggleSelect, onEditAlt, onCancelEditAlt, onSaveAlt, onAltDraftChange,
   onGenerateAlt, onCompress, onSmartRename, onSaveRename, onCancelRename, onRenameDraftChange,
 }: AssetCardProps) {
@@ -202,10 +203,10 @@ export function AssetCard({
         </button>
         {asset.size > 0 && (
           <button
-            onClick={() => onCompress(asset)}
-            disabled={compressing}
-            className="p-1.5 rounded text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 transition-colors"
-            title="Compress image"
+            onClick={() => !compressDisabled && onCompress(asset)}
+            disabled={compressing || compressDisabled}
+            className={`p-1.5 rounded transition-colors ${compressDisabled ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-500 hover:text-blue-400 hover:bg-zinc-800'}`}
+            title={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
           >
             {compressing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
