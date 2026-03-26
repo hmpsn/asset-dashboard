@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, ChevronDown, Link, Link2Off, Trash2, Globe, Eye, EyeOff, ExternalLink, MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { webflow } from '../api';
 
 export interface Workspace {
   id: string;
@@ -56,8 +57,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
     setTokenError('');
     setSites([]);
     try {
-      const res = await fetch(`/api/webflow/sites?token=${encodeURIComponent(token.trim())}`);
-      const data = await res.json();
+      const data = await webflow.sites(token.trim());
       if (Array.isArray(data) && data.length > 0) {
         setSites(data);
       } else {

@@ -4,7 +4,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { get } from '../../api/client.js';
+import { get } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface PipelineSummary {
   briefs: number;
@@ -23,7 +24,7 @@ interface DecaySummary {
 
 export function useContentPipeline(workspaceId: string) {
   return useQuery({
-    queryKey: ['content-pipeline', workspaceId],
+    queryKey: queryKeys.admin.contentPipeline(workspaceId),
     queryFn: async (): Promise<{ summary: PipelineSummary | null; decay: DecaySummary | null }> => {
       const [briefs, posts, matrices, decayData] = await Promise.all([
         get(`/api/content-briefs/${workspaceId}`).catch(() => []),

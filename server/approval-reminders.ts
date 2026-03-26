@@ -35,7 +35,10 @@ async function checkStaleApprovals() {
 
     const batches = listBatches(ws.id);
     for (const batch of batches) {
-      if (batch.status === 'applied') continue;
+      if (batch.status === 'applied') {
+        sentReminders.delete(batch.id); // evict applied batches to prevent leak
+        continue;
+      }
 
       const pendingItems = batch.items.filter(i => i.status === 'pending');
       if (pendingItems.length === 0) continue;
@@ -66,6 +69,12 @@ async function checkStaleApprovals() {
         log.error({ err: err }, `Failed to send:`);
       }
     }
+  }
+
+  // Prune sentReminders entries older than 7 days to prevent unbounded growth
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  for (const [batchId, ts] of sentReminders) {
+    if (ts < sevenDaysAgo) sentReminders.delete(batchId);
   }
 }
 

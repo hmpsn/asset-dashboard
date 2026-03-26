@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 // --- Types ---
 
@@ -42,35 +43,23 @@ function rowToRecord(row: PaymentRow): PaymentRecord {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  selectBySession: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(`
         INSERT INTO payments (id, workspace_id, stripe_session_id, stripe_payment_intent_id,
           product_type, amount, currency, status, content_request_id, metadata, created_at, paid_at)
         VALUES (@id, @workspace_id, @stripe_session_id, @stripe_payment_intent_id,
           @product_type, @amount, @currency, @status, @content_request_id, @metadata, @created_at, @paid_at)
       `),
-      selectById: db.prepare(
-        'SELECT * FROM payments WHERE id = ? AND workspace_id = ?',
-      ),
-      selectBySession: db.prepare(
-        'SELECT * FROM payments WHERE workspace_id = ? AND stripe_session_id = ?',
-      ),
-      selectByWorkspace: db.prepare(
-        'SELECT * FROM payments WHERE workspace_id = ? ORDER BY created_at DESC',
-      ),
-      update: db.prepare(`
+  selectById: db.prepare(
+    'SELECT * FROM payments WHERE id = ? AND workspace_id = ?',
+  ),
+  selectBySession: db.prepare(
+    'SELECT * FROM payments WHERE workspace_id = ? AND stripe_session_id = ?',
+  ),
+  selectByWorkspace: db.prepare(
+    'SELECT * FROM payments WHERE workspace_id = ? ORDER BY created_at DESC',
+  ),
+  update: db.prepare(`
         UPDATE payments SET
           stripe_session_id = @stripe_session_id,
           stripe_payment_intent_id = @stripe_payment_intent_id,
@@ -84,10 +73,7 @@ function stmts(): Stmts {
           paid_at = @paid_at
         WHERE id = @id AND workspace_id = @workspace_id
       `),
-    };
-  }
-  return _stmts;
-}
+}));
 
 // --- CRUD ---
 

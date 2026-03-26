@@ -6,6 +6,7 @@
  * `pending_schemas` table. On publish, the schema is ready to apply.
  */
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { getMatrix, getSchemaTypesForTemplate } from './content-matrices.js';
 import { getWorkspace } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -28,40 +29,26 @@ interface PendingSchemaRow {
 
 // ── Prepared statements (lazy) ──
 
-interface SchemaQueueStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectByCellId: ReturnType<typeof db.prepare>;
-  updateStatus: ReturnType<typeof db.prepare>;
-  markStaleByCellId: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: SchemaQueueStmts | null = null;
-function stmts(): SchemaQueueStmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT OR REPLACE INTO pending_schemas
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT OR REPLACE INTO pending_schemas
            (id, workspace_id, matrix_id, cell_id, schema_json, status, created_at, updated_at)
          VALUES
            (@id, @workspace_id, @matrix_id, @cell_id, @schema_json, @status, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM pending_schemas WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectByCellId: db.prepare(
-        `SELECT * FROM pending_schemas WHERE cell_id = ? AND status = 'pending' LIMIT 1`,
-      ),
-      updateStatus: db.prepare(
-        `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id`,
-      ),
-      markStaleByCellId: db.prepare(
-        `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND status = 'pending'`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM pending_schemas WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectByCellId: db.prepare(
+    `SELECT * FROM pending_schemas WHERE cell_id = ? AND status = 'pending' LIMIT 1`,
+  ),
+  updateStatus: db.prepare(
+    `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id`,
+  ),
+  markStaleByCellId: db.prepare(
+    `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND status = 'pending'`,
+  ),
+}));
 
 // ── Template loader (lazy import to avoid circular deps) ──
 

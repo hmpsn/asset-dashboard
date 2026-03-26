@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
 import type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
@@ -17,38 +18,24 @@ interface BatchRow {
   updated_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
          VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM approval_batches WHERE workspace_id = ?`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM approval_batches WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM approval_batches WHERE workspace_id = ?`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id`,
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM approval_batches WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToBatch(row: BatchRow): ApprovalBatch {
   return {

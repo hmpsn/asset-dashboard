@@ -17,6 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { getUploadRoot } from './data-dir.js';
 import { listWorkspaces } from './workspaces.js';
 import { listActivity } from './activity-log.js';
@@ -84,45 +85,26 @@ function rowToSignal(row: ChurnSignalRow): ChurnSignal {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectAll: ReturnType<typeof db.prepare>;
-  selectActive: ReturnType<typeof db.prepare>;
-  selectActiveByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  selectUndismissedByTypeWs: ReturnType<typeof db.prepare>;
-  insert: ReturnType<typeof db.prepare>;
-  dismiss: ReturnType<typeof db.prepare>;
-  countAll: ReturnType<typeof db.prepare>;
-  pruneOldest: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectAll: db.prepare('SELECT * FROM churn_signals ORDER BY detected_at DESC'),
-      selectActive: db.prepare('SELECT * FROM churn_signals WHERE dismissed_at IS NULL ORDER BY detected_at DESC'),
-      selectActiveByWorkspace: db.prepare('SELECT * FROM churn_signals WHERE dismissed_at IS NULL AND workspace_id = ? ORDER BY detected_at DESC'),
-      selectById: db.prepare('SELECT * FROM churn_signals WHERE id = ?'),
-      selectUndismissedByTypeWs: db.prepare('SELECT * FROM churn_signals WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL LIMIT 1'),
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectAll: db.prepare('SELECT * FROM churn_signals ORDER BY detected_at DESC'),
+  selectActive: db.prepare('SELECT * FROM churn_signals WHERE dismissed_at IS NULL ORDER BY detected_at DESC'),
+  selectActiveByWorkspace: db.prepare('SELECT * FROM churn_signals WHERE dismissed_at IS NULL AND workspace_id = ? ORDER BY detected_at DESC'),
+  selectById: db.prepare('SELECT * FROM churn_signals WHERE id = ?'),
+  selectUndismissedByTypeWs: db.prepare('SELECT * FROM churn_signals WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL LIMIT 1'),
+  insert: db.prepare(`
         INSERT INTO churn_signals (id, workspace_id, workspace_name, type, severity,
           title, description, detected_at, dismissed_at)
         VALUES (@id, @workspace_id, @workspace_name, @type, @severity,
           @title, @description, @detected_at, @dismissed_at)
       `),
-      dismiss: db.prepare('UPDATE churn_signals SET dismissed_at = ? WHERE id = ?'),
-      countAll: db.prepare('SELECT COUNT(*) as count FROM churn_signals'),
-      pruneOldest: db.prepare(`
+  dismiss: db.prepare('UPDATE churn_signals SET dismissed_at = ? WHERE id = ?'),
+  countAll: db.prepare('SELECT COUNT(*) as count FROM churn_signals'),
+  pruneOldest: db.prepare(`
         DELETE FROM churn_signals WHERE id IN (
           SELECT id FROM churn_signals ORDER BY detected_at ASC LIMIT ?
         )
       `),
-    };
-  }
-  return _stmts;
-}
+}));
 
 export function listChurnSignals(workspaceId?: string): ChurnSignal[] {
   if (workspaceId) {

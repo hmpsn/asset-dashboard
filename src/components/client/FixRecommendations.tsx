@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
+import { Sparkles, ShoppingCart, Image, FileText, Code2, ArrowRightLeft, Wrench, Crown, MessageSquare, TrendingUp, TrendingDown, Eye, MousePointerClick, ChevronDown, Lightbulb, CheckCircle2, Zap, Shield } from 'lucide-react';
 import { useCart } from './useCart';
 import type { AuditDetail } from './types';
 import { useBetaMode } from './BetaContext';
@@ -249,6 +249,7 @@ const typeConfig: Record<string, { icon: typeof FileText; label: string }> = {
   schema: { icon: Code2, label: 'Schema Markup' },
   technical: { icon: Wrench, label: 'Technical Fixes' },
   content: { icon: FileText, label: 'Content Improvements' },
+  content_refresh: { icon: TrendingDown, label: 'Content Refresh' },
   performance: { icon: Zap, label: 'Performance' },
   accessibility: { icon: Shield, label: 'Accessibility' },
   strategy: { icon: Sparkles, label: 'Strategy Opportunities' },

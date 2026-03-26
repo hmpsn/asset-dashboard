@@ -120,12 +120,18 @@ function detectConflicts(
         reason: `Exact keyword match with ${target.type === 'existing_page' ? 'existing page' : 'another cell'}: "${target.keyword}"`,
       });
     } else if (isSubsetMatch(keyword, target.keyword) || isSubsetMatch(target.keyword, keyword)) {
+      // Subset matches across different pages/matrices are usually different-intent specializations
+      // (e.g., "dentist" vs "pediatric dentist") — downgrade to low to reduce false positives.
+      // Only keep medium for same-matrix cells where intent overlap is more likely.
+      const severity = target.type === 'same_matrix' ? 'medium' : 'low';
       conflicts.push({
         keyword,
         sourceId,
         conflictsWith: target,
-        severity: 'medium',
-        reason: `Keyword subset overlap with "${target.keyword}" — may compete for same SERP`,
+        severity,
+        reason: severity === 'low'
+          ? `"${target.keyword}" is a more specific variation — likely targets a different audience or intent`
+          : `Keyword subset overlap with "${target.keyword}" — may compete for same SERP`,
       });
     } else {
       const overlap = wordOverlap(keyword, target.keyword);

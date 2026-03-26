@@ -3,6 +3,7 @@
  * Handles all SQLite persistence for generated posts and their version snapshots.
  */
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 
@@ -34,14 +35,6 @@ interface PostRow {
   review_checklist: string | null;
   created_at: string;
   updated_at: string;
-}
-
-interface PostStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
 }
 
 // ── Version history types ──
@@ -82,20 +75,9 @@ interface VersionRow {
   created_at: string;
 }
 
-interface VersionStmts {
-  insert: ReturnType<typeof db.prepare>;
-  listByPost: ReturnType<typeof db.prepare>;
-  getById: ReturnType<typeof db.prepare>;
-  countByPost: ReturnType<typeof db.prepare>;
-  deleteByPost: ReturnType<typeof db.prepare>;
-}
-
-let _vStmts: VersionStmts | null = null;
-function vStmts(): VersionStmts {
-  if (!_vStmts) {
-    _vStmts = {
-      insert: db.prepare(
-        `INSERT INTO content_post_versions
+const vStmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_post_versions
            (id, post_id, workspace_id, version_number, trigger, trigger_detail,
             title, meta_description, introduction, sections, conclusion,
             seo_title, seo_meta_description, total_word_count, created_at)
@@ -103,23 +85,20 @@ function vStmts(): VersionStmts {
            (@id, @post_id, @workspace_id, @version_number, @trigger, @trigger_detail,
             @title, @meta_description, @introduction, @sections, @conclusion,
             @seo_title, @seo_meta_description, @total_word_count, @created_at)`,
-      ),
-      listByPost: db.prepare(
-        `SELECT * FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC`,
-      ),
-      getById: db.prepare(
-        `SELECT * FROM content_post_versions WHERE id = ? AND workspace_id = ?`,
-      ),
-      countByPost: db.prepare(
-        `SELECT COUNT(*) as cnt FROM content_post_versions WHERE post_id = ?`,
-      ),
-      deleteByPost: db.prepare(
-        `DELETE FROM content_post_versions WHERE post_id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _vStmts;
-}
+  ),
+  listByPost: db.prepare(
+    `SELECT * FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC`,
+  ),
+  getById: db.prepare(
+    `SELECT * FROM content_post_versions WHERE id = ? AND workspace_id = ?`,
+  ),
+  countByPost: db.prepare(
+    `SELECT COUNT(*) as cnt FROM content_post_versions WHERE post_id = ?`,
+  ),
+  deleteByPost: db.prepare(
+    `DELETE FROM content_post_versions WHERE post_id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToVersion(row: VersionRow): PostVersion {
   return {
@@ -141,15 +120,12 @@ function rowToVersion(row: VersionRow): PostVersion {
   };
 }
 
-let _stmts: PostStmts | null = null;
-function stmts(): PostStmts {
-  if (!_stmts) {
-    _stmts = {
-      // Note: INSERT omits webflow_* / published_* columns intentionally.
-      // savePost() routes existing rows to UPDATE (which includes them).
-      // New posts never have publish data so omitting here is safe.
-      insert: db.prepare(
-        `INSERT OR REPLACE INTO content_posts
+const stmts = createStmtCache(() => ({
+  // Note: INSERT omits webflow_* / published_* columns intentionally.
+  // savePost() routes existing rows to UPDATE (which includes them).
+  // New posts never have publish data so omitting here is safe.
+  insert: db.prepare(
+    `INSERT OR REPLACE INTO content_posts
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
@@ -159,15 +135,15 @@ function stmts(): PostStmts {
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
             @unification_note, @review_checklist, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_posts WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE content_posts SET
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_posts WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE content_posts SET
            title = @title, meta_description = @meta_description,
            introduction = @introduction, sections = @sections, conclusion = @conclusion,
            seo_title = @seo_title, seo_meta_description = @seo_meta_description,
@@ -178,14 +154,11 @@ function stmts(): PostStmts {
            published_at = @published_at, published_slug = @published_slug,
            updated_at = @updated_at
          WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToPost(row: PostRow): GeneratedPost {
   return {

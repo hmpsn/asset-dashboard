@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from './seo-context.js';
 import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
 import { callOpenAI } from './openai-helpers.js';
@@ -46,20 +47,9 @@ interface BriefRow {
   template_id: string | null;
 }
 
-interface BriefStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: BriefStmts | null = null;
-function stmts(): BriefStmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO content_briefs
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_briefs
            (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
             suggested_meta_desc, outline, word_count_target, intent, audience,
             competitor_insights, internal_link_suggestions, created_at,
@@ -77,15 +67,15 @@ function stmts(): BriefStmts {
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
             @keyword_locked, @keyword_source, @keyword_validation, @template_id)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_briefs WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE content_briefs SET
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_briefs WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE content_briefs SET
            target_keyword = @target_keyword, secondary_keywords = @secondary_keywords,
            suggested_title = @suggested_title, suggested_meta_desc = @suggested_meta_desc,
            outline = @outline, word_count_target = @word_count_target, intent = @intent,
@@ -102,14 +92,11 @@ function stmts(): BriefStmts {
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
            keyword_validation = @keyword_validation, template_id = @template_id
          WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToBrief(row: BriefRow): ContentBrief {
   return {

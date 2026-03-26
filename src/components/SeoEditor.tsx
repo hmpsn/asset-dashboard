@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions, keywords } from '../api/seo';
+import { workspaces } from '../api';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
@@ -855,8 +856,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
             onClearTracking={workspaceId ? async (pageId) => {
               try {
-                const res = await fetch(`/api/workspaces/${workspaceId}/page-states/${pageId}`, { method: 'DELETE' });
-                if (res.ok) refreshStates();
+                await workspaces.deletePageState(workspaceId, pageId);
+                refreshStates();
               } catch (err) { console.error('SeoEditor operation failed:', err); }
             } : undefined}
             errorState={errorStates[page.id] || null}

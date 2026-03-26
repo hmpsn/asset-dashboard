@@ -100,6 +100,9 @@ export const anomalies = {
 
   acknowledge: (id: string) =>
     post<unknown>(`/api/anomalies/${id}/acknowledge`),
+
+  scan: () =>
+    post<unknown>('/api/anomalies/scan'),
 };
 
 // ── Churn signals ───────────────────────────────────────────────
@@ -209,12 +212,6 @@ export const salesReport = {
   getById: (id: string) => getOptional<unknown>(`/api/sales-report/${id}`),
 };
 
-// ── Rank tracking ──────────────────────────────────────────────
-export const rankTracking = {
-  latest: (wsId: string) =>
-    getOptional<unknown>(`/api/rank-tracking/${wsId}/latest`),
-};
-
 // ── Work orders ────────────────────────────────────────────────
 export const workOrders = {
   list: (wsId: string) =>
@@ -295,4 +292,56 @@ export const contentSubscriptions = {
 
   subscribe: (wsId: string, plan: string) =>
     post<{ sessionId: string; url: string }>(`/api/public/content-subscribe/${wsId}`, { plan }),
+};
+
+// ── Stripe ───────────────────────────────────────────────────
+export const stripe = {
+  getConfig: () =>
+    getOptional<unknown>('/api/stripe/config'),
+
+  saveKeys: (body: { secretKey?: string; webhookSecret?: string; publishableKey?: string }) =>
+    post<unknown>('/api/stripe/config/keys', body),
+
+  saveProducts: (body: Record<string, unknown>) =>
+    post<unknown>('/api/stripe/config/products', body),
+
+  deleteConfig: () => del('/api/stripe/config'),
+};
+
+// ── Auth ─────────────────────────────────────────────────────
+export const auth = {
+  logout: () => post<void>('/api/auth/logout'),
+};
+
+// ── Public: keyword feedback ─────────────────────────────────
+export const keywordFeedback = {
+  get: (wsId: string) =>
+    getSafe<unknown[]>(`/api/public/keyword-feedback/${wsId}`, []),
+
+  submit: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/public/keyword-feedback/${wsId}`, body),
+};
+
+// ── Public: tracked keywords ─────────────────────────────────
+export const trackedKeywords = {
+  get: (wsId: string) =>
+    getSafe<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
+      `/api/public/tracked-keywords/${wsId}`,
+      { keywords: [] },
+    ),
+
+  remove: (wsId: string, keyword: string) =>
+    del<{ keywords: Array<{ query: string; pinned: boolean; addedAt: string }> }>(
+      `/api/public/tracked-keywords/${wsId}`,
+      { keyword },
+    ),
+};
+
+// ── Public: business priorities ───────────────────────────────
+export const businessPriorities = {
+  get: (wsId: string) =>
+    getSafe<{ priorities: Array<{ text: string; category: string }> }>(
+      `/api/public/business-priorities/${wsId}`,
+      { priorities: [] },
+    ),
 };

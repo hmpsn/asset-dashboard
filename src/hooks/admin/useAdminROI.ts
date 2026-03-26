@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface PageROI {
   pagePath: string;
@@ -41,7 +42,7 @@ interface ROIData {
 
 export function useAdminROI(workspaceId: string) {
   return useQuery({
-    queryKey: ['admin-roi', workspaceId],
+    queryKey: queryKeys.admin.roi(workspaceId),
     queryFn: () => get<ROIData>(`/api/public/roi/${workspaceId}`),
     staleTime: 10 * 60 * 1000, // 10 minutes
     retry: 2,

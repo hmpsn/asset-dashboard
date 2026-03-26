@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 
 export interface Recommendation {
   id: string;
   workspaceId: string;
   priority: 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-  type: 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy';
+  type: 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo';
   title: string;
   description: string;
   insight: string;
@@ -33,7 +34,7 @@ export interface Recommendation {
  */
 export function useRecommendations(workspaceId?: string) {
   const { data: recs = [], isSuccess: loaded } = useQuery({
-    queryKey: ['recommendations', workspaceId],
+    queryKey: queryKeys.shared.recommendations(workspaceId!),
     queryFn: async () => {
       const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}?status=pending`);
       return data && Array.isArray(data.recommendations) ? data.recommendations : [];

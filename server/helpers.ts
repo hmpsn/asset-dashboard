@@ -11,6 +11,7 @@ import { listWorkspaces } from './workspaces.js';
 import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { getUploadRoot } from './data-dir.js';
+import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 
 // ── Page Path Utilities ──
 
@@ -175,24 +176,13 @@ export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKe
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
 
-    // Build knowledge base for schema enrichment (credentials, locations, sameAs URLs, etc.)
-    const kbParts: string[] = [];
-    if (ws.knowledgeBase?.trim()) kbParts.push(ws.knowledgeBase.trim());
-    // Also read knowledge-docs/ folder if it exists
-    try {
-      const kbDir = path.join(getUploadRoot(), ws.folder, 'knowledge-docs');
-      if (fs.existsSync(kbDir)) {
-        const kbFiles = fs.readdirSync(kbDir).filter(f => /\.(txt|md)$/i.test(f)).sort();
-        let kbContent = '';
-        for (const file of kbFiles) {
-          const text = fs.readFileSync(path.join(kbDir, file), 'utf-8').trim();
-          if (text) kbContent += `--- ${file} ---\n${text}\n\n`;
-          if (kbContent.length > 3000) break;
-        }
-        if (kbContent) kbParts.push(kbContent.slice(0, 3000));
-      }
-    } catch { /* knowledge-docs not available */ }
-    if (kbParts.length > 0) ctx.knowledgeBase = kbParts.join('\n\n').slice(0, 4000);
+    // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
+    const rawKB = getRawKnowledge(ws.id);
+    if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
+
+    // Audience personas for richer schema targeting
+    const personasBlock = buildPersonasContext(ws.id);
+    if (personasBlock) ctx._personasBlock = personasBlock;
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,

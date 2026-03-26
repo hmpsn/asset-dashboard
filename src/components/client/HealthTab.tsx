@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus, LayoutList, Layers } from 'lucide-react';
 import { MetricRing } from '../ui';
 import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
@@ -21,6 +21,45 @@ export interface HealthTabProps {
   actionPlanSlot?: ReactNode;
 }
 
+// Plain-English impact statements for each check type — shown below the raw issue message
+// to help clients understand WHY something matters without needing to know SEO terminology.
+const CHECK_IMPACT: Record<string, string> = {
+  'title': 'The page title is the first thing people see in Google search results. It directly controls whether they click or scroll past.',
+  'meta-description': 'Google shows this text below your link in search results. A missing or poor description means fewer people click through to your site.',
+  'h1': 'The main heading tells Google what your page is about. Without it, your page is harder to rank for relevant searches.',
+  'canonical': 'Without this, Google may split your ranking power across multiple URLs — weakening your position for all of them.',
+  'duplicate-title': 'Having two pages with the same title confuses Google about which one to show. It can reduce rankings for both.',
+  'duplicate-description': 'Duplicate descriptions make it harder for Google to understand what makes each page unique.',
+  'img-alt': 'Missing alt text hides your images from Google Image Search and creates accessibility barriers for screen reader users.',
+  'og-tags': 'Without these, links shared to social media show no title, description, or image — significantly reducing click-through.',
+  'og-image': 'Without a preview image, social shares look bare and get far fewer clicks than posts with rich previews.',
+  'structured-data': 'Schema markup can unlock rich results in Google — stars, FAQs, breadcrumbs — which stand out and get more clicks.',
+  'internal-links': 'Internal links spread authority across your site and help Google discover all your pages.',
+  'content-length': 'Pages with thin content are less likely to rank. Google prefers pages that fully answer a user\'s question.',
+  'redirect-chains': 'Every redirect hop slows your page down and weakens the SEO authority passed through the link.',
+  'mixed-content': 'HTTP content on an HTTPS page triggers browser security warnings that erode visitor trust.',
+  'ssl': 'Google gives a small ranking boost to secure HTTPS pages. Insecure pages also display warnings in browsers.',
+  'viewport': 'Without a viewport tag, your page won\'t scale correctly on mobile — and most searches now happen on phones.',
+  'lang': 'The language attribute helps Google serve your content to the right audience in the right language.',
+  'robots': 'The robots meta tag controls whether Google can index this page. An incorrect setting can hide it from search entirely.',
+  'heading-hierarchy': 'A clear heading structure (H1, H2, H3) helps Google understand your content and helps visitors scan the page.',
+  'cwv': 'Google uses page speed and stability as a ranking signal — slow or jumpy pages rank lower and lose visitors.',
+  'cwv-lcp': 'Slow loading speed causes visitors to leave before your page even appears. Google penalizes slow-loading pages.',
+  'cwv-cls': 'Content that shifts while loading frustrates visitors and can cause accidental clicks. Google flags this as poor experience.',
+  'aeo-author': 'AI answer engines (ChatGPT, Google AI Overviews) prefer citing content with named, credentialed authors.',
+  'aeo-date': 'Undated content gets deprioritized by AI systems that can\'t verify freshness — a quick fix with lasting benefit.',
+  'aeo-answer-first': 'AI systems extract the first substantive paragraph as their citation. Generic intros waste that prime position.',
+  'aeo-faq-no-schema': 'FAQ schema makes Q&A pairs directly extractable by AI answer engines and can unlock rich results in Google.',
+  'aeo-hidden-content': 'Content hidden in accordions or tabs often isn\'t read by search crawlers or AI systems.',
+  'aeo-citations': 'Pages that cite authoritative sources (.gov, .edu, journals) are trusted more by AI systems.',
+  'aeo-dark-patterns': 'Aggressive overlays and autoplay reduce content accessibility for AI retrieval systems.',
+};
+
+function checkImpact(check: string): string | null {
+  const chk = check.toLowerCase();
+  return CHECK_IMPACT[chk] || null;
+}
+
 const CONTENT_ISSUE_CHECKS = ['content-length', 'heading', 'h1', 'h1-missing', 'h1-multiple', 'word-count'];
 function hasContentIssues(issues: { check: string; message: string }[]): boolean {
   return issues.some(i => {
@@ -36,8 +75,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   
   // Ref for snap-to-section
   const allPagesRef = useRef<HTMLDivElement>(null);
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'all');
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'warning');
+  const [showInfoItems, setShowInfoItems] = useState(false);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'by-page' | 'by-fix-type'>('by-page');
   const [auditSearch, setAuditSearch] = useState('');
   const [requestedPages, setRequestedPages] = useState<Set<string>>(new Set());
   const [requestingPage, setRequestingPage] = useState<string | null>(null);
@@ -75,7 +116,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
   const filteredPages = auditDetail?.audit.pages.filter(p => {
     if (auditSearch && !p.page.toLowerCase().includes(auditSearch.toLowerCase()) && !toLiveUrl(p.url, liveDomain).toLowerCase().includes(auditSearch.toLowerCase())) return false;
-    if (severityFilter === 'all') return true;
+    if (severityFilter === 'all') {
+      if (!showInfoItems) return p.issues.some(i => i.severity !== 'info');
+      return true;
+    }
+    if (severityFilter === 'info') return p.issues.some(i => i.severity === 'info');
     return p.issues.some(i => i.severity === severityFilter);
   }) || [];
 
@@ -88,6 +133,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
     }));
     return cats;
   })() : {};
+
+  const infoIssueCount = auditDetail
+    ? auditDetail.audit.pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0)
+    : 0;
 
   // Share reports state
   const [shareOpen, setShareOpen] = useState(false);
@@ -198,6 +247,30 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         );
       })()}
 
+      {/* ── 1b. WHAT CHANGED SINCE LAST AUDIT ── */}
+      {auditDetail.auditDiff && auditDetail.previousScore != null && (
+        auditDetail.auditDiff.resolved > 0 || auditDetail.auditDiff.newIssues > 0
+      ) && (() => {
+        const { resolved, newIssues } = auditDetail.auditDiff!;
+        const scoreDelta = auditDetail.audit.siteScore - auditDetail.previousScore!;
+        const deltaColor = scoreDelta > 0 ? 'text-emerald-400' : scoreDelta < 0 ? 'text-red-400' : 'text-zinc-500';
+        const DeltaIcon = scoreDelta > 0 ? TrendingUp : scoreDelta < 0 ? AlertTriangle : Minus;
+        return (
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[12px]">
+            <DeltaIcon className={`w-4 h-4 flex-shrink-0 ${deltaColor}`} />
+            <span className="text-zinc-400">Since last audit:</span>
+            {resolved > 0 && <span className="text-emerald-400 font-medium">{resolved} resolved</span>}
+            {resolved > 0 && newIssues > 0 && <span className="text-zinc-600">·</span>}
+            {newIssues > 0 && <span className="text-red-400 font-medium">{newIssues} new</span>}
+            <span className="text-zinc-600">·</span>
+            <span className={`font-medium ${deltaColor}`}>
+              score {auditDetail.previousScore} → {auditDetail.audit.siteScore}
+              {scoreDelta !== 0 && <span className="ml-1">({scoreDelta > 0 ? '+' : ''}{scoreDelta})</span>}
+            </span>
+          </div>
+        );
+      })()}
+
       {/* ── 2. PAGE SPEED (Always Expanded) ── */}
       {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (() => {
         const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
@@ -238,7 +311,10 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 })}
               </div>
               {!s.fieldDataAvailable && (
-                <div className="mt-1.5 text-[10px] text-zinc-500 italic">Lab simulation — real data not yet available</div>
+                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-300">These are simulated scores, not real user data. Real metrics appear once Chrome has enough traffic data for your site.</p>
+                </div>
               )}
             </div>
           );
@@ -323,6 +399,9 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                 <span className="text-[11px] text-zinc-500 truncate">{item.page}</span>
                               </div>
                               <div className="text-[11px] text-zinc-300 mt-0.5">{item.issue.message}</div>
+                              {checkImpact(item.issue.check) && (
+                                <div className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{checkImpact(item.issue.check)}</div>
+                              )}
                             </div>
                             {hasContentIssues([item.issue]) && workspaceId && !requestedPages.has(item.pageId) && (
                               <button
@@ -386,6 +465,9 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                       {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                       <div className="flex-1">
                                         <div className="text-[11px] text-zinc-300">{issue.message}</div>
+                                        {checkImpact(issue.check) && (
+                                          <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{checkImpact(issue.check)}</div>
+                                        )}
                                         {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
                                       </div>
                                     </div>
@@ -491,20 +573,47 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       <div ref={allPagesRef}>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
+            {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
-              {(['all', 'error', 'warning', 'info'] as const).map(s => (
+              <button onClick={() => setViewMode('by-page')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${viewMode === 'by-page' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <LayoutList className="w-3 h-3" /> By Page
+              </button>
+              <button onClick={() => setViewMode('by-fix-type')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <Layers className="w-3 h-3" /> By Fix Type
+              </button>
+            </div>
+            {/* Severity filter */}
+            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+              {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} onClick={() => setSeverityFilter(s)}
                   className={`px-3 py-2 min-h-[44px] rounded-md text-[11px] font-medium transition-colors ${
                     severityFilter === s ? (s === 'all' ? 'bg-zinc-700 text-zinc-200' : `${SEV[s].bg} ${SEV[s].text}`) : 'text-zinc-500 hover:text-zinc-300'
-                  }`}>{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
+                  }`}>{s === 'all' ? 'Issues' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
               ))}
             </div>
-            <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
-            <button onClick={() => toggleSection('all-pages')} className="ml-auto p-1.5 rounded hover:bg-zinc-800 text-zinc-500">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            {infoIssueCount > 0 && (
+              <button
+                onClick={() => setShowInfoItems(!showInfoItems)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors border ${
+                  showInfoItems
+                    ? 'bg-zinc-700 text-zinc-300 border-zinc-600'
+                    : 'bg-transparent text-zinc-500 border-zinc-700 hover:text-zinc-300'
+                }`}
+              >
+                <Info className="w-3 h-3" />
+                {showInfoItems ? 'Hide' : 'Show'} {infoIssueCount} informational
+              </button>
+            )}
+            {viewMode === 'by-page' && (
+              <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
+            )}
           </div>
+
+          {/* By-page view */}
+          {viewMode === 'by-page' && (
           <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
             {filteredPages.map(page => {
               const errs = page.issues.filter(i => i.severity === 'error').length;
@@ -527,11 +636,11 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
                   </button>
-                  
+
                   {isExpanded && (
                     <div className="px-4 pb-3">
                       <div className="space-y-2">
-                        {page.issues.map((issue, i) => {
+                        {page.issues.filter(i => showInfoItems || i.severity !== 'info').map((issue, i) => {
                           const sc = SEV[issue.severity];
                           return (
                             <div key={i} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
@@ -573,6 +682,96 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             })}
             {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
           </div>
+          )}
+
+          {/* By-fix-type view */}
+          {viewMode === 'by-fix-type' && (() => {
+            // Group all issues by category, then by check type
+            const FIX_TYPE_LABELS: Record<string, string> = {
+              'title': 'Page Titles', 'meta-description': 'Meta Descriptions', 'h1': 'Headings (H1)',
+              'canonical': 'Canonical Tags', 'img-alt': 'Image Alt Text', 'og-tags': 'Social Media Tags',
+              'og-image': 'Social Media Images', 'structured-data': 'Schema / Structured Data',
+              'internal-links': 'Internal Links', 'content-length': 'Content Length',
+              'redirect-chains': 'Redirect Chains', 'mixed-content': 'Mixed Content',
+              'ssl': 'SSL / HTTPS', 'viewport': 'Mobile Viewport', 'robots': 'Robots / Indexing',
+              'heading-hierarchy': 'Heading Structure', 'cwv': 'Core Web Vitals',
+              'duplicate-title': 'Duplicate Titles', 'duplicate-description': 'Duplicate Descriptions',
+            };
+            const groups = new Map<string, { check: string; label: string; severity: 'error' | 'warning' | 'info'; pages: { pageId: string; page: string; url: string; message: string; recommendation?: string }[] }>();
+
+            (auditDetail?.audit.pages || []).forEach(p => {
+              p.issues.forEach(issue => {
+                if (!showInfoItems && issue.severity === 'info') return;
+                if (severityFilter !== 'all' && issue.severity !== severityFilter) return;
+                const key = issue.check || 'other';
+                if (!groups.has(key)) {
+                  groups.set(key, {
+                    check: key,
+                    label: FIX_TYPE_LABELS[key.toLowerCase()] || (issue.category ? (CAT_LABELS[issue.category]?.label || issue.category) + ': ' + key : key),
+                    severity: issue.severity,
+                    pages: [],
+                  });
+                }
+                const g = groups.get(key)!;
+                // Keep highest severity
+                if (issue.severity === 'error' && g.severity !== 'error') g.severity = 'error';
+                else if (issue.severity === 'warning' && g.severity === 'info') g.severity = 'warning';
+                g.pages.push({ pageId: p.pageId, page: p.page, url: p.url, message: issue.message, recommendation: issue.recommendation });
+              });
+            });
+
+            const sorted = [...groups.values()].sort((a, b) => {
+              const sevScore = (s: string) => s === 'error' ? 3 : s === 'warning' ? 2 : 1;
+              const d = sevScore(b.severity) - sevScore(a.severity);
+              if (d !== 0) return d;
+              return b.pages.length - a.pages.length;
+            });
+
+            return (
+              <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
+                {sorted.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No issues match your filters</div>}
+                {sorted.map(group => {
+                  const sc = SEV[group.severity];
+                  const isExpanded = expandedPages.has(`fix-type-${group.check}`);
+                  return (
+                    <div key={group.check} className={`transition-all ${isExpanded ? 'bg-zinc-950/50' : ''}`}>
+                      <button
+                        onClick={() => togglePage(`fix-type-${group.check}`)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-zinc-300">{group.label}</div>
+                          <div className="text-[11px] text-zinc-500">{group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-[11px] font-medium uppercase ${sc.text}`}>{group.severity}</span>
+                          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
+                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-4 pb-3">
+                          {checkImpact(group.check) && (
+                            <div className="text-[11px] text-zinc-400 mb-2 leading-relaxed px-1">{checkImpact(group.check)}</div>
+                          )}
+                          <div className="space-y-1.5">
+                            {group.pages.map((p, i) => (
+                              <div key={`${p.pageId}-${i}`} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                                <div className="text-[11px] font-medium text-zinc-300 truncate">{p.page}</div>
+                                <div className="text-[10px] text-zinc-500 truncate">{toLiveUrl(p.url, liveDomain)}</div>
+                                {p.recommendation && <div className="text-[10px] text-zinc-500 mt-0.5">{p.recommendation}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

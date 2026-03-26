@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOptional } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 
 export interface AuditSummaryData {
   id: string;
@@ -15,7 +16,7 @@ export interface AuditSummaryData {
 
 /** React Query key for audit summary */
 export const auditSummaryKey = (workspaceId: string) =>
-  ['audit-summary', workspaceId] as const;
+  queryKeys.shared.auditSummary(workspaceId);
 
 /**
  * Shared hook for fetching audit summary.

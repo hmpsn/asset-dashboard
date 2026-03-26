@@ -4,10 +4,11 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { get } from '../../api/client.js';
-import { keywords } from '../../api/seo.js';
-import { workspaces } from '../../api/workspaces.js';
-import type { KeywordStrategy } from '../../shared/types/workspace.ts';
+import { get } from '../../api/client';
+import { keywords } from '../../api/seo';
+import { workspaces } from '../../api/workspaces';
+import type { KeywordStrategy } from '../../shared/types/workspace';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface WorkspaceData {
   competitorDomains?: string[];
@@ -21,7 +22,7 @@ interface KeywordStrategyData {
 
 export function useKeywordStrategy(workspaceId: string) {
   return useQuery({
-    queryKey: ['keyword-strategy', workspaceId],
+    queryKey: queryKeys.admin.keywordStrategy(workspaceId),
     queryFn: async (): Promise<KeywordStrategyData> => {
       const [strategyResponse, semrushStatus, workspaceResponse] = await Promise.all([
         workspaceId ? get<KeywordStrategy>(`/api/webflow/keyword-strategy/${workspaceId}`).catch(() => null) : Promise.resolve(null),

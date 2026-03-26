@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { get, getSafe } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
 interface Asset {
   id: string;
@@ -19,13 +21,13 @@ interface Asset {
  */
 export function useWebflowAssets(siteId: string) {
   return useQuery<Asset[]>({
-    queryKey: ['admin-webflow-assets', siteId],
+    queryKey: queryKeys.admin.webflowAssets(siteId),
     queryFn: async () => {
       const data = await getSafe<Asset[]>(`/api/webflow/assets/${siteId}`, []);
       return Array.isArray(data) ? data : [];
     },
     enabled: !!siteId,
-    staleTime: 60_000,
+    staleTime: STALE_TIMES.NORMAL,
   });
 }
 
@@ -35,7 +37,7 @@ export function useWebflowAssets(siteId: string) {
  */
 export function useAssetAudit(siteId: string, enabled: boolean) {
   return useQuery<Set<string>>({
-    queryKey: ['admin-asset-audit', siteId],
+    queryKey: queryKeys.admin.assetAudit(siteId),
     queryFn: async () => {
       const data = await get<{ issues?: Array<{ issues: string[]; assetId: string }> }>(`/api/webflow/audit/${siteId}`);
       return new Set<string>(
@@ -43,6 +45,6 @@ export function useAssetAudit(siteId: string, enabled: boolean) {
       );
     },
     enabled: !!siteId && enabled,
-    staleTime: 5 * 60_000,
+    staleTime: STALE_TIMES.STABLE,
   });
 }

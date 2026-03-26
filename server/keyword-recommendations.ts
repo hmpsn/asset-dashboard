@@ -7,7 +7,7 @@
  */
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from './semrush.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
-import { getWorkspace } from './workspaces.js';
+import { buildSeoContext } from './seo-context.js';
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 
@@ -131,8 +131,9 @@ export async function getKeywordRecommendations(
   // If AI scoring is enabled and we have business context, re-rank
   if (useAI && candidates.length > 1) {
     try {
-      const ws = getWorkspace(workspaceId);
-      const bizContext = ws?.keywordStrategy?.businessContext || ws?.brandVoice || '';
+      const seoCtx = buildSeoContext(workspaceId);
+      // Use full context (business context + brand voice + personas + knowledge) for richer ranking
+      const bizContext = seoCtx.fullContext || seoCtx.businessContext || '';
       if (bizContext) {
         const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
         // Mark the AI-recommended keyword

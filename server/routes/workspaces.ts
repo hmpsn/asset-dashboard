@@ -46,6 +46,7 @@ import {
   clearPageState,
   clearPageStatesByStatus,
 } from '../workspaces.js';
+import { clearSeoContextCache } from '../seo-context.js';
 
 // Workspaces
 router.get('/api/workspaces', (_req, res) => {
@@ -200,6 +201,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
+  clearSeoContextCache(req.params.id); // Invalidate cached AI context
   // Strip token from response to avoid leaking to frontend
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
   broadcast('workspace:updated', safe);

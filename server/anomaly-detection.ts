@@ -16,6 +16,7 @@
 
 import crypto from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, type Workspace } from './workspaces.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison, getGA4Conversions } from './google-analytics.js';
@@ -37,6 +38,10 @@ export function initAnomalyBroadcast(fn: (workspaceId: string, event: string, da
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000; // Every 12 hours
 const MIN_SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000; // Skip startup scan if last scan < 6h ago
 const COMPARISON_DAYS = 28;
+
+// --- Minimum traffic floors — skip anomalies on low-volume pages to reduce noise ---
+const MIN_CLICKS = 200;        // previous period clicks must be ≥200 to trigger click anomaly
+const MIN_IMPRESSIONS = 2000;  // previous period impressions must be ≥2000 to trigger impression anomaly
 
 // --- Thresholds (% change that triggers an anomaly) ---
 const THRESHOLDS = {
@@ -127,30 +132,12 @@ function rowToAnomaly(row: AnomalyRow): Anomaly {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectAll: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectActiveByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  insert: ReturnType<typeof db.prepare>;
-  dismiss: ReturnType<typeof db.prepare>;
-  acknowledge: ReturnType<typeof db.prepare>;
-  deleteOlderThan: ReturnType<typeof db.prepare>;
-  recentUndismissed: ReturnType<typeof db.prepare>;
-  getLastScan: ReturnType<typeof db.prepare>;
-  setLastScan: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectAll: db.prepare('SELECT * FROM anomalies ORDER BY detected_at DESC'),
-      selectByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? ORDER BY detected_at DESC'),
-      selectActiveByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? AND dismissed_at IS NULL ORDER BY detected_at DESC'),
-      selectById: db.prepare('SELECT * FROM anomalies WHERE id = ?'),
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectAll: db.prepare('SELECT * FROM anomalies ORDER BY detected_at DESC'),
+  selectByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? ORDER BY detected_at DESC'),
+  selectActiveByWorkspace: db.prepare('SELECT * FROM anomalies WHERE workspace_id = ? AND dismissed_at IS NULL ORDER BY detected_at DESC'),
+  selectById: db.prepare('SELECT * FROM anomalies WHERE id = ?'),
+  insert: db.prepare(`
         INSERT INTO anomalies (id, workspace_id, workspace_name, type, severity,
           title, description, metric, current_value, previous_value, change_pct,
           ai_summary, detected_at, dismissed_at, acknowledged_at, source)
@@ -158,16 +145,16 @@ function stmts(): Stmts {
           @title, @description, @metric, @current_value, @previous_value, @change_pct,
           @ai_summary, @detected_at, @dismissed_at, @acknowledged_at, @source)
       `),
-      dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ?'),
-      acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ?'),
-      deleteOlderThan: db.prepare('DELETE FROM anomalies WHERE detected_at < ?'),
-      recentUndismissed: db.prepare(`
+  dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ?'),
+  acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ?'),
+  deleteOlderThan: db.prepare('DELETE FROM anomalies WHERE detected_at < ?'),
+  recentUndismissed: db.prepare(`
         SELECT * FROM anomalies
         WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL AND detected_at > ?
         LIMIT 1
       `),
-      getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
-      setLastScan: db.prepare(`
+  getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
+  setLastScan: db.prepare(`
         INSERT OR REPLACE INTO anomalies (id, workspace_id, workspace_name, type, severity,
           title, description, metric, current_value, previous_value, change_pct,
           ai_summary, detected_at, dismissed_at, acknowledged_at, source)
@@ -175,10 +162,7 @@ function stmts(): Stmts {
           'Last scan marker', '', 'last_scan', 0, 0, 0,
           NULL, ?, 'system', NULL, 'gsc')
       `),
-    };
-  }
-  return _stmts;
-}
+}));
 
 /** Get the timestamp of the last successful anomaly scan */
 function getLastScanTime(): Date | null {
@@ -282,7 +266,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
       const { current, previous, changePercent } = cmp;
 
       // Traffic drop (clicks)
-      if (changePercent.clicks <= THRESHOLDS.traffic_drop && !alreadyDetected(ws.id, 'traffic_drop')) {
+      if (changePercent.clicks <= THRESHOLDS.traffic_drop && previous.clicks >= MIN_CLICKS && !alreadyDetected(ws.id, 'traffic_drop')) {
         detected.push(createAnomaly(ws, 'traffic_drop', 'clicks', current.clicks, previous.clicks, changePercent.clicks, 'gsc',
           `Search clicks dropped ${Math.abs(changePercent.clicks)}%`,
           `Clicks fell from ${previous.clicks.toLocaleString()} to ${current.clicks.toLocaleString()} (${changePercent.clicks}%) over the last ${COMPARISON_DAYS} days vs the prior period.`,
@@ -290,7 +274,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
       }
 
       // Traffic spike (clicks)
-      if (changePercent.clicks >= THRESHOLDS.traffic_spike && !alreadyDetected(ws.id, 'traffic_spike')) {
+      if (changePercent.clicks >= THRESHOLDS.traffic_spike && previous.clicks >= MIN_CLICKS && !alreadyDetected(ws.id, 'traffic_spike')) {
         detected.push(createAnomaly(ws, 'traffic_spike', 'clicks', current.clicks, previous.clicks, changePercent.clicks, 'gsc',
           `Search clicks surged ${changePercent.clicks}%`,
           `Clicks rose from ${previous.clicks.toLocaleString()} to ${current.clicks.toLocaleString()} (+${changePercent.clicks}%) over the last ${COMPARISON_DAYS} days.`,
@@ -298,7 +282,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
       }
 
       // Impressions drop
-      if (changePercent.impressions <= THRESHOLDS.impressions_drop && !alreadyDetected(ws.id, 'impressions_drop')) {
+      if (changePercent.impressions <= THRESHOLDS.impressions_drop && previous.impressions >= MIN_IMPRESSIONS && !alreadyDetected(ws.id, 'impressions_drop')) {
         detected.push(createAnomaly(ws, 'impressions_drop', 'impressions', current.impressions, previous.impressions, changePercent.impressions, 'gsc',
           `Search impressions dropped ${Math.abs(changePercent.impressions)}%`,
           `Impressions fell from ${previous.impressions.toLocaleString()} to ${current.impressions.toLocaleString()} — potential visibility loss.`,
