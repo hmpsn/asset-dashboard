@@ -121,7 +121,7 @@ function recalcBatchStatus(batch: ApprovalBatch): void {
   if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   else if (statuses.every(s => s === 'approved' || s === 'applied')) batch.status = 'approved';
   else if (statuses.every(s => s === 'rejected')) batch.status = 'rejected';
-  else if (statuses.some(s => s === 'approved' || s === 'rejected')) batch.status = 'partial';
+  else if (statuses.some(s => s === 'approved' || s === 'rejected' || s === 'applied')) batch.status = 'partial';
   else batch.status = 'pending';
 
   batch.updatedAt = new Date().toISOString();
