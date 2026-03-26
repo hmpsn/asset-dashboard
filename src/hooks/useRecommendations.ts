@@ -7,7 +7,7 @@ export interface Recommendation {
   id: string;
   workspaceId: string;
   priority: 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-  type: 'technical' | 'content' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy';
+  type: 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo';
   title: string;
   description: string;
   insight: string;

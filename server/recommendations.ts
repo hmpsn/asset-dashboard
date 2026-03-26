@@ -21,6 +21,9 @@ import { getLatestSnapshot } from './reports.js';
 import type { AuditSnapshot } from './reports.js';
 import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
+import { loadDecayAnalysis } from './content-decay.js';
+import type { DecayingPage } from './content-decay.js';
+import { getDeclinedKeywords } from './routes/keyword-strategy.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -194,6 +197,15 @@ function determinePriority(
   return 'fix_later';
 }
 
+/** Weight impact score based on page type (homepage/service pages matter more) */
+function pageImportanceMultiplier(slug: string): number {
+  const s = slug.toLowerCase().replace(/^\//, '');
+  if (s === '' || s === 'index' || s === 'home') return 1.5;
+  if (/(?:^|\/)services?|solutions?|products?|pricing|packages/.test(s)) return 1.2;
+  if (/(?:^|\/)thank[-_]?you|confirmation|success|members?|password|unsubscribe/.test(s)) return 0.8;
+  return 1.0;
+}
+
 /** Map check name to recommendation type */
 function checkToRecType(check: string, category?: string): RecType {
   const chk = check.toLowerCase();
@@ -223,6 +235,10 @@ function mapToProduct(recType: RecType, pageCount: number): { productType?: stri
       return pageCount >= 5
         ? { productType: 'aeo_site_review', productPrice: 499 }
         : { productType: 'aeo_page_review', productPrice: 99 };
+    case 'content_refresh':
+      return pageCount >= 5
+        ? { productType: 'content_refresh_5', productPrice: 799 }
+        : { productType: 'content_refresh', productPrice: 199 };
     default:
       return {};
   }
@@ -350,6 +366,19 @@ function strategyInsight(type: 'content_gap' | 'quick_win' | 'keyword_gap', item
   return '';
 }
 
+function decayInsight(page: DecayingPage): string {
+  const decline = Math.abs(page.clickDeclinePct);
+  const clickDrop = page.previousClicks - page.currentClicks;
+  if (page.severity === 'critical') {
+    return `This page lost ${decline}% of its search clicks (${clickDrop} clicks/mo). ` +
+      `Position moved from ${page.previousPosition.toFixed(1)} to ${page.currentPosition.toFixed(1)}. ` +
+      `Refreshing the content — updating facts, improving structure, and targeting current search intent — can recover most of this traffic.`;
+  }
+  return `Search clicks declined ${decline}% (${clickDrop} fewer clicks/mo). ` +
+    `The page may be losing relevance as competitors update their content. ` +
+    `A targeted refresh addressing current search intent could reverse the trend.`;
+}
+
 // ─── Main Engine ──────────────────────────────────────────────────
 
 export async function generateRecommendations(workspaceId: string): Promise<RecommendationSet> {
@@ -415,12 +444,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // Create one recommendation per issue group
     for (const [, group] of issueGroups) {
       const isCrit = isCriticalCheck(group.check);
-      const impactScore = computeImpactScore(
+      let impactScore = computeImpactScore(
         group.severity,
         isCrit,
         group.totalTrafficScore,
         maxTrafficScore * group.pages.length,
       );
+      // Apply page importance: use max multiplier across affected pages
+      const maxMultiplier = group.pages.reduce((m, p) => Math.max(m, pageImportanceMultiplier(p.slug)), 1.0);
+      impactScore = Math.min(100, Math.round(impactScore * maxMultiplier));
 
       const priority = determinePriority(impactScore, group.severity, group.totalTrafficScore);
       const recType = checkToRecType(group.check, group.category);
@@ -515,23 +547,39 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   }
 
   // ── 2. Strategy-based recommendations ──
+  // Load declined keywords so we can skip suggestions the client has rejected (2C)
+  const declinedKeywords = new Set(
+    getDeclinedKeywords(workspaceId).map(k => k.toLowerCase())
+  );
+
   if (strategy) {
     // Quick wins → fix_now or fix_soon
     if (strategy.quickWins) {
       for (const qw of strategy.quickWins) {
+        // 2C: skip if the current keyword was declined
+        if (qw.currentKeyword && declinedKeywords.has(qw.currentKeyword.toLowerCase())) continue;
+
         const t = getTrafficForSlug(traffic, qw.pagePath.replace(/^\//, ''));
+        // 2E: demote zero-traffic quick wins — fixing meta on unvisited pages is not a "quick win"
+        const hasTraffic = t.clicks > 0 || t.impressions > 0;
         const impactScore = qw.estimatedImpact === 'high' ? 75 : qw.estimatedImpact === 'medium' ? 55 : 35;
+        // 2D: apply page importance multiplier
+        const pageMultiplier = pageImportanceMultiplier(qw.pagePath);
+        const adjustedScore = Math.min(100, Math.round(impactScore * pageMultiplier));
+        const priority: RecPriority = !hasTraffic
+          ? 'fix_later'
+          : qw.estimatedImpact === 'high' ? 'fix_now' : 'fix_soon';
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,
-          priority: qw.estimatedImpact === 'high' ? 'fix_now' : 'fix_soon',
+          priority,
           type: 'strategy',
           title: `Quick Win: ${qw.action}`,
           description: qw.rationale,
           insight: strategyInsight('quick_win', qw),
           impact: qw.estimatedImpact as 'high' | 'medium' | 'low',
           effort: 'low',
-          impactScore,
+          impactScore: adjustedScore,
           source: 'strategy:quick-win',
           affectedPages: [qw.pagePath.replace(/^\//, '')],
           trafficAtRisk: t.clicks,
@@ -549,6 +597,9 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // Content gaps → ongoing
     if (strategy.contentGaps) {
       for (const cg of strategy.contentGaps) {
+        // 2C: skip if the target keyword was declined by the client
+        if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
+
         const impactScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
@@ -578,9 +629,14 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     // Pages with declining positions (from page map)
     if (strategy.pageMap) {
       for (const pm of strategy.pageMap) {
+        // 2C: skip if the primary keyword was declined
+        if (pm.primaryKeyword && declinedKeywords.has(pm.primaryKeyword.toLowerCase())) continue;
+
         if (pm.currentPosition && pm.currentPosition > 3 && pm.currentPosition <= 20 && pm.impressions && pm.impressions > 100) {
           // Page ranking 4-20 with decent impressions — opportunity to push up
-          const impactScore = pm.currentPosition <= 10 ? 60 : 40;
+          // 2D: apply page importance multiplier
+          const baseScore = pm.currentPosition <= 10 ? 60 : 40;
+          const impactScore = Math.min(100, Math.round(baseScore * pageImportanceMultiplier(pm.pagePath)));
           recs.push({
             id: `rec_${crypto.randomBytes(6).toString('hex')}`,
             workspaceId,
@@ -608,6 +664,63 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         }
       }
     }
+  }
+
+  // ── 3. Content decay recommendations ──
+  try {
+    const decayAnalysis = loadDecayAnalysis(workspaceId);
+    if (decayAnalysis && decayAnalysis.decayingPages.length > 0) {
+      // Only create recs for critical and warning pages (skip "watch")
+      const actionableDecay = decayAnalysis.decayingPages.filter(p => p.severity === 'critical' || p.severity === 'warning');
+
+      for (const dp of actionableDecay) {
+        const pageSlug = dp.page.replace(/^\//, '');
+        const t = getTrafficForSlug(traffic, pageSlug);
+        const isHighTraffic = dp.previousClicks >= 100; // Was a meaningful traffic page
+
+        const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
+        const impactScore = dp.severity === 'critical'
+          ? Math.min(90, 60 + Math.round(dp.previousClicks / 50))
+          : Math.min(70, 40 + Math.round(dp.previousClicks / 100));
+
+        const product = mapToProduct('content_refresh', 1);
+        const clicksLost = dp.previousClicks - dp.currentClicks;
+
+        recs.push({
+          id: `rec_${crypto.randomBytes(6).toString('hex')}`,
+          workspaceId,
+          priority,
+          type: 'content_refresh',
+          title: `Content Decay: ${dp.title || dp.page} (${Math.abs(dp.clickDeclinePct)}% decline)`,
+          description: dp.refreshRecommendation
+            || `This page has lost ${Math.abs(dp.clickDeclinePct)}% of its search clicks. Refresh the content to recover traffic.`,
+          insight: decayInsight(dp),
+          impact: dp.severity === 'critical' ? 'high' : 'medium',
+          effort: 'medium',
+          impactScore,
+          source: `decay:${pageSlug}`,
+          affectedPages: [pageSlug],
+          trafficAtRisk: dp.previousClicks,
+          impressionsAtRisk: dp.previousImpressions,
+          estimatedGain: isHighTraffic
+            ? `Refreshing could recover ${Math.round(clicksLost * 0.5)} – ${clicksLost} clicks/mo`
+            : `Content refresh to reverse ${Math.abs(dp.clickDeclinePct)}% traffic decline`,
+          actionType: product.productType ? 'purchase' : 'manual',
+          productType: product.productType,
+          productPrice: product.productPrice,
+          status: 'pending',
+          assignedTo,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      if (actionableDecay.length > 0) {
+        log.info(`Added ${actionableDecay.length} content refresh recommendations for ${workspaceId}`);
+      }
+    }
+  } catch (err) {
+    log.warn({ err }, 'Content decay data unavailable for recommendations');
   }
 
   // ── Build slug→pageId map from audit for resolving affectedPages ──
@@ -715,13 +828,21 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   // ── Build summary (exclude auto-resolved from active counts) ──
   const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
+  const totalTrafficAtRisk = activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0);
+  const totalImpressionsAtRisk = activeRecs.reduce((s, r) => s + r.impressionsAtRisk, 0);
+  // Conservative 12% recovery rate on traffic at risk (actionable issues only)
+  const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
+  const actionableTraffic = actionableRecs.reduce((s, r) => s + r.trafficAtRisk, 0);
+  const actionableImpressions = actionableRecs.reduce((s, r) => s + r.impressionsAtRisk, 0);
   const summary = {
     fixNow: activeRecs.filter(r => r.priority === 'fix_now').length,
     fixSoon: activeRecs.filter(r => r.priority === 'fix_soon').length,
     fixLater: activeRecs.filter(r => r.priority === 'fix_later').length,
     ongoing: activeRecs.filter(r => r.priority === 'ongoing').length,
     totalImpactScore: activeRecs.reduce((s, r) => s + r.impactScore, 0),
-    trafficAtRisk: activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0),
+    trafficAtRisk: totalTrafficAtRisk,
+    estimatedRecoverableClicks: Math.round(actionableTraffic * 0.12),
+    estimatedRecoverableImpressions: Math.round(actionableImpressions * 0.12),
   };
 
   const set: RecommendationSet = {

@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Lightbulb, Zap, Clock, CalendarClock, RefreshCw,
-  TrendingUp, ShoppingCart, Crown, ChevronDown, ChevronRight,
+  TrendingUp, TrendingDown, ShoppingCart, Crown, ChevronDown, ChevronRight,
   CheckCircle2, MousePointerClick, Eye,
-  FileText, Code2, Image, Wrench, Target, PenTool,
+  FileText, Code2, Image, Wrench, Target, PenTool, Sparkles,
   Loader2, XCircle, ArrowUpRight, Shield,
 } from 'lucide-react';
 import { useCart } from './useCart';
@@ -29,7 +29,9 @@ const REC_TYPE_TAB: Record<RecType, string> = {
   performance: 'performance',
   accessibility: 'seo-audit',
   content: 'seo-briefs',
+  content_refresh: 'seo-briefs',
   strategy: 'seo-strategy',
+  aeo: 'seo-audit',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -81,7 +83,9 @@ const TYPE_ICONS: Record<RecType, typeof FileText> = {
   performance: Zap,
   technical: Wrench,
   content: PenTool,
+  content_refresh: TrendingDown,
   strategy: Target,
+  aeo: Sparkles,
 };
 
 const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -229,6 +233,9 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           {data.summary.trafficAtRisk > 0 && (
             <p className="text-[12px] text-zinc-400 mt-1">
               <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues
+              {data.summary.estimatedRecoverableClicks > 0 && (
+                <span className="ml-1 text-teal-400">· ~{num(data.summary.estimatedRecoverableClicks)} recoverable</span>
+              )}
             </p>
           )}
         </div>
@@ -335,7 +342,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
           <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
             We've analyzed your audit, traffic, and SEO strategy to create a prioritized action plan.
             {data.summary.trafficAtRisk > 0 && (
-              <> <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues.</>
+              <> <span className="text-amber-400 font-medium">{num(data.summary.trafficAtRisk)} organic clicks/mo</span> are at risk from unresolved issues{data.summary.estimatedRecoverableClicks > 0 ? ` — addressing fix-now and fix-soon items could recover ~${num(data.summary.estimatedRecoverableClicks)} clicks/mo.` : '.'}</>
             )}
           </p>
         )}
