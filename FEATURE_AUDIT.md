@@ -139,11 +139,11 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 11. Rank Tracker
-**What it does:** Track specific keyword positions over time using Google Search Console data. Pin priority keywords, capture snapshots, and visualize trends.
+**What it does:** Track specific keyword positions over time using Google Search Console data. Pin priority keywords, capture snapshots, and visualize trends. Click any keyword row to expand a **position sparkline** showing the full position history over time (inverted Y-axis: lower position = higher on chart) with best/worst position stats and period delta. **Trends toggle** (header button, appears when pinned keywords exist) shows a multi-keyword SVG line chart for all pinned keywords, with color-coded lines, gridlines, Y-axis position labels, and a legend with current positions.
 
-**Agency value:** Shows the direct impact of SEO work over time. "Your target keyword moved from position 18 to position 6."
+**Agency value:** Shows the direct impact of SEO work over time. "Your target keyword moved from position 18 to position 6." Sparklines and trends chart provide quick visual proof without exporting data.
 
-**Client value:** Proof that the SEO investment is working, tracked against the keywords they actually care about.
+**Client value:** Proof that the SEO investment is working, tracked against the keywords they actually care about. Trend visualization makes progress tangible.
 
 **Mutual:** Aligns both parties on which keywords matter and provides objective measurement of progress.
 
@@ -513,6 +513,16 @@ A brief value assessment of every feature in the platform, covering what it does
 **Client value:** N/A — admin-only view (clients have their own portal).
 
 **Mutual:** Eliminates the "let me pull up the data" delay. Every workspace conversation starts from a position of full awareness.
+
+**Admin dashboard improvements (March 2026):**
+- **Needs Attention prioritization**: Action items sorted by priority (P1=critical, P2=important, P3=setup). Capped at 5 visible urgent items with "N more" collapse. Setup suggestions (missing GSC/GA4/Webflow) hidden in collapsed section when P1 alerts exist. Section moved above Anomaly Alerts.
+- **SEO Pipeline merge**: SeoWorkStatus and SeoChangeImpact merged into single "SEO Pipeline" SectionCard via `embedded` prop.
+- **Content Decay StatCard**: New metric card showing decaying page count (critical/warning), deep-links to Content Health sub-tab. Data served from aggregated workspace-home endpoint (loadDecayAnalysis).
+- **Weekly Accomplishments**: Compact summary bar "This week: 3 SEO updates · 2 briefs · 1 audit" between header and metric cards. Server-side aggregation of last-7-day activity by type.
+- **PageIntelligence action buttons**: "Fix in SEO Editor", "Create Brief", conditional "Add Schema" buttons at bottom of each expanded page analysis, using fixContext navigation pattern.
+- **KeywordStrategy dedup**: Removed duplicate Ranking Tiers StatCard (stacked bar chart already shows same data), grid 5→4 columns.
+- **SeoAudit score delta**: Score delta badge (↑6 from last audit) in site score card using history snapshots.
+- **SeoAudit sub-tab deep-links**: `?sub=` query param for direct navigation to sub-tabs. Visual separator between audit tabs and analysis tabs. Renamed: "Content Decay" → "Content Health", "AEO Review" → "AI Search Ready".
 
 ### 42. Security Hardening
 **What it does:** Pre-payment security layer across the Express server. **Helmet** adds security headers on all responses (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, CSP whitelisting Stripe domains in production). **HTTPS enforcement** redirects all HTTP traffic to HTTPS in production via `X-Forwarded-Proto` proxy trust. **3-tier rate limiting** on all public API routes: 60 req/min general reads, 10/min writes (POST/PATCH/DELETE), 5/min checkout (pre-wired for Stripe). **Input sanitization** via `sanitizeString()` (trim, length cap, control character stripping) and `validateEnum()` applied to all content request write endpoints. **Stripe webhook placeholder** marks the correct mount point before `express.json()` for raw body parsing.
