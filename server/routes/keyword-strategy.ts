@@ -1700,6 +1700,8 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchem
       updated_at = datetime('now')
   `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy || null);
 
+  if (status === 'approved') addTrackedKeyword(ws.id, kw);
+
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
   res.json({ keyword: kw, status, reason: reason || null });
 });
@@ -1735,6 +1737,11 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeed
     }
   });
   insert(req.body.keywords);
+
+  for (const item of req.body.keywords) {
+    if (item.status === 'approved') addTrackedKeyword(ws.id, item.keyword.toLowerCase().trim());
+  }
+
   log.info(`Bulk keyword feedback: ${req.body.keywords.length} keywords for workspace ${ws.id}`);
   res.json({ updated: req.body.keywords.length });
 });
