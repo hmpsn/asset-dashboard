@@ -1602,6 +1602,8 @@ Rules:
     // 7. Save to workspace — pageMap goes to page_keywords table, rest to workspace blob
     sendProgress('complete', 'Strategy complete!', 1.0);
     const pageMap = strategy.pageMap || [];
+    // Snapshot previous page map BEFORE replacing (needed for strategy diff)
+    const prevPageMapForHistory = listPageKeywords(ws.id);
     // Save pageMap to dedicated table (replaces all existing entries)
     replaceAllPageKeywords(ws.id, pageMap);
 
@@ -1628,9 +1630,8 @@ Rules:
     };
     // Save previous strategy to history (keep last 5)
     if (ws.keywordStrategy?.generatedAt) {
-      const prevPageMap = listPageKeywords(ws.id);
       db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
-        ws.id, JSON.stringify(ws.keywordStrategy), JSON.stringify(prevPageMap), ws.keywordStrategy.generatedAt
+        ws.id, JSON.stringify(ws.keywordStrategy), JSON.stringify(prevPageMapForHistory), ws.keywordStrategy.generatedAt
       );
       // Prune old entries, keep last 5
       db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
