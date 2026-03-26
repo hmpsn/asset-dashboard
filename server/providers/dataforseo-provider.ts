@@ -381,21 +381,48 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit,
-        item_types: ['organic'],
+        item_types: ['organic', 'featured_snippet', 'local_pack'],
       }]);
 
       const taskResults = getTaskResult(json);
       const cost = getTaskCost(json);
       const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
 
-      const results: DomainKeyword[] = items.map(item => {
+      // Collect SERP feature types per keyword (keywords may appear multiple times with different item types)
+      const serpFeaturesMap = new Map<string, Set<string>>();
+      for (const item of items) {
+        const kwData = item.keyword_data as Record<string, unknown> | undefined;
+        const keyword = (kwData?.keyword as string) ?? '';
+        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+        const itemType = (serpItem?.type as string) ?? 'organic';
+        if (keyword && itemType !== 'organic') {
+          if (!serpFeaturesMap.has(keyword)) serpFeaturesMap.set(keyword, new Set());
+          serpFeaturesMap.get(keyword)!.add(itemType);
+        }
+      }
+
+      // Deduplicate: keep only the organic entry per keyword (with SERP features attached)
+      const seen = new Set<string>();
+      const results: DomainKeyword[] = [];
+      for (const item of items) {
         const kwData = item.keyword_data as Record<string, unknown> | undefined;
         const kwInfo = kwData?.keyword_info as Record<string, unknown> | undefined;
-        const serpItem = (item.ranked_serp_element as Record<string, unknown>)?.serp_item as Record<string, unknown> | undefined;
-        const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
+        const serpElement = item.ranked_serp_element as Record<string, unknown> | undefined;
+        const serpItem = serpElement?.serp_item as Record<string, unknown> | undefined;
+        const itemType = (serpItem?.type as string) ?? 'organic';
+        const keyword = (kwData?.keyword as string) ?? '';
 
-        return {
-          keyword: (kwData?.keyword as string) ?? '',
+        // Only include organic results (skip duplicate featured_snippet/local_pack entries)
+        if (itemType !== 'organic') continue;
+        if (seen.has(keyword)) continue;
+        seen.add(keyword);
+
+        const monthlies = kwInfo?.monthly_searches as Array<{ search_volume: number }> | undefined;
+        const features = serpFeaturesMap.get(keyword);
+
+        results.push({
+          keyword,
           position: (serpItem?.rank_group as number) ?? 0,
           volume: (kwInfo?.search_volume as number) ?? 0,
           difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
@@ -404,9 +431,9 @@ export class DataForSeoProvider implements SeoDataProvider {
           traffic: (serpItem?.etv as number) ?? 0,
           trafficPercent: 0,
           trend: monthlies ? monthlies.map(m => m.search_volume ?? 0) : undefined,
-          serpFeatures: undefined,
-        };
-      });
+          serpFeatures: features ? [...features].join(',') : undefined,
+        });
+      }
 
       logCreditUsage({ credits: cost, endpoint: 'ranked_keywords', query: target, rowsReturned: results.length, workspaceId, cached: false });
       writeCache(workspaceId, cacheKey, results);

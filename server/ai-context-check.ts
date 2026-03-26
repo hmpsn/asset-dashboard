@@ -9,7 +9,7 @@ import path from 'path';
 import { getWorkspace } from './workspaces.js';
 import { countPageKeywords } from './page-keywords.js';
 import { getUploadRoot } from './data-dir.js';
-import { isSemrushConfigured } from './semrush.js';
+import { isAnyProviderConfigured } from './seo-data-provider.js';
 
 export interface ContextSource {
   key: string;
@@ -147,14 +147,14 @@ export function checkAIContext(workspaceId: string): ContextCompleteness {
     fixAction: 'seo-strategy',
   });
 
-  // 8. SEMRush
-  const hasSemrush = isSemrushConfigured();
+  // 8. SEO Data Provider (SEMRush or DataForSEO)
+  const hasSeoProvider = isAnyProviderConfigured();
   sources.push({
     key: 'semrush',
-    label: 'SEMRush',
-    status: hasSemrush ? 'connected' : 'missing',
-    detail: hasSemrush
-      ? 'API key configured'
+    label: 'SEO Data Provider',
+    status: hasSeoProvider ? 'connected' : 'missing',
+    detail: hasSeoProvider
+      ? 'SEO data provider configured'
       : 'Not configured — briefs use estimated metrics instead of real data',
     impacts: ['strategy', 'briefs'],
     fixAction: 'settings',

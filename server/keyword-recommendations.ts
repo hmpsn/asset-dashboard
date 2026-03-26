@@ -5,7 +5,8 @@
  *
  * Used by content matrices to recommend the best target keyword for each cell.
  */
-import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from './semrush.js';
+import { getConfiguredProvider } from './seo-data-provider.js';
+import { getWorkspace } from './workspaces.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
 import { createLogger } from './logger.js';
@@ -65,7 +66,9 @@ export async function getKeywordRecommendations(
 ): Promise<KeywordRecommendationResult> {
   const { useAI = false, maxCandidates = 15 } = options;
 
-  if (!isSemrushConfigured()) {
+  const ws = getWorkspace(workspaceId);
+  const provider = getConfiguredProvider(ws?.seoDataProvider);
+  if (!provider) {
     return {
       seedKeyword,
       candidates: [{
@@ -77,14 +80,14 @@ export async function getKeywordRecommendations(
         isRecommended: true,
       }],
       recommended: seedKeyword,
-      message: 'SEMRush not configured — seed keyword used as-is',
+      message: 'No SEO data provider configured — seed keyword used as-is',
     };
   }
 
   // Fetch seed metrics + related keywords in parallel
   const [seedMetrics, related] = await Promise.all([
-    getKeywordOverview([seedKeyword], workspaceId).catch(() => []),
-    getRelatedKeywords(seedKeyword, workspaceId, maxCandidates).catch(() => []),
+    provider.getKeywordMetrics([seedKeyword], workspaceId).catch(() => []),
+    provider.getRelatedKeywords(seedKeyword, workspaceId, maxCandidates).catch(() => []),
   ]);
 
   const seed = seedMetrics[0];

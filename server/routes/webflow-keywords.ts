@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
-import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
@@ -25,17 +25,19 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
   const { fullContext } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
   const kwMapContext = buildKeywordMapContext(workspaceId);
 
-  // Fetch real SEMRush data for accuracy
+  // Fetch real keyword data for accuracy
   let semrushBlock = '';
-  if (isSemrushConfigured() && workspaceId) {
+  const kwWs = workspaceId ? getWorkspace(workspaceId) : null;
+  const kwProvider = getConfiguredProvider(kwWs?.seoDataProvider);
+  if (kwProvider && workspaceId) {
     try {
       const seedKeyword = seoTitle || pageTitle;
       const words = seedKeyword.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
       if (words.length > 0) {
         const phrase = words.slice(0, 5).join(' ');
         const [metrics, related] = await Promise.all([
-          getKeywordOverview([phrase], workspaceId).catch(() => []),
-          getRelatedKeywords(phrase, workspaceId, 10).catch(() => []),
+          kwProvider.getKeywordMetrics([phrase], workspaceId).catch(() => []),
+          kwProvider.getRelatedKeywords(phrase, workspaceId, 10).catch(() => []),
         ]);
         if (metrics.length > 0) {
           const m = metrics[0];
