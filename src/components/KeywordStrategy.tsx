@@ -458,19 +458,11 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           )}
 
           {/* ── Summary Dashboard ── */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard label="Pages Mapped" value={strategy.pageMap.length} />
             <StatCard label="Impressions" value={totalImpressions.toLocaleString()} icon={Eye} sub="last 90 days" />
             <StatCard label="Clicks" value={totalClicks.toLocaleString()} icon={MousePointerClick} sub={totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : undefined} />
             <StatCard label="Avg Position" value={ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'} icon={Trophy} valueColor={positionColor(avgPos)} sub={`${ranked.length} pages ranking`} />
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-              <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1.5">Ranking Tiers</div>
-              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                {top3.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">{top3.length} top 3</span>}
-                {top10.length > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-medium">{top10.length} top 10</span>}
-                {notRankingCount > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-500 font-medium">{notRankingCount} unranked</span>}
-              </div>
-            </div>
           </div>
 
           {/* ── Performance Tiers Bar ── */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
@@ -42,12 +43,17 @@ type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review' | 'content-decay
 
 function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
-  const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>('audit');
+  const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>(() => {
+    const sub = searchParams.get('sub');
+    const valid: AuditSubTab[] = ['audit', 'links', 'history', 'aeo-review', 'content-decay'];
+    return valid.includes(sub as AuditSubTab) ? (sub as AuditSubTab) : 'audit';
+  });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
@@ -503,9 +509,25 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         { id: 'audit' as const, label: 'Site Audit', icon: Globe },
         { id: 'links' as const, label: 'Dead Links', icon: ExternalLink },
         { id: 'history' as const, label: 'History', icon: Clock },
-        { id: 'aeo-review' as const, label: 'AEO Review', icon: Sparkles },
-        { id: 'content-decay' as const, label: 'Content Decay', icon: TrendingDown },
-      ]).map(t => (
+      ] as const).map(t => (
+        <button
+          key={t.id}
+          onClick={() => setAuditSubTab(t.id)}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+            auditSubTab === t.id
+              ? 'border-teal-500 text-teal-300'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <t.icon className="w-3.5 h-3.5" />
+          {t.label}
+        </button>
+      ))}
+      <div className="w-px h-4 bg-zinc-700 mx-1 self-center" />
+      {([
+        { id: 'content-decay' as const, label: 'Content Health', icon: TrendingDown },
+        { id: 'aeo-review' as const, label: 'AI Search Ready', icon: Sparkles },
+      ] as const).map(t => (
         <button
           key={t.id}
           onClick={() => setAuditSubTab(t.id)}
@@ -631,7 +653,18 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Site Score</span>
           </div>
-          <div className={`text-3xl font-bold ${scoreColorClass(effectiveData!.siteScore)}`}>{effectiveData!.siteScore}</div>
+          <div className="flex items-end gap-2">
+            <div className={`text-3xl font-bold ${scoreColorClass(effectiveData!.siteScore)}`}>{effectiveData!.siteScore}</div>
+            {history.length >= 2 && (() => {
+              const delta = history[0].siteScore - history[1].siteScore;
+              if (delta === 0) return null;
+              return (
+                <span className={`text-[11px] font-medium mb-1 ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {delta > 0 ? '↑' : '↓'} {Math.abs(delta)} from last audit
+                </span>
+              );
+            })()}
+          </div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
           </div>
