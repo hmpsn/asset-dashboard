@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, post, patch } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWebflowAssets, useAssetAudit } from '../hooks/admin';
+import { useWebflowAssets, useAssetAudit, useCmsImages } from '../hooks/admin';
+import type { CmsImageUsage } from '../../shared/types/cms-images';
 import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen, Search,
@@ -44,6 +45,15 @@ function AssetBrowser({ siteId }: Props) {
   const bulkCompressJobId = useRef<string | null>(null);
   const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId);
   const { data: unusedIds = null } = useAssetAudit(siteId, assets.length > 0);
+  const { data: cmsImageData } = useCmsImages(siteId, assets.length > 0);
+
+  // Build a quick-lookup map: assetId → CmsImageUsage[]
+  const cmsUsageMap = new Map<string, CmsImageUsage[]>();
+  if (cmsImageData) {
+    for (const a of cmsImageData.assets) {
+      cmsUsageMap.set(a.assetId, a.usages);
+    }
+  }
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
     queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
@@ -240,11 +250,12 @@ function AssetBrowser({ siteId }: Props) {
     if (!url) return;
     setCompressing(prev => new Set(prev).add(asset.id));
     try {
-      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number }>(`/api/webflow/compress/${asset.id}`, {
+      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number; cmsUpdates?: { succeeded: number; failed: number } }>(`/api/webflow/compress/${asset.id}`, {
         imageUrl: url,
         siteId,
         altText: asset.altText,
         fileName: asset.displayName || asset.originalFileName,
+        cmsUsages: cmsUsageMap.get(asset.id),
       });
       if (data.success) {
         // Replace the asset in our list
@@ -255,7 +266,8 @@ function AssetBrowser({ siteId }: Props) {
           hostedUrl: data.newHostedUrl,
           displayName: data.newFileName,
         } : a));
-        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings)})`);
+        const cmsNote = data.cmsUpdates?.succeeded ? ` · ${data.cmsUpdates.succeeded} CMS ref${data.cmsUpdates.succeeded !== 1 ? 's' : ''} updated` : '';
+        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings)})${cmsNote}`);
         setTimeout(() => setCompressResult(null), 4000);
       } else if (data.skipped) {
         setCompressResult(data.reason || 'Already optimized');
@@ -340,6 +352,7 @@ function AssetBrowser({ siteId }: Props) {
         imageUrl: a.hostedUrl || a.url,
         altText: a.altText,
         fileName: a.displayName || a.originalFileName,
+        cmsUsages: cmsUsageMap.get(a.id),
       })),
     });
     if (jobId) {
