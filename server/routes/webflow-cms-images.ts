@@ -11,6 +11,15 @@ import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '
 const router = Router();
 const log = createLogger('webflow-cms-images');
 
+function displayNameFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    return pathname.split('/').pop()?.split('?')[0] || url;
+  } catch {
+    return url.split('/').pop()?.split('?')[0] || url;
+  }
+}
+
 const OVERSIZED_THRESHOLD = 500 * 1024; // 500 KB
 
 // Fetch Webflow asset metadata (alt text, size, content type, hosted URL) using the site token
@@ -112,9 +121,11 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
           const val = fd[field.slug];
           if (!val) continue;
 
-          const addUsage = (assetId: string) => {
+          type AssetMeta = { hostedUrl: string; altText: string; size: number; contentType: string; displayName: string; isRichTextOnly?: boolean };
+
+          const addUsage = (assetId: string, meta: AssetMeta) => {
             if (!assetUsageMap.has(assetId)) {
-              assetUsageMap.set(assetId, { assetId, usages: [] });
+              assetUsageMap.set(assetId, { assetId, ...meta, usages: [] });
             }
             assetUsageMap.get(assetId)!.usages.push({
               collectionId: coll.id,
@@ -129,41 +140,76 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
 
           if (field.type === 'Image') {
             // Image field: { fileId, url } or string URL
+            let assetId: string | undefined;
             if (typeof val === 'object' && val !== null) {
               const obj = val as Record<string, unknown>;
-              if (typeof obj.fileId === 'string') addUsage(obj.fileId);
+              if (typeof obj.fileId === 'string') assetId = obj.fileId;
             } else if (typeof val === 'string' && val.includes('/')) {
-              // Bare URL — extract asset ID from Webflow CDN path if possible
               const match = val.match(/\/([a-f0-9]{24})\//i);
-              if (match) addUsage(match[1]);
+              if (match) assetId = match[1];
+            }
+            if (assetId) {
+              const m = assetMetaMap.get(assetId);
+              addUsage(assetId, {
+                hostedUrl: m?.hostedUrl ?? '',
+                altText: m?.altText ?? '',
+                size: m?.size ?? 0,
+                contentType: m?.contentType ?? 'image/unknown',
+                displayName: displayNameFromUrl(m?.hostedUrl ?? ''),
+                isRichTextOnly: false,
+              });
             }
           } else if (field.type === 'MultiImage') {
             // MultiImage field: array of { fileId, url }
             if (Array.isArray(val)) {
               for (const img of val) {
                 const imgObj = img as Record<string, unknown>;
-                if (typeof imgObj.fileId === 'string') addUsage(imgObj.fileId);
+                if (typeof imgObj.fileId === 'string') {
+                  const assetId = imgObj.fileId;
+                  const m = assetMetaMap.get(assetId);
+                  addUsage(assetId, {
+                    hostedUrl: m?.hostedUrl ?? '',
+                    altText: m?.altText ?? '',
+                    size: m?.size ?? 0,
+                    contentType: m?.contentType ?? 'image/unknown',
+                    displayName: displayNameFromUrl(m?.hostedUrl ?? ''),
+                    isRichTextOnly: false,
+                  });
+                }
               }
             }
           } else if (field.type === 'RichText') {
             // RichText field: HTML string — extract all <img src="..."> URLs
             // Deduplicate: same asset may appear multiple times in one field
             if (typeof val === 'string') {
-              const imgSrcRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+              const imgTagRegex = /<img([^>]+)>/gi;
               const seenAssetIds = new Set<string>();
-              let match: RegExpExecArray | null;
-              while ((match = imgSrcRegex.exec(val)) !== null) {
-                const src = match[1];
+              let tagMatch: RegExpExecArray | null;
+              while ((tagMatch = imgTagRegex.exec(val)) !== null) {
+                const attrs = tagMatch[1];
+                const srcMatch = /src=["']([^"']+)["']/i.exec(attrs);
+                const altMatch = /alt=["']([^"']*)["']/i.exec(attrs);
+                if (!srcMatch) continue;
+                const src = srcMatch[1];
+                const imgAlt = altMatch ? altMatch[1] : '';
                 // Look up by exact URL first, then try extracting ID from CDN path
                 let resolvedId = assetUrlMap.get(src);
                 if (!resolvedId) {
                   const idMatch = src.match(/\/([a-f0-9]{24})\//i);
-                  if (idMatch && assetMetaMap.has(idMatch[1])) resolvedId = idMatch[1];
+                  if (idMatch) resolvedId = idMatch[1];
                 }
-                if (resolvedId && !seenAssetIds.has(resolvedId)) {
-                  seenAssetIds.add(resolvedId);
-                  addUsage(resolvedId);
-                }
+                if (!resolvedId || seenAssetIds.has(resolvedId)) continue;
+                seenAssetIds.add(resolvedId);
+                const m = assetMetaMap.get(resolvedId);
+                const isRichTextOnly = !m;
+                addUsage(resolvedId, {
+                  hostedUrl: m?.hostedUrl ?? src,
+                  altText: m?.altText ?? imgAlt,
+                  size: m?.size ?? 0,
+                  contentType: m?.contentType ?? 'image/unknown',
+                  displayName: displayNameFromUrl(src),
+                  isRichTextOnly,
+                });
               }
             }
           }
@@ -176,11 +222,8 @@ router.get('/api/webflow/cms-images/:siteId', async (req, res) => {
     let missingAlt = 0;
     let oversized = 0;
     for (const asset of assets) {
-      const meta = assetMetaMap.get(asset.assetId);
-      if (meta) {
-        if (!meta.altText || meta.altText.trim() === '') missingAlt++;
-        if ((meta.size ?? 0) > OVERSIZED_THRESHOLD) oversized++;
-      }
+      if (!asset.altText || asset.altText.trim() === '') missingAlt++;
+      if (asset.size > OVERSIZED_THRESHOLD) oversized++;
     }
 
     const result: CmsImageScanResult = {

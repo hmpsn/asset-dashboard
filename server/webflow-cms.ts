@@ -12,6 +12,13 @@ export async function listCollections(siteId: string, tokenOverride?: string): P
   return data.collections || [];
 }
 
+// --- Get single CMS item by ID ---
+export async function getCollectionItem(collectionId: string, itemId: string, tokenOverride?: string): Promise<Record<string, unknown> | null> {
+  const res = await webflowFetch(`/collections/${collectionId}/items/${itemId}`, {}, tokenOverride);
+  if (!res.ok) return null;
+  return await res.json() as Record<string, unknown>;
+}
+
 // --- List CMS collection items ---
 export async function listCollectionItems(collectionId: string, limit = 100, offset = 0, tokenOverride?: string): Promise<{ items: Array<Record<string, unknown>>; total: number }> {
   const res = await webflowFetch(`/collections/${collectionId}/items?limit=${limit}&offset=${offset}`, {}, tokenOverride);

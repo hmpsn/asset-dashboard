@@ -148,16 +148,32 @@ export function getConfiguredProvider(preferred?: ProviderName): SeoDataProvider
 // ── Per-provider capability flags ──
 // Providers can mark specific capabilities as unavailable (e.g. DataForSEO
 // without a backlinks subscription). The registry uses this for fallback.
-const disabledCapabilities = new Map<ProviderName, Set<string>>();
+// Each entry stores an expiry timestamp (0 = permanent / no TTL).
+const disabledCapabilities = new Map<ProviderName, Map<string, number>>();
 
-export function markCapabilityDisabled(providerName: ProviderName, capability: string): void {
-  if (!disabledCapabilities.has(providerName)) disabledCapabilities.set(providerName, new Set());
-  disabledCapabilities.get(providerName)!.add(capability);
-  log.warn(`${providerName}: "${capability}" capability disabled — will fall back to alternate provider`);
+export function markCapabilityDisabled(providerName: ProviderName, capability: string, ttlMs = 0): void {
+  if (!disabledCapabilities.has(providerName)) disabledCapabilities.set(providerName, new Map());
+  const expiresAt = ttlMs > 0 ? Date.now() + ttlMs : 0;
+  disabledCapabilities.get(providerName)!.set(capability, expiresAt);
+  log.warn(`${providerName}: "${capability}" capability disabled${ttlMs > 0 ? ` for ${ttlMs / 1000 / 3600}h` : ''} — will fall back to alternate provider`);
 }
 
 export function isCapabilityDisabled(providerName: ProviderName, capability: string): boolean {
-  return disabledCapabilities.get(providerName)?.has(capability) ?? false;
+  const caps = disabledCapabilities.get(providerName);
+  if (!caps) return false;
+  const expiresAt = caps.get(capability);
+  if (expiresAt === undefined) return false;
+  // TTL-based entry: auto-clear when expired
+  if (expiresAt > 0 && Date.now() >= expiresAt) {
+    caps.delete(capability);
+    log.info(`${providerName}: "${capability}" TTL expired — re-enabling`);
+    return false;
+  }
+  return true;
+}
+
+export function clearCapabilityDisabled(providerName: ProviderName, capability: string): void {
+  disabledCapabilities.get(providerName)?.delete(capability);
 }
 
 /**

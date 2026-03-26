@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { get, post, patch } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebflowAssets, useAssetAudit, useCmsImages } from '../hooks/admin';
-import type { CmsImageUsage } from '../../shared/types/cms-images';
+import type { CmsImageUsage, CmsImageScanResult } from '../../shared/types/cms-images';
 import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
 import { EmptyState } from './ui';
+import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { OrganizePreview } from './assets/OrganizePreview';
 import { AssetFilters } from './assets/AssetFilters';
@@ -59,6 +60,28 @@ function AssetBrowser({ siteId }: Props) {
     return map;
   }, [cmsImageData]);
 
+  // CMS assets mapped to the Asset shape for rendering via AssetCard
+  const cmsAssetList = useMemo<Asset[]>(() =>
+    (cmsImageData?.assets ?? []).map(a => ({
+      id: a.assetId,
+      hostedUrl: a.hostedUrl || undefined,
+      altText: a.altText || undefined,
+      size: a.size,
+      contentType: a.contentType,
+      displayName: a.displayName,
+      originalFileName: a.displayName,
+    })),
+  [cmsImageData]);
+
+  // Set of asset IDs that are RichText-only (no backing Webflow asset — compress unavailable)
+  const richTextOnlyIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of cmsImageData?.assets ?? []) {
+      if (a.isRichTextOnly) set.add(a.assetId);
+    }
+    return set;
+  }, [cmsImageData]);
+
   // CMS field selector state — which fields are included in filter + bulk ops
   const [selectedCmsFields, setSelectedCmsFields] = useState<Set<string>>(new Set());
 
@@ -75,6 +98,20 @@ function AssetBrowser({ siteId }: Props) {
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
     queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
+  const updateCmsAssets = (assetId: string, patch: Partial<{ altText: string }>) =>
+    queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId), old => {
+      if (!old) return old;
+      return {
+        ...old,
+        assets: old.assets.map(a => a.assetId === assetId ? { ...a, ...patch } : a),
+        stats: {
+          ...old.stats,
+          missingAlt: old.assets.filter(a =>
+            (a.assetId === assetId ? !(patch.altText ?? a.altText)?.trim() : !(a.altText?.trim()))
+          ).length,
+        },
+      };
+    });
   const refreshAssets = () => queryClient.invalidateQueries({ queryKey: ['admin-webflow-assets', siteId] });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -106,12 +143,23 @@ function AssetBrowser({ siteId }: Props) {
   const [organizeResult, setOrganizeResult] = useState<{ moved: number; failed: number; total: number } | null>(null);
 
 
-  const filtered = assets
+  const isCmsFilter = filter === 'cms-images' || filter === 'cms-missing-alt';
+  const sourceList = isCmsFilter ? cmsAssetList : assets;
+
+  const filtered = sourceList
     .filter(a => {
       if (search) {
         const q = search.toLowerCase();
         const name = a.displayName || a.originalFileName || '';
         if (!name.toLowerCase().includes(q) && !(a.altText || '').toLowerCase().includes(q)) return false;
+      }
+      if (isCmsFilter) {
+        // Narrow by selected CMS fields
+        const usages = cmsUsageMap.get(a.id);
+        const inSelectedField = usages?.some(u => selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`)) ?? false;
+        if (!inSelectedField) return false;
+        if (filter === 'cms-missing-alt') return !a.altText || a.altText.trim() === '';
+        return true;
       }
       if (filter === 'missing-alt') return !a.altText || a.altText.trim() === '';
       if (filter === 'oversized') return a.size > 500 * 1024;
@@ -119,15 +167,6 @@ function AssetBrowser({ siteId }: Props) {
       if (filter === 'svg') return a.contentType?.includes('svg');
       if (filter === 'unused') return unusedIds ? unusedIds.has(a.id) : false;
       if (filter === 'used') return unusedIds ? !unusedIds.has(a.id) : true;
-      if (filter === 'cms-images' || filter === 'cms-missing-alt') {
-        const usages = cmsUsageMap.get(a.id);
-        if (!usages?.length) return false;
-        // Check if asset is used in any selected field
-        const inSelectedField = usages.some(u => selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`));
-        if (!inSelectedField) return false;
-        if (filter === 'cms-missing-alt') return !a.altText || a.altText.trim() === '';
-        return true;
-      }
       return true;
     })
     .sort((a, b) => {
@@ -161,6 +200,7 @@ function AssetBrowser({ siteId }: Props) {
         return;
       }
       updateAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
+      updateCmsAssets(assetId, { altText: altDraft });
       setEditingAlt(null);
     } catch (err) {
       console.error('AssetBrowser operation failed:', err);
@@ -180,6 +220,7 @@ function AssetBrowser({ siteId }: Props) {
         setAltError(`Alt text generation failed: ${data.error}`);
       } else if (data.altText) {
         updateAssets(prev => prev.map(a => a.id === asset.id ? { ...a, altText: data.altText } : a));
+        updateCmsAssets(asset.id, { altText: data.altText });
         if (data.writeError) {
           setAltError(`Alt text generated but failed to save to Webflow: ${data.writeError}`);
         } else {
@@ -250,6 +291,7 @@ function AssetBrowser({ siteId }: Props) {
                 updateAssets(prev => prev.map(a =>
                   a.id === event.assetId ? { ...a, altText: event.altText } : a
                 ));
+                updateCmsAssets(event.assetId, { altText: event.altText });
                 if (event.updated) successCount++;
                 else failCount++;
               } else {
@@ -678,6 +720,7 @@ function AssetBrowser({ siteId }: Props) {
             renamingId={renamingId === asset.id} renameDraft={renameDraft}
             renameLoading={renameLoading.has(asset.id)} unusedFlag={!!unusedIds?.has(asset.id)}
             cmsUsages={cmsUsageMap.get(asset.id)}
+            compressDisabled={isCmsFilter && richTextOnlyIds.has(asset.id)}
             onToggleSelect={toggleSelect}
             onEditAlt={(id, currentAlt) => { setEditingAlt(id); setAltDraft(currentAlt); }}
             onCancelEditAlt={() => setEditingAlt(null)}

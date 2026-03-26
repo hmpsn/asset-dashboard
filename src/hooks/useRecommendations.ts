@@ -36,7 +36,7 @@ export function useRecommendations(workspaceId?: string) {
   const { data: recs = [], isSuccess: loaded } = useQuery({
     queryKey: queryKeys.shared.recommendations(workspaceId!),
     queryFn: async () => {
-      const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}?status=pending`);
+      const data = await getOptional<{ recommendations?: Recommendation[] }>(`/api/public/recommendations/${workspaceId}`);
       return data && Array.isArray(data.recommendations) ? data.recommendations : [];
     },
     enabled: !!workspaceId,

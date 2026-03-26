@@ -14,7 +14,7 @@ import {
   getPageDom,
   uploadAsset,
 } from '../webflow.js';
-import { updateCollectionItem, listCollectionItems, publishCollectionItems } from '../webflow-cms.js';
+import { updateCollectionItem, getCollectionItem, publishCollectionItems } from '../webflow-cms.js';
 import type { CmsImageUsage } from '../../shared/types/cms-images.ts';
 import {
   listWorkspaces,
@@ -259,16 +259,7 @@ async function repairCmsReferences(
     const richTextFields = fields.filter(f => f.fieldType === 'RichText');
     if (multiImageFields.length > 0 || richTextFields.length > 0) {
       try {
-        // Paginate all items to find the one we need (Webflow CMS API has no single-item GET)
-        const all: Array<Record<string, unknown>> = [];
-        let offset = 0;
-        while (true) {
-          const { items: batch, total } = await listCollectionItems(collectionId, 100, offset, token);
-          all.push(...batch);
-          if (all.length >= total) break;
-          offset += 100;
-        }
-        currentItem = all.find(i => (i.id || (i as Record<string, unknown>)._id) === itemId) || null;
+        currentItem = await getCollectionItem(collectionId, itemId, token);
       } catch { /* proceed without current item data */ }
     }
 
@@ -438,13 +429,16 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       );
     }
 
-    // Only delete old asset if there are no failed CMS reference repairs.
-    // When repairs fail, the old asset must remain so CMS items aren't broken.
+    // Only delete old asset if CMS repairs either weren't needed or all succeeded.
+    // When repairs fail OR were needed but skipped (e.g. missing hostedUrl),
+    // the old asset must remain so CMS items aren't broken.
+    const cmsRepairsNeeded = !!(cmsUsages?.length);
+    const cmsRepairsSkipped = cmsRepairsNeeded && !cmsUpdates;
     const hasFailedCmsRepairs = cmsUpdates && cmsUpdates.failed > 0;
-    if (!hasFailedCmsRepairs) {
+    if (!hasFailedCmsRepairs && !cmsRepairsSkipped) {
       await deleteAsset(req.params.assetId, compressToken);
     } else {
-      log.warn({ assetId: req.params.assetId, failed: cmsUpdates.failed }, 'Skipping old asset deletion — CMS reference repairs had failures');
+      log.warn({ assetId: req.params.assetId, failed: cmsUpdates?.failed, skipped: cmsRepairsSkipped }, 'Skipping old asset deletion — CMS reference repairs had failures or were skipped');
     }
 
     res.json({
@@ -456,7 +450,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       savings,
       savingsPercent,
       newFileName,
-      oldAssetPreserved: !!hasFailedCmsRepairs,
+      oldAssetPreserved: !!(hasFailedCmsRepairs || cmsRepairsSkipped),
       ...(cmsUpdates ? { cmsUpdates } : {}),
     });
   } catch (e) {

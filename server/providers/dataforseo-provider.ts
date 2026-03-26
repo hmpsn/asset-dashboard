@@ -104,16 +104,14 @@ function areCreditsExhausted(): boolean {
 
 // ── Backlinks subscription detection ──
 // DataForSEO backlinks is a separate paid subscription (error 40204).
-// Once detected, we mark the capability disabled on the registry so
-// the resolver can fall back to SEMRush for backlink calls.
+// Once detected, we mark the capability disabled on the registry (with a 24h TTL)
+// so the resolver can fall back to SEMRush for backlink calls.
+// The registry itself handles TTL expiry and auto-re-enables the capability.
 
-let backlinkSubscriptionDisabled = false;
+const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function markBacklinksDisabled(): void {
-  if (!backlinkSubscriptionDisabled) {
-    backlinkSubscriptionDisabled = true;
-    markCapabilityDisabled('dataforseo', 'backlinks');
-  }
+  markCapabilityDisabled('dataforseo', 'backlinks', BACKLINK_COOLDOWN_MS);
 }
 
 function isSubscriptionError(err: unknown): boolean {
@@ -625,8 +623,6 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     if (areCreditsExhausted()) return null;
 
-    if (backlinkSubscriptionDisabled) return null;
-
     try {
       const json = await apiCall('backlinks/summary/live', [{
         target,
@@ -681,7 +677,6 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
 
     if (areCreditsExhausted()) return [];
-    if (backlinkSubscriptionDisabled) return [];
 
     try {
       const json = await apiCall('backlinks/referring_domains/live', [{
