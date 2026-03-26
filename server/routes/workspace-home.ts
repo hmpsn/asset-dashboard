@@ -71,9 +71,9 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     safe(Promise.resolve(listTemplates(req.params.id)), []),
   ]);
 
-  // Content decay — synchronous SQLite read, no need to add to Promise.all
-  const decayAnalysis = loadDecayAnalysis(req.params.id);
-  const contentDecay = decayAnalysis?.summary ?? null;
+  // Content decay — synchronous SQLite read, wrapped for safety
+  let contentDecay = null;
+  try { contentDecay = loadDecayAnalysis(req.params.id)?.summary ?? null; } catch (err) { log.warn({ err }, 'workspace-home partial fetch failed'); }
 
   // Weekly accomplishments — aggregate activity from last 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
