@@ -14,6 +14,7 @@ import {
   deleteBrief,
   generateBrief,
   regenerateBrief,
+  regenerateOutline,
 } from '../content-brief.js';
 import { createContentRequest, updateContentRequest } from '../content-requests.js';
 import { notifyClientBriefReady } from '../email.js';
@@ -161,6 +162,19 @@ router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorks
     res.json(newBrief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate brief' });
+  }
+});
+
+// Regenerate outline only (preserves all other brief fields)
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  try {
+    const { feedback } = req.body || {};
+    const result = await regenerateOutline(req.params.workspaceId, req.params.briefId, feedback);
+    if (!result) return res.status(404).json({ error: 'Brief not found' });
+    log.info(`REGENERATED OUTLINE for brief ${req.params.briefId} in workspace ${req.params.workspaceId}`);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate outline' });
   }
 });
 

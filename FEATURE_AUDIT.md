@@ -1973,13 +1973,39 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 175. Title/Meta A/B Variants
+**What it does:** Content brief generation now produces 3 title variants and 3 meta description variants alongside the primary suggestions. Stored in `title_variants` and `meta_desc_variants` TEXT (JSON) columns on `content_briefs`. The AI prompt requests variants optimized for different angles: CTR, keyword density, and emotional appeal. **Variant picker UI** in BriefDetail shows alternatives below the primary title/meta with "click to use" action — clicking swaps the selected variant into the primary field and demotes the old primary into the variants array, preserving all options. Regenerated briefs also produce variants.
+**Files:** `server/db/migrations/027-brief-variants.sql`, `server/content-brief.ts` (prompt, rowToBrief, briefToParams, INSERT/UPDATE), `shared/types/content.ts` (ContentBrief), `src/components/briefs/BriefDetail.tsx` (variant picker), `src/components/briefs/BriefList.tsx` (prop passthrough), `src/components/ContentBriefs.tsx` (interface)
+
+**Agency value:** No more manually brainstorming title alternatives — AI generates 3 angles per brief. Quick A/B testing of different messaging approaches without regenerating the entire brief.
+
+---
+
+### 176. Outline-Only Regeneration
+**What it does:** Regenerates just the content outline of an existing brief while preserving all other fields (title, meta, keywords, audience, etc.). `regenerateOutline()` in `server/content-brief.ts` loads the existing brief, sends the current outline + optional user feedback to GPT-4.1, and returns a new outline with heading/notes/wordCount/keywords per section. Atomic update via `updateBrief()`. Endpoint: `POST /api/content-briefs/:wid/:bid/regenerate-outline`. **UI**: teal "Regenerate Outline" button next to the Content Outline header in BriefDetail, with optional feedback textarea for guiding the regeneration (e.g., "Add a comparison section" or "Make it more technical").
+**Files:** `server/content-brief.ts` (`regenerateOutline`), `server/routes/content-briefs.ts` (endpoint), `src/api/content.ts` (`regenerateOutline`), `src/components/briefs/BriefDetail.tsx` (button + feedback form), `src/components/briefs/BriefList.tsx` (prop passthrough), `src/components/ContentBriefs.tsx` (handler + state)
+
+**Agency value:** Iterate on brief structure without losing the strategic research (keywords, audience, competitive analysis). Common scenario: brief is good but the outline needs reworking for a different angle.
+
+---
+
+### 177. Brand Voice Scoring
+**What it does:** After a content post is generated, a "Score Voice" button in ContentManager triggers GPT-4.1 evaluation of the post against the workspace's brand voice context. Evaluates 4 dimensions: voice consistency, keyword integration, audience alignment, and tone consistency — each scored 0-100, averaged into a composite `voiceScore`. Detailed `voiceFeedback` text explains strengths and areas for improvement. Stored in `voice_score INTEGER` and `voice_feedback TEXT` on `content_posts`. **UI**: blue "Score Voice" button in post list (data color per Three Laws), inline MetricRing (20px) showing score next to post metadata, expandable feedback panel with 36px MetricRing and full feedback text. Re-score button available after initial scoring.
+**Files:** `server/db/migrations/028-post-voice-score.sql`, `server/content-posts-ai.ts` (`scoreVoiceMatch`), `server/content-posts-db.ts` (row mapping), `server/routes/content-posts.ts` (endpoint), `shared/types/content.ts` (GeneratedPost), `src/api/content.ts` (`scoreVoice`), `src/components/ContentManager.tsx` (scoring UI + MetricRing display + feedback panel)
+
+**Agency value:** Objective measurement of how well AI-generated content matches the client's brand voice. Identifies specific areas where the content diverges from the intended tone, enabling targeted editing rather than full rewrites.
+
+**Client value:** Confidence that content maintains their brand identity. The score provides transparency into content quality beyond just keyword optimization.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 22 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner + schema coverage/priority/impact tracking |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 34 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline |
+| Content & Strategy | 37 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline + title/meta variants + outline-only regen + voice scoring |
 | Client Communication | 11 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email + content plan review alerts |
 | Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1991,9 +2017,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 7 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**176 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**179 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **176**. Last updated: March 2026 (platform unification Phase 4 shipped — centralized query keys, STALE_TIMES, shared GA4 base hook, WS→cache invalidation registry).
+Current feature count: **179**. Last updated: March 2026 (content generator level-up — title/meta A/B variants, outline-only regeneration, brand voice scoring).
 
 ### Recent Additions (March 2026)
 

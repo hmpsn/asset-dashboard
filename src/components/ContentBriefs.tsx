@@ -41,6 +41,8 @@ interface ContentBrief {
   referenceUrls?: string[];
   realPeopleAlsoAsk?: string[];
   realTopResults?: { position: number; title: string; url: string }[];
+  titleVariants?: string[];
+  metaDescVariants?: string[];
 }
 
 interface ContentTopicRequest {
@@ -112,6 +114,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [generatingPostFor, setGeneratingPostFor] = useState<string | null>(null);
   const [regeneratingBrief, setRegeneratingBrief] = useState<string | null>(null);
+  const [regeneratingOutline, setRegeneratingOutline] = useState<string | null>(null);
   const [sendingToClient, setSendingToClient] = useState<string | null>(null);
   const [deliveringReqId, setDeliveringReqId] = useState<string | null>(null);
   const [deliveryUrl, setDeliveryUrl] = useState('');
@@ -119,6 +122,15 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [pageType, setPageType] = useState('');
   const [refUrls, setRefUrls] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const handleRegenerateOutline = async (briefId: string, feedback?: string) => {
+    setRegeneratingOutline(briefId);
+    try {
+      const updated = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback });
+      queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => (old ?? []).map(b => b.id === briefId ? updated : b));
+    } catch (err) { console.error('ContentBriefs operation failed:', err); }
+    setRegeneratingOutline(null);
+  };
 
   const handleRegenerateBrief = async (briefId: string, feedback: string) => {
     setRegeneratingBrief(briefId);
@@ -512,6 +524,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         onExportClientHTML={exportClientHTML}
         onSendToClient={handleSendToClient}
         onConfirmDeleteBrief={confirmDeleteBrief}
+        onRegenerateOutline={handleRegenerateOutline}
+        regeneratingOutline={regeneratingOutline}
       />
     </div>
   );

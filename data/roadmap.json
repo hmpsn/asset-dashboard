@@ -2647,18 +2647,18 @@
       "items": [
         {
           "title": "Phase 3A: Title/Meta A/B variants in content briefs (3 options each)",
-          "status": "pending",
-          "notes": "Modify content-brief.ts AI prompt to generate 3 title + 3 meta variants. Add title_variants/meta_desc_variants to DB. Variant picker cards in ContentBriefs.tsx. Recommended model: Opus."
+          "status": "done",
+          "notes": "Shipped — AI prompt generates 3 title + 3 meta variants. DB migration 027-brief-variants.sql. Variant picker in BriefDetail with swap-to-primary UX. Feature #175."
         },
         {
           "title": "Phase 3B: Outline-only regeneration with optional feedback",
-          "status": "pending",
-          "notes": "New regenerateOutline() function + POST endpoint. ContentBriefs.tsx teal Regenerate Outline button with feedback textarea. Recommended model: Opus."
+          "status": "done",
+          "notes": "Shipped — regenerateOutline() + POST endpoint. Teal button in BriefDetail with optional feedback textarea. Preserves all other brief fields. Feature #176."
         },
         {
           "title": "Phase 3C: Brand voice scoring on generated content posts",
-          "status": "pending",
-          "notes": "Post-generation GPT scoring pass returns 0-100 score + callouts. voice_score/voice_feedback in posts table. MetricRing display in ContentPipeline. Recommended model: Opus."
+          "status": "done",
+          "notes": "Shipped — scoreVoiceMatch() evaluates 4 dimensions via GPT-4.1. DB migration 028-post-voice-score.sql. MetricRing + Score Voice button in ContentManager. Expandable feedback panel. Feature #177."
         },
         {
           "title": "Phase 4A: Client keyword submission to strategy",

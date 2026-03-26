@@ -25,6 +25,9 @@ export const contentBriefs = {
     post<{ results: { keyword: string; valid: boolean; source: string; metrics: { volume: number; difficulty: number; cpc: number; validatedAt: string } | null; warnings?: string[] }[]; message?: string }>(
       `/api/content-briefs/${wsId}/validate-keywords`, { keywords },
     ),
+
+  regenerateOutline: (wsId: string, briefId: string, feedback?: string) =>
+    post<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}/regenerate-outline`, { feedback }),
 };
 
 export const contentPosts = {
@@ -61,6 +64,9 @@ export const contentPosts = {
     post<{ review: Record<string, { pass: boolean; reason: string }> }>(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
     ),
+
+  scoreVoice: (wsId: string, postId: string) =>
+    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
 };
 
 export const contentRequests = {

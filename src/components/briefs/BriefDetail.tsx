@@ -35,6 +35,8 @@ interface ContentBrief {
   referenceUrls?: string[];
   realPeopleAlsoAsk?: string[];
   realTopResults?: { position: number; title: string; url: string }[];
+  titleVariants?: string[];
+  metaDescVariants?: string[];
 }
 
 interface BriefDetailProps {
@@ -47,6 +49,8 @@ interface BriefDetailProps {
   onSetEditingBrief: (id: string | null) => void;
   onGeneratePost: (briefId: string) => void;
   onRegenerate: (briefId: string, feedback: string) => void;
+  onRegenerateOutline?: (briefId: string, feedback?: string) => void;
+  regeneratingOutline?: string | null;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
   onSendToClient: (brief: ContentBrief) => void;
@@ -56,10 +60,13 @@ interface BriefDetailProps {
 export function BriefDetail({
   brief, editingBrief, generatingPostFor, regeneratingBrief, sendingToClient,
   onSaveBriefField, onSetEditingBrief, onGeneratePost, onRegenerate,
+  onRegenerateOutline, regeneratingOutline,
   onCopyAsMarkdown, onExportClientHTML, onSendToClient, onConfirmDelete,
 }: BriefDetailProps) {
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [regenFeedback, setRegenFeedback] = useState('');
+  const [showOutlineRegen, setShowOutlineRegen] = useState(false);
+  const [outlineRegenFeedback, setOutlineRegenFeedback] = useState('');
 
   return (
     <div className="px-4 pb-4 space-y-4 border-t border-zinc-800">
@@ -129,7 +136,7 @@ export function BriefDetail({
         </div>
       )}
 
-      {/* Title & Meta */}
+      {/* Title & Meta — with A/B variant picker */}
       <div className="space-y-2">
         <div>
           <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Suggested Title</div>
@@ -138,6 +145,24 @@ export function BriefDetail({
           ) : (
             <div className="text-xs text-teal-400 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedTitle}</div>
           )}
+          {brief.titleVariants && brief.titleVariants.length > 0 && (
+            <div className="mt-1.5 space-y-1">
+              <div className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Alternatives</div>
+              {brief.titleVariants.map((variant, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSaveBriefField(brief.id, {
+                    suggestedTitle: variant,
+                    titleVariants: [brief.suggestedTitle, ...brief.titleVariants!.filter((_, j) => j !== i)],
+                  })}
+                  className="w-full text-left text-xs text-zinc-400 hover:text-teal-400 bg-zinc-950/50 hover:bg-zinc-900 rounded-lg px-3 py-1.5 border border-zinc-800/50 hover:border-teal-500/30 transition-colors group"
+                >
+                  <span className="group-hover:text-teal-400">{variant}</span>
+                  <span className="text-[10px] text-zinc-600 ml-2 group-hover:text-teal-500">click to use</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-1">Meta Description</div>
@@ -145,6 +170,24 @@ export function BriefDetail({
             <textarea defaultValue={brief.suggestedMetaDesc} onBlur={e => { if (e.target.value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: e.target.value }); }} className="w-full text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-700 focus:border-teal-500/50 focus:outline-none resize-y" rows={2} />
           ) : (
             <div className="text-xs text-zinc-300 bg-zinc-950 rounded-lg px-3 py-2 border border-zinc-800">{brief.suggestedMetaDesc}</div>
+          )}
+          {brief.metaDescVariants && brief.metaDescVariants.length > 0 && (
+            <div className="mt-1.5 space-y-1">
+              <div className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Alternatives</div>
+              {brief.metaDescVariants.map((variant, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSaveBriefField(brief.id, {
+                    suggestedMetaDesc: variant,
+                    metaDescVariants: [brief.suggestedMetaDesc, ...brief.metaDescVariants!.filter((_, j) => j !== i)],
+                  })}
+                  className="w-full text-left text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950/50 hover:bg-zinc-900 rounded-lg px-3 py-1.5 border border-zinc-800/50 hover:border-teal-500/30 transition-colors group"
+                >
+                  <span className="group-hover:text-zinc-200">{variant}</span>
+                  <span className="text-[10px] text-zinc-600 ml-2 group-hover:text-teal-500">click to use</span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -277,7 +320,45 @@ export function BriefDetail({
       {/* Content Outline */}
       {brief.outline.length > 0 && (
         <div>
-          <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">Content Outline</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Content Outline</div>
+            {onRegenerateOutline && (
+              <button
+                onClick={() => setShowOutlineRegen(!showOutlineRegen)}
+                disabled={regeneratingOutline === brief.id}
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors disabled:opacity-50"
+              >
+                {regeneratingOutline === brief.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                {regeneratingOutline === brief.id ? 'Regenerating...' : 'Regenerate Outline'}
+              </button>
+            )}
+          </div>
+          {showOutlineRegen && onRegenerateOutline && (
+            <div className="mb-3 p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+              <textarea
+                value={outlineRegenFeedback}
+                onChange={e => setOutlineRegenFeedback(e.target.value)}
+                placeholder="Optional: describe what you'd like changed (e.g., 'Add a comparison section', 'Make it more practical')..."
+                className="w-full text-xs text-zinc-300 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 focus:border-teal-500/50 focus:outline-none resize-y"
+                rows={2}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { onRegenerateOutline(brief.id, outlineRegenFeedback.trim() || undefined); setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
+                  disabled={regeneratingOutline === brief.id}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                >
+                  Regenerate
+                </button>
+                <button
+                  onClick={() => { setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             {brief.outline.map((section, i) => (
               <div key={i} className="bg-zinc-950 rounded-lg px-3 py-2.5 border border-zinc-800">

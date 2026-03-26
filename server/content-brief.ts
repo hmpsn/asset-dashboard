@@ -45,6 +45,8 @@ interface BriefRow {
   keyword_source: string | null;
   keyword_validation: string | null;
   template_id: string | null;
+  title_variants: string | null;
+  meta_desc_variants: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -57,7 +59,8 @@ const stmts = createStmtCache(() => ({
             topical_entities, serp_analysis, difficulty_score, traffic_potential,
             cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
             page_type, reference_urls, real_people_also_ask, real_top_results,
-            keyword_locked, keyword_source, keyword_validation, template_id)
+            keyword_locked, keyword_source, keyword_validation, template_id,
+            title_variants, meta_desc_variants)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -66,7 +69,8 @@ const stmts = createStmtCache(() => ({
             @topical_entities, @serp_analysis, @difficulty_score, @traffic_potential,
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
-            @keyword_locked, @keyword_source, @keyword_validation, @template_id)`,
+            @keyword_locked, @keyword_source, @keyword_validation, @template_id,
+            @title_variants, @meta_desc_variants)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -90,7 +94,8 @@ const stmts = createStmtCache(() => ({
            page_type = @page_type, reference_urls = @reference_urls,
            real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
-           keyword_validation = @keyword_validation, template_id = @template_id
+           keyword_validation = @keyword_validation, template_id = @template_id,
+           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants
          WHERE id = @id`,
   ),
   deleteById: db.prepare(
@@ -133,6 +138,8 @@ function rowToBrief(row: BriefRow): ContentBrief {
     keywordSource: (row.keyword_source as ContentBrief['keywordSource']) ?? undefined,
     keywordValidation: row.keyword_validation ? JSON.parse(row.keyword_validation) : undefined,
     templateId: row.template_id ?? undefined,
+    titleVariants: row.title_variants ? JSON.parse(row.title_variants) : undefined,
+    metaDescVariants: row.meta_desc_variants ? JSON.parse(row.meta_desc_variants) : undefined,
   };
 }
 
@@ -170,6 +177,8 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     keyword_source: brief.keywordSource ?? null,
     keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
     template_id: brief.templateId ?? null,
+    title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
+    meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
   };
 }
 
@@ -423,7 +432,9 @@ Return the complete brief as valid JSON with these fields:
 {
   "executiveSummary": "...",
   "suggestedTitle": "...",
+  "titleVariants": ["Alternative title 2", "Alternative title 3"],
   "suggestedMetaDesc": "...",
+  "metaDescVariants": ["Alternative meta description 2", "Alternative meta description 3"],
   "secondaryKeywords": [...],
   "contentFormat": "...",
   "toneAndStyle": "...",
@@ -491,6 +502,8 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || existingBrief.eeatGuidance,
     contentChecklist: (parsed.contentChecklist as string[]) || existingBrief.contentChecklist,
     schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || existingBrief.schemaRecommendations,
+    titleVariants: (parsed.titleVariants as string[]) || existingBrief.titleVariants,
+    metaDescVariants: (parsed.metaDescVariants as string[]) || existingBrief.metaDescVariants,
     pageType: existingBrief.pageType,
     referenceUrls: existingBrief.referenceUrls,
     realPeopleAlsoAsk: existingBrief.realPeopleAlsoAsk,
@@ -527,9 +540,91 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     reference_urls: newBrief.referenceUrls ? JSON.stringify(newBrief.referenceUrls) : null,
     real_people_also_ask: newBrief.realPeopleAlsoAsk ? JSON.stringify(newBrief.realPeopleAlsoAsk) : null,
     real_top_results: newBrief.realTopResults ? JSON.stringify(newBrief.realTopResults) : null,
+    keyword_locked: newBrief.keywordLocked ? 1 : 0,
+    keyword_source: newBrief.keywordSource ?? null,
+    keyword_validation: newBrief.keywordValidation ? JSON.stringify(newBrief.keywordValidation) : null,
+    template_id: newBrief.templateId ?? null,
+    title_variants: newBrief.titleVariants ? JSON.stringify(newBrief.titleVariants) : null,
+    meta_desc_variants: newBrief.metaDescVariants ? JSON.stringify(newBrief.metaDescVariants) : null,
   });
 
   return newBrief;
+}
+
+/**
+ * Regenerate ONLY the outline of an existing brief, preserving all other fields.
+ * Optionally accepts user feedback to guide the new outline.
+ */
+export async function regenerateOutline(
+  workspaceId: string,
+  briefId: string,
+  feedback?: string,
+): Promise<ContentBrief | null> {
+  const existingBrief = getBrief(workspaceId, briefId);
+  if (!existingBrief) return null;
+
+  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId);
+  const ptConfig = getPageTypeConfig(existingBrief.pageType);
+
+  const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
+
+  const prompt = `You are an expert SEO content strategist. Your task is to regenerate ONLY the content outline for a brief.
+
+Target keyword: ${existingBrief.targetKeyword}
+Content format: ${existingBrief.contentFormat || 'guide'}
+Page type: ${existingBrief.pageType || 'blog'}
+Title: ${existingBrief.suggestedTitle}
+Word count target: ${existingBrief.wordCountTarget}
+Intent: ${existingBrief.intent}
+Audience: ${existingBrief.audience}
+${keywordBlock}${brandVoiceBlock}
+
+Current outline:
+${currentOutline}
+
+${feedback ? `User feedback on the outline:\n${feedback}\n` : ''}
+Generate a new outline that ${feedback ? 'addresses the feedback above' : 'takes a fresh approach to the topic structure'}.
+
+Return ONLY valid JSON — an array of section objects:
+[
+  { "heading": "H2 heading text", "subheadings": ["H3 subtopic 1", "H3 subtopic 2"], "notes": "Detailed guidance (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords for this section"] }
+]
+
+Rules:
+- The FIRST section must directly answer the query (ANSWER-FIRST for AEO)
+- ${ptConfig.sectionRange} sections total
+- Each section should have 2-4 subheadings
+- Include secondary keywords: ${existingBrief.secondaryKeywords.join(', ')}
+- Do NOT use generic headings like "Introduction" or "Conclusion" — those are handled separately
+- Vary section types (how-to steps, comparisons, data tables, case studies, FAQs)`;
+
+  const aiResult = await callOpenAI({
+    model: 'gpt-4.1',
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 4000,
+    temperature: 0.6,
+    feature: 'content-brief-outline-regen',
+    workspaceId,
+  });
+
+  // Parse the outline from the response
+  let newOutline: ContentBrief['outline'];
+  try {
+    const raw = aiResult.text || '[]';
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+    const parsed = JSON.parse(cleaned);
+    // Handle both { outline: [...] } and direct array
+    newOutline = Array.isArray(parsed) ? parsed : (parsed.outline || parsed.sections || []);
+    if (!Array.isArray(newOutline) || newOutline.length === 0) {
+      throw new Error('Empty outline returned');
+    }
+  } catch {
+    throw new Error('Failed to parse regenerated outline');
+  }
+
+  // Update only the outline field
+  const updated = updateBrief(workspaceId, briefId, { outline: newOutline });
+  return updated;
 }
 
 export async function generateBrief(
@@ -672,8 +767,10 @@ ${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${pe
 Generate a content brief in the following JSON format:
 {
   "executiveSummary": "2-3 sentence plain-English summary of why this content matters and its strategic value. Write from the reader's perspective (what THEY gain), not the brand's perspective (do NOT say 'position [brand] as an expert' or 'reinforce authority')",
-  "suggestedTitle": "SEO-optimized title tag (50-60 chars)",
-  "suggestedMetaDesc": "Compelling meta description (150-160 chars)",
+  "suggestedTitle": "SEO-optimized title tag (50-60 chars) — your top recommendation",
+  "titleVariants": ["Alternative title option 2 (50-60 chars)", "Alternative title option 3 (50-60 chars)"],
+  "suggestedMetaDesc": "Compelling meta description (150-160 chars) — your top recommendation",
+  "metaDescVariants": ["Alternative meta description 2 (150-160 chars)", "Alternative meta description 3 (150-160 chars)"],
   "secondaryKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"],
   "contentFormat": "The recommended format: guide, listicle, how-to, comparison, FAQ, case-study, pillar-page, or landing-page",
   "toneAndStyle": "Specific tone and style guidance for the writer (e.g., authoritative but approachable, data-driven, conversational)",
@@ -795,6 +892,8 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || undefined,
     contentChecklist: (parsed.contentChecklist as string[]) || undefined,
     schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || undefined,
+    titleVariants: (parsed.titleVariants as string[]) || undefined,
+    metaDescVariants: (parsed.metaDescVariants as string[]) || undefined,
     pageType: (context.pageType as ContentBrief['pageType']) || undefined,
     // Persist real SERP data so post generation can use it
     realPeopleAlsoAsk: context.serpData?.peopleAlsoAsk?.length ? context.serpData.peopleAlsoAsk : undefined,
@@ -843,6 +942,8 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keyword_source: brief.keywordSource ?? null,
     keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
     template_id: brief.templateId ?? null,
+    title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
+    meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
   });
 
   return brief;
