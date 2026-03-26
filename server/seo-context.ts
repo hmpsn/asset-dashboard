@@ -80,7 +80,9 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
 
   if (!strategy) {
     const fullContext = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
-    return { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    const result: SeoContext = { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+    return result;
   }
 
   let keywordBlock = '';
