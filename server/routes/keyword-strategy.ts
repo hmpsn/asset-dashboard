@@ -377,8 +377,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
     if (semrushMode !== 'none' && provider) {
-      sendProgress('semrush', 'Fetching SEMRush keyword intelligence...', 0.55);
-      // Derive domain from baseUrl so SEMRush always hits the live site (not webflow.io staging)
+      sendProgress('semrush', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
+      // Derive domain from baseUrl so provider always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
 
       if (siteDomain) {
