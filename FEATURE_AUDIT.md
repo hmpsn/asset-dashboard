@@ -2033,6 +2033,18 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 182. DataForSEO Provider + SEO Data Abstraction Layer
+**What it does:** Adds a provider-agnostic SEO data layer allowing per-workspace selection of SEMRush or DataForSEO. `SeoDataProvider` interface (9 methods: keyword metrics, related/question keywords, domain keywords/overview, competitors, keyword gap, backlinks overview, referring domains) with a registry supporting preferred + fallback resolution. `SemrushProvider` wraps existing semrush.ts with zero behavior change. `DataForSeoProvider` implements full API client with Basic auth, per-workspace file cache (`.dataforseo-cache/`), disk-based credit tracking, and circuit breaker. Workspace-level `seoDataProvider` preference stored in SQLite. Provider toggle UI in KeywordStrategy settings panel (visible when both providers configured). Strategy generator and all SEO consumers wired through abstraction layer. Provider status endpoint and DataForSEO usage tracking in AI usage dashboard.
+**Files:** `server/seo-data-provider.ts` (interface + registry), `server/providers/semrush-provider.ts`, `server/providers/dataforseo-provider.ts`, `server/db/migrations/031-seo-data-provider.sql`, `server/app.ts` (registration), `server/routes/keyword-strategy.ts` (consumer wiring), `server/routes/semrush.ts` (status endpoint), `server/routes/ai.ts` (usage tracking), `server/workspaces.ts` (column mapping), `shared/types/workspace.ts`, `src/api/seo.ts`, `src/components/KeywordStrategy.tsx` (toggle UI)
+
+**Agency value:** ~70-80% API cost reduction by switching to DataForSEO (~$50-150/mo vs SEMRush ~$430/mo). Per-workspace flexibility — can keep SEMRush for high-priority clients and use DataForSEO for others. Zero lock-in with provider abstraction.
+
+**Client value:** Same quality keyword data and competitive intelligence at lower cost. Provider choice is transparent to the client experience.
+
+**Mutual:** Cost savings fund more client work or better tooling. Abstraction layer future-proofs against any single API vendor's pricing changes.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -2048,12 +2060,12 @@ When the user asks to update this document with recent features, follow this pro
 | Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
 | Platform & UX | 21 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe, strategy→planner bridge |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 7 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook |
+| Architecture | 8 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook, SEO data provider abstraction layer |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**183 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**184 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **183**. Last updated: March 2026 (SEO strategy strengthening — client keyword requests, SERP targeting, strategy diff, ROI quick wins).
+Current feature count: **184**. Last updated: March 2026 (DataForSEO provider + SEO data abstraction layer).
 
 ### Recent Additions (March 2026)
 

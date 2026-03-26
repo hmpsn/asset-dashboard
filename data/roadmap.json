@@ -2682,8 +2682,8 @@
         },
         {
           "title": "Phase 5: DataForSEO migration + provider toggle in Command Center",
-          "status": "pending",
-          "notes": "SeoDataProvider abstraction layer. DataForSEO provider (~$50/mo vs SEMRush ~$430/mo). Per-workspace provider toggle in Command Center with cost comparison. Recommended model: Opus."
+          "status": "done",
+          "notes": "Shipped — SeoDataProvider interface (9 methods) + registry with preferred/fallback. SemrushProvider (zero behavior change). DataForSeoProvider with Basic auth, file cache, credit tracking, circuit breaker. Migration 031. Per-workspace provider toggle in KeywordStrategy settings. Strategy generator + AI usage wired through abstraction. Feature #182."
         }
       ]
     },
