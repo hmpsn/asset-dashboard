@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { EmptyState } from './ui';
+import { EmptyState, MetricRing } from './ui';
 import {
   Loader2, FileText, PenLine, Clock, CheckCircle2, Eye, Send,
   Trash2, Download, Search, ArrowUpDown, Filter,
@@ -23,6 +23,8 @@ interface PostSummary {
   createdAt: string;
   updatedAt: string;
   sections: { heading: string; wordCount: number; status: string }[];
+  voiceScore?: number;
+  voiceFeedback?: string;
 }
 
 type SortField = 'date' | 'title' | 'status' | 'words';
@@ -50,6 +52,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
+  const [scoringVoice, setScoringVoice] = useState<string | null>(null);
+  const [expandedVoice, setExpandedVoice] = useState<string | null>(null);
 
   const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: ['admin-posts', workspaceId] });
 
@@ -77,6 +81,15 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       invalidatePosts();
       setDeleteConfirm(null);
     } catch (err) { console.error('ContentManager operation failed:', err); }
+  };
+
+  const scoreVoice = async (postId: string) => {
+    setScoringVoice(postId);
+    try {
+      const result = await contentPosts.scoreVoice(workspaceId, postId);
+      if (result) invalidatePosts();
+    } catch (err) { console.error('ContentManager operation failed:', err); }
+    setScoringVoice(null);
   };
 
   // Filter & sort
@@ -253,6 +266,20 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       <span className="text-[11px] text-zinc-600">
                         {new Date(post.createdAt).toLocaleDateString()}
                       </span>
+                      {/* Voice score inline */}
+                      {post.voiceScore != null && (
+                        <>
+                          <span className="text-[11px] text-zinc-600">·</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setExpandedVoice(expandedVoice === post.id ? null : post.id); }}
+                            className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                            title={`Voice match: ${post.voiceScore}/100 — click for details`}
+                          >
+                            <MetricRing score={post.voiceScore} size={20} strokeWidth={3} />
+                            <span className="text-[11px] text-blue-400 font-medium">Voice {post.voiceScore}</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                   </button>
 
@@ -320,6 +347,19 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                       )
                     )}
 
+                    {/* Score Voice */}
+                    {!isGenerating && !post.voiceScore && (
+                      <button
+                        onClick={() => scoreVoice(post.id)}
+                        disabled={scoringVoice === post.id}
+                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                        title="Score brand voice match"
+                      >
+                        {scoringVoice === post.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        Score Voice
+                      </button>
+                    )}
+
                     {/* Export */}
                     {!isGenerating && (
                       <a
@@ -351,6 +391,30 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                   </div>
                 </div>
               </div>
+
+              {/* Expandable voice feedback */}
+              {expandedVoice === post.id && post.voiceFeedback && (
+                <div className="px-4 pb-3 border-t border-zinc-800/50">
+                  <div className="flex items-center gap-2 mt-2 mb-1.5">
+                    <MetricRing score={post.voiceScore!} size={36} strokeWidth={4} />
+                    <div>
+                      <div className="text-[11px] text-zinc-500 font-medium">Brand Voice Match</div>
+                      <div className="text-xs text-zinc-300 font-semibold">{post.voiceScore}/100</div>
+                    </div>
+                    <button
+                      onClick={() => scoreVoice(post.id)}
+                      disabled={scoringVoice === post.id}
+                      className="ml-auto text-[11px] px-2 py-1 rounded-md text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                    >
+                      {scoringVoice === post.id ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : null}
+                      Re-score
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap bg-zinc-950/50 rounded-lg px-3 py-2 border border-zinc-800/50">
+                    {post.voiceFeedback}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

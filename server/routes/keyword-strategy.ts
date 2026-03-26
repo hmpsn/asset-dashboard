@@ -22,16 +22,11 @@ import {
 } from '../search-console.js';
 import { addTrackedKeyword, getTrackedKeywords } from '../rank-tracking.js';
 import {
-  isSemrushConfigured,
-  getKeywordOverview,
-  getDomainOrganicKeywords,
-  getKeywordGap,
-  getRelatedKeywords,
-  getOrganicCompetitors,
-  getQuestionKeywords,
   trendDirection,
   hasSerpOpportunity,
 } from '../semrush.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
+import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from '../seo-data-provider.js';
 import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 import {
   listPages,
@@ -67,6 +62,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const provider = getConfiguredProvider(ws.seoDataProvider);
 
   const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
   const semrushMode = (req.body?.semrushMode as string) || 'none'; // 'quick', 'full', 'none'
@@ -372,14 +369,14 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // 5. SEMRush data gathering (based on mode)
     // The keyword pool paradigm: SEMRush provides the keyword universe, AI assigns them to pages
     let semrushContext = '';
-    let semrushDomainData: Awaited<ReturnType<typeof getDomainOrganicKeywords>> = [];
-    let keywordGaps: Awaited<ReturnType<typeof getKeywordGap>> = [];
-    const relatedKws: Awaited<ReturnType<typeof getRelatedKeywords>> = [];
+    let semrushDomainData: DomainKeyword[] = [];
+    let keywordGaps: KeywordGapEntry[] = [];
+    const relatedKws: RelatedKeyword[] = [];
     const allQuestionKws: { seed: string; questions: { keyword: string; volume: number }[] }[] = [];
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
-    if (semrushMode !== 'none' && isSemrushConfigured()) {
+    if (semrushMode !== 'none' && provider) {
       sendProgress('semrush', 'Fetching SEMRush keyword intelligence...', 0.55);
       // Derive domain from baseUrl so SEMRush always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
@@ -388,7 +385,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // Both quick and full: get domain organic keywords
         try {
           log.info(`Fetching domain organic keywords for ${siteDomain}...`);
-          semrushDomainData = await getDomainOrganicKeywords(siteDomain, ws.id, 200);
+          semrushDomainData = await provider.getDomainKeywords(siteDomain, ws.id, 200);
           log.info(`Got ${semrushDomainData.length} domain keywords`);
 
           if (semrushDomainData.length > 0) {
@@ -405,7 +402,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         if (competitorDomains.length === 0) {
           try {
             sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
-            const discovered = await getOrganicCompetitors(siteDomain, ws.id, 5);
+            const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
             const autoCompetitors = discovered
               .filter(c => !c.domain.includes(siteDomain) && !siteDomain.includes(c.domain))
               .slice(0, 3)
@@ -429,7 +426,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             for (const comp of competitorDomains.slice(0, 3)) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
-                const compKws = await getDomainOrganicKeywords(cleanComp, ws.id, compLimit);
+                const compKws = await provider.getDomainKeywords(cleanComp, ws.id, compLimit);
                 for (const ck of compKws) {
                   competitorKeywordData.push({
                     keyword: ck.keyword,
@@ -466,7 +463,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           try {
             sendProgress('semrush', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
-            keywordGaps = await getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
+            keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
             log.info(`Found ${keywordGaps.length} keyword gaps`);
 
             if (keywordGaps.length > 0) {
@@ -486,7 +483,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             sendProgress('semrush', 'Fetching related keyword ideas...', 0.65);
             const seedKeywords = semrushDomainData.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
             for (const seed of seedKeywords) {
-              const related = await getRelatedKeywords(seed, ws.id, 10);
+              const related = await provider.getRelatedKeywords(seed, ws.id, 10);
               relatedKws.push(...related);
             }
             if (relatedKws.length > 0) {
@@ -505,7 +502,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             sendProgress('semrush', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
             const qSeeds = semrushDomainData.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, 5).map(k => k.keyword);
             for (const seed of qSeeds) {
-              const questions = await getQuestionKeywords(seed, ws.id, 10);
+              const questions = await provider.getQuestionKeywords(seed, ws.id, 10);
               if (questions.length > 0) {
                 allQuestionKws.push({ seed, questions: questions.map(q => ({ keyword: q.keyword, volume: q.volume })) });
               }
@@ -573,6 +570,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (declinedKeywords.length > 0) {
       businessSection += `\nDECLINED KEYWORDS (the client has explicitly rejected these — do NOT suggest them or close variants as primaryKeyword, secondaryKeywords, or content gap targets):\n${declinedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
       log.info(`Injecting ${declinedKeywords.length} declined keywords into AI prompt`);
+    }
+
+    // Inject client-requested keywords so AI prioritizes them
+    const requestedKeywords = getRequestedKeywords(ws.id);
+    if (requestedKeywords.length > 0) {
+      businessSection += `\nCLIENT-REQUESTED KEYWORDS (the client has submitted these keyword ideas — give them HIGH PRIORITY in page assignments and content gap suggestions. If no existing page covers a requested keyword, it MUST appear as a content gap):\n${requestedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
+      log.info(`Injecting ${requestedKeywords.length} client-requested keywords into AI prompt`);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -647,6 +651,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       const kw = tk.query.toLowerCase().trim();
       if (!keywordPool.has(kw) && kw.length > 1) {
         keywordPool.set(kw, { volume: 0, difficulty: 0, source: 'client' });
+        clientKeywordsAdded++;
+      }
+    }
+    // Add client-requested keywords to pool
+    for (const kw of requestedKeywords) {
+      if (!keywordPool.has(kw.toLowerCase())) {
+        keywordPool.set(kw.toLowerCase(), { volume: 0, difficulty: 0, source: 'client' });
         clientKeywordsAdded++;
       }
     }
@@ -783,7 +794,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
-    if (isSemrushConfigured() && semrushMode !== 'none') {
+    if (provider && semrushMode !== 'none') {
       const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       const existingPkLookup = new Map(
         listPageKeywords(ws.id)
@@ -819,11 +830,11 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       }
       log.info(`Keyword validation: ${preEnriched} pre-enriched from existing data, ${needsApiLookup.length} need API lookup`);
 
-      // Second pass: fetch remaining from SEMRush API
+      // Second pass: fetch remaining from provider API
       if (needsApiLookup.length > 0) {
         try {
           const uniqueNeeds = [...new Set(needsApiLookup.map(k => k.toLowerCase()))];
-          const metrics = await getKeywordOverview(uniqueNeeds.slice(0, 100), ws.id);
+          const metrics = await provider.getKeywordMetrics(uniqueNeeds.slice(0, 100), ws.id);
           const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
 
           let unvalidated = 0;
@@ -1147,7 +1158,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
     // If we still have keywords without volume data and SEMRush is available, bulk-fetch them
     // Only look up keywords NOT already in the pool (those are "invented" by the AI)
     // Cap at 30 to avoid burning credits on keywords that will mostly return NOTHING FOUND
-    if (isSemrushConfigured() && semrushMode !== 'none') {
+    if (provider && semrushMode !== 'none') {
       const pagesNeedingVolume = strategy.pageMap
         .filter((pm: { volume?: number; primaryKeyword: string }) => !pm.volume && pm.primaryKeyword);
       // Filter to reasonable keywords only (≤5 words, not too specific)
@@ -1160,7 +1171,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       const needsVolume = uniqueNeeds.slice(0, 30);
       if (needsVolume.length > 0) {
         try {
-          const metrics = await getKeywordOverview(needsVolume as string[], ws.id);
+          const metrics = await provider.getKeywordMetrics(needsVolume as string[], ws.id);
           const metricMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const pm of strategy.pageMap) {
             if (!pm.volume) {
@@ -1193,9 +1204,9 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           missingCgKws.push(cg.targetKeyword);
         }
       }
-      if (missingCgKws.length > 0 && isSemrushConfigured() && semrushMode !== 'none') {
+      if (missingCgKws.length > 0 && provider && semrushMode !== 'none') {
         try {
-          const cgMetrics = await getKeywordOverview(missingCgKws.slice(0, 30), ws.id);
+          const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), ws.id);
           const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const cg of strategy.contentGaps) {
             if (!cg.volume) {
@@ -1266,6 +1277,31 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             .map(q => q.keyword);
           if (relatedQs.length > 0) cg.questionKeywords = relatedQs;
         }
+      }
+    }
+
+    // ── SERP Feature Targeting Recommendations ───────────────────
+    if (strategy.contentGaps?.length) {
+      for (const cg of strategy.contentGaps) {
+        if (!cg.serpFeatures?.length) continue;
+        const recs: string[] = [];
+        for (const feat of cg.serpFeatures) {
+          switch (feat) {
+            case 'featured_snippet':
+              recs.push('Structure content with a clear definition or step-by-step list in the first 100 words to target the featured snippet');
+              break;
+            case 'people_also_ask':
+              recs.push('Include FAQ sections with concise 2-3 sentence answers to target People Also Ask boxes');
+              break;
+            case 'video':
+              recs.push('Embed a relevant video or create video content to compete for the video carousel');
+              break;
+            case 'local_pack':
+              recs.push('Include location-specific content, NAP details, and LocalBusiness schema markup');
+              break;
+          }
+        }
+        if (recs.length > 0) cg.serpTargeting = recs;
       }
     }
 
@@ -1486,7 +1522,7 @@ Rules:
 
     // Enrich siteKeywords with volume/difficulty
     let siteKeywordMetrics: { keyword: string; volume: number; difficulty: number }[] = [];
-    if (isSemrushConfigured() && semrushMode !== 'none' && strategy.siteKeywords?.length) {
+    if (provider && semrushMode !== 'none' && strategy.siteKeywords?.length) {
       const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       const found: typeof siteKeywordMetrics = [];
       const missing: string[] = [];
@@ -1500,7 +1536,7 @@ Rules:
       }
       if (missing.length > 0) {
         try {
-          const extra = await getKeywordOverview(missing.slice(0, 15), ws.id);
+          const extra = await provider.getKeywordMetrics(missing.slice(0, 15), ws.id);
           for (const m of extra) {
             found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
           }
@@ -1534,6 +1570,23 @@ Rules:
       log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
     }
 
+    // ── Quick Win ROI Scoring ──────────────────────────────────
+    if (strategy.quickWins?.length) {
+      // Compute ROI score: (volume × (1 - difficulty/100)) / max(currentPosition, 1)
+      // Fall back to impact-based scoring if no volume data
+      for (const qw of strategy.quickWins) {
+        const pageData = strategy.pageMap?.find((p: { pagePath: string }) => p.pagePath === qw.pagePath);
+        if (pageData?.volume && pageData?.currentPosition) {
+          const difficulty = pageData.difficulty ?? 50;
+          qw.roiScore = Math.round((pageData.volume * (1 - difficulty / 100)) / Math.max(pageData.currentPosition, 1));
+        } else {
+          // Fallback: estimate from impact level
+          qw.roiScore = qw.estimatedImpact === 'high' ? 100 : qw.estimatedImpact === 'medium' ? 50 : 20;
+        }
+      }
+      strategy.quickWins.sort((a: { roiScore?: number }, b: { roiScore?: number }) => (b.roiScore || 0) - (a.roiScore || 0));
+    }
+
     // Sort pageMap by volume (highest impact first)
     if (strategy.pageMap?.length) {
       strategy.pageMap.sort((a: { volume?: number; impressions?: number }, b: { volume?: number; impressions?: number }) =>
@@ -1549,6 +1602,8 @@ Rules:
     // 7. Save to workspace — pageMap goes to page_keywords table, rest to workspace blob
     sendProgress('complete', 'Strategy complete!', 1.0);
     const pageMap = strategy.pageMap || [];
+    // Snapshot previous page map BEFORE replacing (needed for strategy diff)
+    const prevPageMapForHistory = listPageKeywords(ws.id);
     // Save pageMap to dedicated table (replaces all existing entries)
     replaceAllPageKeywords(ws.id, pageMap);
 
@@ -1573,6 +1628,15 @@ Rules:
       },
       generatedAt: new Date().toISOString(),
     };
+    // Save previous strategy to history (keep last 5)
+    if (ws.keywordStrategy?.generatedAt) {
+      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
+        ws.id, JSON.stringify(ws.keywordStrategy), JSON.stringify(prevPageMapForHistory), ws.keywordStrategy.generatedAt
+      );
+      // Prune old entries, keep last 5
+      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+    }
+
     updateWorkspace(ws.id, { keywordStrategy });
     clearSeoContextCache(ws.id);
     incrementUsage(ws.id, 'strategy_generations');
@@ -1623,6 +1687,54 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
   res.json({ ...strategy, pageMap });
 });
 
+// Get strategy diff (compare current vs previous)
+router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const current = ws.keywordStrategy;
+  if (!current) return res.json(null);
+
+  const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
+  if (!prev) return res.json(null);
+
+  const prevStrategy = JSON.parse(prev.strategy_json);
+  const prevPageMap = JSON.parse(prev.page_map_json);
+  const currentPageMap = listPageKeywords(ws.id);
+
+  // Compute diffs
+  const prevSiteKws = new Set(prevStrategy.siteKeywords || []);
+  const currSiteKws = new Set(current.siteKeywords || []);
+  const newKeywords = [...currSiteKws].filter(k => !prevSiteKws.has(k));
+  const lostKeywords = [...prevSiteKws].filter(k => !currSiteKws.has(k));
+
+  const prevGapKws = new Set((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const currGapKws = new Set((current.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const newGaps = [...currGapKws].filter(k => !prevGapKws.has(k));
+  const resolvedGaps = [...prevGapKws].filter(k => !currGapKws.has(k));
+
+  // Page map changes
+  const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+  const currPageKws = new Map(currentPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+  const keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[] = [];
+  for (const [path, kw] of currPageKws) {
+    const old = prevPageKws.get(path);
+    if (old && old !== kw) keywordChanges.push({ pagePath: path, oldKeyword: old, newKeyword: kw });
+  }
+
+  res.json({
+    previousGeneratedAt: prev.generated_at,
+    currentGeneratedAt: current.generatedAt,
+    newKeywords,
+    lostKeywords,
+    newGaps,
+    resolvedGaps,
+    keywordChanges,
+    prevSiteKeywordCount: prevSiteKws.size,
+    currSiteKeywordCount: currSiteKws.size,
+  });
+});
+
 // Update keyword strategy (manual edits)
 const patchStrategySchema = z.object({
   pageMap: z.array(z.object({
@@ -1663,6 +1775,12 @@ export function getDeclinedKeywords(workspaceId: string): string[] {
   return rows.map(r => r.keyword);
 }
 
+/** Get all client-requested keywords for a workspace (used by strategy generator to prioritize) */
+export function getRequestedKeywords(workspaceId: string): string[] {
+  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'requested') as { keyword: string }[];
+  return rows.map(r => r.keyword);
+}
+
 /** Get all keyword feedback for a workspace */
 function getAllFeedback(workspaceId: string) {
   return db.prepare('SELECT * FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(workspaceId);
@@ -1678,7 +1796,7 @@ router.get('/api/webflow/keyword-feedback/:workspaceId', (req, res) => {
 // Admin or client: submit feedback on a keyword
 const feedbackSchema = z.object({
   keyword: z.string().min(1),
-  status: z.enum(['approved', 'declined']),
+  status: z.enum(['approved', 'declined', 'requested']),
   reason: z.string().optional(),
   source: z.enum(['content_gap', 'page_map', 'opportunity', 'topic_cluster', 'keyword_gap']).optional(),
   declinedBy: z.string().optional(),
@@ -1700,6 +1818,8 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchem
       updated_at = datetime('now')
   `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy || null);
 
+  if (status === 'approved') addTrackedKeyword(ws.id, kw);
+
   log.info(`Keyword feedback: "${kw}" → ${status} for workspace ${ws.id}${reason ? ` (reason: ${reason})` : ''}`);
   res.json({ keyword: kw, status, reason: reason || null });
 });
@@ -1708,7 +1828,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchem
 const bulkFeedbackSchema = z.object({
   keywords: z.array(z.object({
     keyword: z.string().min(1),
-    status: z.enum(['approved', 'declined']),
+    status: z.enum(['approved', 'declined', 'requested']),
     reason: z.string().optional(),
     source: z.string().optional(),
   })).min(1).max(100),
@@ -1735,6 +1855,11 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeed
     }
   });
   insert(req.body.keywords);
+
+  for (const item of req.body.keywords) {
+    if (item.status === 'approved') addTrackedKeyword(ws.id, item.keyword.toLowerCase().trim());
+  }
+
   log.info(`Bulk keyword feedback: ${req.body.keywords.length} keywords for workspace ${ws.id}`);
   res.json({ updated: req.body.keywords.length });
 });

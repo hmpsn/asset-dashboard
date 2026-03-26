@@ -20,6 +20,7 @@ import {
   getUsageByFeature,
 } from '../openai-helpers.js';
 import { getSemrushUsage, getSemrushByDay } from '../semrush.js';
+import { getDataForSeoUsage, getDataForSeoByDay } from '../providers/dataforseo-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { checkAIContext } from '../ai-context-check.js';
 import { aiLimiter } from '../middleware.js';
@@ -115,7 +116,9 @@ router.get('/api/ai/usage', (req, res) => {
   const byFeature = getUsageByFeature(workspaceId, since);
   const semrush = getSemrushUsage(workspaceId, since);
   const semrushDaily = getSemrushByDay(workspaceId, days);
-  res.json({ ...summary, daily, byFeature, semrush, semrushDaily });
+  const dataforseo = getDataForSeoUsage(workspaceId, since);
+  const dataforseoDaily = getDataForSeoByDay(workspaceId, days);
+  res.json({ ...summary, daily, byFeature, semrush, semrushDaily, dataforseo, dataforseoDaily });
 });
 
 // --- Time Saved Metric ---

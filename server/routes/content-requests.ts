@@ -19,7 +19,8 @@ import {
 import { notifyClientBriefReady, notifyClientContentPublished, notifyTeamContentRequest } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
-import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
+import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import {
   listPages,
   filterPublishedPages,
@@ -181,18 +182,19 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       } catch { /* GSC unavailable */ }
     }
 
-    // Gather SEMRush data if configured
-    let semrushMetrics: import('../semrush.js').KeywordMetrics | undefined;
-    let semrushRelated: import('../semrush.js').RelatedKeyword[] | undefined;
-    if (isSemrushConfigured()) {
+    // Gather SEO keyword data if a provider is configured
+    let semrushMetrics: KeywordMetrics | undefined;
+    let semrushRelated: RelatedKeyword[] | undefined;
+    const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([
-          getKeywordOverview([request.targetKeyword], req.params.workspaceId),
-          getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
+          seoProvider.getKeywordMetrics([request.targetKeyword], req.params.workspaceId),
+          seoProvider.getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
         ]);
         if (metrics.length > 0) semrushMetrics = metrics[0];
         if (related.length > 0) semrushRelated = related;
-      } catch (e) { log.error({ err: e }, 'SEMRush brief enrichment error'); }
+      } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
     }
 
     // Gather GA4 landing page performance if connected

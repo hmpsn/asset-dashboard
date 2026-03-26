@@ -33,6 +33,8 @@ interface PostRow {
   published_at: string | null;
   published_slug: string | null;
   review_checklist: string | null;
+  voice_score: number | null;
+  voice_feedback: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -129,12 +131,14 @@ const stmts = createStmtCache(() => ({
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist, created_at, updated_at)
+            unification_note, review_checklist, voice_score, voice_feedback,
+            created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist, @created_at, @updated_at)`,
+            @unification_note, @review_checklist, @voice_score, @voice_feedback,
+            @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
@@ -152,6 +156,7 @@ const stmts = createStmtCache(() => ({
            unification_note = @unification_note, review_checklist = @review_checklist,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
+           voice_score = @voice_score, voice_feedback = @voice_feedback,
            updated_at = @updated_at
          WHERE id = @id`,
   ),
@@ -183,6 +188,8 @@ function rowToPost(row: PostRow): GeneratedPost {
     publishedAt: row.published_at ?? undefined,
     publishedSlug: row.published_slug ?? undefined,
     reviewChecklist: row.review_checklist ? JSON.parse(row.review_checklist) : undefined,
+    voiceScore: row.voice_score ?? undefined,
+    voiceFeedback: row.voice_feedback ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -211,6 +218,8 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     published_at: post.publishedAt ?? null,
     published_slug: post.publishedSlug ?? null,
     review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
+    voice_score: post.voiceScore ?? null,
+    voice_feedback: post.voiceFeedback ?? null,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
   };

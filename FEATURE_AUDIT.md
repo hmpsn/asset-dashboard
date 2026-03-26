@@ -62,9 +62,9 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 4. Dead Link Checker
-**What it does:** Crawls every page (including CMS via sitemap), extracts all links, and checks for 404s, timeouts, and redirect chains. **Auto-restore**: last scan results persist to disk and load on mount — no data loss between navigation, deploys, or restarts.
+**What it does:** Crawls every page (including CMS via sitemap), extracts all links, and checks for 404s, timeouts, and redirect chains. **Auto-restore**: last scan results persist to disk and load on mount — no data loss between navigation, deploys, or restarts. **Audit integration**: dead link scan now runs automatically as part of every site audit (opt-out checkbox in audit trigger UI). Results surface in the audit header as a clickable "Broken Links" stat card. A dedicated dead links panel below site-wide issues shows each broken URL with: status code, type badge (internal/external), source page, anchor text, "Fix in SEO Editor" button (internal links), and inline "Add Redirect" form. Pending redirects can be exported as CSV (broken URL, status, found-on, redirect-to columns).
 
-**Agency value:** Catches broken links before Google does, including ones buried in CMS collection pages.
+**Agency value:** Catches broken links before Google does, including ones buried in CMS collection pages. Now integrated with the site audit flow — no separate tool visit required. One-click redirect creation from audit results speeds up remediation.
 
 **Client value:** No "page not found" experiences for visitors. Protects brand credibility.
 
@@ -139,11 +139,11 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 11. Rank Tracker
-**What it does:** Track specific keyword positions over time using Google Search Console data. Pin priority keywords, capture snapshots, and visualize trends.
+**What it does:** Track specific keyword positions over time using Google Search Console data. Pin priority keywords, capture snapshots, and visualize trends. Click any keyword row to expand a **position sparkline** showing the full position history over time (inverted Y-axis: lower position = higher on chart) with best/worst position stats and period delta. **Trends toggle** (header button, appears when pinned keywords exist) shows a multi-keyword SVG line chart for all pinned keywords, with color-coded lines, gridlines, Y-axis position labels, and a legend with current positions.
 
-**Agency value:** Shows the direct impact of SEO work over time. "Your target keyword moved from position 18 to position 6."
+**Agency value:** Shows the direct impact of SEO work over time. "Your target keyword moved from position 18 to position 6." Sparklines and trends chart provide quick visual proof without exporting data.
 
-**Client value:** Proof that the SEO investment is working, tracked against the keywords they actually care about.
+**Client value:** Proof that the SEO investment is working, tracked against the keywords they actually care about. Trend visualization makes progress tangible.
 
 **Mutual:** Aligns both parties on which keywords matter and provides objective measurement of progress.
 
@@ -513,6 +513,16 @@ A brief value assessment of every feature in the platform, covering what it does
 **Client value:** N/A — admin-only view (clients have their own portal).
 
 **Mutual:** Eliminates the "let me pull up the data" delay. Every workspace conversation starts from a position of full awareness.
+
+**Admin dashboard improvements (March 2026):**
+- **Needs Attention prioritization**: Action items sorted by priority (P1=critical, P2=important, P3=setup). Capped at 5 visible urgent items with "N more" collapse. Setup suggestions (missing GSC/GA4/Webflow) hidden in collapsed section when P1 alerts exist. Section moved above Anomaly Alerts.
+- **SEO Pipeline merge**: SeoWorkStatus and SeoChangeImpact merged into single "SEO Pipeline" SectionCard via `embedded` prop.
+- **Content Decay StatCard**: New metric card showing decaying page count (critical/warning), deep-links to Content Health sub-tab. Data served from aggregated workspace-home endpoint (loadDecayAnalysis).
+- **Weekly Accomplishments**: Compact summary bar "This week: 3 SEO updates · 2 briefs · 1 audit" between header and metric cards. Server-side aggregation of last-7-day activity by type.
+- **PageIntelligence action buttons**: "Fix in SEO Editor", "Create Brief", conditional "Add Schema" buttons at bottom of each expanded page analysis, using fixContext navigation pattern.
+- **KeywordStrategy dedup**: Removed duplicate Ranking Tiers StatCard (stacked bar chart already shows same data), grid 5→4 columns.
+- **SeoAudit score delta**: Score delta badge (↑6 from last audit) in site score card using history snapshots.
+- **SeoAudit sub-tab deep-links**: `?sub=` query param for direct navigation to sub-tabs. Visual separator between audit tabs and analysis tabs. Renamed: "Content Decay" → "Content Health", "AEO Review" → "AI Search Ready".
 
 ### 42. Security Hardening
 **What it does:** Pre-payment security layer across the Express server. **Helmet** adds security headers on all responses (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, CSP whitelisting Stripe domains in production). **HTTPS enforcement** redirects all HTTP traffic to HTTPS in production via `X-Forwarded-Proto` proxy trust. **3-tier rate limiting** on all public API routes: 60 req/min general reads, 10/min writes (POST/PATCH/DELETE), 5/min checkout (pre-wired for Stripe). **Input sanitization** via `sanitizeString()` (trim, length cap, control character stripping) and `validateEnum()` applied to all content request write endpoints. **Stripe webhook placeholder** marks the correct mount point before `express.json()` for raw body parsing.
@@ -1026,6 +1036,7 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 - ~~Fix→ routing~~: ✅ Shipped — Each issue maps to the appropriate tool (Schema, SEO Editor, Briefs, Redirects, Performance) with a one-click Fix button.
 - ~~Auto-fix context~~: ✅ Shipped — Fix→ passes page context to target tools: Schema auto-generates, SEO Editor auto-expands, Briefs pre-fill keyword.
 - ~~Traffic intelligence~~: ✅ Shipped — `/api/audit-traffic/:siteId` cross-references GSC clicks/impressions and GA4 pageviews/sessions per page. Traffic badges on page cards. Sort by traffic impact toggle.
+- ~~Auto dead link scan~~: ✅ Shipped — Dead link scan runs automatically with every site audit (opt-out checkbox). Results appear as a "Broken Links" stat card in the audit header and a detailed panel with per-link actions: "Fix in SEO Editor" (internal links), inline redirect form, and CSV export.
 - **Full-site PageSpeed**: Offer a deeper multi-page PSI scan as a separate background job.
 - **Accessibility audit expansion**: Currently only checks img alt text. Could add WCAG contrast, ARIA, heading order, form label checks.
 - **Historical trend charts**: Track audit score over time per-page, not just site-wide.
@@ -1962,13 +1973,85 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 175. Title/Meta A/B Variants
+**What it does:** Content brief generation now produces 3 title variants and 3 meta description variants alongside the primary suggestions. Stored in `title_variants` and `meta_desc_variants` TEXT (JSON) columns on `content_briefs`. The AI prompt requests variants optimized for different angles: CTR, keyword density, and emotional appeal. **Variant picker UI** in BriefDetail shows alternatives below the primary title/meta with "click to use" action — clicking swaps the selected variant into the primary field and demotes the old primary into the variants array, preserving all options. Regenerated briefs also produce variants.
+**Files:** `server/db/migrations/027-brief-variants.sql`, `server/content-brief.ts` (prompt, rowToBrief, briefToParams, INSERT/UPDATE), `shared/types/content.ts` (ContentBrief), `src/components/briefs/BriefDetail.tsx` (variant picker), `src/components/briefs/BriefList.tsx` (prop passthrough), `src/components/ContentBriefs.tsx` (interface)
+
+**Agency value:** No more manually brainstorming title alternatives — AI generates 3 angles per brief. Quick A/B testing of different messaging approaches without regenerating the entire brief.
+
+---
+
+### 176. Outline-Only Regeneration
+**What it does:** Regenerates just the content outline of an existing brief while preserving all other fields (title, meta, keywords, audience, etc.). `regenerateOutline()` in `server/content-brief.ts` loads the existing brief, sends the current outline + optional user feedback to GPT-4.1, and returns a new outline with heading/notes/wordCount/keywords per section. Atomic update via `updateBrief()`. Endpoint: `POST /api/content-briefs/:wid/:bid/regenerate-outline`. **UI**: teal "Regenerate Outline" button next to the Content Outline header in BriefDetail, with optional feedback textarea for guiding the regeneration (e.g., "Add a comparison section" or "Make it more technical").
+**Files:** `server/content-brief.ts` (`regenerateOutline`), `server/routes/content-briefs.ts` (endpoint), `src/api/content.ts` (`regenerateOutline`), `src/components/briefs/BriefDetail.tsx` (button + feedback form), `src/components/briefs/BriefList.tsx` (prop passthrough), `src/components/ContentBriefs.tsx` (handler + state)
+
+**Agency value:** Iterate on brief structure without losing the strategic research (keywords, audience, competitive analysis). Common scenario: brief is good but the outline needs reworking for a different angle.
+
+---
+
+### 177. Brand Voice Scoring
+**What it does:** After a content post is generated, a "Score Voice" button in ContentManager triggers GPT-4.1 evaluation of the post against the workspace's brand voice context. Evaluates 4 dimensions: voice consistency, keyword integration, audience alignment, and tone consistency — each scored 0-100, averaged into a composite `voiceScore`. Detailed `voiceFeedback` text explains strengths and areas for improvement. Stored in `voice_score INTEGER` and `voice_feedback TEXT` on `content_posts`. **UI**: blue "Score Voice" button in post list (data color per Three Laws), inline MetricRing (20px) showing score next to post metadata, expandable feedback panel with 36px MetricRing and full feedback text. Re-score button available after initial scoring.
+**Files:** `server/db/migrations/028-post-voice-score.sql`, `server/content-posts-ai.ts` (`scoreVoiceMatch`), `server/content-posts-db.ts` (row mapping), `server/routes/content-posts.ts` (endpoint), `shared/types/content.ts` (GeneratedPost), `src/api/content.ts` (`scoreVoice`), `src/components/ContentManager.tsx` (scoring UI + MetricRing display + feedback panel)
+
+**Agency value:** Objective measurement of how well AI-generated content matches the client's brand voice. Identifies specific areas where the content diverges from the intended tone, enabling targeted editing rather than full rewrites.
+
+**Client value:** Confidence that content maintains their brand identity. The score provides transparency into content quality beyond just keyword optimization.
+
+---
+
+### 178. Client Keyword Requests
+**What it does:** Clients can now submit keyword ideas through the "Suggest a Keyword" section in their Strategy tab, not just approve/decline AI-suggested ones. Submitted keywords get `status: 'requested'` in the `keyword_feedback` table (expanded CHECK constraint via migration 029). During strategy generation, requested keywords are injected into the AI prompt as high-priority items and added to the keyword pool. If no existing page covers a requested keyword, it MUST appear as a content gap. Client UI shows submitted suggestions with pending status badges.
+**Files:** `server/db/migrations/029-keyword-requested.sql`, `server/routes/keyword-strategy.ts` (schema, `getRequestedKeywords`, prompt injection, pool injection), `server/routes/public-portal.ts` (validation update), `src/components/client/StrategyTab.tsx` (Suggest a Keyword section)
+
+**Agency value:** Clients become active participants in keyword strategy. Their domain expertise surfaces keywords the AI might miss.
+
+**Client value:** Direct influence over SEO strategy — submit keyword ideas and see them prioritized in the next generation.
+
+---
+
+### 179. SERP Feature Targeting Recommendations
+**What it does:** Content gaps with SERP feature opportunities (featured snippets, PAA, video, local pack) now include actionable targeting recommendations. Post-processing step after SERP enrichment generates specific content structuring advice per feature type: definition/list formatting for featured snippets, FAQ sections for PAA, video embedding for video carousels, and NAP/schema markup for local pack. Displayed as yellow recommendation text below SERP feature badges in ContentGaps component.
+**Files:** `server/routes/keyword-strategy.ts` (serpTargeting post-processing), `shared/types/workspace.ts` (ContentGap.serpTargeting), `src/components/strategy/ContentGaps.tsx` (targeting display)
+
+**Agency value:** Turns SERP feature data from "interesting" to "actionable." Each content gap with a SERP opportunity now tells you exactly what to do to win it.
+
+---
+
+### 180. Strategy Diff — What Changed
+**What it does:** Tracks strategy changes across generations. Before saving a new strategy, the previous version is archived to `strategy_history` table (keeps last 5). New diff endpoint (`GET /api/webflow/keyword-strategy/:wid/diff`) computes: new/lost site keywords, new/resolved content gaps, and page keyword reassignments. Collapsible "What Changed" panel in KeywordStrategy shows all changes with green/red/amber color coding. Only appears when changes exist.
+**Files:** `server/db/migrations/030-strategy-history.sql`, `server/routes/keyword-strategy.ts` (history save, prune, diff endpoint), `src/api/seo.ts` (strategyDiff, StrategyDiff type), `src/components/strategy/StrategyDiff.tsx` (new component), `src/components/KeywordStrategy.tsx` (integration)
+
+**Agency value:** Answers "what changed since last time?" without manually comparing. Shows strategy evolution over time. Proves the value of re-running strategy as data improves.
+
+---
+
+### 181. Prioritized Quick Wins with ROI Scoring
+**What it does:** Quick wins are now scored and sorted by estimated ROI. Score formula: `(volume × (1 - difficulty/100)) / position` — favoring high-volume, low-difficulty keywords on pages that are close to ranking well. Falls back to impact-level estimates when volume data isn't available. ROI score displayed as a blue data badge next to the impact badge in the QuickWins component.
+**Files:** `server/routes/keyword-strategy.ts` (ROI scoring + sorting), `shared/types/workspace.ts` (QuickWin.roiScore), `src/components/strategy/QuickWins.tsx` (ROI badge display)
+
+**Agency value:** Quick wins are no longer just "high/medium/low" — they're quantified by potential return. The highest-ROI fix is always at the top.
+
+---
+
+### 182. DataForSEO Provider + SEO Data Abstraction Layer
+**What it does:** Adds a provider-agnostic SEO data layer allowing per-workspace selection of SEMRush or DataForSEO. `SeoDataProvider` interface (9 methods: keyword metrics, related/question keywords, domain keywords/overview, competitors, keyword gap, backlinks overview, referring domains) with a registry supporting preferred + fallback resolution. `SemrushProvider` wraps existing semrush.ts with zero behavior change. `DataForSeoProvider` implements full API client with Basic auth, per-workspace file cache (`.dataforseo-cache/`), disk-based credit tracking, and circuit breaker. Workspace-level `seoDataProvider` preference stored in SQLite. Provider toggle UI in KeywordStrategy settings panel (visible when both providers configured). Strategy generator and all SEO consumers wired through abstraction layer. Provider status endpoint and DataForSEO usage tracking in AI usage dashboard.
+**Files:** `server/seo-data-provider.ts` (interface + registry), `server/providers/semrush-provider.ts`, `server/providers/dataforseo-provider.ts`, `server/db/migrations/031-seo-data-provider.sql`, `server/app.ts` (registration), `server/routes/keyword-strategy.ts` (consumer wiring), `server/routes/semrush.ts` (status endpoint), `server/routes/ai.ts` (usage tracking), `server/workspaces.ts` (column mapping), `shared/types/workspace.ts`, `src/api/seo.ts`, `src/components/KeywordStrategy.tsx` (toggle UI)
+
+**Agency value:** ~70-80% API cost reduction by switching to DataForSEO (~$50-150/mo vs SEMRush ~$430/mo). Per-workspace flexibility — can keep SEMRush for high-priority clients and use DataForSEO for others. Zero lock-in with provider abstraction.
+
+**Client value:** Same quality keyword data and competitive intelligence at lower cost. Provider choice is transparent to the client experience.
+
+**Mutual:** Cost savings fund more client work or better tooling. Abstraction layer future-proofs against any single API vendor's pricing changes.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 22 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner + schema coverage/priority/impact tracking |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 34 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline |
+| Content & Strategy | 41 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline + title/meta variants + outline-only regen + voice scoring + client keyword requests + SERP targeting + strategy diff + ROI quick wins |
 | Client Communication | 11 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email + content plan review alerts |
 | Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -1977,12 +2060,12 @@ When the user asks to update this document with recent features, follow this pro
 | Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
 | Platform & UX | 21 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe, strategy→planner bridge |
 | Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 7 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook |
+| Architecture | 8 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook, SEO data provider abstraction layer |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**176 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**184 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **176**. Last updated: March 2026 (platform unification Phase 4 shipped — centralized query keys, STALE_TIMES, shared GA4 base hook, WS→cache invalidation registry).
+Current feature count: **184**. Last updated: March 2026 (DataForSEO provider + SEO data abstraction layer).
 
 ### Recent Additions (March 2026)
 

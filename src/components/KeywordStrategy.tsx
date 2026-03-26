@@ -3,7 +3,7 @@ import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   AlertCircle, Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy, AlertTriangle,
+  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
 import { StatCard, AIContextIndicator } from './ui';
 import { useKeywordStrategy } from '../hooks/admin';
@@ -16,7 +16,9 @@ import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './strategy/CannibalizationAlert';
-import { keywords } from '../api/seo';
+import { StrategyDiff } from './strategy/StrategyDiff';
+import { keywords, rankTracking } from '../api/seo';
+import { workspaces } from '../api';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -60,6 +62,27 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
+  const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
+  const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
+  const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
+
+  // Seed trackedKeywords from server on mount so buttons reflect actual state
+  useEffect(() => {
+    rankTracking.keywords(workspaceId)
+      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => k.query))))
+      .catch(() => {});
+  }, [workspaceId]);
+
+  // Load provider status + workspace preference
+  useEffect(() => {
+    keywords.providerStatus()
+      .then(data => { if (data?.providers) setProviderList(data.providers); })
+      .catch(() => {});
+    workspaces.getById(workspaceId)
+      .then((ws: Record<string, unknown>) => { if (ws?.seoDataProvider) setActiveProvider(ws.seoDataProvider as string); })
+      .catch(() => {});
+  }, [workspaceId]);
+
   const stepLabels: Record<string, string> = {
     discovery: 'Discovering pages',
     content: 'Fetching page content',
@@ -151,6 +174,16 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     } finally {
       setGenerating(false);
       setProgressStep('');
+    }
+  };
+
+  const trackKeyword = async (kw: string) => {
+    if (trackedKeywords.has(kw)) return;
+    try {
+      await rankTracking.addKeyword(workspaceId, { query: kw });
+      setTrackedKeywords(prev => new Set(prev).add(kw));
+    } catch {
+      // silently ignore duplicates — server deduplicates
     }
   };
 
@@ -292,6 +325,42 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         </button>
         {settingsOpen && (
           <div className="px-4 pb-4 space-y-4">
+            {/* SEO Data Provider */}
+            {providerList.filter(p => p.configured).length > 1 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-teal-400" />
+                  <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">SEO Data Provider</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {providerList.filter(p => p.configured).map(p => (
+                    <button
+                      key={p.name}
+                      onClick={() => {
+                        setActiveProvider(p.name);
+                        workspaces.update(workspaceId, { seoDataProvider: p.name }).catch(() => {});
+                      }}
+                      className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        (activeProvider || 'semrush') === p.name
+                          ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                          : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      <div className="font-semibold capitalize">{p.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'}</div>
+                      <div className="text-[10px] mt-0.5 opacity-70">
+                        {p.name === 'dataforseo' ? 'Pay-as-you-go' : 'Subscription'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1.5">
+                  {(activeProvider || 'semrush') === 'dataforseo'
+                    ? 'DataForSEO: pay-per-call pricing (~$0.01-0.08/call). Uses same cache layer.'
+                    : 'SEMRush: subscription-based. Traditional keyword intelligence provider.'}
+                </p>
+              </div>
+            )}
+
             {/* SEMRush Mode */}
             {semrushAvailable && (
               <div>
@@ -501,6 +570,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             </div>
           )}
 
+          {/* ── What Changed (Strategy Diff) ── */}
+          <StrategyDiff workspaceId={workspaceId} />
+
           {/* ── Low-Hanging Fruit ── */}
           <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
 
@@ -518,6 +590,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             <div className="flex flex-wrap gap-1.5">
               {strategy.siteKeywords.map((kw: string, i: number) => {
                 const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => m.keyword.toLowerCase() === kw.toLowerCase());
+                const tracked = trackedKeywords.has(kw);
                 return (
                   <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/10 border border-teal-500/20 rounded text-[11px] text-teal-300">
                     {kw}
@@ -527,6 +600,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
                         {metrics.difficulty > 0 && <span className={`text-[11px] font-mono ${difficultyColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
                       </>
                     )}
+                    <button
+                      onClick={() => trackKeyword(kw)}
+                      title={tracked ? 'Tracking' : 'Track in Rank Tracker'}
+                      className={`ml-0.5 transition-colors ${tracked ? 'text-emerald-400' : 'text-zinc-500 hover:text-teal-400'}`}
+                    >
+                      {tracked ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                    </button>
                   </span>
                 );
               })}

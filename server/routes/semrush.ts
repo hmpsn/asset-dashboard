@@ -10,6 +10,7 @@ import {
   getDomainOverview, getDomainOrganicKeywords, getKeywordGap,
   getBacklinksOverview, getOrganicCompetitors,
 } from '../semrush.js';
+import { listProviders } from '../seo-data-provider.js';
 import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
@@ -105,6 +106,11 @@ router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
 // --- SEMRush Utilities ---
 router.get('/api/semrush/status', (_req, res) => {
   res.json({ configured: isSemrushConfigured() });
+});
+
+// Unified SEO data provider status
+router.get('/api/seo-providers/status', (_req, res) => {
+  res.json({ providers: listProviders() });
 });
 
 router.post('/api/semrush/estimate', (req, res) => {

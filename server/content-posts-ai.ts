@@ -676,3 +676,82 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     return null;
   }
 }
+
+// --- Brand Voice Scoring ---
+
+/**
+ * Score how well a generated post matches the workspace's brand voice.
+ * Evaluates: voice consistency, keyword integration, audience alignment, tone consistency.
+ * Returns a 0-100 score and specific feedback.
+ */
+export async function scoreVoiceMatch(
+  post: GeneratedPost,
+  brief: ContentBrief,
+  workspaceId: string,
+): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
+  const voiceCtx = buildVoiceContext(workspaceId);
+
+  // Build a text summary of the post content for analysis
+  const allContent = [
+    post.introduction || '',
+    ...post.sections.map(s => s.content || ''),
+    post.conclusion || '',
+  ].join('\n').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Truncate to ~8000 chars to stay within token limits
+  const contentSnippet = allContent.slice(0, 8000);
+
+  const prompt = `You are a brand voice analyst. Evaluate how well this content matches the brand voice and brief requirements.
+
+BRAND VOICE & BUSINESS CONTEXT:
+${voiceCtx}
+
+BRIEF REQUIREMENTS:
+- Target keyword: "${brief.targetKeyword}"
+- Secondary keywords: ${brief.secondaryKeywords.join(', ')}
+- Audience: ${brief.audience}
+- Intent: ${brief.intent}
+${brief.toneAndStyle ? `- Tone & Style: ${brief.toneAndStyle}` : ''}
+${brief.contentFormat ? `- Content Format: ${brief.contentFormat}` : ''}
+
+POST TITLE: ${post.title}
+POST CONTENT (plain text):
+${contentSnippet}
+
+Score this content on a 0-100 scale across these dimensions:
+1. Brand Voice Consistency (0-25): Does the writing match the workspace's brand voice, vocabulary, and personality?
+2. Keyword Integration (0-25): Are the target and secondary keywords woven in naturally, without stuffing?
+3. Audience Alignment (0-25): Is the content pitched at the right level for the target audience? Does it address their needs and intent?
+4. Tone Consistency (0-25): Is the tone consistent throughout the piece, with no jarring shifts?
+
+Return ONLY valid JSON in this exact format:
+{
+  "voiceScore": <total 0-100>,
+  "voiceFeedback": "<2-4 sentences: specific callouts about voice match, including both positives and areas for improvement>"
+}`;
+
+  const result = await callOpenAI({
+    model: CONTENT_MODEL,
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 500,
+    temperature: 0.3,
+    feature: 'voice-scoring',
+    workspaceId,
+  });
+
+  try {
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      log.warn('Voice scoring: no JSON object found in response');
+      return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
+    }
+    const parsed = JSON.parse(jsonMatch[0]) as { voiceScore: number; voiceFeedback: string };
+    const score = Math.max(0, Math.min(100, Math.round(parsed.voiceScore)));
+    const feedback = parsed.voiceFeedback || 'No feedback provided.';
+    log.info(`Voice score for post ${post.id}: ${score}/100`);
+    return { voiceScore: score, voiceFeedback: feedback };
+  } catch (err) {
+    log.warn({ err }, 'Failed to parse voice scoring JSON');
+    return { voiceScore: null, voiceFeedback: 'Voice scoring failed — could not parse AI response.' };
+  }
+}

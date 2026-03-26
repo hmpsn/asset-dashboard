@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { adminPath, type Page } from '../routes';
+import { redirects as redirectsApi } from '../api/misc';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
@@ -10,7 +12,8 @@ import {
   Loader2, ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
-  TrendingDown, Sparkles, EyeOff, AlertTriangle,
+  TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off, Download,
+  Wrench, ArrowRight, Plus,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
@@ -43,6 +46,7 @@ type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review' | 'content-decay
 
 function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { startJob, jobs } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
@@ -65,7 +69,14 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [skipLinkCheck, setSkipLinkCheck] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+
+  // Dead link details — inline redirect form
+  const [redirectFormUrl, setRedirectFormUrl] = useState<string | null>(null);
+  const [redirectFormTo, setRedirectFormTo] = useState('');
+  const [pendingRedirects, setPendingRedirects] = useState<Map<string, string>>(new Map());
+  const [savingRedirect, setSavingRedirect] = useState(false);
   const [applyingFix, setApplyingFix] = useState<string | null>(null);
   const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
   const [editedSuggestions, setEditedSuggestions] = useState<Record<string, string>>({});
@@ -336,7 +347,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setLoading(true);
     setHasRun(true);
     setAuditError(null);
-    const jobId = await startJob('seo-audit', { siteId, workspaceId });
+    const jobId = await startJob('seo-audit', { siteId, workspaceId, skipLinkCheck });
     if (jobId) {
       auditJobId.current = jobId;
     } else {
@@ -435,6 +446,42 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const exportDeadLinksCSV = () => {
+    const links = effectiveData?.deadLinkDetails;
+    if (!links || links.length === 0) return;
+    const rows = links.map(l => {
+      const redirectTo = pendingRedirects.get(l.url) || '';
+      return [l.url, String(l.status), l.statusText, l.type, l.foundOn, l.anchorText, redirectTo]
+        .map(v => `"${v.replace(/"/g, '""')}"`)
+        .join(',');
+    });
+    const csv = 'Broken URL,Status,Status Text,Type,Found On,Anchor Text,Redirect To\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dead-links.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const saveRedirect = async (fromUrl: string) => {
+    const toUrl = redirectFormTo.trim();
+    if (!toUrl) return;
+    setSavingRedirect(true);
+    try {
+      // Persist locally and attempt server save
+      setPendingRedirects(prev => new Map(prev).set(fromUrl, toUrl));
+      try {
+        await redirectsApi.save(siteId, { rules: [{ from: fromUrl, to: toUrl }] });
+      } catch { /* server save is best-effort */ }
+      setRedirectFormUrl(null);
+      setRedirectFormTo('');
+    } finally {
+      setSavingRedirect(false);
+    }
   };
 
   const toggleExpand = (page: string) => {
@@ -575,6 +622,15 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           >
             Run SEO Audit
           </button>
+          <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!skipLinkCheck}
+              onChange={e => setSkipLinkCheck(!e.target.checked)}
+              className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-zinc-900"
+            />
+            Include dead link scan
+          </label>
         </div>
       </div>
     );
@@ -648,7 +704,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     <div className="space-y-5">
       {auditTabBar}
       {/* Summary cards */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className={`grid gap-3 ${effectiveData!.deadLinkSummary ? 'grid-cols-6' : 'grid-cols-5'}`}>
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 col-span-1">
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Site Score</span>
@@ -673,6 +729,16 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} className={severityFilter === 'error' ? 'border-red-500/50' : ''} />
         <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} className={severityFilter === 'warning' ? 'border-amber-500/50' : ''} />
         <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} className={severityFilter === 'info' ? 'border-blue-500/50' : ''} />
+        {effectiveData!.deadLinkSummary && (
+          <StatCard
+            label="Broken Links"
+            value={effectiveData!.deadLinkSummary.total}
+            icon={Link2Off}
+            valueColor={effectiveData!.deadLinkSummary.internal > 0 ? 'text-red-400' : effectiveData!.deadLinkSummary.total > 0 ? 'text-amber-400' : 'text-emerald-400'}
+            sub={effectiveData!.deadLinkSummary.total === 0 ? 'All links healthy' : `${effectiveData!.deadLinkSummary.internal} internal · ${effectiveData!.deadLinkSummary.external} external`}
+            onClick={() => setAuditSubTab('links')}
+          />
+        )}
       </div>
 
       {/* Contextual tool tips based on audit findings */}
@@ -865,6 +931,121 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Dead Link Details Panel */}
+      {effectiveData!.deadLinkDetails && effectiveData!.deadLinkDetails.length > 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Link2Off className="w-4 h-4 text-red-400" />
+              <span className="text-sm font-medium text-zinc-300">Broken Links</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+                {effectiveData!.deadLinkDetails.length}
+              </span>
+              {pendingRedirects.size > 0 && (
+                <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {pendingRedirects.size} redirect{pendingRedirects.size !== 1 ? 's' : ''} queued
+                </span>
+              )}
+            </div>
+            <button
+              onClick={exportDeadLinksCSV}
+              className="flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+            >
+              <Download className="w-3 h-3" /> Export CSV
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {effectiveData!.deadLinkDetails.map((link, idx) => {
+              const isFormOpen = redirectFormUrl === link.url;
+              const hasRedirect = pendingRedirects.has(link.url);
+              return (
+                <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-950/40 overflow-hidden">
+                  <div className="flex items-start gap-2 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[11px] px-1 py-px rounded border font-mono flex-shrink-0 ${link.status === 404 || link.status === '404' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                          {link.status}
+                        </span>
+                        <span className={`text-[10px] px-1 py-px rounded border flex-shrink-0 ${link.type === 'internal' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-zinc-700/50 text-zinc-400 border-zinc-600/50'}`}>
+                          {link.type}
+                        </span>
+                        <span className="text-xs text-zinc-300 font-mono truncate">{link.url}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[11px] text-zinc-500">Found on:</span>
+                        <span className="text-[11px] text-zinc-400 truncate">{link.foundOn || link.foundOnSlug}</span>
+                        {link.anchorText && (
+                          <>
+                            <span className="text-[11px] text-zinc-600">·</span>
+                            <span className="text-[11px] text-zinc-500 italic truncate">"{link.anchorText}"</span>
+                          </>
+                        )}
+                      </div>
+                      {hasRedirect && !isFormOpen && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <ArrowRight className="w-3 h-3 text-teal-400" />
+                          <span className="text-[11px] text-teal-400 font-mono">{pendingRedirects.get(link.url)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {workspaceId && link.type === 'internal' && (
+                        <button
+                          onClick={() => navigate(adminPath(workspaceId, 'seo-editor' as Page), {
+                            state: { fixContext: { pageSlug: link.foundOnSlug, pageName: link.foundOn, issueCheck: 'broken_link', issueMessage: `Broken link: ${link.url}` } },
+                          })}
+                          className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+                          title="Open source page in SEO Editor"
+                        >
+                          <Wrench className="w-2.5 h-2.5" /> Fix
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (isFormOpen) { setRedirectFormUrl(null); setRedirectFormTo(''); }
+                          else { setRedirectFormUrl(link.url); setRedirectFormTo(hasRedirect ? pendingRedirects.get(link.url)! : ''); }
+                        }}
+                        className={`flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded border transition-colors ${hasRedirect ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border-zinc-700'}`}
+                        title="Create a redirect for this URL"
+                      >
+                        <Plus className="w-2.5 h-2.5" /> {hasRedirect ? 'Edit Redirect' : 'Add Redirect'}
+                      </button>
+                    </div>
+                  </div>
+                  {isFormOpen && (
+                    <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 flex items-center gap-2">
+                      <ArrowRight className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={redirectFormTo}
+                        onChange={e => setRedirectFormTo(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveRedirect(link.url); if (e.key === 'Escape') { setRedirectFormUrl(null); setRedirectFormTo(''); } }}
+                        placeholder="/new-path or https://example.com/new"
+                        className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-teal-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => saveRedirect(link.url)}
+                        disabled={!redirectFormTo.trim() || savingRedirect}
+                        className="px-2.5 py-1 rounded text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                      >
+                        {savingRedirect ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => { setRedirectFormUrl(null); setRedirectFormTo(''); }}
+                        className="p-1 rounded hover:bg-zinc-700 text-zinc-500"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

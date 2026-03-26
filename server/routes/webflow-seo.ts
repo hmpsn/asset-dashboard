@@ -40,7 +40,8 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
       log.error({ detail: req.params.siteId }, 'SEO audit: No token available for site');
       return res.status(500).json({ error: 'No Webflow API token configured. Please link a workspace to this site in Settings, or set WEBFLOW_API_TOKEN environment variable.' });
     }
-    const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined);
+    const skipLinkCheck = req.query.skipLinkCheck === 'true';
+    const result = await runSeoAudit(req.params.siteId, token, req.query.workspaceId as string | undefined, skipLinkCheck);
     // Auto-flag pages with issues for edit tracking
     const auditWsId = req.query.workspaceId as string | undefined;
     const auditWs = auditWsId ? getWorkspace(auditWsId) : listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
