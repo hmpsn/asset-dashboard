@@ -18,7 +18,7 @@ import {
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyApprovalReady } from '../email.js';
-import { getClientActor } from '../middleware.js';
+import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
   updateCollectionItem,
   publishCollectionItems,
@@ -149,17 +149,17 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
 });
 
 // --- Public Approvals (client dashboard, no auth required) ---
-router.get('/api/public/approvals/:workspaceId', (req, res) => {
+router.get('/api/public/approvals/:workspaceId', requireClientPortalAuth(), (req, res) => {
   res.json(listBatches(req.params.workspaceId));
 });
 
-router.get('/api/public/approvals/:workspaceId/:batchId', (req, res) => {
+router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAuth(), (req, res) => {
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
   res.json(batch);
 });
 
-router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', validate(updateItemSchema), (req, res) => {
+router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res) => {
   // Only include fields that were actually sent — passing undefined would overwrite existing values
   const update: Partial<Pick<import('../../shared/types/approvals').ApprovalItem, 'status' | 'clientValue' | 'clientNote'>> = {};
   if (req.body.status !== undefined) update.status = req.body.status;
@@ -200,12 +200,28 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', validate(upd
       }
     }
   }
+  // Handle undo — client reverting their approve/reject decision back to pending
+  if (status === 'pending') {
+    const item = batch.items.find(i => i.id === req.params.itemId);
+    if (item?.pageId) {
+      updatePageState(req.params.workspaceId, item.pageId, {
+        status: 'in-review',
+        updatedBy: 'client',
+      });
+      const actorInfo = getClientActor(req, req.params.workspaceId);
+      addActivity(req.params.workspaceId, 'approval_reverted',
+        `${actorInfo?.name || 'Client'} reverted ${item.field} decision on ${item.pageTitle || item.pageId}`,
+        undefined,
+        { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
+        actorInfo);
+    }
+  }
   broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: req.params.batchId, itemId: req.params.itemId, status });
   res.json(batch);
 });
 
 // Apply approved items to Webflow
-router.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) => {
+router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPortalAuth(), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const batch = getBatch(req.params.workspaceId, req.params.batchId);

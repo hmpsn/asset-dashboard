@@ -346,6 +346,24 @@ export function ApprovalsTab({
                                 {item.status === 'approved' && (
                                   <div className="flex items-center gap-2 mt-3 text-[11px] text-green-400">
                                     <Check className="w-3 h-3" /> Approved — will be applied when you push changes live
+                                    <button
+                                      onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending' })}
+                                      className="ml-2 px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] text-zinc-400 transition-colors"
+                                    >Undo</button>
+                                  </div>
+                                )}
+                                {item.status === 'rejected' && (
+                                  <div className="mt-3">
+                                    <div className="flex items-center gap-2 text-[11px] text-red-400">
+                                      <X className="w-3 h-3" /> Rejected
+                                      <button
+                                        onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending' })}
+                                        className="ml-2 px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] text-zinc-400 transition-colors"
+                                      >Undo</button>
+                                    </div>
+                                    {item.clientNote && (
+                                      <div className="mt-1 text-[10px] text-zinc-500">Note: {item.clientNote}</div>
+                                    )}
                                   </div>
                                 )}
                                 {item.status === 'applied' && (

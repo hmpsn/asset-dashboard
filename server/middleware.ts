@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import type express from 'express';
 import multer from 'multer';
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { getUploadRoot } from './data-dir.js';
 import { verifyClientToken, getSafeClientUser } from './client-users.js';
 
@@ -149,6 +149,33 @@ export function getClientActor(req: express.Request, workspaceId: string): { id?
   if (!payload || payload.workspaceId !== workspaceId) return undefined;
   const user = getSafeClientUser(payload.clientUserId);
   return user ? { id: user.id, name: user.name } : undefined;
+}
+
+// ── Client Portal Auth Guard ──
+
+/** Require client portal authentication (JWT or legacy session cookie) on public endpoints.
+ *  Passwordless workspaces (no client password set) are accessible by URL alone. */
+export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const workspaceId = req.params[wsIdParam];
+    // Check JWT token first (preferred)
+    const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
+    if (clientToken) {
+      const payload = verifyClientToken(clientToken);
+      if (payload && payload.workspaceId === workspaceId) return next();
+    }
+    // Fall back to legacy session cookie
+    if (req.cookies?.[`client_session_${workspaceId}`]) return next();
+    // Allow admin access (internal JWT) so admin dashboard can call these endpoints
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) return next();
+    if (req.cookies?.token) return next();
+    // Passwordless workspaces are accessible by URL (the workspace ID is the credential)
+    const ws = getWorkspace(workspaceId);
+    if (ws && !ws.hasPassword) return next();
+
+    return res.status(401).json({ error: 'Authentication required' });
+  };
 }
 
 // ── File Upload ──
