@@ -1409,7 +1409,7 @@ async function aiGenerateUnifiedSchema(
 
   const pageUrl = (!slug || slug === 'index' || slug === 'home') ? baseUrl : `${baseUrl}/${slug}`;
   const pageContent = html ? extractPageContent(html) : '';
-  const info = html ? extractStructuredInfo(html) : { emails: [], phones: [], images: [], questions: [], author: '', publishDate: '' };
+  const info = html ? extractStructuredInfo(html) : { emails: [], phones: [], images: [], questions: [], author: '', publishDate: '', steps: [], videoUrls: [] };
 
   const companyName = ctx.companyName || '(unknown — infer from page content)';
   const siteUrl = ctx.liveDomain ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`) : baseUrl;
@@ -1704,8 +1704,8 @@ export async function generateSchemaForPage(
   // Inject per-page analytics if maps were provided
   if (gscMap || ga4Map) {
     const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
-    if (gscMap) ctx._gscPageData = gscMap.get(lookupPath) ?? gscMap.get('/') ?? undefined;
-    if (ga4Map) ctx._ga4PageData = ga4Map.get(lookupPath) ?? ga4Map.get('/') ?? undefined;
+    if (gscMap) ctx._gscPageData = gscMap.get(lookupPath);
+    if (ga4Map) ctx._ga4PageData = ga4Map.get(lookupPath);
   }
 
   // Try AI unified schema first
@@ -1917,11 +1917,14 @@ export async function generateSchemaSuggestions(
           const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
           const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
+          const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
             searchIntent: getPageIntent(slug),
             _pageAnalysis: getPageAnalysis(slug),
+            _gscPageData: gscMap?.get(cmsNormalizedPath),
+            _ga4PageData: ga4Map?.get(cmsNormalizedPath),
           };
 
           let suggestedSchemas: SchemaSuggestion[];

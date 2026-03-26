@@ -532,6 +532,12 @@ export function buildPlanContextForPage(
     case 'faq':
       lines.push('\nINSTRUCTION: Use FAQPage only if the page has a real dedicated FAQ section with clearly labeled Q&A pairs.');
       break;
+    case 'howto':
+      lines.push('\nINSTRUCTION: Use HowTo as mainEntity with step nodes extracted from numbered lists or "Step N:" headings. Include totalTime if mentioned. Add supply/tool arrays only if explicitly listed on the page.');
+      break;
+    case 'video':
+      lines.push('\nINSTRUCTION: Use VideoObject as mainEntity with name, description, uploadDate, and thumbnailUrl from page content. Include embedUrl for YouTube/Vimeo embeds. Omit VideoObject entirely if uploadDate or thumbnailUrl cannot be found in the content.');
+      break;
   }
 
   return lines.join('\n');

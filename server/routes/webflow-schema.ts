@@ -284,7 +284,7 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
     // Gather current schema types from existing snapshot for competitor gap analysis
     const existingSnapshot = getSchemaSnapshot(req.params.siteId);
     const ourSchemaTypes = existingSnapshot
-      ? [...new Set(existingSnapshot.flatMap(p =>
+      ? [...new Set(existingSnapshot.results.flatMap(p =>
           p.suggestedSchemas?.flatMap(s => s.type?.split(' + ') || []) || []
         ))]
       : [];
