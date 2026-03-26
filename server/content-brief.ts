@@ -508,6 +508,10 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     referenceUrls: existingBrief.referenceUrls,
     realPeopleAlsoAsk: existingBrief.realPeopleAlsoAsk,
     realTopResults: existingBrief.realTopResults,
+    keywordLocked: existingBrief.keywordLocked,
+    keywordSource: existingBrief.keywordSource,
+    keywordValidation: existingBrief.keywordValidation,
+    templateId: existingBrief.templateId,
   };
 
   stmts().insert.run({
