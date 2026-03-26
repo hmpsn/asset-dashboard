@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus, LayoutList, Layers } from 'lucide-react';
 import { MetricRing } from '../ui';
 import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
@@ -78,6 +78,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   const [severityFilter, setSeverityFilter] = useState<'all' | 'error' | 'warning' | 'info'>(initialSeverity || 'warning');
   const [showInfoItems, setShowInfoItems] = useState(false);
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'by-page' | 'by-fix-type'>('by-page');
   const [auditSearch, setAuditSearch] = useState('');
   const [requestedPages, setRequestedPages] = useState<Set<string>>(new Set());
   const [requestingPage, setRequestingPage] = useState<string | null>(null);
@@ -572,6 +573,18 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       <div ref={allPagesRef}>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
+            {/* View mode toggle */}
+            <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+              <button onClick={() => setViewMode('by-page')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${viewMode === 'by-page' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <LayoutList className="w-3 h-3" /> By Page
+              </button>
+              <button onClick={() => setViewMode('by-fix-type')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${viewMode === 'by-fix-type' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <Layers className="w-3 h-3" /> By Fix Type
+              </button>
+            </div>
+            {/* Severity filter */}
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
               {(['all', 'error', 'warning'] as const).map(s => (
                 <button key={s} onClick={() => setSeverityFilter(s)}
@@ -593,12 +606,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                 {showInfoItems ? 'Hide' : 'Show'} {infoIssueCount} informational
               </button>
             )}
-            <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
-            <button onClick={() => toggleSection('all-pages')} className="ml-auto p-1.5 rounded hover:bg-zinc-800 text-zinc-500">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            {viewMode === 'by-page' && (
+              <input type="text" value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search pages..."
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 w-40" />
+            )}
           </div>
+
+          {/* By-page view */}
+          {viewMode === 'by-page' && (
           <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
             {filteredPages.map(page => {
               const errs = page.issues.filter(i => i.severity === 'error').length;
@@ -621,7 +636,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                       <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                     </div>
                   </button>
-                  
+
                   {isExpanded && (
                     <div className="px-4 pb-3">
                       <div className="space-y-2">
@@ -667,6 +682,96 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             })}
             {filteredPages.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No pages match your filters</div>}
           </div>
+          )}
+
+          {/* By-fix-type view */}
+          {viewMode === 'by-fix-type' && (() => {
+            // Group all issues by category, then by check type
+            const FIX_TYPE_LABELS: Record<string, string> = {
+              'title': 'Page Titles', 'meta-description': 'Meta Descriptions', 'h1': 'Headings (H1)',
+              'canonical': 'Canonical Tags', 'img-alt': 'Image Alt Text', 'og-tags': 'Social Media Tags',
+              'og-image': 'Social Media Images', 'structured-data': 'Schema / Structured Data',
+              'internal-links': 'Internal Links', 'content-length': 'Content Length',
+              'redirect-chains': 'Redirect Chains', 'mixed-content': 'Mixed Content',
+              'ssl': 'SSL / HTTPS', 'viewport': 'Mobile Viewport', 'robots': 'Robots / Indexing',
+              'heading-hierarchy': 'Heading Structure', 'cwv': 'Core Web Vitals',
+              'duplicate-title': 'Duplicate Titles', 'duplicate-description': 'Duplicate Descriptions',
+            };
+            const groups = new Map<string, { check: string; label: string; severity: 'error' | 'warning' | 'info'; pages: { pageId: string; page: string; url: string; message: string; recommendation?: string }[] }>();
+
+            (auditDetail?.audit.pages || []).forEach(p => {
+              p.issues.forEach(issue => {
+                if (!showInfoItems && issue.severity === 'info') return;
+                if (severityFilter !== 'all' && issue.severity !== severityFilter) return;
+                const key = issue.check || 'other';
+                if (!groups.has(key)) {
+                  groups.set(key, {
+                    check: key,
+                    label: FIX_TYPE_LABELS[key.toLowerCase()] || (issue.category ? (CAT_LABELS[issue.category]?.label || issue.category) + ': ' + key : key),
+                    severity: issue.severity,
+                    pages: [],
+                  });
+                }
+                const g = groups.get(key)!;
+                // Keep highest severity
+                if (issue.severity === 'error' && g.severity !== 'error') g.severity = 'error';
+                else if (issue.severity === 'warning' && g.severity === 'info') g.severity = 'warning';
+                g.pages.push({ pageId: p.pageId, page: p.page, url: p.url, message: issue.message, recommendation: issue.recommendation });
+              });
+            });
+
+            const sorted = [...groups.values()].sort((a, b) => {
+              const sevScore = (s: string) => s === 'error' ? 3 : s === 'warning' ? 2 : 1;
+              const d = sevScore(b.severity) - sevScore(a.severity);
+              if (d !== 0) return d;
+              return b.pages.length - a.pages.length;
+            });
+
+            return (
+              <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
+                {sorted.length === 0 && <div className="px-4 py-8 text-center text-xs text-zinc-500">No issues match your filters</div>}
+                {sorted.map(group => {
+                  const sc = SEV[group.severity];
+                  const isExpanded = expandedPages.has(`fix-type-${group.check}`);
+                  return (
+                    <div key={group.check} className={`transition-all ${isExpanded ? 'bg-zinc-950/50' : ''}`}>
+                      <button
+                        onClick={() => togglePage(`fix-type-${group.check}`)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-zinc-300">{group.label}</div>
+                          <div className="text-[11px] text-zinc-500">{group.pages.length} {group.pages.length === 1 ? 'page' : 'pages'} affected</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-[11px] font-medium uppercase ${sc.text}`}>{group.severity}</span>
+                          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${sc.bg} border ${sc.border} ${sc.text}`}>{group.pages.length}</span>
+                          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-4 pb-3">
+                          {checkImpact(group.check) && (
+                            <div className="text-[11px] text-zinc-400 mb-2 leading-relaxed px-1">{checkImpact(group.check)}</div>
+                          )}
+                          <div className="space-y-1.5">
+                            {group.pages.map((p, i) => (
+                              <div key={`${p.pageId}-${i}`} className={`px-3 py-2 rounded-lg ${sc.bg} border ${sc.border}`}>
+                                <div className="text-[11px] font-medium text-zinc-300 truncate">{p.page}</div>
+                                <div className="text-[10px] text-zinc-500 truncate">{toLiveUrl(p.url, liveDomain)}</div>
+                                {p.recommendation && <div className="text-[10px] text-zinc-500 mt-0.5">{p.recommendation}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

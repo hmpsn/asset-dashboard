@@ -616,6 +616,67 @@
       ]
     },
     {
+      "id": "sprint-semrush-optimization",
+      "name": "SEMRush API Cost Optimization",
+      "goal": "Reduce SEMRush credit consumption by 40-60% without degrading strategy quality",
+      "items": [
+        {
+          "id": 371,
+          "title": "Extend SEMRush cache TTLs by data volatility",
+          "source": "OPTIMIZATION",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — Named TTL constants: keyword metrics 7d→30d, related/questions 7d→30d, domain overview 48h→7d, backlinks 48h→7d, competitors 72h→14d. Domain organic stays at 7d (rankings shift weekly). ~10-20% fewer cache misses on repeat operations.",
+          "status": "done"
+        },
+        {
+          "id": 372,
+          "title": "Unify domain organic fetch limit to prevent cache misses",
+          "source": "OPTIMIZATION",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — Strategy gen fetched limit=100 (quick) or limit=200 (full), but getKeywordGap internally re-fetches client domain with limit=200. Different limit = different cache key = duplicate API call. Standardized to 200 for all modes.",
+          "status": "done"
+        },
+        {
+          "id": 373,
+          "title": "Global cross-workspace keyword metrics cache (SQLite)",
+          "source": "OPTIMIZATION",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — keyword_metrics_cache SQLite table with L1/L2 cache chain in getKeywordOverview: L1 (global SQLite) → L2 (per-workspace file) → L3 (SEMRush API). File cache hits backfill global table. API results write to both caches. Saves 30-50% of keyword_overview credits across workspaces in same industry. Feature #178.",
+          "status": "done"
+        },
+        {
+          "id": 374,
+          "title": "Pre-enrichment deduplication in strategy generation",
+          "source": "OPTIMIZATION",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Post-AI validation now checks domain organic data (already fetched earlier in the same run) before calling SEMRush API. Combined with #375 (page_keywords skip). Saves ~1,000 credits per strategy run. Feature #178.",
+          "status": "done"
+        },
+        {
+          "id": 375,
+          "title": "Skip keywords with existing metrics in page_keywords table",
+          "source": "OPTIMIZATION",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "Shipped — Post-AI validation checks existing page_keywords entries (from previous runs) before calling SEMRush API. On re-runs, 60-90% of validation API calls eliminated since most keywords are unchanged. Combined with global cache (#373) and domain organic dedup (#374). Feature #178.",
+          "status": "done"
+        },
+        {
+          "id": 376,
+          "title": "Incremental strategy updates (re-analyze changed pages only)",
+          "source": "OPTIMIZATION",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Add 'Update Strategy' mode alongside full 'Regenerate'. Uses page_keywords.analysis_generated_at to identify pages needing re-analysis. Skips competitor data if fetched within 7 days. Only runs AI on new/changed pages. Preserves existing keyword assignments for unchanged pages. Biggest long-term savings: 50-70% of a full run. Depends on: page_keywords table (#364, done).",
+          "status": "pending"
+        }
+      ]
+    },
+    {
       "id": "backlog",
       "name": "Backlog",
       "hours": "80+",
@@ -3396,66 +3457,6 @@
           "priority": "P0",
           "notes": "Shipped — Three fixes: (1) Race condition: concurrent updateWorkspace calls inside Promise.all caused read-modify-write data loss. Fixed by collecting batch results then persisting atomically. (2) getSiteSubdomain called per-page (~256 redundant Webflow API calls) — moved outside loop. (3) Added 10s timeout to HTML fetches to prevent job hangs.",
           "status": "done"
-        }
-      ]
-    },
-    {
-      "sprint": "SEMRush API Cost Optimization",
-      "goal": "Reduce SEMRush credit consumption by 40-60% without degrading strategy quality",
-      "items": [
-        {
-          "id": 371,
-          "title": "Extend SEMRush cache TTLs by data volatility",
-          "source": "OPTIMIZATION",
-          "est": "0.5h",
-          "priority": "P1",
-          "notes": "Shipped — Named TTL constants: keyword metrics 7d→30d, related/questions 7d→30d, domain overview 48h→7d, backlinks 48h→7d, competitors 72h→14d. Domain organic stays at 7d (rankings shift weekly). ~10-20% fewer cache misses on repeat operations.",
-          "status": "done"
-        },
-        {
-          "id": 372,
-          "title": "Unify domain organic fetch limit to prevent cache misses",
-          "source": "OPTIMIZATION",
-          "est": "0.5h",
-          "priority": "P1",
-          "notes": "Shipped — Strategy gen fetched limit=100 (quick) or limit=200 (full), but getKeywordGap internally re-fetches client domain with limit=200. Different limit = different cache key = duplicate API call. Standardized to 200 for all modes.",
-          "status": "done"
-        },
-        {
-          "id": 373,
-          "title": "Global cross-workspace keyword metrics cache (SQLite)",
-          "source": "OPTIMIZATION",
-          "est": "3h",
-          "priority": "P1",
-          "notes": "Shipped — keyword_metrics_cache SQLite table with L1/L2 cache chain in getKeywordOverview: L1 (global SQLite) → L2 (per-workspace file) → L3 (SEMRush API). File cache hits backfill global table. API results write to both caches. Saves 30-50% of keyword_overview credits across workspaces in same industry. Feature #178.",
-          "status": "done"
-        },
-        {
-          "id": 374,
-          "title": "Pre-enrichment deduplication in strategy generation",
-          "source": "OPTIMIZATION",
-          "est": "1h",
-          "priority": "P1",
-          "notes": "Shipped — Post-AI validation now checks domain organic data (already fetched earlier in the same run) before calling SEMRush API. Combined with #375 (page_keywords skip). Saves ~1,000 credits per strategy run. Feature #178.",
-          "status": "done"
-        },
-        {
-          "id": 375,
-          "title": "Skip keywords with existing metrics in page_keywords table",
-          "source": "OPTIMIZATION",
-          "est": "1.5h",
-          "priority": "P2",
-          "notes": "Shipped — Post-AI validation checks existing page_keywords entries (from previous runs) before calling SEMRush API. On re-runs, 60-90% of validation API calls eliminated since most keywords are unchanged. Combined with global cache (#373) and domain organic dedup (#374). Feature #178.",
-          "status": "done"
-        },
-        {
-          "id": 376,
-          "title": "Incremental strategy updates (re-analyze changed pages only)",
-          "source": "OPTIMIZATION",
-          "est": "4h",
-          "priority": "P2",
-          "notes": "Add 'Update Strategy' mode alongside full 'Regenerate'. Uses page_keywords.analysis_generated_at to identify pages needing re-analysis. Skips competitor data if fetched within 7 days. Only runs AI on new/changed pages. Preserves existing keyword assignments for unchanged pages. Biggest long-term savings: 50-70% of a full run. Depends on: page_keywords table (#364, done).",
-          "status": "pending"
         }
       ]
     }
