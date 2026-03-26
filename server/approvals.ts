@@ -115,7 +115,8 @@ export function updateItem(
   const statuses = batch.items.map(i => i.status);
   if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   else if (statuses.every(s => s === 'approved' || s === 'applied')) batch.status = 'approved';
-  else if (statuses.some(s => s === 'approved')) batch.status = 'partial';
+  else if (statuses.every(s => s === 'rejected')) batch.status = 'rejected';
+  else if (statuses.some(s => s === 'approved' || s === 'rejected')) batch.status = 'partial';
   else batch.status = 'pending';
 
   batch.updatedAt = new Date().toISOString();
