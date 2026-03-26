@@ -9,6 +9,7 @@ import multer from 'multer';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { getUploadRoot } from './data-dir.js';
 import { verifyClientToken, getSafeClientUser } from './client-users.js';
+import { verifyToken as verifyJwtToken } from './auth.js';
 
 // ── Rate Limiting ──
 
@@ -164,15 +165,18 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
       const payload = verifyClientToken(clientToken);
       if (payload && payload.workspaceId === workspaceId) return next();
     }
-    // Fall back to legacy session cookie
-    if (req.cookies?.[`client_session_${workspaceId}`]) return next();
-    // Allow admin access (internal JWT) so admin dashboard can call these endpoints
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) return next();
-    if (req.cookies?.token) return next();
+    // Fall back to legacy session cookie (verify HMAC signature)
+    const sessionCookie = req.cookies?.[`client_session_${workspaceId}`];
+    if (sessionCookie && verifyClientSession(workspaceId, sessionCookie)) return next();
+    // Allow admin access (verify JWT signature) so admin dashboard can call these endpoints
+    const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
+    if (jwtToken) {
+      const jwtPayload = verifyJwtToken(jwtToken);
+      if (jwtPayload) return next();
+    }
     // Passwordless workspaces are accessible by URL (the workspace ID is the credential)
     const ws = getWorkspace(workspaceId);
-    if (ws && !ws.hasPassword) return next();
+    if (ws && !ws.clientPassword) return next();
 
     return res.status(401).json({ error: 'Authentication required' });
   };
