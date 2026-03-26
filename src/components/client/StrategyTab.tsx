@@ -111,6 +111,27 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const getFeedbackStatus = (keyword: string) => keywordFeedback.get(keyword.toLowerCase().trim());
   const isLoadingFeedback = (keyword: string) => feedbackLoading.has(keyword.toLowerCase().trim());
 
+  // ── Keyword Request State ──
+  const [suggestKeyword, setSuggestKeyword] = useState('');
+  const [suggestingKeyword, setSuggestingKeyword] = useState(false);
+  const requestedKeywords = [...keywordFeedback.entries()].filter(([, s]) => s === ('requested' as string)).map(([k]) => k);
+
+  const submitKeywordRequest = useCallback(async () => {
+    if (!workspaceId || !suggestKeyword.trim()) return;
+    const kw = suggestKeyword.trim().toLowerCase();
+    setSuggestingKeyword(true);
+    try {
+      await post(`/api/public/keyword-feedback/${workspaceId}`, { keyword: kw, status: 'requested', source: 'content_gap' });
+      setKeywordFeedback(prev => { const next = new Map(prev); next.set(kw, 'requested' as 'approved'); return next; });
+      setSuggestKeyword('');
+      setToast?.(`"${suggestKeyword.trim()}" submitted — it will be prioritized in your next strategy`);
+    } catch {
+      setToast?.('Failed to submit keyword suggestion');
+    } finally {
+      setSuggestingKeyword(false);
+    }
+  }, [workspaceId, suggestKeyword, setToast]);
+
   // ── Business Priorities State ──
   const [priorities, setPriorities] = useState<{ text: string; category: string }[]>([]);
   const [prioritiesLoaded, setPrioritiesLoaded] = useState(false);
@@ -439,6 +460,66 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
               {priorities.length >= 10 && (
                 <p className="text-[10px] text-zinc-600 mt-1.5">Maximum 10 priorities reached</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SUGGEST A KEYWORD ── */}
+      {workspaceId && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <button
+            onClick={() => toggleSection('suggest-keyword')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                <Plus className="w-3.5 h-3.5 text-teal-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-zinc-200">Suggest a Keyword</div>
+                <div className="text-[11px] text-zinc-500">
+                  {requestedKeywords.length > 0
+                    ? `${requestedKeywords.length} keyword${requestedKeywords.length > 1 ? 's' : ''} submitted`
+                    : 'Submit keyword ideas for your next strategy'}
+                </div>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${expandedSections.has('suggest-keyword') ? '' : '-rotate-90'}`} />
+          </button>
+
+          {expandedSections.has('suggest-keyword') && (
+            <div className="px-4 pb-4 border-t border-zinc-800/50">
+              <p className="text-[11px] text-zinc-400 mt-3 mb-3 leading-relaxed">
+                Have a keyword idea? Submit it here and it will be given high priority in your next strategy generation.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  value={suggestKeyword}
+                  onChange={e => setSuggestKeyword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && submitKeywordRequest()}
+                  placeholder="e.g., best project management tools"
+                  className="flex-1 px-3 py-2 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500/50"
+                />
+                <button
+                  onClick={submitKeywordRequest}
+                  disabled={!suggestKeyword.trim() || suggestingKeyword}
+                  className="px-3 py-2 text-xs font-medium rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 transition-colors disabled:opacity-50"
+                >
+                  {suggestingKeyword ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
+              {requestedKeywords.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <div className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Your Suggestions</div>
+                  {requestedKeywords.map(kw => (
+                    <div key={kw} className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
+                      <span className="text-[11px] text-zinc-300">{kw}</span>
+                      <span className="text-[10px] text-teal-400/60 font-medium">Pending</span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

@@ -352,8 +352,8 @@ router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source } = req.body;
-  if (!keyword || !status || !['approved', 'declined'].includes(status)) {
-    return res.status(400).json({ error: 'keyword and status (approved|declined) required' });
+  if (!keyword || !status || !['approved', 'declined', 'requested'].includes(status)) {
+    return res.status(400).json({ error: 'keyword and status (approved|declined|requested) required' });
   }
   const kw = keyword.toLowerCase().trim();
   const declinedBy = clientPayload?.email || 'client';
@@ -403,7 +403,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
 
   const insert = db.transaction((items: { keyword: string; status: string; reason?: string; source?: string }[]) => {
     for (const item of items) {
-      if (!item.keyword || !['approved', 'declined'].includes(item.status)) continue;
+      if (!item.keyword || !['approved', 'declined', 'requested'].includes(item.status)) continue;
       stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source || 'content_gap', declinedBy);
     }
   });

@@ -15,6 +15,7 @@ interface ContentGap {
   competitorProof?: string;
   trendDirection?: 'rising' | 'declining' | 'stable';
   serpFeatures?: string[];
+  serpTargeting?: string[];
   questionKeywords?: string[];
 }
 
@@ -106,6 +107,13 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                   <span className="flex items-center gap-0.5 text-[10px] text-orange-400 font-medium"><Swords className="w-3 h-3" />{gap.competitorProof}</span>
                 )}
               </div>
+              {gap.serpTargeting && gap.serpTargeting.length > 0 && (
+                <div className="mt-1.5 pl-2 border-l-2 border-yellow-500/20">
+                  {gap.serpTargeting.map((rec, ri) => (
+                    <div key={ri} className="text-[10px] text-yellow-400/80 leading-relaxed">→ {rec}</div>
+                  ))}
+                </div>
+              )}
               {gap.questionKeywords && gap.questionKeywords.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
                   <MessageCircleQuestion className="w-3 h-3 text-cyan-400 flex-shrink-0" />

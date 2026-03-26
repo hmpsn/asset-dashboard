@@ -3,6 +3,18 @@ import { get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
 
+export interface StrategyDiff {
+  previousGeneratedAt: string;
+  currentGeneratedAt: string;
+  newKeywords: string[];
+  lostKeywords: string[];
+  newGaps: string[];
+  resolvedGaps: string[];
+  keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[];
+  prevSiteKeywordCount: number;
+  currSiteKeywordCount: number;
+}
+
 // ── Audit ───────────────────────────────────────────────────────
 export const audit = {
   summary: (wsId: string) =>
@@ -124,6 +136,9 @@ export const keywords = {
 
   patchStrategy: (wsId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
+
+  strategyDiff: (wsId: string) =>
+    getOptional<StrategyDiff | null>(`/api/webflow/keyword-strategy/${wsId}/diff`),
 
   semrushStatus: () =>
     getOptional<unknown>('/api/semrush/status'),

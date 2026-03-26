@@ -575,6 +575,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       log.info(`Injecting ${declinedKeywords.length} declined keywords into AI prompt`);
     }
 
+    // Inject client-requested keywords so AI prioritizes them
+    const requestedKeywords = getRequestedKeywords(ws.id);
+    if (requestedKeywords.length > 0) {
+      businessSection += `\nCLIENT-REQUESTED KEYWORDS (the client has submitted these keyword ideas — give them HIGH PRIORITY in page assignments and content gap suggestions. If no existing page covers a requested keyword, it MUST appear as a content gap):\n${requestedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
+      log.info(`Injecting ${requestedKeywords.length} client-requested keywords into AI prompt`);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let strategy: any;
     try {
@@ -647,6 +654,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       const kw = tk.query.toLowerCase().trim();
       if (!keywordPool.has(kw) && kw.length > 1) {
         keywordPool.set(kw, { volume: 0, difficulty: 0, source: 'client' });
+        clientKeywordsAdded++;
+      }
+    }
+    // Add client-requested keywords to pool
+    for (const kw of requestedKeywords) {
+      if (!keywordPool.has(kw.toLowerCase())) {
+        keywordPool.set(kw.toLowerCase(), { volume: 0, difficulty: 0, source: 'client' });
         clientKeywordsAdded++;
       }
     }
@@ -1269,6 +1283,31 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       }
     }
 
+    // ── SERP Feature Targeting Recommendations ───────────────────
+    if (strategy.contentGaps?.length) {
+      for (const cg of strategy.contentGaps) {
+        if (!cg.serpFeatures?.length) continue;
+        const recs: string[] = [];
+        for (const feat of cg.serpFeatures) {
+          switch (feat) {
+            case 'featured_snippet':
+              recs.push('Structure content with a clear definition or step-by-step list in the first 100 words to target the featured snippet');
+              break;
+            case 'people_also_ask':
+              recs.push('Include FAQ sections with concise 2-3 sentence answers to target People Also Ask boxes');
+              break;
+            case 'video':
+              recs.push('Embed a relevant video or create video content to compete for the video carousel');
+              break;
+            case 'local_pack':
+              recs.push('Include location-specific content, NAP details, and LocalBusiness schema markup');
+              break;
+          }
+        }
+        if (recs.length > 0) cg.serpTargeting = recs;
+      }
+    }
+
     // ── Cannibalization Detection + Canonical Recommender ────────
     // Find keywords assigned to multiple pages, recommend canonical URLs and specific actions
     const cannibalization: Array<{
@@ -1534,6 +1573,23 @@ Rules:
       log.info(`Content gaps: ${withVolume.length} with volume data, ${strategy.contentGaps.length} total kept`);
     }
 
+    // ── Quick Win ROI Scoring ──────────────────────────────────
+    if (strategy.quickWins?.length) {
+      // Compute ROI score: (volume × (1 - difficulty/100)) / max(currentPosition, 1)
+      // Fall back to impact-based scoring if no volume data
+      for (const qw of strategy.quickWins) {
+        const pageData = strategy.pageMap?.find((p: { pagePath: string }) => p.pagePath === qw.pagePath);
+        if (pageData?.volume && pageData?.currentPosition) {
+          const difficulty = pageData.difficulty ?? 50;
+          qw.roiScore = Math.round((pageData.volume * (1 - difficulty / 100)) / Math.max(pageData.currentPosition, 1));
+        } else {
+          // Fallback: estimate from impact level
+          qw.roiScore = qw.estimatedImpact === 'high' ? 100 : qw.estimatedImpact === 'medium' ? 50 : 20;
+        }
+      }
+      strategy.quickWins.sort((a: { roiScore?: number }, b: { roiScore?: number }) => (b.roiScore || 0) - (a.roiScore || 0));
+    }
+
     // Sort pageMap by volume (highest impact first)
     if (strategy.pageMap?.length) {
       strategy.pageMap.sort((a: { volume?: number; impressions?: number }, b: { volume?: number; impressions?: number }) =>
@@ -1573,6 +1629,16 @@ Rules:
       },
       generatedAt: new Date().toISOString(),
     };
+    // Save previous strategy to history (keep last 5)
+    if (ws.keywordStrategy?.generatedAt) {
+      const prevPageMap = listPageKeywords(ws.id);
+      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
+        ws.id, JSON.stringify(ws.keywordStrategy), JSON.stringify(prevPageMap), ws.keywordStrategy.generatedAt
+      );
+      // Prune old entries, keep last 5
+      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+    }
+
     updateWorkspace(ws.id, { keywordStrategy });
     clearSeoContextCache(ws.id);
     incrementUsage(ws.id, 'strategy_generations');
@@ -1623,6 +1689,54 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', (req, res) => {
   res.json({ ...strategy, pageMap });
 });
 
+// Get strategy diff (compare current vs previous)
+router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const current = ws.keywordStrategy;
+  if (!current) return res.json(null);
+
+  const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
+  if (!prev) return res.json(null);
+
+  const prevStrategy = JSON.parse(prev.strategy_json);
+  const prevPageMap = JSON.parse(prev.page_map_json);
+  const currentPageMap = listPageKeywords(ws.id);
+
+  // Compute diffs
+  const prevSiteKws = new Set(prevStrategy.siteKeywords || []);
+  const currSiteKws = new Set(current.siteKeywords || []);
+  const newKeywords = [...currSiteKws].filter(k => !prevSiteKws.has(k));
+  const lostKeywords = [...prevSiteKws].filter(k => !currSiteKws.has(k));
+
+  const prevGapKws = new Set((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const currGapKws = new Set((current.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const newGaps = [...currGapKws].filter(k => !prevGapKws.has(k));
+  const resolvedGaps = [...prevGapKws].filter(k => !currGapKws.has(k));
+
+  // Page map changes
+  const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+  const currPageKws = new Map(currentPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));
+  const keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[] = [];
+  for (const [path, kw] of currPageKws) {
+    const old = prevPageKws.get(path);
+    if (old && old !== kw) keywordChanges.push({ pagePath: path, oldKeyword: old, newKeyword: kw });
+  }
+
+  res.json({
+    previousGeneratedAt: prev.generated_at,
+    currentGeneratedAt: current.generatedAt,
+    newKeywords,
+    lostKeywords,
+    newGaps,
+    resolvedGaps,
+    keywordChanges,
+    prevSiteKeywordCount: prevSiteKws.size,
+    currSiteKeywordCount: currSiteKws.size,
+  });
+});
+
 // Update keyword strategy (manual edits)
 const patchStrategySchema = z.object({
   pageMap: z.array(z.object({
@@ -1663,6 +1777,12 @@ export function getDeclinedKeywords(workspaceId: string): string[] {
   return rows.map(r => r.keyword);
 }
 
+/** Get all client-requested keywords for a workspace (used by strategy generator to prioritize) */
+export function getRequestedKeywords(workspaceId: string): string[] {
+  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'requested') as { keyword: string }[];
+  return rows.map(r => r.keyword);
+}
+
 /** Get all keyword feedback for a workspace */
 function getAllFeedback(workspaceId: string) {
   return db.prepare('SELECT * FROM keyword_feedback WHERE workspace_id = ? ORDER BY updated_at DESC').all(workspaceId);
@@ -1678,7 +1798,7 @@ router.get('/api/webflow/keyword-feedback/:workspaceId', (req, res) => {
 // Admin or client: submit feedback on a keyword
 const feedbackSchema = z.object({
   keyword: z.string().min(1),
-  status: z.enum(['approved', 'declined']),
+  status: z.enum(['approved', 'declined', 'requested']),
   reason: z.string().optional(),
   source: z.enum(['content_gap', 'page_map', 'opportunity', 'topic_cluster', 'keyword_gap']).optional(),
   declinedBy: z.string().optional(),
@@ -1710,7 +1830,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchem
 const bulkFeedbackSchema = z.object({
   keywords: z.array(z.object({
     keyword: z.string().min(1),
-    status: z.enum(['approved', 'declined']),
+    status: z.enum(['approved', 'declined', 'requested']),
     reason: z.string().optional(),
     source: z.string().optional(),
   })).min(1).max(100),

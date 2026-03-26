@@ -2662,23 +2662,23 @@
         },
         {
           "title": "Phase 4A: Client keyword submission to strategy",
-          "status": "pending",
-          "notes": "Accept status:'requested' in feedback endpoint. Inject requested keywords as high-priority in strategy AI prompt. Client UI: Suggest a Keyword input. Depends on Phase 1."
+          "status": "done",
+          "notes": "Shipped — 'requested' status in keyword_feedback. Migration 029. getRequestedKeywords() + AI prompt injection. Client UI: Suggest a Keyword section in StrategyTab. Feature #178."
         },
         {
           "title": "Phase 4B: SERP feature targeting in keyword strategy",
-          "status": "pending",
-          "notes": "Post-process keywords with serpFeatures data to generate targeting recommendations. SERP Opportunities section in KeywordStrategy.tsx."
+          "status": "done",
+          "notes": "Shipped — serpTargeting recommendations generated per content gap with SERP features. Displayed as yellow guidance text in ContentGaps component. Feature #179."
         },
         {
-          "title": "Phase 4C: Strategy diff \u2014 What Changed between runs",
-          "status": "pending",
-          "notes": "strategy_history table (last 5 per workspace). Diff endpoint computes new/lost keywords, position changes, content gaps. What Changed section in UI."
+          "title": "Phase 4C: Strategy diff — What Changed between runs",
+          "status": "done",
+          "notes": "Shipped — strategy_history table (migration 030, keeps last 5). Diff endpoint. StrategyDiff component shows new/lost keywords, new/resolved gaps, keyword reassignments. Feature #180."
         },
         {
           "title": "Phase 4D: Prioritized quick wins by ROI score",
-          "status": "pending",
-          "notes": "Score = (volume * (1 - difficulty/100)) / currentPosition. Sort quick wins by ROI. High/Medium/Low Impact badges in KeywordStrategy."
+          "status": "done",
+          "notes": "Shipped — ROI score = (volume*(1-difficulty/100))/position. Blue ROI badge in QuickWins. Sorted by score descending. Feature #181."
         },
         {
           "title": "Phase 5: DataForSEO migration + provider toggle in Command Center",

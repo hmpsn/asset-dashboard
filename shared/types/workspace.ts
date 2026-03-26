@@ -78,6 +78,8 @@ export interface ContentGap {
   competitorProof?: string; // e.g. "competitor.com ranks #3"
   // Question keywords related to this gap (for FAQ/AEO targeting)
   questionKeywords?: string[];
+  // SERP feature targeting recommendations
+  serpTargeting?: string[];
 }
 
 export interface QuickWin {
@@ -86,6 +88,7 @@ export interface QuickWin {
   action: string;          // specific action to take
   estimatedImpact: 'high' | 'medium' | 'low';
   rationale: string;
+  roiScore?: number;       // computed ROI score for prioritization
 }
 
 export interface TopicCluster {

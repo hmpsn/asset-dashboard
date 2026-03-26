@@ -1999,13 +1999,47 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 178. Client Keyword Requests
+**What it does:** Clients can now submit keyword ideas through the "Suggest a Keyword" section in their Strategy tab, not just approve/decline AI-suggested ones. Submitted keywords get `status: 'requested'` in the `keyword_feedback` table (expanded CHECK constraint via migration 029). During strategy generation, requested keywords are injected into the AI prompt as high-priority items and added to the keyword pool. If no existing page covers a requested keyword, it MUST appear as a content gap. Client UI shows submitted suggestions with pending status badges.
+**Files:** `server/db/migrations/029-keyword-requested.sql`, `server/routes/keyword-strategy.ts` (schema, `getRequestedKeywords`, prompt injection, pool injection), `server/routes/public-portal.ts` (validation update), `src/components/client/StrategyTab.tsx` (Suggest a Keyword section)
+
+**Agency value:** Clients become active participants in keyword strategy. Their domain expertise surfaces keywords the AI might miss.
+
+**Client value:** Direct influence over SEO strategy — submit keyword ideas and see them prioritized in the next generation.
+
+---
+
+### 179. SERP Feature Targeting Recommendations
+**What it does:** Content gaps with SERP feature opportunities (featured snippets, PAA, video, local pack) now include actionable targeting recommendations. Post-processing step after SERP enrichment generates specific content structuring advice per feature type: definition/list formatting for featured snippets, FAQ sections for PAA, video embedding for video carousels, and NAP/schema markup for local pack. Displayed as yellow recommendation text below SERP feature badges in ContentGaps component.
+**Files:** `server/routes/keyword-strategy.ts` (serpTargeting post-processing), `shared/types/workspace.ts` (ContentGap.serpTargeting), `src/components/strategy/ContentGaps.tsx` (targeting display)
+
+**Agency value:** Turns SERP feature data from "interesting" to "actionable." Each content gap with a SERP opportunity now tells you exactly what to do to win it.
+
+---
+
+### 180. Strategy Diff — What Changed
+**What it does:** Tracks strategy changes across generations. Before saving a new strategy, the previous version is archived to `strategy_history` table (keeps last 5). New diff endpoint (`GET /api/webflow/keyword-strategy/:wid/diff`) computes: new/lost site keywords, new/resolved content gaps, and page keyword reassignments. Collapsible "What Changed" panel in KeywordStrategy shows all changes with green/red/amber color coding. Only appears when changes exist.
+**Files:** `server/db/migrations/030-strategy-history.sql`, `server/routes/keyword-strategy.ts` (history save, prune, diff endpoint), `src/api/seo.ts` (strategyDiff, StrategyDiff type), `src/components/strategy/StrategyDiff.tsx` (new component), `src/components/KeywordStrategy.tsx` (integration)
+
+**Agency value:** Answers "what changed since last time?" without manually comparing. Shows strategy evolution over time. Proves the value of re-running strategy as data improves.
+
+---
+
+### 181. Prioritized Quick Wins with ROI Scoring
+**What it does:** Quick wins are now scored and sorted by estimated ROI. Score formula: `(volume × (1 - difficulty/100)) / position` — favoring high-volume, low-difficulty keywords on pages that are close to ranking well. Falls back to impact-level estimates when volume data isn't available. ROI score displayed as a blue data badge next to the impact badge in the QuickWins component.
+**Files:** `server/routes/keyword-strategy.ts` (ROI scoring + sorting), `shared/types/workspace.ts` (QuickWin.roiScore), `src/components/strategy/QuickWins.tsx` (ROI badge display)
+
+**Agency value:** Quick wins are no longer just "high/medium/low" — they're quantified by potential return. The highest-ROI fix is always at the top.
+
+---
+
 ## Summary
 
 | Category | Feature Count | Primary Value Driver |
 |----------|:---:|---|
 | SEO & Technical | 22 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner + schema coverage/priority/impact tracking |
 | Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 37 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline + title/meta variants + outline-only regen + voice scoring |
+| Content & Strategy | 41 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline + title/meta variants + outline-only regen + voice scoring + client keyword requests + SERP targeting + strategy diff + ROI quick wins |
 | Client Communication | 11 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email + content plan review alerts |
 | Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
 | AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
@@ -2017,9 +2051,9 @@ When the user asks to update this document with recent features, follow this pro
 | Architecture | 7 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook |
 | Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
 
-**179 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**183 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **179**. Last updated: March 2026 (content generator level-up — title/meta A/B variants, outline-only regeneration, brand voice scoring).
+Current feature count: **183**. Last updated: March 2026 (SEO strategy strengthening — client keyword requests, SERP targeting, strategy diff, ROI quick wins).
 
 ### Recent Additions (March 2026)
 

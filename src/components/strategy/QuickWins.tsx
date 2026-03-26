@@ -5,6 +5,7 @@ interface QuickWin {
   action: string;
   estimatedImpact: string;
   rationale: string;
+  roiScore?: number;
 }
 
 export interface QuickWinsProps {
@@ -28,6 +29,9 @@ export function QuickWins({ quickWins }: QuickWinsProps) {
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono text-zinc-500">{qw.pagePath}</span>
                 <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${impactColor}`}>{qw.estimatedImpact} impact</span>
+                {qw.roiScore != null && qw.roiScore > 0 && (
+                  <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">ROI {qw.roiScore}</span>
+                )}
               </div>
               <div className="text-[11px] text-zinc-200 mt-1 font-medium">{qw.action}</div>
               <div className="text-[11px] text-zinc-500 mt-0.5">{qw.rationale}</div>

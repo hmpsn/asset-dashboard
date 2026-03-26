@@ -16,6 +16,7 @@ import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './strategy/CannibalizationAlert';
+import { StrategyDiff } from './strategy/StrategyDiff';
 import { keywords, rankTracking } from '../api/seo';
 
 interface PageKeywordMap {
@@ -519,6 +520,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               )}
             </div>
           )}
+
+          {/* ── What Changed (Strategy Diff) ── */}
+          <StrategyDiff workspaceId={workspaceId} />
 
           {/* ── Low-Hanging Fruit ── */}
           <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
