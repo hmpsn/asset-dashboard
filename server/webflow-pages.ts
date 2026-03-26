@@ -30,12 +30,13 @@ export async function listPages(siteId: string, tokenOverride?: string): Promise
 }
 
 // Filter to only published, non-collection, non-draft pages
+// Homepage may have publishedPath: "" or null — allow it via slug fallback
 export function filterPublishedPages(pages: WebflowPage[]): WebflowPage[] {
   return pages.filter(p =>
     p.draft !== true &&
     !p.collectionId &&
     !p.archived &&
-    p.publishedPath
+    (p.publishedPath || p.slug === '' || p.slug === 'index' || p.slug === 'home')
   );
 }
 
