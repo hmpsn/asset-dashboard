@@ -2684,6 +2684,11 @@
           "title": "Phase 5: DataForSEO migration + provider toggle in Command Center",
           "status": "done",
           "notes": "Shipped — SeoDataProvider interface (9 methods) + registry with preferred/fallback. SemrushProvider (zero behavior change). DataForSeoProvider with Basic auth, file cache, credit tracking, circuit breaker. Migration 031. Per-workspace provider toggle in KeywordStrategy settings. Strategy generator + AI usage wired through abstraction. Feature #182."
+        },
+        {
+          "title": "Phase 6: CMS Image Optimization — compress + alt text + RichText repair",
+          "status": "done",
+          "notes": "Shipped — GET /api/webflow/cms-images/:siteId scans all collections for Image, MultiImage, and RichText fields. Per-asset usage map with collection + field metadata. Compress endpoint now accepts cmsUsages[] and calls repairCmsReferences() before deleting old asset: Image fields (fileId/url swap), MultiImage (array entry swap), RichText (HTML string URL replacement). Auto-publishes updated CMS items. CmsFieldSelector UI with smart defaults (meta/OG fields unchecked, content fields checked). cms-images and cms-missing-alt filter types in AssetBrowser. Blue CMS badge on AssetCard showing collection → field name. selectedCmsFields state gates both filter and bulk operations. Feature #183."
         }
       ]
     },

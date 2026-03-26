@@ -145,6 +145,45 @@ export function getConfiguredProvider(preferred?: ProviderName): SeoDataProvider
   return null;
 }
 
+// ── Per-provider capability flags ──
+// Providers can mark specific capabilities as unavailable (e.g. DataForSEO
+// without a backlinks subscription). The registry uses this for fallback.
+const disabledCapabilities = new Map<ProviderName, Set<string>>();
+
+export function markCapabilityDisabled(providerName: ProviderName, capability: string): void {
+  if (!disabledCapabilities.has(providerName)) disabledCapabilities.set(providerName, new Set());
+  disabledCapabilities.get(providerName)!.add(capability);
+  log.warn(`${providerName}: "${capability}" capability disabled — will fall back to alternate provider`);
+}
+
+export function isCapabilityDisabled(providerName: ProviderName, capability: string): boolean {
+  return disabledCapabilities.get(providerName)?.has(capability) ?? false;
+}
+
+/**
+ * Get a provider that supports backlinks. If the preferred provider's backlinks
+ * are unavailable (e.g. DataForSEO without backlinks subscription), falls back
+ * to another configured provider that does support them.
+ */
+export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
+  const primary = getConfiguredProvider(preferred);
+  if (!primary) return null;
+
+  // Check if primary provider has backlinks disabled
+  const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
+  if (primaryName && isCapabilityDisabled(primaryName, 'backlinks')) {
+    // Fall back to any other configured provider that supports backlinks
+    for (const [name, p] of providers.entries()) {
+      if (name !== primaryName && p.isConfigured() && !isCapabilityDisabled(name, 'backlinks')) {
+        return p;
+      }
+    }
+    return null; // No fallback available
+  }
+
+  return primary;
+}
+
 export function isAnyProviderConfigured(): boolean {
   for (const p of providers.values()) {
     if (p.isConfigured()) return true;

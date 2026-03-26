@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { get, getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
+import type { CmsImageScanResult } from '../../../shared/types/cms-images';
 
 interface Asset {
   id: string;
@@ -44,6 +45,19 @@ export function useAssetAudit(siteId: string, enabled: boolean) {
         (data.issues || []).filter((i) => i.issues.includes('unused')).map((i) => i.assetId)
       );
     },
+    enabled: !!siteId && enabled,
+    staleTime: STALE_TIMES.STABLE,
+  });
+}
+
+/**
+ * Scan CMS collections for Image/MultiImage fields and return
+ * per-asset usage data + stats. Lazy-loaded — only fires when enabled.
+ */
+export function useCmsImages(siteId: string, enabled: boolean) {
+  return useQuery<CmsImageScanResult>({
+    queryKey: queryKeys.admin.cmsImages(siteId),
+    queryFn: () => get<CmsImageScanResult>(`/api/webflow/cms-images/${siteId}`),
     enabled: !!siteId && enabled,
     staleTime: STALE_TIMES.STABLE,
   });

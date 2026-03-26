@@ -40,13 +40,13 @@ A brief value assessment of every feature in the platform, covering what it does
 ---
 
 ### 2. Asset Manager
-**What it does:** Lists all Webflow site images with sizes, formats, and alt text. One-click compression and re-upload directly to Webflow.
+**What it does:** Lists all Webflow site images with sizes, formats, and alt text. One-click compression and re-upload directly to Webflow. **CMS Image Optimization**: scans all CMS collections for Image, MultiImage, and RichText fields — builds a per-asset usage map showing where every image is used (collection + field + item). After compression, CMS items are automatically patched before the old asset is deleted: Image fields get the new fileId/url, MultiImage arrays swap the entry, and RichText HTML has the old CDN URL replaced with the new one (string replacement). Updated items are auto-published. **Field selector**: collapsible panel groups CMS image fields by collection with checkboxes — meta/OG/thumbnail fields unchecked by default, content/body fields checked. Selected fields gate both the CMS filter and bulk compression. **CMS filters**: "CMS Images" shows only assets used in selected fields; "CMS Missing Alt" narrows to those without alt text. **CMS badges** on each asset card show which collection → field it lives in.
 
-**Agency value:** Turns hours of manual download-compress-reupload into a single click per image.
+**Agency value:** Turns hours of manual download-compress-reupload into a single click per image. CMS reference repair means compressed images go live everywhere — no broken images in blog posts, service pages, or rich text blocks after optimization.
 
-**Client value:** Faster page loads and better Core Web Vitals without needing to learn image optimization.
+**Client value:** Faster page loads and better Core Web Vitals without needing to learn image optimization. Images in blog posts stay intact after compression — no manual re-insertion.
 
-**Mutual:** Measurable performance gains (PageSpeed scores) with minimal agency time investment.
+**Mutual:** Measurable performance gains (PageSpeed scores) with minimal agency time investment. Field-level control protects carefully sized OG/meta images while still compressing content images.
 
 ---
 

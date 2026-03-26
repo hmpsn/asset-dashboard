@@ -14,6 +14,8 @@ import {
   getPageDom,
   uploadAsset,
 } from '../webflow.js';
+import { updateCollectionItem, listCollectionItems, publishCollectionItems } from '../webflow-cms.js';
+import type { CmsImageUsage } from '../../shared/types/cms-images.ts';
 import {
   listWorkspaces,
   getWorkspace,
@@ -222,9 +224,118 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   res.end();
 });
 
+// --- CMS Reference Repair Helper ---
+// Called after a new compressed asset is uploaded to update CMS items that
+// referenced the old asset ID. Runs before deleting the old asset so that
+// if updates fail, the old asset still exists as a fallback.
+async function repairCmsReferences(
+  cmsUsages: CmsImageUsage[],
+  oldAssetId: string,
+  newAssetId: string,
+  newHostedUrl: string,
+  oldHostedUrl: string,
+  token?: string,
+): Promise<{ succeeded: number; failed: number }> {
+  let succeeded = 0;
+  let failed = 0;
+
+  // Group usages by collection+item to batch field updates per item
+  const itemMap = new Map<string, { collectionId: string; fields: Array<{ fieldSlug: string; fieldType: string }> }>();
+  for (const usage of cmsUsages) {
+    const key = `${usage.collectionId}:${usage.itemId}`;
+    if (!itemMap.has(key)) itemMap.set(key, { collectionId: usage.collectionId, fields: [] });
+    itemMap.get(key)!.fields.push({ fieldSlug: usage.fieldSlug, fieldType: usage.fieldType });
+  }
+
+  // Track which collections have updated items (for optional publish)
+  const updatedByCollection = new Map<string, string[]>();
+
+  for (const [key, { collectionId, fields }] of itemMap.entries()) {
+    const itemId = key.split(':')[1];
+
+    // Fetch current item to handle MultiImage array updates and RichText replacements
+    let currentItem: Record<string, unknown> | null = null;
+    const multiImageFields = fields.filter(f => f.fieldType === 'MultiImage');
+    const richTextFields = fields.filter(f => f.fieldType === 'RichText');
+    if (multiImageFields.length > 0 || richTextFields.length > 0) {
+      try {
+        // Paginate all items to find the one we need (Webflow CMS API has no single-item GET)
+        const all: Array<Record<string, unknown>> = [];
+        let offset = 0;
+        while (true) {
+          const { items: batch, total } = await listCollectionItems(collectionId, 100, offset, token);
+          all.push(...batch);
+          if (all.length >= total) break;
+          offset += 100;
+        }
+        currentItem = all.find(i => (i.id || (i as Record<string, unknown>)._id) === itemId) || null;
+      } catch { /* proceed without current item data */ }
+    }
+
+    const fieldData: Record<string, unknown> = {};
+
+    for (const { fieldSlug, fieldType } of fields) {
+      if (fieldType === 'Image') {
+        fieldData[fieldSlug] = { fileId: newAssetId, url: newHostedUrl };
+      } else if (fieldType === 'MultiImage' && currentItem) {
+        const fd = (currentItem.fieldData || currentItem) as Record<string, unknown>;
+        const currentArray = fd[fieldSlug];
+        if (Array.isArray(currentArray)) {
+          fieldData[fieldSlug] = currentArray.map((img: unknown) => {
+            const imgObj = img as Record<string, unknown>;
+            if (imgObj.fileId === oldAssetId) {
+              return { fileId: newAssetId, url: newHostedUrl };
+            }
+            return img;
+          });
+        } else {
+          fieldData[fieldSlug] = [{ fileId: newAssetId, url: newHostedUrl }];
+        }
+      } else if (fieldType === 'RichText' && currentItem && oldHostedUrl) {
+        const fd = (currentItem.fieldData || currentItem) as Record<string, unknown>;
+        const htmlString = fd[fieldSlug];
+        if (typeof htmlString === 'string' && htmlString.includes(oldHostedUrl)) {
+          // Replace all occurrences of the old CDN URL with the new one
+          fieldData[fieldSlug] = htmlString.split(oldHostedUrl).join(newHostedUrl);
+        }
+      }
+    }
+
+    if (Object.keys(fieldData).length === 0) continue;
+
+    // Rate-limit CMS PATCH calls
+    await new Promise(r => setTimeout(r, 200));
+
+    const result = await updateCollectionItem(collectionId, itemId, fieldData, token);
+    if (result.success) {
+      succeeded++;
+      if (!updatedByCollection.has(collectionId)) updatedByCollection.set(collectionId, []);
+      updatedByCollection.get(collectionId)!.push(itemId);
+    } else {
+      failed++;
+      log.warn({ collectionId, itemId, error: result.error }, 'CMS reference repair failed for item');
+    }
+  }
+
+  // Auto-publish updated items so changes go live
+  for (const [collectionId, itemIds] of updatedByCollection.entries()) {
+    try {
+      await publishCollectionItems(collectionId, itemIds, token);
+    } catch { /* publish is best-effort */ }
+  }
+
+  return { succeeded, failed };
+}
+
 // --- Image Compression ---
 router.post('/api/webflow/compress/:assetId', async (req, res) => {
-  const { imageUrl, siteId, altText, fileName } = req.body;
+  const { imageUrl, siteId, altText, fileName, cmsUsages } = req.body as {
+    imageUrl: string;
+    siteId: string;
+    altText?: string;
+    fileName?: string;
+    cmsUsages?: CmsImageUsage[];
+  };
   if (!imageUrl || !siteId) return res.status(400).json({ error: 'imageUrl and siteId required' });
   const compressToken = getTokenForSite(siteId) || undefined;
 
@@ -314,7 +425,27 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       return res.status(500).json({ error: uploadResult.error });
     }
 
-    await deleteAsset(req.params.assetId, compressToken);
+    // Repair CMS references BEFORE deleting old asset (so old asset stays as fallback if updates fail)
+    let cmsUpdates: { succeeded: number; failed: number } | undefined;
+    if (cmsUsages?.length && uploadResult.assetId && uploadResult.hostedUrl) {
+      cmsUpdates = await repairCmsReferences(
+        cmsUsages,
+        req.params.assetId,
+        uploadResult.assetId,
+        uploadResult.hostedUrl,
+        imageUrl,
+        compressToken,
+      );
+    }
+
+    // Only delete old asset if there are no failed CMS reference repairs.
+    // When repairs fail, the old asset must remain so CMS items aren't broken.
+    const hasFailedCmsRepairs = cmsUpdates && cmsUpdates.failed > 0;
+    if (!hasFailedCmsRepairs) {
+      await deleteAsset(req.params.assetId, compressToken);
+    } else {
+      log.warn({ assetId: req.params.assetId, failed: cmsUpdates.failed }, 'Skipping old asset deletion — CMS reference repairs had failures');
+    }
 
     res.json({
       success: true,
@@ -325,6 +456,8 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
       savings,
       savingsPercent,
       newFileName,
+      oldAssetPreserved: !!hasFailedCmsRepairs,
+      ...(cmsUpdates ? { cmsUpdates } : {}),
     });
   } catch (e) {
     log.error({ err: e }, 'Compress error');

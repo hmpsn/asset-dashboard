@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { get, post, patch } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWebflowAssets, useAssetAudit } from '../hooks/admin';
+import { useWebflowAssets, useAssetAudit, useCmsImages } from '../hooks/admin';
+import type { CmsImageUsage } from '../../shared/types/cms-images';
 import {
   Image, AlertTriangle, Trash2, Sparkles, X,
-  Loader2, Minimize2, FolderOpen, Search,
+  Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
 import { EmptyState } from './ui';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -12,6 +13,7 @@ import { OrganizePreview } from './assets/OrganizePreview';
 import { AssetFilters } from './assets/AssetFilters';
 import { AssetCard } from './assets/AssetCard';
 import { BulkActions } from './assets/BulkActions';
+import { CmsFieldSelector, buildDefaultSelectedFields } from './assets/CmsFieldSelector';
 
 interface Asset {
   id: string;
@@ -36,7 +38,7 @@ function formatSize(bytes: number): string {
 }
 
 type SortField = 'fileName' | 'fileSize' | 'createdOn';
-type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used';
+type FilterType = 'all' | 'missing-alt' | 'oversized' | 'images' | 'svg' | 'unused' | 'used' | 'cms-images' | 'cms-missing-alt';
 
 function AssetBrowser({ siteId }: Props) {
   const queryClient = useQueryClient();
@@ -44,6 +46,32 @@ function AssetBrowser({ siteId }: Props) {
   const bulkCompressJobId = useRef<string | null>(null);
   const { data: assets = [], isLoading: loading } = useWebflowAssets(siteId);
   const { data: unusedIds = null } = useAssetAudit(siteId, assets.length > 0);
+  const { data: cmsImageData } = useCmsImages(siteId, assets.length > 0);
+
+  // Build a quick-lookup map: assetId → CmsImageUsage[]
+  const cmsUsageMap = useMemo(() => {
+    const map = new Map<string, CmsImageUsage[]>();
+    if (cmsImageData) {
+      for (const a of cmsImageData.assets) {
+        map.set(a.assetId, a.usages);
+      }
+    }
+    return map;
+  }, [cmsImageData]);
+
+  // CMS field selector state — which fields are included in filter + bulk ops
+  const [selectedCmsFields, setSelectedCmsFields] = useState<Set<string>>(new Set());
+
+  // Initialize selectedCmsFields with smart defaults when CMS data first loads
+  useEffect(() => {
+    if (cmsImageData?.collections && cmsImageData.collections.length > 0) {
+      setSelectedCmsFields(prev => {
+        // Only initialize if currently empty (first load)
+        if (prev.size === 0) return buildDefaultSelectedFields(cmsImageData.collections);
+        return prev;
+      });
+    }
+  }, [cmsImageData]);
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
     queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
@@ -91,6 +119,15 @@ function AssetBrowser({ siteId }: Props) {
       if (filter === 'svg') return a.contentType?.includes('svg');
       if (filter === 'unused') return unusedIds ? unusedIds.has(a.id) : false;
       if (filter === 'used') return unusedIds ? !unusedIds.has(a.id) : true;
+      if (filter === 'cms-images' || filter === 'cms-missing-alt') {
+        const usages = cmsUsageMap.get(a.id);
+        if (!usages?.length) return false;
+        // Check if asset is used in any selected field
+        const inSelectedField = usages.some(u => selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`));
+        if (!inSelectedField) return false;
+        if (filter === 'cms-missing-alt') return !a.altText || a.altText.trim() === '';
+        return true;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -240,11 +277,14 @@ function AssetBrowser({ siteId }: Props) {
     if (!url) return;
     setCompressing(prev => new Set(prev).add(asset.id));
     try {
-      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number }>(`/api/webflow/compress/${asset.id}`, {
+      const data = await post<{ success?: boolean; skipped?: boolean; reason?: string; newAssetId?: string; newSize?: number; newHostedUrl?: string; newFileName?: string; savingsPercent?: number; savings?: number; cmsUpdates?: { succeeded: number; failed: number } }>(`/api/webflow/compress/${asset.id}`, {
         imageUrl: url,
         siteId,
         altText: asset.altText,
         fileName: asset.displayName || asset.originalFileName,
+        cmsUsages: (cmsUsageMap.get(asset.id) ?? []).filter(u =>
+          selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`)
+        ),
       });
       if (data.success) {
         // Replace the asset in our list
@@ -255,7 +295,8 @@ function AssetBrowser({ siteId }: Props) {
           hostedUrl: data.newHostedUrl,
           displayName: data.newFileName,
         } : a));
-        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings)})`);
+        const cmsNote = data.cmsUpdates?.succeeded ? ` · ${data.cmsUpdates.succeeded} CMS ref${data.cmsUpdates.succeeded !== 1 ? 's' : ''} updated` : '';
+        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings)})${cmsNote}`);
         setTimeout(() => setCompressResult(null), 4000);
       } else if (data.skipped) {
         setCompressResult(data.reason || 'Already optimized');
@@ -340,6 +381,9 @@ function AssetBrowser({ siteId }: Props) {
         imageUrl: a.hostedUrl || a.url,
         altText: a.altText,
         fileName: a.displayName || a.originalFileName,
+        cmsUsages: (cmsUsageMap.get(a.id) ?? []).filter(u =>
+          selectedCmsFields.has(`${u.collectionId}:${u.fieldSlug}`)
+        ),
       })),
     });
     if (jobId) {
@@ -425,6 +469,8 @@ function AssetBrowser({ siteId }: Props) {
   const missingAltCount = assets.filter(a => !a.altText || a.altText.trim() === '').length;
   const oversizedCount = assets.filter(a => a.size > 500 * 1024).length;
   const unusedCount = unusedIds ? assets.filter(a => unusedIds.has(a.id)).length : 0;
+  const cmsImageCount = cmsImageData?.stats.totalCmsImages ?? 0;
+  const cmsMissingAltCount = cmsImageData?.stats.missingAlt ?? 0;
 
   if (loading) {
     return (
@@ -454,6 +500,15 @@ function AssetBrowser({ siteId }: Props) {
           <span className="text-red-400 flex items-center gap-1">
             <Trash2 className="w-3.5 h-3.5" /> {unusedCount} unused
           </span>
+        )}
+        {cmsImageCount > 0 && (
+          <button
+            onClick={() => setFilter('cms-images')}
+            className={`flex items-center gap-1 transition-colors ${filter === 'cms-images' || filter === 'cms-missing-alt' ? 'text-blue-300' : 'text-blue-500 hover:text-blue-300'}`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            {cmsImageCount} CMS{cmsMissingAltCount > 0 ? `, ${cmsMissingAltCount} missing alt` : ''}
+          </button>
         )}
         <button
           onClick={handleOrganizePreview}
@@ -570,8 +625,18 @@ function AssetBrowser({ siteId }: Props) {
       {/* Toolbar */}
       <AssetFilters
         search={search} filter={filter} sort={sort}
+        hasCmsData={cmsImageCount > 0}
         onSearchChange={setSearch} onFilterChange={setFilter} onSortChange={setSort}
       />
+
+      {/* CMS field selector — shown when a CMS filter is active */}
+      {(filter === 'cms-images' || filter === 'cms-missing-alt') && cmsImageData?.collections && (
+        <CmsFieldSelector
+          collections={cmsImageData.collections}
+          selectedFields={selectedCmsFields}
+          onChange={setSelectedCmsFields}
+        />
+      )}
 
       {/* Bulk actions */}
       {selected.size > 0 && (
@@ -612,6 +677,7 @@ function AssetBrowser({ siteId }: Props) {
             generatingAlt={generatingAlt.has(asset.id)} compressing={compressing.has(asset.id)}
             renamingId={renamingId === asset.id} renameDraft={renameDraft}
             renameLoading={renameLoading.has(asset.id)} unusedFlag={!!unusedIds?.has(asset.id)}
+            cmsUsages={cmsUsageMap.get(asset.id)}
             onToggleSelect={toggleSelect}
             onEditAlt={(id, currentAlt) => { setEditingAlt(id); setAltDraft(currentAlt); }}
             onCancelEditAlt={() => setEditingAlt(null)}

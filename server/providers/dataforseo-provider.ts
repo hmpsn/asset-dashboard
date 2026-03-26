@@ -19,6 +19,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
+import { markCapabilityDisabled } from '../seo-data-provider.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -99,6 +100,25 @@ function markCreditsExhausted(): void {
 
 function areCreditsExhausted(): boolean {
   return Date.now() < creditExhaustedUntil;
+}
+
+// ── Backlinks subscription detection ──
+// DataForSEO backlinks is a separate paid subscription (error 40204).
+// Once detected, we mark the capability disabled on the registry so
+// the resolver can fall back to SEMRush for backlink calls.
+
+let backlinkSubscriptionDisabled = false;
+
+function markBacklinksDisabled(): void {
+  if (!backlinkSubscriptionDisabled) {
+    backlinkSubscriptionDisabled = true;
+    markCapabilityDisabled('dataforseo', 'backlinks');
+  }
+}
+
+function isSubscriptionError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('40204') || msg.includes('subscription');
 }
 
 // ── Per-workspace file cache ──
@@ -605,6 +625,8 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     if (areCreditsExhausted()) return null;
 
+    if (backlinkSubscriptionDisabled) return null;
+
     try {
       const json = await apiCall('backlinks/summary/live', [{
         target,
@@ -639,6 +661,10 @@ export class DataForSeoProvider implements SeoDataProvider {
       writeCache(workspaceId, cacheKey, overview);
       return overview;
     } catch (err) {
+      if (isSubscriptionError(err)) {
+        markBacklinksDisabled();
+        return null;
+      }
       log.error({ err }, `DataForSEO backlinks summary error for "${target}"`);
       return null;
     }
@@ -655,6 +681,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
 
     if (areCreditsExhausted()) return [];
+    if (backlinkSubscriptionDisabled) return [];
 
     try {
       const json = await apiCall('backlinks/referring_domains/live', [{
@@ -679,6 +706,10 @@ export class DataForSeoProvider implements SeoDataProvider {
       writeCache(workspaceId, cacheKey, results);
       return results;
     } catch (err) {
+      if (isSubscriptionError(err)) {
+        markBacklinksDisabled();
+        return [];
+      }
       log.error({ err }, `DataForSEO referring domains error for "${target}"`);
       return [];
     }

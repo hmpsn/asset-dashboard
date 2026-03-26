@@ -55,6 +55,7 @@ export const queryKeys = {
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
     cmsCollections: (siteId: string) => ['cms-collections', siteId] as const,
+    cmsImages: (siteId: string) => ['admin-cms-images', siteId] as const,
 
     // Workspace / global
     workspaces: () => ['admin-workspaces'] as const,
