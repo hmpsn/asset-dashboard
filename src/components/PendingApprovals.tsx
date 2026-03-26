@@ -2,9 +2,11 @@
  * PendingApprovals — Shows pending approval batches sent to clients with retract capability.
  * Reusable across SeoEditor, SchemaSuggester, CmsEditor, and any tool that creates approval batches.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
 import { approvals } from '../api/misc';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import type { ApprovalBatch } from '../../shared/types/approvals';
 
 interface PendingApprovalsProps {
@@ -20,40 +22,41 @@ interface PendingApprovalsProps {
 }
 
 export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refreshKey, compact }: PendingApprovalsProps) {
-  const [batches, setBatches] = useState<ApprovalBatch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [retracting, setRetracting] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [reminding, setReminding] = useState<string | null>(null);
   const [reminderSent, setReminderSent] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
+  // Live-update when client approves/rejects/applies items
+  useWorkspaceEvents(workspaceId, {
+    'approval:update': () => queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] }),
+    'approval:applied': () => queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] }),
+  });
+
+  const { data: rawBatches = [], isLoading: loading } = useQuery({
+    queryKey: ['admin-approvals', workspaceId, refreshKey],
+    queryFn: async () => {
       const all = await approvals.list(workspaceId) as ApprovalBatch[];
-      let filtered = all;
-      if (nameFilter) {
-        const lower = nameFilter.toLowerCase();
-        filtered = filtered.filter(b => b.name.toLowerCase().includes(lower));
-      }
-      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setBatches(filtered);
-    } catch (err) { console.error('[PendingApprovals] load error:', err); }
-    finally { setLoading(false); }
-  }, [workspaceId, nameFilter]);
+      return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    },
+  });
 
-  useEffect(() => { load(); }, [load, refreshKey]);
+  const batches = nameFilter
+    ? rawBatches.filter(b => b.name.toLowerCase().includes(nameFilter!.toLowerCase()))
+    : rawBatches;
 
-  const retract = async (batchId: string) => {
-    setRetracting(batchId);
-    try {
-      await approvals.remove(workspaceId, batchId);
-      setBatches(prev => prev.filter(b => b.id !== batchId));
+  const retractMutation = useMutation({
+    mutationFn: (batchId: string) => approvals.remove(workspaceId, batchId) as Promise<void>,
+    onSuccess: (_data, batchId) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] });
       setConfirmId(null);
       onRetracted?.(batchId);
-    } catch (err) { console.error('PendingApprovals operation failed:', err); }
-    finally { setRetracting(null); }
-  };
+    },
+    onError: (err) => { console.error('PendingApprovals retract failed:', err); },
+  });
+
+  const retract = (batchId: string) => retractMutation.mutate(batchId);
 
   const sendReminder = async (batchId: string) => {
     setReminding(batchId);
@@ -76,6 +79,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
     if (status === 'applied') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/20 font-medium">Applied</span>;
     if (status === 'approved') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">Approved</span>;
     if (status === 'partial') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">Partially Reviewed</span>;
+    if (status === 'rejected') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-medium">Rejected</span>;
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">Awaiting Review</span>;
   };
 
@@ -123,10 +127,10 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
                     <span className="text-[10px] text-red-400">Remove from client view?</span>
                     <button
                       onClick={() => retract(batch.id)}
-                      disabled={retracting === batch.id}
+                      disabled={retractMutation.isPending && retractMutation.variables === batch.id}
                       className="px-2 py-1 rounded text-[10px] font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
                     >
-                      {retracting === batch.id ? '...' : 'Yes'}
+                      {retractMutation.isPending && retractMutation.variables === batch.id ? '...' : 'Yes'}
                     </button>
                     <button
                       onClick={() => setConfirmId(null)}

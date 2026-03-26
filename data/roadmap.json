@@ -3528,6 +3528,16 @@
           "priority": "P0",
           "notes": "Shipped \u2014 Three fixes: (1) Race condition: concurrent updateWorkspace calls inside Promise.all caused read-modify-write data loss. Fixed by collecting batch results then persisting atomically. (2) getSiteSubdomain called per-page (~256 redundant Webflow API calls) \u2014 moved outside loop. (3) Added 10s timeout to HTML fetches to prevent job hangs.",
           "status": "done"
+        },
+        {
+          "id": 371,
+          "title": "Approval review cycle audit \u2014 P0-P3 fixes",
+          "source": "CODE REVIEW",
+          "est": "3h",
+          "priority": "P0",
+          "notes": "Shipped \u2014 Full audit of approval/review cycle. P0: save-edit no longer clobbers item status (Object.assign undefined fix). P1: retract works for approved/rejected batches, two-step rejection with notes, edit diff UI, bulk approve confirm, React Query migration. P2: client undo (approved/rejected \u2192 pending) with PageEditState sync and activity logging; rejection notes cleared on undo. P3: all 4 public approval endpoints secured with requireClientPortalAuth() middleware. Also: batch 'rejected' status with recalculation + badge, live WebSocket updates for admin PendingApprovals, Zod validation on endpoints.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         }
       ]
     }
