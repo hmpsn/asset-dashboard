@@ -194,6 +194,9 @@ export async function buildSchemaContext(
     // Audience personas for richer schema targeting
     const personasBlock = buildPersonasContext(ws.id);
     if (personasBlock) ctx._personasBlock = personasBlock;
+
+    // Verified business profile for schema grounding (bypasses page content verification)
+    if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,

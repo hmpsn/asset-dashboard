@@ -106,6 +106,15 @@ export interface SchemaContext {
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
   _competitorSchemaGaps?: string[];  // Internal: schema types competitors have that we don't yet
+  _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
+    phone?: string;
+    email?: string;
+    address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
+    socialProfiles?: string[];
+    openingHours?: string;
+    foundedDate?: string;
+    numberOfEmployees?: string;
+  };
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -658,7 +667,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
 }
 
 // Content verification: cross-check schema values against actual page content
-function verifySchemaContent(schema: Record<string, unknown>, pageText: string, html: string | null): string[] {
+function verifySchemaContent(schema: Record<string, unknown>, pageText: string, html: string | null, ctx?: SchemaContext): string[] {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph) || !pageText) return [];
 
@@ -667,25 +676,39 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
   // Also check the raw HTML (lowered) for things like mailto: links, tel: links
   const lowerHtml = (html || '').toLowerCase();
 
+  // Business profile trusted values — bypass page-content checks for these
+  const bp = ctx?._businessProfile;
+  const bpEmail = bp?.email?.toLowerCase();
+  const bpPhone = bp?.phone ? bp.phone.replace(/\D/g, '') : undefined;
+  const bpCity = bp?.address?.city?.toLowerCase();
+  const bpStreet = bp?.address?.street?.toLowerCase();
+  const bpHasHours = !!bp?.openingHours;
+  const bpSocialProfiles = new Set((bp?.socialProfiles || []).map(u => u.toLowerCase()));
+
   for (const node of graph) {
     const type = node['@type'] as string;
     if (!type) continue;
 
     // Check email — must appear in visible text or as mailto: link
+    // Exception: if business profile provides this email, skip the content check
     const email = node['email'] as string | undefined;
     if (email && typeof email === 'string') {
-      if (!lowerText.includes(email.toLowerCase()) && !lowerHtml.includes(`mailto:${email.toLowerCase()}`)) {
+      const emailLower = email.toLowerCase();
+      const trustedByProfile = bpEmail && emailLower === bpEmail;
+      if (!trustedByProfile && !lowerText.includes(emailLower) && !lowerHtml.includes(`mailto:${emailLower}`)) {
         stripped.push(`${type}: removed hallucinated email "${email}" (not found in page content)`);
         delete node['email'];
       }
     }
 
     // Check telephone — must appear in visible text or as tel: link
+    // Exception: if business profile provides a phone, bypass the check for matching digits
     const tel = node['telephone'];
     if (tel) {
       const phones = Array.isArray(tel) ? tel : [tel];
       const verified = phones.filter((p: string) => {
         const digits = String(p).replace(/\D/g, '');
+        if (bpPhone && digits === bpPhone) return true;  // trusted by business profile
         return lowerText.includes(digits) || lowerText.includes(String(p)) || lowerHtml.includes(`tel:${digits}`) || lowerHtml.includes(`tel:+${digits}`);
       });
       if (verified.length === 0) {
@@ -698,18 +721,21 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
     }
 
     // Check address — if PostalAddress exists, verify street/city appear in content
+    // Exception: if business profile provides matching address, bypass the content check
     const address = node['address'] as Record<string, unknown> | undefined;
     if (address && typeof address === 'object' && address['@type'] === 'PostalAddress') {
       const street = (address['streetAddress'] as string || '').toLowerCase();
       const city = (address['addressLocality'] as string || '').toLowerCase();
-      if (street && !lowerText.includes(street) && city && !lowerText.includes(city)) {
+      const trustedByProfile = (bpCity && city === bpCity) || (bpStreet && street === bpStreet);
+      if (!trustedByProfile && street && !lowerText.includes(street) && city && !lowerText.includes(city)) {
         stripped.push(`${type}: removed hallucinated address (street/city not found in page content)`);
         delete node['address'];
       }
     }
 
     // Check openingHoursSpecification — remove if no hours pattern found in content
-    if (node['openingHoursSpecification'] && !lowerText.match(/\d{1,2}:\d{2}\s*(?:am|pm|–|-|to)/i) && !lowerText.match(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
+    // Exception: if business profile provides opening hours, trust it
+    if (node['openingHoursSpecification'] && !bpHasHours && !lowerText.match(/\d{1,2}:\d{2}\s*(?:am|pm|–|-|to)/i) && !lowerText.match(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
       stripped.push(`${type}: removed hallucinated openingHoursSpecification (no hours found in page content)`);
       delete node['openingHoursSpecification'];
     }
@@ -808,13 +834,16 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
       }
     }
 
-    // Check sameAs URLs — filter to only URLs that appear in the HTML
+    // Check sameAs URLs — filter to only URLs that appear in the HTML or business profile
     const sameAs = node['sameAs'] as string[] | undefined;
     if (Array.isArray(sameAs)) {
-      const verified = sameAs.filter(url => lowerHtml.includes(url.toLowerCase()));
+      const verified = sameAs.filter(url => {
+        const urlLower = url.toLowerCase();
+        return lowerHtml.includes(urlLower) || bpSocialProfiles.has(urlLower);
+      });
       if (verified.length < sameAs.length) {
         const removed = sameAs.length - verified.length;
-        stripped.push(`${type}: removed ${removed} hallucinated sameAs URL(s) (not found in page HTML)`);
+        stripped.push(`${type}: removed ${removed} hallucinated sameAs URL(s) (not found in page HTML or business profile)`);
         if (verified.length === 0) {
           delete node['sameAs'];
         } else {
@@ -1179,7 +1208,7 @@ async function postProcessSchema(
   }
 
   // Step 3: Content verification — strip hallucinated factual claims
-  const contentWarnings = verifySchemaContent(schema, pageContent, html);
+  const contentWarnings = verifySchemaContent(schema, pageContent, html, ctx);
   if (contentWarnings.length > 0) {
     log.info({ warnings: contentWarnings }, 'Content verification stripped hallucinated values');
   }
@@ -1496,6 +1525,14 @@ High-impression pages with poor position (>10) are prime candidates for rich res
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
 ${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
+${ctx._businessProfile ? `\nTRUSTED BUSINESS PROFILE (verified by admin — use these values directly, they do NOT need to appear in page content):
+${ctx._businessProfile.phone ? `- Phone: ${ctx._businessProfile.phone}` : ''}
+${ctx._businessProfile.email ? `- Email: ${ctx._businessProfile.email}` : ''}
+${ctx._businessProfile.address ? `- Address: ${[ctx._businessProfile.address.street, ctx._businessProfile.address.city, ctx._businessProfile.address.state, ctx._businessProfile.address.zip, ctx._businessProfile.address.country].filter(Boolean).join(', ')}` : ''}
+${ctx._businessProfile.socialProfiles?.length ? `- Social/External Profiles (use for Organization.sameAs): ${ctx._businessProfile.socialProfiles.join(', ')}` : ''}
+${ctx._businessProfile.openingHours ? `- Opening Hours: ${ctx._businessProfile.openingHours}` : ''}
+${ctx._businessProfile.foundedDate ? `- Founded: ${ctx._businessProfile.foundedDate}` : ''}
+${ctx._businessProfile.numberOfEmployees ? `- Employees: ${ctx._businessProfile.numberOfEmployees}` : ''}` : ''}
 PAGE CONTENT (excerpt):
 ${pageContent.slice(0, 3000)}
 

@@ -4,6 +4,7 @@ import { useToast } from './Toast';
 import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
+import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { PublishSettings } from './PublishSettings';
 import { get, patch, post } from '../api/client';
 
@@ -32,6 +33,15 @@ interface WorkspaceData {
   trialEndsAt?: string;
   onboardingEnabled?: boolean;
   onboardingCompleted?: boolean;
+  businessProfile?: {
+    phone?: string;
+    email?: string;
+    address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
+    socialProfiles?: string[];
+    openingHours?: string;
+    foundedDate?: string;
+    numberOfEmployees?: string;
+  } | null;
 }
 
 interface Props {
@@ -42,7 +52,7 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'export';
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'export';
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
@@ -160,7 +170,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-zinc-800">
-        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export']] as [SectionTab, string][]).map(([id, label]) => (
+        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: '#71717a' }}>
@@ -205,6 +215,15 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           publishTarget={ws?.publishTarget as Parameters<typeof PublishSettings>[0]['publishTarget']}
           onSave={async (target) => { await patchWorkspace({ publishTarget: target }); }}
           toast={toast}
+        />
+      )}
+
+      {tab === 'business-profile' && (
+        <BusinessProfileTab
+          workspaceId={workspaceId}
+          businessProfile={ws?.businessProfile}
+          toast={toast}
+          onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
         />
       )}
 
