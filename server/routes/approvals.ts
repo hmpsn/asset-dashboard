@@ -160,8 +160,13 @@ router.get('/api/public/approvals/:workspaceId/:batchId', (req, res) => {
 });
 
 router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', validate(updateItemSchema), (req, res) => {
+  // Only include fields that were actually sent — passing undefined would overwrite existing values
+  const update: Partial<Pick<import('../../shared/types/approvals').ApprovalItem, 'status' | 'clientValue' | 'clientNote'>> = {};
+  if (req.body.status !== undefined) update.status = req.body.status;
+  if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
+  if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
   const { status, clientValue, clientNote } = req.body;
-  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, { status, clientValue, clientNote });
+  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
   if (!batch) return res.status(404).json({ error: 'Item not found' });
   // Sync PageEditState when client approves or rejects
   if (status === 'approved' || status === 'rejected') {

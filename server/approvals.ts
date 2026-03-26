@@ -107,7 +107,9 @@ export function updateItem(
   const item = batch.items.find(i => i.id === itemId);
   if (!item) return null;
 
-  Object.assign(item, update, { updatedAt: new Date().toISOString() });
+  // Filter out undefined values to prevent overwriting existing fields (e.g. status)
+  const defined = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
+  Object.assign(item, defined, { updatedAt: new Date().toISOString() });
 
   // Recalculate batch status
   const statuses = batch.items.map(i => i.status);
