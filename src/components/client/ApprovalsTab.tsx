@@ -26,6 +26,8 @@ export function ApprovalsTab({
   const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
   const [editingApproval, setEditingApproval] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [rejectingItem, setRejectingItem] = useState<string | null>(null);
+  const [rejectDraft, setRejectDraft] = useState('');
   const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
   const { getState } = usePageEditStates(workspaceId, true);
 
@@ -37,6 +39,7 @@ export function ApprovalsTab({
 
   const approveAllInBatch = async (batch: ApprovalBatch) => {
     const pending = batch.items.filter(i => i.status === 'pending');
+    if (!window.confirm(`Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} in "${batch.name}"?`)) return;
     for (const item of pending) {
       await updateApprovalItem(batch.id, item.id, { status: 'approved' });
     }
@@ -45,6 +48,7 @@ export function ApprovalsTab({
 
   const approveAllForPage = async (batchId: string, items: ApprovalItem[]) => {
     const pending = items.filter(i => i.status === 'pending');
+    if (!window.confirm(`Approve all ${pending.length} pending change${pending.length !== 1 ? 's' : ''} for this page?`)) return;
     for (const item of pending) {
       await updateApprovalItem(batchId, item.id, { status: 'approved' });
     }
@@ -236,8 +240,8 @@ export function ApprovalsTab({
                                     </div>
                                     <div>
                                       <div className="text-[11px] text-zinc-500 mb-1 flex items-center gap-1">
-                                        Proposed
-                                        {item.clientValue && <span className="text-teal-400">(edited by you)</span>}
+                                        {item.clientValue ? 'Your Edit' : 'Proposed'}
+                                        {item.clientValue && <span className="text-teal-400">✓</span>}
                                       </div>
                                       {isEditing ? (
                                         <div className="space-y-2">
@@ -272,12 +276,17 @@ export function ApprovalsTab({
                                           {displayValue}
                                         </div>
                                       )}
+                                      {item.clientValue && !isEditing && (
+                                        <div className="mt-1 text-[10px] text-zinc-500">
+                                          Originally: <span className="line-through">{item.proposedValue}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 )}
 
                                 {/* Actions */}
-                                {item.status === 'pending' && !isEditing && (
+                                {item.status === 'pending' && !isEditing && rejectingItem !== item.id && (
                                   effectiveTier === 'free' ? (
                                     <TierGate tier={effectiveTier} required="growth" feature="Approve & Edit Changes" compact className="mt-3"><span /></TierGate>
                                   ) : (
@@ -297,13 +306,42 @@ export function ApprovalsTab({
                                       </button>
                                     )}
                                     <button
-                                      onClick={() => updateApprovalItem(batch.id, item.id, { status: 'rejected' })}
+                                      onClick={() => { setRejectingItem(item.id); setRejectDraft(''); }}
                                       className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-[11px] font-medium text-red-400 transition-colors"
                                     >
                                       <X className="w-3 h-3" /> Reject
                                     </button>
                                   </div>
                                   )
+                                )}
+                                {/* Rejection note — inline two-step */}
+                                {item.status === 'pending' && !isEditing && rejectingItem === item.id && effectiveTier !== 'free' && (
+                                  <div className="mt-3 space-y-2">
+                                    <div className="text-[11px] text-zinc-400">Add an optional note for the agency:</div>
+                                    <textarea
+                                      value={rejectDraft}
+                                      onChange={e => setRejectDraft(e.target.value)}
+                                      rows={2}
+                                      placeholder="Reason for rejection (optional)"
+                                      className="w-full px-3 py-1.5 bg-zinc-800 border border-red-500/30 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-red-400 resize-none placeholder:text-zinc-600"
+                                    />
+                                    <div className="flex gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          updateApprovalItem(batch.id, item.id, { status: 'rejected', ...(rejectDraft ? { clientNote: rejectDraft } : {}) });
+                                          setRejectingItem(null);
+                                          setRejectDraft('');
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-[11px] font-medium transition-colors"
+                                      >
+                                        <X className="w-3 h-3" /> Confirm Reject
+                                      </button>
+                                      <button
+                                        onClick={() => { setRejectingItem(null); setRejectDraft(''); }}
+                                        className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-[11px] text-zinc-400 transition-colors"
+                                      >Cancel</button>
+                                    </div>
+                                  </div>
                                 )}
                                 {item.status === 'approved' && (
                                   <div className="flex items-center gap-2 mt-3 text-[11px] text-green-400">

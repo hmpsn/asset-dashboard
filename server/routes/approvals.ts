@@ -95,9 +95,12 @@ router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('wo
   if (batch) {
     for (const item of batch.items) {
       if (item.pageId) {
-        // Reset pages that are still "in-review" for this batch back to clean
+        // Reset any page still associated with this batch (in-review, approved, or rejected)
         const state = getPageState(workspaceId, item.pageId);
-        if (state?.status === 'in-review' && state.approvalBatchId === batchId) {
+        if (
+          (state?.status === 'in-review' || state?.status === 'approved' || state?.status === 'rejected') &&
+          state.approvalBatchId === batchId
+        ) {
           clearPageState(workspaceId, item.pageId);
         }
       }
