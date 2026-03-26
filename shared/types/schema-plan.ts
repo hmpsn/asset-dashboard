@@ -15,6 +15,8 @@ export type SchemaPageRole =
   | 'faq'
   | 'case-study'
   | 'comparison'
+  | 'howto'
+  | 'video'
   | 'generic';
 
 export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
@@ -32,6 +34,8 @@ export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
   faq: 'FAQ',
   'case-study': 'Case Study',
   comparison: 'Comparison',
+  howto: 'How-To / Tutorial',
+  video: 'Video Page',
   generic: 'General Page',
 };
 
@@ -51,6 +55,8 @@ export const SCHEMA_ROLE_CLIENT_DESC: Record<SchemaPageRole, string> = {
   faq: 'FAQ answers eligible for Google FAQ rich results (expandable in search)',
   'case-study': 'Article markup with client details — breadcrumb in search',
   comparison: 'Page info with product reference — breadcrumb in search',
+  howto: 'Step-by-step how-to markup eligible for How-To rich results in Google',
+  video: 'Video markup eligible for video carousel and video rich results in Google',
   generic: 'Basic page info — breadcrumb navigation in search',
 };
 
@@ -111,6 +117,14 @@ export const SCHEMA_ROLE_INDEX: Record<SchemaPageRole, { description: string; ex
   comparison: {
     description: 'Competitor comparison pages. References the main product entity — mentions competitor products.',
     examples: ['/vs-competitor', '/compare/us-vs-them', '/alternatives/competitor-name'],
+  },
+  howto: {
+    description: 'Step-by-step tutorial or guide pages. Gets HowTo schema with numbered steps — eligible for Google How-To rich results.',
+    examples: ['/how-to/set-up-account', '/tutorials/getting-started', '/guides/seo-checklist'],
+  },
+  video: {
+    description: 'Pages featuring a primary video. Gets VideoObject schema — eligible for Google video carousel and rich results.',
+    examples: ['/videos/product-demo', '/watch/tutorial-overview', '/video-library/webinar-recap'],
   },
   generic: {
     description: 'Pages that don\'t fit another category. Gets basic WebPage + BreadcrumbList markup.',

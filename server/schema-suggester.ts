@@ -35,7 +35,7 @@ export interface SchemaSuggestion {
 }
 
 // Page type hints for tailored schema generation
-export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'generic';
+export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'howto' | 'video' | 'generic';
 
 export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   auto: 'Auto-detect',
@@ -54,6 +54,8 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   'case-study': 'Case Study',
   comparison: 'Comparison',
   author: 'Author Profile',
+  howto: 'How-To / Tutorial',
+  video: 'Video Page',
   generic: 'General Page',
 };
 
@@ -75,6 +77,8 @@ export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; s
   'case-study': { primary: ['Article'], secondary: ['Person', 'CreativeWork', 'BreadcrumbList'] },
   comparison: { primary: ['WebPage'], secondary: ['ItemList', 'BreadcrumbList'] },
   author: { primary: ['Person', 'ProfilePage'], secondary: ['BreadcrumbList'] },
+  howto: { primary: ['HowTo'], secondary: ['Article', 'BreadcrumbList'] },
+  video: { primary: ['VideoObject'], secondary: ['Article', 'BreadcrumbList'] },
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
 
@@ -201,6 +205,8 @@ const RECOMMENDED_FIELDS: Record<string, string[]> = {
   BlogPosting: ['publisher'],
   Product: ['offers', 'image'],
   LocalBusiness: ['telephone', 'openingHoursSpecification'],
+  HowTo: ['description', 'totalTime', 'supply', 'tool', 'image'],
+  VideoObject: ['description', 'duration', 'embedUrl', 'contentUrl'],
 };
 
 // Cross-reference rules: { type → field → expected target @type }
@@ -759,6 +765,49 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
       }
     }
 
+    // Check HowTo steps — verify step names exist in page text; strip hallucinated steps
+    if (type === 'HowTo') {
+      const steps = node['step'] as Record<string, unknown>[] | undefined;
+      if (Array.isArray(steps) && steps.length > 0) {
+        const verified = steps.filter((step: Record<string, unknown>) => {
+          const name = (step['name'] as string || '').toLowerCase().trim();
+          const text = (step['text'] as string || '').toLowerCase().trim();
+          return (name.length > 3 && lowerText.includes(name)) || (text.length > 10 && lowerText.includes(text.slice(0, 30)));
+        });
+        if (verified.length === 0) {
+          stripped.push(`HowTo: removed — none of the ${steps.length} step(s) found in page content`);
+          node['_remove'] = true;
+        } else if (verified.length < steps.length) {
+          stripped.push(`HowTo: removed ${steps.length - verified.length} hallucinated step(s) not found in page content`);
+          node['step'] = verified;
+        }
+      }
+    }
+
+    // Check VideoObject — verify thumbnailUrl and embedUrl/contentUrl exist in HTML
+    if (type === 'VideoObject') {
+      const thumbnailUrl = node['thumbnailUrl'] as string | undefined;
+      const embedUrl = node['embedUrl'] as string | undefined;
+      const contentUrl = node['contentUrl'] as string | undefined;
+      if (thumbnailUrl && !lowerHtml.includes(thumbnailUrl.toLowerCase())) {
+        stripped.push(`VideoObject: removed hallucinated thumbnailUrl "${thumbnailUrl}" (not found in page HTML)`);
+        delete node['thumbnailUrl'];
+      }
+      if (embedUrl && !lowerHtml.includes(embedUrl.toLowerCase().split('?')[0])) {
+        stripped.push(`VideoObject: removed unverified embedUrl "${embedUrl}" (not found in page HTML)`);
+        delete node['embedUrl'];
+      }
+      if (contentUrl && !lowerHtml.includes(contentUrl.toLowerCase())) {
+        stripped.push(`VideoObject: removed unverified contentUrl (not found in page HTML)`);
+        delete node['contentUrl'];
+      }
+      // If thumbnailUrl was stripped, remove the whole VideoObject since it's a required field
+      if (!node['thumbnailUrl']) {
+        stripped.push('VideoObject: removed — thumbnailUrl is required and could not be verified from page content');
+        node['_remove'] = true;
+      }
+    }
+
     // Check sameAs URLs — filter to only URLs that appear in the HTML
     const sameAs = node['sameAs'] as string[] | undefined;
     if (Array.isArray(sameAs)) {
@@ -880,7 +929,43 @@ function extractStructuredInfo(html: string) {
   // Extract date
   const dateMatch = html.match(/(?:datetime|published|date)[=:"'\s]*(\d{4}-\d{2}-\d{2})/i);
   const publishDate = dateMatch ? dateMatch[1] : '';
-  return { emails, phones, images, questions, author, publishDate };
+
+  // Extract HowTo steps: <ol><li> items, "Step N:" headings, numbered headings
+  const stepTexts = new Set<string>();
+  // <ol><li> pattern
+  const olMatch = html.match(/<ol[^>]*>([\s\S]*?)<\/ol>/gi);
+  if (olMatch) {
+    for (const ol of olMatch) {
+      const lis = ol.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+      for (const li of lis) {
+        const text = li.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (text.length > 10 && text.length < 200) stepTexts.add(text);
+      }
+    }
+  }
+  // "Step N:" heading patterns
+  const stepHeadings = html.match(/<h[2-4][^>]*>[^<]*(?:step\s+\d+|^\d+\.)[^<]*/gi) || [];
+  for (const h of stepHeadings) {
+    const text = h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (text.length > 5 && text.length < 200) stepTexts.add(text);
+  }
+  const steps = [...stepTexts].slice(0, 15);
+
+  // Extract video URLs: YouTube/Vimeo iframes, <video src>
+  const videoUrls: string[] = [];
+  const iframeSrcs = html.match(/(?:src)=["']([^"']*(?:youtube\.com\/embed|youtube-nocookie\.com\/embed|vimeo\.com\/video|player\.vimeo\.com)[^"']*)["']/gi) || [];
+  for (const src of iframeSrcs) {
+    const m = src.match(/src=["']([^"']+)["']/i);
+    if (m) videoUrls.push(m[1]);
+  }
+  const videoSrcs = html.match(/<video[^>]+src=["']([^"']+)["']/gi) || [];
+  for (const v of videoSrcs) {
+    const m = v.match(/src=["']([^"']+)["']/i);
+    if (m) videoUrls.push(m[1]);
+  }
+  const uniqueVideoUrls = [...new Set(videoUrls)].slice(0, 5);
+
+  return { emails, phones, images, questions, author, publishDate, steps, videoUrls: uniqueVideoUrls };
 }
 
 // Post-process AI output: strip empty arrays, empty strings, and empty objects
@@ -1039,6 +1124,30 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - If publications/works are listed, include "hasOccupation" with CreativeWork nodes or use "creator" relationships
 - If this author works for the company, include "worksFor": {"@id": "${siteUrl}/#organization"}
 - BreadcrumbList: Home → [Team/About] → Author Name`,
+
+    howto: `PAGE TYPE INSTRUCTIONS (How-To / Tutorial):
+- MUST include HowTo as mainEntity with: name (the tutorial title), description, step (array of HowToStep)
+- Each HowToStep MUST have: "@type": "HowToStep", "name" (step headline), "text" (detailed instructions)
+- Extract steps from NUMBERED LISTS (<ol><li>) or "Step N:" headings ONLY — do NOT fabricate steps from paragraphs
+- ONLY include steps whose text actually appears in the page content
+- If totalTime is mentioned (e.g. "takes 30 minutes"), include as ISO 8601 duration: "PT30M"
+- If supplies or tools are listed, include "supply": [{"@type": "HowToSupply", "name": "..."}] and "tool": [{"@type": "HowToTool", "name": "..."}]
+- If a featured image exists, include "image" on HowTo
+- If the tutorial also has article-style content, include Article as a secondary node
+- BreadcrumbList: Home → [Category] → Tutorial Title
+- WebPage.mainEntity should reference the HowTo node`,
+
+    video: `PAGE TYPE INSTRUCTIONS (Video Page):
+- MUST include VideoObject as mainEntity with: name, description, uploadDate (ISO 8601), thumbnailUrl
+- uploadDate MUST be a real date from page content — do NOT fabricate; if not found, omit VideoObject entirely
+- thumbnailUrl MUST be a real image URL from page content — do NOT fabricate
+- If a YouTube or Vimeo embed is detected, include "embedUrl" with the embed URL
+- If a direct video file URL is found, include "contentUrl"
+- If transcript text is present, include "transcript" (max 500 chars)
+- If duration is mentioned (e.g. "10:30"), convert to ISO 8601 duration: "PT10M30S"
+- If the page also has article content, include Article as a secondary node alongside VideoObject
+- BreadcrumbList: Home → [Category] → Video Title
+- WebPage.mainEntity should reference the VideoObject node`,
 
     generic: `PAGE TYPE INSTRUCTIONS (General Page):
 - Use WebPage + BreadcrumbList as the baseline
@@ -1377,6 +1486,8 @@ ${info.emails.length ? `- Emails: ${info.emails.join(', ')}` : ''}
 ${info.phones.length ? `- Phones: ${info.phones.join(', ')}` : ''}
 ${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : ''}
 ${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
+${info.steps.length ? `- How-To Steps Detected (${info.steps.length}): ${info.steps.slice(0, 5).map((s, i) => `Step ${i + 1}: ${s.slice(0, 80)}`).join(' | ')}` : ''}
+${info.videoUrls.length ? `- Video Embed URLs Detected: ${info.videoUrls.join(', ')}` : ''}
 ${(ctx._gscPageData || ctx._ga4PageData) ? `
 SEARCH PERFORMANCE (this page — use to prioritize richness and breadth of schema):
 ${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} impressions/90d | ${ctx._gscPageData.clicks.toLocaleString()} clicks | Avg Position: ${ctx._gscPageData.position.toFixed(1)} | CTR: ${(ctx._gscPageData.ctr * 100).toFixed(2)}%` : ''}
@@ -1457,6 +1568,8 @@ PROPERTY RULES — enforced by automated validation:
 30. "knowsAbout" should contain 3-5 concise domain expertise terms, not 10+ verbose phrases
 31. Keep "description" fields concise — aim for 1-3 sentences (50-200 words). Move detailed feature lists to other properties (featureList, serviceType) rather than cramming them into description.
 32. WebPage "description" should closely mirror the page's meta description when available — do not rewrite or heavily embellish it.
+33. HOWTO PAGES: If "How-To Steps Detected" are listed above in PAGE INFO, use those EXACT steps for HowToStep nodes — do NOT paraphrase or reorder. Each HowToStep "name" must be a direct match to step text from the page. Duration in "totalTime" must appear explicitly in the page content. "supply" and "tool" arrays only if explicitly listed on the page.
+34. VIDEO PAGES: If "Video Embed URLs Detected" are listed above in PAGE INFO, use the EXACT URL for "embedUrl". "uploadDate" and "thumbnailUrl" MUST come from page content — omit VideoObject entirely if these cannot be found. "duration" must be formatted as ISO 8601 (e.g. "PT5M30S") and must appear in the page content. If both a VideoObject and article content are present, include both as top-level @graph nodes.
 
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 

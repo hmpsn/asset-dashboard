@@ -282,6 +282,8 @@ ROLES (choose exactly one per page):
 - faq: Dedicated FAQ pages with real Q&A content
 - case-study: Case study/customer story — Article schema
 - comparison: Comparison pages (vs competitors) — reference the pillar's entity
+- howto: Step-by-step tutorial/guide pages — HowTo schema with numbered steps eligible for rich results
+- video: Pages featuring a primary video — VideoObject schema eligible for video carousel in search
 - generic: Anything that doesn't fit above — WebPage + BreadcrumbList only
 
 CANONICAL ENTITIES: Identify the DISTINCT products/services this site offers. Most SaaS sites have ONE product.
@@ -348,7 +350,7 @@ IMPORTANT:
     // Validate and normalize roles
     const validRoles = new Set<string>([
       'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about', 'contact',
-      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'generic',
+      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'howto', 'video', 'generic',
     ]);
 
     const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => ({
@@ -446,6 +448,12 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
       primaryType = 'Article';
     } else if (/^\/(integrations?|partners?)\//.test(slug)) {
       role = 'partnership';
+    } else if (/^\/(how-to|howto|tutorial|guide)s?\//.test(slug) || /^\/(how-to|howto|tutorial|guide)s?$/.test(slug)) {
+      role = 'howto' as SchemaPageRole;
+      primaryType = 'HowTo';
+    } else if (/^\/(video|watch)s?\//.test(slug) || /^\/(video|watch)s?$/.test(slug)) {
+      role = 'video' as SchemaPageRole;
+      primaryType = 'VideoObject';
     }
 
     return {
