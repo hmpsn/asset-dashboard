@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { get, post, patch } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebflowAssets, useAssetAudit, useCmsImages } from '../hooks/admin';
-import type { CmsImageUsage } from '../../shared/types/cms-images';
+import type { CmsImageUsage, CmsImageScanResult } from '../../shared/types/cms-images';
 import {
   Image, AlertTriangle, Trash2, Sparkles, X,
   Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
 import { EmptyState } from './ui';
+import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { OrganizePreview } from './assets/OrganizePreview';
 import { AssetFilters } from './assets/AssetFilters';
@@ -97,6 +98,20 @@ function AssetBrowser({ siteId }: Props) {
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
     queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
+  const updateCmsAssets = (assetId: string, patch: Partial<{ altText: string }>) =>
+    queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId), old => {
+      if (!old) return old;
+      return {
+        ...old,
+        assets: old.assets.map(a => a.assetId === assetId ? { ...a, ...patch } : a),
+        stats: {
+          ...old.stats,
+          missingAlt: old.assets.filter(a =>
+            (a.assetId === assetId ? !(patch.altText ?? a.altText)?.trim() : !(a.altText?.trim()))
+          ).length,
+        },
+      };
+    });
   const refreshAssets = () => queryClient.invalidateQueries({ queryKey: ['admin-webflow-assets', siteId] });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -185,6 +200,7 @@ function AssetBrowser({ siteId }: Props) {
         return;
       }
       updateAssets(prev => prev.map(a => a.id === assetId ? { ...a, altText: altDraft } : a));
+      updateCmsAssets(assetId, { altText: altDraft });
       setEditingAlt(null);
     } catch (err) {
       console.error('AssetBrowser operation failed:', err);
@@ -204,6 +220,7 @@ function AssetBrowser({ siteId }: Props) {
         setAltError(`Alt text generation failed: ${data.error}`);
       } else if (data.altText) {
         updateAssets(prev => prev.map(a => a.id === asset.id ? { ...a, altText: data.altText } : a));
+        updateCmsAssets(asset.id, { altText: data.altText });
         if (data.writeError) {
           setAltError(`Alt text generated but failed to save to Webflow: ${data.writeError}`);
         } else {
@@ -274,6 +291,7 @@ function AssetBrowser({ siteId }: Props) {
                 updateAssets(prev => prev.map(a =>
                   a.id === event.assetId ? { ...a, altText: event.altText } : a
                 ));
+                updateCmsAssets(event.assetId, { altText: event.altText });
                 if (event.updated) successCount++;
                 else failCount++;
               } else {

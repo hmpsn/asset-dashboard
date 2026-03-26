@@ -19,7 +19,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { markCapabilityDisabled, clearCapabilityDisabled } from '../seo-data-provider.js';
+import { markCapabilityDisabled } from '../seo-data-provider.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -104,25 +104,14 @@ function areCreditsExhausted(): boolean {
 
 // ── Backlinks subscription detection ──
 // DataForSEO backlinks is a separate paid subscription (error 40204).
-// Once detected, we mark the capability disabled on the registry so
-// the resolver can fall back to SEMRush for backlink calls.
+// Once detected, we mark the capability disabled on the registry (with a 24h TTL)
+// so the resolver can fall back to SEMRush for backlink calls.
+// The registry itself handles TTL expiry and auto-re-enables the capability.
 
-let backlinkDisabledUntil = 0;
 const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function markBacklinksDisabled(): void {
-  backlinkDisabledUntil = Date.now() + BACKLINK_COOLDOWN_MS;
-  markCapabilityDisabled('dataforseo', 'backlinks');
-  log.warn(`DataForSEO backlinks disabled for ${BACKLINK_COOLDOWN_MS / 1000 / 3600}h — will fall back to alternate provider`);
-}
-
-function areBacklinksDisabled(): boolean {
-  if (backlinkDisabledUntil > 0 && Date.now() >= backlinkDisabledUntil) {
-    backlinkDisabledUntil = 0;
-    clearCapabilityDisabled('dataforseo', 'backlinks');
-    log.info('DataForSEO backlinks TTL expired — re-enabling');
-  }
-  return Date.now() < backlinkDisabledUntil;
+  markCapabilityDisabled('dataforseo', 'backlinks', BACKLINK_COOLDOWN_MS);
 }
 
 function isSubscriptionError(err: unknown): boolean {
@@ -634,8 +623,6 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     if (areCreditsExhausted()) return null;
 
-    if (areBacklinksDisabled()) return null;
-
     try {
       const json = await apiCall('backlinks/summary/live', [{
         target,
@@ -690,7 +677,6 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
 
     if (areCreditsExhausted()) return [];
-    if (areBacklinksDisabled()) return [];
 
     try {
       const json = await apiCall('backlinks/referring_domains/live', [{
