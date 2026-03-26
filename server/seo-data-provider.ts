@@ -160,6 +160,10 @@ export function isCapabilityDisabled(providerName: ProviderName, capability: str
   return disabledCapabilities.get(providerName)?.has(capability) ?? false;
 }
 
+export function clearCapabilityDisabled(providerName: ProviderName, capability: string): void {
+  disabledCapabilities.get(providerName)?.delete(capability);
+}
+
 /**
  * Get a provider that supports backlinks. If the preferred provider's backlinks
  * are unavailable (e.g. DataForSEO without backlinks subscription), falls back

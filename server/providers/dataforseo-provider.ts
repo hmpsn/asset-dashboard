@@ -19,7 +19,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { markCapabilityDisabled } from '../seo-data-provider.js';
+import { markCapabilityDisabled, clearCapabilityDisabled } from '../seo-data-provider.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -107,13 +107,22 @@ function areCreditsExhausted(): boolean {
 // Once detected, we mark the capability disabled on the registry so
 // the resolver can fall back to SEMRush for backlink calls.
 
-let backlinkSubscriptionDisabled = false;
+let backlinkDisabledUntil = 0;
+const BACKLINK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function markBacklinksDisabled(): void {
-  if (!backlinkSubscriptionDisabled) {
-    backlinkSubscriptionDisabled = true;
-    markCapabilityDisabled('dataforseo', 'backlinks');
+  backlinkDisabledUntil = Date.now() + BACKLINK_COOLDOWN_MS;
+  markCapabilityDisabled('dataforseo', 'backlinks');
+  log.warn(`DataForSEO backlinks disabled for ${BACKLINK_COOLDOWN_MS / 1000 / 3600}h — will fall back to alternate provider`);
+}
+
+function areBacklinksDisabled(): boolean {
+  if (backlinkDisabledUntil > 0 && Date.now() >= backlinkDisabledUntil) {
+    backlinkDisabledUntil = 0;
+    clearCapabilityDisabled('dataforseo', 'backlinks');
+    log.info('DataForSEO backlinks TTL expired — re-enabling');
   }
+  return Date.now() < backlinkDisabledUntil;
 }
 
 function isSubscriptionError(err: unknown): boolean {
@@ -625,7 +634,7 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     if (areCreditsExhausted()) return null;
 
-    if (backlinkSubscriptionDisabled) return null;
+    if (areBacklinksDisabled()) return null;
 
     try {
       const json = await apiCall('backlinks/summary/live', [{
@@ -681,7 +690,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
 
     if (areCreditsExhausted()) return [];
-    if (backlinkSubscriptionDisabled) return [];
+    if (areBacklinksDisabled()) return [];
 
     try {
       const json = await apiCall('backlinks/referring_domains/live', [{
