@@ -357,7 +357,7 @@ export function ApprovalsTab({
                                     <div className="flex items-center gap-2 text-[11px] text-red-400">
                                       <X className="w-3 h-3" /> Rejected
                                       <button
-                                        onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending' })}
+                                        onClick={() => updateApprovalItem(batch.id, item.id, { status: 'pending', clientNote: '' })}
                                         className="ml-2 px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-[11px] text-zinc-400 transition-colors"
                                       >Undo</button>
                                     </div>

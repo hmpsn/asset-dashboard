@@ -207,6 +207,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
       updatePageState(req.params.workspaceId, item.pageId, {
         status: 'in-review',
         updatedBy: 'client',
+        rejectionNote: '',
       });
       const actorInfo = getClientActor(req, req.params.workspaceId);
       addActivity(req.params.workspaceId, 'approval_reverted',
