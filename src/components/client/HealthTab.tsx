@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus } from 'lucide-react';
 import { MetricRing } from '../ui';
 import { scoreColorClass } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
@@ -19,6 +19,45 @@ export interface HealthTabProps {
   workspaceId?: string;
   onContentRequested?: () => void;
   actionPlanSlot?: ReactNode;
+}
+
+// Plain-English impact statements for each check type — shown below the raw issue message
+// to help clients understand WHY something matters without needing to know SEO terminology.
+const CHECK_IMPACT: Record<string, string> = {
+  'title': 'The page title is the first thing people see in Google search results. It directly controls whether they click or scroll past.',
+  'meta-description': 'Google shows this text below your link in search results. A missing or poor description means fewer people click through to your site.',
+  'h1': 'The main heading tells Google what your page is about. Without it, your page is harder to rank for relevant searches.',
+  'canonical': 'Without this, Google may split your ranking power across multiple URLs — weakening your position for all of them.',
+  'duplicate-title': 'Having two pages with the same title confuses Google about which one to show. It can reduce rankings for both.',
+  'duplicate-description': 'Duplicate descriptions make it harder for Google to understand what makes each page unique.',
+  'img-alt': 'Missing alt text hides your images from Google Image Search and creates accessibility barriers for screen reader users.',
+  'og-tags': 'Without these, links shared to social media show no title, description, or image — significantly reducing click-through.',
+  'og-image': 'Without a preview image, social shares look bare and get far fewer clicks than posts with rich previews.',
+  'structured-data': 'Schema markup can unlock rich results in Google — stars, FAQs, breadcrumbs — which stand out and get more clicks.',
+  'internal-links': 'Internal links spread authority across your site and help Google discover all your pages.',
+  'content-length': 'Pages with thin content are less likely to rank. Google prefers pages that fully answer a user\'s question.',
+  'redirect-chains': 'Every redirect hop slows your page down and weakens the SEO authority passed through the link.',
+  'mixed-content': 'HTTP content on an HTTPS page triggers browser security warnings that erode visitor trust.',
+  'ssl': 'Google gives a small ranking boost to secure HTTPS pages. Insecure pages also display warnings in browsers.',
+  'viewport': 'Without a viewport tag, your page won\'t scale correctly on mobile — and most searches now happen on phones.',
+  'lang': 'The language attribute helps Google serve your content to the right audience in the right language.',
+  'robots': 'The robots meta tag controls whether Google can index this page. An incorrect setting can hide it from search entirely.',
+  'heading-hierarchy': 'A clear heading structure (H1, H2, H3) helps Google understand your content and helps visitors scan the page.',
+  'cwv': 'Google uses page speed and stability as a ranking signal — slow or jumpy pages rank lower and lose visitors.',
+  'cwv-lcp': 'Slow loading speed causes visitors to leave before your page even appears. Google penalizes slow-loading pages.',
+  'cwv-cls': 'Content that shifts while loading frustrates visitors and can cause accidental clicks. Google flags this as poor experience.',
+  'aeo-author': 'AI answer engines (ChatGPT, Google AI Overviews) prefer citing content with named, credentialed authors.',
+  'aeo-date': 'Undated content gets deprioritized by AI systems that can\'t verify freshness — a quick fix with lasting benefit.',
+  'aeo-answer-first': 'AI systems extract the first substantive paragraph as their citation. Generic intros waste that prime position.',
+  'aeo-faq-no-schema': 'FAQ schema makes Q&A pairs directly extractable by AI answer engines and can unlock rich results in Google.',
+  'aeo-hidden-content': 'Content hidden in accordions or tabs often isn\'t read by search crawlers or AI systems.',
+  'aeo-citations': 'Pages that cite authoritative sources (.gov, .edu, journals) are trusted more by AI systems.',
+  'aeo-dark-patterns': 'Aggressive overlays and autoplay reduce content accessibility for AI retrieval systems.',
+};
+
+function checkImpact(check: string): string | null {
+  const chk = check.toLowerCase();
+  return CHECK_IMPACT[chk] || null;
 }
 
 const CONTENT_ISSUE_CHECKS = ['content-length', 'heading', 'h1', 'h1-missing', 'h1-multiple', 'word-count'];
@@ -207,6 +246,30 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
         );
       })()}
 
+      {/* ── 1b. WHAT CHANGED SINCE LAST AUDIT ── */}
+      {auditDetail.auditDiff && auditDetail.previousScore != null && (
+        auditDetail.auditDiff.resolved > 0 || auditDetail.auditDiff.newIssues > 0
+      ) && (() => {
+        const { resolved, newIssues } = auditDetail.auditDiff!;
+        const scoreDelta = auditDetail.audit.siteScore - auditDetail.previousScore!;
+        const deltaColor = scoreDelta > 0 ? 'text-emerald-400' : scoreDelta < 0 ? 'text-red-400' : 'text-zinc-500';
+        const DeltaIcon = scoreDelta > 0 ? TrendingUp : scoreDelta < 0 ? AlertTriangle : Minus;
+        return (
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[12px]">
+            <DeltaIcon className={`w-4 h-4 flex-shrink-0 ${deltaColor}`} />
+            <span className="text-zinc-400">Since last audit:</span>
+            {resolved > 0 && <span className="text-emerald-400 font-medium">{resolved} resolved</span>}
+            {resolved > 0 && newIssues > 0 && <span className="text-zinc-600">·</span>}
+            {newIssues > 0 && <span className="text-red-400 font-medium">{newIssues} new</span>}
+            <span className="text-zinc-600">·</span>
+            <span className={`font-medium ${deltaColor}`}>
+              score {auditDetail.previousScore} → {auditDetail.audit.siteScore}
+              {scoreDelta !== 0 && <span className="ml-1">({scoreDelta > 0 ? '+' : ''}{scoreDelta})</span>}
+            </span>
+          </div>
+        );
+      })()}
+
       {/* ── 2. PAGE SPEED (Always Expanded) ── */}
       {auditDetail.audit.cwvSummary && (auditDetail.audit.cwvSummary.mobile || auditDetail.audit.cwvSummary.desktop) && (() => {
         const ratingColor = (r: CwvStrategyResult['metrics']['LCP']['rating']) =>
@@ -335,6 +398,9 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                 <span className="text-[11px] text-zinc-500 truncate">{item.page}</span>
                               </div>
                               <div className="text-[11px] text-zinc-300 mt-0.5">{item.issue.message}</div>
+                              {checkImpact(item.issue.check) && (
+                                <div className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{checkImpact(item.issue.check)}</div>
+                              )}
                             </div>
                             {hasContentIssues([item.issue]) && workspaceId && !requestedPages.has(item.pageId) && (
                               <button
@@ -398,6 +464,9 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                                       {issue.severity === 'warning' && <Info className={`w-3.5 h-3.5 ${sc.text} flex-shrink-0 mt-0.5`} />}
                                       <div className="flex-1">
                                         <div className="text-[11px] text-zinc-300">{issue.message}</div>
+                                        {checkImpact(issue.check) && (
+                                          <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{checkImpact(issue.check)}</div>
+                                        )}
                                         {issue.recommendation && <div className="text-[11px] text-zinc-500 mt-0.5">{issue.recommendation}</div>}
                                       </div>
                                     </div>

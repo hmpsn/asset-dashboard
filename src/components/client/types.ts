@@ -36,6 +36,7 @@ export interface AuditDetail {
   id: string; createdAt: string; siteName: string; logoUrl?: string; previousScore?: number;
   audit: { siteScore: number; totalPages: number; errors: number; warnings: number; infos: number; pages: PageAuditResult[]; siteWideIssues: SeoIssue[]; cwvSummary?: CwvSummary; };
   scoreHistory: Array<{ id: string; createdAt: string; siteScore: number }>;
+  auditDiff?: { resolved: number; newIssues: number };
 }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; }
 

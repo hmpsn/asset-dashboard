@@ -483,13 +483,21 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   : <>Based on your keyword strategy and competitor analysis, these topics represent untapped search traffic. Click <strong className="text-teal-300">Request This Topic</strong> to have {STUDIO_NAME} create a full content brief.</>}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {strategyData.contentGaps.slice(0, expandedSections.has('content-opportunities-all') ? undefined : 4).map((gap, i) => {
+                {[...strategyData.contentGaps]
+                  // 3B: Sort data-backed gaps above AI-only suggestions
+                  .sort((a, b) => {
+                    const aData = (a.volume != null && a.volume > 0) || (a.impressions != null && a.impressions > 0) ? 1 : 0;
+                    const bData = (b.volume != null && b.volume > 0) || (b.impressions != null && b.impressions > 0) ? 1 : 0;
+                    return bData - aData;
+                  })
+                  .slice(0, expandedSections.has('content-opportunities-all') ? undefined : 4).map((gap, i) => {
                   const matchingReq = contentRequests?.find(r => r.targetKeyword === gap.targetKeyword && r.status !== 'declined');
                   const alreadyRequested = matchingReq != null || requestedTopics.has(gap.targetKeyword);
                   const planStatus = contentPlanKeywords?.get(gap.targetKeyword.toLowerCase());
                   const pageType = gap.suggestedPageType || 'blog';
                   const pageTypeLabel = ({ blog: 'Blog Post', landing: 'Landing Page', service: 'Service Page', location: 'Location Page', product: 'Product Page', pillar: 'Pillar Page', resource: 'Resource Guide' } as Record<string, string>)[pageType] || 'Blog Post';
                   const keywordDiffers = gap.targetKeyword.toLowerCase().replace(/[^a-z0-9]/g, '') !== gap.topic.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const isDataValidated = (gap.volume != null && gap.volume > 0) || (gap.impressions != null && gap.impressions > 0);
                   return (
                     <div key={i} className="px-3.5 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
                       <div className="flex items-center justify-between mb-1">
@@ -498,6 +506,10 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">{pageTypeLabel}</span>
+                          {isDataValidated
+                            ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Data-validated</span>
+                            : <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700/50 font-medium">AI suggestion</span>
+                          }
                           <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
                         </div>
                       </div>
