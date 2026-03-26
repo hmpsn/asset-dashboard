@@ -167,6 +167,11 @@ export type SchemaAnalyticsMaps = {
   ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>;
 };
 
+// 5-minute TTL cache for analytics maps — prevents repeated API calls on
+// the interactive single-page generation endpoint.
+const analyticsCache: Record<string, { maps: SchemaAnalyticsMaps; ts: number }> = {};
+const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export async function buildSchemaContext(
   siteId: string,
   options?: { includeAnalytics?: boolean },
@@ -213,27 +218,37 @@ export async function buildSchemaContext(
   let ga4Map: SchemaAnalyticsMaps['ga4Map'];
 
   if (options?.includeAnalytics && ws) {
-    const [gscResults, ga4Results] = await Promise.allSettled([
-      ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
-      ws.ga4PropertyId ? getGA4TopPages(ws.ga4PropertyId, 90, 500) : Promise.resolve([]),
-    ]);
+    const cacheKey = ws.id;
+    const cached = analyticsCache[cacheKey];
+    if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) {
+      gscMap = cached.maps.gscMap;
+      ga4Map = cached.maps.ga4Map;
+    } else {
+      const [gscResults, ga4Results] = await Promise.allSettled([
+        ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
+        ws.ga4PropertyId ? getGA4TopPages(ws.ga4PropertyId, 90, 500) : Promise.resolve([]),
+      ]);
 
-    if (gscResults.status === 'fulfilled' && gscResults.value.length > 0) {
-      gscMap = new Map();
-      for (const p of gscResults.value) {
-        try {
-          const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
-          gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
-        } catch { /* skip malformed URLs */ }
+      if (gscResults.status === 'fulfilled' && gscResults.value.length > 0) {
+        gscMap = new Map();
+        for (const p of gscResults.value) {
+          try {
+            const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
+            gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
+          } catch { /* skip malformed URLs */ }
+        }
       }
-    }
 
-    if (ga4Results.status === 'fulfilled' && ga4Results.value.length > 0) {
-      ga4Map = new Map();
-      for (const p of ga4Results.value) {
-        const urlPath = (p.path.startsWith('/') ? p.path : `/${p.path}`).replace(/\/$/, '') || '/';
-        ga4Map.set(urlPath, { pageviews: p.pageviews, users: p.users, avgEngagementTime: p.avgEngagementTime });
+      if (ga4Results.status === 'fulfilled' && ga4Results.value.length > 0) {
+        ga4Map = new Map();
+        for (const p of ga4Results.value) {
+          const urlPath = (p.path.startsWith('/') ? p.path : `/${p.path}`).replace(/\/$/, '') || '/';
+          ga4Map.set(urlPath, { pageviews: p.pageviews, users: p.users, avgEngagementTime: p.avgEngagementTime });
+        }
       }
+
+      // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
+      analyticsCache[cacheKey] = { maps: { gscMap, ga4Map }, ts: Date.now() };
     }
   }
 

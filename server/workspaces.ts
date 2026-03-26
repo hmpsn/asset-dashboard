@@ -70,6 +70,7 @@ interface WorkspaceRow {
   audit_suppressions: string | null;
   publish_target: string | null;
   business_profile: string | null;
+  seo_data_provider: string | null;
   created_at: string;
 }
 

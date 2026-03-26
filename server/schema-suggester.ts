@@ -168,7 +168,6 @@ export interface SchemaContext {
   _personasBlock?: string;  // Internal: audience personas for richer schema targeting
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
-  _competitorSchemaGaps?: string[];  // Internal: schema types competitors have that we don't yet
   _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
     phone?: string;
     email?: string;

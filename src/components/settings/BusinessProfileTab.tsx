@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Link2, Clock, Save, Loader2 } from 'lucide-react';
 import { put } from '../../api/client';
 
@@ -43,6 +43,26 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
     numberOfEmployees: businessProfile?.numberOfEmployees || '',
   });
   const [socialInput, setSocialInput] = useState('');
+
+  // Re-initialize form if businessProfile prop arrives after mount (ws loads async)
+  useEffect(() => {
+    if (!businessProfile) return;
+    setForm({
+      phone: businessProfile.phone || '',
+      email: businessProfile.email || '',
+      address: {
+        street: businessProfile.address?.street || '',
+        city: businessProfile.address?.city || '',
+        state: businessProfile.address?.state || '',
+        zip: businessProfile.address?.zip || '',
+        country: businessProfile.address?.country || '',
+      },
+      socialProfiles: businessProfile.socialProfiles || [],
+      openingHours: businessProfile.openingHours || '',
+      foundedDate: businessProfile.foundedDate || '',
+      numberOfEmployees: businessProfile.numberOfEmployees || '',
+    });
+  }, [businessProfile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (key: keyof BusinessProfile, value: string) =>
     setForm(f => ({ ...f, [key]: value }));
