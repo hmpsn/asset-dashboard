@@ -22,10 +22,9 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow');
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // Processing queue

@@ -332,20 +332,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     ? queue.filter(q => q.workspace === selected.folder)
     : queue;
 
-  // Auto-expand sidebar group containing active tab (#160)
-  useEffect(() => {
-    const activeGroup = navGroups.find(g => g.label && g.items.some(i => i.id === tab));
-    if (activeGroup && collapsedGroups.has(activeGroup.label)) {
-      setCollapsedGroups(prev => {
-        const next = new Set(prev);
-        next.delete(activeGroup.label);
-        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
-        return next;
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
-
   // ── Sidebar navigation groups ──
   const navGroups: Array<{ label: string; groupIcon?: typeof Globe; groupColor?: string; activeBg?: string; activeText?: string; activeIcon?: string; inactiveIcon?: string; hoverBg?: string; hoverText?: string; items: Array<{ id: Page; label: string; icon: typeof Globe; desc?: string; needsSite?: boolean; hidden?: boolean }> }> = [
     { label: '', items: [
@@ -384,6 +370,20 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
     ]},
   ];
+
+  // Auto-expand sidebar group containing active tab (#160)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const activeGroup = navGroups.find(g => g.label && g.items.some(i => i.id === tab));
+    if (activeGroup && collapsedGroups.has(activeGroup.label)) {
+      setCollapsedGroups(prev => {
+        const next = new Set(prev);
+        next.delete(activeGroup.label);
+        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
+        return next;
+      });
+    }
+  }, [tab]); // navGroups is an unmemoized inline array — intentionally excluded
 
   // ── Breadcrumb tab label map ──
   const TAB_LABELS: Record<string, string> = {

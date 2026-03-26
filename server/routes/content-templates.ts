@@ -11,8 +11,8 @@ import {
   duplicateTemplate,
 } from '../content-templates.js';
 import { createLogger } from '../logger.js';
-
 import { requireWorkspaceAccess } from '../auth.js';
+
 const router = Router();
 const log = createLogger('content-templates-routes');
 

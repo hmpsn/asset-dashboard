@@ -11,9 +11,9 @@ import { getWorkspace } from '../workspaces.js';
 import { getInternalLinks } from '../performance-store.js';
 import type { PageLinkHealth, InternalLinkResult } from '../internal-links.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('routes:site-architecture');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 router.get('/api/site-architecture/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {

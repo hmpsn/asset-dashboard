@@ -20,10 +20,9 @@ import {
   getTokenForSite,
 } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-alt-text');
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- AI Alt Text Generation for existing assets ---

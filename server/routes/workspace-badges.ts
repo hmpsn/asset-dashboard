@@ -6,8 +6,8 @@ import { getWorkspace } from '../workspaces.js';
 import { listContentRequests } from '../content-requests.js';
 import { listBriefs } from '../content-brief.js';
 import { listPosts } from '../content-posts.js';
-
 import { requireWorkspaceAccess } from '../auth.js';
+
 const router = Router();
 
 /**

@@ -6,9 +6,9 @@ import { crawlCompetitorSchemas, compareSchemas } from '../competitor-schema.js'
 import { getWorkspace } from '../workspaces.js';
 import { getSchemaSnapshot } from '../schema-store.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('routes/competitor-schema');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**

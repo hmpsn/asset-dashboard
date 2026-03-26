@@ -17,8 +17,8 @@ import {
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import type { SeoIssue } from '../seo-audit.js';
-
 import { requireWorkspaceAccess } from '../auth.js';
+
 const router = Router();
 const log = createLogger('rewrite-chat');
 

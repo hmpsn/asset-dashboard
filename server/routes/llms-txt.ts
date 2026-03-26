@@ -7,9 +7,9 @@
 import { Router } from 'express';
 import { generateLlmsTxt } from '../llms-txt-generator.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('routes:llms-txt');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 router.get('/api/llms-txt/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {

@@ -2,11 +2,10 @@
  * annotations routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { listAnnotations, addAnnotation, deleteAnnotation } from '../annotations.js';
+import { requireWorkspaceAccess } from '../auth.js';
+
+const router = Router();
 
 // --- Annotations ---
 // Public: list annotations for a workspace

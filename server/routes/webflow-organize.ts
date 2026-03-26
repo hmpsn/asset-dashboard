@@ -14,10 +14,9 @@ import {
 } from '../webflow.js';
 import { getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-organize');
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- Organize Assets into Folders ---

@@ -2,10 +2,6 @@
  * webflow-seo routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
-const router = Router();
-
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
@@ -21,8 +17,10 @@ import {
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-seo');
+const router = Router();
 
 // --- SEO Audit ---
 router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {

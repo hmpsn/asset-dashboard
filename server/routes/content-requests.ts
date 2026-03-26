@@ -2,10 +2,6 @@
  * content-requests routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { generateBrief } from '../content-brief.js';
@@ -29,8 +25,10 @@ import {
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('content-requests');
+const router = Router();
 
 const updateContentRequestSchema = z.object({
   status: z.string().optional(),

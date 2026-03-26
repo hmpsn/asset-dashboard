@@ -13,10 +13,9 @@ import { isContentPage, isExcludedPage } from '../audit-page.js';
 import { addActivity } from '../activity-log.js';
 import type { SeoIssue } from '../seo-audit.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('aeo-review');
-
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 const REVIEW_DIR = getDataDir('aeo-reviews');
 

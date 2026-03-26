@@ -10,9 +10,9 @@ import { getWorkspace } from '../workspaces.js';
 import { listMatrices } from '../content-matrices.js';
 import { listTemplates } from '../content-templates.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('data-export');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // --- Helpers ---

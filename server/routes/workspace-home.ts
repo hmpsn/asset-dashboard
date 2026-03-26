@@ -15,9 +15,9 @@ import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listTemplates } from '../content-templates.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('workspace-home');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**

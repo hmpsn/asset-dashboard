@@ -2,10 +2,6 @@
  * webflow-analysis routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { analyzeInternalLinks } from '../internal-links.js';
 import { checkSiteLinks, getSiteDomains } from '../link-checker.js';
@@ -24,8 +20,10 @@ import { runSalesAudit } from '../sales-audit.js';
 import { getAllGscPages } from '../search-console.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-analysis');
+const router = Router();
 
 // --- Competitor SEO Comparison ---
 router.post('/api/competitor-compare', async (req, res) => {

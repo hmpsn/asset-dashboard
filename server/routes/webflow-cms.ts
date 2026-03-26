@@ -16,10 +16,9 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-cms');
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- CMS Collections ---

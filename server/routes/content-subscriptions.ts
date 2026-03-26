@@ -13,9 +13,9 @@ import {
 import { createCheckoutSession } from '../stripe.js';
 import { CONTENT_SUB_PLANS, type ContentSubPlan } from '../../shared/types/content.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('routes:content-subscriptions');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // ── Admin endpoints ──

@@ -19,9 +19,9 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('content-publish');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // --- Publish a content post to Webflow CMS ---

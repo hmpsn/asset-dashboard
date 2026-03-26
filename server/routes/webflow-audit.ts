@@ -9,10 +9,9 @@ import {
 } from '../webflow.js';
 import { getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-audit');
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- Asset Audit ---

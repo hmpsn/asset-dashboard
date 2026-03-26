@@ -2,10 +2,6 @@
  * content-briefs routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { renderBriefHTML } from '../brief-export-html.js';
 import {
   listBriefs,
@@ -22,8 +18,10 @@ import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('content-briefs');
+const router = Router();
 
 // --- Content Briefs ---
 // List all briefs for a workspace

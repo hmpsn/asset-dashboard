@@ -2,15 +2,13 @@
  * webflow-pagespeed routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
-const router = Router();
-
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
 import { savePageSpeed, getPageSpeed, saveSinglePageSpeed } from '../performance-store.js';
 import { getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
+const router = Router();
 const log = createLogger('webflow-pagespeed');
 
 // --- PageSpeed / Core Web Vitals ---

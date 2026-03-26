@@ -2,10 +2,6 @@
  * approvals routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import {
   createBatch,
@@ -35,8 +31,10 @@ import {
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('approvals');
+const router = Router();
 
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),

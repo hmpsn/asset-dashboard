@@ -6,10 +6,9 @@ import { callOpenAI } from '../openai-helpers.js';
 import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
 import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-keywords');
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- AI Keyword Analysis ---

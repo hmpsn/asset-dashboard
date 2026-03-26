@@ -4,8 +4,8 @@
 import { Router } from 'express';
 import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } from '../content-decay.js';
 import { getWorkspace } from '../workspaces.js';
-
 import { requireWorkspaceAccess } from '../auth.js';
+
 const router = Router();
 
 // Run decay analysis for a workspace

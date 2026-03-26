@@ -2,16 +2,15 @@
  * anomalies routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import {
   listAnomalies,
   dismissAnomaly,
   acknowledgeAnomaly,
   runAnomalyDetection,
 } from '../anomaly-detection.js';
+import { requireWorkspaceAccess } from '../auth.js';
+
+const router = Router();
 
 // --- Anomaly Detection ---
 router.get('/api/anomalies', (_req, res) => {

@@ -2,10 +2,6 @@
  * rank-tracking routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import {
   getTrackedKeywords,
@@ -18,6 +14,9 @@ import {
 } from '../rank-tracking.js';
 import { getSearchOverview } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
+import { requireWorkspaceAccess } from '../auth.js';
+
+const router = Router();
 
 // --- Rank Tracking ---
 // Get tracked keywords for a workspace

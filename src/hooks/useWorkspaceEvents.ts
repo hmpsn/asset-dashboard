@@ -87,9 +87,10 @@ export function useWorkspaceEvents(
                 ws.send(JSON.stringify({ action: 'identify', workspaceId, ...id }));
               }
             } else {
-              // Auth failed (expired/invalid token) — subscribe without auth (fallback)
-              ws.send(JSON.stringify({ action: 'subscribe', workspaceId }));
-              currentSubRef.current = workspaceId;
+              // Auth failed (expired/invalid token) — do NOT fall back to unauthenticated subscribe.
+              // Unauthenticated clients bypass server-side workspace access checks, so subscribing
+              // without auth would grant *more* access than a valid token. Instead, log and stop.
+              console.warn('WebSocket authentication failed — real-time events disabled for this session');
             }
             return;
           }

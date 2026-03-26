@@ -7,10 +7,9 @@ import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { getSeoChanges, getSeoChangeImpact, getSchemaImpactSummary } from '../seo-change-tracker.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('seo-change-tracker');
-
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // List recent SEO changes for a workspace

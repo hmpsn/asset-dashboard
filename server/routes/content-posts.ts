@@ -2,10 +2,6 @@
  * content-posts routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { getBrief } from '../content-brief.js';
@@ -34,8 +30,10 @@ import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('content-posts');
+const router = Router();
 
 // --- Content Post Generator (#194) ---
 

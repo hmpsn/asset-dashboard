@@ -8,8 +8,8 @@ import path from 'path';
 import { getUploadRoot } from '../data-dir.js';
 import { getWorkspace } from '../workspaces.js';
 import { upload } from '../middleware.js';
-
 import { requireWorkspaceAccess } from '../auth.js';
+
 const router = Router();
 
 function getBrandDocsDir(workspaceId: string): string | null {

@@ -2,10 +2,6 @@
  * reports routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import fs from 'fs';
 import path from 'path';
 import { addActivity } from '../activity-log.js';
@@ -31,8 +27,10 @@ import { renderSalesReportHTML } from '../sales-report-html.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('reports');
+const router = Router();
 
 // --- Sales Report (URL-based, no Webflow API needed) ---
 router.post('/api/sales-report', async (req, res) => {

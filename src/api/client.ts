@@ -16,7 +16,7 @@ export class ApiError extends Error {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: unknown;
-    try { body = await res.json(); } catch (err) { console.error('client operation failed:', err); }
+    try { body = await res.json(); } catch { /* non-JSON error body */ }
     const msg = (body && typeof body === 'object' && 'error' in body)
       ? String((body as { error: unknown }).error)
       : res.statusText || `HTTP ${res.status}`;
@@ -103,8 +103,7 @@ export async function getSafe<T>(url: string, fallback: T, signal?: AbortSignal)
     const res = await fetch(url, { signal });
     if (!res.ok) return fallback;
     return await res.json() as T;
-  } catch (err) {
-      console.error('client operation failed:', err);
+  } catch {
     return fallback;
   }
 }

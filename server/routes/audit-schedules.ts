@@ -2,16 +2,15 @@
  * audit-schedules routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import {
   getSchedule,
   listSchedules,
   upsertSchedule,
   deleteSchedule,
 } from '../scheduled-audits.js';
+import { requireWorkspaceAccess } from '../auth.js';
+
+const router = Router();
 
 // --- Scheduled Audits ---
 router.get('/api/audit-schedules', (_req, res) => {

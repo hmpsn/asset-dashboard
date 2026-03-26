@@ -2,11 +2,10 @@
  * churn-signals routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { listChurnSignals, dismissSignal } from '../churn-signals.js';
+import { requireWorkspaceAccess } from '../auth.js';
+
+const router = Router();
 
 // --- Churn Prevention Signals (admin) ---
 router.get('/api/churn-signals', (_req, res) => {

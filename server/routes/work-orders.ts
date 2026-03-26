@@ -2,10 +2,6 @@
  * work-orders routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { listClientUsers } from '../client-users.js';
@@ -13,6 +9,9 @@ import { notifyClientFixesApplied } from '../email.js';
 import { listPayments } from '../payments.js';
 import { listWorkOrders, updateWorkOrder } from '../work-orders.js';
 import { getWorkspace, updatePageState } from '../workspaces.js';
+import { requireWorkspaceAccess } from '../auth.js';
+
+const router = Router();
 
 router.get('/api/public/fix-orders/:workspaceId', (req, res) => {
   const payments = listPayments(req.params.workspaceId);

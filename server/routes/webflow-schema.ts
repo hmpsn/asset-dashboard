@@ -2,10 +2,6 @@
  * webflow-schema routes — extracted from server/index.ts
  */
 import { Router } from 'express';
-
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { buildSchemaContext } from '../helpers.js';
 import { getCachedArchitecture } from '../site-architecture.js';
@@ -27,8 +23,10 @@ import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClie
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccessFromQuery } from '../auth.js';
 
 const log = createLogger('webflow-schema');
+const router = Router();
 
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {

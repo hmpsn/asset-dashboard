@@ -13,9 +13,9 @@ import {
 import { getKeywordRecommendations } from '../keyword-recommendations.js';
 import { detectMatrixCannibalization, checkKeywordCannibalization } from '../cannibalization-detection.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('routes:content-matrices');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // List all matrices for a workspace

@@ -14,9 +14,9 @@ import { getTemplate } from '../content-templates.js';
 import { createBatch } from '../approvals.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('routes:content-plan-review');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 // ── Public endpoints (client portal) ──
