@@ -367,6 +367,56 @@ describe('validateForGoogleRichResults', () => {
     expect(result.status).toBe('valid');
     expect(result.richResults).toHaveLength(0);
   });
+
+  it('validates all types in multi-type @type arrays', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': ['WebPage', 'ProfilePage'],
+        '@id': 'https://example.com/team/jane/#profilepage',
+        mainEntity: { '@type': 'Person', name: 'Jane Doe' },
+        name: 'Jane Doe Profile',
+        description: 'Team member page',
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.errors).toHaveLength(0);
+    expect(result.richResults).toContain('ProfilePage');
+  });
+
+  it('flags missing required fields from secondary type in multi-type arrays', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': ['WebPage', 'ProfilePage'],
+        '@id': 'https://example.com/team/jane/#profilepage',
+        // Missing: mainEntity (required by ProfilePage)
+        name: 'Jane Doe Profile',
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.status).toBe('errors');
+    expect(result.errors.some(e => e.field === 'mainEntity' && e.type === 'ProfilePage')).toBe(true);
+    expect(result.richResults).not.toContain('ProfilePage');
+  });
+
+  it('does not duplicate errors for shared fields across multi-type arrays', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': ['Article', 'BlogPosting'],
+        '@id': 'https://example.com/blog/test/#article',
+        // Missing: headline, datePublished, author, image (required by both)
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.status).toBe('errors');
+    // Each field should only appear once despite being required by both types
+    const headlineErrors = result.errors.filter(e => e.field === 'headline');
+    expect(headlineErrors).toHaveLength(1);
+    const authorErrors = result.errors.filter(e => e.field === 'author');
+    expect(authorErrors).toHaveLength(1);
+  });
 });
 
 // ── 3. Entity Consistency ────────────────────────────────────────

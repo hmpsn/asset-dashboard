@@ -249,11 +249,11 @@ function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string
   return [];
 }
 
-function getNodeType(node: Record<string, unknown>): string {
+function getNodeTypes(node: Record<string, unknown>): string[] {
   const t = node['@type'];
-  if (typeof t === 'string') return t;
-  if (Array.isArray(t) && typeof t[0] === 'string') return t[0];
-  return '';
+  if (typeof t === 'string') return [t];
+  if (Array.isArray(t)) return t.filter((v): v is string => typeof v === 'string');
+  return [];
 }
 
 export function validateForGoogleRichResults(schema: Record<string, unknown>): ValidationResult {
@@ -264,34 +264,46 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
   const nodes = extractGraphNodes(schema);
 
   for (const node of nodes) {
-    const type = getNodeType(node);
-    if (!type) continue;
+    const types = getNodeTypes(node);
+    if (types.length === 0) continue;
 
-    const rules = RICH_RESULT_RULES[type];
-    if (!rules) continue;
-
-    // Check required fields for this node only
+    // Track errors/warnings per node across all its types to avoid duplicates
+    const seenErrorFields = new Set<string>();
+    const seenWarningFields = new Set<string>();
     const nodeErrors: ValidationError[] = [];
-    for (const field of rules.required) {
-      const val = node[field];
-      if (val === undefined || val === null || val === '') {
-        nodeErrors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
+
+    for (const type of types) {
+      const rules = RICH_RESULT_RULES[type];
+      if (!rules) continue;
+
+      // Check required fields
+      for (const field of rules.required) {
+        if (seenErrorFields.has(field)) continue;
+        const val = node[field];
+        if (val === undefined || val === null || val === '') {
+          seenErrorFields.add(field);
+          nodeErrors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
+        }
+      }
+
+      // Check recommended fields
+      for (const field of rules.recommended) {
+        if (seenWarningFields.has(field)) continue;
+        const val = node[field];
+        if (val === undefined || val === null || val === '') {
+          seenWarningFields.add(field);
+          warnings.push({ type, field, message: `Missing recommended property "${field}" for ${type}` });
+        }
+      }
+
+      // Rich result eligibility: type is eligible if it has no errors from its own rules
+      const typeHasErrors = nodeErrors.some(e => e.type === type);
+      if (RICH_RESULT_TYPES.has(type) && !typeHasErrors) {
+        richResults.push(type);
       }
     }
+
     errors.push(...nodeErrors);
-
-    // Check recommended fields
-    for (const field of rules.recommended) {
-      const val = node[field];
-      if (val === undefined || val === null || val === '') {
-        warnings.push({ type, field, message: `Missing recommended property "${field}" for ${type}` });
-      }
-    }
-
-    // Rich result eligibility: based on this node's errors only (not accumulated)
-    if (RICH_RESULT_TYPES.has(type) && nodeErrors.length === 0) {
-      richResults.push(type);
-    }
   }
 
   const status: 'valid' | 'warnings' | 'errors' =
@@ -314,11 +326,12 @@ export function validateEntityConsistency(
   // Gather all Organization nodes across pages
   const orgEntries: Array<{ pageId: string; node: Record<string, unknown> }> = [];
 
+  const ORG_TYPES = new Set(['Organization', 'LocalBusiness', 'MedicalOrganization', 'FinancialService']);
   for (const { pageId, schema } of schemas) {
     const nodes = extractGraphNodes(schema);
     for (const node of nodes) {
-      const type = getNodeType(node);
-      if (type === 'Organization' || type === 'LocalBusiness' || type === 'MedicalOrganization' || type === 'FinancialService') {
+      const types = getNodeTypes(node);
+      if (types.some(t => ORG_TYPES.has(t))) {
         orgEntries.push({ pageId, node });
       }
     }
