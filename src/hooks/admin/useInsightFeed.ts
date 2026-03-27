@@ -59,12 +59,11 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       const currentClicks = data.currentClicks as number | undefined;
       const previousClicks = data.previousClicks as number | undefined;
       if (curr !== undefined && prev !== undefined) {
-        if (curr > 10) {
-          headline = `dropped to page 2`;
-        } else if (curr < prev) {
-          headline = `climbed to position ${curr}`;
+        const improved = curr < prev; // lower position = better
+        if (improved) {
+          headline = curr <= 10 ? `climbed to position ${curr}` : `improved to position ${curr}`;
         } else {
-          headline = `dropped to position ${curr}`;
+          headline = curr > 10 ? `dropped off page 1` : `fell to position ${curr}`;
         }
         contextParts.push(`Position ${prev} → ${curr}`);
         const clickDelta = (currentClicks !== undefined && previousClicks !== undefined) ? currentClicks - previousClicks : undefined;

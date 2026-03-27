@@ -304,7 +304,7 @@ export interface SerpOpportunityData {
   impressions: number;
   clicks: number;
   position: number;
-  /** Already a decimal (e.g., 0.063 for 6.3%) — raw from GSC before conversion */
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
   ctr: number;
   schemaStatus: 'missing' | 'partial' | 'complete';
 }

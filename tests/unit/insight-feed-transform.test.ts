@@ -52,13 +52,22 @@ describe('transformToFeedInsight', () => {
       expect(result.title).toBe('Seo Tips');
     });
 
-    it('produces headline containing "dropped to page 2" when position > 10', () => {
+    it('produces headline containing "dropped off page 1" when position worsened past 10', () => {
       const insight = makeInsight({
         insightType: 'ranking_mover',
         data: { previousPosition: 9, currentPosition: 12 },
       });
       const result = transformToFeedInsight(insight);
-      expect(result.headline).toContain('dropped to page 2');
+      expect(result.headline).toContain('dropped off page 1');
+    });
+
+    it('produces "improved to position X" when position improved but still beyond page 1', () => {
+      const insight = makeInsight({
+        insightType: 'ranking_mover',
+        data: { previousPosition: 15, currentPosition: 12 },
+      });
+      const result = transformToFeedInsight(insight);
+      expect(result.headline).toContain('improved to position 12');
     });
 
     it('produces headline containing "climbed to position X" when position improved', () => {
@@ -70,13 +79,13 @@ describe('transformToFeedInsight', () => {
       expect(result.headline).toContain('climbed to position 3');
     });
 
-    it('produces headline containing "dropped to position X" when position worsened (still on page 1)', () => {
+    it('produces headline containing "fell to position X" when position worsened (still on page 1)', () => {
       const insight = makeInsight({
         insightType: 'ranking_mover',
         data: { previousPosition: 3, currentPosition: 7 },
       });
       const result = transformToFeedInsight(insight);
-      expect(result.headline).toContain('dropped to position 7');
+      expect(result.headline).toContain('fell to position 7');
     });
 
     it('context contains "Position X → Y"', () => {
