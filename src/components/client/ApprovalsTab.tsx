@@ -204,7 +204,7 @@ export function ApprovalsTab({
                               <div key={item.id} className="px-5 py-3 ml-4 border-l-2 border-zinc-800">
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="text-[11px] font-medium text-zinc-400">{fieldLabel}</span>
-                                  <span className={`text-[11px] px-1.5 py-0.5 rounded border ${statusColors[item.status]}`}>{item.status}</span>
+                                  <span className={`text-[11px] px-1.5 py-0.5 rounded border ${statusColors[item.status || 'pending']}`}>{item.status || 'pending'}</span>
                                   {isSchema && schemaTypes.length > 0 && schemaTypes.map(t => (
                                     <span key={t} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
@@ -286,7 +286,7 @@ export function ApprovalsTab({
                                 )}
 
                                 {/* Actions */}
-                                {item.status === 'pending' && !isEditing && rejectingItem !== item.id && (
+                                {(item.status === 'pending' || !item.status) && !isEditing && rejectingItem !== item.id && (
                                   effectiveTier === 'free' ? (
                                     <TierGate tier={effectiveTier} required="growth" feature="Approve & Edit Changes" compact className="mt-3"><span /></TierGate>
                                   ) : (

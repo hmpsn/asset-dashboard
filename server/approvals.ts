@@ -38,12 +38,17 @@ const stmts = createStmtCache(() => ({
 }));
 
 function rowToBatch(row: BatchRow): ApprovalBatch {
+  const items: ApprovalItem[] = JSON.parse(row.items);
+  // Self-heal items corrupted by the pre-fix Object.assign undefined bug
+  for (const item of items) {
+    if (!item.status) item.status = 'pending';
+  }
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     siteId: row.site_id,
     name: row.name,
-    items: JSON.parse(row.items),
+    items,
     status: row.status as ApprovalBatch['status'],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
