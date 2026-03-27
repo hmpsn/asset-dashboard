@@ -345,8 +345,9 @@ export function computeCompetitorGapInsights(
     }
   }
 
-  // Filter out branded competitor queries — not actionable
+  // Filter out branded competitor queries and low-volume keywords — not actionable
   const filteredGapData = gapData.filter(gap => {
+    if (gap.volume < 50) return false; // Skip keywords with negligible search volume
     const tokens = brandTokensByDomain.get(gap.competitorDomain) ?? [];
     return !isBrandedQuery(gap.keyword, tokens);
   });
@@ -490,6 +491,7 @@ export function computeKeywordClusterInsights(
   for (const [, queries] of clusters) {
     const rows = queries.map(q => bestByQuery.get(q)!);
     const totalImpressions = rows.reduce((sum, r) => sum + r.impressions, 0);
+    if (totalImpressions < 100) continue; // Skip low-visibility clusters — not worth strategic attention
     const avgPosition = rows.reduce((sum, r) => sum + r.position, 0) / rows.length;
 
     // Identify pillar page: page with most combined impressions for this cluster
