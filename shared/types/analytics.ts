@@ -269,6 +269,74 @@ export interface CompetitorGapData {
 export interface ConversionAttributionData {
   sessions: number;
   conversions: number;
+  /** Already a percentage (e.g., 4.0 for 4%). Do NOT multiply by 100. */
   conversionRate: number;
   estimatedRevenue: number | null;
 }
+
+export interface RankingMoverData {
+  query: string;
+  pageUrl: string;
+  currentPosition: number;
+  previousPosition: number;
+  /** Positive = improved (moved up), negative = dropped */
+  positionChange: number;
+  currentClicks: number;
+  previousClicks: number;
+  impressions: number;
+}
+
+export interface CtrOpportunityData {
+  query: string;
+  pageUrl: string;
+  position: number;
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT divide/multiply by 100. */
+  actualCtr: number;
+  /** Already a percentage (e.g., 30.0 for 30%). Do NOT divide/multiply by 100. */
+  expectedCtr: number;
+  ctrRatio: number;
+  impressions: number;
+  estimatedClickGap: number;
+}
+
+export interface SerpOpportunityData {
+  pageUrl: string;
+  impressions: number;
+  clicks: number;
+  position: number;
+  /** Already a decimal (e.g., 0.063 for 6.3%) — raw from GSC before conversion */
+  ctr: number;
+  schemaStatus: 'missing' | 'partial' | 'complete';
+}
+
+// ── Insight Data Map (discriminated union) ────────────────────────
+// Use this to get type-safe access to insight data by type.
+
+export interface InsightDataMap {
+  page_health: PageHealthData;
+  ranking_opportunity: QuickWinData;
+  content_decay: ContentDecayData;
+  cannibalization: CannibalizationData;
+  keyword_cluster: KeywordClusterData;
+  competitor_gap: CompetitorGapData;
+  conversion_attribution: ConversionAttributionData;
+  ranking_mover: RankingMoverData;
+  ctr_opportunity: CtrOpportunityData;
+  serp_opportunity: SerpOpportunityData;
+  strategy_alignment: Record<string, unknown>;
+  anomaly_digest: Record<string, unknown>;
+}
+
+// ── Insight Feed Filter Keys ──────────────────────────────────────
+// Shared constants to prevent string literal mismatches between
+// SummaryPills (producer) and InsightFeed (consumer).
+
+export const INSIGHT_FILTER_KEYS = {
+  DROPS: 'drops',
+  OPPORTUNITIES: 'opportunities',
+  WINS: 'wins',
+  SCHEMA: 'schema',
+  DECAY: 'decay',
+} as const;
+
+export type InsightFilterKey = typeof INSIGHT_FILTER_KEYS[keyof typeof INSIGHT_FILTER_KEYS];

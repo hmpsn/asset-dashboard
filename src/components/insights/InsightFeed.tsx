@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.js';
-import type { InsightDomain } from '../../../shared/types/analytics.js';
+import { INSIGHT_FILTER_KEYS, type InsightDomain } from '../../../shared/types/analytics.js';
 import { InsightFeedItem } from './InsightFeedItem.js';
 import { InsightSkeleton } from './InsightSkeleton.js';
 import { SummaryPills } from './SummaryPills.js';
@@ -18,9 +18,9 @@ interface InsightFeedProps {
 
 const FILTER_CHIPS = [
   { key: null, label: 'All' },
-  { key: 'drops', label: 'Drops' },
-  { key: 'opportunities', label: 'Opportunities' },
-  { key: 'wins', label: 'Wins' },
+  { key: INSIGHT_FILTER_KEYS.DROPS, label: 'Drops' },
+  { key: INSIGHT_FILTER_KEYS.OPPORTUNITIES, label: 'Opportunities' },
+  { key: INSIGHT_FILTER_KEYS.WINS, label: 'Wins' },
 ] as const;
 
 export function InsightFeed({ feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll }: InsightFeedProps) {
@@ -30,11 +30,11 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
 
   if (activeFilter) {
     filtered = filtered.filter(f => {
-      if (activeFilter === 'drops') return f.severity === 'critical' || f.severity === 'warning';
-      if (activeFilter === 'opportunities') return f.severity === 'opportunity';
-      if (activeFilter === 'wins') return f.severity === 'positive';
-      if (activeFilter === 'schema') return f.type === 'serp_opportunity';
-      if (activeFilter === 'decay') return f.type === 'content_decay';
+      if (activeFilter === INSIGHT_FILTER_KEYS.DROPS) return f.severity === 'critical' || f.severity === 'warning';
+      if (activeFilter === INSIGHT_FILTER_KEYS.OPPORTUNITIES) return f.severity === 'opportunity';
+      if (activeFilter === INSIGHT_FILTER_KEYS.WINS) return f.severity === 'positive';
+      if (activeFilter === INSIGHT_FILTER_KEYS.SCHEMA) return f.type === 'serp_opportunity';
+      if (activeFilter === INSIGHT_FILTER_KEYS.DECAY) return f.type === 'content_decay';
       return true;
     });
   }

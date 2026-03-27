@@ -7,7 +7,7 @@ import {
   transformToFeedInsight,
   computeSummaryCounts,
 } from '../../src/hooks/admin/useInsightFeed.js';
-import type { AnalyticsInsight } from '../../shared/types/analytics.js';
+import { INSIGHT_FILTER_KEYS, type AnalyticsInsight } from '../../shared/types/analytics.js';
 import type { FeedInsight } from '../../shared/types/insights.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ severity: 'positive' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const drops = summary.find(s => s.filterKey === 'drops');
+    const drops = summary.find(s => s.filterKey === INSIGHT_FILTER_KEYS.DROPS);
     expect(drops).toBeDefined();
     expect(drops!.count).toBe(2);
     expect(drops!.color).toBe('red');
@@ -267,7 +267,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ severity: 'opportunity' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const opps = summary.find(s => s.filterKey === 'opportunities');
+    const opps = summary.find(s => s.filterKey === INSIGHT_FILTER_KEYS.OPPORTUNITIES);
     expect(opps).toBeDefined();
     expect(opps!.count).toBe(2);
     expect(opps!.color).toBe('amber');
@@ -278,7 +278,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ severity: 'positive', type: 'ranking_mover' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const wins = summary.find(s => s.filterKey === 'wins');
+    const wins = summary.find(s => s.filterKey === INSIGHT_FILTER_KEYS.WINS);
     expect(wins).toBeDefined();
     expect(wins!.count).toBe(1);
     expect(wins!.color).toBe('green');
@@ -290,7 +290,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ type: 'serp_opportunity', severity: 'opportunity' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const gaps = summary.find(s => s.filterKey === 'schema');
+    const gaps = summary.find(s => s.filterKey === INSIGHT_FILTER_KEYS.SCHEMA);
     expect(gaps).toBeDefined();
     expect(gaps!.count).toBe(2);
     expect(gaps!.color).toBe('blue');
@@ -301,7 +301,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ type: 'content_decay', severity: 'warning' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const decaying = summary.find(s => s.filterKey === 'decay');
+    const decaying = summary.find(s => s.filterKey === INSIGHT_FILTER_KEYS.DECAY);
     expect(decaying).toBeDefined();
     expect(decaying!.count).toBe(1);
     expect(decaying!.color).toBe('purple');

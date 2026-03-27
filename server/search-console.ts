@@ -184,6 +184,7 @@ export interface QueryPageRow {
   page: string;
   clicks: number;
   impressions: number;
+  /** CTR as a percentage (e.g., 6.3 for 6.3%). Already converted from GSC decimal. Do NOT multiply by 100. */
   ctr: number;
   position: number;
 }

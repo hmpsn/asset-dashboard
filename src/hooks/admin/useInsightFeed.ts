@@ -11,7 +11,7 @@ import { getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 import { fmtNum } from '../../utils/formatNumbers';
-import type { AnalyticsInsight } from '../../../shared/types/analytics.js';
+import { INSIGHT_FILTER_KEYS, type AnalyticsInsight } from '../../../shared/types/analytics.js';
 import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -224,19 +224,19 @@ export function computeSummaryCounts(feed: FeedInsight[]): SummaryCount[] {
   const counts: SummaryCount[] = [];
 
   if (drops > 0) {
-    counts.push({ label: 'drops', count: drops, color: 'red', filterKey: 'drops' });
+    counts.push({ label: 'drops', count: drops, color: 'red', filterKey: INSIGHT_FILTER_KEYS.DROPS });
   }
   if (opportunities > 0) {
-    counts.push({ label: 'opportunities', count: opportunities, color: 'amber', filterKey: 'opportunities' });
+    counts.push({ label: 'opportunities', count: opportunities, color: 'amber', filterKey: INSIGHT_FILTER_KEYS.OPPORTUNITIES });
   }
   if (wins > 0) {
-    counts.push({ label: 'wins', count: wins, color: 'green', filterKey: 'wins' });
+    counts.push({ label: 'wins', count: wins, color: 'green', filterKey: INSIGHT_FILTER_KEYS.WINS });
   }
   if (schemaGaps > 0) {
-    counts.push({ label: 'schema gaps', count: schemaGaps, color: 'blue', filterKey: 'schema' });
+    counts.push({ label: 'schema gaps', count: schemaGaps, color: 'blue', filterKey: INSIGHT_FILTER_KEYS.SCHEMA });
   }
   if (decayingPages > 0) {
-    counts.push({ label: 'decaying pages', count: decayingPages, color: 'purple', filterKey: 'decay' });
+    counts.push({ label: 'decaying pages', count: decayingPages, color: 'purple', filterKey: INSIGHT_FILTER_KEYS.DECAY });
   }
 
   return counts;
