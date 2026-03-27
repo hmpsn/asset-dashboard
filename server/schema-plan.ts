@@ -284,7 +284,18 @@ ROLES (choose exactly one per page):
 - comparison: Comparison pages (vs competitors) — reference the pillar's entity
 - howto: Step-by-step tutorial/guide pages — HowTo schema with numbered steps eligible for rich results
 - video: Pages featuring a primary video — VideoObject schema eligible for video carousel in search
+- job-posting: Job listing pages — JobPosting schema eligible for Google Jobs rich results
+- course: Course/training pages — Course + CourseInstance schema eligible for Course rich results
+- event: Event pages with dates/venue — Event schema eligible for Event rich results
+- author: Team member/author profile pages — ProfilePage + Person schema
+- review: Review/testimonial pages with ratings — Review + AggregateRating schema
+- pricing: Pricing/plans pages with structured offers — WebPage + Offer array
+- recipe: Recipe pages with ingredients/instructions — Recipe schema eligible for Recipe rich results
 - generic: Anything that doesn't fit above — WebPage + BreadcrumbList only
+
+INDUSTRY SUBTYPES: If the site is in healthcare or financial services, note this in the "notes" field:
+- Medical sites: Use "MedicalOrganization" or "Physician" instead of "LocalBusiness" for the main entity
+- Financial sites: Use "FinancialService" instead of "LocalBusiness" for the main entity
 
 CANONICAL ENTITIES: Identify the DISTINCT products/services this site offers. Most SaaS sites have ONE product.
 - Each entity needs: type (SoftwareApplication or Service), name, canonicalUrl (the pillar page), id (@id format)
@@ -304,7 +315,14 @@ RULES:
 10. CMS collection pages (e.g. /customers/*, /case-studies/*) → "case-study" if they are customer stories
 11. CMS collection pages under /integrations/* or /partners/* → "partnership"
 12. Resource/guide pages → "blog" (Article schema)
-13. You MUST assign a role to EVERY page in the list — do not skip any
+13. Job/careers pages with individual listings → "job-posting"
+14. Course/training/workshop pages → "course"
+15. Event/webinar/conference pages → "event"
+16. Individual team member/author profile pages → "author"
+17. Review/testimonial pages → "review"
+18. /pricing, /plans, /packages → "pricing"
+19. Recipe pages → "recipe"
+20. You MUST assign a role to EVERY page in the list — do not skip any
 
 Return JSON with this exact structure:
 {
@@ -350,7 +368,8 @@ IMPORTANT:
     // Validate and normalize roles
     const validRoles = new Set<string>([
       'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about', 'contact',
-      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'howto', 'video', 'generic',
+      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'howto', 'video',
+      'job-posting', 'course', 'event', 'author', 'review', 'pricing', 'recipe', 'generic',
     ]);
 
     const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => ({
@@ -449,11 +468,32 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
     } else if (/^\/(integrations?|partners?)\//.test(slug)) {
       role = 'partnership';
     } else if (/^\/(how-to|howto|tutorial|guide)s?\//.test(slug) || /^\/(how-to|howto|tutorial|guide)s?$/.test(slug)) {
-      role = 'howto' as SchemaPageRole;
+      role = 'howto';
       primaryType = 'HowTo';
     } else if (/^\/(video|watch)s?\//.test(slug) || /^\/(video|watch)s?$/.test(slug)) {
-      role = 'video' as SchemaPageRole;
+      role = 'video';
       primaryType = 'VideoObject';
+    } else if (/^\/(careers?|jobs?|hiring|positions?)\//.test(slug)) {
+      role = 'job-posting';
+      primaryType = 'JobPosting';
+    } else if (/^\/(courses?|training|workshops?|classes?)\//.test(slug) || /^\/(courses?|training)$/.test(slug)) {
+      role = 'course';
+      primaryType = 'Course';
+    } else if (/^\/(events?|webinars?|meetups?|conferences?)\//.test(slug) || /^\/(events?|webinars?)$/.test(slug)) {
+      role = 'event';
+      primaryType = 'Event';
+    } else if (/^\/(team|authors?|staff|people)\//.test(slug)) {
+      role = 'author';
+      primaryType = 'ProfilePage';
+    } else if (/^\/(reviews?|testimonials?)/.test(slug)) {
+      role = 'review';
+      primaryType = 'Review';
+    } else if (/^\/(pricing|plans|packages)$/.test(slug)) {
+      role = 'pricing';
+      primaryType = 'WebPage';
+    } else if (/^\/(recipes?|cooking|meals?)\//.test(slug)) {
+      role = 'recipe';
+      primaryType = 'Recipe';
     }
 
     return {
@@ -537,6 +577,27 @@ export function buildPlanContextForPage(
       break;
     case 'video':
       lines.push('\nINSTRUCTION: Use VideoObject as mainEntity with name, description, uploadDate, and thumbnailUrl from page content. Include embedUrl for YouTube/Vimeo embeds. Omit VideoObject entirely if uploadDate or thumbnailUrl cannot be found in the content.');
+      break;
+    case 'job-posting':
+      lines.push('\nINSTRUCTION: Use JobPosting with title, datePosted, description, hiringOrganization. Include validThrough, employmentType, jobLocation, and baseSalary if available in content.');
+      break;
+    case 'course':
+      lines.push('\nINSTRUCTION: Use Course with name, description, provider. Include CourseInstance with startDate/endDate/courseMode if schedule info is on the page.');
+      break;
+    case 'event':
+      lines.push('\nINSTRUCTION: Use Event with name, startDate, location. Include endDate, offers (ticket info), organizer, and eventStatus if available.');
+      break;
+    case 'author':
+      lines.push('\nINSTRUCTION: Use ProfilePage with mainEntity being a Person node. Include name, jobTitle, knowsAbout, sameAs (social links), and worksFor referencing the Organization.');
+      break;
+    case 'review':
+      lines.push('\nINSTRUCTION: Use Review with itemReviewed, reviewRating, author. If aggregate ratings are shown, include AggregateRating with ratingValue and reviewCount.');
+      break;
+    case 'pricing':
+      lines.push('\nINSTRUCTION: Use WebPage with Offer nodes for each pricing tier. Include name, price, priceCurrency, and description for each plan.');
+      break;
+    case 'recipe':
+      lines.push('\nINSTRUCTION: Use Recipe with name, image, recipeIngredient array, recipeInstructions as HowToStep array. Include cookTime, prepTime, nutrition if available.');
       break;
   }
 

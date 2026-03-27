@@ -203,12 +203,25 @@ const RICH_RESULT_RULES: Record<string, {
     required: ['name'],
     recommended: ['description', 'provider', 'areaServed', 'serviceType'],
   },
+  ProfilePage: {
+    required: ['mainEntity'],
+    recommended: ['name', 'description'],
+  },
+  MedicalOrganization: {
+    required: ['name', 'address'],
+    recommended: ['telephone', 'medicalSpecialty', 'availableService', 'openingHours', 'image'],
+  },
+  FinancialService: {
+    required: ['name', 'address'],
+    recommended: ['telephone', 'areaServed', 'serviceType', 'openingHours', 'image'],
+  },
 };
 
 // Types that qualify for Google Rich Results
 const RICH_RESULT_TYPES = new Set([
   'Article', 'FAQPage', 'LocalBusiness', 'Product', 'JobPosting',
   'Event', 'Recipe', 'Course', 'Review', 'BreadcrumbList', 'Service',
+  'ProfilePage', 'MedicalOrganization', 'FinancialService',
 ]);
 
 function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {
@@ -289,7 +302,7 @@ export function validateEntityConsistency(
     const nodes = extractGraphNodes(schema);
     for (const node of nodes) {
       const type = getNodeType(node);
-      if (type === 'Organization' || type === 'LocalBusiness') {
+      if (type === 'Organization' || type === 'LocalBusiness' || type === 'MedicalOrganization' || type === 'FinancialService') {
         orgEntries.push({ pageId, node });
       }
     }

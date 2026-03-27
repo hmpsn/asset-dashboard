@@ -269,6 +269,98 @@ describe('validateForGoogleRichResults', () => {
     expect(result.warnings.length).toBeGreaterThan(0);
   });
 
+  it('validates Course with required fields', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Course',
+        '@id': 'https://example.com/courses/seo-101/#course',
+        name: 'SEO 101',
+        description: 'Learn the fundamentals of SEO',
+        provider: { '@type': 'Organization', name: 'Acme Academy' },
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('Course');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('flags Course missing required fields', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Course',
+        '@id': 'https://example.com/courses/seo-101/#course',
+        name: 'SEO 101',
+        // Missing: description, provider
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.status).toBe('errors');
+    expect(result.errors.some(e => e.field === 'description')).toBe(true);
+    expect(result.errors.some(e => e.field === 'provider')).toBe(true);
+  });
+
+  it('validates Review with required fields', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Review',
+        '@id': 'https://example.com/reviews/widget/#review',
+        itemReviewed: { '@type': 'Product', name: 'Widget Pro' },
+        reviewRating: { '@type': 'Rating', ratingValue: '4.5' },
+        author: { '@type': 'Person', name: 'Jane Doe' },
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('Review');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('validates ProfilePage for author pages', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'ProfilePage',
+        '@id': 'https://example.com/team/jane/#profilepage',
+        mainEntity: { '@type': 'Person', name: 'Jane Doe', jobTitle: 'CEO' },
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('ProfilePage');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('validates MedicalOrganization (medical industry subtype)', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'MedicalOrganization',
+        '@id': 'https://example.com/#medical',
+        name: 'Springfield Medical Center',
+        address: { '@type': 'PostalAddress', streetAddress: '123 Health Ave' },
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('MedicalOrganization');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('validates FinancialService (financial industry subtype)', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'FinancialService',
+        '@id': 'https://example.com/#financial',
+        name: 'Acme Financial Advisors',
+        address: { '@type': 'PostalAddress', streetAddress: '456 Wall St' },
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('FinancialService');
+    expect(result.errors).toHaveLength(0);
+  });
+
   it('handles empty @graph', () => {
     const schema = { '@context': 'https://schema.org', '@graph': [] };
     const result = validateForGoogleRichResults(schema);
