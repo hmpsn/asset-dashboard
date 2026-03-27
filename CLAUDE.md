@@ -141,7 +141,8 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
 - **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts` — never bare `JSON.parse` on DB columns.
-- **Array validation from DB** — when Zod-validating a JSON array column, validate items individually (filter out bad items) rather than validating the whole array (which drops ALL items if any one fails). See `server/approvals.ts` `rowToBatch` for the pattern.
+- **Array validation from DB** — when Zod-validating a JSON array column, validate items individually (filter out bad items) rather than validating the whole array (which drops ALL items if any one fails). Use `parseJsonSafeArray(raw, itemSchema, context)` from `server/db/json-validation.ts`. See `server/approvals.ts` `rowToBatch` for the pattern.
+- **Zod schema field names** — when writing Zod schemas for existing TypeScript interfaces, always cross-reference field names against the source interface in `shared/types/`. Zod won't flag name mismatches at compile time — a required field with a wrong name silently fails `safeParse` at runtime, returning the fallback instead of real data.
 - **Large edits**: break into multiple smaller edits if > 300 lines
 - **Route removal checklist** — when removing or renaming a `Page` type value, update ALL of these in the same commit:
   1. `src/routes.ts` — remove from `Page` union type
