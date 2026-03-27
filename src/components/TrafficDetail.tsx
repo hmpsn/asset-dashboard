@@ -5,55 +5,21 @@ import {
   BarChart3, Zap, Target, Leaf, ArrowRight,
   UserPlus, UserCheck, FileText, TrendingUp, Eye, AlertTriangle,
 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
 import { DATE_PRESETS_FULL } from './ui';
 import { fmtNum as formatNumber } from '../utils/formatNumbers';
-import type { GA4DailyTrend } from '../../shared/types/analytics';
 import { useAdminGA4 } from '../hooks/admin';
+import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
+import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
+import type { TrendLine } from './charts/AnnotatedTrendChart';
+import { InsightFeed } from './insights';
 
-type DataTab = 'overview' | 'events' | 'insights';
+type DataTab = 'insights' | 'breakdown' | 'events';
 
 interface Props {
   workspaceId: string;
   ga4PropertyId?: string;
-}
-
-// ── Mini trend chart (Recharts) ──
-function TrendChart({ data, dataKey, color }: { data: GA4DailyTrend[]; dataKey: 'users' | 'sessions' | 'pageviews'; color: string }) {
-  if (data.length < 2) return null;
-  return (
-    <div>
-      <ResponsiveContainer width="100%" height={120}>
-        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 16, left: 0 }}>
-          <defs>
-            <linearGradient id={`grad-ga4-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.2} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 10 }} tickLine={false} axisLine={false} interval={data.length - 2} />
-          <YAxis hide domain={['dataMin', 'dataMax']} />
-          <Tooltip content={({ active, payload }) => {
-            if (!active || !payload?.length) return null;
-            const row = payload[0]?.payload as GA4DailyTrend | undefined;
-            if (!row) return null;
-            return (
-              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
-                <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.date}</div>
-                <div className="px-3 py-1.5 space-y-1">
-                  {[{ label: 'Users', key: 'users' as const, c: '#60a5fa' }, { label: 'Sessions', key: 'sessions' as const, c: '#a78bfa' }, { label: 'Pageviews', key: 'pageviews' as const, c: '#34d399' }].map(m => (
-                    <div key={m.key} className="flex justify-between text-[11px]"><span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: m.c }} />{m.label}</span><span className="text-zinc-200 font-medium">{row[m.key].toLocaleString()}</span></div>
-                  ))}
-                </div>
-              </div>
-            );
-          }} />
-          <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#grad-ga4-${dataKey})`} dot={false} activeDot={{ r: 4, fill: color, stroke: '#18181b', strokeWidth: 2 }} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
 }
 
 const DeviceIcon = ({ device }: { device: string }) => {
@@ -71,18 +37,34 @@ function formatDuration(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
+const TRAFFIC_LINES: TrendLine[] = [
+  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' },
+  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' },
+  { key: 'pageviews', color: '#10b981', yAxisId: 'left', label: 'Pageviews' },
+];
+
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [trendMetric, setTrendMetric] = useState<'users' | 'sessions' | 'pageviews'>('users');
-  const [tab, setTab] = useState<DataTab>('overview');
+  const [tab, setTab] = useState<DataTab>('insights');
+  const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
 
   const queryClient = useQueryClient();
 
   const {
-    overview, trend, topPages, sources, devices, countries,
+    overview, topPages, sources, devices, countries,
     comparison, newVsReturning, organic, landingPages, conversions,
     isLoading: loading, error,
   } = useAdminGA4(workspaceId, days, !!ga4PropertyId);
+
+  const overviewData = useAnalyticsOverview(
+    workspaceId,
+    undefined,
+    undefined,
+    ga4PropertyId,
+    days,
+  );
+
+  const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
 
   const retry = () => queryClient.invalidateQueries({ queryKey: ['admin-ga4-overview', workspaceId] });
 
@@ -122,8 +104,6 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
 
   if (!overview) return null;
 
-  const trendColors: Record<string, string> = { users: '#14b8a6', sessions: '#3b82f6', pageviews: '#10b981' };
-
   return (
     <div className="space-y-5">
       {/* Date range + loading indicator */}
@@ -138,29 +118,203 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       {/* Tab navigation */}
       <TabBar
         tabs={[
-          { id: 'overview', label: 'Overview', icon: BarChart3 },
-          { id: 'insights', label: 'Insights', icon: Target },
+          { id: 'insights', label: 'Traffic Insights', icon: Target },
+          { id: 'breakdown', label: 'Breakdown', icon: BarChart3 },
           { id: 'events', label: 'Events', icon: Zap },
         ]}
         active={tab}
         onChange={id => setTab(id as DataTab)}
       />
 
-      {/* ═══════ OVERVIEW TAB ═══════ */}
-      {tab === 'overview' && (<>
-        {/* Trend chart */}
-        {trend.length > 1 && (
-          <SectionCard
-            title="Daily Trend"
-            action={
-              <DateRangeSelector
-                options={[{ label: 'Users', value: 0 }, { label: 'Sessions', value: 1 }, { label: 'Pageviews', value: 2 }]}
-                selected={['users', 'sessions', 'pageviews'].indexOf(trendMetric)}
-                onChange={i => setTrendMetric((['users', 'sessions', 'pageviews'] as const)[i])}
-              />
-            }
-          >
-            <TrendChart data={trend} dataKey={trendMetric} color={trendColors[trendMetric]} />
+      {/* ═══════ INSIGHTS TAB ═══════ */}
+      {tab === 'insights' && (
+        <div className="space-y-4">
+          {/* Insight Feed — traffic domain, priority first */}
+          <InsightFeed
+            feed={feed}
+            loading={feedLoading}
+            domain="traffic"
+            showFilterChips
+          />
+
+          {/* Traffic Health Summary */}
+          <SectionCard title="Traffic Health Summary">
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center">
+                <div className={`text-lg font-bold ${overview.bounceRate < 50 ? 'text-green-400' : overview.bounceRate < 65 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {overview.bounceRate}%
+                </div>
+                <div className="text-[11px] text-zinc-500">Bounce Rate</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${overview.avgSessionDuration > 120 ? 'text-green-400' : overview.avgSessionDuration > 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {formatDuration(overview.avgSessionDuration)}
+                </div>
+                <div className="text-[11px] text-zinc-500">Avg Session</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${organic ? (organic.shareOfTotalUsers > 30 ? 'text-green-400' : organic.shareOfTotalUsers > 15 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>
+                  {organic ? `${organic.shareOfTotalUsers}%` : '—'}
+                </div>
+                <div className="text-[11px] text-zinc-500">Organic Share</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${conversions.length > 3 ? 'text-green-400' : conversions.length > 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {conversions.length}
+                </div>
+                <div className="text-[11px] text-zinc-500">Tracked Events</div>
+              </div>
+            </div>
+          </SectionCard>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Growth Signals */}
+            {comparison && (
+              <SectionCard title="Growth Signals" titleIcon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
+                <div className="space-y-2">
+                  {[
+                    { label: 'User growth', value: comparison.changePercent.users },
+                    { label: 'Session growth', value: comparison.changePercent.sessions },
+                    { label: 'Pageview growth', value: comparison.changePercent.pageviews },
+                  ].map(g => (
+                    <div key={g.label} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                      <span className="text-zinc-400">{g.label}</span>
+                      <span className={`font-medium ${g.value > 0 ? 'text-emerald-400' : g.value < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                        {g.value > 0 ? '+' : ''}{g.value}%
+                      </span>
+                    </div>
+                  ))}
+                  {comparison.change.bounceRate !== 0 && (
+                    <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                      <span className="text-zinc-400">Bounce rate change</span>
+                      <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Engagement Analysis */}
+            <SectionCard title="Engagement Analysis" titleIcon={<Eye className="w-4 h-4 text-blue-400" />}>
+              <div className="space-y-2">
+                {newVsReturning.map(seg => (
+                  <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                    <span className="text-zinc-400 capitalize">{seg.segment} user engagement</span>
+                    <span className={`font-medium ${seg.engagementRate > 60 ? 'text-green-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {seg.engagementRate}%
+                    </span>
+                  </div>
+                ))}
+                {topPages.length > 0 && (
+                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                    <span className="text-zinc-400">Top page avg. engagement</span>
+                    <span className="text-zinc-300 font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
+                  </div>
+                )}
+                {organic && (
+                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                    <span className="text-zinc-400">Organic avg. engagement</span>
+                    <span className="text-zinc-300 font-medium">{formatDuration(organic.avgEngagementTime)}</span>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+          </div>
+
+          {/* Organic vs Total */}
+          {organic && (
+            <SectionCard title="Organic vs All Traffic" titleIcon={<Leaf className="w-4 h-4 text-emerald-400" />}>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-[11px] text-zinc-500 mb-2">Users</div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="h-2 flex-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${organic.shareOfTotalUsers}%` }} />
+                    </div>
+                    <span className="text-[11px] text-emerald-400 font-medium w-10 text-right">{organic.shareOfTotalUsers}%</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-500">{formatNumber(organic.organicUsers)} of {formatNumber(overview.totalUsers)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-zinc-500 mb-2">Bounce Rate</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center flex-1">
+                      <div className="text-sm font-bold text-emerald-400">{organic.organicBounceRate}%</div>
+                      <div className="text-[10px] text-zinc-500">Organic</div>
+                    </div>
+                    <div className="text-zinc-700">vs</div>
+                    <div className="text-center flex-1">
+                      <div className="text-sm font-bold text-zinc-300">{overview.bounceRate}%</div>
+                      <div className="text-[10px] text-zinc-500">All</div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-zinc-500 mb-2">Engagement</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center flex-1">
+                      <div className="text-sm font-bold text-emerald-400">{organic.engagementRate}%</div>
+                      <div className="text-[10px] text-zinc-500">Organic</div>
+                    </div>
+                    <div className="text-zinc-700">vs</div>
+                    <div className="text-center flex-1">
+                      <div className="text-sm font-bold text-zinc-300">{overview.newUserPercentage}%</div>
+                      <div className="text-[10px] text-zinc-500">New Users</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Next Steps */}
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
+            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Next steps →</span>
+            {organic && organic.shareOfTotalUsers < 30 && (
+              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                <Leaf className="w-3 h-3" /> Organic share is low — build a <strong className="text-teal-400">Keyword Strategy</strong>
+              </span>
+            )}
+            {overview.bounceRate > 60 && (
+              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                <AlertTriangle className="w-3 h-3" /> High bounce rate — review landing pages in <strong className="text-teal-400">SEO Editor</strong>
+              </span>
+            )}
+            {conversions.length === 0 && (
+              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+                <Zap className="w-3 h-3" /> No events tracked — set up conversion tracking
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════ BREAKDOWN TAB ═══════ */}
+      {tab === 'breakdown' && (<>
+        {/* Annotated Trend Chart */}
+        {overviewData.trendData.length > 1 && (
+          <SectionCard title="Daily Trend">
+            <AnnotatedTrendChart
+              data={overviewData.trendData}
+              lines={TRAFFIC_LINES.map(l => ({ ...l, active: activeTrafficLines.has(l.key) }))}
+              annotations={overviewData.annotations}
+              onCreateAnnotation={
+                overviewData.createAnnotation.mutate
+                  ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
+                  : undefined
+              }
+              onToggleLine={(key) => {
+                setActiveTrafficLines(prev => {
+                  const next = new Set(prev);
+                  if (next.has(key)) next.delete(key);
+                  else if (next.size < 3) next.add(key);
+                  return next;
+                });
+              }}
+              maxActiveLines={3}
+            />
           </SectionCard>
         )}
 
@@ -348,163 +502,6 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           </SectionCard>
         )}
       </>)}
-
-      {/* ═══════ INSIGHTS TAB ═══════ */}
-      {tab === 'insights' && (
-        <div className="space-y-4">
-          {/* Traffic Health Summary */}
-          <SectionCard title="Traffic Health Summary">
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center">
-                <div className={`text-lg font-bold ${overview.bounceRate < 50 ? 'text-green-400' : overview.bounceRate < 65 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {overview.bounceRate}%
-                </div>
-                <div className="text-[11px] text-zinc-500">Bounce Rate</div>
-              </div>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${overview.avgSessionDuration > 120 ? 'text-green-400' : overview.avgSessionDuration > 60 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {formatDuration(overview.avgSessionDuration)}
-                </div>
-                <div className="text-[11px] text-zinc-500">Avg Session</div>
-              </div>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${organic ? (organic.shareOfTotalUsers > 30 ? 'text-green-400' : organic.shareOfTotalUsers > 15 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>
-                  {organic ? `${organic.shareOfTotalUsers}%` : '—'}
-                </div>
-                <div className="text-[11px] text-zinc-500">Organic Share</div>
-              </div>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${conversions.length > 3 ? 'text-green-400' : conversions.length > 0 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {conversions.length}
-                </div>
-                <div className="text-[11px] text-zinc-500">Tracked Events</div>
-              </div>
-            </div>
-          </SectionCard>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Growth Signals */}
-            {comparison && (
-              <SectionCard title="Growth Signals" titleIcon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
-                <div className="space-y-2">
-                  {[
-                    { label: 'User growth', value: comparison.changePercent.users },
-                    { label: 'Session growth', value: comparison.changePercent.sessions },
-                    { label: 'Pageview growth', value: comparison.changePercent.pageviews },
-                  ].map(g => (
-                    <div key={g.label} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                      <span className="text-zinc-400">{g.label}</span>
-                      <span className={`font-medium ${g.value > 0 ? 'text-emerald-400' : g.value < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                        {g.value > 0 ? '+' : ''}{g.value}%
-                      </span>
-                    </div>
-                  ))}
-                  {comparison.change.bounceRate !== 0 && (
-                    <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                      <span className="text-zinc-400">Bounce rate change</span>
-                      <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </SectionCard>
-            )}
-
-            {/* Engagement Analysis */}
-            <SectionCard title="Engagement Analysis" titleIcon={<Eye className="w-4 h-4 text-blue-400" />}>
-              <div className="space-y-2">
-                {newVsReturning.map(seg => (
-                  <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                    <span className="text-zinc-400 capitalize">{seg.segment} user engagement</span>
-                    <span className={`font-medium ${seg.engagementRate > 60 ? 'text-green-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
-                      {seg.engagementRate}%
-                    </span>
-                  </div>
-                ))}
-                {topPages.length > 0 && (
-                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                    <span className="text-zinc-400">Top page avg. engagement</span>
-                    <span className="text-zinc-300 font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
-                  </div>
-                )}
-                {organic && (
-                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                    <span className="text-zinc-400">Organic avg. engagement</span>
-                    <span className="text-zinc-300 font-medium">{formatDuration(organic.avgEngagementTime)}</span>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
-          </div>
-
-          {/* Organic vs Total */}
-          {organic && (
-            <SectionCard title="Organic vs All Traffic" titleIcon={<Leaf className="w-4 h-4 text-emerald-400" />}>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-[11px] text-zinc-500 mb-2">Users</div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="h-2 flex-1 bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${organic.shareOfTotalUsers}%` }} />
-                    </div>
-                    <span className="text-[11px] text-emerald-400 font-medium w-10 text-right">{organic.shareOfTotalUsers}%</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500">{formatNumber(organic.organicUsers)} of {formatNumber(overview.totalUsers)}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-zinc-500 mb-2">Bounce Rate</div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-emerald-400">{organic.organicBounceRate}%</div>
-                      <div className="text-[10px] text-zinc-500">Organic</div>
-                    </div>
-                    <div className="text-zinc-700">vs</div>
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-zinc-300">{overview.bounceRate}%</div>
-                      <div className="text-[10px] text-zinc-500">All</div>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-zinc-500 mb-2">Engagement</div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-emerald-400">{organic.engagementRate}%</div>
-                      <div className="text-[10px] text-zinc-500">Organic</div>
-                    </div>
-                    <div className="text-zinc-700">vs</div>
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-zinc-300">{overview.newUserPercentage}%</div>
-                      <div className="text-[10px] text-zinc-500">New Users</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {/* Next Steps */}
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
-            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Next steps →</span>
-            {organic && organic.shareOfTotalUsers < 30 && (
-              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <Leaf className="w-3 h-3" /> Organic share is low — build a <strong className="text-teal-400">Keyword Strategy</strong>
-              </span>
-            )}
-            {overview.bounceRate > 60 && (
-              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <AlertTriangle className="w-3 h-3" /> High bounce rate — review landing pages in <strong className="text-teal-400">SEO Editor</strong>
-              </span>
-            )}
-            {conversions.length === 0 && (
-              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <Zap className="w-3 h-3" /> No events tracked — set up conversion tracking
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
     </div>
   );
