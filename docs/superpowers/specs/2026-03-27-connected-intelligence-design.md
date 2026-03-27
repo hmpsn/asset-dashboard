@@ -335,6 +335,34 @@ Example client: "We detected a ranking change on your Claude Code Limits page an
 - Track resolution: "Resolved — brief created", "Resolved — content refreshed"
 - Feeds into workspace activity log
 
+### 3.6 AI Insight Narratives (Premium Feature)
+
+**Tier:** Premium only. Gated via `TierGate` — Growth/Free see computational insights, Premium gets AI narratives.
+
+**Refresh:** Weekly (not daily). Computed once per week per workspace on a scheduled job. Stored in DB alongside the computational insight. Cost: ~$0.01-0.02/workspace/week (~$0.50-1.00/workspace/year).
+
+**What it adds:**
+- Human-readable explanations on top of computational insights: "Your SEO tips page dropped 4 positions — likely related to the March core update. Competitors have added 2026 benchmarks you're missing."
+- Cross-referencing that formulas can't do: "This ranking drop is expected — you have a content refresh in progress that should recover it."
+- Smart prioritization narrative: "Focus on these 3 pages first — they drive 60% of your organic traffic and all show CTR below expected."
+
+**What it does NOT do:**
+- Does NOT auto-generate briefs or content (that's a paid service, not a free automation)
+- Does NOT auto-create pipeline items (recommendations surface as CTAs: "Request Content Refresh" → drives purchase flow)
+- Does NOT replace computational insights (AI narratives layer ON TOP of the existing feed, not instead of it)
+
+**Implementation:**
+- Single GPT-4.1-mini call per workspace per week, batching top 15 insights with enrichment context
+- Stored as `ai_narrative` field on each insight row (nullable, populated only for Premium)
+- Frontend: `InsightFeedItem` shows narrative below the context line when available, styled differently (italic, lighter color)
+- Admin view: always shows AI narratives (agency pays for Premium, not the client)
+- Client view: shows narrative framed as "Our analysis" (Phase 3.1 narrative framing applies)
+
+**Revenue alignment:**
+- AI narratives make the value of the platform more visible → justifies Premium pricing
+- Recommendations end in CTAs that drive content purchases → revenue, not cost
+- Weekly cadence means clients check in regularly → engagement, not churn
+
 ---
 
 ## Data Model Changes
