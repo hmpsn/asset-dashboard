@@ -1,0 +1,351 @@
+# Phase 2: Page Strategy Engine — Design Spec
+
+**Date:** 2026-03-27
+**Status:** Approved
+**Prerequisite:** Phase 1 (Brandscript Engine + Voice Calibration)
+**Branch:** `claude/confident-lamport`
+
+---
+
+## Overview
+
+The Page Strategy Engine solves the "what pages to build and what goes on each page" problem. Today this lives in rough internal docs and the team's heads — no formalized, shareable, iterative artifact. Phase 2 introduces the **Site Blueprint**: a project-level page plan that the AI generates, the strategist refines, and the client reviews across weekly sessions.
+
+The system builds on top of existing Content Templates, Content Matrices, and SEMrush integration rather than duplicating their functionality.
+
+---
+
+## Core Concepts
+
+### Site Blueprint
+
+A blueprint is the complete page strategy for a client project. It contains:
+
+- **Blueprint entries** — each representing a page or CMS collection
+- **Version history** — linear versioning for tracking evolution across sessions
+- **Brand context** — linked to the Phase 1 brandscript for AI-informed generation
+- **Scope management** — pages are either `included` (in scope) or `recommended` (upsell opportunities)
+
+### Blueprint Entries
+
+Each entry represents either:
+
+- **A static page** (homepage, about, contact) — one entry = one page
+- **A CMS collection** (services, locations, team members) — one entry = the whole collection
+
+Every entry has:
+
+- Page name and page type
+- Scope status (`included` or `recommended`)
+- Primary and secondary keywords with source attribution
+- An ordered section plan
+- Optional links to Content Template (for defaults) and Content Matrix (for scaled collections)
+
+### Section Plans
+
+Each entry's section plan is an ordered list of sections. Every section has:
+
+- **Section type** — Hero, Problem/Pain, Solution, Social Proof, Process/How-It-Works, FAQ, CTA, About/Team, Testimonials, Features/Benefits, Pricing, Gallery, Stats/Numbers
+- **Narrative role** — StoryBrand mapping: Hook, Problem, Guide, Plan, Call to Action, Failure/Stakes, Success/Transformation. Supports custom frameworks.
+- **Brand note** — one-line brand purpose (e.g., "Address the internal problem using empathetic tone")
+- **SEO note** — one-line SEO purpose (e.g., "Target: dental implants cost — include in H2")
+- **Word count target** — rough guidance for Phase 3 copy generation
+
+Section plans extend the existing Content Template `sections[]` structure by adding `narrativeRole`, `brandNote`, and `seoNote` fields.
+
+---
+
+## System 1: Blueprint Generator
+
+### Purpose
+
+AI generates a recommended site map from three inputs, so the strategist walks into a client session with a polished recommendation rather than starting from scratch.
+
+### Inputs
+
+1. **Brandscript** (Phase 1) — industry, services/offerings, customer journey, key differentiators, messaging pillars
+2. **SEMrush keyword data** — keyword clusters for the client's domain/industry via existing integration
+3. **Industry conventions** — AI knowledge of standard pages for the business type
+
+### Generation Process
+
+1. User creates a new blueprint for a workspace, optionally selecting a brandscript
+2. AI analyzes the brandscript to identify offerings, audience segments, and differentiators
+3. AI pulls keyword clusters from SEMrush (domain organic keywords + related keywords for core offerings)
+4. AI generates recommended pages, categorized as:
+   - **Core pages** — homepage, about, contact (always recommended)
+   - **Service/offering pages** — derived from brandscript offerings
+   - **Supporting pages** — FAQ, testimonials, process/how-it-works
+   - **Content/SEO pages** — blog, resources, guides (driven by keyword opportunity)
+   - **Location pages** — if multi-location, derived from brandscript or keyword data
+5. Each page is assigned a page type, default section plan, and primary keyword
+6. Keywords are distributed across pages to avoid cannibalization
+
+### Output
+
+A complete blueprint with all recommended pages. The strategist then:
+
+1. Reviews the generated blueprint
+2. Trims to client scope (cut pages become `recommended` upsell opportunities)
+3. Adjusts section plans, keywords, or page types as needed
+4. Adds any manual pages the AI missed
+
+### AI Model
+
+- Blueprint generation (creative, strategic): Claude Sonnet 4
+- Keyword clustering and assignment (structured): GPT-4.1-mini
+
+---
+
+## System 2: SEO Keyword Mapping
+
+### Page-Level Keywords
+
+Each blueprint entry receives keyword assignments:
+
+- **Primary keyword** — main target for the page
+- **Secondary keywords** — supporting terms (2-5 per page)
+- **Source** — `ai_suggested`, `semrush`, or `manual`
+
+During blueprint generation, the AI assigns highest-opportunity keywords to pages using SEMrush metrics (volume, difficulty, CPC). Distribution avoids cannibalization — no two pages target the same primary keyword.
+
+### Section-Level Annotations
+
+Each section's SEO note indicates which keyword(s) to weave in and where. These are:
+
+- Auto-generated by the AI based on the page's keywords and the section's narrative role
+- Visible but not editable in the default view (lightweight, gut-check only)
+- Overridable if needed
+
+### Connection to Content Matrices
+
+For CMS collections with many pages (e.g., 20 service pages across 3 locations), the blueprint entry can spawn a Content Matrix. The matrix handles:
+
+- Cartesian product generation (service × location)
+- Per-cell keyword validation via SEMrush
+- Status tracking per page
+- Brief generation per cell
+
+Phase 2 feeds into this existing system — it doesn't rebuild it.
+
+---
+
+## System 3: Section Plan Templates
+
+### Page Type Templates
+
+Reusable section plan defaults organized by page type. The platform ships with sensible defaults:
+
+| Page Type | Default Sections |
+|---|---|
+| Homepage | Hero (Hook), Problem/Pain (Problem), Solution (Guide), Process (Plan), Social Proof (Success), CTA (Call to Action) |
+| Service Page | Hero (Hook), Problem/Pain (Problem), Features/Benefits (Guide), Process (Plan), FAQ (Objection Handling), Social Proof (Success), CTA (Call to Action) |
+| About Page | Hero (Hook), Story/Mission (Guide), Team (Guide - Authority), Values (Guide), Social Proof (Success), CTA (Call to Action) |
+| Location Page | Hero (Hook), Services Overview (Guide), Area Info (Authority), Social Proof (Success), FAQ (Objection Handling), CTA (Call to Action) |
+| Contact Page | Hero (Hook), Contact Form (Call to Action), Location/Hours (Plan), FAQ (Objection Handling) |
+| Blog/Resource | Hero (Hook), Content Body (varies), Related Resources (Plan), CTA (Call to Action) |
+| FAQ Page | Hero (Hook), FAQ Sections grouped by topic (Objection Handling), CTA (Call to Action) |
+| Testimonials Page | Hero (Hook), Testimonial Grid (Success), Case Studies (Success), CTA (Call to Action) |
+
+### Template Customization
+
+- Templates are workspace-level — customize per client if needed
+- Start from platform defaults, then adjust
+- Changes to a template propagate to blueprint entries that reference it (unless the entry has been manually overridden)
+- Non-StoryBrand clients: narrative roles can use custom labels (e.g., Golden Circle: Why, How, What)
+
+### Extension of Existing Content Templates
+
+Rather than a parallel system, section plan templates extend the existing `content_templates` table. The existing `sections[]` JSON array gains three new fields per section:
+
+- `narrativeRole` — string, the StoryBrand or custom narrative role
+- `brandNote` — string, one-line brand purpose
+- `seoNote` — string, one-line SEO purpose
+
+All existing Content Template functionality (variables, URL patterns, keyword patterns, CMS field mappings) is preserved and usable alongside the new fields.
+
+---
+
+## System 4: Iterative Refinement + Client Workflow
+
+### Versioning
+
+- Each blueprint has a `version` number (integer, starts at 1)
+- Incrementing version saves a snapshot of the current state to `blueprint_versions`
+- Version history shows what changed and when — useful for demonstrating progress across weekly sessions
+- Simple linear history, no branching
+
+### Refinement Actions
+
+All actions available on an active blueprint:
+
+- Add or remove pages
+- Change a page's type (swaps in new default section plan)
+- Reorder pages or sections within a page
+- Promote `recommended` → `included` (upsell converted)
+- Demote `included` → `recommended` (scope cut)
+- Edit section plans, keyword assignments, or annotations
+- Add notes/comments to any entry (capture client feedback)
+- Create a new version snapshot
+
+### Client-Facing View
+
+Following the existing content plan review pattern:
+
+- Read-only view of the blueprint shared via link
+- Client sees: page list, section summaries, scope status
+- Client can leave comments on entries
+- Client cannot edit structure directly
+- Optional — skip for hands-off clients
+
+### Session Prep
+
+The blueprint serves as the through-line across the engagement:
+
+- Clear picture of what's locked in vs. open questions
+- Change log since last session
+- `recommended` pages visible as future opportunities to discuss
+
+---
+
+## Data Model
+
+### New Tables
+
+#### `site_blueprints`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | TEXT PK | UUID |
+| `workspace_id` | TEXT FK | Links to workspace |
+| `name` | TEXT | Blueprint name (e.g., "Rinse Dental Site Strategy") |
+| `version` | INTEGER | Current version number |
+| `status` | TEXT | `draft`, `active`, `archived` |
+| `brandscript_id` | TEXT FK NULL | Links to Phase 1 brandscript |
+| `industry_type` | TEXT NULL | Industry category for AI generation |
+| `generation_inputs` | TEXT NULL | JSON — inputs used for AI generation |
+| `notes` | TEXT NULL | General notes |
+| `created_at` | TEXT | ISO timestamp |
+| `updated_at` | TEXT | ISO timestamp |
+
+#### `blueprint_entries`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | TEXT PK | UUID |
+| `blueprint_id` | TEXT FK | Links to blueprint |
+| `name` | TEXT | Page name (e.g., "Homepage", "Individual Service Page") |
+| `page_type` | TEXT | blog, landing, service, location, product, pillar, resource, homepage, about, contact, faq, testimonials |
+| `scope` | TEXT | `included` or `recommended` |
+| `order` | INTEGER | Display order |
+| `is_collection` | INTEGER | 0 = static page, 1 = CMS collection |
+| `primary_keyword` | TEXT NULL | Primary SEO target |
+| `secondary_keywords` | TEXT NULL | JSON array of secondary keywords |
+| `keyword_source` | TEXT NULL | `ai_suggested`, `semrush`, `manual` |
+| `section_plan` | TEXT | JSON array of section objects |
+| `template_id` | TEXT FK NULL | Links to content_templates |
+| `matrix_id` | TEXT FK NULL | Links to content_matrices (for scaled collections) |
+| `notes` | TEXT NULL | Entry-level notes/comments |
+| `created_at` | TEXT | ISO timestamp |
+| `updated_at` | TEXT | ISO timestamp |
+
+**`section_plan` JSON structure:**
+
+```json
+[
+  {
+    "id": "uuid",
+    "sectionType": "hero",
+    "narrativeRole": "hook",
+    "brandNote": "Lead with the transformation — what life looks like after the problem is solved",
+    "seoNote": "Target: dental implants Austin — include in H1",
+    "wordCountTarget": 150,
+    "order": 1
+  }
+]
+```
+
+#### `blueprint_versions`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | TEXT PK | UUID |
+| `blueprint_id` | TEXT FK | Links to blueprint |
+| `version` | INTEGER | Version number |
+| `snapshot` | TEXT | JSON — full blueprint state (entries + metadata) |
+| `change_notes` | TEXT NULL | What changed in this version |
+| `created_at` | TEXT | ISO timestamp |
+
+### Extended Existing Tables
+
+#### `content_templates` — `sections[]` JSON gains:
+
+- `narrativeRole` — string, nullable (backward compatible)
+- `brandNote` — string, nullable
+- `seoNote` — string, nullable
+
+No schema migration needed for the JSON column — new fields are added at the application level and older templates simply won't have them.
+
+---
+
+## Integration Map
+
+| Phase 2 Concept | Connects To | Relationship |
+|---|---|---|
+| Site Blueprint | Brandscript (Phase 1) | `brandscript_id` FK — pulls brand context for AI generation |
+| Blueprint Entry | Content Template | `template_id` FK — inherits default section plan |
+| Blueprint Entry (CMS) | Content Matrix | `matrix_id` FK — spawns matrix for keyword validation at scale |
+| Blueprint Entry | Content Brief (Phase 3) | Phase 3 generates briefs from entries |
+| Keyword Mapping | SEMrush Integration | Pulls keyword data during blueprint generation |
+| Client View | Existing Client Portal | Read-only sharing with comments |
+| Section Narrative Roles | Voice Calibration (Phase 1) | Voice profile informs brand notes and tone guidance |
+
+---
+
+## UI Location
+
+**Brand Hub → Page Strategy tab**
+
+Sits alongside the Phase 1 tabs (Brandscript, Voice Calibration, Brand Identity) in the Brand Hub.
+
+### Key Views
+
+1. **Blueprint overview** — site map view showing all entries, scope status, keyword assignments
+2. **Entry detail** — section plan editor for a specific page, with drag-to-reorder sections
+3. **Version history** — timeline of blueprint versions with change notes
+4. **Client view** — simplified read-only view with comment capability
+
+---
+
+## Service Tier Considerations
+
+Blueprint generation and page strategy are available to all tiers, but:
+
+- **Essentials** — manual blueprint creation only (no AI generation), basic section plans
+- **Professional** — AI blueprint generation, SEMrush keyword mapping, section plans with narrative roles
+- **Premium** — everything in Professional + client-facing view, version history, Content Matrix spawning
+
+---
+
+## AI Model Strategy
+
+| Task | Model | Reasoning |
+|---|---|---|
+| Blueprint generation (page recommendations) | Claude Sonnet 4 | Creative, strategic — needs to understand business context and make nuanced recommendations |
+| Keyword clustering + page assignment | GPT-4.1-mini | Structured data task — assign keywords to pages, avoid cannibalization |
+| Section plan generation | Claude Sonnet 4 | Creative — needs to map narrative roles and write brand/SEO notes |
+| SEO annotation generation | GPT-4.1-mini | Structured — distribute keywords across sections with placement guidance |
+
+---
+
+## Phase 3 Forward Compatibility
+
+The blueprint and its section plans become the primary input for Phase 3 (Full Copy Pipeline):
+
+- Section plans define **what** to generate — each section becomes a copy generation unit
+- Brand notes provide **tone and purpose** guidance per section
+- SEO notes provide **keyword and placement** constraints per section
+- Word count targets provide **length** guidance
+- The page type template structure maps to Webflow CMS collection fields for eventual direct export
+
+Phase 2's section plan is the contract between strategy and execution. The better the section plan, the better Phase 3's output.
