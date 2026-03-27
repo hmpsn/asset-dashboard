@@ -119,7 +119,7 @@ export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
     pipeline_status: params.pipelineStatus ?? null,
     anomaly_linked: params.anomalyLinked ? 1 : 0,
     impact_score: params.impactScore ?? 0,
-    domain: params.domain ?? null,
+    domain: params.domain ?? 'cross',
   });
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
