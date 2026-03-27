@@ -16,13 +16,18 @@ import type {
   QuickWinData,
   ContentDecayData,
   CannibalizationData,
+  ConversionAttributionData,
+  CompetitorGapData,
+  KeywordClusterData,
 } from '../shared/types/analytics.js';
+import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights } from './analytics-insights-store.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
+import { getConfiguredProvider } from './seo-data-provider.js';
 import { createLogger } from './logger.js';
 
 // ── Shared types for computation results ─────────────────────────
@@ -280,6 +285,261 @@ export function computeCannibalizationInsights(
   return results;
 }
 
+// ── Conversion Attribution ───────────────────────────────────────
+
+const CONVERSION_MIN_SESSIONS = 10;
+
+/**
+ * Compute per-page conversion attribution from GA4 organic landing pages.
+ * Pages with fewer than 10 sessions are excluded as noise.
+ */
+export function computeConversionAttributionInsights(
+  landingPages: GA4LandingPage[],
+): ComputedInsight<ConversionAttributionData>[] {
+  if (landingPages.length === 0) return [];
+
+  const results: ComputedInsight<ConversionAttributionData>[] = landingPages
+    .filter(p => p.sessions >= CONVERSION_MIN_SESSIONS)
+    .map(p => {
+      const conversionRate = p.sessions > 0 ? (p.conversions / p.sessions) * 100 : 0;
+
+      let severity: InsightSeverity;
+      if (conversionRate >= 5) severity = 'positive';
+      else if (conversionRate >= 2) severity = 'opportunity';
+      else if (conversionRate >= 0.5) severity = 'warning';
+      else severity = 'critical';
+
+      return {
+        pageId: p.landingPage,
+        insightType: 'conversion_attribution' as const,
+        data: {
+          sessions: p.sessions,
+          conversions: p.conversions,
+          conversionRate: Math.round(conversionRate * 100) / 100,
+          estimatedRevenue: null, // Phase 4: derive from GA4 event values
+        },
+        severity,
+      };
+    });
+
+  results.sort((a, b) => b.data.conversionRate - a.data.conversionRate);
+  return results;
+}
+
+// ── Competitor Gap Analysis ──────────────────────────────────────
+
+interface GapInput {
+  keyword: string;
+  competitorDomain: string;
+  competitorPosition: number;
+  volume: number;
+  difficulty: number;
+}
+
+/**
+ * Score and classify competitor keyword gaps.
+ * Enriches with our existing GSC position when available.
+ */
+export function computeCompetitorGapInsights(
+  gapData: GapInput[],
+  ourQueryData: QueryPageRow[],
+): ComputedInsight<CompetitorGapData>[] {
+  if (gapData.length === 0) return [];
+
+  // Build a map of our best position per query
+  const ourPositions = new Map<string, number>();
+  for (const row of ourQueryData) {
+    const existing = ourPositions.get(row.query);
+    if (!existing || row.position < existing) {
+      ourPositions.set(row.query, row.position);
+    }
+  }
+
+  const results: ComputedInsight<CompetitorGapData>[] = gapData.map(gap => {
+    const ourPosition = ourPositions.get(gap.keyword) ?? null;
+
+    let severity: InsightSeverity;
+    if (gap.volume >= 1000 && gap.difficulty < 50 && ourPosition === null) {
+      severity = 'critical'; // High volume, winnable, we don't rank
+    } else if (gap.volume >= 500 && gap.difficulty < 60 && ourPosition === null) {
+      severity = 'warning';
+    } else {
+      severity = 'opportunity';
+    }
+
+    return {
+      pageId: null,
+      insightType: 'competitor_gap' as const,
+      data: {
+        keyword: gap.keyword,
+        competitorDomain: gap.competitorDomain,
+        competitorPosition: gap.competitorPosition,
+        ourPosition,
+        volume: gap.volume,
+        difficulty: gap.difficulty,
+      },
+      severity,
+    };
+  });
+
+  results.sort((a, b) => b.data.volume - a.data.volume);
+  return results;
+}
+
+// ── Keyword Clustering ──────────────────────────────────────────
+
+/**
+ * Compute word-overlap similarity between two queries (Jaccard on word tokens).
+ * Returns 0-1 where 1 = identical word sets.
+ */
+function wordJaccard(a: string, b: string): number {
+  const setA = new Set(a.toLowerCase().split(/\s+/));
+  const setB = new Set(b.toLowerCase().split(/\s+/));
+  let intersection = 0;
+  for (const w of setA) {
+    if (setB.has(w)) intersection++;
+  }
+  const union = setA.size + setB.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+const CLUSTER_SIMILARITY_THRESHOLD = 0.3;
+
+/**
+ * Cluster GSC queries using word-overlap similarity + co-occurrence on same pages.
+ * Two queries are grouped if they share ≥30% word overlap OR both rank on the same page.
+ */
+export function computeKeywordClusterInsights(
+  queryPageData: QueryPageRow[],
+): ComputedInsight<KeywordClusterData>[] {
+  if (queryPageData.length === 0) return [];
+
+  // Deduplicate queries, keeping best-performing row per query
+  const bestByQuery = new Map<string, QueryPageRow>();
+  for (const row of queryPageData) {
+    const existing = bestByQuery.get(row.query);
+    if (!existing || row.impressions > existing.impressions) {
+      bestByQuery.set(row.query, row);
+    }
+  }
+
+  // Build page co-occurrence map: page → set of queries
+  const pageQueries = new Map<string, Set<string>>();
+  for (const row of queryPageData) {
+    const existing = pageQueries.get(row.page) ?? new Set();
+    existing.add(row.query);
+    pageQueries.set(row.page, existing);
+  }
+
+  // Build co-occurrence pairs: queries sharing a page are related
+  const coOccurs = new Map<string, Set<string>>();
+  for (const queries of pageQueries.values()) {
+    const arr = [...queries];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        if (!coOccurs.has(arr[i])) coOccurs.set(arr[i], new Set());
+        if (!coOccurs.has(arr[j])) coOccurs.set(arr[j], new Set());
+        coOccurs.get(arr[i])!.add(arr[j]);
+        coOccurs.get(arr[j])!.add(arr[i]);
+      }
+    }
+  }
+
+  // Union-Find for clustering
+  const uniqueQueries = [...bestByQuery.keys()];
+  const parent = new Map<string, string>();
+  for (const q of uniqueQueries) parent.set(q, q);
+
+  function find(x: string): string {
+    while (parent.get(x) !== x) {
+      parent.set(x, parent.get(parent.get(x)!)!); // path compression
+      x = parent.get(x)!;
+    }
+    return x;
+  }
+
+  function union(a: string, b: string): void {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+
+  // Merge by co-occurrence (same page)
+  for (const [query, related] of coOccurs) {
+    for (const r of related) {
+      if (bestByQuery.has(query) && bestByQuery.has(r)) {
+        union(query, r);
+      }
+    }
+  }
+
+  // Merge by word similarity
+  for (let i = 0; i < uniqueQueries.length; i++) {
+    for (let j = i + 1; j < uniqueQueries.length; j++) {
+      if (wordJaccard(uniqueQueries[i], uniqueQueries[j]) >= CLUSTER_SIMILARITY_THRESHOLD) {
+        union(uniqueQueries[i], uniqueQueries[j]);
+      }
+    }
+  }
+
+  // Group queries by cluster root
+  const clusters = new Map<string, string[]>();
+  for (const q of uniqueQueries) {
+    const root = find(q);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root)!.push(q);
+  }
+
+  // Convert clusters to insights
+  const results: ComputedInsight<KeywordClusterData>[] = [];
+  for (const [, queries] of clusters) {
+    const rows = queries.map(q => bestByQuery.get(q)!);
+    const totalImpressions = rows.reduce((sum, r) => sum + r.impressions, 0);
+    const avgPosition = rows.reduce((sum, r) => sum + r.position, 0) / rows.length;
+
+    // Identify pillar page: page with most combined impressions for this cluster
+    const pageImpressions = new Map<string, number>();
+    for (const row of queryPageData) {
+      if (queries.includes(row.query)) {
+        pageImpressions.set(row.page, (pageImpressions.get(row.page) ?? 0) + row.impressions);
+      }
+    }
+    let pillarPage: string | null = null;
+    let maxPageImp = 0;
+    for (const [page, imp] of pageImpressions) {
+      if (imp > maxPageImp) { pillarPage = page; maxPageImp = imp; }
+    }
+
+    // Label: use the highest-impression query as the cluster label
+    const labelQuery = rows.sort((a, b) => b.impressions - a.impressions)[0].query;
+
+    let severity: InsightSeverity;
+    if (totalImpressions >= 2000 && avgPosition <= 10) severity = 'positive';
+    else if (totalImpressions >= 500) severity = 'opportunity';
+    else if (avgPosition > 15) severity = 'warning';
+    else severity = 'opportunity';
+
+    results.push({
+      pageId: pillarPage,
+      insightType: 'keyword_cluster' as const,
+      data: {
+        label: labelQuery,
+        queries: queries.sort((a, b) => {
+          const impA = bestByQuery.get(a)!.impressions;
+          const impB = bestByQuery.get(b)!.impressions;
+          return impB - impA;
+        }),
+        totalImpressions,
+        avgPosition: Math.round(avgPosition * 10) / 10,
+        pillarPage,
+      },
+      severity,
+    });
+  }
+
+  results.sort((a, b) => b.data.totalImpressions - a.data.totalImpressions);
+  return results;
+}
+
 // ── Orchestrator (lazy evaluation) ───────────────────────────────
 
 const log = createLogger('analytics-intelligence');
@@ -428,5 +688,77 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       });
     }
     log.info({ workspaceId, count: decayInsights.length }, 'Computed content decay insights');
+  }
+
+  // Phase 3A: Keyword clustering
+  if (queryPageData.length > 0) {
+    const clusterInsights = computeKeywordClusterInsights(queryPageData);
+    for (const insight of clusterInsights.slice(0, 20)) {
+      upsertInsight({
+        workspaceId,
+        pageId: insight.pageId,
+        insightType: 'keyword_cluster',
+        data: insight.data as unknown as Record<string, unknown>,
+        severity: insight.severity,
+      });
+    }
+    log.info({ workspaceId, count: Math.min(clusterInsights.length, 20) }, 'Computed keyword clusters');
+  }
+
+  // Phase 3B: Competitor gap analysis (uses SEMRush/DataForSEO provider)
+  if (ws.liveDomain) {
+    try {
+      const provider = getConfiguredProvider(ws.seoDataProvider as any);
+      if (provider?.isConfigured()) {
+        const competitors = ws.competitorDomains?.length
+          ? ws.competitorDomains
+          : await provider.getCompetitors(ws.liveDomain, workspaceId, 3).then(c => c.map(e => e.domain)).catch(() => []);
+
+        if (competitors.length > 0) {
+          const gapData = await apiCache.wrap(workspaceId, 'keywordGap', { competitors }, () =>
+            provider.getKeywordGap(ws.liveDomain!, competitors, workspaceId, 50),
+          );
+          if (gapData.length > 0) {
+            const gapInsights = computeCompetitorGapInsights(gapData, queryPageData);
+            for (const insight of gapInsights.slice(0, 30)) {
+              upsertInsight({
+                workspaceId,
+                pageId: insight.pageId,
+                insightType: 'competitor_gap',
+                data: insight.data as unknown as Record<string, unknown>,
+                severity: insight.severity,
+              });
+            }
+            log.info({ workspaceId, count: Math.min(gapInsights.length, 30) }, 'Computed competitor gap insights');
+          }
+        }
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to compute competitor gap insights');
+    }
+  }
+
+  // Phase 3C: Conversion attribution (GA4 organic landing pages)
+  if (ga4Id) {
+    try {
+      const landingPages = await apiCache.wrap(workspaceId, 'ga4LandingPages_organic', { days: 30 }, () =>
+        getGA4LandingPages(ga4Id, 30, 100, true),
+      );
+      if (landingPages.length > 0) {
+        const conversionInsights = computeConversionAttributionInsights(landingPages);
+        for (const insight of conversionInsights.slice(0, 20)) {
+          upsertInsight({
+            workspaceId,
+            pageId: insight.pageId,
+            insightType: 'conversion_attribution',
+            data: insight.data as unknown as Record<string, unknown>,
+            severity: insight.severity,
+          });
+        }
+        log.info({ workspaceId, count: Math.min(conversionInsights.length, 20) }, 'Computed conversion attribution insights');
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Failed to compute conversion attribution insights');
+    }
   }
 }

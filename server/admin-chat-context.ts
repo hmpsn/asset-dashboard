@@ -36,7 +36,7 @@ import {
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
-import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData } from '../shared/types/analytics.js';
+import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
 
 const log = createLogger('admin-chat-context');
 
@@ -196,6 +196,46 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
       return `  "${c.query}": ${pages}`;
     });
     sections.push(`CANNIBALIZATION (multiple pages competing):\n${lines.join('\n')}`);
+  }
+
+  // Keyword clusters
+  const clusters = insights
+    .filter(i => i.insightType === 'keyword_cluster')
+    .map(i => i.data as unknown as KeywordClusterData)
+    .sort((a, b) => b.totalImpressions - a.totalImpressions);
+  if (clusters.length > 0) {
+    const lines = clusters.slice(0, 8).map(c => {
+      const pillar = c.pillarPage ? ` → pillar: ${(() => { try { return new URL(c.pillarPage).pathname; } catch { return c.pillarPage; } })()}` : '';
+      return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
+    });
+    sections.push(`KEYWORD CLUSTERS (topic groups from GSC queries):\n${lines.join('\n')}`);
+  }
+
+  // Competitor gaps
+  const gaps = insights
+    .filter(i => i.insightType === 'competitor_gap')
+    .map(i => i.data as unknown as CompetitorGapData)
+    .sort((a, b) => b.volume - a.volume);
+  if (gaps.length > 0) {
+    const lines = gaps.slice(0, 10).map(g => {
+      const ours = g.ourPosition ? `our pos ${Math.round(g.ourPosition)}` : 'we don\'t rank';
+      return `  "${g.keyword}" — ${g.competitorDomain} pos ${g.competitorPosition}, vol ${g.volume}, diff ${g.difficulty} (${ours})`;
+    });
+    sections.push(`COMPETITOR GAPS (keywords competitors rank for):\n${lines.join('\n')}`);
+  }
+
+  // Conversion attribution
+  const conversions = insights
+    .filter(i => i.insightType === 'conversion_attribution')
+    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as ConversionAttributionData) }))
+    .sort((a, b) => b.conversionRate - a.conversionRate);
+  if (conversions.length > 0) {
+    const lines = conversions.slice(0, 8).map(c => {
+      let path: string;
+      try { path = new URL(c.pageId || '').pathname; } catch { path = c.pageId || '(unknown)'; }
+      return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR (${c.conversions} conversions, ${c.sessions} sessions)`;
+    });
+    sections.push(`CONVERSION ATTRIBUTION (pages driving conversions):\n${lines.join('\n')}`);
   }
 
   if (sections.length === 0) return '';

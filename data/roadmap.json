@@ -3568,6 +3568,15 @@
           "notes": "Shipped — Phase 2A: Schema pipeline enrichment — added _pageHealthScore, _pageHealthTrend, _quickWinStatus, _faqOpportunities to SchemaContext; buildSchemaIntelligenceBlock() + extractFaqOpportunities() in schema-suggester.ts; buildSchemaContext() in helpers.ts extended with queryPageData + insightsMap from intelligence layer; all 3 callers updated. Phase 2B: Content brief enrichment — buildBriefIntelligenceBlock() injects cannibalization warnings, decay context, quick wins, page health into generateBrief() prompt. Phase 2C: Chat advisor — added 'insights' context category with pattern matching; buildInsightsContext() formats health scores, quick wins, decay, cannibalization for chat prompt. 36 new TDD tests across 3 files.",
           "status": "done",
           "shippedAt": "2026-03-26"
+        },
+        {
+          "title": "Analytics Intelligence Layer — Phase 3 (Advanced Intelligence)",
+          "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — 3 advanced algorithms: (1) Keyword clustering via Union-Find with word Jaccard similarity + page co-occurrence, pillar page detection. (2) Competitor gap analysis via SeoDataProvider abstraction (SEMRush + DataForSEO), auto-discovery, volume/difficulty scoring. (3) Conversion attribution from GA4 organic landing pages with conversion rate computation. All wired into computeAndPersistInsights() orchestrator + buildInsightsContext() chat advisor. 20 new TDD tests.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         }
       ]
     }
