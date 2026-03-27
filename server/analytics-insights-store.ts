@@ -19,7 +19,7 @@ const stmts = createStmtCache(() => ({
   upsert: db.prepare(`
     INSERT INTO analytics_insights (id, workspace_id, page_id, insight_type, data, severity, computed_at)
     VALUES (@id, @workspace_id, @page_id, @insight_type, @data, @severity, @computed_at)
-    ON CONFLICT(workspace_id, page_id, insight_type) DO UPDATE SET
+    ON CONFLICT(workspace_id, COALESCE(page_id, '__workspace__'), insight_type) DO UPDATE SET
       id          = excluded.id,
       data        = excluded.data,
       severity    = excluded.severity,

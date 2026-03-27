@@ -1,5 +1,6 @@
 import { TrendingUp, Target, Award } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
+import { Skeleton } from '../ui/Skeleton';
 import type { AnalyticsInsight, QuickWinData } from '../../../shared/types/analytics';
 
 interface InsightCardsProps {
@@ -7,10 +8,6 @@ interface InsightCardsProps {
   insights: AnalyticsInsight[];
   tier: 'free' | 'growth' | 'premium';
   loading: boolean;
-}
-
-function SkeletonBlock({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse bg-zinc-800 rounded ${className}`} />;
 }
 
 // ── Traffic Momentum ─────────────────────────────────────────────
@@ -29,8 +26,8 @@ function TrafficMomentumCard({ insights, loading }: { insights: AnalyticsInsight
     >
       {loading ? (
         <div className="space-y-2">
-          <SkeletonBlock className="h-4 w-3/4" />
-          <SkeletonBlock className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
         </div>
       ) : (
         <div className="space-y-2 text-sm">
@@ -81,9 +78,9 @@ function QuickWinsCard({
     >
       {loading ? (
         <div className="space-y-2">
-          <SkeletonBlock className="h-4 w-full" />
-          <SkeletonBlock className="h-4 w-2/3" />
-          <SkeletonBlock className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-4 w-3/4" />
         </div>
       ) : tier === 'free' ? (
         <div className="space-y-2">
@@ -150,8 +147,8 @@ function TopPerformersCard({
     >
       {loading ? (
         <div className="space-y-2">
-          <SkeletonBlock className="h-4 w-3/4" />
-          <SkeletonBlock className="h-4 w-1/2" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
         </div>
       ) : (
         <div className="space-y-2 text-sm">

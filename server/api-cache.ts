@@ -23,7 +23,14 @@ export interface ApiCache {
 }
 
 function hashParams(params: object): string {
-  return JSON.stringify(params, Object.keys(params).sort());
+  return JSON.stringify(params, (_key, value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(value).sort()) sorted[k] = value[k];
+      return sorted;
+    }
+    return value;
+  });
 }
 
 function cacheKey(workspaceId: string, functionName: string, params: object): string {

@@ -315,7 +315,7 @@ export function ApprovalsTab({
                                   )
                                 )}
                                 {/* Rejection note — inline two-step */}
-                                {item.status === 'pending' && !isEditing && rejectingItem === item.id && effectiveTier !== 'free' && (
+                                {(item.status === 'pending' || !item.status) && !isEditing && rejectingItem === item.id && effectiveTier !== 'free' && (
                                   <div className="mt-3 space-y-2">
                                     <div className="text-[11px] text-zinc-400">Add an optional note for the agency:</div>
                                     <textarea
