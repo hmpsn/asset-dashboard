@@ -55,8 +55,9 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   const create = async () => {
     if (!newAnn.date || !newAnn.label) return;
     try {
-      const entry = await api.create(workspaceId, newAnn);
-      setAnnotations(prev => [entry as Annotation, ...prev]);
+      const result = await api.create(workspaceId, newAnn) as { id: string };
+      const fullAnnotation: Annotation = { id: result.id, workspaceId, date: newAnn.date, label: newAnn.label, category: newAnn.category, createdAt: new Date().toISOString() };
+      setAnnotations(prev => [fullAnnotation, ...prev]);
       setNewAnn({ date: '', label: '', category: 'site_change' });
     } catch (err) { console.error('AnalyticsAnnotations create failed:', err); }
   };
