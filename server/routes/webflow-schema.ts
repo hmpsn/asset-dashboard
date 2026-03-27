@@ -195,8 +195,10 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     res.json({ success: true, published });
 
     // Trigger background llms.txt regeneration after schema publish
-    const llmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
-    if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
+    try {
+      const llmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+      if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
+    } catch { /* non-critical — response already sent */ }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema publish error');
