@@ -1028,6 +1028,15 @@
           "status": "pending"
         },
         {
+          "id": 523,
+          "title": "Workspace onboarding automation — templates, batch setup, reduce repetitive per-workspace tasks",
+          "source": "Connected Intelligence brainstorming",
+          "est": "6-8h",
+          "priority": "P3",
+          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec.",
+          "status": "pending"
+        },
+        {
           "id": 522,
           "title": "Typed data contracts audit — replace Record<string, unknown> across codebase",
           "source": "Connected Intelligence PR review",
