@@ -93,6 +93,35 @@ export const schema = {
     getSafe<unknown[]>(`/api/schema/${wsId}/deploy-history`, []),
 };
 
+// ── Schema Validation ───────────────────────────────────────────
+export interface SchemaValidationResult {
+  status: 'valid' | 'warnings' | 'errors';
+  richResults: string[];
+  errors: Array<{ type: string; field: string; message: string }>;
+  warnings: Array<{ type: string; field: string; message: string }>;
+}
+
+export interface SchemaValidationRecord {
+  id: string;
+  pageId: string;
+  status: 'valid' | 'warnings' | 'errors';
+  richResults: string[];
+  errors: Array<{ type: string; message: string }>;
+  warnings: Array<{ type: string; message: string }>;
+  validatedAt: string;
+}
+
+export const schemaValidation = {
+  validate: (siteId: string, body: { pageId: string; schema: Record<string, unknown> }) =>
+    post<SchemaValidationResult>(`/api/webflow/schema-validate/${siteId}`, body),
+
+  getAll: (siteId: string) =>
+    getSafe<SchemaValidationRecord[]>(`/api/webflow/schema-validations/${siteId}`, []),
+
+  get: (siteId: string, pageId: string) =>
+    getOptional<SchemaValidationRecord>(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`),
+};
+
 // ── Schema Site Plan ────────────────────────────────────────────
 export const schemaPlan = {
   get: (siteId: string) =>

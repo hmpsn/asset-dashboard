@@ -40,6 +40,7 @@ import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -1660,9 +1661,14 @@ Rules:
     const responseStrategy = { ...keywordStrategy, pageMap };
     if (wantsStream) {
       res.write(`data: ${JSON.stringify({ done: true, strategy: responseStrategy })}\n\n`);
-      return res.end();
+      res.end();
+    } else {
+      res.json(responseStrategy);
     }
-    res.json(responseStrategy);
+
+    // Trigger background llms.txt regeneration after strategy update
+    queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
+    return;
   } catch (err) {
     if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);

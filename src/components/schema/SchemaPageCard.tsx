@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
-  Loader2, Save, Trash2, Star, History, Clock,
+  Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
@@ -91,6 +91,7 @@ export interface SchemaPageCardProps {
   getEffectiveSchema: (pageId: string, original: Record<string, unknown>) => Record<string, unknown>;
   siteId: string;
   onRestore: (pageId: string, schema: Record<string, unknown>) => void;
+  validationStatus?: 'valid' | 'warnings' | 'errors';
 }
 
 export function SchemaPageCard({
@@ -103,7 +104,7 @@ export function SchemaPageCard({
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
   onSendToClient, onSaveAsTemplate, onRetract, retracting, retracted,
-  getEffectiveSchema, siteId, onRestore,
+  getEffectiveSchema, siteId, onRestore, validationStatus,
 }: SchemaPageCardProps) {
   const [showHistory, setShowHistory] = useState(false);
   const hasErrors = (page.validationErrors?.length || 0) > 0;
@@ -187,6 +188,12 @@ export function SchemaPageCard({
             <option value="author">Author Profile</option>
             <option value="howto">How-To / Tutorial</option>
             <option value="video">Video Page</option>
+            <option value="job-posting">Job Posting</option>
+            <option value="course">Course / Training</option>
+            <option value="event">Event</option>
+            <option value="review">Review</option>
+            <option value="pricing">Pricing Page</option>
+            <option value="recipe">Recipe</option>
             <option value="generic">General Page</option>
           </select>
           <button
@@ -368,7 +375,23 @@ export function SchemaPageCard({
             )}
 
             {/* Publish to Webflow */}
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              {/* Validation status badge */}
+              {validationStatus === 'valid' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
+                  <ShieldCheck className="w-3 h-3" /> Schema valid
+                </span>
+              )}
+              {validationStatus === 'warnings' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <AlertTriangle className="w-3 h-3" /> Warnings
+                </span>
+              )}
+              {validationStatus === 'errors' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/10 text-red-400 border border-red-500/20" title="Fix errors before publishing">
+                  <XCircle className="w-3 h-3" /> Fix errors to publish
+                </span>
+              )}
               {!page.pageId.startsWith('cms-') && (
                 published ? (
                   <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
@@ -379,7 +402,7 @@ export function SchemaPageCard({
                     <span className="text-xs text-amber-400">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
                     <button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
-                      disabled={publishing || !!schemaParseError}
+                      disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-green-500 text-white"
                     >
                       {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
