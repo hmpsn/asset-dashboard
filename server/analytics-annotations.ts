@@ -29,8 +29,6 @@ const selectStmt = db.prepare(`
   ORDER BY date DESC
 `);
 
-const deleteStmt = db.prepare(`DELETE FROM analytics_annotations WHERE id = ?`);
-
 export function createAnnotation(opts: {
   workspaceId: string;
   date: string;

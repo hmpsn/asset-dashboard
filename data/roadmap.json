@@ -3580,6 +3580,7 @@
           "shippedAt": "2026-03-26"
         },
         {
+          "id": 386,
           "title": "Analytics Intelligence Layer — Phase 4 (Strategy Engine + Client Polish)",
           "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
           "est": "5h",

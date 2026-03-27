@@ -13,8 +13,8 @@ describe('analytics annotations store', () => {
   let store: {
     createAnnotation: (opts: { workspaceId: string; date: string; label: string; category: string; createdBy?: string }) => { id: string };
     getAnnotations: (workspaceId: string, opts?: { startDate?: string; endDate?: string; category?: string }) => Array<{ id: string; workspaceId: string; date: string; label: string; category: string; createdBy: string | null; createdAt: string }>;
-    deleteAnnotation: (id: string) => boolean;
-    updateAnnotation: (id: string, opts: { label?: string; date?: string; category?: string }) => boolean;
+    deleteAnnotation: (id: string, workspaceId: string) => boolean;
+    updateAnnotation: (id: string, workspaceId: string, opts: { label?: string; date?: string; category?: string }) => boolean;
   };
 
   const dbPath = path.join(import.meta.dirname, '.test-annotations.db');
@@ -87,7 +87,7 @@ describe('analytics annotations store', () => {
       label: 'Original label',
       category: 'other',
     });
-    const updated = store.updateAnnotation(id, { label: 'Updated label', category: 'campaign' });
+    const updated = store.updateAnnotation(id, 'ws1', { label: 'Updated label', category: 'campaign' });
     expect(updated).toBe(true);
     const annotations = store.getAnnotations('ws1');
     const found = annotations.find(a => a.id === id);
@@ -102,13 +102,13 @@ describe('analytics annotations store', () => {
       label: 'To be deleted',
       category: 'other',
     });
-    const deleted = store.deleteAnnotation(id);
+    const deleted = store.deleteAnnotation(id, 'ws1');
     expect(deleted).toBe(true);
     const annotations = store.getAnnotations('ws1');
     expect(annotations.find(a => a.id === id)).toBeUndefined();
   });
 
   it('deleteAnnotation returns false for non-existent id', () => {
-    expect(store.deleteAnnotation('non-existent-id')).toBe(false);
+    expect(store.deleteAnnotation('non-existent-id', 'ws1')).toBe(false);
   });
 });
