@@ -555,13 +555,15 @@ export async function getOrComputeInsights(
 ): Promise<AnalyticsInsight[]> {
   const existing = getInsights(workspaceId, insightType);
 
-  // Check if any existing insights are fresh enough
+  // Check if a recent computation cycle ran — use the newest computedAt
+  // (orphaned insights from previous runs may have old timestamps, but if
+  // any insight was freshly computed, the whole batch was just refreshed)
   if (existing.length > 0) {
-    const oldestComputedAt = existing.reduce(
-      (oldest, i) => (i.computedAt < oldest ? i.computedAt : oldest),
+    const newestComputedAt = existing.reduce(
+      (newest, i) => (i.computedAt > newest ? i.computedAt : newest),
       existing[0].computedAt,
     );
-    if (!isStale(oldestComputedAt)) {
+    if (!isStale(newestComputedAt)) {
       return existing;
     }
   }

@@ -264,8 +264,12 @@ export async function buildSchemaContext(
       try {
         const allInsights = getInsights(ws.id);
         insightsMap = new Map();
-        const quickWinPages = new Set(
-          allInsights.filter(i => i.insightType === 'quick_win').map(i => i.pageId),
+        // Quick win pageIds are composite keys like "https://example.com/blog::seo tips"
+        // Extract the page URL prefix (before "::") for matching against page_health pageIds
+        const quickWinPageUrls = new Set(
+          allInsights
+            .filter(i => i.insightType === 'quick_win' && i.pageId)
+            .map(i => i.pageId!.split('::')[0]),
         );
         for (const insight of allInsights) {
           if (insight.insightType === 'page_health' && insight.pageId) {
@@ -273,7 +277,7 @@ export async function buildSchemaContext(
             insightsMap.set(insight.pageId, {
               healthScore: data.score,
               healthTrend: data.trend,
-              isQuickWin: quickWinPages.has(insight.pageId),
+              isQuickWin: quickWinPageUrls.has(insight.pageId),
             });
           }
         }

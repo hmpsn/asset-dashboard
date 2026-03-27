@@ -3570,6 +3570,7 @@
           "shippedAt": "2026-03-26"
         },
         {
+          "id": 385,
           "title": "Analytics Intelligence Layer — Phase 3 (Advanced Intelligence)",
           "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
           "est": "3h",
