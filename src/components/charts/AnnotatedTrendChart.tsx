@@ -79,10 +79,12 @@ function CreatePopover({
   state,
   onSave,
   onClose,
+  containerWidth,
 }: {
   state: PopoverState;
   onSave: (date: string, label: string, category: string) => void;
   onClose: () => void;
+  containerWidth?: number;
 }) {
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState<Category>('site_change');
@@ -107,7 +109,7 @@ function CreatePopover({
     <div
       ref={popoverRef}
       className="absolute z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-3 w-64"
-      style={{ left: Math.min(state.x, window.innerWidth - 280), top: state.y + 10 }}
+      style={{ left: Math.min(state.x, (containerWidth ?? 600) - 270), top: state.y + 10 }}
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] font-mono text-zinc-500">{state.date}</span>
@@ -187,8 +189,8 @@ export function AnnotatedTrendChart({
             tickLine={false}
             axisLine={{ stroke: '#3f3f46' }}
             tickFormatter={v => {
-              const d = new Date(v);
-              return `${d.getMonth() + 1}/${d.getDate()}`;
+              const [, m, d] = String(v).split('-');
+              return m && d ? `${Number(m)}/${Number(d)}` : v;
             }}
           />
           {/* Left Y-axis (only if we have a left-axis line) */}
@@ -257,6 +259,7 @@ export function AnnotatedTrendChart({
           state={popover}
           onSave={onCreateAnnotation}
           onClose={() => setPopover(null)}
+          containerWidth={containerRef.current?.offsetWidth}
         />
       )}
     </div>

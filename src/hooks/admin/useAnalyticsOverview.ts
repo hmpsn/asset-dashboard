@@ -85,7 +85,7 @@ export function useAnalyticsOverview(
     ga4UsersDelta: ga4.comparison?.changePercent.users ?? null,
     ga4SessionsDelta: ga4.comparison?.changePercent.sessions ?? null,
     ga4BounceRateDelta: ga4.comparison
-      ? ((ga4.comparison.current.bounceRate - ga4.comparison.previous.bounceRate) / (ga4.comparison.previous.bounceRate || 1)) * 100
+      ? Math.round(((ga4.comparison.current.bounceRate - ga4.comparison.previous.bounceRate) / (ga4.comparison.previous.bounceRate || 1)) * 100 * 10) / 10
       : null,
     trendData,
     annotations,
