@@ -306,7 +306,7 @@ RULES:
 1. There should be exactly ONE homepage
 2. There should be 0-3 pillar pages (most sites have 1)
 3. Pages that describe the SAME product for different audiences are "audience", not "pillar"
-4. /demo, /contact, /request-demo, /get-started, /signup, /book → "lead-gen"
+4. /demo, /contact, /request-demo, /get-started, /signup, /book → "lead-gen" (NOT /pricing — that is "pricing")
 5. Blog posts → "blog" — this includes CMS collection pages under /blog/*, /posts/*, /articles/*, /news/*
 6. /about → "about" (but individual /team/person-name → "author", individual /careers/job-title → "job-posting")
 7. /faq only if it's a dedicated FAQ page, not a product page with a FAQ section

@@ -183,6 +183,22 @@ const RICH_RESULT_RULES: Record<string, {
     required: ['itemReviewed', 'reviewRating', 'author'],
     recommended: ['datePublished', 'reviewBody'],
   },
+  HowTo: {
+    required: ['name', 'step'],
+    recommended: ['image', 'description', 'totalTime', 'estimatedCost', 'supply', 'tool'],
+  },
+  VideoObject: {
+    required: ['name', 'description', 'thumbnailUrl', 'uploadDate'],
+    recommended: ['contentUrl', 'embedUrl', 'duration', 'author', 'publisher'],
+  },
+  BlogPosting: {
+    required: ['headline', 'datePublished', 'author', 'image'],
+    recommended: ['dateModified', 'publisher', 'description', 'keywords'],
+  },
+  NewsArticle: {
+    required: ['headline', 'datePublished', 'author', 'image'],
+    recommended: ['dateModified', 'publisher', 'description', 'articleSection'],
+  },
   BreadcrumbList: {
     required: ['itemListElement'],
     recommended: [],
@@ -222,6 +238,7 @@ const RICH_RESULT_TYPES = new Set([
   'Article', 'FAQPage', 'LocalBusiness', 'Product', 'JobPosting',
   'Event', 'Recipe', 'Course', 'Review', 'BreadcrumbList', 'Service',
   'ProfilePage', 'MedicalOrganization', 'FinancialService',
+  'HowTo', 'VideoObject', 'BlogPosting', 'NewsArticle',
 ]);
 
 function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {
@@ -253,13 +270,15 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
     const rules = RICH_RESULT_RULES[type];
     if (!rules) continue;
 
-    // Check required fields
+    // Check required fields for this node only
+    const nodeErrors: ValidationError[] = [];
     for (const field of rules.required) {
       const val = node[field];
       if (val === undefined || val === null || val === '') {
-        errors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
+        nodeErrors.push({ type, field, message: `Missing required property "${field}" for ${type}` });
       }
     }
+    errors.push(...nodeErrors);
 
     // Check recommended fields
     for (const field of rules.recommended) {
@@ -269,12 +288,9 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
       }
     }
 
-    // Rich result eligibility
-    if (RICH_RESULT_TYPES.has(type)) {
-      const hasRequiredErrors = errors.some(e => e.type === type);
-      if (!hasRequiredErrors) {
-        richResults.push(type);
-      }
+    // Rich result eligibility: based on this node's errors only (not accumulated)
+    if (RICH_RESULT_TYPES.has(type) && nodeErrors.length === 0) {
+      richResults.push(type);
     }
   }
 

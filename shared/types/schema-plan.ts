@@ -104,7 +104,7 @@ export const SCHEMA_ROLE_INDEX: Record<SchemaPageRole, { description: string; ex
   },
   'lead-gen': {
     description: 'Conversion-focused pages with CTAs. Gets minimal WebPage + BreadcrumbList only — no product or service entities.',
-    examples: ['/demo', '/pricing', '/get-started', '/signup', '/book-a-call'],
+    examples: ['/demo', '/get-started', '/signup', '/book-a-call'],
   },
   blog: {
     description: 'Blog posts, articles, news, guides, and other editorial content. Gets Article schema with author and dates.',
