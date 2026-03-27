@@ -6,6 +6,9 @@
 
 const DEFAULT_TTL_MS = 15 * 60 * 1_000;
 
+// Sentinel for caching functions that legitimately return undefined
+const CACHED_UNDEFINED = Symbol('CACHED_UNDEFINED');
+
 interface CacheEntry {
   value: unknown;
   expiresAt: number;
@@ -60,17 +63,16 @@ export function createApiCache(options: ApiCacheOptions = {}): ApiCache {
 
     async wrap<T>(workspaceId: string, functionName: string, params: object, fn: () => Promise<T>): Promise<T> {
       const cached = await this.get(workspaceId, functionName, params);
-      if (cached !== undefined) return cached as T;
+      if (cached !== undefined) return (cached === CACHED_UNDEFINED ? undefined : cached) as T;
       const result = await fn();
-      this.set(workspaceId, functionName, params, result);
+      this.set(workspaceId, functionName, params, result === undefined ? CACHED_UNDEFINED : result);
       return result;
     },
 
     invalidate(workspaceId) {
       const prefix = `${workspaceId}:`;
-      for (const key of store.keys()) {
-        if (key.startsWith(prefix)) store.delete(key);
-      }
+      const toDelete = [...store.keys()].filter(k => k.startsWith(prefix));
+      for (const key of toDelete) store.delete(key);
     },
   };
 }
