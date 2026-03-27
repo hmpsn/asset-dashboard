@@ -355,9 +355,9 @@ Every client-facing insight should end with either:
 - Track resolution: "Resolved — brief created", "Resolved — content refreshed"
 - Feeds into workspace activity log
 
-### 3.6 AI Insight Narratives (Premium Feature)
+### 3.6 AI Insight Narratives (Growth + Premium Feature)
 
-**Tier:** Premium only. Gated via `TierGate` — Growth/Free see computational insights, Premium gets AI narratives.
+**Tier:** Growth and Premium. Gated via `TierGate` — Free tier sees computational insights only, Growth/Premium get AI narratives. This makes AI narratives a compelling reason to upgrade from Free to Growth.
 
 **Refresh:** Weekly (not daily). Computed once per week per workspace on a scheduled job. Stored in DB alongside the computational insight. Cost: ~$0.01-0.02/workspace/week (~$0.50-1.00/workspace/year).
 
@@ -373,13 +373,13 @@ Every client-facing insight should end with either:
 
 **Implementation:**
 - Single GPT-4.1-mini call per workspace per week, batching top 15 insights with enrichment context
-- Stored as `ai_narrative` field on each insight row (nullable, populated only for Premium)
+- Stored as `ai_narrative` field on each insight row (nullable, populated only for Growth/Premium)
 - Frontend: `InsightFeedItem` shows narrative below the context line when available, styled differently (italic, lighter color)
 - Admin view: always shows AI narratives (agency pays for Premium, not the client)
 - Client view: shows narrative framed as "Our analysis" (Phase 3.1 narrative framing applies)
 
 **Revenue alignment:**
-- AI narratives make the value of the platform more visible → justifies Premium pricing
+- AI narratives make the value of the platform more visible → justifies Growth/Premium pricing
 - Recommendations end in CTAs that drive content purchases → revenue, not cost
 - Weekly cadence means clients check in regularly → engagement, not churn
 
