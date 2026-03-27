@@ -74,13 +74,19 @@ export function isStale(computedAt: string | undefined, maxAgeMs: number = DEFAU
  * - CTR      (0–20):  actual CTR vs expected CTR for that position
  * - Engagement (0–25): GA4 engagement time normalized (0–180s → 0–25)
  */
+const PAGE_HEALTH_MIN_IMPRESSIONS = 50; // Skip pages with negligible visibility
+
 export function computePageHealthScores(
   gscPages: SearchPage[],
   ga4Pages: GA4TopPage[],
 ): ComputedInsight<PageHealthData>[] {
   if (gscPages.length === 0) return [];
 
-  const maxClicks = Math.max(...gscPages.map(p => p.clicks), 1);
+  // Filter out pages with negligible traffic — scoring them produces noise
+  const significantPages = gscPages.filter(p => p.impressions >= PAGE_HEALTH_MIN_IMPRESSIONS);
+  if (significantPages.length === 0) return [];
+
+  const maxClicks = Math.max(...significantPages.map(p => p.clicks), 1);
 
   // Index GA4 pages by path for O(1) lookup
   const ga4Map = new Map<string, GA4TopPage>();
@@ -88,7 +94,7 @@ export function computePageHealthScores(
     ga4Map.set(p.path, p);
   }
 
-  return gscPages.map(page => {
+  return significantPages.map(page => {
     // Extract path from full URL for GA4 matching
     let pagePath: string;
     try {
@@ -215,6 +221,7 @@ export function computeCannibalizationInsights(
     rows.sort((a, b) => a.position - b.position);
 
     const totalImpressions = rows.reduce((sum, r) => sum + r.impressions, 0);
+    if (totalImpressions < 100) continue; // Skip low-visibility cannibalization — not worth acting on
 
     results.push({
       pageId: `cannibalization::${query}`, // use query as key so each gets its own DB row
@@ -545,6 +552,7 @@ export function computeRankingMovers(
     prevMap.set(`${row.query}::${row.page}`, row);
   }
   for (const curr of currentQueryPages) {
+    if (curr.impressions < 50) continue; // Skip low-visibility queries — position changes are noise
     const prev = prevMap.get(`${curr.query}::${curr.page}`);
     if (!prev) continue;
     const positionChange = prev.position - curr.position; // positive = improvement
@@ -861,7 +869,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   {
     const decayAnalysis = loadDecayAnalysis(workspaceId);
     if (decayAnalysis && decayAnalysis.decayingPages.length > 0) {
-      for (const page of decayAnalysis.decayingPages) {
+      // Only surface decay that's both percentage-significant AND volume-significant.
+      // A page dropping from 20→17 clicks (-15%) isn't actionable even though it exceeds
+      // the decay engine's 10% threshold. Require minimum baseline AND minimum absolute loss.
+      const significantDecay = decayAnalysis.decayingPages.filter(p =>
+        p.previousClicks >= 20 && // meaningful baseline
+        Math.abs(p.previousClicks - p.currentClicks) >= 5 // lost at least 5 clicks
+      );
+      for (const page of significantDecay) {
         const severity: InsightSeverity =
           page.severity === 'critical' ? 'critical'
           : page.severity === 'warning' ? 'warning'
@@ -879,7 +894,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           severity,
         });
       }
-      log.info({ workspaceId, count: decayAnalysis.decayingPages.length }, 'Loaded content decay insights from decay engine');
+      log.info({ workspaceId, count: significantDecay.length, filtered: decayAnalysis.decayingPages.length - significantDecay.length }, 'Loaded content decay insights from decay engine');
     }
     // Always prune stale decay insights — even when the decay engine
     // returns null/empty, old decay insights should be removed
