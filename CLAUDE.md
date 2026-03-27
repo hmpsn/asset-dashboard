@@ -33,6 +33,7 @@ Integrations: Webflow, Google Search Console, GA4, SEMRush, Stripe, OpenAI (GPT-
 2. **Check `FEATURE_AUDIT.md`** — understand what exists. Don't build something that already exists.
 3. **If UI work** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX.
 4. **Cross-reference before building** — search the codebase to verify a component/endpoint/feature doesn't already exist.
+5. **For multi-phase or cross-system features** — before writing any implementation code, generate feature-specific guardrails: (a) CLAUDE.md rules for reusable patterns this feature introduces, (b) a `.windsurf/rules/<feature>.md` reference doc for feature-specific contracts, and (c) per-phase acceptance checklists embedded in the implementation plan. Guardrails written after bugs are found cost 3× more than guardrails written before the first commit.
 
 ### After completing a task
 

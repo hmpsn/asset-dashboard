@@ -3554,6 +3554,15 @@
           "status": "pending"
         },
         {
+          "id": 524,
+          "title": "Process: pre-implementation guardrail generation for multi-phase features",
+          "source": "PROCESS",
+          "est": "ongoing",
+          "priority": "P1",
+          "notes": "Before starting any multi-phase or cross-system feature: (1) analyze spec for error-prone patterns, (2) write CLAUDE.md rules for reusable patterns, (3) create .windsurf/rules/<feature>.md for feature-specific contracts, (4) embed per-phase acceptance checklists in the implementation plan. Rule added to CLAUDE.md Session Protocol step 5. Reference: typed-contracts PR where schema-vs-stored-shape, field-name-mismatch, and || undefined bugs were all caught in review rather than prevented upfront.",
+          "status": "done"
+        },
+        {
           "id": 362,
           "title": "Page analysis race condition + performance fixes",
           "source": "BUG FIX",
