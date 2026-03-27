@@ -46,9 +46,9 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
     setActiveSearchLines(prev => {
       const next = new Set(prev);
       if (next.has(key)) {
-        if (next.size > 1) next.delete(key);
-      } else {
-        next.add(key);
+        if (next.size > 1) next.delete(key); // keep at least 1 active
+      } else if (next.size < 3) {
+        next.add(key); // max 3 active lines
       }
       return next;
     });

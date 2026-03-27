@@ -515,7 +515,7 @@ export function computeRankingMovers(
       : positionChange > 5 ? 'positive' : 'opportunity';
     results.push({
       insightType: 'ranking_mover' as const,
-      pageId: curr.page,
+      pageId: `${curr.page}::${curr.query}`,
       data: {
         query: curr.query, pageUrl: curr.page,
         currentPosition: Math.round(curr.position * 10) / 10,
@@ -551,6 +551,10 @@ export function computeCtrOpportunities(
 
   for (const row of queryPageData) {
     if (row.impressions < CTR_OPPORTUNITY_MIN_IMPRESSIONS) continue;
+    // Only check page-1 positions (1–10) — positions beyond page 1
+    // naturally have very low CTR and would produce false positives
+    const roundedPos = Math.round(row.position);
+    if (roundedPos < 1 || roundedPos > 10) continue;
 
     const expectedCtr = expectedCtrForPosition(row.position);
     // row.ctr from GSC is already a percentage (e.g., 6.3 for 6.3%)
