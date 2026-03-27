@@ -369,7 +369,7 @@ export function computeCompetitorGapInsights(
     }
 
     return {
-      pageId: null,
+      pageId: `gap::${gap.keyword}`, // use keyword as key so each gets its own DB row
       insightType: 'competitor_gap' as const,
       data: {
         keyword: gap.keyword,
@@ -520,7 +520,7 @@ export function computeKeywordClusterInsights(
     else severity = 'opportunity';
 
     results.push({
-      pageId: pillarPage,
+      pageId: `cluster::${labelQuery}`, // use label as key so each cluster gets its own DB row
       insightType: 'keyword_cluster' as const,
       data: {
         label: labelQuery,
