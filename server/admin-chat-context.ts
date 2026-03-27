@@ -480,18 +480,18 @@ export async function assembleAdminContext(
             const trafficMap = await getAuditTrafficForWorkspace(ws);
             if (Object.keys(trafficMap).length > 0) {
               const pagesWithTraffic = pages
-                ?.filter((p: any) => p.issues?.length > 0)
-                .map((p: any) => {
+                ?.filter(p => p.issues?.length > 0)
+                .map(p => {
                   const slug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
                   const traffic = trafficMap[slug] || trafficMap[p.slug];
                   return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
                 })
-                .filter((p: any) => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
-                .sort((a: any, b: any) =>
+                .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
+                .sort((a, b) =>
                   ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
                 .slice(0, 8);
               if (pagesWithTraffic?.length) {
-                sections.push(`HIGH-TRAFFIC PAGES WITH SEO ISSUES (prioritize these — they get real visitors):\n${pagesWithTraffic.map((p: any) => `• ${p.slug} — ${p.issues} issues, score ${p.score} | ${p.traffic.clicks} clicks, ${p.traffic.pageviews} pageviews`).join('\n')}`);
+                sections.push(`HIGH-TRAFFIC PAGES WITH SEO ISSUES (prioritize these — they get real visitors):\n${pagesWithTraffic.map(p => `• ${p.slug} — ${p.issues} issues, score ${p.score} | ${p.traffic.clicks} clicks, ${p.traffic.pageviews} pageviews`).join('\n')}`);
                 dataSources.push('Audit Traffic Intelligence (high-traffic pages with SEO errors)');
               }
             }

@@ -433,21 +433,19 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 
       // Handle cart checkouts (multiple line items)
       if (session.metadata?.cartItems) {
-        try {
-          const cartItems = parseJsonSafe(session.metadata.cartItems, cartItemsArraySchema, [], { workspaceId, field: 'cartItems', table: 'stripe_session' });
-          for (const item of cartItems) {
-            if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
-              createWorkOrder(workspaceId, {
-                paymentId: payment?.id || session.id,
-                productType: item.productType as ProductType,
-                status: 'pending',
-                pageIds: item.pageIds || [],
-                issueChecks: item.issueChecks,
-                quantity: item.quantity || 1,
-              });
-            }
+        const cartItems = parseJsonSafe(session.metadata.cartItems, cartItemsArraySchema, [], { workspaceId, field: 'cartItems', table: 'stripe_session' });
+        for (const item of cartItems) {
+          if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
+            createWorkOrder(workspaceId, {
+              paymentId: payment?.id || session.id,
+              productType: item.productType as ProductType,
+              status: 'pending',
+              pageIds: item.pageIds || [],
+              issueChecks: item.issueChecks,
+              quantity: item.quantity || 1,
+            });
           }
-        } catch { /* cartItems parse error — skip */ }
+        }
       }
 
       // Notify team of payment

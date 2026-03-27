@@ -77,7 +77,11 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
     workspaceId: row.workspace_id,
     generatedAt: row.generated_at,
     recommendations: parseJsonFallback(row.recommendations, []),
-    summary: parseJsonFallback(row.summary, {}),
+    summary: parseJsonFallback(row.summary, {
+      fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0,
+      totalImpactScore: 0, trafficAtRisk: 0,
+      estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
+    }),
   };
 }
 

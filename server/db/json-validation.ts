@@ -9,12 +9,12 @@ const log = createLogger('json-validation');
  * On JSON.parse failure: logs a warning and returns the fallback value.
  * Never throws.
  */
-export function parseJsonSafe<T>(
+export function parseJsonSafe<T, F extends T | null = T>(
   raw: string | null | undefined,
   schema: ZodType<T>,
-  fallback: T,
+  fallback: F,
   context?: { workspaceId?: string; field?: string; table?: string },
-): T {
+): T | F {
   if (raw == null || raw === '') return fallback;
   try {
     const parsed = JSON.parse(raw);

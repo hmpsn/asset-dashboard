@@ -138,12 +138,12 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.portal_contacts) ws.portalContacts = parseJsonSafe(row.portal_contacts, portalContactsArraySchema, [], { workspaceId: row.id, field: 'portal_contacts', table: 'workspaces' });
   if (row.audit_suppressions) ws.auditSuppressions = parseJsonSafe(row.audit_suppressions, auditSuppressionsArraySchema, [], { workspaceId: row.id, field: 'audit_suppressions', table: 'workspaces' });
   if (row.publish_target) {
-    const pt = parseJsonSafe(row.publish_target, publishTargetSchema, null as any, { workspaceId: row.id, field: 'publish_target', table: 'workspaces' });
+    const pt = parseJsonSafe(row.publish_target, publishTargetSchema, null, { workspaceId: row.id, field: 'publish_target', table: 'workspaces' });
     if (pt) ws.publishTarget = pt;
   }
   if (row.seo_data_provider) ws.seoDataProvider = row.seo_data_provider as 'semrush' | 'dataforseo';
   if (row.business_profile) {
-    const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null as any, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
+    const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
     if (bp) ws.businessProfile = bp;
   }
   return ws;
@@ -159,8 +159,8 @@ function attachPageStates(ws: Workspace): Workspace {
         pageId: r.page_id,
         slug: r.slug ?? undefined,
         status: r.status as PageEditStatus,
-        auditIssues: r.audit_issues ? parseJsonFallback(r.audit_issues, undefined) : undefined,
-        fields: r.fields ? parseJsonFallback(r.fields, undefined) : undefined,
+        auditIssues: r.audit_issues ? parseJsonFallback<string[] | undefined>(r.audit_issues, undefined) : undefined,
+        fields: r.fields ? parseJsonFallback<Record<string, string> | undefined>(r.fields, undefined) : undefined,
         source: r.source as PageEditState['source'] ?? undefined,
         approvalBatchId: r.approval_batch_id ?? undefined,
         contentRequestId: r.content_request_id ?? undefined,

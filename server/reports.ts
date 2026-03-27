@@ -99,7 +99,7 @@ function rowToSnapshot(row: SnapshotRow): AuditSnapshot {
     siteId: row.site_id,
     siteName: row.site_name,
     createdAt: row.created_at,
-    audit: parseJsonFallback<SeoAuditResult>(row.audit, {} as SeoAuditResult),
+    audit: parseJsonFallback<SeoAuditResult>(row.audit, { siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [] } as SeoAuditResult),
     logoUrl: row.logo_url ?? undefined,
     actionItems: row.action_items ? parseJsonFallback(row.action_items, []) : [],
     previousScore: row.previous_score ?? undefined,
@@ -304,7 +304,7 @@ export function getSnapshot(id: string): AuditSnapshot | null {
 export function listSnapshots(siteId: string): SnapshotSummary[] {
   const rows = listSnapshotsStmt().all(siteId) as SnapshotRow[];
   return rows.map(row => {
-    const audit = parseJsonFallback<SeoAuditResult>(row.audit, {} as SeoAuditResult);
+    const audit = parseJsonFallback<SeoAuditResult>(row.audit, { siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [] } as SeoAuditResult);
     return {
       id: row.id,
       createdAt: row.created_at,

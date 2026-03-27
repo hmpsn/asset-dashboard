@@ -4,8 +4,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 
 export type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
 import type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
-import { parseJsonSafe } from './db/json-validation.js';
-import { approvalItemsArraySchema } from './schemas/approval-schemas.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import { approvalItemSchema } from './schemas/approval-schemas.js';
 
 // ── SQLite row shape ──
 
@@ -40,12 +40,20 @@ const stmts = createStmtCache(() => ({
 }));
 
 function rowToBatch(row: BatchRow): ApprovalBatch {
-  const items: ApprovalItem[] = parseJsonSafe(
-    row.items,
-    approvalItemsArraySchema,
-    [],
-    { workspaceId: row.workspace_id, field: 'items', table: 'approval_batches' },
-  );
+  const rawItems = parseJsonFallback<unknown[]>(row.items, []);
+  let healed = false;
+  const items: ApprovalItem[] = [];
+  for (const raw of rawItems) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const obj = raw as Record<string, unknown>;
+    // Heal missing status from historical Object.assign bug
+    if (!obj.status) { obj.status = 'pending'; healed = true; }
+    const result = approvalItemSchema.safeParse(obj);
+    if (result.success) items.push(result.data as ApprovalItem);
+  }
+  if (healed) {
+    stmts().update.run({ id: row.id, items: JSON.stringify(items), status: row.status, updated_at: new Date().toISOString() });
+  }
   return {
     id: row.id,
     workspaceId: row.workspace_id,
