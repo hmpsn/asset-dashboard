@@ -152,6 +152,22 @@ export function resolvePageTitle(
 ): string | null {
   if (!pageId) return null;
 
+  // Handle composite pageIds (e.g., "page::query", "cannibalization::query", "cluster::label")
+  // Split on :: and use the meaningful part for title resolution
+  if (pageId.includes('::')) {
+    const [left, right] = pageId.split('::', 2);
+    // If left is a URL, resolve it as the page title
+    if (left.startsWith('http://') || left.startsWith('https://') || left.startsWith('/')) {
+      const title = resolvePageTitle(left, titleMap);
+      return title;
+    }
+    // For non-URL prefixes (cannibalization::, cluster::), use the right part as a readable label
+    if (right) {
+      // Capitalize first letter of each word
+      return right.replace(/\b\w/g, c => c.toUpperCase());
+    }
+  }
+
   // Exact match first
   const exactTitle = titleMap.get(pageId);
   if (exactTitle) return exactTitle;
