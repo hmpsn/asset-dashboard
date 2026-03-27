@@ -287,6 +287,17 @@ interface EnrichedInsight extends AnalyticsInsight {
 - Cross-reference `schema_page_types` with page impressions/clicks
 - "This page gets 50K impressions but has no Article schema — adding it could improve CTR"
 
+### 2.8 Signal-to-Noise Tuning — Actionable Feed, Not Fire Hose
+
+Phase 1 surfaces every computed insight (393 drops + 86 opportunities in production). This overwhelms rather than guides. Phase 2 should tune the feed to feel like a prioritized work list:
+
+- **Minimum impact threshold** — insights below a configurable impact score don't appear in the feed (still stored in DB for completeness, just hidden from default view). Start with bottom 20% filtered.
+- **Consolidation** — group related insights instead of showing each individually. "5 pages lost position for 'ai coding' queries" instead of 5 separate ranking_mover items for the same keyword cluster.
+- **Staleness** — insights older than 30 days auto-demote in the feed. A ranking drop from 6 weeks ago that hasn't been resolved isn't actionable anymore — it's context.
+- **Resolution tracking** — mark insights as "addressed" when a brief is created, content is refreshed, or schema is added. Resolved insights move to a "Recently addressed" collapsible, not the main feed.
+- **Feed caps** — Overview: 5 (existing). Detail tabs: 10 with expand (existing). Full "all insights" view: paginated, 25 per page.
+- **Severity recalibration** — review whether 393 "drops" is correct or whether the thresholds are too sensitive. A page going from position 3 → 6 is flagged the same as position 3 → 15. Consider scaling severity by absolute impact (traffic lost), not just position delta magnitude.
+
 ---
 
 ## Phase 3: Client Intelligence
