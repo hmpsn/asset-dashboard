@@ -189,12 +189,13 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             </div>
           </SectionCard>
 
-          {/* Insight Feed — traffic domain */}
+          {/* Insight Feed — traffic domain, capped at 10 */}
           <InsightFeed
             feed={feed}
             loading={feedLoading}
             domain="traffic"
             showFilterChips
+            limit={10}
           />
 
           <div className="grid grid-cols-2 gap-4">
