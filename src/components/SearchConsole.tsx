@@ -2,11 +2,11 @@ import { useState } from 'react';
 import {
   Loader2, Search, TrendingUp, TrendingDown, Eye, MousePointer,
   BarChart3, ExternalLink, ArrowUpDown,
-  AlertTriangle, Target, Zap, Shield, ChevronDown,
+  AlertTriangle, Target, Zap, Shield, Flag,
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { PageHeader, StatCard, SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
-import { Annotations } from './Annotations';
+import { AnalyticsAnnotations } from './AnalyticsAnnotations';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
 import type { PerformanceTrend, SearchQuery, SearchPage } from '../../shared/types/analytics';
 import { useAdminSearch } from '../hooks/admin';
@@ -65,7 +65,7 @@ function TrendChart({ data, metric, color, height = 80 }: { data: PerformanceTre
 
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type DataTab = 'queries' | 'pages' | 'insights';
+type DataTab = 'queries' | 'pages' | 'insights' | 'annotations';
 
 
 export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
@@ -73,8 +73,6 @@ export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
-  const [annotationsOpen, setAnnotationsOpen] = useState(false);
-
   const {
     overview, trend, devices, countries, searchTypes, comparison,
     isLoading: dataLoading, error,
@@ -307,6 +305,7 @@ export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
               { id: 'queries', label: 'Top Queries', icon: Search },
               { id: 'pages', label: 'Top Pages', icon: ExternalLink },
               { id: 'insights', label: 'Insights', icon: Zap },
+              { id: 'annotations', label: 'Annotations', icon: Flag },
             ]}
             active={tab}
             onChange={id => setTab(id as DataTab)}
@@ -460,6 +459,11 @@ export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
             </div>
           )}
 
+          {/* Annotations tab */}
+          {tab === 'annotations' && (
+            <AnalyticsAnnotations workspaceId={workspaceId} />
+          )}
+
           {/* Data tables */}
           {(tab === 'queries' || tab === 'pages') && (
             <SectionCard noPadding>
@@ -525,21 +529,6 @@ export function SearchConsole({ siteId, workspaceId, gscPropertyUrl }: Props) {
         </>
       )}
 
-      {/* Annotations collapsible panel */}
-      <div className="border border-zinc-800 rounded-xl overflow-hidden">
-        <button
-          onClick={() => setAnnotationsOpen(!annotationsOpen)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-xs font-medium text-zinc-300 hover:bg-zinc-800/30 transition-colors"
-        >
-          <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${annotationsOpen ? '' : '-rotate-90'}`} />
-          Timeline Annotations
-        </button>
-        {annotationsOpen && (
-          <div className="px-4 pb-4">
-            <Annotations workspaceId={workspaceId} />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
