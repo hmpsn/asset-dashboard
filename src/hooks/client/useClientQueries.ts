@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSafe, getOptional } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
+import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
@@ -197,5 +198,16 @@ export function useClientContentPlan(wsId: string, enabled: boolean) {
     queryFn: () => getSafe<ContentPlanMatrix[]>(`/api/public/content-plan/${wsId}`, []),
     enabled,
     select: (d) => processContentPlan(Array.isArray(d) ? d : []),
+  });
+}
+
+
+// ── Analytics Insights ────────────────────────────────────────────
+export function useClientInsights(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.insights(wsId),
+    queryFn: () => getSafe<AnalyticsInsight[]>(`/api/public/insights/${wsId}`, []),
+    enabled,
+    select: (d) => (Array.isArray(d) ? d : []),
   });
 }

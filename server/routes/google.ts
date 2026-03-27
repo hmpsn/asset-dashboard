@@ -34,6 +34,8 @@ import {
 import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('google-auth');
 
@@ -245,6 +247,74 @@ router.get('/api/google/search-comparison/:siteId', async (req, res) => {
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
     res.json(await fetchSearchComparison(req.params.siteId, gscSiteUrl, days));
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Analytics Annotations ─────────────────────────────────────────
+
+const createAnnotationSchema = z.object({
+  date: z.string().min(1, 'date is required'),
+  label: z.string().min(1, 'label is required'),
+  category: z.string().min(1, 'category is required'),
+  createdBy: z.string().optional(),
+});
+
+router.get('/api/google/annotations/:workspaceId', (req, res) => {
+  try {
+    const { startDate, endDate, category } = req.query as { startDate?: string; endDate?: string; category?: string };
+    const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate, category });
+    res.json(annotations);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/api/google/annotations/:workspaceId', validate(createAnnotationSchema), (req, res) => {
+  const { date, label, category, createdBy } = req.body;
+  try {
+    const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+const updateAnnotationSchema = z.object({
+  label: z.string().min(1).optional(),
+  date: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+});
+
+router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotationSchema), (req, res) => {
+  const { label, date, category } = req.body;
+  try {
+    const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category });
+    if (!updated) return res.status(404).json({ error: 'Annotation not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
+  try {
+    const deleted = deleteAnnotation(req.params.id, req.params.workspaceId);
+    if (!deleted) return res.status(404).json({ error: 'Annotation not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Analytics annotations on a separate path to avoid shadowing the existing
+// /api/public/annotations/:workspaceId route in annotations.ts
+router.get('/api/public/analytics-annotations/:workspaceId', (req, res) => {
+  try {
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate });
+    res.json(annotations);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

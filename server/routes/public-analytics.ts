@@ -45,6 +45,24 @@ import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
 import { getWorkspace, getBrandName } from '../workspaces.js';
+import { getOrComputeInsights } from '../analytics-intelligence.js';
+import type { InsightType } from '../../shared/types/analytics.js';
+
+// ── Analytics insights endpoint ──────────────────────────────────
+
+router.get('/api/public/insights/:workspaceId', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  try {
+    const type = req.query.type as InsightType | undefined;
+    const insights = await getOrComputeInsights(ws.id, type);
+    res.json(insights);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
 
 router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);

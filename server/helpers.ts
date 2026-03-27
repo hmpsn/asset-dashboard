@@ -8,10 +8,12 @@ import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
-import { getAllGscPages } from './search-console.js';
+import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { getUploadRoot } from './data-dir.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
+import { getInsights } from './analytics-insights-store.js';
+import type { PageHealthData } from '../shared/types/analytics.js';
 
 // ── Page Path Utilities ──
 
@@ -165,6 +167,8 @@ export function applySuppressionsToAudit(
 export type SchemaAnalyticsMaps = {
   gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>;
   ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>;
+  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>;
+  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>;
 };
 
 // 5-minute TTL cache for analytics maps — prevents repeated API calls on
@@ -216,6 +220,8 @@ export async function buildSchemaContext(
   // Fetch analytics maps when requested (for schema generation routes)
   let gscMap: SchemaAnalyticsMaps['gscMap'];
   let ga4Map: SchemaAnalyticsMaps['ga4Map'];
+  let queryPageData: SchemaAnalyticsMaps['queryPageData'];
+  let insightsMap: SchemaAnalyticsMaps['insightsMap'];
 
   if (options?.includeAnalytics && ws) {
     const cacheKey = ws.id;
@@ -223,10 +229,13 @@ export async function buildSchemaContext(
     if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) {
       gscMap = cached.maps.gscMap;
       ga4Map = cached.maps.ga4Map;
+      queryPageData = cached.maps.queryPageData;
+      insightsMap = cached.maps.insightsMap;
     } else {
-      const [gscResults, ga4Results] = await Promise.allSettled([
+      const [gscResults, ga4Results, qpResults] = await Promise.allSettled([
         ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
         ws.ga4PropertyId ? getGA4TopPages(ws.ga4PropertyId, 90, 500) : Promise.resolve([]),
+        ws.gscPropertyUrl ? getQueryPageData(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
       ]);
 
       if (gscResults.status === 'fulfilled' && gscResults.value.length > 0) {
@@ -247,12 +256,39 @@ export async function buildSchemaContext(
         }
       }
 
+      if (qpResults.status === 'fulfilled' && qpResults.value.length > 0) {
+        queryPageData = qpResults.value.map(r => ({ query: r.query, page: r.page, impressions: r.impressions, position: r.position }));
+      }
+
+      // Build insights map from intelligence layer (SQLite — synchronous)
+      try {
+        const allInsights = getInsights(ws.id);
+        insightsMap = new Map();
+        // Quick win pageIds are composite keys like "https://example.com/blog::seo tips"
+        // Extract the page URL prefix (before "::") for matching against page_health pageIds
+        const quickWinPageUrls = new Set(
+          allInsights
+            .filter(i => i.insightType === 'quick_win' && i.pageId)
+            .map(i => i.pageId!.split('::')[0]),
+        );
+        for (const insight of allInsights) {
+          if (insight.insightType === 'page_health' && insight.pageId) {
+            const data = insight.data as unknown as PageHealthData;
+            insightsMap.set(insight.pageId, {
+              healthScore: data.score,
+              healthTrend: data.trend,
+              isQuickWin: quickWinPageUrls.has(insight.pageId),
+            });
+          }
+        }
+      } catch { /* intelligence layer not ready — skip */ }
+
       // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
-      analyticsCache[cacheKey] = { maps: { gscMap, ga4Map }, ts: Date.now() };
+      analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };
     }
   }
 
-  return { ctx, pageKeywordMap, gscMap, ga4Map };
+  return { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap };
 }
 
 // ── Audit Traffic Cache ──

@@ -53,6 +53,7 @@ export const queryKeys = {
     seoEditor: (siteId: string) => ['seo-editor', siteId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
+    analyticsAnnotations: (wsId: string) => ['analytics-annotations', wsId] as const,
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
@@ -93,6 +94,7 @@ export const queryKeys = {
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
+    insights: (wsId: string) => ['client-insights', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

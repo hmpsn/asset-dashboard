@@ -5,9 +5,76 @@ import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
+import { getInsights } from './analytics-insights-store.js';
+import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief } from '../shared/types/content.ts';
+
+// ── Analytics Intelligence for brief enrichment ──
+
+interface BriefIntelligenceInput {
+  targetKeyword: string;
+  workspaceId: string;
+  cannibalizationInsights?: Array<{ query: string; pages: string[]; positions: number[] }>;
+  decayInsights?: Array<{ pageId: string; deltaPercent: number; baselineClicks: number; currentClicks: number }>;
+  quickWins?: Array<{ pageUrl: string; query: string; currentPosition: number; estimatedTrafficGain: number }>;
+  pageHealthScores?: Array<{ pageId: string; score: number; trend: string }>;
+}
+
+/**
+ * Build an analytics intelligence block for the content brief generation prompt.
+ * Injects cannibalization warnings, decay context, quick wins, and page health data.
+ */
+export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): string {
+  const sections: string[] = [];
+
+  // Cannibalization: pages already competing for target keyword
+  const matching = opts.cannibalizationInsights?.filter(
+    c => c.query.toLowerCase() === opts.targetKeyword.toLowerCase(),
+  );
+  if (matching?.length) {
+    const lines = matching.map(c => {
+      const pageList = c.pages.map((p, i) => {
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch { return p; }
+      }).join(', ');
+      return `- "${c.query}": ${pageList}`;
+    });
+    sections.push(`CANNIBALIZATION WARNING — You already rank for this keyword on existing pages; consider updating vs creating new:\n${lines.join('\n')}`);
+  }
+
+  // Content decay: related pages losing traffic
+  if (opts.decayInsights?.length) {
+    const lines = opts.decayInsights.map(d => {
+      let path: string;
+      try { path = new URL(d.pageId).pathname; } catch { path = d.pageId; }
+      return `- ${path}: ${d.deltaPercent}% change (${d.baselineClicks} → ${d.currentClicks} clicks)`;
+    });
+    sections.push(`CONTENT DECAY — Existing content on this topic is losing traffic; brief should address freshness:\n${lines.join('\n')}`);
+  }
+
+  // Quick wins: related queries close to page 1
+  if (opts.quickWins?.length) {
+    const lines = opts.quickWins.map(q =>
+      `- "${q.query}" at pos ${Math.round(q.currentPosition)}, est. +${q.estimatedTrafficGain} clicks/mo if improved`,
+    );
+    sections.push(`QUICK WIN OPPORTUNITIES — Related queries that are close to page 1:\n${lines.join('\n')}`);
+  }
+
+  // Page health: related pages' overall scores
+  if (opts.pageHealthScores?.length) {
+    const lines = opts.pageHealthScores.map(p => {
+      let path: string;
+      try { path = new URL(p.pageId).pathname; } catch { path = p.pageId; }
+      return `- ${path}: ${p.score}/100 (${p.trend})`;
+    });
+    sections.push(`PAGE HEALTH — Related pages' health scores:\n${lines.join('\n')}`);
+  }
+
+  if (sections.length === 0) return '';
+
+  return `\n\nANALYTICS INTELLIGENCE (from intelligence layer — use to inform content strategy):\n\n${sections.join('\n\n')}`;
+}
 
 // ── SQLite row shape ──
 
@@ -758,6 +825,31 @@ The outline sections MUST match the following template sections in order. You ma
     ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post.`
     : '';
 
+  // Analytics intelligence from the intelligence layer
+  let intelligenceBlock = '';
+  try {
+    const allInsights = getInsights(workspaceId);
+    if (allInsights.length > 0) {
+      intelligenceBlock = buildBriefIntelligenceBlock({
+        targetKeyword,
+        workspaceId,
+        cannibalizationInsights: allInsights
+          .filter(i => i.insightType === 'cannibalization')
+          .map(i => i.data as unknown as CannibalizationData),
+        decayInsights: allInsights
+          .filter(i => i.insightType === 'content_decay')
+          .map(i => ({ pageId: i.pageId || '', ...(i.data as unknown as ContentDecayData) })),
+        quickWins: allInsights
+          .filter(i => i.insightType === 'quick_win')
+          .map(i => i.data as unknown as QuickWinData)
+          .map(d => ({ pageUrl: d.pageUrl, query: d.query, currentPosition: d.currentPosition, estimatedTrafficGain: d.estimatedTrafficGain })),
+        pageHealthScores: allInsights
+          .filter(i => i.insightType === 'page_health' && i.pageId)
+          .map(i => ({ pageId: i.pageId!, ...(i.data as unknown as PageHealthData) })),
+      });
+    }
+  } catch { /* intelligence layer not ready — skip */ }
+
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
@@ -766,7 +858,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${intelligenceBlock}
 
 Generate a content brief in the following JSON format:
 {

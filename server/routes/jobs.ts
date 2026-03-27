@@ -556,7 +556,7 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-            const { ctx, pageKeywordMap, gscMap, ga4Map } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
+            const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
             const schemaWsId = (params.workspaceId as string) || '';
             // Enrich with architecture tree for deterministic breadcrumbs
             if (ctx.workspaceId) {
@@ -575,7 +575,7 @@ router.post('/api/jobs', async (req, res) => {
                 lastSaveTime = now;
                 saveSchemaSnapshot(schemaSiteId, schemaWsId, partial);
               }
-            }, () => isJobCancelled(job.id), gscMap, ga4Map);
+            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap);
             // Final save — always write the complete result
             if (result.length > 0) {
               saveSchemaSnapshot(schemaSiteId, schemaWsId, result);

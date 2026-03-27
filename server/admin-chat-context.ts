@@ -35,6 +35,8 @@ import {
 } from './seo-context.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
+import { getInsights } from './analytics-insights-store.js';
+import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
 
 const log = createLogger('admin-chat-context');
 
@@ -54,7 +56,8 @@ type ContextCategory =
   | 'competitors'    // competitive analysis
   | 'client'         // client communication, churn, engagement
   | 'page_analysis'  // analyze a specific page URL
-  | 'content_review'; // review pasted content/document
+  | 'content_review' // review pasted content/document
+  | 'insights';      // analytics intelligence — quick wins, priorities, decay, cannibalization
 
 const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   general: [/status report/i, /overview/i, /what.*happening/i, /what.*going on/i, /summary/i, /this week/i, /this month/i, /full.*report/i, /everything/i, /what.*next/i, /roi/i, /highest.*priority/i, /work.*on/i],
@@ -71,6 +74,7 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   client: [/client/i, /churn/i, /engagement/i, /tell.*client/i, /update.*client/i, /report.*client/i, /communi/i],
   page_analysis: [/https?:\/\//i, /analyze.*page/i, /review.*page/i, /look at.*\//i, /check.*\//i, /what.*wrong.*\//i, /www[.]/i],
   content_review: [], // detected by content length, not patterns
+  insights: [/what.*should.*work/i, /priorit/i, /quick.*win/i, /opportunit/i, /declin/i, /cannibali/i, /page.*health/i, /health.*score/i, /what.*focus/i, /biggest.*impact/i],
 };
 
 /**
@@ -127,6 +131,116 @@ export function extractUrl(question: string): string | null {
   if (pathMatch) return pathMatch[1];
 
   return null;
+}
+
+// ── Analytics Intelligence Context ──
+
+/**
+ * Build a formatted context block from analytics intelligence insights.
+ * Used by the chat advisor to surface quick wins, decay, cannibalization, and health scores.
+ */
+export function buildInsightsContext(insights: AnalyticsInsight[]): string {
+  if (insights.length === 0) return '';
+
+  const sections: string[] = [];
+
+  // Page Health summary — top 10 by score, worst first
+  const healthInsights = insights
+    .filter(i => i.insightType === 'page_health')
+    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as PageHealthData), severity: i.severity }))
+    .sort((a, b) => a.score - b.score);
+  if (healthInsights.length > 0) {
+    const lines = healthInsights.slice(0, 10).map(h => {
+      let path: string;
+      try { path = new URL(h.pageId || '').pathname; } catch { path = h.pageId || '(unknown)'; }
+      return `  ${path}: ${h.score}/100 (${h.trend}) — ${h.clicks} clicks, pos ${h.position?.toFixed?.(1) ?? h.position}`;
+    });
+    sections.push(`PAGE HEALTH SCORES (worst first):\n${lines.join('\n')}`);
+  }
+
+  // Quick wins
+  const quickWins = insights
+    .filter(i => i.insightType === 'quick_win')
+    .map(i => i.data as unknown as QuickWinData)
+    .sort((a, b) => b.estimatedTrafficGain - a.estimatedTrafficGain);
+  if (quickWins.length > 0) {
+    const lines = quickWins.slice(0, 10).map(q =>
+      `  "${q.query}" — pos ${Math.round(q.currentPosition)}, est. +${q.estimatedTrafficGain} clicks/mo if improved`,
+    );
+    sections.push(`QUICK WINS (pages close to page 1):\n${lines.join('\n')}`);
+  }
+
+  // Content decay
+  const decayInsights = insights
+    .filter(i => i.insightType === 'content_decay')
+    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as ContentDecayData) }))
+    .sort((a, b) => a.deltaPercent - b.deltaPercent);
+  if (decayInsights.length > 0) {
+    const lines = decayInsights.slice(0, 8).map(d => {
+      let path: string;
+      try { path = new URL(d.pageId || '').pathname; } catch { path = d.pageId || '(unknown)'; }
+      return `  ${path}: ${d.deltaPercent}% (${d.baselineClicks} → ${d.currentClicks} clicks)`;
+    });
+    sections.push(`CONTENT DECAY (pages losing traffic):\n${lines.join('\n')}`);
+  }
+
+  // Cannibalization
+  const cannibalization = insights
+    .filter(i => i.insightType === 'cannibalization')
+    .map(i => i.data as unknown as CannibalizationData);
+  if (cannibalization.length > 0) {
+    const lines = cannibalization.slice(0, 8).map(c => {
+      const pages = c.pages.map((p, i) => {
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch { return p; }
+      }).join(', ');
+      return `  "${c.query}": ${pages}`;
+    });
+    sections.push(`CANNIBALIZATION (multiple pages competing):\n${lines.join('\n')}`);
+  }
+
+  // Keyword clusters
+  const clusters = insights
+    .filter(i => i.insightType === 'keyword_cluster')
+    .map(i => i.data as unknown as KeywordClusterData)
+    .sort((a, b) => b.totalImpressions - a.totalImpressions);
+  if (clusters.length > 0) {
+    const lines = clusters.slice(0, 8).map(c => {
+      const pillar = c.pillarPage ? ` → pillar: ${(() => { try { return new URL(c.pillarPage).pathname; } catch { return c.pillarPage; } })()}` : '';
+      return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
+    });
+    sections.push(`KEYWORD CLUSTERS (topic groups from GSC queries):\n${lines.join('\n')}`);
+  }
+
+  // Competitor gaps
+  const gaps = insights
+    .filter(i => i.insightType === 'competitor_gap')
+    .map(i => i.data as unknown as CompetitorGapData)
+    .sort((a, b) => b.volume - a.volume);
+  if (gaps.length > 0) {
+    const lines = gaps.slice(0, 10).map(g => {
+      const ours = g.ourPosition ? `our pos ${Math.round(g.ourPosition)}` : 'we don\'t rank';
+      return `  "${g.keyword}" — ${g.competitorDomain} pos ${g.competitorPosition}, vol ${g.volume}, diff ${g.difficulty} (${ours})`;
+    });
+    sections.push(`COMPETITOR GAPS (keywords competitors rank for):\n${lines.join('\n')}`);
+  }
+
+  // Conversion attribution
+  const conversions = insights
+    .filter(i => i.insightType === 'conversion_attribution')
+    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as ConversionAttributionData) }))
+    .sort((a, b) => b.conversionRate - a.conversionRate);
+  if (conversions.length > 0) {
+    const lines = conversions.slice(0, 8).map(c => {
+      let path: string;
+      try { path = new URL(c.pageId || '').pathname; } catch { path = c.pageId || '(unknown)'; }
+      return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR (${c.conversions} conversions, ${c.sessions} sessions)`;
+    });
+    sections.push(`CONVERSION ATTRIBUTION (pages driving conversions):\n${lines.join('\n')}`);
+  }
+
+  if (sections.length === 0) return '';
+
+  return `ANALYTICS INTELLIGENCE (computed insights from intelligence layer):\n\n${sections.join('\n\n')}`;
 }
 
 // ── Context Assembly ──
@@ -409,6 +523,20 @@ export async function assembleAdminContext(
         dataSources.push('Detected Anomalies');
       }
     } catch { /* non-critical */ }
+  }
+
+  // Analytics Intelligence (quick wins, decay, cannibalization, health scores)
+  if (categories.has('insights') || categories.has('general') || categories.has('strategy')) {
+    try {
+      const allInsights = getInsights(workspaceId);
+      if (allInsights.length > 0) {
+        const insightsBlock = buildInsightsContext(allInsights);
+        if (insightsBlock) {
+          sections.push(insightsBlock);
+          dataSources.push('Analytics Intelligence (page health, quick wins, content decay, cannibalization)');
+        }
+      }
+    } catch { /* intelligence layer not ready — non-critical */ }
   }
 
   // Content Pipeline (briefs + requests)

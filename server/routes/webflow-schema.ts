@@ -44,7 +44,7 @@ const log = createLogger('webflow-schema');
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, pageKeywordMap, gscMap, ga4Map } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
+    const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     // Enrich with architecture tree (best-effort — don't block if unavailable)
     if (ctx.workspaceId) {
       try {
@@ -52,7 +52,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
         ctx._architectureTree = arch.tree;
       } catch { /* architecture not available — proceed without */ }
     }
-    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap, undefined, undefined, gscMap, ga4Map);
+    const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -95,7 +95,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
   if (!pageId) return res.status(400).json({ error: 'pageId required' });
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const { ctx, gscMap, ga4Map } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
+    const { ctx, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(req.params.siteId, { includeAnalytics: true });
     // Use explicitly-passed pageType, fall back to persisted type for this page
     const resolvedPageType = pageType || getPageTypes(req.params.siteId)[pageId];
     if (resolvedPageType) ctx.pageType = resolvedPageType;
@@ -106,7 +106,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
         ctx._architectureTree = arch.tree;
       } catch { /* proceed without architecture */ }
     }
-    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map);
+    const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map, queryPageData, insightsMap);
     if (!result) return res.status(404).json({ error: 'Page not found' });
     res.json(result);
   } catch (err) {

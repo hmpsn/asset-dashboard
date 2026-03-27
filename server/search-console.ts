@@ -191,7 +191,8 @@ export interface QueryPageRow {
 export async function getQueryPageData(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 90
+  days: number = 90,
+  opts?: { maxRows?: number },
 ): Promise<QueryPageRow[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
@@ -204,6 +205,37 @@ export async function getQueryPageData(
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
+  const maxRows = opts?.maxRows ?? 500;
+
+  if (maxRows > 500) {
+    // Use pagination for larger datasets
+    return paginateGscQuery(
+      async (startRow, rowLimit) => {
+        const data = await gscFetch(
+          `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
+          token,
+          {
+            startDate: fmt(startDate),
+            endDate: fmt(endDate),
+            dimensions: ['query', 'page'],
+            rowLimit,
+            startRow,
+            type: 'web',
+          },
+        ) as { rows?: SearchAnalyticsRow[] };
+        return (data.rows || []).map(r => ({
+          query: r.keys[0],
+          page: r.keys[1],
+          clicks: r.clicks,
+          impressions: r.impressions,
+          ctr: +(r.ctr * 100).toFixed(1),
+          position: +r.position.toFixed(1),
+        }));
+      },
+      { maxRows, pageSize: 500 },
+    );
+  }
+
   const data = await gscFetch(
     `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
@@ -211,7 +243,7 @@ export async function getQueryPageData(
       startDate: fmt(startDate),
       endDate: fmt(endDate),
       dimensions: ['query', 'page'],
-      rowLimit: 500,
+      rowLimit: maxRows,
       type: 'web',
     }
   ) as { rows?: SearchAnalyticsRow[] };
@@ -234,25 +266,21 @@ export async function getQueryPageData(
 export async function getAllGscPages(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 90
+  days: number = 90,
+  dateRange?: CustomDateRange,
 ): Promise<SearchPage[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3);
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const { startDate: start, endDate: end } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const data = await gscFetch(
     `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
+      startDate: start,
+      endDate: end,
       dimensions: ['page'],
       rowLimit: 1000,
       type: 'web',
@@ -266,6 +294,27 @@ export async function getAllGscPages(
     ctr: +(r.ctr * 100).toFixed(1),
     position: +r.position.toFixed(1),
   }));
+}
+
+/**
+ * Generic pagination helper for GSC API queries.
+ * Fetches multiple pages of results using startRow, up to maxRows total.
+ */
+export async function paginateGscQuery<T>(
+  fetchPage: (startRow: number, rowLimit: number) => Promise<T[]>,
+  opts?: { maxRows?: number; pageSize?: number },
+): Promise<T[]> {
+  const maxRows = opts?.maxRows ?? 2000;
+  const pageSize = opts?.pageSize ?? 500;
+  const results: T[] = [];
+
+  for (let startRow = 0; startRow < maxRows; startRow += pageSize) {
+    const page = await fetchPage(startRow, pageSize);
+    results.push(...page);
+    if (page.length < pageSize) break; // Last page — no more data
+  }
+
+  return results.slice(0, maxRows);
 }
 
 /** Shared date range helper (GSC has ~3 day data delay) */

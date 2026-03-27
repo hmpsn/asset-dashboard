@@ -69,6 +69,28 @@ export const activity = {
     getSafe<unknown[]>(`/api/public/activity/${wsId}?limit=${limit}`, []),
 };
 
+// ── Analytics Annotations (new system — admin-facing, with categories/edit) ──
+export const analyticsAnnotations = {
+  list: (wsId: string, opts?: { startDate?: string; endDate?: string; category?: string }) => {
+    if (opts) {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(opts)) { if (v != null) params.set(k, v); }
+      const qs = params.toString();
+      return getSafe<unknown[]>(`/api/google/annotations/${wsId}${qs ? '?' + qs : ''}`, []);
+    }
+    return getSafe<unknown[]>(`/api/google/annotations/${wsId}`, []);
+  },
+
+  create: (wsId: string, body: Record<string, unknown>) =>
+    post<unknown>(`/api/google/annotations/${wsId}`, body),
+
+  update: (wsId: string, id: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/api/google/annotations/${wsId}/${id}`, body),
+
+  remove: (wsId: string, id: string) =>
+    del(`/api/google/annotations/${wsId}/${id}`),
+};
+
 // ── Annotations ─────────────────────────────────────────────────
 export const annotations = {
   list: (wsId: string) =>
