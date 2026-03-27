@@ -3558,6 +3558,16 @@
           "notes": "Shipped \u2014 server/analytics-intelligence.ts with lazy evaluation (6h TTL). 4 pure computation functions: (1) page health scores (0\u2013100, 4-component scoring: position/traffic/CTR/engagement), (2) quick wins (positions 4\u201320, \u226550 impressions, traffic gain estimates via expected CTR curves), (3) content decay (current vs previous 30d GSC clicks, >20% decline flagged, severity tiers), (4) cannibalization (multi-page ranking for same top-20 query). Orchestrator fetches GSC+GA4 in parallel via apiCache.wrap(), persists via upsertInsight(). Public endpoint upgraded to getOrComputeInsights() with lazy evaluation. 25 new unit tests, all TDD.",
           "status": "done",
           "shippedAt": "2026-03-26"
+        },
+        {
+          "id": 384,
+          "title": "Analytics Intelligence Layer — Phase 2 (AI Engine Enrichment)",
+          "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — Phase 2A: Schema pipeline enrichment — added _pageHealthScore, _pageHealthTrend, _quickWinStatus, _faqOpportunities to SchemaContext; buildSchemaIntelligenceBlock() + extractFaqOpportunities() in schema-suggester.ts; buildSchemaContext() in helpers.ts extended with queryPageData + insightsMap from intelligence layer; all 3 callers updated. Phase 2B: Content brief enrichment — buildBriefIntelligenceBlock() injects cannibalization warnings, decay context, quick wins, page health into generateBrief() prompt. Phase 2C: Chat advisor — added 'insights' context category with pattern matching; buildInsightsContext() formats health scores, quick wins, decay, cannibalization for chat prompt. 36 new TDD tests across 3 files.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         }
       ]
     }

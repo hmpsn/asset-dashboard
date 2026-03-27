@@ -171,6 +171,10 @@ export interface SchemaContext {
   _personasBlock?: string;  // Internal: audience personas for richer schema targeting
   _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
   _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
+  _pageHealthScore?: number;  // Internal: 0-100 from analytics intelligence layer
+  _pageHealthTrend?: 'improving' | 'declining' | 'stable';  // Internal: trend direction
+  _quickWinStatus?: boolean;  // Internal: is this page a quick-win candidate?
+  _faqOpportunities?: Array<{ query: string; impressions: number; position: number }>;  // Internal: question queries from GSC
   _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
     phone?: string;
     email?: string;
@@ -180,6 +184,62 @@ export interface SchemaContext {
     foundedDate?: string;
     numberOfEmployees?: string;
   };
+}
+
+// ── Analytics Intelligence helpers for prompt enrichment ────────────
+
+const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
+
+/**
+ * Extract question-type queries from GSC data that target a specific page.
+ * These are FAQ candidates — questions people search to find this page.
+ */
+export function extractFaqOpportunities(
+  queryPageData: Array<{ query: string; page: string; impressions: number; position: number }>,
+  pageUrl: string,
+): Array<{ query: string; impressions: number; position: number }> {
+  return queryPageData
+    .filter(row => row.page === pageUrl && QUESTION_PREFIXES.test(row.query))
+    .map(({ query, impressions, position }) => ({ query, impressions, position }))
+    .sort((a, b) => b.impressions - a.impressions)
+    .slice(0, 10);
+}
+
+/**
+ * Build the intelligence enrichment block for the schema generation prompt.
+ * Returns empty string if no intelligence data is available.
+ */
+export function buildSchemaIntelligenceBlock(ctx: SchemaContext): string {
+  const lines: string[] = [];
+
+  if (ctx._pageHealthScore != null) {
+    const trend = ctx._pageHealthTrend ? ` (${ctx._pageHealthTrend})` : '';
+    lines.push(`- Page Health Score: ${ctx._pageHealthScore}/100${trend}`);
+  }
+
+  if (ctx._quickWinStatus === true) {
+    lines.push(`- Quick Win: Yes — this page is close to page 1 and worth extra schema richness`);
+  }
+
+  const faqBlock: string[] = [];
+  if (ctx._faqOpportunities && ctx._faqOpportunities.length > 0) {
+    faqBlock.push(`\nFAQ OPPORTUNITIES (question queries people use to find this page — do NOT auto-generate FAQ schema from these; surface as insight only):`);
+    for (const opp of ctx._faqOpportunities) {
+      faqBlock.push(`- "${opp.query}" (${opp.impressions.toLocaleString()} impressions, pos ${Math.round(opp.position)})`);
+    }
+  }
+
+  if (lines.length === 0 && faqBlock.length === 0) return '';
+
+  const parts: string[] = [];
+  if (lines.length > 0) {
+    parts.push(`\nANALYTICS INTELLIGENCE:\n${lines.join('\n')}`);
+  }
+  if (faqBlock.length > 0) {
+    parts.push(faqBlock.join('\n'));
+  }
+
+  return parts.join('\n');
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -1587,6 +1647,7 @@ SEARCH PERFORMANCE (this page — use to prioritize richness and breadth of sche
 ${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} impressions/90d | ${ctx._gscPageData.clicks.toLocaleString()} clicks | Avg Position: ${ctx._gscPageData.position.toFixed(1)} | CTR: ${(ctx._gscPageData.ctr * 100).toFixed(2)}%` : ''}
 ${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
 High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
+${buildSchemaIntelligenceBlock(ctx)}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
 ${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
@@ -1777,6 +1838,8 @@ export async function generateSchemaForPage(
   ctx: SchemaContext = {},
   gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
   ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
+  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
+  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -1808,6 +1871,20 @@ export async function generateSchemaForPage(
     const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
     if (gscMap) ctx._gscPageData = gscMap.get(lookupPath);
     if (ga4Map) ctx._ga4PageData = ga4Map.get(lookupPath);
+  }
+
+  // Inject intelligence layer data (health score, quick win, FAQ opportunities)
+  const pageUrl = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
+  if (insightsMap) {
+    const insightData = insightsMap.get(pageUrl);
+    if (insightData) {
+      ctx._pageHealthScore = insightData.healthScore;
+      ctx._pageHealthTrend = insightData.healthTrend as SchemaContext['_pageHealthTrend'];
+      ctx._quickWinStatus = insightData.isQuickWin;
+    }
+  }
+  if (queryPageData) {
+    ctx._faqOpportunities = extractFaqOpportunities(queryPageData, pageUrl);
   }
 
   // Try AI unified schema first
@@ -1869,6 +1946,8 @@ export async function generateSchemaSuggestions(
   isCancelled?: () => boolean,
   gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
   ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
+  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
+  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -1942,6 +2021,8 @@ export async function generateSchemaSuggestions(
         const lookupPath = pagePath || `/${page.slug}`;
         const normalizedPath = (isHomepage ? '/' : lookupPath).replace(/\/$/, '') || '/';
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
+        const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
+        const insightData = insightsMap?.get(fullPageUrl);
         const pageCtx: SchemaContext = {
           ...ctx,
           pageKeywords: getPageKeywords(lookupPath),
@@ -1950,6 +2031,10 @@ export async function generateSchemaSuggestions(
           _pageAnalysis: getPageAnalysis(lookupPath),
           _gscPageData: gscMap?.get(normalizedPath),
           _ga4PageData: ga4Map?.get(normalizedPath),
+          _pageHealthScore: insightData?.healthScore,
+          _pageHealthTrend: insightData?.healthTrend as SchemaContext['_pageHealthTrend'],
+          _quickWinStatus: insightData?.isQuickWin,
+          _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, fullPageUrl) : undefined,
         };
 
         let suggestedSchemas: SchemaSuggestion[];
@@ -2027,6 +2112,7 @@ export async function generateSchemaSuggestions(
           const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
           const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
+          const cmsInsightData = insightsMap?.get(item.url);
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
@@ -2034,6 +2120,10 @@ export async function generateSchemaSuggestions(
             _pageAnalysis: getPageAnalysis(slug),
             _gscPageData: gscMap?.get(cmsNormalizedPath),
             _ga4PageData: ga4Map?.get(cmsNormalizedPath),
+            _pageHealthScore: cmsInsightData?.healthScore,
+            _pageHealthTrend: cmsInsightData?.healthTrend as SchemaContext['_pageHealthTrend'],
+            _quickWinStatus: cmsInsightData?.isQuickWin,
+            _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, item.url) : undefined,
           };
 
           let suggestedSchemas: SchemaSuggestion[];
