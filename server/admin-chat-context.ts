@@ -456,21 +456,20 @@ export async function assembleAdminContext(
         const snapshot = getLatestSnapshot(ws.webflowSiteId);
         if (snapshot) {
           const filteredAudit = applySuppressionsToAudit(snapshot.audit, ws.auditSuppressions || []);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const pages = filteredAudit.pages as any[] | undefined;
+          const pages = filteredAudit.pages;
           const auditSummary = {
             siteScore: filteredAudit.siteScore,
             totalPages: pages?.length || 0,
-            errors: pages?.reduce((sum: number, p: any) => sum + (p.issues?.filter((i: any) => i.severity === 'error').length || 0), 0) || 0,
-            warnings: pages?.reduce((sum: number, p: any) => sum + (p.issues?.filter((i: any) => i.severity === 'warning').length || 0), 0) || 0,
+            errors: pages?.reduce((sum, p) => sum + (p.issues?.filter(i => i.severity === 'error').length || 0), 0) || 0,
+            warnings: pages?.reduce((sum, p) => sum + (p.issues?.filter(i => i.severity === 'warning').length || 0), 0) || 0,
             siteWideIssues: filteredAudit.siteWideIssues?.slice(0, 5),
             worstPages: pages
-              ?.filter((p: any) => p.issues?.length > 0)
-              .sort((a: any, b: any) => a.score - b.score)
+              ?.filter(p => p.issues?.length > 0)
+              .sort((a, b) => a.score - b.score)
               .slice(0, 8)
-              .map((p: any) => ({
+              .map(p => ({
                 page: p.page, slug: p.slug, score: p.score,
-                topIssues: p.issues?.slice(0, 3).map((i: any) => `[${i.severity}] ${i.check || i.type}: ${i.message}`) || [],
+                topIssues: p.issues?.slice(0, 3).map(i => `[${i.severity}] ${i.check || i.type}: ${i.message}`) || [],
               })),
           };
           sections.push(`SITE HEALTH AUDIT:\n${JSON.stringify(auditSummary, null, 1)}`);
@@ -481,18 +480,18 @@ export async function assembleAdminContext(
             const trafficMap = await getAuditTrafficForWorkspace(ws);
             if (Object.keys(trafficMap).length > 0) {
               const pagesWithTraffic = pages
-                ?.filter((p: any) => p.issues?.length > 0)
-                .map((p: any) => {
+                ?.filter(p => p.issues?.length > 0)
+                .map(p => {
                   const slug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
                   const traffic = trafficMap[slug] || trafficMap[p.slug];
                   return { page: p.page, slug, issues: p.issues.length, score: p.score, traffic };
                 })
-                .filter((p: any) => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
-                .sort((a: any, b: any) =>
+                .filter(p => p.traffic && (p.traffic.clicks > 0 || p.traffic.pageviews > 0))
+                .sort((a, b) =>
                   ((b.traffic?.clicks || 0) + (b.traffic?.pageviews || 0)) - ((a.traffic?.clicks || 0) + (a.traffic?.pageviews || 0)))
                 .slice(0, 8);
               if (pagesWithTraffic?.length) {
-                sections.push(`HIGH-TRAFFIC PAGES WITH SEO ISSUES (prioritize these — they get real visitors):\n${pagesWithTraffic.map((p: any) => `• ${p.slug} — ${p.issues} issues, score ${p.score} | ${p.traffic.clicks} clicks, ${p.traffic.pageviews} pageviews`).join('\n')}`);
+                sections.push(`HIGH-TRAFFIC PAGES WITH SEO ISSUES (prioritize these — they get real visitors):\n${pagesWithTraffic.map(p => `• ${p.slug} — ${p.issues} issues, score ${p.score} | ${p.traffic.clicks} clicks, ${p.traffic.pageviews} pageviews`).join('\n')}`);
                 dataSources.push('Audit Traffic Intelligence (high-traffic pages with SEO errors)');
               }
             }

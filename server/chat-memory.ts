@@ -5,6 +5,7 @@
 
 import db from './db/index.js';
 import { callOpenAI } from './openai-helpers.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -100,7 +101,7 @@ function rowToSession(row: ChatRow): ChatSession {
     workspaceId: row.workspace_id,
     channel: row.channel,
     title: row.title,
-    messages: JSON.parse(row.messages),
+    messages: parseJsonFallback<ChatMessage[]>(row.messages, []),
     summary: row.summary ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -138,7 +139,7 @@ export function listSessions(workspaceId: string, channel?: string): SessionSumm
     : listSessionsStmt().all(workspaceId) as ChatRow[];
 
   return rows.map(row => {
-    const messages: ChatMessage[] = JSON.parse(row.messages);
+    const messages: ChatMessage[] = parseJsonFallback<ChatMessage[]>(row.messages, []);
     return {
       id: row.id,
       title: row.title,

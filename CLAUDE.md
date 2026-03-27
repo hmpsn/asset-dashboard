@@ -33,6 +33,7 @@ Integrations: Webflow, Google Search Console, GA4, SEMRush, Stripe, OpenAI (GPT-
 2. **Check `FEATURE_AUDIT.md`** — understand what exists. Don't build something that already exists.
 3. **If UI work** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX.
 4. **Cross-reference before building** — search the codebase to verify a component/endpoint/feature doesn't already exist.
+5. **For multi-phase or cross-system features** — before writing any implementation code, generate feature-specific guardrails: (a) CLAUDE.md rules for reusable patterns this feature introduces, (b) a `.windsurf/rules/<feature>.md` reference doc for feature-specific contracts, and (c) per-phase acceptance checklists embedded in the implementation plan. Guardrails written after bugs are found cost 3× more than guardrails written before the first commit.
 
 ### After completing a task
 
@@ -140,7 +141,10 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **User-facing strings**: follow `.windsurf/workflows/ui-vocabulary.md` canonical labels
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
-- **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL)
+- **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts` — never bare `JSON.parse` on DB columns.
+- **Array validation from DB** — when Zod-validating a JSON array column, validate items individually (filter out bad items) rather than validating the whole array (which drops ALL items if any one fails). Use `parseJsonSafeArray(raw, itemSchema, context)` from `server/db/json-validation.ts`. See `server/approvals.ts` `rowToBatch` for the pattern.
+- **Zod schema field names** — when writing Zod schemas for existing TypeScript interfaces, always cross-reference field names against the source interface in `shared/types/`. Zod won't flag name mismatches at compile time — a required field with a wrong name silently fails `safeParse` at runtime, returning the fallback instead of real data.
+- **Schema vs stored shape** — DB column schemas must reflect what is actually stored, not the in-memory assembled object. If a write path deliberately omits a field (e.g. storing it in a separate table), that field must be `.optional()` in the Zod schema. A required field absent from the stored blob causes every `parseJsonSafe` call to silently return the empty fallback, destroying all real data. See `keywordStrategySchema.pageMap` as the canonical example.
 - **Large edits**: break into multiple smaller edits if > 300 lines
 - **Route removal checklist** — when removing or renaming a `Page` type value, update ALL of these in the same commit:
   1. `src/routes.ts` — remove from `Page` union type
@@ -152,6 +156,11 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
   7. Tests referencing the old route value
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
 - **Test assertions on collections** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously, hiding real failures. Pattern: `expect(arr.length).toBeGreaterThan(0); expect(arr.every(fn)).toBe(true);`
+- **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `.windsurf/rules/analytics-insights.md`.
+- **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, and write path (`upsertX()`) in the same commit. TypeScript will not catch a mapper that silently ignores a new column.
+- **Enrichment field fallbacks** — optional fields computed at insight-store time must have explicit fallbacks. `pageTitle` must always resolve to something (cleaned slug if all else fails) — never render a raw URL. Enrichment failure must degrade gracefully, not block insight storage.
+- **Feedback loop completeness** — every cross-system write (e.g. insights → strategy, insights → pipeline) requires both halves: server `broadcastToWorkspace()` AND frontend `useWebSocket` handler that invalidates the correct React Query key. Neither half alone is sufficient.
+- **Client vs admin insight framing** — client-facing insight components must use narrative, outcome-oriented language. No purple. No admin jargon. Premium features wrapped in `<TierGate>`. Verify with `grep -r "purple-" src/components/client/` before marking Phase 3 done.
 
 ---
 
@@ -176,6 +185,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `.windsurf/workflows/deploy.md` | Commit, push, verify deploy |
 | `.windsurf/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `.windsurf/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
+| `.windsurf/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
 
 ---
 

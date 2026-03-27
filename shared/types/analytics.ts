@@ -19,6 +19,7 @@ export interface SearchPage {
   page: string;
   clicks: number;
   impressions: number;
+  /** Percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
   ctr: number;
   position: number;
 }
@@ -26,6 +27,7 @@ export interface SearchPage {
 export interface SearchOverview {
   totalClicks: number;
   totalImpressions: number;
+  /** Percentage (e.g., 4.2 for 4.2%). Do NOT multiply by 100. */
   avgCtr: number;
   avgPosition: number;
   topQueries: SearchQuery[];
@@ -37,6 +39,7 @@ export interface PerformanceTrend {
   date: string;
   clicks: number;
   impressions: number;
+  /** Percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
   ctr: number;
   position: number;
 }
@@ -78,7 +81,9 @@ export interface GA4Overview {
   totalSessions: number;
   totalPageviews: number;
   avgSessionDuration: number;
+  /** Percentage (e.g., 45.2 for 45.2%). */
   bounceRate: number;
+  /** Percentage (e.g., 68.5 for 68.5%). */
   newUserPercentage: number;
   dateRange: { start: string; end: string };
 }

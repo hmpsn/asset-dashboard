@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { SeoAuditResult } from './seo-audit.js';
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';
@@ -98,9 +99,9 @@ function rowToSnapshot(row: SnapshotRow): AuditSnapshot {
     siteId: row.site_id,
     siteName: row.site_name,
     createdAt: row.created_at,
-    audit: JSON.parse(row.audit),
+    audit: parseJsonFallback<SeoAuditResult>(row.audit, { siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [] } as SeoAuditResult),
     logoUrl: row.logo_url ?? undefined,
-    actionItems: row.action_items ? JSON.parse(row.action_items) : [],
+    actionItems: row.action_items ? parseJsonFallback(row.action_items, []) : [],
     previousScore: row.previous_score ?? undefined,
   };
 }
@@ -303,7 +304,7 @@ export function getSnapshot(id: string): AuditSnapshot | null {
 export function listSnapshots(siteId: string): SnapshotSummary[] {
   const rows = listSnapshotsStmt().all(siteId) as SnapshotRow[];
   return rows.map(row => {
-    const audit = JSON.parse(row.audit);
+    const audit = parseJsonFallback<SeoAuditResult>(row.audit, { siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [] } as SeoAuditResult);
     return {
       id: row.id,
       createdAt: row.created_at,

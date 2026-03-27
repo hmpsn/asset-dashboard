@@ -610,7 +610,7 @@
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2h",
           "priority": "P2",
-          "notes": "Shipped — Analytics Hub redesign. InsightCards prominent on Overview tab, queries/pages tables in Search Performance detail tab, annotations as timeline markers on chart + CRUD section. Replaced separate SearchConsole + GoogleAnalytics pages with unified AnalyticsHub.",
+          "notes": "Shipped \u2014 Analytics Hub redesign. InsightCards prominent on Overview tab, queries/pages tables in Search Performance detail tab, annotations as timeline markers on chart + CRUD section. Replaced separate SearchConsole + GoogleAnalytics pages with unified AnalyticsHub.",
           "status": "done",
           "shippedAt": "2026-03"
         }
@@ -1038,7 +1038,7 @@
         },
         {
           "id": 522,
-          "title": "Typed data contracts audit — replace Record<string, unknown> across codebase",
+          "title": "Typed data contracts audit \u2014 replace Record<string, unknown> across codebase",
           "source": "Connected Intelligence PR review",
           "est": "3-4h",
           "priority": "P2",
@@ -2667,47 +2667,47 @@
         {
           "title": "Phase 3A: Title/Meta A/B variants in content briefs (3 options each)",
           "status": "done",
-          "notes": "Shipped — AI prompt generates 3 title + 3 meta variants. DB migration 027-brief-variants.sql. Variant picker in BriefDetail with swap-to-primary UX. Feature #175."
+          "notes": "Shipped \u2014 AI prompt generates 3 title + 3 meta variants. DB migration 027-brief-variants.sql. Variant picker in BriefDetail with swap-to-primary UX. Feature #175."
         },
         {
           "title": "Phase 3B: Outline-only regeneration with optional feedback",
           "status": "done",
-          "notes": "Shipped — regenerateOutline() + POST endpoint. Teal button in BriefDetail with optional feedback textarea. Preserves all other brief fields. Feature #176."
+          "notes": "Shipped \u2014 regenerateOutline() + POST endpoint. Teal button in BriefDetail with optional feedback textarea. Preserves all other brief fields. Feature #176."
         },
         {
           "title": "Phase 3C: Brand voice scoring on generated content posts",
           "status": "done",
-          "notes": "Shipped — scoreVoiceMatch() evaluates 4 dimensions via GPT-4.1. DB migration 028-post-voice-score.sql. MetricRing + Score Voice button in ContentManager. Expandable feedback panel. Feature #177."
+          "notes": "Shipped \u2014 scoreVoiceMatch() evaluates 4 dimensions via GPT-4.1. DB migration 028-post-voice-score.sql. MetricRing + Score Voice button in ContentManager. Expandable feedback panel. Feature #177."
         },
         {
           "title": "Phase 4A: Client keyword submission to strategy",
           "status": "done",
-          "notes": "Shipped — 'requested' status in keyword_feedback. Migration 029. getRequestedKeywords() + AI prompt injection. Client UI: Suggest a Keyword section in StrategyTab. Feature #178."
+          "notes": "Shipped \u2014 'requested' status in keyword_feedback. Migration 029. getRequestedKeywords() + AI prompt injection. Client UI: Suggest a Keyword section in StrategyTab. Feature #178."
         },
         {
           "title": "Phase 4B: SERP feature targeting in keyword strategy",
           "status": "done",
-          "notes": "Shipped — serpTargeting recommendations generated per content gap with SERP features. Displayed as yellow guidance text in ContentGaps component. Feature #179."
+          "notes": "Shipped \u2014 serpTargeting recommendations generated per content gap with SERP features. Displayed as yellow guidance text in ContentGaps component. Feature #179."
         },
         {
-          "title": "Phase 4C: Strategy diff — What Changed between runs",
+          "title": "Phase 4C: Strategy diff \u2014 What Changed between runs",
           "status": "done",
-          "notes": "Shipped — strategy_history table (migration 030, keeps last 5). Diff endpoint. StrategyDiff component shows new/lost keywords, new/resolved gaps, keyword reassignments. Feature #180."
+          "notes": "Shipped \u2014 strategy_history table (migration 030, keeps last 5). Diff endpoint. StrategyDiff component shows new/lost keywords, new/resolved gaps, keyword reassignments. Feature #180."
         },
         {
           "title": "Phase 4D: Prioritized quick wins by ROI score",
           "status": "done",
-          "notes": "Shipped — ROI score = (volume*(1-difficulty/100))/position. Blue ROI badge in QuickWins. Sorted by score descending. Feature #181."
+          "notes": "Shipped \u2014 ROI score = (volume*(1-difficulty/100))/position. Blue ROI badge in QuickWins. Sorted by score descending. Feature #181."
         },
         {
           "title": "Phase 5: DataForSEO migration + provider toggle in Command Center",
           "status": "done",
-          "notes": "Shipped — SeoDataProvider interface (9 methods) + registry with preferred/fallback. SemrushProvider (zero behavior change). DataForSeoProvider with Basic auth, file cache, credit tracking, circuit breaker. Migration 031. Per-workspace provider toggle in KeywordStrategy settings. Strategy generator + AI usage wired through abstraction. Feature #182."
+          "notes": "Shipped \u2014 SeoDataProvider interface (9 methods) + registry with preferred/fallback. SemrushProvider (zero behavior change). DataForSeoProvider with Basic auth, file cache, credit tracking, circuit breaker. Migration 031. Per-workspace provider toggle in KeywordStrategy settings. Strategy generator + AI usage wired through abstraction. Feature #182."
         },
         {
-          "title": "Phase 6: CMS Image Optimization — compress + alt text + RichText repair",
+          "title": "Phase 6: CMS Image Optimization \u2014 compress + alt text + RichText repair",
           "status": "done",
-          "notes": "Shipped — GET /api/webflow/cms-images/:siteId scans all collections for Image, MultiImage, and RichText fields. Per-asset usage map with collection + field metadata. Compress endpoint now accepts cmsUsages[] and calls repairCmsReferences() before deleting old asset: Image fields (fileId/url swap), MultiImage (array entry swap), RichText (HTML string URL replacement). Auto-publishes updated CMS items. CmsFieldSelector UI with smart defaults (meta/OG fields unchecked, content fields checked). cms-images and cms-missing-alt filter types in AssetBrowser. Blue CMS badge on AssetCard showing collection → field name. selectedCmsFields state gates both filter and bulk operations. Feature #183."
+          "notes": "Shipped \u2014 GET /api/webflow/cms-images/:siteId scans all collections for Image, MultiImage, and RichText fields. Per-asset usage map with collection + field metadata. Compress endpoint now accepts cmsUsages[] and calls repairCmsReferences() before deleting old asset: Image fields (fileId/url swap), MultiImage (array entry swap), RichText (HTML string URL replacement). Auto-publishes updated CMS items. CmsFieldSelector UI with smart defaults (meta/OG fields unchecked, content fields checked). cms-images and cms-missing-alt filter types in AssetBrowser. Blue CMS badge on AssetCard showing collection \u2192 field name. selectedCmsFields state gates both filter and bulk operations. Feature #183."
         }
       ]
     },
@@ -3554,6 +3554,24 @@
           "status": "pending"
         },
         {
+          "id": 523,
+          "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
+          "source": "TECH DEBT",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "Three deferred items from typed-contracts PR (#87) code review: (1) work-orders.ts has bare JSON.parse calls not migrated in the PR \u2014 add parseJsonFallback or parseJsonSafeArray. (2) recommendations.ts and reports.ts use parseJsonFallback for high-value recommendation/summary data \u2014 add Zod schemas (RecommendationSchema, SummarySchema) and switch to parseJsonSafe with typed fallback. (3) pageKeywordMapSchema missing ~16 optional fields from PageKeywordMap interface \u2014 harmless due to .passthrough() but represents schema drift; add optional fields to keep schema in sync for future required-field additions.",
+          "status": "pending"
+        },
+        {
+          "id": 524,
+          "title": "Process: pre-implementation guardrail generation for multi-phase features",
+          "source": "PROCESS",
+          "est": "ongoing",
+          "priority": "P1",
+          "notes": "Before starting any multi-phase or cross-system feature: (1) analyze spec for error-prone patterns, (2) write CLAUDE.md rules for reusable patterns, (3) create .windsurf/rules/<feature>.md for feature-specific contracts, (4) embed per-phase acceptance checklists in the implementation plan. Rule added to CLAUDE.md Session Protocol step 5. Reference: typed-contracts PR where schema-vs-stored-shape, field-name-mismatch, and || undefined bugs were all caught in review rather than prevented upfront.",
+          "status": "done"
+        },
+        {
           "id": 362,
           "title": "Page analysis race condition + performance fixes",
           "source": "BUG FIX",
@@ -3594,31 +3612,31 @@
         },
         {
           "id": 384,
-          "title": "Analytics Intelligence Layer — Phase 2 (AI Engine Enrichment)",
+          "title": "Analytics Intelligence Layer \u2014 Phase 2 (AI Engine Enrichment)",
           "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
           "est": "4h",
           "priority": "P1",
-          "notes": "Shipped — Phase 2A: Schema pipeline enrichment — added _pageHealthScore, _pageHealthTrend, _quickWinStatus, _faqOpportunities to SchemaContext; buildSchemaIntelligenceBlock() + extractFaqOpportunities() in schema-suggester.ts; buildSchemaContext() in helpers.ts extended with queryPageData + insightsMap from intelligence layer; all 3 callers updated. Phase 2B: Content brief enrichment — buildBriefIntelligenceBlock() injects cannibalization warnings, decay context, quick wins, page health into generateBrief() prompt. Phase 2C: Chat advisor — added 'insights' context category with pattern matching; buildInsightsContext() formats health scores, quick wins, decay, cannibalization for chat prompt. 36 new TDD tests across 3 files.",
+          "notes": "Shipped \u2014 Phase 2A: Schema pipeline enrichment \u2014 added _pageHealthScore, _pageHealthTrend, _quickWinStatus, _faqOpportunities to SchemaContext; buildSchemaIntelligenceBlock() + extractFaqOpportunities() in schema-suggester.ts; buildSchemaContext() in helpers.ts extended with queryPageData + insightsMap from intelligence layer; all 3 callers updated. Phase 2B: Content brief enrichment \u2014 buildBriefIntelligenceBlock() injects cannibalization warnings, decay context, quick wins, page health into generateBrief() prompt. Phase 2C: Chat advisor \u2014 added 'insights' context category with pattern matching; buildInsightsContext() formats health scores, quick wins, decay, cannibalization for chat prompt. 36 new TDD tests across 3 files.",
           "status": "done",
           "shippedAt": "2026-03-26"
         },
         {
           "id": 385,
-          "title": "Analytics Intelligence Layer — Phase 3 (Advanced Intelligence)",
+          "title": "Analytics Intelligence Layer \u2014 Phase 3 (Advanced Intelligence)",
           "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
           "est": "3h",
           "priority": "P1",
-          "notes": "Shipped — 3 advanced algorithms: (1) Keyword clustering via Union-Find with word Jaccard similarity + page co-occurrence, pillar page detection. (2) Competitor gap analysis via SeoDataProvider abstraction (SEMRush + DataForSEO), auto-discovery, volume/difficulty scoring. (3) Conversion attribution from GA4 organic landing pages with conversion rate computation. All wired into computeAndPersistInsights() orchestrator + buildInsightsContext() chat advisor. 20 new TDD tests.",
+          "notes": "Shipped \u2014 3 advanced algorithms: (1) Keyword clustering via Union-Find with word Jaccard similarity + page co-occurrence, pillar page detection. (2) Competitor gap analysis via SeoDataProvider abstraction (SEMRush + DataForSEO), auto-discovery, volume/difficulty scoring. (3) Conversion attribution from GA4 organic landing pages with conversion rate computation. All wired into computeAndPersistInsights() orchestrator + buildInsightsContext() chat advisor. 20 new TDD tests.",
           "status": "done",
           "shippedAt": "2026-03-26"
         },
         {
           "id": 386,
-          "title": "Analytics Intelligence Layer — Phase 4 (Strategy Engine + Client Polish)",
+          "title": "Analytics Intelligence Layer \u2014 Phase 4 (Strategy Engine + Client Polish)",
           "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
           "est": "5h",
           "priority": "P1",
-          "notes": "Shipped — 5 sub-tasks: (1) Strategy enrichment — buildStrategyIntelligenceBlock() injects keyword clusters, competitor gaps, performance deltas, conversion data into master prompt. (2) 2 new insight cards — Schema Opportunities + Content Health with tier-gating. (3) Analytics annotations — SQLite table + CRUD + admin/public routes (4 categories). (4) Content calendar intelligence — suggestPublishDates() from decay + quick wins. (5) GSC pagination — paginateGscQuery() helper, getQueryPageData upgraded to 2000 rows. 35 new TDD tests.",
+          "notes": "Shipped \u2014 5 sub-tasks: (1) Strategy enrichment \u2014 buildStrategyIntelligenceBlock() injects keyword clusters, competitor gaps, performance deltas, conversion data into master prompt. (2) 2 new insight cards \u2014 Schema Opportunities + Content Health with tier-gating. (3) Analytics annotations \u2014 SQLite table + CRUD + admin/public routes (4 categories). (4) Content calendar intelligence \u2014 suggestPublishDates() from decay + quick wins. (5) GSC pagination \u2014 paginateGscQuery() helper, getQueryPageData upgraded to 2000 rows. 35 new TDD tests.",
           "status": "done",
           "shippedAt": "2026-03-26"
         }
