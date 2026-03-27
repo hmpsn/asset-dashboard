@@ -6,8 +6,8 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
-import { parseJsonSafe } from './db/json-validation.js';
-import { postSectionsArraySchema, reviewChecklistSchema } from './schemas/content-schemas.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { postSectionSchema, reviewChecklistSchema } from './schemas/content-schemas.js';
 
 const log = createLogger('content-posts-db');
 
@@ -115,7 +115,7 @@ function rowToVersion(row: VersionRow): PostVersion {
     title: row.title,
     metaDescription: row.meta_description,
     introduction: row.introduction,
-    sections: parseJsonSafe(row.sections, postSectionsArraySchema, [], { field: 'sections', table: 'content_post_versions' }),
+    sections: parseJsonSafeArray(row.sections, postSectionSchema, { field: 'sections', table: 'content_post_versions' }),
     conclusion: row.conclusion,
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,
@@ -176,7 +176,7 @@ function rowToPost(row: PostRow): GeneratedPost {
     title: row.title,
     metaDescription: row.meta_description,
     introduction: row.introduction,
-    sections: parseJsonSafe(row.sections, postSectionsArraySchema, [], { field: 'sections', table: 'content_posts' }),
+    sections: parseJsonSafeArray(row.sections, postSectionSchema, { field: 'sections', table: 'content_posts' }),
     conclusion: row.conclusion,
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,

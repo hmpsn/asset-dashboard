@@ -435,15 +435,19 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (session.metadata?.cartItems) {
         const cartItems = parseJsonSafe(session.metadata.cartItems, cartItemsArraySchema, [], { workspaceId, field: 'cartItems', table: 'stripe_session' });
         for (const item of cartItems) {
-          if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
-            createWorkOrder(workspaceId, {
-              paymentId: payment?.id || session.id,
-              productType: item.productType as ProductType,
-              status: 'pending',
-              pageIds: item.pageIds || [],
-              issueChecks: item.issueChecks,
-              quantity: item.quantity || 1,
-            });
+          try {
+            if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
+              createWorkOrder(workspaceId, {
+                paymentId: payment?.id || session.id,
+                productType: item.productType as ProductType,
+                status: 'pending',
+                pageIds: item.pageIds || [],
+                issueChecks: item.issueChecks,
+                quantity: item.quantity || 1,
+              });
+            }
+          } catch (err) {
+            log.error({ err, workspaceId, productType: item.productType }, 'Failed to create work order for cart item — skipping');
           }
         }
       }

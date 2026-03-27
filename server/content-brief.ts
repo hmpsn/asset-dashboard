@@ -10,7 +10,7 @@ import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthDat
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief } from '../shared/types/content.ts';
-import { parseJsonSafe, parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
   schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
@@ -181,35 +181,45 @@ function rowToBrief(row: BriefRow): ContentBrief {
     id: row.id,
     workspaceId: row.workspace_id,
     targetKeyword: row.target_keyword,
-    secondaryKeywords: parseJsonSafe(row.secondary_keywords, z.array(z.string()), [], { field: 'secondary_keywords', table: 'content_briefs' }),
+    secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { field: 'secondary_keywords', table: 'content_briefs' }),
     suggestedTitle: row.suggested_title,
     suggestedMetaDesc: row.suggested_meta_desc,
-    outline: parseJsonSafe(row.outline, z.array(outlineItemSchema), [], { field: 'outline', table: 'content_briefs' }),
+    outline: parseJsonSafeArray(row.outline, outlineItemSchema, { field: 'outline', table: 'content_briefs' }),
     wordCountTarget: row.word_count_target,
     intent: row.intent,
     audience: row.audience,
     competitorInsights: row.competitor_insights,
-    internalLinkSuggestions: parseJsonSafe(row.internal_link_suggestions, z.array(z.string()), [], { field: 'internal_link_suggestions', table: 'content_briefs' }),
+    internalLinkSuggestions: parseJsonSafeArray(row.internal_link_suggestions, z.string(), { field: 'internal_link_suggestions', table: 'content_briefs' }),
     createdAt: row.created_at,
     executiveSummary: row.executive_summary ?? undefined,
     contentFormat: row.content_format ?? undefined,
     toneAndStyle: row.tone_and_style ?? undefined,
     peopleAlsoAsk: row.people_also_ask ? parseJsonFallback<string[]>(row.people_also_ask, []) : undefined,
     topicalEntities: row.topical_entities ? parseJsonFallback<string[]>(row.topical_entities, []) : undefined,
-    serpAnalysis: row.serp_analysis ? parseJsonSafe(row.serp_analysis, serpAnalysisSchema, null, { field: 'serp_analysis', table: 'content_briefs' }) ?? undefined : undefined,
+    serpAnalysis: row.serp_analysis
+      ? parseJsonSafe(row.serp_analysis, serpAnalysisSchema, null, { field: 'serp_analysis', table: 'content_briefs' }) ?? undefined
+      : undefined,
     difficultyScore: row.difficulty_score ?? undefined,
     trafficPotential: row.traffic_potential ?? undefined,
     ctaRecommendations: row.cta_recommendations ? parseJsonFallback<string[]>(row.cta_recommendations, []) : undefined,
-    eeatGuidance: row.eeat_guidance ? parseJsonSafe(row.eeat_guidance, eeatGuidanceSchema, null, { field: 'eeat_guidance', table: 'content_briefs' }) ?? undefined : undefined,
+    eeatGuidance: row.eeat_guidance
+      ? parseJsonSafe(row.eeat_guidance, eeatGuidanceSchema, null, { field: 'eeat_guidance', table: 'content_briefs' }) ?? undefined
+      : undefined,
     contentChecklist: row.content_checklist ? parseJsonFallback<string[]>(row.content_checklist, []) : undefined,
-    schemaRecommendations: row.schema_recommendations ? parseJsonSafe(row.schema_recommendations, z.array(schemaRecommendationSchema), [], { field: 'schema_recommendations', table: 'content_briefs' }) : undefined,
+    schemaRecommendations: row.schema_recommendations
+      ? parseJsonSafeArray(row.schema_recommendations, schemaRecommendationSchema, { field: 'schema_recommendations', table: 'content_briefs' })
+      : undefined,
     pageType: row.page_type as ContentBrief['pageType'] ?? undefined,
     referenceUrls: row.reference_urls ? parseJsonFallback<string[]>(row.reference_urls, []) : undefined,
     realPeopleAlsoAsk: row.real_people_also_ask ? parseJsonFallback<string[]>(row.real_people_also_ask, []) : undefined,
-    realTopResults: row.real_top_results ? parseJsonSafe(row.real_top_results, z.array(realTopResultSchema), [], { field: 'real_top_results', table: 'content_briefs' }) : undefined,
+    realTopResults: row.real_top_results
+      ? parseJsonSafeArray(row.real_top_results, realTopResultSchema, { field: 'real_top_results', table: 'content_briefs' })
+      : undefined,
     keywordLocked: row.keyword_locked ? true : undefined,
     keywordSource: (row.keyword_source as ContentBrief['keywordSource']) ?? undefined,
-    keywordValidation: row.keyword_validation ? parseJsonSafe(row.keyword_validation, keywordValidationSchema, null, { field: 'keyword_validation', table: 'content_briefs' }) ?? undefined : undefined,
+    keywordValidation: row.keyword_validation
+      ? parseJsonSafe(row.keyword_validation, keywordValidationSchema, null, { field: 'keyword_validation', table: 'content_briefs' }) ?? undefined
+      : undefined,
     templateId: row.template_id ?? undefined,
     titleVariants: row.title_variants ? parseJsonFallback<string[]>(row.title_variants, []) : undefined,
     metaDescVariants: row.meta_desc_variants ? parseJsonFallback<string[]>(row.meta_desc_variants, []) : undefined,
