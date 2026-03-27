@@ -54,6 +54,7 @@ export const queryKeys = {
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
     analyticsAnnotations: (wsId: string) => ['analytics-annotations', wsId] as const,
+    insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
