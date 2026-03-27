@@ -94,10 +94,10 @@ export const publishTargetSchema = z.object({
   fieldMap: z.object({
     title: z.string(),
     slug: z.string(),
-    content: z.string(),
+    body: z.string(),
     metaTitle: z.string().optional(),
     metaDescription: z.string().optional(),
-    excerpt: z.string().optional(),
+    summary: z.string().optional(),
     author: z.string().optional(),
     category: z.string().optional(),
     featuredImage: z.string().optional(),
