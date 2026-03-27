@@ -82,6 +82,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
               value={overview.gscPosition.toFixed(1)}
               delta={overview.gscPositionDelta ?? undefined}
               deltaLabel="%"
+              invertDelta
               icon={ArrowUpDown}
               iconColor="#fbbf24"
               sub="GSC"
@@ -113,6 +114,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
               value={`${overview.ga4BounceRate.toFixed(1)}%`}
               delta={overview.ga4BounceRateDelta ?? undefined}
               deltaLabel="%"
+              invertDelta
               icon={TrendingDown}
               iconColor="#ef4444"
               sub="GA4"
