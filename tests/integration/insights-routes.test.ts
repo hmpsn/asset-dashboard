@@ -65,6 +65,7 @@ describe('GET /api/public/insights/:workspaceId', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
     expect(body.every((i: { insightType: string }) => i.insightType === 'ranking_opportunity')).toBe(true);
   });
 

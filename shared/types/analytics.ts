@@ -1,9 +1,16 @@
 // ── Analytics domain types (Search Console + GA4) ───────────────
+//
+// UNIT CONVENTION: All `ctr` fields in GSC types are PERCENTAGES (e.g., 6.3 for 6.3%).
+// The raw GSC API returns decimals (0.063), but server/search-console.ts converts via
+// `+(r.ctr * 100).toFixed(1)` at the API boundary. Do NOT multiply by 100 again.
+//
+// All `bounceRate`, `engagementRate`, `conversionRate` fields are also PERCENTAGES.
 
 export interface SearchQuery {
   query: string;
   clicks: number;
   impressions: number;
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
   ctr: number;
   position: number;
 }
