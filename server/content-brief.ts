@@ -10,7 +10,7 @@ import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthDat
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief } from '../shared/types/content.ts';
-import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
   schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
@@ -194,24 +194,24 @@ function rowToBrief(row: BriefRow): ContentBrief {
     executiveSummary: row.executive_summary ?? undefined,
     contentFormat: row.content_format ?? undefined,
     toneAndStyle: row.tone_and_style ?? undefined,
-    peopleAlsoAsk: row.people_also_ask ? parseJsonFallback<string[]>(row.people_also_ask, []) : undefined,
-    topicalEntities: row.topical_entities ? parseJsonFallback<string[]>(row.topical_entities, []) : undefined,
+    peopleAlsoAsk: row.people_also_ask ? parseJsonSafeArray(row.people_also_ask, z.string(), { field: 'people_also_ask', table: 'content_briefs' }) : undefined,
+    topicalEntities: row.topical_entities ? parseJsonSafeArray(row.topical_entities, z.string(), { field: 'topical_entities', table: 'content_briefs' }) : undefined,
     serpAnalysis: row.serp_analysis
       ? parseJsonSafe(row.serp_analysis, serpAnalysisSchema, null, { field: 'serp_analysis', table: 'content_briefs' }) ?? undefined
       : undefined,
     difficultyScore: row.difficulty_score ?? undefined,
     trafficPotential: row.traffic_potential ?? undefined,
-    ctaRecommendations: row.cta_recommendations ? parseJsonFallback<string[]>(row.cta_recommendations, []) : undefined,
+    ctaRecommendations: row.cta_recommendations ? parseJsonSafeArray(row.cta_recommendations, z.string(), { field: 'cta_recommendations', table: 'content_briefs' }) : undefined,
     eeatGuidance: row.eeat_guidance
       ? parseJsonSafe(row.eeat_guidance, eeatGuidanceSchema, null, { field: 'eeat_guidance', table: 'content_briefs' }) ?? undefined
       : undefined,
-    contentChecklist: row.content_checklist ? parseJsonFallback<string[]>(row.content_checklist, []) : undefined,
+    contentChecklist: row.content_checklist ? parseJsonSafeArray(row.content_checklist, z.string(), { field: 'content_checklist', table: 'content_briefs' }) : undefined,
     schemaRecommendations: row.schema_recommendations
       ? parseJsonSafeArray(row.schema_recommendations, schemaRecommendationSchema, { field: 'schema_recommendations', table: 'content_briefs' })
       : undefined,
     pageType: row.page_type as ContentBrief['pageType'] ?? undefined,
-    referenceUrls: row.reference_urls ? parseJsonFallback<string[]>(row.reference_urls, []) : undefined,
-    realPeopleAlsoAsk: row.real_people_also_ask ? parseJsonFallback<string[]>(row.real_people_also_ask, []) : undefined,
+    referenceUrls: row.reference_urls ? parseJsonSafeArray(row.reference_urls, z.string(), { field: 'reference_urls', table: 'content_briefs' }) : undefined,
+    realPeopleAlsoAsk: row.real_people_also_ask ? parseJsonSafeArray(row.real_people_also_ask, z.string(), { field: 'real_people_also_ask', table: 'content_briefs' }) : undefined,
     realTopResults: row.real_top_results
       ? parseJsonSafeArray(row.real_top_results, realTopResultSchema, { field: 'real_top_results', table: 'content_briefs' })
       : undefined,
@@ -221,8 +221,8 @@ function rowToBrief(row: BriefRow): ContentBrief {
       ? parseJsonSafe(row.keyword_validation, keywordValidationSchema, null, { field: 'keyword_validation', table: 'content_briefs' }) ?? undefined
       : undefined,
     templateId: row.template_id ?? undefined,
-    titleVariants: row.title_variants ? parseJsonFallback<string[]>(row.title_variants, []) : undefined,
-    metaDescVariants: row.meta_desc_variants ? parseJsonFallback<string[]>(row.meta_desc_variants, []) : undefined,
+    titleVariants: row.title_variants ? parseJsonSafeArray(row.title_variants, z.string(), { field: 'title_variants', table: 'content_briefs' }) : undefined,
+    metaDescVariants: row.meta_desc_variants ? parseJsonSafeArray(row.meta_desc_variants, z.string(), { field: 'meta_desc_variants', table: 'content_briefs' }) : undefined,
   };
 }
 

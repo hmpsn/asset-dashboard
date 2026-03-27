@@ -7,8 +7,8 @@ import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 import { createLogger } from './logger.js';
-import { parseJsonSafe } from './db/json-validation.js';
-import { cartItemsArraySchema, stringArraySchema } from './schemas/payment-schemas.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { cartItemSchema, stringArraySchema } from './schemas/payment-schemas.js';
 import {
   createContentSubscription, getContentSubscriptionByStripeId,
   updateContentSubscription, resetPeriod,
@@ -433,7 +433,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 
       // Handle cart checkouts (multiple line items)
       if (session.metadata?.cartItems) {
-        const cartItems = parseJsonSafe(session.metadata.cartItems, cartItemsArraySchema, [], { workspaceId, field: 'cartItems', table: 'stripe_session' });
+        const cartItems = parseJsonSafeArray(session.metadata.cartItems, cartItemSchema, { workspaceId, field: 'cartItems', table: 'stripe_session' });
         for (const item of cartItems) {
           try {
             if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
-import { parseJsonSafe, parseJsonFallback } from '../../server/db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from '../../server/db/json-validation.js';
 
 // Mock the logger to verify warnings
 vi.mock('../../server/logger.js', () => ({
@@ -90,6 +90,74 @@ describe('parseJsonSafe', () => {
     const raw = JSON.stringify([{ id: 123 }]); // id should be string
     const result = parseJsonSafe(raw, arraySchema, []);
     expect(result).toEqual([]);
+  });
+});
+
+describe('parseJsonSafeArray', () => {
+  const itemSchema = z.object({ id: z.string(), score: z.number() });
+
+  it('returns all items when every item passes validation', () => {
+    const data = [{ id: 'a', score: 90 }, { id: 'b', score: 75 }];
+    const result = parseJsonSafeArray(JSON.stringify(data), itemSchema);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('a');
+    expect(result[1].score).toBe(75);
+  });
+
+  it('filters bad items and keeps good ones (per-item validation)', () => {
+    const data = [{ id: 'good', score: 85 }, { id: 'bad', score: 'not-a-number' }];
+    const result = parseJsonSafeArray(JSON.stringify(data), itemSchema);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('good');
+  });
+
+  it('returns empty array when all items fail validation', () => {
+    const data = [{ id: 123, score: 'wrong' }, { score: 99 }]; // both invalid
+    const result = parseJsonSafeArray(JSON.stringify(data), itemSchema);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array for valid JSON that is not an array (object)', () => {
+    const result = parseJsonSafeArray(JSON.stringify({ id: 'a', score: 1 }), itemSchema);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array for valid JSON that is not an array (primitive)', () => {
+    expect(parseJsonSafeArray('"just a string"', itemSchema)).toEqual([]);
+    expect(parseJsonSafeArray('42', itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for malformed JSON', () => {
+    expect(parseJsonSafeArray('{bad json', itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for null input', () => {
+    expect(parseJsonSafeArray(null, itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for undefined input', () => {
+    expect(parseJsonSafeArray(undefined, itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for empty string', () => {
+    expect(parseJsonSafeArray('', itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for valid empty array input', () => {
+    expect(parseJsonSafeArray('[]', itemSchema)).toEqual([]);
+  });
+
+  it('works with simple scalar schemas (z.string())', () => {
+    const data = ['apple', 'banana', 42, null, 'cherry'];
+    const result = parseJsonSafeArray(JSON.stringify(data), z.string());
+    expect(result).toEqual(['apple', 'banana', 'cherry']);
+  });
+
+  it('passes context to logger when items are dropped (does not throw)', () => {
+    const data = [{ id: 'ok', score: 1 }, { id: 99, score: 'bad' }];
+    expect(() =>
+      parseJsonSafeArray(JSON.stringify(data), itemSchema, { workspaceId: 'ws-1', field: 'test_field', table: 'test_table' })
+    ).not.toThrow();
   });
 });
 

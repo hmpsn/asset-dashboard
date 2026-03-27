@@ -65,6 +65,10 @@ export const contentPricingSchema = z.object({
   briefPrice: z.number(),
   fullPostPrice: z.number(),
   currency: z.string(),
+  briefLabel: z.string().optional(),
+  fullPostLabel: z.string().optional(),
+  briefDescription: z.string().optional(),
+  fullPostDescription: z.string().optional(),
 }).passthrough();
 
 // ── Portal contacts ──
@@ -104,6 +108,7 @@ export const publishTargetSchema = z.object({
     author: z.string().optional(),
     category: z.string().optional(),
     featuredImage: z.string().optional(),
+    publishDate: z.string().optional(),
   }).passthrough(),
 }).passthrough();
 
