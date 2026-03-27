@@ -840,9 +840,11 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           severity,
         });
       }
-      deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
       log.info({ workspaceId, count: decayAnalysis.decayingPages.length }, 'Loaded content decay insights from decay engine');
     }
+    // Always prune stale decay insights — even when the decay engine
+    // returns null/empty, old decay insights should be removed
+    deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
   }
 
   // Phase 3A: Keyword clustering

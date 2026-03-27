@@ -115,11 +115,21 @@ export function computeImpactScore(
 
   const base = severityWeights[severity] ?? 20;
 
+  // Check all common traffic field names across insight types:
+  // page_health/ranking_opportunity: clicks, impressions
+  // ranking_mover: currentClicks, impressions
+  // content_decay: currentClicks, baselineClicks
+  // cannibalization/keyword_cluster: totalImpressions
+  // conversion_attribution: sessions
   const traffic =
     (data.clicks as number | undefined) ??
+    (data.currentClicks as number | undefined) ??
     (data.impressions as number | undefined) ??
+    (data.totalImpressions as number | undefined) ??
     (data.users as number | undefined) ??
+    (data.sessions as number | undefined) ??
     (data.pageviews as number | undefined) ??
+    (data.baselineClicks as number | undefined) ??
     0;
 
   const bonus = Math.min(Math.log10(Math.max(traffic, 1)) * 10, 50);
