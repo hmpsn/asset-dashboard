@@ -188,6 +188,12 @@ export function SchemaPageCard({
             <option value="author">Author Profile</option>
             <option value="howto">How-To / Tutorial</option>
             <option value="video">Video Page</option>
+            <option value="job-posting">Job Posting</option>
+            <option value="course">Course / Training</option>
+            <option value="event">Event</option>
+            <option value="review">Review</option>
+            <option value="pricing">Pricing Page</option>
+            <option value="recipe">Recipe</option>
             <option value="generic">General Page</option>
           </select>
           <button

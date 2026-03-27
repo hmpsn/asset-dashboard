@@ -603,7 +603,10 @@ const schemaValidateBody = z.object({
 });
 
 const schemaConsistencyBody = z.object({
-  schemas: z.array(z.record(z.unknown())).min(1),
+  schemas: z.array(z.object({
+    pageId: z.string().min(1),
+    schema: z.record(z.unknown()),
+  })).min(1),
 });
 
 // Validate a single page schema against Google Rich Results rules
@@ -633,7 +636,7 @@ router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceAccessFromQu
 // Batch validate all schemas for entity consistency across a workspace
 router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceAccessFromQuery(), validate(schemaConsistencyBody), (req, res) => {
   try {
-    const { schemas } = req.body as { schemas: Record<string, unknown>[] };
+    const { schemas } = req.body as { schemas: Array<{ pageId: string; schema: Record<string, unknown> }> };
     const result = validateEntityConsistency(schemas);
     res.json(result);
   } catch (err) {

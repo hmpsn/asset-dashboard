@@ -257,7 +257,7 @@ async function generatePageSummary(title: string, description: string, pageUrl: 
       temperature: 0.3,
       feature: 'llms-txt-summary',
     });
-    return result.content.trim();
+    return result.text.trim();
   } catch (err) {
     log.warn({ err, pageUrl }, 'Failed to generate page summary');
     return description || '';
@@ -320,6 +320,7 @@ export function buildLlmsTxtIndex(input: IndexInput): string {
       planned: 'Planned', keyword_validated: 'Planned',
       brief_generated: 'Brief Ready', draft: 'In Draft',
       review: 'In Review', approved: 'Approved',
+      client_review: 'Client Review', in_progress: 'In Progress',
     };
 
     for (const p of plannedPages) {
@@ -508,14 +509,10 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     for (const r of activeRequests.slice(0, 30)) {
       const brief = r.briefId ? briefMap.get(r.briefId) : undefined;
       const title = brief?.suggestedTitle || r.topic || r.targetKeyword || 'Untitled';
-      const statusLabel: Record<string, string> = {
-        brief_generated: 'Brief Ready', client_review: 'Client Review',
-        approved: 'Approved', in_progress: 'In Progress',
-      };
       plannedPages.push({
         url: r.targetUrl || '#',
         keyword: title,
-        status: statusLabel[r.status] || r.status,
+        status: r.status,
       });
     }
   } catch { /* non-critical */ }
