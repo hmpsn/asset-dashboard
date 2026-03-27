@@ -1,0 +1,195 @@
+/**
+ * Unit tests for server/db/json-validation.ts — safe JSON parsing with Zod validation.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { z } from 'zod';
+import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from '../../server/db/json-validation.js';
+
+// Mock the logger to verify warnings
+vi.mock('../../server/logger.js', () => ({
+  createLogger: () => ({
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
+const testSchema = z.object({
+  name: z.string(),
+  score: z.number(),
+  tags: z.array(z.string()).optional(),
+});
+
+type TestData = z.infer<typeof testSchema>;
+const fallback: TestData = { name: '', score: 0 };
+
+describe('parseJsonSafe', () => {
+  it('returns parsed data for valid JSON matching schema', () => {
+    const raw = JSON.stringify({ name: 'page-a', score: 85, tags: ['seo'] });
+    const result = parseJsonSafe(raw, testSchema, fallback);
+    expect(result).toEqual({ name: 'page-a', score: 85, tags: ['seo'] });
+  });
+
+  it('returns fallback for null input', () => {
+    expect(parseJsonSafe(null, testSchema, fallback)).toBe(fallback);
+  });
+
+  it('returns fallback for undefined input', () => {
+    expect(parseJsonSafe(undefined, testSchema, fallback)).toBe(fallback);
+  });
+
+  it('returns fallback for empty string', () => {
+    expect(parseJsonSafe('', testSchema, fallback)).toBe(fallback);
+  });
+
+  it('returns fallback for malformed JSON', () => {
+    expect(parseJsonSafe('{not json', testSchema, fallback)).toBe(fallback);
+  });
+
+  it('returns fallback when schema validation fails (wrong type)', () => {
+    const raw = JSON.stringify({ name: 123, score: 'not-a-number' });
+    expect(parseJsonSafe(raw, testSchema, fallback)).toBe(fallback);
+  });
+
+  it('returns fallback when required field is missing', () => {
+    const raw = JSON.stringify({ name: 'page-a' }); // missing score
+    expect(parseJsonSafe(raw, testSchema, fallback)).toBe(fallback);
+  });
+
+  it('allows missing optional fields', () => {
+    const raw = JSON.stringify({ name: 'page-a', score: 72 }); // no tags
+    const result = parseJsonSafe(raw, testSchema, fallback);
+    expect(result).toEqual({ name: 'page-a', score: 72 });
+    expect(result.tags).toBeUndefined();
+  });
+
+  it('allows extra fields with passthrough schema', () => {
+    const passthroughSchema = testSchema.passthrough();
+    const raw = JSON.stringify({ name: 'page-a', score: 72, extra: true });
+    const result = parseJsonSafe(raw, passthroughSchema, fallback);
+    expect((result as any).extra).toBe(true);
+  });
+
+  it('strips extra fields with strict schema (default Zod behavior)', () => {
+    const raw = JSON.stringify({ name: 'page-a', score: 72, extra: true });
+    const result = parseJsonSafe(raw, testSchema, fallback);
+    expect(result).toEqual({ name: 'page-a', score: 72 });
+    expect((result as any).extra).toBeUndefined();
+  });
+
+  it('works with array schemas', () => {
+    const arraySchema = z.array(z.object({ id: z.string() }));
+    const raw = JSON.stringify([{ id: 'a' }, { id: 'b' }]);
+    const result = parseJsonSafe(raw, arraySchema, []);
+    expect(result).toEqual([{ id: 'a' }, { id: 'b' }]);
+  });
+
+  it('returns empty array fallback for malformed array data', () => {
+    const arraySchema = z.array(z.object({ id: z.string() }));
+    const raw = JSON.stringify([{ id: 123 }]); // id should be string
+    const result = parseJsonSafe(raw, arraySchema, []);
+    expect(result).toEqual([]);
+  });
+});
+
+describe('parseJsonSafeArray', () => {
+  const itemSchema = z.object({ id: z.string(), score: z.number() });
+
+  it('returns all items when every item passes validation', () => {
+    const data = [{ id: 'a', score: 90 }, { id: 'b', score: 75 }];
+    const result = parseJsonSafeArray(JSON.stringify(data), itemSchema);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('a');
+    expect(result[1].score).toBe(75);
+  });
+
+  it('filters bad items and keeps good ones (per-item validation)', () => {
+    const data = [{ id: 'good', score: 85 }, { id: 'bad', score: 'not-a-number' }];
+    const result = parseJsonSafeArray(JSON.stringify(data), itemSchema);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('good');
+  });
+
+  it('returns empty array when all items fail validation', () => {
+    const data = [{ id: 123, score: 'wrong' }, { score: 99 }]; // both invalid
+    const result = parseJsonSafeArray(JSON.stringify(data), itemSchema);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array for valid JSON that is not an array (object)', () => {
+    const result = parseJsonSafeArray(JSON.stringify({ id: 'a', score: 1 }), itemSchema);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array for valid JSON that is not an array (primitive)', () => {
+    expect(parseJsonSafeArray('"just a string"', itemSchema)).toEqual([]);
+    expect(parseJsonSafeArray('42', itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for malformed JSON', () => {
+    expect(parseJsonSafeArray('{bad json', itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for null input', () => {
+    expect(parseJsonSafeArray(null, itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for undefined input', () => {
+    expect(parseJsonSafeArray(undefined, itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for empty string', () => {
+    expect(parseJsonSafeArray('', itemSchema)).toEqual([]);
+  });
+
+  it('returns empty array for valid empty array input', () => {
+    expect(parseJsonSafeArray('[]', itemSchema)).toEqual([]);
+  });
+
+  it('works with simple scalar schemas (z.string())', () => {
+    const data = ['apple', 'banana', 42, null, 'cherry'];
+    const result = parseJsonSafeArray(JSON.stringify(data), z.string());
+    expect(result).toEqual(['apple', 'banana', 'cherry']);
+  });
+
+  it('passes context to logger when items are dropped (does not throw)', () => {
+    const data = [{ id: 'ok', score: 1 }, { id: 99, score: 'bad' }];
+    expect(() =>
+      parseJsonSafeArray(JSON.stringify(data), itemSchema, { workspaceId: 'ws-1', field: 'test_field', table: 'test_table' })
+    ).not.toThrow();
+  });
+});
+
+describe('parseJsonFallback', () => {
+  it('returns parsed data for valid JSON', () => {
+    const raw = JSON.stringify({ a: 1 });
+    expect(parseJsonFallback(raw, {})).toEqual({ a: 1 });
+  });
+
+  it('returns fallback for null', () => {
+    expect(parseJsonFallback(null, [])).toEqual([]);
+  });
+
+  it('returns fallback for undefined', () => {
+    expect(parseJsonFallback(undefined, {})).toEqual({});
+  });
+
+  it('returns fallback for empty string', () => {
+    expect(parseJsonFallback('', 42)).toBe(42);
+  });
+
+  it('returns fallback for malformed JSON', () => {
+    expect(parseJsonFallback('{bad', 'default')).toBe('default');
+  });
+
+  it('parses arrays', () => {
+    expect(parseJsonFallback('[1,2,3]', [])).toEqual([1, 2, 3]);
+  });
+
+  it('parses primitive JSON values', () => {
+    expect(parseJsonFallback('"hello"', '')).toBe('hello');
+    expect(parseJsonFallback('42', 0)).toBe(42);
+    expect(parseJsonFallback('true', false)).toBe(true);
+  });
+});

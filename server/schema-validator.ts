@@ -8,6 +8,7 @@
  */
 import db from './db/index.js';
 import { randomUUID } from 'crypto';
+import { parseJsonFallback } from './db/json-validation.js';
 
 // ── Types ──
 
@@ -96,9 +97,9 @@ function rowToValidation(row: ValidationRow) {
     id: row.id,
     pageId: row.page_id,
     status: row.status,
-    richResults: JSON.parse(row.rich_results || '[]'),
-    errors: JSON.parse(row.errors || '[]'),
-    warnings: JSON.parse(row.warnings || '[]'),
+    richResults: parseJsonFallback(row.rich_results, []),
+    errors: parseJsonFallback(row.errors, []),
+    warnings: parseJsonFallback(row.warnings, []),
     validatedAt: row.validated_at,
   };
 }

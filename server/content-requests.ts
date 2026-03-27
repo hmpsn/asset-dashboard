@@ -1,5 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 import type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
@@ -92,7 +93,7 @@ function rowToRequest(row: RequestRow): ContentTopicRequest {
     deliveryNotes: row.delivery_notes ?? undefined,
     targetPageId: row.target_page_id ?? undefined,
     targetPageSlug: row.target_page_slug ?? undefined,
-    comments: JSON.parse(row.comments),
+    comments: parseJsonFallback(row.comments, []),
     requestedAt: row.requested_at,
     updatedAt: row.updated_at,
   };
