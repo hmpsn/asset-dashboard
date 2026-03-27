@@ -52,7 +52,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
     <div className="space-y-6">
       {/* Date range selector */}
       <div className="flex justify-end">
-        <DateRangeSelector presets={DATE_PRESETS_SEARCH} value={days} onChange={setDays} />
+        <DateRangeSelector options={DATE_PRESETS_SEARCH} selected={days} onChange={setDays} />
       </div>
 
       {/* Headline metrics */}
