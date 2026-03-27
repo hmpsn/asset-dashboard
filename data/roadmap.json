@@ -610,8 +610,9 @@
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2h",
           "priority": "P2",
-          "notes": "Lead with 'What's working' insight cards (top movers, quick wins). Data tables move to collapsible 'Detailed Breakdown' section. Annotations become timeline view not separate tab. CTR opportunities prioritized above raw query lists. Default view shows 10 rows with 'Show more' not infinite scroll.",
-          "status": "pending"
+          "notes": "Shipped — Analytics Hub redesign. InsightCards prominent on Overview tab, queries/pages tables in Search Performance detail tab, annotations as timeline markers on chart + CRUD section. Replaced separate SearchConsole + GoogleAnalytics pages with unified AnalyticsHub.",
+          "status": "done",
+          "shippedAt": "2026-03"
         }
       ]
     },
