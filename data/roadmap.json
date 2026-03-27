@@ -3554,6 +3554,15 @@
           "status": "pending"
         },
         {
+          "id": 525,
+          "title": "Process: generate feature-specific guardrails before implementation begins",
+          "source": "INTERNAL",
+          "est": "0h",
+          "priority": "P0",
+          "notes": "Already added to CLAUDE.md Session Protocol rule 5. For any multi-phase or cross-system feature, generate: (a) CLAUDE.md rules for reusable patterns, (b) .windsurf/rules/<feature>.md reference doc, (c) per-phase acceptance checklists in the plan. First applied on Connected Intelligence Engine Phases 2-3. This is a process rule, not a task \u2014 marking as done.",
+          "status": "done"
+        },
+        {
           "id": 524,
           "title": "Process: pre-implementation guardrail generation for multi-phase features",
           "source": "PROCESS",

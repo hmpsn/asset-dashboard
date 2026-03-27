@@ -7,7 +7,7 @@
 
 ## 1. New Insight Type Registration Checklist
 
-Adding a new `InsightType` value **requires all four of these in the same commit**. TypeScript will
+Adding a new `InsightType` value **requires all eight of these**. TypeScript will
 catch a missing `InsightType` union entry, but will NOT catch a missing `InsightDataMap` entry,
 missing Zod schema, or missing frontend renderer — those fail silently at runtime.
 
@@ -17,7 +17,16 @@ missing Zod schema, or missing frontend renderer — those fail silently at runt
   — **never leave as `Record<string, unknown>`** — that defeats the discriminated union
 - [ ] Add Zod schema `xDataSchema` in `server/schemas/content-schemas.ts` (or a new
   `server/schemas/insight-schemas.ts`) matching the interface field-for-field
+- [ ] Add computation function in `server/analytics-intelligence.ts`
+- [ ] Add domain classification in `server/insight-enrichment.ts` → `classifyDomain()`
+- [ ] Add impact score formula in `server/insight-enrichment.ts` → `computeImpactScore()`
 - [ ] Add renderer case in `InsightFeedItem` (or equivalent frontend component)
+
+**Verification after adding a new type:**
+```bash
+grep -rn "YOUR_NEW_TYPE" shared/types/ server/ src/
+```
+Expect hits in all 8 locations.
 
 **Current types and their data interfaces:**
 
@@ -34,7 +43,7 @@ missing Zod schema, or missing frontend renderer — those fail silently at runt
 | `ctr_opportunity` | `CtrOpportunityData` | needs schema | Phase 1 |
 | `serp_opportunity` | `SerpOpportunityData` | needs schema | Phase 1 |
 | `strategy_alignment` | ⚠️ `Record<string,unknown>` — needs typed interface | needs schema | Phase 1 |
-| `anomaly_digest` | ⚠️ `Record<string,unknown>` — needs typed interface | needs schema | Phase 2 |
+| `anomaly_digest` | `AnomalyDigestData` | needs schema | Phase 2 |
 
 ---
 
@@ -143,7 +152,7 @@ Phase 3 adds client-facing insight views. The framing rules are strict:
 
 Before marking Phase 1 complete, verify ALL of the following:
 
-- [ ] Every new insight type (`ranking_mover`, `ctr_opportunity`, `serp_opportunity`) registered in all 4 locations (Section 1)
+- [ ] Every new insight type (`ranking_mover`, `ctr_opportunity`, `serp_opportunity`) registered in all 8 locations (Section 1)
 - [ ] `strategy_alignment` and `anomaly_digest` have typed interfaces replacing `Record<string,unknown>`
 - [ ] `analytics_insights` migration, `InsightRow`, `rowToInsight()`, `upsertInsight()` in sync (Section 2)
 - [ ] Every insight in the feed shows a page title, not a raw URL — verify by calling `getInsights(workspaceId)` on a workspace with data and confirming `insight.pageTitle` is non-null and non-URL-shaped on at least one result
