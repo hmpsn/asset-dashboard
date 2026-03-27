@@ -3555,8 +3555,9 @@
           "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
           "est": "6h",
           "priority": "P1",
-          "notes": "Pending \u2014 server/analytics-intelligence.ts computation module. Lazy evaluation (>6h stale). Insight types: page_health score (GSC position trend + GA4 engagement), quick_wins (positions 4-20 with traffic gain estimate), content_decay (pages losing >20% clicks MoM), keyword_clustering (string similarity + co-occurrence), cannibalization (multiple pages ranking same top-20 query). Requires Opus model for algorithm design and cross-module aggregation.",
-          "status": "pending"
+          "notes": "Shipped \u2014 server/analytics-intelligence.ts with lazy evaluation (6h TTL). 4 pure computation functions: (1) page health scores (0\u2013100, 4-component scoring: position/traffic/CTR/engagement), (2) quick wins (positions 4\u201320, \u226550 impressions, traffic gain estimates via expected CTR curves), (3) content decay (current vs previous 30d GSC clicks, >20% decline flagged, severity tiers), (4) cannibalization (multi-page ranking for same top-20 query). Orchestrator fetches GSC+GA4 in parallel via apiCache.wrap(), persists via upsertInsight(). Public endpoint upgraded to getOrComputeInsights() with lazy evaluation. 25 new unit tests, all TDD.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         }
       ]
     }
