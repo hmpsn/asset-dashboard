@@ -25,8 +25,11 @@ export interface AnalyticsOverviewData {
     date: string;
     clicks: number;
     impressions: number;
+    ctr: number;
+    position: number;
     users: number;
     sessions: number;
+    pageviews: number;
   }>;
   // Annotations
   annotations: Annotation[];
@@ -54,18 +57,46 @@ export function useAnalyticsOverview(
 
   // Merge GSC trend + GA4 trend into unified date-keyed array
   const trendData = useMemo(() => {
-    const byDate = new Map<string, { date: string; clicks: number; impressions: number; users: number; sessions: number }>();
+    const byDate = new Map<string, {
+      date: string;
+      clicks: number;
+      impressions: number;
+      ctr: number;
+      position: number;
+      users: number;
+      sessions: number;
+      pageviews: number;
+    }>();
 
     for (const t of gsc.trend) {
-      byDate.set(t.date, { date: t.date, clicks: t.clicks, impressions: t.impressions, users: 0, sessions: 0 });
+      byDate.set(t.date, {
+        date: t.date,
+        clicks: t.clicks,
+        impressions: t.impressions,
+        ctr: Math.round(t.ctr * 100 * 10) / 10, // Convert to percentage, round to 1 decimal
+        position: Math.round(t.position * 10) / 10, // Round to 1 decimal
+        users: 0,
+        sessions: 0,
+        pageviews: 0,
+      });
     }
     for (const t of ga4.trend) {
       const existing = byDate.get(t.date);
       if (existing) {
         existing.users = t.users;
         existing.sessions = t.sessions;
+        existing.pageviews = t.pageviews;
       } else {
-        byDate.set(t.date, { date: t.date, clicks: 0, impressions: 0, users: t.users, sessions: t.sessions });
+        byDate.set(t.date, {
+          date: t.date,
+          clicks: 0,
+          impressions: 0,
+          ctr: 0,
+          position: 0,
+          users: t.users,
+          sessions: t.sessions,
+          pageviews: t.pageviews,
+        });
       }
     }
 
