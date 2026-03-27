@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export type AnnotationCategory = 'site_change' | 'algorithm_update' | 'campaign' | 'other';
 
@@ -17,17 +18,18 @@ export interface Annotation {
   createdAt: string;
 }
 
-const insertStmt = db.prepare(`
-  INSERT INTO analytics_annotations (id, workspace_id, date, label, category, created_by)
-  VALUES (?, ?, ?, ?, ?, ?)
-`);
-
-const selectStmt = db.prepare(`
-  SELECT id, workspace_id AS workspaceId, date, label, category, created_by AS createdBy, created_at AS createdAt
-  FROM analytics_annotations
-  WHERE workspace_id = ?
-  ORDER BY date DESC
-`);
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(`
+    INSERT INTO analytics_annotations (id, workspace_id, date, label, category, created_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `),
+  select: db.prepare(`
+    SELECT id, workspace_id AS workspaceId, date, label, category, created_by AS createdBy, created_at AS createdAt
+    FROM analytics_annotations
+    WHERE workspace_id = ?
+    ORDER BY date DESC
+  `),
+}));
 
 export function createAnnotation(opts: {
   workspaceId: string;
@@ -37,7 +39,7 @@ export function createAnnotation(opts: {
   createdBy?: string;
 }): { id: string } {
   const id = randomUUID();
-  insertStmt.run(id, opts.workspaceId, opts.date, opts.label, opts.category, opts.createdBy ?? null);
+  stmts().insert.run(id, opts.workspaceId, opts.date, opts.label, opts.category, opts.createdBy ?? null);
   return { id };
 }
 
@@ -45,7 +47,7 @@ export function getAnnotations(
   workspaceId: string,
   opts?: { startDate?: string; endDate?: string; category?: string },
 ): Annotation[] {
-  let rows = selectStmt.all(workspaceId) as Annotation[];
+  let rows = stmts().select.all(workspaceId) as Annotation[];
 
   if (opts?.startDate) {
     rows = rows.filter(r => r.date >= opts.startDate!);
