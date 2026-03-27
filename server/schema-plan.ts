@@ -272,9 +272,9 @@ ROLES (choose exactly one per page):
 - pillar: The canonical product page for SaaS — owns the primary SoftwareApplication entity
 - service: Service business pages — owns a Service entity with serviceType, areaServed, pricing
 - audience: Persona/use-case pages that describe the same product for a specific audience — reference the pillar's entity, don't create their own
-- lead-gen: Conversion pages (/demo, /contact, /pricing, /signup) — WebPage + BreadcrumbList only, no product entity
+- lead-gen: Conversion pages (/demo, /contact, /signup) — WebPage + BreadcrumbList only, no product entity
 - blog: Blog/article content — Article schema with author
-- about: About/team/careers pages — WebPage only
+- about: About page (top-level /about, /team, /careers) — WebPage only
 - contact: Contact page — WebPage with contact details if available
 - location: Location-specific pages — LocalBusiness schema
 - product: Distinct product pages (different from the main pillar product)
@@ -306,9 +306,9 @@ RULES:
 1. There should be exactly ONE homepage
 2. There should be 0-3 pillar pages (most sites have 1)
 3. Pages that describe the SAME product for different audiences are "audience", not "pillar"
-4. /demo, /contact, /request-demo, /get-started, /pricing, /signup, /book → "lead-gen"
+4. /demo, /contact, /request-demo, /get-started, /signup, /book → "lead-gen"
 5. Blog posts → "blog" — this includes CMS collection pages under /blog/*, /posts/*, /articles/*, /news/*
-6. /about, /team, /careers → "about"
+6. /about → "about" (but individual /team/person-name → "author", individual /careers/job-title → "job-posting")
 7. /faq only if it's a dedicated FAQ page, not a product page with a FAQ section
 8. Comparison pages (/vs-*, /compare-*, /alternative-*) → "comparison"
 9. Partnership pages (/partner-name, /integrations/partner) → "partnership"
@@ -444,12 +444,21 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
     if (p.isHomepage) {
       role = 'homepage';
       primaryType = 'Organization';
-    } else if (/^\/(demo|contact|request-demo|get-started|pricing|signup|book)/.test(slug)) {
+    } else if (/^\/(demo|contact|request-demo|get-started|signup|book)/.test(slug)) {
       role = 'lead-gen';
     } else if (/^\/(blog|posts?|articles?|news|resources?|guides?)\//.test(slug) || /^\/(blog|posts?|articles?|news)$/.test(slug)) {
       role = 'blog';
       primaryType = 'Article';
-    } else if (/^\/(about|team|careers?)/.test(slug)) {
+    } else if (/^\/(careers?|jobs?|hiring|positions?)\//.test(slug)) {
+      role = 'job-posting';
+      primaryType = 'JobPosting';
+    } else if (/^\/(team|authors?|staff|people)\//.test(slug)) {
+      role = 'author';
+      primaryType = 'ProfilePage';
+    } else if (/^\/(pricing|plans|packages)$/.test(slug)) {
+      role = 'pricing';
+      primaryType = 'WebPage';
+    } else if (/^\/(about|team|careers?)(\/?$)/.test(slug)) {
       role = 'about';
     } else if (/^\/(faq|frequently-asked)/.test(slug)) {
       role = 'faq';
@@ -473,24 +482,15 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
     } else if (/^\/(video|watch)s?\//.test(slug) || /^\/(video|watch)s?$/.test(slug)) {
       role = 'video';
       primaryType = 'VideoObject';
-    } else if (/^\/(careers?|jobs?|hiring|positions?)\//.test(slug)) {
-      role = 'job-posting';
-      primaryType = 'JobPosting';
     } else if (/^\/(courses?|training|workshops?|classes?)\//.test(slug) || /^\/(courses?|training)$/.test(slug)) {
       role = 'course';
       primaryType = 'Course';
     } else if (/^\/(events?|webinars?|meetups?|conferences?)\//.test(slug) || /^\/(events?|webinars?)$/.test(slug)) {
       role = 'event';
       primaryType = 'Event';
-    } else if (/^\/(team|authors?|staff|people)\//.test(slug)) {
-      role = 'author';
-      primaryType = 'ProfilePage';
     } else if (/^\/(reviews?|testimonials?)/.test(slug)) {
       role = 'review';
       primaryType = 'Review';
-    } else if (/^\/(pricing|plans|packages)$/.test(slug)) {
-      role = 'pricing';
-      primaryType = 'WebPage';
     } else if (/^\/(recipes?|cooking|meals?)\//.test(slug)) {
       role = 'recipe';
       primaryType = 'Recipe';
