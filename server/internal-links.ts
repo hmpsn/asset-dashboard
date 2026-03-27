@@ -13,8 +13,8 @@ import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
-import { parseJsonSafe } from './db/json-validation.js';
-import { linkSuggestionsArraySchema } from './schemas/internal-links-schemas.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
+import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
 
 const log = createLogger('internal-links');
 
@@ -366,10 +366,9 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     let raw = aiResult.text || '[]';
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
-    let suggestions: LinkSuggestion[] = parseJsonSafe(
+    let suggestions: LinkSuggestion[] = parseJsonSafeArray(
       raw,
-      linkSuggestionsArraySchema,
-      [],
+      linkSuggestionSchema,
       { workspaceId: workspaceId || undefined, field: 'ai-suggestions', table: 'internal_links' },
     );
 
