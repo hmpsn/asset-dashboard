@@ -163,7 +163,8 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
         headline = 'conversion driver';
       }
       const rate = data.conversionRate as number | undefined;
-      if (rate !== undefined) contextParts.push(`${(rate * 100).toFixed(1)}% CVR`);
+      // rate is already a percentage (e.g., 4.0 for 4%) from the backend
+      if (rate !== undefined) contextParts.push(`${rate.toFixed(1)}% CVR`);
       break;
     }
 
@@ -190,7 +191,7 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
   }
 
   const context = contextParts.join(' · ');
-  const domain = insight.domain ?? 'search';
+  const domain = insight.domain ?? 'cross';
 
   return {
     id: insight.id,
@@ -230,10 +231,10 @@ export function computeSummaryCounts(feed: FeedInsight[]): SummaryCount[] {
     counts.push({ label: 'wins', count: wins, color: 'green', filterKey: 'wins' });
   }
   if (schemaGaps > 0) {
-    counts.push({ label: 'schema gaps', count: schemaGaps, color: 'blue', filterKey: 'schema_gaps' });
+    counts.push({ label: 'schema gaps', count: schemaGaps, color: 'blue', filterKey: 'schema' });
   }
   if (decayingPages > 0) {
-    counts.push({ label: 'decaying pages', count: decayingPages, color: 'purple', filterKey: 'decaying_pages' });
+    counts.push({ label: 'decaying pages', count: decayingPages, color: 'purple', filterKey: 'decay' });
   }
 
   return counts;

@@ -61,7 +61,7 @@ describe('GET /api/public/insights/:workspaceId', () => {
   });
 
   it('can filter by insightType query param', async () => {
-    const res = await api(`/api/public/insights/${testWsId}?type=quick_win`);
+    const res = await api(`/api/public/insights/${testWsId}?type=ranking_opportunity`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);

@@ -290,7 +290,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ type: 'serp_opportunity', severity: 'opportunity' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const gaps = summary.find(s => s.filterKey === 'schema_gaps');
+    const gaps = summary.find(s => s.filterKey === 'schema');
     expect(gaps).toBeDefined();
     expect(gaps!.count).toBe(2);
     expect(gaps!.color).toBe('blue');
@@ -301,7 +301,7 @@ describe('computeSummaryCounts', () => {
       makeFeedInsight({ type: 'content_decay', severity: 'warning' }),
     ];
     const summary = computeSummaryCounts(feed);
-    const decaying = summary.find(s => s.filterKey === 'decaying_pages');
+    const decaying = summary.find(s => s.filterKey === 'decay');
     expect(decaying).toBeDefined();
     expect(decaying!.count).toBe(1);
     expect(decaying!.color).toBe('purple');

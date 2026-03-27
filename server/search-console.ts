@@ -192,15 +192,22 @@ export async function getQueryPageData(
   siteId: string,
   gscSiteUrl: string,
   days: number = 90,
-  opts?: { maxRows?: number },
+  opts?: { maxRows?: number; dateRange?: CustomDateRange },
 ): Promise<QueryPageRow[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3);
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
+  let startDate: Date;
+  let endDate: Date;
+  if (opts?.dateRange) {
+    startDate = new Date(opts.dateRange.startDate);
+    endDate = new Date(opts.dateRange.endDate);
+  } else {
+    endDate = new Date();
+    endDate.setDate(endDate.getDate() - 3);
+    startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+  }
 
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);

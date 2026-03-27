@@ -62,7 +62,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
     setActiveLines(prev => {
       const next = new Set(prev);
       if (next.has(key)) {
-        next.delete(key);
+        if (next.size > 1) next.delete(key); // keep at least 1 active
       } else if (next.size < 3) {
         next.add(key);
       }

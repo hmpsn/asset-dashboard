@@ -553,18 +553,20 @@ export function computeCtrOpportunities(
     if (row.impressions < CTR_OPPORTUNITY_MIN_IMPRESSIONS) continue;
 
     const expectedCtr = expectedCtrForPosition(row.position);
-    // row.ctr from GSC is a decimal (0–1), not a percentage
-    const actualCtr = row.ctr;
+    // row.ctr from GSC is already a percentage (e.g., 6.3 for 6.3%)
+    // expectedCtrForPosition returns a decimal (e.g., 0.30 for 30%)
+    // Normalize both to decimals for comparison
+    const actualCtrDecimal = row.ctr / 100;
     if (expectedCtr === 0) continue;
 
-    const ctrRatio = actualCtr / expectedCtr;
+    const ctrRatio = actualCtrDecimal / expectedCtr;
     if (ctrRatio >= CTR_OPPORTUNITY_THRESHOLD_RATIO) continue;
 
     const severity: InsightSeverity = ctrRatio < 0.3 ? 'critical'
       : ctrRatio < 0.5 ? 'warning'
       : 'opportunity';
 
-    const ctrGap = Math.round((expectedCtr - actualCtr) * row.impressions);
+    const ctrGap = Math.round((expectedCtr - actualCtrDecimal) * row.impressions);
 
     results.push({
       insightType: 'ctr_opportunity' as const,
@@ -573,8 +575,8 @@ export function computeCtrOpportunities(
         query: row.query,
         pageUrl: row.page,
         position: Math.round(row.position * 10) / 10,
-        actualCtr: Math.round(actualCtr * 10000) / 100, // percent with 2 dp
-        expectedCtr: Math.round(expectedCtr * 10000) / 100,
+        actualCtr: row.ctr, // already a percentage from GSC
+        expectedCtr: Math.round(expectedCtr * 100 * 10) / 10, // convert decimal to percentage
         ctrRatio: Math.round(ctrRatio * 100) / 100,
         impressions: row.impressions,
         estimatedClickGap: Math.max(0, ctrGap),
@@ -735,7 +737,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     // Previous period query-page data for ranking movers
     gscUrl && siteId
       ? apiCache.wrap(workspaceId, 'getQueryPageData_prev', { days: 30, maxRows: 2000, range: previousDateRange }, () =>
-          getQueryPageData(siteId, gscUrl, 30, { maxRows: 2000 }),
+          getQueryPageData(siteId, gscUrl, 30, { maxRows: 2000, dateRange: previousDateRange }),
         )
       : [],
   ]) as [SearchPage[], QueryPageRow[], GA4TopPage[], SearchPage[], QueryPageRow[]];
