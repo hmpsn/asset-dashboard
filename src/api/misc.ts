@@ -72,8 +72,13 @@ export const activity = {
 // ── Analytics Annotations (new system — admin-facing, with categories/edit) ──
 export const analyticsAnnotations = {
   list: (wsId: string, opts?: { startDate?: string; endDate?: string; category?: string }) => {
-    const qs = opts ? '?' + new URLSearchParams(opts as Record<string, string>) : '';
-    return getSafe<unknown[]>(`/api/google/annotations/${wsId}${qs}`, []);
+    if (opts) {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(opts)) { if (v != null) params.set(k, v); }
+      const qs = params.toString();
+      return getSafe<unknown[]>(`/api/google/annotations/${wsId}${qs ? '?' + qs : ''}`, []);
+    }
+    return getSafe<unknown[]>(`/api/google/annotations/${wsId}`, []);
   },
 
   create: (wsId: string, body: Record<string, unknown>) =>

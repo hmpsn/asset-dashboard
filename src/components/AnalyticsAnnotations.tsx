@@ -1,17 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Flag, Plus, Trash2, Pencil, Loader2, Check, X } from 'lucide-react';
-import { analyticsAnnotations as api } from '../api/misc';
 import { EmptyState } from './ui';
-
-interface Annotation {
-  id: string;
-  workspaceId: string;
-  date: string;
-  label: string;
-  category: string;
-  createdBy?: string;
-  createdAt: string;
-}
+import {
+  useAnalyticsAnnotations,
+  useCreateAnnotation,
+  useUpdateAnnotation,
+  useDeleteAnnotation,
+  type Annotation,
+} from '../hooks/admin/useAnalyticsAnnotations';
 
 type Category = 'site_change' | 'algorithm_update' | 'campaign' | 'other';
 
@@ -38,54 +34,42 @@ function CategoryBadge({ category }: { category: string }) {
 }
 
 export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: annotations = [], isLoading } = useAnalyticsAnnotations(workspaceId);
+  const createMutation = useCreateAnnotation(workspaceId);
+  const updateMutation = useUpdateAnnotation(workspaceId);
+  const deleteMutation = useDeleteAnnotation(workspaceId);
+
   const [filter, setFilter] = useState<Category | 'all'>('all');
   const [newAnn, setNewAnn] = useState({ date: '', label: '', category: 'site_change' as Category });
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState({ date: '', label: '', category: 'site_change' as Category });
 
-  useEffect(() => {
-    api.list(workspaceId)
-      .then(d => { if (Array.isArray(d)) setAnnotations(d as Annotation[]); })
-      .catch(err => console.error('AnalyticsAnnotations fetch failed:', err))
-      .finally(() => setLoading(false));
-  }, [workspaceId]);
-
-  const create = async () => {
+  const create = () => {
     if (!newAnn.date || !newAnn.label) return;
-    try {
-      const result = await api.create(workspaceId, newAnn) as { id: string };
-      const fullAnnotation: Annotation = { id: result.id, workspaceId, date: newAnn.date, label: newAnn.label, category: newAnn.category, createdAt: new Date().toISOString() };
-      setAnnotations(prev => [fullAnnotation, ...prev]);
-      setNewAnn({ date: '', label: '', category: 'site_change' });
-    } catch (err) { console.error('AnalyticsAnnotations create failed:', err); }
+    createMutation.mutate(newAnn, {
+      onSuccess: () => setNewAnn({ date: '', label: '', category: 'site_change' }),
+    });
   };
 
-  const remove = async (id: string) => {
-    try { await api.remove(workspaceId, id); } catch (err) { console.error('AnalyticsAnnotations delete failed:', err); }
-    setAnnotations(prev => prev.filter(a => a.id !== id));
-  };
+  const remove = (id: string) => deleteMutation.mutate(id);
 
   const startEdit = (ann: Annotation) => {
     setEditId(ann.id);
     setEditDraft({ date: ann.date, label: ann.label, category: ann.category as Category });
   };
 
-  const saveEdit = async () => {
+  const saveEdit = () => {
     if (!editId) return;
-    try {
-      await api.update(workspaceId, editId, editDraft);
-      setAnnotations(prev => prev.map(a => a.id === editId ? { ...a, ...editDraft } : a));
-    } catch (err) { console.error('AnalyticsAnnotations update failed:', err); }
-    setEditId(null);
+    updateMutation.mutate({ id: editId, ...editDraft }, {
+      onSuccess: () => setEditId(null),
+    });
   };
 
   const visible = annotations
     .filter(a => filter === 'all' || a.category === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
@@ -123,7 +107,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
           <input type="text" value={newAnn.label} onChange={e => setNewAnn(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Launched new landing pages"
             className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
         </div>
-        <button onClick={create} disabled={!newAnn.date || !newAnn.label}
+        <button onClick={create} disabled={!newAnn.date || !newAnn.label || createMutation.isPending}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors">
           <Plus className="w-3.5 h-3.5" /> Add Annotation
         </button>
@@ -158,7 +142,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
                   </select>
                   <input type="text" value={editDraft.label} onChange={e => setEditDraft(p => ({ ...p, label: e.target.value }))}
                     className="flex-1 min-w-0 px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-xs text-zinc-300" />
-                  <button onClick={saveEdit} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1"><Check className="w-3.5 h-3.5" /></button>
+                  <button onClick={saveEdit} disabled={updateMutation.isPending} className="text-teal-400 hover:text-teal-300 flex-shrink-0 p-1"><Check className="w-3.5 h-3.5" /></button>
                   <button onClick={() => setEditId(null)} className="text-zinc-500 hover:text-zinc-300 flex-shrink-0 p-1"><X className="w-3.5 h-3.5" /></button>
                 </>
               ) : (

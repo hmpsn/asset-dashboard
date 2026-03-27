@@ -53,6 +53,7 @@ export const queryKeys = {
     seoEditor: (siteId: string) => ['seo-editor', siteId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
+    analyticsAnnotations: (wsId: string) => ['analytics-annotations', wsId] as const,
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
