@@ -3538,6 +3538,25 @@
           "notes": "Shipped \u2014 Full audit of approval/review cycle. P0: save-edit no longer clobbers item status (Object.assign undefined fix). P1: retract works for approved/rejected batches, two-step rejection with notes, edit diff UI, bulk approve confirm, React Query migration. P2: client undo (approved/rejected \u2192 pending) with PageEditState sync and activity logging; rejection notes cleared on undo. P3: all 4 public approval endpoints secured with requireClientPortalAuth() middleware. Also: batch 'rejected' status with recalculation + badge, live WebSocket updates for admin PendingApprovals, Zod validation on endpoints.",
           "status": "done",
           "shippedAt": "2026-03-26"
+        },
+        {
+          "id": 382,
+          "title": "Analytics Intelligence Layer \u2014 Phase 1A/1C/1D (Sonnet tasks)",
+          "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped \u2014 Foundation for analytics intelligence. (1A) analytics_insights SQLite table (migration 035) with UNIQUE(workspace, page, type) + 7 insight types; analytics-insights-store.ts CRUD module; AnalyticsInsight types + 7 data shapes in shared/types/analytics.ts. (1C) server/api-cache.ts \u2014 15-min in-memory TTL cache for GSC/GA4 responses with createApiCache factory, wrap/get/set/invalidate API. (1D) GET /api/public/insights/:workspaceId endpoint + InsightCards component (3 cards: Traffic Momentum, Quick Wins, Top Performers) with tier-aware CTAs; useClientInsights hook; queryKeys.client.insights. All TDD: 28 new tests across 4 test files. Phase 1B (intelligence computation engine) deferred to Opus.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
+        },
+        {
+          "id": 383,
+          "title": "Analytics Intelligence Layer \u2014 Phase 1B (Opus: computation engine)",
+          "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
+          "est": "6h",
+          "priority": "P1",
+          "notes": "Pending \u2014 server/analytics-intelligence.ts computation module. Lazy evaluation (>6h stale). Insight types: page_health score (GSC position trend + GA4 engagement), quick_wins (positions 4-20 with traffic gain estimate), content_decay (pages losing >20% clicks MoM), keyword_clustering (string similarity + co-occurrence), cannibalization (multiple pages ranking same top-20 query). Requires Opus model for algorithm design and cross-module aggregation.",
+          "status": "pending"
         }
       ]
     }

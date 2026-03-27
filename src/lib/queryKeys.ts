@@ -91,6 +91,7 @@ export const queryKeys = {
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
+    insights: (wsId: string) => ['client-insights', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────
