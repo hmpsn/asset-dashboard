@@ -282,7 +282,13 @@ router.post('/api/google/annotations/:workspaceId', validate(createAnnotationSch
   }
 });
 
-router.patch('/api/google/annotations/:workspaceId/:id', (req, res) => {
+const updateAnnotationSchema = z.object({
+  label: z.string().min(1).optional(),
+  date: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+});
+
+router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotationSchema), (req, res) => {
   const { label, date, category } = req.body;
   try {
     const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category });
@@ -291,6 +297,7 @@ router.patch('/api/google/annotations/:workspaceId/:id', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
+});
 });
 
 router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
