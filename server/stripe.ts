@@ -7,6 +7,8 @@ import { getWorkspace, updateWorkspace, listWorkspaces } from './workspaces.js';
 import { createWorkOrder } from './work-orders.js';
 import { notifyTeamPaymentReceived } from './email.js';
 import { createLogger } from './logger.js';
+import { parseJsonSafe } from './db/json-validation.js';
+import { cartItemsArraySchema, stringArraySchema } from './schemas/payment-schemas.js';
 import {
   createContentSubscription, getContentSubscriptionByStripeId,
   updateContentSubscription, resetPeriod,
@@ -413,8 +415,10 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 
       // Create work orders for fix/schema products
       if (productType.startsWith('fix_') || productType.startsWith('schema_')) {
-        const pageIds = session.metadata?.pageIds ? JSON.parse(session.metadata.pageIds) as string[] : [];
-        const issueChecks = session.metadata?.issueChecks ? JSON.parse(session.metadata.issueChecks) as string[] : undefined;
+        const pageIds = parseJsonSafe(session.metadata?.pageIds, stringArraySchema, [], { workspaceId, field: 'pageIds', table: 'stripe_session' });
+        const issueChecks = session.metadata?.issueChecks
+          ? parseJsonSafe(session.metadata.issueChecks, stringArraySchema, [], { workspaceId, field: 'issueChecks', table: 'stripe_session' })
+          : undefined;
         const quantity = parseInt(session.metadata?.quantity || '1', 10);
         createWorkOrder(workspaceId, {
           paymentId: payment?.id || session.id,
@@ -430,7 +434,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Handle cart checkouts (multiple line items)
       if (session.metadata?.cartItems) {
         try {
-          const cartItems = JSON.parse(session.metadata.cartItems) as Array<{ productType: string; pageIds?: string[]; issueChecks?: string[]; quantity?: number }>;
+          const cartItems = parseJsonSafe(session.metadata.cartItems, cartItemsArraySchema, [], { workspaceId, field: 'cartItems', table: 'stripe_session' });
           for (const item of cartItems) {
             if (item.productType.startsWith('fix_') || item.productType.startsWith('schema_')) {
               createWorkOrder(workspaceId, {

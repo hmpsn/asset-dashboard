@@ -456,21 +456,20 @@ export async function assembleAdminContext(
         const snapshot = getLatestSnapshot(ws.webflowSiteId);
         if (snapshot) {
           const filteredAudit = applySuppressionsToAudit(snapshot.audit, ws.auditSuppressions || []);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const pages = filteredAudit.pages as any[] | undefined;
+          const pages = filteredAudit.pages;
           const auditSummary = {
             siteScore: filteredAudit.siteScore,
             totalPages: pages?.length || 0,
-            errors: pages?.reduce((sum: number, p: any) => sum + (p.issues?.filter((i: any) => i.severity === 'error').length || 0), 0) || 0,
-            warnings: pages?.reduce((sum: number, p: any) => sum + (p.issues?.filter((i: any) => i.severity === 'warning').length || 0), 0) || 0,
+            errors: pages?.reduce((sum, p) => sum + (p.issues?.filter(i => i.severity === 'error').length || 0), 0) || 0,
+            warnings: pages?.reduce((sum, p) => sum + (p.issues?.filter(i => i.severity === 'warning').length || 0), 0) || 0,
             siteWideIssues: filteredAudit.siteWideIssues?.slice(0, 5),
             worstPages: pages
-              ?.filter((p: any) => p.issues?.length > 0)
-              .sort((a: any, b: any) => a.score - b.score)
+              ?.filter(p => p.issues?.length > 0)
+              .sort((a, b) => a.score - b.score)
               .slice(0, 8)
-              .map((p: any) => ({
+              .map(p => ({
                 page: p.page, slug: p.slug, score: p.score,
-                topIssues: p.issues?.slice(0, 3).map((i: any) => `[${i.severity}] ${i.check || i.type}: ${i.message}`) || [],
+                topIssues: p.issues?.slice(0, 3).map(i => `[${i.severity}] ${i.check || i.type}: ${i.message}`) || [],
               })),
           };
           sections.push(`SITE HEALTH AUDIT:\n${JSON.stringify(auditSummary, null, 1)}`);

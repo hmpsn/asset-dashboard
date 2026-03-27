@@ -13,6 +13,13 @@ export type {
   AudiencePersona, Workspace,
 } from '../shared/types/workspace.ts';
 import type { PageEditStatus, PageEditState, Workspace } from '../shared/types/workspace.ts';
+import { parseJsonSafe, parseJsonFallback } from './db/json-validation.js';
+import {
+  eventDisplayConfigArraySchema, eventGroupArraySchema,
+  keywordStrategySchema, competitorDomainsSchema, personasArraySchema,
+  contentPricingSchema, portalContactsArraySchema, auditSuppressionsArraySchema,
+  publishTargetSchema, businessProfileSchema,
+} from './schemas/workspace-schemas.js';
 
 // ── Brand name resolution ──
 
@@ -106,11 +113,11 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.client_password) ws.clientPassword = row.client_password;
   if (row.client_email) ws.clientEmail = row.client_email;
   if (row.live_domain) ws.liveDomain = row.live_domain;
-  if (row.event_config) ws.eventConfig = JSON.parse(row.event_config);
-  if (row.event_groups) ws.eventGroups = JSON.parse(row.event_groups);
-  if (row.keyword_strategy) ws.keywordStrategy = JSON.parse(row.keyword_strategy);
-  if (row.competitor_domains) ws.competitorDomains = JSON.parse(row.competitor_domains);
-  if (row.personas) ws.personas = JSON.parse(row.personas);
+  if (row.event_config) ws.eventConfig = parseJsonSafe(row.event_config, eventDisplayConfigArraySchema, [], { workspaceId: row.id, field: 'event_config', table: 'workspaces' });
+  if (row.event_groups) ws.eventGroups = parseJsonSafe(row.event_groups, eventGroupArraySchema, [], { workspaceId: row.id, field: 'event_groups', table: 'workspaces' });
+  if (row.keyword_strategy) ws.keywordStrategy = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, { siteKeywords: [], pageMap: [], opportunities: [] }, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
+  if (row.competitor_domains) ws.competitorDomains = parseJsonSafe(row.competitor_domains, competitorDomainsSchema, [], { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
+  if (row.personas) ws.personas = parseJsonSafe(row.personas, personasArraySchema, [], { workspaceId: row.id, field: 'personas', table: 'workspaces' });
   if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
   if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
   if (row.analytics_client_view !== null) ws.analyticsClientView = !!row.analytics_client_view;
@@ -127,12 +134,18 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.stripe_subscription_id) ws.stripeSubscriptionId = row.stripe_subscription_id;
   if (row.onboarding_enabled !== null) ws.onboardingEnabled = !!row.onboarding_enabled;
   if (row.onboarding_completed !== null) ws.onboardingCompleted = !!row.onboarding_completed;
-  if (row.content_pricing) ws.contentPricing = JSON.parse(row.content_pricing);
-  if (row.portal_contacts) ws.portalContacts = JSON.parse(row.portal_contacts);
-  if (row.audit_suppressions) ws.auditSuppressions = JSON.parse(row.audit_suppressions);
-  if (row.publish_target) ws.publishTarget = JSON.parse(row.publish_target);
+  if (row.content_pricing) ws.contentPricing = parseJsonSafe(row.content_pricing, contentPricingSchema, { briefPrice: 0, fullPostPrice: 0, currency: 'USD' }, { workspaceId: row.id, field: 'content_pricing', table: 'workspaces' });
+  if (row.portal_contacts) ws.portalContacts = parseJsonSafe(row.portal_contacts, portalContactsArraySchema, [], { workspaceId: row.id, field: 'portal_contacts', table: 'workspaces' });
+  if (row.audit_suppressions) ws.auditSuppressions = parseJsonSafe(row.audit_suppressions, auditSuppressionsArraySchema, [], { workspaceId: row.id, field: 'audit_suppressions', table: 'workspaces' });
+  if (row.publish_target) {
+    const pt = parseJsonSafe(row.publish_target, publishTargetSchema, null as any, { workspaceId: row.id, field: 'publish_target', table: 'workspaces' });
+    if (pt) ws.publishTarget = pt;
+  }
   if (row.seo_data_provider) ws.seoDataProvider = row.seo_data_provider as 'semrush' | 'dataforseo';
-  if (row.business_profile) ws.businessProfile = JSON.parse(row.business_profile);
+  if (row.business_profile) {
+    const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null as any, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
+    if (bp) ws.businessProfile = bp;
+  }
   return ws;
 }
 
@@ -146,8 +159,8 @@ function attachPageStates(ws: Workspace): Workspace {
         pageId: r.page_id,
         slug: r.slug ?? undefined,
         status: r.status as PageEditStatus,
-        auditIssues: r.audit_issues ? JSON.parse(r.audit_issues) : undefined,
-        fields: r.fields ? JSON.parse(r.fields) : undefined,
+        auditIssues: r.audit_issues ? parseJsonFallback(r.audit_issues, undefined) : undefined,
+        fields: r.fields ? parseJsonFallback(r.fields, undefined) : undefined,
         source: r.source as PageEditState['source'] ?? undefined,
         approvalBatchId: r.approval_batch_id ?? undefined,
         contentRequestId: r.content_request_id ?? undefined,

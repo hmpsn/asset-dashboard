@@ -4,6 +4,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 
 export type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
 import type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
+import { parseJsonSafe } from './db/json-validation.js';
+import { approvalItemsArraySchema } from './schemas/approval-schemas.js';
 
 // ── SQLite row shape ──
 
@@ -38,16 +40,12 @@ const stmts = createStmtCache(() => ({
 }));
 
 function rowToBatch(row: BatchRow): ApprovalBatch {
-  const items: ApprovalItem[] = JSON.parse(row.items);
-  // Self-heal items corrupted by the pre-fix Object.assign undefined bug
-  let healed = false;
-  for (const item of items) {
-    if (!item.status) { item.status = 'pending'; healed = true; }
-  }
-  // Persist the fix so corrupted data doesn't survive server restarts
-  if (healed) {
-    stmts().update.run({ id: row.id, items: JSON.stringify(items), status: row.status, updated_at: new Date().toISOString() });
-  }
+  const items: ApprovalItem[] = parseJsonSafe(
+    row.items,
+    approvalItemsArraySchema,
+    [],
+    { workspaceId: row.workspace_id, field: 'items', table: 'approval_batches' },
+  );
   return {
     id: row.id,
     workspaceId: row.workspace_id,

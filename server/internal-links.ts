@@ -13,6 +13,8 @@ import { callOpenAI } from './openai-helpers.js';
 import { buildSeoContext } from './seo-context.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
+import { parseJsonSafe } from './db/json-validation.js';
+import { linkSuggestionsArraySchema } from './schemas/internal-links-schemas.js';
 
 const log = createLogger('internal-links');
 
@@ -364,13 +366,12 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     let raw = aiResult.text || '[]';
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
-    let suggestions: LinkSuggestion[];
-    try {
-      suggestions = JSON.parse(raw);
-    } catch {
-      log.error('Internal links: AI returned invalid JSON');
-      suggestions = [];
-    }
+    let suggestions: LinkSuggestion[] = parseJsonSafe(
+      raw,
+      linkSuggestionsArraySchema,
+      [],
+      { workspaceId: workspaceId || undefined, field: 'ai-suggestions', table: 'internal_links' },
+    );
 
     // Validate and clean suggestions
     suggestions = suggestions.filter(s =>

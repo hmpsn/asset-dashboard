@@ -6,6 +6,8 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
+import { parseJsonSafe } from './db/json-validation.js';
+import { postSectionsArraySchema, reviewChecklistSchema } from './schemas/content-schemas.js';
 
 const log = createLogger('content-posts-db');
 
@@ -113,7 +115,7 @@ function rowToVersion(row: VersionRow): PostVersion {
     title: row.title,
     metaDescription: row.meta_description,
     introduction: row.introduction,
-    sections: JSON.parse(row.sections),
+    sections: parseJsonSafe(row.sections, postSectionsArraySchema, [], { field: 'sections', table: 'content_post_versions' }),
     conclusion: row.conclusion,
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,
@@ -174,7 +176,7 @@ function rowToPost(row: PostRow): GeneratedPost {
     title: row.title,
     metaDescription: row.meta_description,
     introduction: row.introduction,
-    sections: JSON.parse(row.sections),
+    sections: parseJsonSafe(row.sections, postSectionsArraySchema, [], { field: 'sections', table: 'content_posts' }),
     conclusion: row.conclusion,
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,
@@ -187,7 +189,12 @@ function rowToPost(row: PostRow): GeneratedPost {
     webflowCollectionId: row.webflow_collection_id ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedSlug: row.published_slug ?? undefined,
-    reviewChecklist: row.review_checklist ? JSON.parse(row.review_checklist) : undefined,
+    reviewChecklist: row.review_checklist
+      ? parseJsonSafe(row.review_checklist, reviewChecklistSchema, {
+          factual_accuracy: false, brand_voice: false, internal_links: false,
+          no_hallucinations: false, meta_optimized: false, word_count_target: false,
+        }, { field: 'review_checklist', table: 'content_posts' })
+      : undefined,
     voiceScore: row.voice_score ?? undefined,
     voiceFeedback: row.voice_feedback ?? undefined,
     createdAt: row.created_at,

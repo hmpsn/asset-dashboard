@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { getWorkspace, updatePageState, getPageIdBySlug } from './workspaces.js';
 import type { Workspace, QuickWin, ContentGap } from './workspaces.js';
 import { getLatestSnapshot } from './reports.js';
@@ -75,8 +76,8 @@ export function loadRecommendations(workspaceId: string): RecommendationSet | nu
   return {
     workspaceId: row.workspace_id,
     generatedAt: row.generated_at,
-    recommendations: JSON.parse(row.recommendations),
-    summary: JSON.parse(row.summary),
+    recommendations: parseJsonFallback(row.recommendations, []),
+    summary: parseJsonFallback(row.summary, {}),
   };
 }
 
