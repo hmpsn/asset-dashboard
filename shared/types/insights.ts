@@ -13,6 +13,7 @@ export interface FeedInsight {
   domain: InsightDomain;    // for tab filtering
   impactScore: number;      // for ranking (higher = show first)
   actions?: FeedAction[];   // "View in Strategy", "Create Brief", etc.
+  details?: string[];       // expandable detail lines (e.g., competing page URLs for cannibalization)
 }
 
 export interface FeedAction {
