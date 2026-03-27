@@ -215,6 +215,13 @@ interface EnrichedInsight extends AnalyticsInsight {
 2. Webflow page metadata title
 3. Cleaned slug fallback: `/blog/best-ai-coding-agents` → "Best AI Coding Agents"
 
+**Dual score display for page_health insights:**
+The platform has two distinct page scores that measure different things:
+- **Performance Score** (health score from `computePageHealthScores`): traffic performance — clicks, impressions, position, CTR, engagement. Low score = "nobody's finding this page."
+- **Optimization Score** (from keyword analysis `optimizationScore`): on-page SEO quality — keyword in title/meta/content/URL, secondary keywords present. Low score = "the content needs SEO work."
+
+Both scores should display together in the InsightFeed for `page_health` insights: "Performance: 16 · Optimization: 75" — this tells the user whether the problem is content quality or discoverability. Requires pulling `optimizationScore` from `page_keywords` during enrichment (add to `EnrichedInsight`).
+
 ### 1.7 Loading States
 
 **Progressive rendering:**
@@ -306,10 +313,23 @@ Phase 1 surfaces every computed insight (393 drops + 86 opportunities in product
 
 Different insight framing for the client dashboard:
 - Admin sees: "What should I do next" (action-oriented, technical)
-- Client sees: "Here's why we're valuable" (narrative, outcome-oriented)
+- Client sees: "Here's what's happening + here's what you can do" (informative, revenue-driving)
+
+**Critical framing rule:** Client narratives must NEVER imply work is being done unless the client has purchased that service. The pattern is: **observation → context → CTA that drives revenue**.
+
+| ❌ Never say | ✅ Say instead |
+|-------------|---------------|
+| "We're working on a recovery plan" | "A content refresh could help recover this ranking." + **[Request Content Refresh]** |
+| "We're monitoring this trend" | "3 pages are showing content decay." + **[View Recommendations]** |
+| "Our team is addressing this" | "Schema markup typically improves CTR by 20-30%." + **[Learn About Schema]** |
 
 Example admin: "Claude Code Limits Guide dropped to page 2 — position 4 → 11, lost ~2,400 clicks/mo"
-Example client: "We detected a ranking change on your Claude Code Limits page and are working on a recovery plan"
+Example client: "Your Claude Code Limits page dropped from position 4 to 11 this week. A content refresh could help recover this ranking." + **[Request Content Refresh]**
+
+Every client-facing insight should end with either:
+- A **purchase CTA** ("Request Content Refresh", "Order Schema Markup", "Upgrade to Growth")
+- A **self-service action** ("Review in Strategy", "Check Audit Details")
+- **Nothing** (for positive insights — "Your best content drove 78 conversions this month" needs no CTA)
 
 ### 3.2 ROI Attribution
 
