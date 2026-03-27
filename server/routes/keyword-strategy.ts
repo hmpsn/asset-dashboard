@@ -41,7 +41,8 @@ import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { getInsights } from '../analytics-insights-store.js';
-import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData, ContentDecayData } from '../../shared/types/analytics.js';
+import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
+import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -1096,23 +1097,11 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           .filter(i => i.insightType === 'conversion_attribution')
           .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
           .sort((a, b) => b.conversionRate - a.conversionRate);
-        // Performance deltas from content decay insights
-        const performanceDeltas = insights
-          .filter(i => i.insightType === 'content_decay')
-          .map(i => {
-            const d = i.data as unknown as ContentDecayData;
-            return {
-              query: i.pageId || '',
-              positionDelta: 0,
-              clicksDelta: d.currentClicks - d.baselineClicks,
-              currentPosition: 0,
-            };
-          });
         intelligenceBlock = buildStrategyIntelligenceBlock({
           keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
           competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
           conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
-          performanceDeltas: performanceDeltas.length > 0 ? performanceDeltas : undefined,
+          performanceDeltas: undefined,
         });
       }
     } catch { /* non-critical — strategy works without intelligence data */ }
@@ -1784,9 +1773,14 @@ Rules:
     const responseStrategy = { ...keywordStrategy, pageMap };
     if (wantsStream) {
       res.write(`data: ${JSON.stringify({ done: true, strategy: responseStrategy })}\n\n`);
-      return res.end();
+      res.end();
+    } else {
+      res.json(responseStrategy);
     }
-    res.json(responseStrategy);
+
+    // Trigger background llms.txt regeneration after strategy update
+    queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
+    return;
   } catch (err) {
     if (keepalive) clearInterval(keepalive);
     const msg = err instanceof Error ? err.message : String(err);

@@ -36,8 +36,22 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   // React Query hook replaces manual data fetching
   const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
   
-  const [edits, setEdits] = useState<Record<string, EditState>>({});
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
+  const restoredFromCache = useRef(false);
+  const [edits, setEdits] = useState<Record<string, EditState>>(() => {
+    try {
+      const raw = sessionStorage.getItem(`seo-editor-edits-${siteId}`);
+      if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
+    } catch { /* ignore */ }
+    return {};
+  });
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    try {
+      const raw = sessionStorage.getItem(`seo-editor-expanded-${siteId}`);
+      if (raw) return new Set(JSON.parse(raw));
+    } catch { /* ignore */ }
+    return new Set();
+  });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [draftSaving, setDraftSaving] = useState<Set<string>>(new Set());
@@ -55,7 +69,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
-  const [variations, setVariations] = useState<Record<string, { field: string; options: string[]; descOptions?: string[] }>>({});
+  const [variations, setVariations] = useState<Record<string, { field: string; options: string[]; descOptions?: string[] }>>(() => {
+    try {
+      const raw = sessionStorage.getItem(`seo-editor-vars-${siteId}`);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return {};
+  });
   const [errorStates, setErrorStates] = useState<Record<string, { type: string; message: string }>>({});
   const [previewExpanded, setPreviewExpanded] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
@@ -63,6 +83,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const cancelBulkAnalyzeRef = useRef(false);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
+
+  // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
+  useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
 
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
@@ -83,6 +108,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   // Load drafts and update edits when pages data changes from React Query
   useEffect(() => {
+    // Skip re-initialization if edits were restored from RQ cache (admin tab switch)
+    if (restoredFromCache.current) {
+      restoredFromCache.current = false;
+      return;
+    }
     const editMap: Record<string, EditState> = {};
     for (const p of pages) {
       // Check for saved draft first
@@ -261,18 +291,16 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
 
       if (field === 'both' && data.pairs && data.pairs.length > 0) {
-        // Paired mode — auto-select first pair and show variation picker
-        updateField(pageId, 'seoTitle', data.pairs[0].title);
-        updateField(pageId, 'seoDescription', data.pairs[0].description);
+        // Paired mode — show variation picker without overwriting current values
         setVariations(prev => ({
           ...prev,
           [pageId]: { field: 'both', options: data.pairs!.map(p => p.title), descOptions: data.pairs!.map(p => p.description) },
         }));
       } else if (data.variations && data.variations.length > 1) {
-        const key = field === 'title' ? 'seoTitle' : 'seoDescription';
-        updateField(pageId, key, data.variations[0]);
+        // Show variation picker without overwriting current values
         setVariations(prev => ({ ...prev, [pageId]: { field, options: data.variations! } }));
       } else if (data.text) {
+        // Single result (no picker) — apply directly
         const key = field === 'title' ? 'seoTitle' : 'seoDescription';
         updateField(pageId, key, data.text);
       }

@@ -13,6 +13,7 @@ import {
 import { getKeywordRecommendations } from '../keyword-recommendations.js';
 import { detectMatrixCannibalization, checkKeywordCannibalization } from '../cannibalization-detection.js';
 import { createLogger } from '../logger.js';
+import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 
 const log = createLogger('routes:content-matrices');
 import { requireWorkspaceAccess } from '../auth.js';
@@ -85,6 +86,11 @@ router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', requi
     );
     if (!updated) return res.status(404).json({ error: 'Matrix or cell not found' });
     res.json(updated);
+
+    // Regenerate llms.txt when a cell is marked published (new content is live)
+    if (req.body.status === 'published') {
+      queueLlmsTxtRegeneration(req.params.workspaceId, 'content_published');
+    }
   } catch (err) {
     log.error({ err }, 'Failed to update matrix cell');
     res.status(500).json({ error: 'Failed to update matrix cell' });

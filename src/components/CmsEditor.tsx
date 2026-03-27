@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Loader2, Save, ChevronDown, ChevronRight, Check, AlertCircle,
   Search, Sparkles, Wand2, Upload, Send, Clock, ArrowRight,
 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useCmsEditor } from '../hooks/admin';
 import { EmptyState, LoadingState, ErrorState, CharacterCounter, SerpPreview, SocialPreview } from './ui';
@@ -66,22 +65,41 @@ interface Props {
 }
 
 export function CmsEditor({ siteId, workspaceId }: Props) {
-  const queryClient = useQueryClient();
   const { data: cmsData, isLoading } = useCmsEditor(siteId, workspaceId);
   const collections = cmsData?.collections || [];
   const approvalBatches = cmsData?.approvalBatches || [];
 
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [edits, setEdits] = useState<Record<string, Record<string, string>>>({});
-  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  // Session persistence: restore from sessionStorage (survives tab switches + refresh)
+  const restoredFromCache = useRef(false);
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(() => {
+    try { const raw = sessionStorage.getItem(`cms-editor-expanded-colls-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    return new Set();
+  });
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
+    try { const raw = sessionStorage.getItem(`cms-editor-expanded-items-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    return new Set();
+  });
+  const [edits, setEdits] = useState<Record<string, Record<string, string>>>(() => {
+    try {
+      const raw = sessionStorage.getItem(`cms-editor-edits-${siteId}`);
+      if (raw) { const parsed = JSON.parse(raw); if (Object.keys(parsed).length > 0) { restoredFromCache.current = true; return parsed; } }
+    } catch { /* ignore */ }
+    return {};
+  });
+  const [dirty, setDirty] = useState<Set<string>>(() => {
+    try { const raw = sessionStorage.getItem(`cms-editor-dirty-${siteId}`); if (raw) return new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    return new Set();
+  });
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
-  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>({});
+  const [variations, setVariations] = useState<Record<string, { fieldSlug: string; options: string[] }>>(() => {
+    try { const raw = sessionStorage.getItem(`cms-editor-vars-${siteId}`); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
+    return {};
+  });
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -95,10 +113,21 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
+  // Sync state to sessionStorage for persistence across tab switches + refresh
+  useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`cms-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-colls-${siteId}`, JSON.stringify(Array.from(expandedCollections))); } catch { /* ignore */ } }, [expandedCollections, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-expanded-items-${siteId}`, JSON.stringify(Array.from(expandedItems))); } catch { /* ignore */ } }, [expandedItems, siteId]);
+  useEffect(() => { try { sessionStorage.setItem(`cms-editor-dirty-${siteId}`, JSON.stringify(Array.from(dirty))); } catch { /* ignore */ } }, [dirty, siteId]);
+
   // Initialize edit state when collections data loads
   useEffect(() => {
     if (!collections.length) return;
-    
+    // Skip re-initialization if restored from RQ cache (admin tab switch)
+    if (restoredFromCache.current) {
+      restoredFromCache.current = false;
+      return;
+    }
     const editMap: Record<string, Record<string, string>> = {};
     for (const coll of collections) {
       for (const item of coll.items) {
@@ -214,9 +243,10 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         workspaceId,
       });
       if (data.variations && data.variations.length > 1) {
-        updateField(itemId, fieldSlug, data.variations[0]);
+        // Show variation picker without overwriting current value
         setVariations(prev => ({ ...prev, [itemId]: { fieldSlug, options: data.variations! } }));
       } else if (data.text) {
+        // Single result (no picker) — apply directly
         updateField(itemId, fieldSlug, data.text);
       }
     } catch (err) { console.error('CmsEditor operation failed:', err); } finally {

@@ -44,7 +44,7 @@ export interface SchemaSuggestion {
 }
 
 // Page type hints for tailored schema generation
-export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'howto' | 'video' | 'generic';
+export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'howto' | 'video' | 'job-posting' | 'course' | 'event' | 'review' | 'pricing' | 'recipe' | 'generic';
 
 export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   auto: 'Auto-detect',
@@ -65,6 +65,12 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   author: 'Author Profile',
   howto: 'How-To / Tutorial',
   video: 'Video Page',
+  'job-posting': 'Job Posting',
+  course: 'Course / Training',
+  event: 'Event',
+  review: 'Review',
+  pricing: 'Pricing Page',
+  recipe: 'Recipe',
   generic: 'General Page',
 };
 
@@ -88,6 +94,12 @@ export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; s
   author: { primary: ['Person', 'ProfilePage'], secondary: ['BreadcrumbList'] },
   howto: { primary: ['HowTo'], secondary: ['Article', 'BreadcrumbList'] },
   video: { primary: ['VideoObject'], secondary: ['Article', 'BreadcrumbList'] },
+  'job-posting': { primary: ['JobPosting'], secondary: ['BreadcrumbList'] },
+  course: { primary: ['Course'], secondary: ['CourseInstance', 'BreadcrumbList'] },
+  event: { primary: ['Event'], secondary: ['Offer', 'Place', 'BreadcrumbList'] },
+  review: { primary: ['Review'], secondary: ['AggregateRating', 'BreadcrumbList'] },
+  pricing: { primary: ['WebPage'], secondary: ['Offer', 'BreadcrumbList'] },
+  recipe: { primary: ['Recipe'], secondary: ['HowToStep', 'NutritionInformation', 'BreadcrumbList'] },
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
 
@@ -108,6 +120,10 @@ const RICH_RESULTS_ELIGIBLE: Record<string, { feature: string; required: string[
   JobPosting:    { feature: 'Job listing in search',          required: ['title', 'hiringOrganization', 'jobLocation', 'datePosted', 'description'] },
   BreadcrumbList: { feature: 'Breadcrumb trail in search',    required: ['itemListElement'] },
   Course:        { feature: 'Course info in search',          required: ['name', 'description', 'provider'] },
+  Review:        { feature: 'Review rich result',             required: ['itemReviewed', 'reviewRating', 'author'] },
+  ProfilePage:   { feature: 'Profile page in search',        required: ['mainEntity'] },
+  MedicalOrganization: { feature: 'Medical business panel',  required: ['name', 'address'] },
+  FinancialService:    { feature: 'Financial service panel',  required: ['name', 'address'] },
   Speakable:     { feature: 'Speakable for voice assistants', required: ['cssSelector'] },
 };
 
@@ -1303,6 +1319,55 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - BreadcrumbList: Home → [Category] → Video Title
 - WebPage.mainEntity should reference the VideoObject node`,
 
+    'job-posting': `PAGE TYPE INSTRUCTIONS (Job Posting):
+- MUST include JobPosting as mainEntity with: title, datePosted (ISO 8601), description, hiringOrganization → Organization
+- Include validThrough (expiry date) if mentioned
+- Include employmentType (FULL_TIME, PART_TIME, CONTRACT, etc.) if specified
+- Include jobLocation with Place + PostalAddress if a work location is given
+- Include baseSalary with MonetaryAmount if salary/compensation is mentioned
+- Include qualifications, skills, educationRequirements if listed
+- BreadcrumbList: Home → Careers → Job Title`,
+
+    course: `PAGE TYPE INSTRUCTIONS (Course / Training):
+- MUST include Course as mainEntity with: name, description, provider → Organization
+- If schedule/dates are provided, include CourseInstance with: startDate, endDate, courseMode (online/onsite/blended)
+- Include Offer with price info if course cost is mentioned
+- Include coursePrerequisites if listed
+- If instructor info is available, include instructor as Person
+- BreadcrumbList: Home → Courses → Course Name`,
+
+    event: `PAGE TYPE INSTRUCTIONS (Event):
+- MUST include Event as mainEntity with: name, startDate (ISO 8601), location (Place with address)
+- Include endDate, eventStatus (EventScheduled/EventCancelled/EventMovedOnline), eventAttendanceMode
+- Include offers (Offer with price, availability, url) if tickets/registration is mentioned
+- Include organizer → Organization
+- Include performer/speaker info as Person nodes if listed
+- BreadcrumbList: Home → Events → Event Name`,
+
+    review: `PAGE TYPE INSTRUCTIONS (Review):
+- MUST include Review as mainEntity with: itemReviewed (Product/Service/Organization), reviewRating (Rating with ratingValue), author → Person
+- If aggregate ratings are shown, include AggregateRating with ratingValue, reviewCount, bestRating
+- Include datePublished if the review date is visible
+- Include reviewBody with the review text
+- BreadcrumbList: Home → Reviews → Review Title`,
+
+    pricing: `PAGE TYPE INSTRUCTIONS (Pricing Page):
+- Use WebPage as primary type
+- Include Offer nodes for each pricing tier/plan with: name, price, priceCurrency, description
+- Use priceSpecification for complex pricing (per-month, per-user, etc.)
+- If free tier exists, include with price "0"
+- Do NOT fabricate pricing — only include what's on the page
+- BreadcrumbList: Home → Pricing`,
+
+    recipe: `PAGE TYPE INSTRUCTIONS (Recipe):
+- MUST include Recipe as mainEntity with: name, image, recipeIngredient (array of strings), recipeInstructions (array of HowToStep)
+- Include cookTime, prepTime, totalTime as ISO 8601 durations if mentioned
+- Include recipeYield (servings) if mentioned
+- Include nutrition (NutritionInformation) if nutritional facts are listed
+- Include author → Person if the recipe author is identified
+- Include recipeCategory and recipeCuisine if identifiable
+- BreadcrumbList: Home → Recipes → Recipe Name`,
+
     generic: `PAGE TYPE INSTRUCTIONS (General Page):
 - Use WebPage + BreadcrumbList as the baseline
 - Include any structured data that's clearly supported by the page content
@@ -1497,7 +1562,7 @@ RULES:
 - Return ONLY the corrected JSON-LD object`;
 
       const fixResult = await callOpenAI({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1',
         messages: [{ role: 'user', content: fixPrompt }],
         maxTokens: 3000,
         temperature: 0.1,
@@ -1738,7 +1803,7 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,
@@ -2290,7 +2355,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,
