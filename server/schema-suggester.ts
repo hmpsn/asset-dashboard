@@ -1437,7 +1437,7 @@ RULES:
 - Return ONLY the corrected JSON-LD object`;
 
       const fixResult = await callOpenAI({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1',
         messages: [{ role: 'user', content: fixPrompt }],
         maxTokens: 3000,
         temperature: 0.1,
@@ -1677,7 +1677,7 @@ Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,
@@ -2200,7 +2200,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,

@@ -29,6 +29,14 @@ import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClie
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
+import {
+  validateForGoogleRichResults,
+  validateEntityConsistency,
+  upsertValidation,
+  getValidation,
+  getValidations,
+  deleteValidation,
+} from '../schema-validator.js';
 
 const log = createLogger('webflow-schema');
 
@@ -109,8 +117,30 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
 
 // --- Publish Schema to Webflow Page ---
 router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pageId, schema, publishAfter } = req.body;
+  const { pageId, schema, publishAfter, skipValidation } = req.body;
   if (!pageId || !schema) return res.status(400).json({ error: 'pageId and schema required' });
+
+  // Validation gate: validate before publishing (unless explicitly skipped)
+  if (!skipValidation) {
+    const validation = validateForGoogleRichResults(schema);
+    const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const workspaceId = ws?.id || req.params.siteId;
+    upsertValidation({
+      workspaceId,
+      pageId,
+      status: validation.status,
+      richResults: validation.richResults,
+      errors: validation.errors.map(e => ({ type: e.type, message: e.message })),
+      warnings: validation.warnings.map(e => ({ type: e.type, message: e.message })),
+    });
+    if (validation.status === 'errors') {
+      return res.status(422).json({
+        error: 'Schema has validation errors — fix before publishing',
+        validation,
+      });
+    }
+  }
+
   try {
     const token = getTokenForSite(req.params.siteId) || undefined;
     const result = await publishSchemaToPage(req.params.siteId, pageId, schema, token);
@@ -558,6 +588,71 @@ router.get('/api/pending-schemas/:workspaceId', (req, res) => {
     log.error({ err }, 'Pending schemas error');
     res.status(500).json({ error: 'Failed to list pending schemas' });
   }
+});
+
+// ── Schema Validation ────────────────────────────────────────────
+
+// Validate a single page schema against Google Rich Results rules
+router.post('/api/webflow/schema-validate/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const { pageId, schema } = req.body;
+  if (!pageId || !schema) return res.status(400).json({ error: 'pageId and schema required' });
+
+  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  const workspaceId = ws?.id || req.params.siteId;
+
+  const result = validateForGoogleRichResults(schema);
+  upsertValidation({
+    workspaceId,
+    pageId,
+    status: result.status,
+    richResults: result.richResults,
+    errors: result.errors.map(e => ({ type: e.type, message: e.message })),
+    warnings: result.warnings.map(e => ({ type: e.type, message: e.message })),
+  });
+
+  res.json(result);
+});
+
+// Batch validate all schemas for entity consistency across a workspace
+router.post('/api/webflow/schema-validate-consistency/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const { schemas } = req.body;
+  if (!Array.isArray(schemas)) return res.status(400).json({ error: 'schemas array required' });
+
+  const result = validateEntityConsistency(schemas);
+  res.json(result);
+});
+
+// Get validation status for a single page
+router.get('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const pageId = req.query.pageId as string;
+  if (!pageId) return res.status(400).json({ error: 'pageId query param required' });
+
+  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  const workspaceId = ws?.id || req.params.siteId;
+
+  const validation = getValidation(workspaceId, pageId);
+  res.json(validation);
+});
+
+// Get all validations for a workspace
+router.get('/api/webflow/schema-validations/:siteId', requireWorkspaceAccessFromQuery(), (_req, res) => {
+  const ws = listWorkspaces().find(w => w.webflowSiteId === _req.params.siteId);
+  const workspaceId = ws?.id || _req.params.siteId;
+
+  const validations = getValidations(workspaceId);
+  res.json(validations);
+});
+
+// Delete a validation record
+router.delete('/api/webflow/schema-validation/:siteId', requireWorkspaceAccessFromQuery(), (req, res) => {
+  const pageId = req.query.pageId as string;
+  if (!pageId) return res.status(400).json({ error: 'pageId query param required' });
+
+  const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+  const workspaceId = ws?.id || req.params.siteId;
+
+  const deleted = deleteValidation(workspaceId, pageId);
+  res.json({ deleted });
 });
 
 export default router;
