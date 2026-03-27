@@ -10,11 +10,20 @@ import type { SearchPage, QueryPageRow } from './search-console.js';
 import type { GA4TopPage } from './google-analytics.js';
 import type {
   InsightSeverity,
+  InsightType,
+  AnalyticsInsight,
   PageHealthData,
   QuickWinData,
   ContentDecayData,
   CannibalizationData,
 } from '../shared/types/analytics.js';
+import { getAllGscPages, getQueryPageData } from './search-console.js';
+import type { CustomDateRange } from './google-analytics.js';
+import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
+import { upsertInsight, getInsights } from './analytics-insights-store.js';
+import { apiCache } from './api-cache.js';
+import { getWorkspace } from './workspaces.js';
+import { createLogger } from './logger.js';
 
 // ── Shared types for computation results ─────────────────────────
 
@@ -91,8 +100,10 @@ export function computePageHealthScores(
     const trafficScore = Math.min(25, 25 * (page.clicks / maxClicks));
 
     // CTR component (0–20): ratio of actual CTR to expected CTR at that position
+    // Note: page.ctr is in percentage form (e.g. 6.3 for 6.3%) from getAllGscPages
     const expectedCtr = expectedCtrForPosition(page.position);
-    const ctrRatio = expectedCtr > 0 ? page.ctr / expectedCtr : 0;
+    const actualCtrDecimal = page.ctr / 100;
+    const ctrRatio = expectedCtr > 0 ? actualCtrDecimal / expectedCtr : 0;
     const ctrScore = Math.min(20, 20 * Math.min(ctrRatio, 2) / 2);
 
     // Engagement component (0–25): engagement time capped at 180s
@@ -150,7 +161,7 @@ export function computeQuickWins(
     const estimatedTrafficGain = Math.round(row.impressions * targetCtr - row.clicks);
 
     return {
-      pageId: row.page,
+      pageId: `${row.page}::${row.query}`, // composite key so each query-page pair gets its own DB row
       insightType: 'quick_win',
       data: {
         query: row.query,
@@ -251,39 +262,25 @@ export function computeCannibalizationInsights(
     const totalImpressions = rows.reduce((sum, r) => sum + r.impressions, 0);
 
     results.push({
-      pageId: null, // workspace-level insight
+      pageId: `cannibalization::${query}`, // use query as key so each gets its own DB row
       insightType: 'cannibalization',
       data: {
         query,
         pages: rows.map(r => r.page),
         positions: rows.map(r => r.position),
+        totalImpressions,
       },
       severity: 'warning',
     });
-
-    // Store totalImpressions for sorting (on the last pushed item)
-    (results[results.length - 1] as unknown as { _sortKey: number })._sortKey = totalImpressions;
   }
 
   // Sort by total impressions descending (most impactful first)
-  results.sort(
-    (a, b) =>
-      ((b as unknown as { _sortKey: number })._sortKey ?? 0) -
-      ((a as unknown as { _sortKey: number })._sortKey ?? 0),
-  );
+  results.sort((a, b) => b.data.totalImpressions - a.data.totalImpressions);
 
   return results;
 }
 
 // ── Orchestrator (lazy evaluation) ───────────────────────────────
-
-import { getAllGscPages, getQueryPageData } from './search-console.js';
-import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
-import { upsertInsight, getInsights } from './analytics-insights-store.js';
-import { apiCache } from './api-cache.js';
-import { getWorkspace } from './workspaces.js';
-import { createLogger } from './logger.js';
-import type { InsightType, AnalyticsInsight } from '../shared/types/analytics.js';
 
 const log = createLogger('analytics-intelligence');
 

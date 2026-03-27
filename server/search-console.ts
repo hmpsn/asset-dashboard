@@ -234,25 +234,21 @@ export async function getQueryPageData(
 export async function getAllGscPages(
   siteId: string,
   gscSiteUrl: string,
-  days: number = 90
+  days: number = 90,
+  dateRange?: CustomDateRange,
 ): Promise<SearchPage[]> {
   const token = await getValidToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() - 3);
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - days);
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const { startDate: start, endDate: end } = gscDateRange(days, dateRange);
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
 
   const data = await gscFetch(
     `${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`,
     token,
     {
-      startDate: fmt(startDate),
-      endDate: fmt(endDate),
+      startDate: start,
+      endDate: end,
       dimensions: ['page'],
       rowLimit: 1000,
       type: 'web',

@@ -229,6 +229,7 @@ export interface CannibalizationData {
   query: string;
   pages: string[];
   positions: number[];
+  totalImpressions: number;
 }
 
 export interface KeywordClusterData {
