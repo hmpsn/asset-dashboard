@@ -34,9 +34,8 @@ const WorkspaceSettings = lazyWithRetry(() => import('./components/WorkspaceSett
 const WorkspaceOverview = lazyWithRetry(() => import('./components/WorkspaceOverview').then(m => ({ default: m.WorkspaceOverview })));
 const MediaTab = lazyWithRetry(() => import('./components/MediaTab').then(m => ({ default: m.MediaTab })));
 const SeoAudit = lazyWithRetry(() => import('./components/SeoAudit').then(m => ({ default: m.SeoAudit })));
-const SearchConsole = lazyWithRetry(() => import('./components/SearchConsole').then(m => ({ default: m.SearchConsole })));
+const AnalyticsHub = lazyWithRetry(() => import('./components/AnalyticsHub').then(m => ({ default: m.AnalyticsHub })));
 const Performance = lazyWithRetry(() => import('./components/Performance').then(m => ({ default: m.Performance })));
-const GoogleAnalytics = lazyWithRetry(() => import('./components/GoogleAnalytics').then(m => ({ default: m.GoogleAnalytics })));
 const RequestManager = lazyWithRetry(() => import('./components/RequestManager').then(m => ({ default: m.RequestManager })));
 const SalesReport = lazyWithRetry(() => import('./components/SalesReport').then(m => ({ default: m.SalesReport })));
 const Roadmap = lazyWithRetry(() => import('./components/Roadmap').then(m => ({ default: m.Roadmap })));
@@ -191,7 +190,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const tabMap: Record<string, Page> = { '1': 'home', '2': 'seo-audit', '3': 'search', '4': 'analytics' };
+      const tabMap: Record<string, Page> = { '1': 'home', '2': 'seo-audit', '3': 'analytics-hub' };
       if (tabMap[e.key] && selected) { e.preventDefault(); navigate(adminPath(selected.id, tabMap[e.key])); }
       if (e.key === ',') { e.preventDefault(); navigate('/settings'); }
     };
@@ -293,7 +292,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   // ── Content renderer ──
   const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
-  const needsSite = !!(SEO_TABS.has(tab) || tab === 'search' || tab === 'analytics' || tab === 'performance');
+  const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
     if (tab === 'roadmap') return <Roadmap />;
@@ -337,9 +336,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
         if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
-    if (tab === 'search') return <SearchConsole key={`search-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} gscPropertyUrl={selected.gscPropertyUrl} />;
+    if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
-    if (tab === 'analytics') return <GoogleAnalytics key={`ga4-${selected.id}`} workspaceId={selected.id} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
