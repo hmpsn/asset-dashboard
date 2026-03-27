@@ -361,6 +361,58 @@ describe('validateForGoogleRichResults', () => {
     expect(result.errors).toHaveLength(0);
   });
 
+  it('validates Dataset with required fields', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Dataset',
+        '@id': 'https://example.com/reports/aie-report/#dataset',
+        name: 'AI Efficiency Report 2026',
+        description: 'A comprehensive dataset of AI efficiency benchmarks across industries.',
+        creator: { '@type': 'Organization', name: 'hmpsn.studio' },
+        dateModified: '2026-03-01',
+        keywords: ['AI', 'efficiency', 'benchmarks'],
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.richResults).toContain('Dataset');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('flags Dataset missing required fields', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Dataset',
+        '@id': 'https://example.com/reports/aie-report/#dataset',
+        name: 'AI Efficiency Report 2026',
+        // Missing: description
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.status).toBe('errors');
+    expect(result.errors.some(e => e.field === 'description')).toBe(true);
+    expect(result.richResults).not.toContain('Dataset');
+  });
+
+  it('warns on Dataset missing recommended fields', () => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [{
+        '@type': 'Dataset',
+        '@id': 'https://example.com/reports/aie-report/#dataset',
+        name: 'AI Efficiency Report 2026',
+        description: 'Benchmark data across industries.',
+        // Missing recommended: creator, dateModified, keywords, etc.
+      }],
+    };
+    const result = validateForGoogleRichResults(schema);
+    expect(result.status).toBe('warnings');
+    expect(result.richResults).toContain('Dataset');
+    expect(result.warnings.some(w => w.field === 'creator')).toBe(true);
+    expect(result.warnings.some(w => w.field === 'dateModified')).toBe(true);
+  });
+
   it('handles empty @graph', () => {
     const schema = { '@context': 'https://schema.org', '@graph': [] };
     const result = validateForGoogleRichResults(schema);

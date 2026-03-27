@@ -231,6 +231,10 @@ const RICH_RESULT_RULES: Record<string, {
     required: ['name', 'address'],
     recommended: ['telephone', 'areaServed', 'serviceType', 'openingHours', 'image'],
   },
+  Dataset: {
+    required: ['name', 'description'],
+    recommended: ['url', 'keywords', 'creator', 'dateModified', 'datePublished', 'license', 'distribution', 'sameAs'],
+  },
 };
 
 // Types that qualify for Google Rich Results
@@ -239,6 +243,7 @@ const RICH_RESULT_TYPES = new Set([
   'Event', 'Recipe', 'Course', 'Review', 'BreadcrumbList', 'Service',
   'ProfilePage', 'MedicalOrganization', 'FinancialService',
   'HowTo', 'VideoObject', 'BlogPosting', 'NewsArticle',
+  'Dataset',
 ]);
 
 function extractGraphNodes(schema: Record<string, unknown>): Array<Record<string, unknown>> {

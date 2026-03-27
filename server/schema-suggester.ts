@@ -1691,7 +1691,7 @@ REQUIREMENTS:
     - For treatment/procedure pages, use "MedicalProcedure" with procedureType, howPerformed, preparation, followup if found in content
     - For provider/doctor profile pages, use "Physician" with medicalSpecialty, credentials, and hospitalAffiliation from content
     - For procedural how-to content, use "HowTo" with step-by-step instructions extracted from the page
-18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema with name, description, distribution (if downloadable), dateModified, and creator referencing the Organization
+18. DATASET PAGES: If the page presents data tables, rankings, indexes, or structured data collections, include "Dataset" schema. REQUIRED: name (string), description (2-3 sentence summary of what the data represents). RECOMMENDED: creator (reference to Organization node), dateModified (ISO date), keywords (array of relevant terms), distribution (object with contentUrl and encodingFormat — only if the data is downloadable), license (URL). Never omit name or description.
 19. ENTITY LINKING (sameAs): On the Organization node, include a "sameAs" array with links to the business's verified external profiles (Google Business, LinkedIn, Facebook, Yelp, industry association pages) — but ONLY if these URLs actually appear in the page content or site footer. Never fabricate profile URLs
 20. SAAS / PLATFORM HOMEPAGES: If the homepage presents a software product or platform:
     - Use "SoftwareApplication" as the primary product node (not Service). Include applicationCategory, operatingSystem ("Web"), and offers if pricing is visible
