@@ -35,9 +35,12 @@ export const pageKeywordMapSchema = z.object({
   secondaryKeywords: z.array(z.string()),
 }).passthrough();
 
+// NOTE: pageMap is stored in a separate page_keywords table and stripped from this
+// column before saving. It is reassembled at the route layer. Mark optional so
+// parseJsonSafe does not reject the stored blob and silently return the empty fallback.
 export const keywordStrategySchema = z.object({
   siteKeywords: z.array(z.string()),
-  pageMap: z.array(pageKeywordMapSchema),
+  pageMap: z.array(pageKeywordMapSchema).optional(),
   opportunities: z.array(z.string()),
 }).passthrough();
 
