@@ -352,7 +352,8 @@ When shipping UI changes that affect color or design patterns:
 |------|--------|
 | 2025-03-07 | Initial creation: unified violet→teal, blue CTA→teal, simplified payment modal, removed client page-type selectors, cleaned content cards, hidden bundles |
 | 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed StripePaymentForm, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
-| 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` (`src/components/charts/AnnotatedTrendChart.tsx`) — Recharts wrapper with dual Y-axes, annotation ReferenceLine markers (category colors: site_change=#3b82f6 blue, algorithm_update=#f59e0b amber, campaign=#a855f7 purple, other=#71717a zinc), click-to-annotate popover (teal Save button). Merged Search Console + Google Analytics into `AnalyticsHub` with sub-nav TabBar. New components: `AnalyticsOverview`, `SearchDetail`, `TrafficDetail`. |
+| 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` with dual Y-axes, annotation markers, click-to-annotate. Merged SearchConsole + GoogleAnalytics into `AnalyticsHub`. |
+| 2026-03-27 | **Connected Intelligence Phase 1**: New `InsightFeed` priority feed component (severity icons: red=critical TrendingDown, amber=warning AlertTriangle, blue=opportunity Target, green=win TrendingUp). `SummaryPills` with colored dots (red/amber/green/blue/purple) and toggle-filter interaction. `InsightSkeleton` shimmer loading. `AnnotatedTrendChart` gains toggleable line chips (solid=active, outline=inactive, grayed=at-max). All three hub tabs now insight-first with sub-tabs. |
 
 ---
 
