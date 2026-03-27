@@ -176,12 +176,19 @@ export interface GA4LandingPage {
 
 export type InsightType =
   | 'page_health'
-  | 'quick_win'
+  | 'ranking_opportunity'    // renamed from quick_win
   | 'content_decay'
   | 'cannibalization'
   | 'keyword_cluster'
   | 'competitor_gap'
-  | 'conversion_attribution';
+  | 'conversion_attribution'
+  | 'ranking_mover'          // new: position changes
+  | 'ctr_opportunity'        // new: high-impression low-CTR
+  | 'serp_opportunity'       // new: rich result eligible
+  | 'strategy_alignment'     // new: strategy vs reality
+  | 'anomaly_digest';        // new: surfaced anomalies
+
+export type InsightDomain = 'search' | 'traffic' | 'cross';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity' | 'positive';
 
@@ -193,6 +200,15 @@ export interface AnalyticsInsight {
   data: Record<string, unknown>;
   severity: InsightSeverity;
   computedAt: string;
+  // Enrichment fields (Phase 1)
+  pageTitle?: string | null;
+  strategyKeyword?: string | null;
+  strategyAlignment?: 'aligned' | 'misaligned' | 'untracked' | null;
+  auditIssues?: string | null;        // JSON array string
+  pipelineStatus?: 'brief_exists' | 'in_progress' | 'published' | null;
+  anomalyLinked?: boolean;
+  impactScore?: number;
+  domain?: InsightDomain;
 }
 
 // ── Insight data shapes (used in data JSON field) ─────────────────
@@ -209,6 +225,7 @@ export interface PageHealthData {
   avgEngagementTime: number;
 }
 
+/** Data shape for ranking_opportunity insights (formerly quick_win) */
 export interface QuickWinData {
   query: string;
   currentPosition: number;
