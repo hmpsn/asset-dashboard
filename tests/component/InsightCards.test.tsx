@@ -42,7 +42,7 @@ const mockInsights: AnalyticsInsight[] = [
 ];
 
 describe('InsightCards', () => {
-  it('renders all three insight cards', () => {
+  it('renders all five insight cards', () => {
     render(
       <InsightCards
         workspaceId="ws_test"
@@ -52,12 +52,11 @@ describe('InsightCards', () => {
       />
     );
 
-    // Traffic Momentum card
     expect(screen.getByText('Traffic Momentum')).toBeInTheDocument();
-    // Quick Wins card
     expect(screen.getByText('Quick Wins')).toBeInTheDocument();
-    // Top Performers card
     expect(screen.getByText('Top Performers')).toBeInTheDocument();
+    expect(screen.getByText('Schema Opportunities')).toBeInTheDocument();
+    expect(screen.getByText('Content Health')).toBeInTheDocument();
   });
 
   it('shows loading skeletons when loading=true', () => {
@@ -98,7 +97,9 @@ describe('InsightCards', () => {
       />
     );
 
-    expect(screen.getByText(/upgrade/i)).toBeInTheDocument();
+    // Multiple cards show upgrade CTAs on free tier (Quick Wins, Schema Opportunities, Content Health)
+    const upgradeElements = screen.getAllByText(/upgrade/i);
+    expect(upgradeElements.length).toBeGreaterThan(0);
   });
 
   it('shows premium messaging for premium tier', () => {
