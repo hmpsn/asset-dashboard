@@ -69,7 +69,7 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
         <SectionCard
           title="Recent Annotations"
           titleIcon={<Flag className="w-4 h-4 text-zinc-500" />}
-          action={<button onClick={() => navigate(adminPath(workspaceId, 'annotations'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
+          action={<button onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
           noPadding
         >
           <div className="divide-y divide-zinc-800/50">
