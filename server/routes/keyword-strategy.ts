@@ -40,8 +40,94 @@ import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { getInsights } from '../analytics-insights-store.js';
+import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData, ContentDecayData } from '../../shared/types/analytics.js';
 
 const log = createLogger('keyword-strategy');
+
+// ── Strategy Intelligence Block ──────────────────────────────────
+
+interface StrategyIntelligenceInput {
+  keywordClusters?: Array<{
+    label: string;
+    queries: string[];
+    totalImpressions: number;
+    avgPosition: number;
+    pillarPage: string | null;
+  }>;
+  competitorGaps?: Array<{
+    keyword: string;
+    competitorDomain: string;
+    competitorPosition: number;
+    ourPosition: number | null;
+    volume: number;
+    difficulty: number;
+  }>;
+  performanceDeltas?: Array<{
+    query: string;
+    positionDelta: number;
+    clicksDelta: number;
+    currentPosition: number;
+  }>;
+  conversionPages?: Array<{
+    pageUrl: string;
+    conversions: number;
+    conversionRate: number;
+    sessions: number;
+  }>;
+}
+
+/**
+ * Build an intelligence block for the strategy generation prompt.
+ * Injects keyword clusters, competitor gaps, performance deltas,
+ * and conversion data to improve AI strategy output.
+ */
+export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput): string {
+  const sections: string[] = [];
+
+  // Keyword clusters
+  if (opts.keywordClusters && opts.keywordClusters.length > 0) {
+    const lines = opts.keywordClusters.slice(0, 10).map(c => {
+      let pillar = '';
+      if (c.pillarPage) {
+        try { pillar = ` → pillar: ${new URL(c.pillarPage).pathname}`; } catch { pillar = ` → pillar: ${c.pillarPage}`; }
+      }
+      return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
+    });
+    sections.push(`KEYWORD CLUSTERS (topic groups discovered from GSC queries — use these to inform site keyword themes and content gap topics):\n${lines.join('\n')}`);
+  }
+
+  // Competitor gaps
+  if (opts.competitorGaps && opts.competitorGaps.length > 0) {
+    const lines = opts.competitorGaps.slice(0, 15).map(g => {
+      const ours = g.ourPosition != null ? `our pos ${Math.round(g.ourPosition)}` : 'not ranking';
+      return `  "${g.keyword}" — ${g.competitorDomain} pos ${g.competitorPosition}, vol ${g.volume}, diff ${g.difficulty} (${ours})`;
+    });
+    sections.push(`COMPETITOR GAPS (high-priority keywords competitors rank for — prioritize these in contentGaps):\n${lines.join('\n')}`);
+  }
+
+  // Performance deltas
+  if (opts.performanceDeltas && opts.performanceDeltas.length > 0) {
+    const lines = opts.performanceDeltas.slice(0, 10).map(d => {
+      const posDir = d.positionDelta > 0 ? `↓${d.positionDelta} pos` : `↑${Math.abs(d.positionDelta)} pos`;
+      return `  "${d.query}": ${posDir}, ${d.clicksDelta > 0 ? '+' : ''}${d.clicksDelta} clicks (now pos ${Math.round(d.currentPosition)})`;
+    });
+    sections.push(`PERFORMANCE CHANGES (keywords with significant position/click changes — declining keywords need defensive strategy):\n${lines.join('\n')}`);
+  }
+
+  // Conversion data
+  if (opts.conversionPages && opts.conversionPages.length > 0) {
+    const lines = opts.conversionPages.slice(0, 10).map(c => {
+      let path: string;
+      try { path = new URL(c.pageUrl).pathname; } catch { path = c.pageUrl; }
+      return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR, ${c.conversions} conversions (${c.sessions} sessions)`;
+    });
+    sections.push(`CONVERSION DATA (pages driving business outcomes — protect and prioritize keywords for these "money pages"):\n${lines.join('\n')}`);
+  }
+
+  if (sections.length === 0) return '';
+  return `\nANALYTICS INTELLIGENCE (from computed intelligence layer — use to inform strategy decisions):\n\n${sections.join('\n\n')}\n`;
+}
 
 // --- Keyword Strategy Generation (SSE progress) ---
 router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
@@ -993,12 +1079,50 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       ? `\n\nKEYWORD CONFLICTS to resolve (same keyword assigned to multiple pages):\n${conflicts.map(([kw, pages]) => `- "${kw}" → ${pages.join(', ')}`).join('\n')}\nFor each conflict, include a fix in "keywordFixes" — reassign one page to a different keyword.\n`
       : '';
 
+    // Fetch analytics intelligence from computed insights layer
+    let intelligenceBlock = '';
+    try {
+      const insights = getInsights(ws.id);
+      if (insights.length > 0) {
+        const keywordClusters = insights
+          .filter(i => i.insightType === 'keyword_cluster')
+          .map(i => i.data as unknown as KeywordClusterData)
+          .sort((a, b) => b.totalImpressions - a.totalImpressions);
+        const competitorGaps = insights
+          .filter(i => i.insightType === 'competitor_gap')
+          .map(i => i.data as unknown as CompetitorGapData)
+          .sort((a, b) => b.volume - a.volume);
+        const conversionPages = insights
+          .filter(i => i.insightType === 'conversion_attribution')
+          .map(i => ({ pageUrl: i.pageId || '', ...(i.data as unknown as ConversionAttributionData) }))
+          .sort((a, b) => b.conversionRate - a.conversionRate);
+        // Performance deltas from content decay insights
+        const performanceDeltas = insights
+          .filter(i => i.insightType === 'content_decay')
+          .map(i => {
+            const d = i.data as unknown as ContentDecayData;
+            return {
+              query: i.pageId || '',
+              positionDelta: 0,
+              clicksDelta: d.currentClicks - d.baselineClicks,
+              currentPosition: 0,
+            };
+          });
+        intelligenceBlock = buildStrategyIntelligenceBlock({
+          keywordClusters: keywordClusters.length > 0 ? keywordClusters : undefined,
+          competitorGaps: competitorGaps.length > 0 ? competitorGaps : undefined,
+          conversionPages: conversionPages.length > 0 ? conversionPages : undefined,
+          performanceDeltas: performanceDeltas.length > 0 ? performanceDeltas : undefined,
+        });
+      }
+    } catch { /* non-critical — strategy works without intelligence data */ }
+
     const masterPrompt = `You are a senior SEO strategist. Page-level keywords have already been assigned. Now provide the site-level strategy.
 ${businessSection}
 Current keyword assignments (${allPageMappings.length} pages):
 ${kwSummary}
 ${conflictNote}${gscSummary}${ga4Context}${auditContext}
-${semrushContext}
+${semrushContext}${intelligenceBlock}
 
 Return JSON with this EXACT structure (do NOT include a pageMap — it's already done):
 {

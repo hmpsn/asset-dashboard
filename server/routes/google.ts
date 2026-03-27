@@ -250,4 +250,61 @@ router.get('/api/google/search-comparison/:siteId', async (req, res) => {
   }
 });
 
+// ── Analytics Annotations ─────────────────────────────────────────
+
+import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
+
+router.get('/api/google/annotations/:workspaceId', (req, res) => {
+  try {
+    const { startDate, endDate, category } = req.query as { startDate?: string; endDate?: string; category?: string };
+    const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate, category });
+    res.json(annotations);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post('/api/google/annotations/:workspaceId', (req, res) => {
+  const { date, label, category, createdBy } = req.body;
+  if (!date || !label || !category) return res.status(400).json({ error: 'date, label, and category required' });
+  try {
+    const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.patch('/api/google/annotations/:workspaceId/:id', (req, res) => {
+  const { label, date, category } = req.body;
+  try {
+    const updated = updateAnnotation(req.params.id, { label, date, category });
+    if (!updated) return res.status(404).json({ error: 'Annotation not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
+  try {
+    const deleted = deleteAnnotation(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Annotation not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Also expose annotations on public route for client dashboard
+router.get('/api/public/annotations/:workspaceId', (req, res) => {
+  try {
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate });
+    res.json(annotations);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;

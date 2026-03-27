@@ -3577,6 +3577,15 @@
           "notes": "Shipped — 3 advanced algorithms: (1) Keyword clustering via Union-Find with word Jaccard similarity + page co-occurrence, pillar page detection. (2) Competitor gap analysis via SeoDataProvider abstraction (SEMRush + DataForSEO), auto-discovery, volume/difficulty scoring. (3) Conversion attribution from GA4 organic landing pages with conversion rate computation. All wired into computeAndPersistInsights() orchestrator + buildInsightsContext() chat advisor. 20 new TDD tests.",
           "status": "done",
           "shippedAt": "2026-03-26"
+        },
+        {
+          "title": "Analytics Intelligence Layer — Phase 4 (Strategy Engine + Client Polish)",
+          "source": "Analytics Intelligence plan (binary-chasing-noodle.md)",
+          "est": "5h",
+          "priority": "P1",
+          "notes": "Shipped — 5 sub-tasks: (1) Strategy enrichment — buildStrategyIntelligenceBlock() injects keyword clusters, competitor gaps, performance deltas, conversion data into master prompt. (2) 2 new insight cards — Schema Opportunities + Content Health with tier-gating. (3) Analytics annotations — SQLite table + CRUD + admin/public routes (4 categories). (4) Content calendar intelligence — suggestPublishDates() from decay + quick wins. (5) GSC pagination — paginateGscQuery() helper, getQueryPageData upgraded to 2000 rows. 35 new TDD tests.",
+          "status": "done",
+          "shippedAt": "2026-03-26"
         }
       ]
     }

@@ -1,7 +1,7 @@
-import { TrendingUp, Target, Award } from 'lucide-react';
+import { TrendingUp, Target, Award, Code2, HeartPulse } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
-import type { AnalyticsInsight, QuickWinData } from '../../../shared/types/analytics';
+import type { AnalyticsInsight, QuickWinData, ContentDecayData, PageHealthData } from '../../../shared/types/analytics';
 
 interface InsightCardsProps {
   workspaceId: string;
@@ -178,14 +178,172 @@ function TopPerformersCard({
   );
 }
 
-// ── InsightCards (3-card layout) ─────────────────────────────────
+// ── Schema Opportunities ─────────────────────────────────────────
+
+export function SchemaOpportunitiesCard({
+  insights,
+  tier,
+  loading,
+}: {
+  insights: AnalyticsInsight[];
+  tier: 'free' | 'growth' | 'premium';
+  loading: boolean;
+}) {
+  // Pages with health data that could benefit from schema markup
+  const healthInsights = insights
+    .filter(i => i.insightType === 'page_health')
+    .sort((a, b) => ((b.data as Record<string, unknown>).impressions as number ?? 0) - ((a.data as Record<string, unknown>).impressions as number ?? 0));
+
+  const highTrafficPages = healthInsights.filter(i => ((i.data as Record<string, unknown>).impressions as number ?? 0) > 100);
+
+  const cardAction =
+    tier === 'premium' ? (
+      <span className="text-xs text-zinc-400">Your strategist is tracking this</span>
+    ) : tier === 'growth' ? (
+      <span className="text-xs text-teal-400 cursor-pointer hover:underline">View Schema tab</span>
+    ) : null;
+
+  return (
+    <SectionCard
+      title="Schema Opportunities"
+      titleIcon={<Code2 size={14} className="text-teal-400" />}
+      action={cardAction ?? undefined}
+    >
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      ) : tier === 'free' ? (
+        <div className="space-y-2">
+          <p className="text-sm text-zinc-400">
+            {highTrafficPages.length > 0
+              ? `${highTrafficPages.length} page${highTrafficPages.length !== 1 ? 's' : ''} could qualify for rich results`
+              : 'Schema analysis available'}
+          </p>
+          <p className="text-xs text-teal-400 cursor-pointer hover:underline">
+            Upgrade to Growth to unlock schema insights
+          </p>
+        </div>
+      ) : highTrafficPages.length === 0 ? (
+        <p className="text-sm text-zinc-400">No schema opportunity data yet</p>
+      ) : (
+        <div className="space-y-2 text-sm">
+          <p className="text-zinc-200">
+            <span className="text-teal-400 font-medium">{highTrafficPages.length} page{highTrafficPages.length !== 1 ? 's' : ''}</span>
+            {' '}could qualify for rich results
+          </p>
+          <ul className="space-y-1">
+            {highTrafficPages.slice(0, 3).map(insight => {
+              let path: string;
+              try { path = new URL(insight.pageId || '').pathname; } catch { path = insight.pageId || 'page'; }
+              return (
+                <li key={insight.id} className="flex items-center justify-between text-zinc-400 text-xs">
+                  <span className="truncate">{path}</span>
+                  <span className="text-zinc-500 shrink-0">
+                    {(insight.data as Record<string, unknown>).impressions as number} imp
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Content Health ───────────────────────────────────────────────
+
+export function ContentHealthCard({
+  insights,
+  tier,
+  loading,
+}: {
+  insights: AnalyticsInsight[];
+  tier: 'free' | 'growth' | 'premium';
+  loading: boolean;
+}) {
+  const decayInsights = insights
+    .filter(i => i.insightType === 'content_decay')
+    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as ContentDecayData) }))
+    .sort((a, b) => a.deltaPercent - b.deltaPercent);
+
+  const estimatedRecovery = decayInsights.reduce(
+    (sum, d) => sum + Math.round(d.baselineClicks - d.currentClicks),
+    0,
+  );
+
+  const cardAction =
+    tier === 'premium' ? (
+      <span className="text-xs text-zinc-400">Your strategist is tracking this</span>
+    ) : tier === 'growth' ? (
+      <span className="text-xs text-teal-400 cursor-pointer hover:underline">View details</span>
+    ) : null;
+
+  return (
+    <SectionCard
+      title="Content Health"
+      titleIcon={<HeartPulse size={14} className="text-teal-400" />}
+      action={cardAction ?? undefined}
+    >
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      ) : tier === 'free' ? (
+        <div className="space-y-2">
+          <p className="text-sm text-zinc-400">
+            {decayInsights.length > 0
+              ? `${decayInsights.length} post${decayInsights.length !== 1 ? 's' : ''} showing decay`
+              : 'Content health analysis available'}
+          </p>
+          <p className="text-xs text-teal-400 cursor-pointer hover:underline">
+            Upgrade to Growth to see content health
+          </p>
+        </div>
+      ) : decayInsights.length === 0 ? (
+        <p className="text-sm text-zinc-400">No content decay data yet</p>
+      ) : (
+        <div className="space-y-2 text-sm">
+          <p className="text-zinc-200">
+            <span className="text-teal-400 font-medium">{decayInsights.length}</span>
+            {' '}post{decayInsights.length !== 1 ? 's' : ''} showing decay
+            {estimatedRecovery > 0 && (
+              <span className="text-zinc-400 text-xs">
+                {' '}— a refresh could restore ~{estimatedRecovery} sessions/mo
+              </span>
+            )}
+          </p>
+          <ul className="space-y-1">
+            {decayInsights.slice(0, 3).map((d, i) => {
+              let path: string;
+              try { path = new URL(d.pageId || '').pathname; } catch { path = d.pageId || 'page'; }
+              return (
+                <li key={i} className="flex items-center justify-between text-zinc-400 text-xs">
+                  <span className="truncate">{path}</span>
+                  <span className="text-red-400 shrink-0">{d.deltaPercent}%</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── InsightCards (5-card layout) ─────────────────────────────────
 
 export function InsightCards({ workspaceId: _workspaceId, insights, tier, loading }: InsightCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <TrafficMomentumCard insights={insights} loading={loading} />
       <QuickWinsCard insights={insights} tier={tier} loading={loading} />
       <TopPerformersCard insights={insights} tier={tier} loading={loading} />
+      <SchemaOpportunitiesCard insights={insights} tier={tier} loading={loading} />
+      <ContentHealthCard insights={insights} tier={tier} loading={loading} />
     </div>
   );
 }

@@ -21,7 +21,8 @@ import type {
   KeywordClusterData,
 } from '../shared/types/analytics.js';
 import type { GA4LandingPage } from './google-analytics.js';
-import { getAllGscPages, getQueryPageData } from './search-console.js';
+import { getAllGscPages, getQueryPageData, paginateGscQuery } from './search-console.js';
+import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights } from './analytics-insights-store.js';
@@ -612,8 +613,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         )
       : [],
     gscUrl && siteId
-      ? apiCache.wrap(workspaceId, 'getQueryPageData', { days: 30 }, () =>
-          getQueryPageData(siteId, gscUrl, 30),
+      ? apiCache.wrap(workspaceId, 'getQueryPageData_paginated', { days: 30, maxRows: 2000 }, () =>
+          getQueryPageData(siteId, gscUrl, 30, { maxRows: 2000 }),
         )
       : [],
     ga4Id
