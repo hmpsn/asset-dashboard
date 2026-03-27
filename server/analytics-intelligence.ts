@@ -187,7 +187,7 @@ const DECAY_THRESHOLD_PERCENT = -20; // flag pages losing more than 20% clicks
 /**
  * Compare current vs previous period page metrics to identify decaying content.
  * Pages losing >20% clicks are flagged.
- * Severity: critical (>50% loss), warning (>30%), watch (>20%).
+ * Severity: critical (>50% loss), warning (>30%), opportunity (>20%).
  */
 export function computeContentDecayInsights(
   currentPages: SearchPage[],
@@ -211,7 +211,7 @@ export function computeContentDecayInsights(
     let severity: InsightSeverity;
     if (deltaPercent <= -50) severity = 'critical';
     else if (deltaPercent <= -30) severity = 'warning';
-    else severity = 'warning'; // 20–30% decline
+    else severity = 'opportunity'; // 20–30% decline
 
     results.push({
       pageId: current.page,
@@ -328,11 +328,27 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const gscUrl = ws.gscPropertyUrl;
   const ga4Id = ws.ga4PropertyId;
 
+  // Compute non-overlapping date ranges for decay comparison
+  // Current: last 30 days (with 3-day GSC delay)
+  // Previous: the 30 days before that
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const curEnd = new Date();
+  curEnd.setDate(curEnd.getDate() - 3); // GSC ~3 day delay
+  const curStart = new Date(curEnd);
+  curStart.setDate(curStart.getDate() - 30);
+  const prevEnd = new Date(curStart);
+  prevEnd.setDate(prevEnd.getDate() - 1); // day before current period starts
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - 30);
+
+  const currentDateRange: CustomDateRange = { startDate: fmt(curStart), endDate: fmt(curEnd) };
+  const previousDateRange: CustomDateRange = { startDate: fmt(prevStart), endDate: fmt(prevEnd) };
+
   // Fetch data in parallel, using the API cache
   const [gscPages, queryPageData, ga4Pages, previousGscPages] = await Promise.all([
     gscUrl && siteId
-      ? apiCache.wrap(workspaceId, 'getAllGscPages', { days: 30 }, () =>
-          getAllGscPages(siteId, gscUrl, 30),
+      ? apiCache.wrap(workspaceId, 'getAllGscPages', { range: currentDateRange }, () =>
+          getAllGscPages(siteId, gscUrl, 30, currentDateRange),
         )
       : [],
     gscUrl && siteId
@@ -345,10 +361,10 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           getGA4TopPages(ga4Id, 30, 100),
         )
       : [],
-    // Previous period for decay comparison
+    // Previous period for decay comparison (non-overlapping 30d window)
     gscUrl && siteId
-      ? apiCache.wrap(workspaceId, 'getAllGscPages_prev', { days: 60 }, () =>
-          getAllGscPages(siteId, gscUrl, 60),
+      ? apiCache.wrap(workspaceId, 'getAllGscPages_prev', { range: previousDateRange }, () =>
+          getAllGscPages(siteId, gscUrl, 30, previousDateRange),
         )
       : [],
   ]) as [SearchPage[], QueryPageRow[], GA4TopPage[], SearchPage[]];

@@ -18,10 +18,11 @@ import type { GA4TopPage, GA4LandingPage } from '../../server/google-analytics.j
 // ── Page Health Scores ───────────────────────────────────────────
 
 describe('computePageHealthScores', () => {
+  // CTR values in percentage form (e.g. 6.3 for 6.3%) matching getAllGscPages output
   const gscPages: SearchPage[] = [
-    { page: 'https://example.com/blog/seo-tips', clicks: 500, impressions: 8000, ctr: 0.0625, position: 3.2 },
-    { page: 'https://example.com/services', clicks: 200, impressions: 5000, ctr: 0.04, position: 8.5 },
-    { page: 'https://example.com/about', clicks: 10, impressions: 200, ctr: 0.05, position: 25 },
+    { page: 'https://example.com/blog/seo-tips', clicks: 500, impressions: 8000, ctr: 6.3, position: 3.2 },
+    { page: 'https://example.com/services', clicks: 200, impressions: 5000, ctr: 4.0, position: 8.5 },
+    { page: 'https://example.com/about', clicks: 10, impressions: 200, ctr: 5.0, position: 25 },
   ];
 
   const ga4Pages: GA4TopPage[] = [
@@ -60,7 +61,7 @@ describe('computePageHealthScores', () => {
     expect(seoTips.data.clicks).toBe(500);
     expect(seoTips.data.impressions).toBe(8000);
     expect(seoTips.data.position).toBeCloseTo(3.2, 1);
-    expect(seoTips.data.ctr).toBeCloseTo(0.0625, 3);
+    expect(seoTips.data.ctr).toBeCloseTo(6.3, 1);
     expect(seoTips.data.pageviews).toBe(1200);
     expect(seoTips.data.avgEngagementTime).toBe(120);
   });
@@ -128,6 +129,12 @@ describe('computeQuickWins', () => {
     expect(seoTips.data.estimatedTrafficGain).toBeGreaterThan(0);
     expect(seoTips.data.currentPosition).toBe(7);
     expect(seoTips.data.pageUrl).toBe('https://example.com/blog/seo-tips');
+  });
+
+  it('uses composite page::query as pageId for unique DB rows', () => {
+    const results = computeQuickWins(queryPageData);
+    const seoTips = results.find(r => r.data.query === 'seo tips for beginners')!;
+    expect(seoTips.pageId).toBe('https://example.com/blog/seo-tips::seo tips for beginners');
   });
 
   it('sorts by estimated traffic gain descending', () => {
@@ -233,13 +240,26 @@ describe('computeCannibalizationInsights', () => {
     expect(webDesign.data.positions).toHaveLength(3);
   });
 
+  it('includes totalImpressions in data', () => {
+    const results = computeCannibalizationInsights(queryPageData);
+    const seoServices = results.find(r => r.data.query === 'seo services')!;
+    expect(seoServices.data.totalImpressions).toBe(1800); // 1000 + 800
+  });
+
   it('sorts by total impressions descending (most impactful first)', () => {
     const results = computeCannibalizationInsights(queryPageData);
     if (results.length > 1) {
-      const imp0 = results[0].data.pages.length; // proxy: more pages = more impact
       // seo services has 1800 total impressions, web design has 1300
       expect(results[0].data.query).toBe('seo services');
+      expect(results[0].data.totalImpressions).toBeGreaterThan(results[1].data.totalImpressions);
     }
+  });
+
+  it('uses query-based pageId so each insight gets its own DB row', () => {
+    const results = computeCannibalizationInsights(queryPageData);
+    const pageIds = results.map(r => r.pageId);
+    expect(pageIds).toContain('cannibalization::seo services');
+    expect(pageIds).toContain('cannibalization::web design');
   });
 
   it('assigns warning severity', () => {
