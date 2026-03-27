@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff, Clock } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState, PageHeader } from './ui';
 import { llmsTxt } from '../api/content';
+import { queryKeys } from '../lib/queryKeys';
+import { STALE_TIMES } from '../lib/queryClient';
 
 interface LlmsTxtResult {
   content: string;
@@ -34,9 +36,9 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
   const [previewMode, setPreviewMode] = useState<'index' | 'full'>('index');
 
   const { data: freshnessData } = useQuery({
-    queryKey: ['llms-txt-freshness', workspaceId],
+    queryKey: queryKeys.admin.llmsTxtFreshness(workspaceId),
     queryFn: () => llmsTxt.freshness(workspaceId),
-    staleTime: 60_000,
+    staleTime: STALE_TIMES.NORMAL,
     enabled: !!workspaceId,
   });
 
