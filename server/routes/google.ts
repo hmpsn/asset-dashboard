@@ -278,7 +278,7 @@ router.post('/api/google/annotations/:workspaceId', (req, res) => {
 router.patch('/api/google/annotations/:workspaceId/:id', (req, res) => {
   const { label, date, category } = req.body;
   try {
-    const updated = updateAnnotation(req.params.id, { label, date, category });
+    const updated = updateAnnotation(req.params.id, req.params.workspaceId, { label, date, category });
     if (!updated) return res.status(404).json({ error: 'Annotation not found' });
     res.json({ ok: true });
   } catch (err) {
@@ -288,7 +288,7 @@ router.patch('/api/google/annotations/:workspaceId/:id', (req, res) => {
 
 router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
   try {
-    const deleted = deleteAnnotation(req.params.id);
+    const deleted = deleteAnnotation(req.params.id, req.params.workspaceId);
     if (!deleted) return res.status(404).json({ error: 'Annotation not found' });
     res.json({ ok: true });
   } catch (err) {
@@ -296,8 +296,9 @@ router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
   }
 });
 
-// Also expose annotations on public route for client dashboard
-router.get('/api/public/annotations/:workspaceId', (req, res) => {
+// Analytics annotations on a separate path to avoid shadowing the existing
+// /api/public/annotations/:workspaceId route in annotations.ts
+router.get('/api/public/analytics-annotations/:workspaceId', (req, res) => {
   try {
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
     const annotations = getAnnotations(req.params.workspaceId, { startDate, endDate });

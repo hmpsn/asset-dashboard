@@ -64,6 +64,7 @@ export function getAnnotations(
 
 export function updateAnnotation(
   id: string,
+  workspaceId: string,
   opts: { label?: string; date?: string; category?: string },
 ): boolean {
   const sets: string[] = [];
@@ -75,13 +76,13 @@ export function updateAnnotation(
 
   if (sets.length === 0) return false;
 
-  vals.push(id);
-  const stmt = db.prepare(`UPDATE analytics_annotations SET ${sets.join(', ')} WHERE id = ?`);
+  vals.push(id, workspaceId);
+  const stmt = db.prepare(`UPDATE analytics_annotations SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ?`);
   const result = stmt.run(...vals);
   return result.changes > 0;
 }
 
-export function deleteAnnotation(id: string): boolean {
-  const result = deleteStmt.run(id);
+export function deleteAnnotation(id: string, workspaceId: string): boolean {
+  const result = db.prepare('DELETE FROM analytics_annotations WHERE id = ? AND workspace_id = ?').run(id, workspaceId);
   return result.changes > 0;
 }
