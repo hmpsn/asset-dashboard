@@ -129,6 +129,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 6. **Color coding** — follow the Three Laws strictly.
 7. **Accessibility** — proper ARIA labels, keyboard navigation, focus management.
 8. **Progressive disclosure** — show summary first, details on demand.
+9. **Extract shared interaction patterns** — when 2+ components implement the same user interaction (toggle logic, filter state, sort behavior), extract to a shared hook or utility. Don't let subagents independently re-implement the same logic — it drifts. Example: `useToggleSet(defaults, { min, max })` instead of 3 inline `useState<Set>` + toggle handlers.
 
 ---
 
