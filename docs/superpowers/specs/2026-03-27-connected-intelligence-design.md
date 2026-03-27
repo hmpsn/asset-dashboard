@@ -272,6 +272,15 @@ interface EnrichedInsight extends AnalyticsInsight {
 - "Health score 45 — linked issues: missing canonical, weak title tag, no schema"
 - Enables actionable next steps directly from the insight feed
 
+### 2.7 Composite PageId Title Resolution
+
+- `resolvePageTitle` currently produces ugly titles for composite pageId keys (e.g., `cannibalization::seo services` → "Cannibalization::seo Services")
+- Split composite pageIds on `::` separator before title resolution — use the page URL portion for title lookup, query portion for context
+- Insight types with composite keys: `ranking_mover` (`page::query`), `ctr_opportunity` (`page::query`), `cannibalization` (`cannibalization::query`), `keyword_cluster` (`cluster::label`)
+- For cannibalization/cluster types where the first segment isn't a URL, use `data.query` or `data.label` as the title instead of parsing the pageId
+
+**Prerequisite:** Data contracts audit must be complete before Phase 2 begins. Phase 2 adds more cross-module data flows that would inherit every unvalidated JSON boundary.
+
 ### 2.6 Schema Gaps → Insight Recommendations
 
 - High-traffic pages missing recommended schema types surface as SERP opportunities
