@@ -149,25 +149,14 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
-### 12. Search Console Integration
-**What it does:** Pulls Google Search Console data — clicks, impressions, CTR, average position — with query-level and page-level breakdowns. Supports 7d/28d/90d/6mo/16mo date ranges with sparkline mini-charts and full performance trend charts. **Insights tab** automatically identifies low-hanging fruit (positions 5-20 with impressions), top performers, CTR opportunities (page 1 but <3% CTR), high-impression/low-click queries, and branded vs. non-branded query breakdown. **AI Search Chat** (GPT-4o) answers natural language questions about the client's actual search data with quick-question presets. Contextual cross-link tips guide users to Strategy and SEO Editor based on findings.
+### 12. Analytics Hub (unified Search Console + Google Analytics)
+**What it does:** Unified analytics hub (`/analytics`) replacing separate Search Console and Google Analytics pages. **Overview tab** combines GSC headline metrics (clicks, impressions, avg position) and GA4 metrics (users, sessions, bounce rate) in a single StatCard row with period deltas. **Unified trend chart** (AnnotatedTrendChart) renders dual Y-axes — GSC clicks (blue) and GA4 users (teal) — with annotation markers as vertical dashed ReferenceLines color-coded by category (site_change=blue, algorithm_update=amber, campaign=purple, other=zinc). Click any date on the chart to create an annotation via popover. **InsightCards** from the intelligence engine (page health, quick wins, content decay, schema health, top performers) are rendered prominently on the overview. **Search Performance tab** deep-dives into GSC queries/pages tables with sortable columns and collapsible device/country/searchType breakdowns. **Site Traffic tab** deep-dives into GA4 with daily trend chart (metric selector), top pages, traffic sources, devices, countries, new vs returning, organic overview, key events grid, and landing pages table.
 
-**Agency value:** GSC data in context alongside all other tools. The insights tab surfaces the exact queries worth optimizing — no manual spreadsheet analysis. AI chat handles "which keywords am I ranking for?" questions.
+**Agency value:** Single view combining both data sources with annotations and intelligence insights front-and-center. No more switching between separate pages. Annotated trend chart visually correlates site changes with traffic impact.
 
-**Client value:** Understands how their site performs in Google search without needing their own GSC access. AI chat answers questions in plain English.
+**Client value:** (Admin-only for now; client portal migration planned.) When migrated, provides unified performance view.
 
-**Mutual:** Single source of truth for organic search performance. Insights → Strategy → Editor workflow keeps both sides aligned on priorities.
-
----
-
-### 13. Google Analytics Integration
-**What it does:** Full GA4 integration — sessions, users, engagement, traffic sources, top pages, device breakdown, country data, event tracking, conversion summaries, and event explorer with page-level filtering. Click-to-inspect detail popovers on all charts showing date + key metrics per data point. **Admin GA4 dashboard** includes sparklines, period comparison (current vs previous with delta indicators), new vs returning user segments, organic overview (organic share of total traffic), organic landing pages, key events/conversions summary, richer sortable tables, and traffic health insights.
-
-**Agency value:** Deep analytics without GA4's clunky interface. Custom event grouping and module-level page filtering tailored per client. Interactive charts make data exploration effortless. Admin view surfaces period-over-period changes, organic performance, and conversion data at a glance.
-
-**Client value:** Clean, curated analytics view showing the metrics that matter to their business — not the overwhelming GA4 default.
-
-**Mutual:** Configurable event groups and display names let the agency present analytics in the client's language ("Form Submissions" not "generate_lead").
+**Mutual:** Annotations on the chart create a shared timeline of changes and their impact on metrics.
 
 ---
 
@@ -1135,9 +1124,10 @@ Items to revisit as budget/tier upgrades allow or when priorities shift.
 
 ### Admin Navigation
 - ~~Sidebar restructure~~: ✅ Shipped (March 2026) — Reorganized from 4 groups/18 items to 4 groups/14 items. New structure: ANALYTICS (Search Console, GA, Rank Tracker, Annotations), SITE HEALTH (Site Audit, Performance, Links, Assets), SEO (Brand & AI, Strategy, Editor, Schema), CONTENT (Content Briefs, Content, Content Perf).
+- ~~Analytics Hub merge~~: ✅ Shipped (March 2026) — Search Console + Google Analytics merged into single "Analytics" sidebar item with hub + detail architecture (AnalyticsHub.tsx). ANALYTICS group now: Analytics, Rank Tracker. Annotations integrated into hub overview.
 - ~~Merged Links tab~~: ✅ Shipped (March 2026) — Redirects + Internal Links merged into single Links tab (`LinksPanel.tsx`) with sub-tab navigation.
 - ~~Header request widget~~: ✅ Shipped (March 2026) — Requests moved from sidebar to header bar as badge widget with pending count indicator. NotificationBell also moved to header.
-- ~~Command palette sync~~: ✅ Shipped (March 2026) — CommandPalette.tsx updated to match new sidebar structure.
+- ~~Command palette sync~~: ✅ Shipped (March 2026) — CommandPalette.tsx updated to match new sidebar structure. Analytics Hub update (March 2026).
 - ~~Sidebar colored group icons~~: ✅ Shipped (March 2026) — Activity (blue) for ANALYTICS, Shield (emerald) for SITE HEALTH, Zap (teal) for SEO, BookOpen (amber) for CONTENT. Hover opacity transition.
 
 ### Roadmap & Project Management

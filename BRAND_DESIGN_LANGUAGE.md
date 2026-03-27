@@ -352,6 +352,7 @@ When shipping UI changes that affect color or design patterns:
 |------|--------|
 | 2025-03-07 | Initial creation: unified violet→teal, blue CTA→teal, simplified payment modal, removed client page-type selectors, cleaned content cards, hidden bundles |
 | 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed StripePaymentForm, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
+| 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` (`src/components/charts/AnnotatedTrendChart.tsx`) — Recharts wrapper with dual Y-axes, annotation ReferenceLine markers (category colors: site_change=#3b82f6 blue, algorithm_update=#f59e0b amber, campaign=#a855f7 purple, other=#71717a zinc), click-to-annotate popover (teal Save button). Merged Search Console + Google Analytics into `AnalyticsHub` with sub-nav TabBar. New components: `AnalyticsOverview`, `SearchDetail`, `TrafficDetail`. |
 
 ---
 

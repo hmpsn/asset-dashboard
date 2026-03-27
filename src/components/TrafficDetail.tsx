@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
-import { DATE_PRESETS_SEARCH } from './ui';
+import { DATE_PRESETS_FULL } from './ui';
 import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import type { GA4DailyTrend } from '../../shared/types/analytics';
 import { useAdminGA4 } from '../hooks/admin';
@@ -131,7 +131,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <p className="text-xs text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</p>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-500" />}
-          <DateRangeSelector options={DATE_PRESETS_SEARCH} selected={days} onChange={setDays} />
+          <DateRangeSelector options={DATE_PRESETS_FULL} selected={days} onChange={setDays} />
         </div>
       </div>
 

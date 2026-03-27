@@ -191,14 +191,16 @@ export function AnnotatedTrendChart({
               return `${d.getMonth() + 1}/${d.getDate()}`;
             }}
           />
-          {/* Left Y-axis */}
-          <YAxis
-            yAxisId="left"
-            tick={{ fill: '#71717a', fontSize: 10 }}
-            tickLine={false}
-            axisLine={false}
-            width={45}
-          />
+          {/* Left Y-axis (only if we have a left-axis line) */}
+          {lines.some(l => l.yAxisId === 'left') && (
+            <YAxis
+              yAxisId="left"
+              tick={{ fill: '#71717a', fontSize: 10 }}
+              tickLine={false}
+              axisLine={false}
+              width={45}
+            />
+          )}
           {/* Right Y-axis (only if we have a right-axis line) */}
           {lines.some(l => l.yAxisId === 'right') && (
             <YAxis
