@@ -56,7 +56,8 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
     case 'ranking_mover': {
       const prev = data.previousPosition as number | undefined;
       const curr = data.currentPosition as number | undefined;
-      const clickDelta = data.estimatedClickDelta as number | undefined;
+      const currentClicks = data.currentClicks as number | undefined;
+      const previousClicks = data.previousClicks as number | undefined;
       if (curr !== undefined && prev !== undefined) {
         if (curr > 10) {
           headline = `dropped to page 2`;
@@ -66,6 +67,7 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
           headline = `dropped to position ${curr}`;
         }
         contextParts.push(`Position ${prev} → ${curr}`);
+        const clickDelta = (currentClicks !== undefined && previousClicks !== undefined) ? currentClicks - previousClicks : undefined;
         if (clickDelta !== undefined && clickDelta !== 0) {
           const sign = clickDelta > 0 ? '+' : '';
           contextParts.push(`${sign}${fmtNum(clickDelta)} clicks/mo`);
@@ -77,7 +79,7 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
     }
 
     case 'ctr_opportunity': {
-      const actualCtr = data.ctr as number | undefined;
+      const actualCtr = data.actualCtr as number | undefined;
       const expectedCtr = data.expectedCtr as number | undefined;
       if (actualCtr !== undefined && expectedCtr !== undefined) {
         headline = `CTR ${actualCtr.toFixed(1)}% vs ${expectedCtr.toFixed(1)}% expected`;

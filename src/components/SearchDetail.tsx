@@ -56,12 +56,13 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
 
   const chartLines = SEARCH_LINES.map(l => ({ ...l, active: activeSearchLines.has(l.key) }));
 
-  // Map PerformanceTrend to chart-compatible format (ctr already as decimal, convert to %)
+  // Map PerformanceTrend to chart-compatible format
+  // ctr is already a percentage from GSC API (e.g., 6.3 for 6.3%), just round
   const chartData = trend.map(t => ({
     date: t.date,
     clicks: t.clicks,
     impressions: t.impressions,
-    ctr: Math.round(t.ctr * 100 * 10) / 10,
+    ctr: Math.round(t.ctr * 10) / 10,
     position: Math.round(t.position * 10) / 10,
   }));
 

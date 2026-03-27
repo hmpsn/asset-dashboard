@@ -308,8 +308,11 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               onToggleLine={(key) => {
                 setActiveTrafficLines(prev => {
                   const next = new Set(prev);
-                  if (next.has(key)) next.delete(key);
-                  else if (next.size < 3) next.add(key);
+                  if (next.has(key)) {
+                    if (next.size > 1) next.delete(key); // keep at least 1 active
+                  } else if (next.size < 3) {
+                    next.add(key);
+                  }
                   return next;
                 });
               }}

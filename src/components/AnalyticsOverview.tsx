@@ -30,6 +30,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
   const [days, setDays] = useState(28);
   const [subTab, setSubTab] = useState<SubTab>('insights');
   const [activeLines, setActiveLines] = useState<Set<string>>(new Set(['clicks', 'users']));
+  const [showAllInsights, setShowAllInsights] = useState(false);
 
   const overview = useAnalyticsOverview(workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days);
   const { data: insights = [], isLoading: insightsLoading } = useClientInsights(workspaceId, true);
@@ -102,8 +103,8 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
               summary={summary}
               loading={feedLoading}
               showPills
-              limit={5}
-              onViewAll={() => setSubTab('insights')}
+              limit={showAllInsights ? undefined : 5}
+              onViewAll={() => setShowAllInsights(true)}
             />
           </SectionCard>
 

@@ -73,7 +73,7 @@ export function useAnalyticsOverview(
         date: t.date,
         clicks: t.clicks,
         impressions: t.impressions,
-        ctr: Math.round(t.ctr * 100 * 10) / 10, // Convert to percentage, round to 1 decimal
+        ctr: Math.round(t.ctr * 10) / 10, // Already a percentage from GSC API, just round
         position: Math.round(t.position * 10) / 10, // Round to 1 decimal
         users: 0,
         sessions: 0,

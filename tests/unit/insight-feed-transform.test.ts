@@ -104,7 +104,7 @@ describe('transformToFeedInsight', () => {
       const insight = makeInsight({
         insightType: 'ctr_opportunity',
         severity: 'opportunity',
-        data: { ctr: 1.2, expectedCtr: 4.8, impressions: 5000 },
+        data: { actualCtr: 1.2, expectedCtr: 4.8, impressions: 5000 },
       });
       const result = transformToFeedInsight(insight);
       expect(result.headline).toContain('CTR 1.2% vs 4.8% expected');
