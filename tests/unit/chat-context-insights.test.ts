@@ -81,7 +81,7 @@ describe('buildInsightsContext', () => {
 
   it('includes quick wins section', () => {
     const insights: AnalyticsInsight[] = [
-      { id: '1', workspaceId: 'ws1', pageId: 'https://example.com/blog', insightType: 'quick_win', data: { query: 'seo tips', currentPosition: 7, impressions: 2000, estimatedTrafficGain: 175, pageUrl: 'https://example.com/blog' }, severity: 'opportunity', computedAt: new Date().toISOString() },
+      { id: '1', workspaceId: 'ws1', pageId: 'https://example.com/blog', insightType: 'ranking_opportunity', data: { query: 'seo tips', currentPosition: 7, impressions: 2000, estimatedTrafficGain: 175, pageUrl: 'https://example.com/blog' }, severity: 'opportunity', computedAt: new Date().toISOString() },
     ];
     const result = buildInsightsContext(insights);
     expect(result).toContain('QUICK WINS');
@@ -110,7 +110,7 @@ describe('buildInsightsContext', () => {
   it('groups multiple insight types together', () => {
     const insights: AnalyticsInsight[] = [
       { id: '1', workspaceId: 'ws1', pageId: 'https://example.com/blog', insightType: 'page_health', data: { score: 72, trend: 'stable', clicks: 500, impressions: 8000, position: 3.2, ctr: 0.0625, pageviews: 1200, bounceRate: 0, avgEngagementTime: 120 }, severity: 'positive', computedAt: new Date().toISOString() },
-      { id: '2', workspaceId: 'ws1', pageId: 'https://example.com/blog', insightType: 'quick_win', data: { query: 'seo tips', currentPosition: 7, impressions: 2000, estimatedTrafficGain: 175, pageUrl: 'https://example.com/blog' }, severity: 'opportunity', computedAt: new Date().toISOString() },
+      { id: '2', workspaceId: 'ws1', pageId: 'https://example.com/blog', insightType: 'ranking_opportunity', data: { query: 'seo tips', currentPosition: 7, impressions: 2000, estimatedTrafficGain: 175, pageUrl: 'https://example.com/blog' }, severity: 'opportunity', computedAt: new Date().toISOString() },
       { id: '3', workspaceId: 'ws1', pageId: null, insightType: 'cannibalization', data: { query: 'seo', pages: ['https://example.com/a', 'https://example.com/b'], positions: [3, 8] }, severity: 'warning', computedAt: new Date().toISOString() },
     ];
     const result = buildInsightsContext(insights);

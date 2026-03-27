@@ -1709,7 +1709,7 @@ ${info.steps.length ? `- How-To Steps Detected (${info.steps.length}): ${info.st
 ${info.videoUrls.length ? `- Video Embed URLs Detected: ${info.videoUrls.join(', ')}` : ''}
 ${(ctx._gscPageData || ctx._ga4PageData) ? `
 SEARCH PERFORMANCE (this page — use to prioritize richness and breadth of schema):
-${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} impressions/90d | ${ctx._gscPageData.clicks.toLocaleString()} clicks | Avg Position: ${ctx._gscPageData.position.toFixed(1)} | CTR: ${(ctx._gscPageData.ctr * 100).toFixed(2)}%` : ''}
+${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} impressions/90d | ${ctx._gscPageData.clicks.toLocaleString()} clicks | Avg Position: ${ctx._gscPageData.position.toFixed(1)} | CTR: ${ctx._gscPageData.ctr.toFixed(1)}%` : ''}
 ${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
 High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
 ${buildSchemaIntelligenceBlock(ctx)}

@@ -61,7 +61,7 @@ function QuickWinsCard({
   tier: 'free' | 'growth' | 'premium';
   loading: boolean;
 }) {
-  const quickWins = insights.filter(i => i.insightType === 'quick_win');
+  const quickWins = insights.filter(i => i.insightType === 'ranking_opportunity');
 
   const cardAction =
     tier === 'premium' ? (

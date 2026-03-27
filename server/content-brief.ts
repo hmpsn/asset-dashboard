@@ -840,7 +840,7 @@ The outline sections MUST match the following template sections in order. You ma
           .filter(i => i.insightType === 'content_decay')
           .map(i => ({ pageId: i.pageId || '', ...(i.data as unknown as ContentDecayData) })),
         quickWins: allInsights
-          .filter(i => i.insightType === 'quick_win')
+          .filter(i => i.insightType === 'ranking_opportunity')
           .map(i => i.data as unknown as QuickWinData)
           .map(d => ({ pageUrl: d.pageUrl, query: d.query, currentPosition: d.currentPosition, estimatedTrafficGain: d.estimatedTrafficGain })),
         pageHealthScores: allInsights

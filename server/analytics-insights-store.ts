@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
+import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
 // ── SQLite row shape ──
 
@@ -13,17 +13,41 @@ interface InsightRow {
   data: string;
   severity: string;
   computed_at: string;
+  page_title: string | null;
+  strategy_keyword: string | null;
+  strategy_alignment: string | null;
+  audit_issues: string | null;
+  pipeline_status: string | null;
+  anomaly_linked: number | null;
+  impact_score: number | null;
+  domain: string | null;
 }
 
 const stmts = createStmtCache(() => ({
   upsert: db.prepare(`
-    INSERT INTO analytics_insights (id, workspace_id, page_id, insight_type, data, severity, computed_at)
-    VALUES (@id, @workspace_id, @page_id, @insight_type, @data, @severity, @computed_at)
+    INSERT INTO analytics_insights (
+      id, workspace_id, page_id, insight_type, data, severity, computed_at,
+      page_title, strategy_keyword, strategy_alignment, audit_issues,
+      pipeline_status, anomaly_linked, impact_score, domain
+    )
+    VALUES (
+      @id, @workspace_id, @page_id, @insight_type, @data, @severity, @computed_at,
+      @page_title, @strategy_keyword, @strategy_alignment, @audit_issues,
+      @pipeline_status, @anomaly_linked, @impact_score, @domain
+    )
     ON CONFLICT(workspace_id, COALESCE(page_id, '__workspace__'), insight_type) DO UPDATE SET
-      id          = excluded.id,
-      data        = excluded.data,
-      severity    = excluded.severity,
-      computed_at = excluded.computed_at
+      id                 = excluded.id,
+      data               = excluded.data,
+      severity           = excluded.severity,
+      computed_at        = excluded.computed_at,
+      page_title         = excluded.page_title,
+      strategy_keyword   = excluded.strategy_keyword,
+      strategy_alignment = excluded.strategy_alignment,
+      audit_issues       = excluded.audit_issues,
+      pipeline_status    = excluded.pipeline_status,
+      anomaly_linked     = excluded.anomaly_linked,
+      impact_score       = excluded.impact_score,
+      domain             = excluded.domain
   `),
   selectByWorkspace: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ?`,
@@ -48,6 +72,14 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     data: JSON.parse(row.data),
     severity: row.severity as InsightSeverity,
     computedAt: row.computed_at,
+    pageTitle: row.page_title ?? undefined,
+    strategyKeyword: row.strategy_keyword ?? undefined,
+    strategyAlignment: (row.strategy_alignment as AnalyticsInsight['strategyAlignment']) ?? undefined,
+    auditIssues: row.audit_issues ?? undefined,
+    pipelineStatus: (row.pipeline_status as AnalyticsInsight['pipelineStatus']) ?? undefined,
+    anomalyLinked: row.anomaly_linked != null ? row.anomaly_linked !== 0 : undefined,
+    impactScore: row.impact_score ?? undefined,
+    domain: (row.domain as InsightDomain) ?? undefined,
   };
 }
 
@@ -57,6 +89,15 @@ export interface UpsertInsightParams {
   insightType: InsightType;
   data: Record<string, unknown>;
   severity: InsightSeverity;
+  // Enrichment fields (Phase 1)
+  pageTitle?: string | null;
+  strategyKeyword?: string | null;
+  strategyAlignment?: string | null;
+  auditIssues?: string | null;
+  pipelineStatus?: string | null;
+  anomalyLinked?: boolean;
+  impactScore?: number;
+  domain?: InsightDomain;
 }
 
 export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
@@ -71,6 +112,14 @@ export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
     data: JSON.stringify(params.data),
     severity: params.severity,
     computed_at: now,
+    page_title: params.pageTitle ?? null,
+    strategy_keyword: params.strategyKeyword ?? null,
+    strategy_alignment: params.strategyAlignment ?? null,
+    audit_issues: params.auditIssues ?? null,
+    pipeline_status: params.pipelineStatus ?? null,
+    anomaly_linked: params.anomalyLinked ? 1 : 0,
+    impact_score: params.impactScore ?? 0,
+    domain: params.domain ?? 'cross',
   });
 
   // Fetch back to get the actual row (id may differ on conflict-replace)

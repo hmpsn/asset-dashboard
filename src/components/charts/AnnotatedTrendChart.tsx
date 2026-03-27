@@ -28,15 +28,18 @@ export interface TrendLine {
   color: string;
   yAxisId: 'left' | 'right';
   label: string;
+  active?: boolean;  // whether this line is currently displayed (default true)
 }
 
 interface AnnotatedTrendChartProps {
   data: Record<string, unknown>[];
-  lines: TrendLine[];
+  lines: TrendLine[];              // ALL available lines (active + inactive)
   annotations: Annotation[];
   dateKey?: string;
   height?: number;
   onCreateAnnotation?: (date: string, label: string, category: string) => void;
+  onToggleLine?: (key: string) => void;  // callback when a line chip is clicked
+  maxActiveLines?: number;                // default 3
 }
 
 // ── Annotation dot (hover target at top of ReferenceLine) ──
@@ -153,6 +156,8 @@ export function AnnotatedTrendChart({
   dateKey = 'date',
   height = 220,
   onCreateAnnotation,
+  onToggleLine,
+  maxActiveLines = 3,
 }: AnnotatedTrendChartProps) {
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -178,8 +183,38 @@ export function AnnotatedTrendChart({
     [onCreateAnnotation, annotations],
   );
 
+  const activeLines = lines.filter(l => l.active !== false);
+
   return (
     <div ref={containerRef} className="relative">
+      {onToggleLine && (
+        <div className="flex gap-1 mb-2">
+          {lines.map(line => {
+            const isActive = line.active !== false;
+            const atMax = activeLines.length >= maxActiveLines;
+            return (
+              <button
+                key={line.key}
+                onClick={() => onToggleLine(line.key)}
+                disabled={!isActive && atMax}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                  isActive
+                    ? 'text-white'
+                    : atMax
+                      ? 'border text-zinc-600 border-zinc-800 cursor-not-allowed'
+                      : 'border hover:border-opacity-60'
+                }`}
+                style={isActive
+                  ? { backgroundColor: line.color }
+                  : { borderColor: `${line.color}60`, color: line.color }
+                }
+              >
+                {line.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={data} onClick={handleChartClick as unknown as (state: unknown) => void}>
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
@@ -193,8 +228,8 @@ export function AnnotatedTrendChart({
               return m && d ? `${Number(m)}/${Number(d)}` : v;
             }}
           />
-          {/* Left Y-axis (only if we have a left-axis line) */}
-          {lines.some(l => l.yAxisId === 'left') && (
+          {/* Left Y-axis (only if we have an active left-axis line) */}
+          {activeLines.some(l => l.yAxisId === 'left') && (
             <YAxis
               yAxisId="left"
               tick={{ fill: '#71717a', fontSize: 10 }}
@@ -203,8 +238,8 @@ export function AnnotatedTrendChart({
               width={45}
             />
           )}
-          {/* Right Y-axis (only if we have a right-axis line) */}
-          {lines.some(l => l.yAxisId === 'right') && (
+          {/* Right Y-axis (only if we have an active right-axis line) */}
+          {activeLines.some(l => l.yAxisId === 'right') && (
             <YAxis
               yAxisId="right"
               orientation="right"
@@ -223,7 +258,7 @@ export function AnnotatedTrendChart({
             }}
             labelStyle={{ color: '#a1a1aa', fontFamily: 'monospace' }}
           />
-          {lines.map(line => (
+          {activeLines.map(line => (
             <Area
               key={line.key}
               type="monotone"
@@ -241,7 +276,7 @@ export function AnnotatedTrendChart({
             <ReferenceLine
               key={ann.id}
               x={ann.date}
-              yAxisId={lines.some(l => l.yAxisId === 'left') ? 'left' : 'right'}
+              yAxisId={activeLines.some(l => l.yAxisId === 'left') ? 'left' : 'right'}
               stroke={showLines ? (ANNOTATION_COLORS[ann.category] ?? ANNOTATION_COLORS.other) : 'transparent'}
               strokeDasharray="4 4"
               strokeWidth={1}

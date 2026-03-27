@@ -36,7 +36,7 @@ describe('GET /api/public/insights/:workspaceId', () => {
     upsertInsight({
       workspaceId: testWsId,
       pageId: '/blog/seo-tips',
-      insightType: 'quick_win',
+      insightType: 'ranking_opportunity',
       data: { query: 'seo tips', currentPosition: 8, estimatedTrafficGain: 120 },
       severity: 'opportunity',
     });
@@ -61,11 +61,12 @@ describe('GET /api/public/insights/:workspaceId', () => {
   });
 
   it('can filter by insightType query param', async () => {
-    const res = await api(`/api/public/insights/${testWsId}?type=quick_win`);
+    const res = await api(`/api/public/insights/${testWsId}?type=ranking_opportunity`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
-    expect(body.every((i: { insightType: string }) => i.insightType === 'quick_win')).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.every((i: { insightType: string }) => i.insightType === 'ranking_opportunity')).toBe(true);
   });
 
   it('returns 404 for unknown workspace', async () => {

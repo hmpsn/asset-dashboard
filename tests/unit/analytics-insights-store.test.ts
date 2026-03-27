@@ -35,14 +35,14 @@ describe('upsertInsight', () => {
     upsertInsight({
       workspaceId: wsId,
       pageId: '/home',
-      insightType: 'quick_win',
+      insightType: 'ranking_opportunity',
       data: { estimatedGain: 100 },
       severity: 'opportunity',
     });
     const updated = upsertInsight({
       workspaceId: wsId,
       pageId: '/home',
-      insightType: 'quick_win',
+      insightType: 'ranking_opportunity',
       data: { estimatedGain: 250 },
       severity: 'positive',
     });
@@ -51,7 +51,7 @@ describe('upsertInsight', () => {
     expect(updated.severity).toBe('positive');
 
     const results = getInsights(wsId);
-    const quickWins = results.filter(i => i.insightType === 'quick_win');
+    const quickWins = results.filter(i => i.insightType === 'ranking_opportunity');
     expect(quickWins).toHaveLength(1);
   });
 
@@ -98,9 +98,9 @@ describe('getInsights', () => {
 describe('getInsight', () => {
   it('returns a specific insight by workspace+page+type', () => {
     const wsId = 'ws_get_' + Date.now();
-    upsertInsight({ workspaceId: wsId, pageId: '/services', insightType: 'quick_win', data: { pos: 7 }, severity: 'opportunity' });
+    upsertInsight({ workspaceId: wsId, pageId: '/services', insightType: 'ranking_opportunity', data: { pos: 7 }, severity: 'opportunity' });
 
-    const insight = getInsight(wsId, '/services', 'quick_win');
+    const insight = getInsight(wsId, '/services', 'ranking_opportunity');
     expect(insight).toBeDefined();
     expect(insight!.data).toEqual({ pos: 7 });
   });

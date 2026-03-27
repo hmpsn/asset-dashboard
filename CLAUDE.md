@@ -112,6 +112,12 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 3. **Delete operations** — always read data before delete (for activity log context).
 4. **Activity logging** — all significant operations must call `addActivity()`.
 5. **STUDIO_NAME constant** — use the constant from `server/constants.ts`, never hard-code "hmpsn.studio".
+6. **Typed data contracts at boundaries** — when data flows between layers (backend → API → frontend, or between modules via JSON columns), define typed interfaces in `shared/types/` BEFORE implementing. Never use `Record<string, unknown>` for new data shapes. Specifically:
+   - New DB JSON columns → define a typed interface, not `Record<string, unknown>`
+   - New insight types → add to `InsightDataMap` in `shared/types/analytics.ts`
+   - New filter/category values → use shared const objects (like `INSIGHT_FILTER_KEYS`), not string literals
+   - Percentage vs decimal fields → add JSDoc: `/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */`
+   - Shared string enums between producer/consumer → single const object imported by both sides
 
 ## UI/UX Rules (mandatory)
 
@@ -123,6 +129,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 6. **Color coding** — follow the Three Laws strictly.
 7. **Accessibility** — proper ARIA labels, keyboard navigation, focus management.
 8. **Progressive disclosure** — show summary first, details on demand.
+9. **Extract shared interaction patterns** — when 2+ components implement the same user interaction (toggle logic, filter state, sort behavior), extract to a shared hook or utility. Don't let subagents independently re-implement the same logic — it drifts. Example: `useToggleSet(defaults, { min, max })` instead of 3 inline `useState<Set>` + toggle handlers.
 
 ---
 
@@ -135,6 +142,16 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
 - **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL)
 - **Large edits**: break into multiple smaller edits if > 300 lines
+- **Route removal checklist** — when removing or renaming a `Page` type value, update ALL of these in the same commit:
+  1. `src/routes.ts` — remove from `Page` union type
+  2. `src/App.tsx` — remove `renderContent()` case
+  3. `src/components/layout/Sidebar.tsx` — remove sidebar entry
+  4. `src/components/layout/Breadcrumbs.tsx` — remove from `TAB_LABELS`
+  5. `src/components/CommandPalette.tsx` — remove from `NAV_ITEMS`
+  6. Grep for `adminPath(*, 'old-route')` — update any navigation targets
+  7. Tests referencing the old route value
+- **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
+- **Test assertions on collections** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously, hiding real failures. Pattern: `expect(arr.length).toBeGreaterThan(0); expect(arr.every(fn)).toBe(true);`
 
 ---
 
