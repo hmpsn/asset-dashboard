@@ -5,7 +5,7 @@ export type Page =
   | 'links'
   | 'seo-strategy' | 'page-intelligence' | 'seo-schema' | 'seo-briefs' | 'seo-ranks'
   | 'content' | 'calendar' | 'brand' | 'subscriptions' | 'content-pipeline'
-  | 'search' | 'analytics' | 'annotations'
+  | 'analytics-hub'
   | 'performance'
   | 'content-perf'
   | 'rewrite'

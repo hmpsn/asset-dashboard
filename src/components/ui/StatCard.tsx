@@ -10,13 +10,15 @@ interface StatCardProps {
   sub?: string;
   delta?: number;
   deltaLabel?: string;
+  /** When true, negative delta = green (improvement), positive = red (regression). Use for metrics like bounce rate, avg position. */
+  invertDelta?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
 export function StatCard({
   label, value, icon: Icon, iconColor, valueColor, sub,
-  delta, deltaLabel, onClick, className,
+  delta, deltaLabel, invertDelta, onClick, className,
 }: StatCardProps) {
   const Tag = onClick ? 'button' : 'div';
   return (
@@ -36,7 +38,7 @@ export function StatCard({
           {value}
         </div>
         {delta !== undefined && delta !== 0 && (
-          <span className={`text-[11px] font-medium ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <span className={`text-[11px] font-medium ${(invertDelta ? delta < 0 : delta > 0) ? 'text-green-400' : 'text-red-400'}`}>
             {delta > 0 ? '+' : ''}{delta}{deltaLabel ?? ''}
           </span>
         )}

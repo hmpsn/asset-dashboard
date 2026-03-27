@@ -27,10 +27,8 @@ interface CommandPaletteProps {
 
 const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: string; needsSite?: boolean }> = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, group: '' },
-  { id: 'search', label: 'Search Console', icon: Search, group: 'Analytics', needsSite: true },
-  { id: 'analytics', label: 'Google Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
+  { id: 'analytics-hub', label: 'Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
   { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Analytics', needsSite: true },
-  { id: 'annotations', label: 'Annotations', icon: Flag, group: 'Analytics', needsSite: true },
   { id: 'seo-audit', label: 'Site Audit', icon: Globe, group: 'Site Health', needsSite: true },
   { id: 'performance', label: 'Performance', icon: Gauge, group: 'Site Health', needsSite: true },
   { id: 'links', label: 'Links', icon: Link2, group: 'Site Health', needsSite: true },

@@ -56,22 +56,22 @@ describe('Sidebar', () => {
 
   it('renders navigation items within groups', () => {
     renderSidebar();
-    expect(screen.getByText('Search Console')).toBeInTheDocument();
+    expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Site Audit')).toBeInTheDocument();
     expect(screen.getByText('SEO Editor')).toBeInTheDocument();
     expect(screen.getByText('Content Pipeline')).toBeInTheDocument();
   });
 
   it('highlights the active tab', () => {
-    renderSidebar({ tab: 'search' });
-    const searchBtn = screen.getByText('Search Console').closest('button')!;
-    expect(searchBtn.className).toContain('bg-blue-500/10');
+    renderSidebar({ tab: 'analytics-hub' });
+    const analyticsBtn = screen.getByText('Analytics').closest('button')!;
+    expect(analyticsBtn.className).toContain('bg-blue-500/10');
   });
 
   it('disables items that need a site when no site linked', () => {
     renderSidebar({ selected: WORKSPACES[1] }); // Beta has no webflowSiteId
-    const searchBtn = screen.getByText('Search Console').closest('button')!;
-    expect(searchBtn.className).toContain('cursor-not-allowed');
+    const analyticsBtn = screen.getByText('Analytics').closest('button')!;
+    expect(analyticsBtn.className).toContain('cursor-not-allowed');
   });
 
   it('shows pending content request badge', () => {
@@ -113,10 +113,10 @@ describe('Sidebar', () => {
   it('collapses group on click and re-expands', () => {
     renderSidebar();
     const analyticsHeader = screen.getByText('ANALYTICS');
-    expect(screen.getByText('Search Console')).toBeInTheDocument();
+    expect(screen.getByText('Analytics')).toBeInTheDocument();
     fireEvent.click(analyticsHeader);
-    expect(screen.queryByText('Search Console')).not.toBeInTheDocument();
+    expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
     fireEvent.click(analyticsHeader);
-    expect(screen.getByText('Search Console')).toBeInTheDocument();
+    expect(screen.getByText('Analytics')).toBeInTheDocument();
   });
 });

@@ -216,7 +216,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             icon={Search}
             iconColor="#22d3ee"
             sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
-            onClick={() => navigate(adminPath(workspaceId, 'search'))}
+            onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
           />
         ) : (
           <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} />
@@ -231,7 +231,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             delta={usersDelta ?? undefined}
             deltaLabel="%"
             sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
-            onClick={() => navigate(adminPath(workspaceId, 'analytics'))}
+            onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
           />
         ) : (
           <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} />
