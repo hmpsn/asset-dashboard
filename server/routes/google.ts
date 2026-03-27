@@ -34,6 +34,8 @@ import {
 import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
 import { listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('google-auth');
 
@@ -251,9 +253,6 @@ router.get('/api/google/search-comparison/:siteId', async (req, res) => {
 });
 
 // ── Analytics Annotations ─────────────────────────────────────────
-
-import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
-import { validate, z } from '../middleware/validate.js';
 
 const createAnnotationSchema = z.object({
   date: z.string().min(1, 'date is required'),
