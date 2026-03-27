@@ -553,10 +553,6 @@ export async function getOrComputeInsights(
   workspaceId: string,
   insightType?: InsightType,
 ): Promise<AnalyticsInsight[]> {
-export async function getOrComputeInsights(
-  workspaceId: string,
-  insightType?: InsightType,
-): Promise<AnalyticsInsight[]> {
   // Always check staleness against ALL workspace insights (not filtered),
   // so a computation cycle that legitimately produced zero results for a
   // given type is recognized as fresh.
@@ -578,7 +574,7 @@ export async function getOrComputeInsights(
   } catch (err) {
     log.warn({ err, workspaceId }, 'Failed to compute fresh insights, returning stale data');
     // Return stale data if we have it
-    if (existing.length > 0) return existing;
+    if (allExisting.length > 0) return insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
   }
 
   return getInsights(workspaceId, insightType);

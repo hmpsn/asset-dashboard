@@ -298,7 +298,6 @@ router.patch('/api/google/annotations/:workspaceId/:id', validate(updateAnnotati
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
-});
 
 router.delete('/api/google/annotations/:workspaceId/:id', (req, res) => {
   try {
