@@ -553,18 +553,22 @@ export async function getOrComputeInsights(
   workspaceId: string,
   insightType?: InsightType,
 ): Promise<AnalyticsInsight[]> {
-  const existing = getInsights(workspaceId, insightType);
+export async function getOrComputeInsights(
+  workspaceId: string,
+  insightType?: InsightType,
+): Promise<AnalyticsInsight[]> {
+  // Always check staleness against ALL workspace insights (not filtered),
+  // so a computation cycle that legitimately produced zero results for a
+  // given type is recognized as fresh.
+  const allExisting = getInsights(workspaceId);
 
-  // Check if a recent computation cycle ran — use the newest computedAt
-  // (orphaned insights from previous runs may have old timestamps, but if
-  // any insight was freshly computed, the whole batch was just refreshed)
-  if (existing.length > 0) {
-    const newestComputedAt = existing.reduce(
+  if (allExisting.length > 0) {
+    const newestComputedAt = allExisting.reduce(
       (newest, i) => (i.computedAt > newest ? i.computedAt : newest),
-      existing[0].computedAt,
+      allExisting[0].computedAt,
     );
     if (!isStale(newestComputedAt)) {
-      return existing;
+      return insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
     }
   }
 
