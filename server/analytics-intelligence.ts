@@ -25,7 +25,7 @@ import { getAllGscPages, getQueryPageData, paginateGscQuery } from './search-con
 import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
-import { upsertInsight, getInsights } from './analytics-insights-store.js';
+import { upsertInsight, getInsights, deleteStaleInsightsByType } from './analytics-insights-store.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -637,6 +637,11 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     'Fetched analytics data for intelligence computation',
   );
 
+  // Record cycle start time — after all upserts for a type, delete rows
+  // with computed_at older than this to prune insights that dropped out
+  // of the current top-N set.
+  const cycleStart = new Date().toISOString();
+
   // Compute each insight type
   if (gscPages.length > 0) {
     const healthInsights = computePageHealthScores(gscPages, ga4Pages);
@@ -649,6 +654,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         severity: insight.severity,
       });
     }
+    deleteStaleInsightsByType(workspaceId, 'page_health', cycleStart);
     log.info({ workspaceId, count: healthInsights.length }, 'Computed page health scores');
   }
 
@@ -664,6 +670,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         severity: insight.severity,
       });
     }
+    deleteStaleInsightsByType(workspaceId, 'quick_win', cycleStart);
     log.info({ workspaceId, count: Math.min(quickWins.length, 20) }, 'Computed quick wins');
 
     const cannibalization = computeCannibalizationInsights(queryPageData);
@@ -676,6 +683,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         severity: insight.severity,
       });
     }
+    deleteStaleInsightsByType(workspaceId, 'cannibalization', cycleStart);
     log.info({ workspaceId, count: Math.min(cannibalization.length, 15) }, 'Computed cannibalization insights');
   }
 
@@ -690,6 +698,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         severity: insight.severity,
       });
     }
+    deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
     log.info({ workspaceId, count: decayInsights.length }, 'Computed content decay insights');
   }
 
@@ -705,6 +714,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         severity: insight.severity,
       });
     }
+    deleteStaleInsightsByType(workspaceId, 'keyword_cluster', cycleStart);
     log.info({ workspaceId, count: Math.min(clusterInsights.length, 20) }, 'Computed keyword clusters');
   }
 
@@ -732,6 +742,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
                 severity: insight.severity,
               });
             }
+            deleteStaleInsightsByType(workspaceId, 'competitor_gap', cycleStart);
             log.info({ workspaceId, count: Math.min(gapInsights.length, 30) }, 'Computed competitor gap insights');
           }
         }
@@ -758,6 +769,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
             severity: insight.severity,
           });
         }
+        deleteStaleInsightsByType(workspaceId, 'conversion_attribution', cycleStart);
         log.info({ workspaceId, count: Math.min(conversionInsights.length, 20) }, 'Computed conversion attribution insights');
       }
     } catch (err) {

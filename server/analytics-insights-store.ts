@@ -100,3 +100,20 @@ export function deleteInsightsForWorkspace(workspaceId: string): number {
   const info = stmts().deleteByWorkspace.run(workspaceId);
   return info.changes;
 }
+
+/**
+ * Delete insights for a workspace+type whose computed_at is older than the given
+ * threshold. Used after a computation cycle to prune rows that dropped out of
+ * the current top-N set (e.g. a quick win that improved to position 2).
+ */
+export function deleteStaleInsightsByType(
+  workspaceId: string,
+  insightType: InsightType,
+  olderThan: string,
+): number {
+  const stmt = db.prepare(
+    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ?`,
+  );
+  const info = stmt.run(workspaceId, insightType, olderThan);
+  return info.changes;
+}

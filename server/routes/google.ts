@@ -253,6 +253,14 @@ router.get('/api/google/search-comparison/:siteId', async (req, res) => {
 // ── Analytics Annotations ─────────────────────────────────────────
 
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
+import { validate, z } from '../middleware/validate.js';
+
+const createAnnotationSchema = z.object({
+  date: z.string().min(1, 'date is required'),
+  label: z.string().min(1, 'label is required'),
+  category: z.string().min(1, 'category is required'),
+  createdBy: z.string().optional(),
+});
 
 router.get('/api/google/annotations/:workspaceId', (req, res) => {
   try {
@@ -264,9 +272,8 @@ router.get('/api/google/annotations/:workspaceId', (req, res) => {
   }
 });
 
-router.post('/api/google/annotations/:workspaceId', (req, res) => {
+router.post('/api/google/annotations/:workspaceId', validate(createAnnotationSchema), (req, res) => {
   const { date, label, category, createdBy } = req.body;
-  if (!date || !label || !category) return res.status(400).json({ error: 'date, label, and category required' });
   try {
     const result = createAnnotation({ workspaceId: req.params.workspaceId, date, label, category, createdBy });
     res.json(result);
