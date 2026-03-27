@@ -12,7 +12,7 @@ import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import type { GA4DailyTrend } from '../../shared/types/analytics';
 import { useAdminGA4 } from '../hooks/admin';
 
-type DataTab = 'overview' | 'events';
+type DataTab = 'overview' | 'events' | 'insights';
 
 interface Props {
   workspaceId: string;
@@ -139,6 +139,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       <TabBar
         tabs={[
           { id: 'overview', label: 'Overview', icon: BarChart3 },
+          { id: 'insights', label: 'Insights', icon: Target },
           { id: 'events', label: 'Events', icon: Zap },
         ]}
         active={tab}
@@ -348,12 +349,9 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         )}
       </>)}
 
-      {/* ═══════ TRAFFIC INSIGHTS (collapsible) ═══════ */}
-      <details className="group mt-2">
-        <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-300 transition-colors py-2 font-medium">
-          Traffic Insights
-        </summary>
-        <div className="space-y-4 mt-2">
+      {/* ═══════ INSIGHTS TAB ═══════ */}
+      {tab === 'insights' && (
+        <div className="space-y-4">
           {/* Traffic Health Summary */}
           <SectionCard title="Traffic Health Summary">
             <div className="grid grid-cols-4 gap-3">
@@ -506,7 +504,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
             )}
           </div>
         </div>
-      </details>
+      )}
 
     </div>
   );
