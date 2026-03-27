@@ -140,7 +140,8 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **User-facing strings**: follow `.windsurf/workflows/ui-vocabulary.md` canonical labels
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
-- **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL)
+- **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts` — never bare `JSON.parse` on DB columns.
+- **Array validation from DB** — when Zod-validating a JSON array column, validate items individually (filter out bad items) rather than validating the whole array (which drops ALL items if any one fails). See `server/approvals.ts` `rowToBatch` for the pattern.
 - **Large edits**: break into multiple smaller edits if > 300 lines
 - **Route removal checklist** — when removing or renaming a `Page` type value, update ALL of these in the same commit:
   1. `src/routes.ts` — remove from `Page` union type
