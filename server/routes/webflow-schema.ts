@@ -26,6 +26,7 @@ import {
   retractSchemaFromPage,
 } from '../webflow.js';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
+import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
@@ -192,6 +193,10 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     }
 
     res.json({ success: true, published });
+
+    // Trigger background llms.txt regeneration after schema publish
+    const llmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema publish error');

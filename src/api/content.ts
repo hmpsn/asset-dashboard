@@ -267,6 +267,9 @@ export const llmsTxt = {
   generate: (wsId: string) =>
     get<{ content: string; fullContent: string; pageCount: number; generatedAt: string }>(`/api/llms-txt/${wsId}`),
 
+  freshness: (wsId: string) =>
+    get<{ lastGeneratedAt: string | null }>(`/api/llms-txt/${wsId}/freshness`),
+
   downloadUrl: (wsId: string) =>
     `/api/llms-txt/${wsId}/download`,
 

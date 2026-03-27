@@ -289,8 +289,8 @@
           "source": "TOOL_AUDIT \u00a71h",
           "est": "1h",
           "priority": "P3",
-          "notes": "Include matrix cells with status >= approved as 'upcoming content' in LLMs.txt output.",
-          "status": "pending"
+          "notes": "Shipped \u2014 Included in Phase 4/5 overhaul: matrix cells with status != published included as upcoming content. Active content requests also included.",
+          "status": "done"
         },
         {
           "id": 433,
@@ -2777,6 +2777,20 @@
           "status": "done",
           "notes": "Shipped \u2014 Fixes Webflow internal site name injection in AI prompts. New getBrandName(ws) helper across 6 server files.",
           "shippedAt": "2026-03-16"
+        },
+        {
+          "id": 520,
+          "title": "Schema accuracy: Google Rich Results validation gate + 9 new page types + health dashboard",
+          "status": "done",
+          "notes": "Shipped \u2014 Phase 1: rule-based pre-publish validator (18 schema types, Google field requirements), schema_validations table, publish blocked on errors. Phase 2: 9 new page roles (job-posting, course, event, author, review, pricing, recipe, medical, financial), AI prompt disambiguation rules fixed. Phase 3: SchemaHealthDashboard component with per-page badges and expandable detail, publish gate badge on SchemaPageCard. GPT-4.1 model upgrade. Entity consistency checker.",
+          "shippedAt": "2026-03-27"
+        },
+        {
+          "id": 521,
+          "title": "LLMs.txt: two-tier output, AI summaries, URL validation, auto-regeneration, freshness tracking",
+          "status": "done",
+          "notes": "Shipped \u2014 Phase 4: AI-generated per-page summaries (GPT-4.1-mini, SQLite cache), two-tier output (llms.txt index + llms-full.txt with summaries), URL validation via HEAD requests, removed 50-page CMS cap (now 500), separate download buttons. Phase 5: background auto-regeneration on schema publish / strategy update / content matrix cell published, freshness timestamp tracked per workspace with UI indicator.",
+          "shippedAt": "2026-03-27"
         },
         {
           "id": 290,

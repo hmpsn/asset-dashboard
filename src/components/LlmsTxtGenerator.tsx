@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff, Clock } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState, PageHeader } from './ui';
 import { llmsTxt } from '../api/content';
 
@@ -14,6 +15,16 @@ interface LlmsTxtGeneratorProps {
   workspaceId: string;
 }
 
+function formatFreshness(ts: string | null | undefined): { label: string; color: string } {
+  if (!ts) return { label: 'Never generated', color: 'text-zinc-500' };
+  const ageMs = Date.now() - new Date(ts).getTime();
+  const hours = ageMs / (1000 * 60 * 60);
+  if (hours < 1) return { label: 'Generated just now', color: 'text-green-400' };
+  if (hours < 24) return { label: `Generated ${Math.round(hours)}h ago`, color: 'text-green-400' };
+  if (hours < 72) return { label: `Generated ${Math.round(hours / 24)}d ago`, color: 'text-amber-400' };
+  return { label: `Generated ${Math.round(hours / 24)}d ago — consider regenerating`, color: 'text-amber-400' };
+}
+
 export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
   const [data, setData] = useState<LlmsTxtResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,6 +32,15 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewMode, setPreviewMode] = useState<'index' | 'full'>('index');
+
+  const { data: freshnessData } = useQuery({
+    queryKey: ['llms-txt-freshness', workspaceId],
+    queryFn: () => llmsTxt.freshness(workspaceId),
+    staleTime: 60_000,
+    enabled: !!workspaceId,
+  });
+
+  const freshness = formatFreshness(freshnessData?.lastGeneratedAt ?? data?.generatedAt);
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -100,7 +120,14 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
     <div className="space-y-4">
       <PageHeader
         title="LLMs.txt Generator"
-        subtitle={data ? `${data.pageCount} pages · Generated ${new Date(data.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Generating…'}
+        subtitle={
+          <span className="flex items-center gap-2">
+            <span>{data ? `${data.pageCount} pages · Generated ${new Date(data.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Generating…'}</span>
+            <span className={`flex items-center gap-1 text-xs ${freshness.color}`}>
+              <Clock className="w-3 h-3" />{freshness.label}
+            </span>
+          </span>
+        }
         icon={<Bot className="w-5 h-5 text-teal-400" />}
         actions={
           <div className="flex items-center gap-2">

@@ -116,6 +116,64 @@ export function deleteSummary(workspaceId: string, pageUrl: string): boolean {
   return result.changes > 0;
 }
 
+// ── Freshness Tracking ──
+
+let _upsertFreshnessStmt: ReturnType<typeof db.prepare> | null = null;
+let _getFreshnessStmt: ReturnType<typeof db.prepare> | null = null;
+
+function upsertFreshnessStmt() {
+  if (!_upsertFreshnessStmt) {
+    _upsertFreshnessStmt = db.prepare(`
+      INSERT INTO llms_txt_freshness (workspace_id, last_generated_at, trigger)
+      VALUES (@workspace_id, @last_generated_at, @trigger)
+      ON CONFLICT(workspace_id) DO UPDATE SET
+        last_generated_at = excluded.last_generated_at,
+        trigger = excluded.trigger
+    `);
+  }
+  return _upsertFreshnessStmt;
+}
+
+function getFreshnessStmt() {
+  if (!_getFreshnessStmt) {
+    _getFreshnessStmt = db.prepare('SELECT last_generated_at FROM llms_txt_freshness WHERE workspace_id = ?');
+  }
+  return _getFreshnessStmt;
+}
+
+export function setLastGenerated(workspaceId: string, trigger?: string) {
+  upsertFreshnessStmt().run({
+    workspace_id: workspaceId,
+    last_generated_at: new Date().toISOString(),
+    trigger: trigger || null,
+  });
+}
+
+export function getLastGenerated(workspaceId: string): string | null {
+  const row = getFreshnessStmt().get(workspaceId) as { last_generated_at: string } | undefined;
+  return row?.last_generated_at ?? null;
+}
+
+// ── Background Regeneration ──
+
+/**
+ * Queue a background llms.txt regeneration for a workspace.
+ * Fire-and-forget — does not block the calling route.
+ */
+export function queueLlmsTxtRegeneration(workspaceId: string, trigger: string) {
+  // Use setImmediate so the calling request completes first
+  setImmediate(async () => {
+    try {
+      log.info({ workspaceId, trigger }, 'Auto-regenerating LLMs.txt');
+      await generateLlmsTxt(workspaceId);
+      setLastGenerated(workspaceId, trigger);
+      log.info({ workspaceId, trigger }, 'LLMs.txt auto-regeneration complete');
+    } catch (err) {
+      log.warn({ err, workspaceId, trigger }, 'LLMs.txt auto-regeneration failed (non-critical)');
+    }
+  });
+}
+
 // ── Helpers ──
 
 function slugToTitle(slug: string): string {
@@ -480,12 +538,17 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     pages,
   });
 
+  const generatedAt = new Date().toISOString();
+
+  // Persist freshness timestamp
+  try { setLastGenerated(workspaceId, 'manual'); } catch { /* non-critical */ }
+
   log.info({ workspaceId, pageCount: pages.length, plannedCount: plannedPages.length, summariesGenerated: needsSummary.length }, 'LLMs.txt generated (two-tier)');
 
   return {
     content,
     fullContent,
     pageCount: pages.length + plannedPages.length,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
   };
 }
