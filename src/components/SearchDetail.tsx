@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
+import { Search, ExternalLink, ArrowUpDown, Loader2, Target, FileText } from 'lucide-react';
 import { SectionCard, TabBar, DateRangeSelector, EmptyState } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
 import type { SearchQuery, SearchPage } from '../../shared/types/analytics';
 import { useAdminSearch } from '../hooks/admin';
+import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { useAnalyticsAnnotations, useCreateAnnotation } from '../hooks/admin/useAnalyticsAnnotations';
+import { InsightFeed } from './insights';
+import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
+import type { TrendLine } from './charts/AnnotatedTrendChart';
 
 interface Props {
   siteId: string;
@@ -12,18 +17,53 @@ interface Props {
 }
 
 type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-type DataTab = 'queries' | 'pages';
+type DataTab = 'insights' | 'queries' | 'pages';
 
-export function SearchDetail({ siteId, workspaceId: _workspaceId, gscPropertyUrl }: Props) {
-  const [tab, setTab] = useState<DataTab>('queries');
+const SEARCH_LINES: TrendLine[] = [
+  { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
+  { key: 'impressions', color: '#8b5cf6', yAxisId: 'left', label: 'Impressions' },
+  { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'CTR %' },
+  { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
+];
+
+export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
+  const [tab, setTab] = useState<DataTab>('insights');
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
+  const [activeSearchLines, setActiveSearchLines] = useState<Set<string>>(new Set(['clicks', 'impressions']));
 
   const {
-    overview, devices, countries, searchTypes,
+    overview, trend, devices, countries, searchTypes,
     isLoading, error,
   } = useAdminSearch(siteId, gscPropertyUrl, days);
+
+  const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
+  const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);
+  const createAnnotation = useCreateAnnotation(workspaceId);
+
+  const handleToggleLine = (key: string) => {
+    setActiveSearchLines(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const chartLines = SEARCH_LINES.map(l => ({ ...l, active: activeSearchLines.has(l.key) }));
+
+  // Map PerformanceTrend to chart-compatible format (ctr already as decimal, convert to %)
+  const chartData = trend.map(t => ({
+    date: t.date,
+    clicks: t.clicks,
+    impressions: t.impressions,
+    ctr: Math.round(t.ctr * 100 * 10) / 10,
+    position: Math.round(t.position * 10) / 10,
+  }));
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -160,73 +200,103 @@ export function SearchDetail({ siteId, workspaceId: _workspaceId, gscPropertyUrl
           {/* Tab navigation */}
           <TabBar
             tabs={[
-              { id: 'queries', label: 'Top Queries', icon: Search },
-              { id: 'pages', label: 'Top Pages', icon: ExternalLink },
+              { id: 'insights', label: 'Search Insights', icon: Target },
+              { id: 'queries', label: 'Queries', icon: Search },
+              { id: 'pages', label: 'Pages', icon: FileText },
             ]}
             active={tab}
             onChange={id => setTab(id as DataTab)}
           />
 
+          {/* Insights tab */}
+          {tab === 'insights' && (
+            <>
+              {chartData.length > 0 && (
+                <SectionCard title="Search Performance Trend">
+                  <AnnotatedTrendChart
+                    data={chartData}
+                    lines={chartLines}
+                    annotations={annotations}
+                    dateKey="date"
+                    height={220}
+                    onCreateAnnotation={(date, label, category) =>
+                      createAnnotation.mutate({ date, label, category })
+                    }
+                    onToggleLine={handleToggleLine}
+                  />
+                </SectionCard>
+              )}
+              <InsightFeed
+                feed={feed}
+                loading={feedLoading}
+                domain="search"
+                showFilterChips
+              />
+            </>
+          )}
+
           {/* Data tables */}
-          <SectionCard noPadding>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left py-3 px-4 text-zinc-500 font-medium">
-                    {tab === 'queries' ? 'Query' : 'Page'}
-                  </th>
-                  {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
-                    <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
-                      <button
-                        onClick={() => handleSort(key)}
-                        className="flex items-center gap-1 ml-auto hover:text-zinc-300 transition-colors"
-                      >
-                        {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
-                        {sortKey === key && <ArrowUpDown className="w-3 h-3" />}
-                      </button>
+          {(tab === 'queries' || tab === 'pages') && (
+            <SectionCard noPadding>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800">
+                    <th className="text-left py-3 px-4 text-zinc-500 font-medium">
+                      {tab === 'queries' ? 'Query' : 'Page'}
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tab === 'queries' && sortQueries(overview.topQueries).map((q, i) => (
-                  <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
-                    <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
-                    <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
-                        {q.position}
-                      </span>
-                    </td>
+                    {(['clicks', 'impressions', 'ctr', 'position'] as SortKey[]).map(key => (
+                      <th key={key} className="text-right py-3 px-3 text-zinc-500 font-medium">
+                        <button
+                          onClick={() => handleSort(key)}
+                          className="flex items-center gap-1 ml-auto hover:text-zinc-300 transition-colors"
+                        >
+                          {key === 'ctr' ? 'CTR' : key.charAt(0).toUpperCase() + key.slice(1)}
+                          {sortKey === key && <ArrowUpDown className="w-3 h-3" />}
+                        </button>
+                      </th>
+                    ))}
                   </tr>
-                ))}
-                {tab === 'pages' && sortPages(overview.topPages).map((p, i) => {
-                  let pagePath: string;
-                  try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
-                  return (
+                </thead>
+                <tbody>
+                  {tab === 'queries' && sortQueries(overview.topQueries).map((q, i) => (
                     <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">
-                        <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
-                          {pagePath}
-                          <ExternalLink className="w-3 h-3 flex-shrink-0 text-zinc-500" />
-                        </a>
-                      </td>
-                      <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
-                      <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
+                      <td className="py-2.5 px-4 text-zinc-300 font-medium">{q.query}</td>
+                      <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
+                      <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
+                      <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
                       <td className="py-2.5 px-3 text-right">
-                        <span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
-                          {p.position}
+                        <span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
+                          {q.position}
                         </span>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </SectionCard>
+                  ))}
+                  {tab === 'pages' && sortPages(overview.topPages).map((p, i) => {
+                    let pagePath: string;
+                    try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
+                    return (
+                      <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                        <td className="py-2.5 px-4 text-zinc-300 font-medium max-w-xs truncate">
+                          <a href={p.page} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
+                            {pagePath}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0 text-zinc-500" />
+                          </a>
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
+                        <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
+                            {p.position}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </SectionCard>
+          )}
         </>
       )}
     </div>
