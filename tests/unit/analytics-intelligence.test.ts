@@ -7,8 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computePageHealthScores,
-  computeQuickWins,
-  computeContentDecayInsights,
+  computeRankingOpportunities,
   computeCannibalizationInsights,
   isStale,
 } from '../../server/analytics-intelligence.js';
@@ -85,24 +84,24 @@ describe('computePageHealthScores', () => {
   });
 });
 
-// ── Quick Wins ───────────────────────────────────────────────────
+// ── Ranking Opportunities ─────────────────────────────────────────
 
-describe('computeQuickWins', () => {
+describe('computeRankingOpportunities', () => {
   const queryPageData: QueryPageRow[] = [
-    // Position 7, high impressions — should be a quick win
+    // Position 7, high impressions — should be a ranking opportunity
     { query: 'seo tips for beginners', page: 'https://example.com/blog/seo-tips', clicks: 45, impressions: 2000, ctr: 0.0225, position: 7 },
-    // Position 2, already top 3 — NOT a quick win
+    // Position 2, already top 3 — NOT a ranking opportunity
     { query: 'best seo agency', page: 'https://example.com/services', clicks: 150, impressions: 3000, ctr: 0.05, position: 2 },
-    // Position 12, decent impressions — quick win
+    // Position 12, decent impressions — ranking opportunity
     { query: 'local seo guide', page: 'https://example.com/blog/local-seo', clicks: 10, impressions: 800, ctr: 0.0125, position: 12 },
-    // Position 15, low impressions — below threshold, NOT a quick win
+    // Position 15, low impressions — below threshold, NOT a ranking opportunity
     { query: 'obscure seo term', page: 'https://example.com/blog/obscure', clicks: 1, impressions: 20, ctr: 0.05, position: 15 },
-    // Position 25, out of range — NOT a quick win
+    // Position 25, out of range — NOT a ranking opportunity
     { query: 'deep query', page: 'https://example.com/deep', clicks: 5, impressions: 500, ctr: 0.01, position: 25 },
   ];
 
   it('identifies pages in positions 4-20 with sufficient impressions', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     expect(results.length).toBe(2);
 
     const queries = results.map(r => r.data.query);
@@ -111,19 +110,19 @@ describe('computeQuickWins', () => {
   });
 
   it('excludes pages already in top 3', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     const queries = results.map(r => r.data.query);
     expect(queries).not.toContain('best seo agency');
   });
 
   it('excludes pages beyond position 20', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     const queries = results.map(r => r.data.query);
     expect(queries).not.toContain('deep query');
   });
 
   it('calculates estimated traffic gain', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     const seoTips = results.find(r => r.data.query === 'seo tips for beginners')!;
 
     expect(seoTips.data.estimatedTrafficGain).toBeGreaterThan(0);
@@ -132,13 +131,13 @@ describe('computeQuickWins', () => {
   });
 
   it('uses composite page::query as pageId for unique DB rows', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     const seoTips = results.find(r => r.data.query === 'seo tips for beginners')!;
     expect(seoTips.pageId).toBe('https://example.com/blog/seo-tips::seo tips for beginners');
   });
 
   it('sorts by estimated traffic gain descending', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     if (results.length > 1) {
       expect(results[0].data.estimatedTrafficGain).toBeGreaterThanOrEqual(
         results[1].data.estimatedTrafficGain,
@@ -147,63 +146,10 @@ describe('computeQuickWins', () => {
   });
 
   it('assigns opportunity severity', () => {
-    const results = computeQuickWins(queryPageData);
+    const results = computeRankingOpportunities(queryPageData);
     for (const r of results) {
       expect(r.severity).toBe('opportunity');
     }
-  });
-});
-
-// ── Content Decay ────────────────────────────────────────────────
-
-describe('computeContentDecayInsights', () => {
-  const currentPages: SearchPage[] = [
-    { page: 'https://example.com/blog/old-post', clicks: 50, impressions: 1000, ctr: 0.05, position: 8 },
-    { page: 'https://example.com/blog/stable-post', clicks: 100, impressions: 2000, ctr: 0.05, position: 5 },
-    { page: 'https://example.com/blog/growing-post', clicks: 200, impressions: 3000, ctr: 0.067, position: 4 },
-  ];
-
-  const previousPages: SearchPage[] = [
-    { page: 'https://example.com/blog/old-post', clicks: 150, impressions: 3000, ctr: 0.05, position: 5 },
-    { page: 'https://example.com/blog/stable-post', clicks: 105, impressions: 2100, ctr: 0.05, position: 5 },
-    { page: 'https://example.com/blog/growing-post', clicks: 100, impressions: 2000, ctr: 0.05, position: 6 },
-  ];
-
-  it('flags pages losing more than 20% clicks', () => {
-    const results = computeContentDecayInsights(currentPages, previousPages);
-    expect(results.length).toBe(1); // only old-post lost >20%
-    expect(results[0].pageId).toContain('old-post');
-  });
-
-  it('does not flag stable or growing pages', () => {
-    const results = computeContentDecayInsights(currentPages, previousPages);
-    const pageIds = results.map(r => r.pageId);
-    expect(pageIds).not.toContain(expect.stringContaining('stable-post'));
-    expect(pageIds).not.toContain(expect.stringContaining('growing-post'));
-  });
-
-  it('includes correct delta percentages', () => {
-    const results = computeContentDecayInsights(currentPages, previousPages);
-    const oldPost = results[0];
-    // 50 vs 150 = -66.7%
-    expect(oldPost.data.deltaPercent).toBeCloseTo(-66.7, 0);
-    expect(oldPost.data.baselineClicks).toBe(150);
-    expect(oldPost.data.currentClicks).toBe(50);
-  });
-
-  it('classifies severity based on decline magnitude', () => {
-    const results = computeContentDecayInsights(currentPages, previousPages);
-    const oldPost = results[0];
-    // 66.7% decline → critical (>50%)
-    expect(oldPost.severity).toBe('critical');
-  });
-
-  it('handles page present in current but missing from previous', () => {
-    const newPage: SearchPage = { page: 'https://example.com/blog/brand-new', clicks: 20, impressions: 100, ctr: 0.2, position: 3 };
-    const results = computeContentDecayInsights([...currentPages, newPage], previousPages);
-    // New page should not be flagged as decaying
-    const pageIds = results.map(r => r.pageId);
-    expect(pageIds).not.toContain(expect.stringContaining('brand-new'));
   });
 });
 

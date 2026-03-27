@@ -20,7 +20,7 @@ const mockInsights: AnalyticsInsight[] = [
     id: 'ins_002',
     workspaceId: 'ws_test',
     pageId: '/blog/seo-tips',
-    insightType: 'quick_win',
+    insightType: 'ranking_opportunity',
     data: {
       query: 'seo tips for beginners',
       currentPosition: 7,
@@ -116,7 +116,7 @@ describe('InsightCards', () => {
   });
 
   it('shows empty state when no quick wins exist', () => {
-    const noQuickWins = mockInsights.filter(i => i.insightType !== 'quick_win');
+    const noQuickWins = mockInsights.filter(i => i.insightType !== 'ranking_opportunity');
     render(
       <InsightCards
         workspaceId="ws_test"

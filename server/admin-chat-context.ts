@@ -158,9 +158,9 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     sections.push(`PAGE HEALTH SCORES (worst first):\n${lines.join('\n')}`);
   }
 
-  // Quick wins
+  // Ranking opportunities
   const quickWins = insights
-    .filter(i => i.insightType === 'quick_win')
+    .filter(i => i.insightType === 'ranking_opportunity')
     .map(i => i.data as unknown as QuickWinData)
     .sort((a, b) => b.estimatedTrafficGain - a.estimatedTrafficGain);
   if (quickWins.length > 0) {

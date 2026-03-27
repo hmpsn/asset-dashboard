@@ -26,6 +26,8 @@ import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights, deleteStaleInsightsByType } from './analytics-insights-store.js';
+import { buildEnrichmentContext, enrichInsight } from './insight-enrichment.js';
+import { loadDecayAnalysis } from './content-decay.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -142,7 +144,7 @@ export function computePageHealthScores(
   });
 }
 
-// ── Quick Wins ───────────────────────────────────────────────────
+// ── Ranking Opportunities (formerly Quick Wins) ──────────────────
 
 const QUICK_WIN_MIN_POSITION = 4;
 const QUICK_WIN_MAX_POSITION = 20;
@@ -152,7 +154,7 @@ const QUICK_WIN_MIN_IMPRESSIONS = 50;
  * Identify pages ranking in positions 4–20 with enough impressions to be
  * worth optimizing. Estimates traffic gain from reaching position 3.
  */
-export function computeQuickWins(
+export function computeRankingOpportunities(
   queryPageData: QueryPageRow[],
 ): ComputedInsight<QuickWinData>[] {
   const candidates = queryPageData.filter(
@@ -168,7 +170,7 @@ export function computeQuickWins(
 
     return {
       pageId: `${row.page}::${row.query}`, // composite key so each query-page pair gets its own DB row
-      insightType: 'quick_win',
+      insightType: 'ranking_opportunity',
       data: {
         query: row.query,
         currentPosition: row.position,
@@ -182,59 +184,6 @@ export function computeQuickWins(
 
   // Sort by estimated traffic gain descending
   results.sort((a, b) => b.data.estimatedTrafficGain - a.data.estimatedTrafficGain);
-
-  return results;
-}
-
-// ── Content Decay ────────────────────────────────────────────────
-
-const DECAY_THRESHOLD_PERCENT = -20; // flag pages losing more than 20% clicks
-
-/**
- * Compare current vs previous period page metrics to identify decaying content.
- * Pages losing >20% clicks are flagged.
- * Severity: critical (>50% loss), warning (>30%), opportunity (>20%).
- */
-export function computeContentDecayInsights(
-  currentPages: SearchPage[],
-  previousPages: SearchPage[],
-): ComputedInsight<ContentDecayData>[] {
-  const previousMap = new Map<string, SearchPage>();
-  for (const p of previousPages) {
-    previousMap.set(p.page, p);
-  }
-
-  const results: ComputedInsight<ContentDecayData>[] = [];
-
-  for (const current of currentPages) {
-    const previous = previousMap.get(current.page);
-    if (!previous || previous.clicks === 0) continue; // skip new pages or zero-baseline
-
-    const deltaPercent = ((current.clicks - previous.clicks) / previous.clicks) * 100;
-
-    if (deltaPercent > DECAY_THRESHOLD_PERCENT) continue; // not decaying enough
-
-    let severity: InsightSeverity;
-    if (deltaPercent <= -50) severity = 'critical';
-    else if (deltaPercent <= -30) severity = 'warning';
-    else severity = 'opportunity'; // 20–30% decline
-
-    results.push({
-      pageId: current.page,
-      insightType: 'content_decay',
-      data: {
-        baselineClicks: previous.clicks,
-        currentClicks: current.clicks,
-        deltaPercent: Math.round(deltaPercent * 10) / 10,
-        baselinePeriod: 'previous_30d',
-        currentPeriod: 'current_30d',
-      },
-      severity,
-    });
-  }
-
-  // Sort by worst decline first
-  results.sort((a, b) => a.data.deltaPercent - b.data.deltaPercent);
 
   return results;
 }
@@ -541,6 +490,154 @@ export function computeKeywordClusterInsights(
   return results;
 }
 
+// ── Ranking Movers ───────────────────────────────────────────────
+
+/**
+ * Compare current vs previous period query-page positions to identify
+ * significant rank changes (>3 positions). Returns top 30 by impact.
+ */
+export function computeRankingMovers(
+  currentQueryPages: QueryPageRow[],
+  previousQueryPages: QueryPageRow[],
+): Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
+  const results: Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> = [];
+  const prevMap = new Map<string, QueryPageRow>();
+  for (const row of previousQueryPages) {
+    prevMap.set(`${row.query}::${row.page}`, row);
+  }
+  for (const curr of currentQueryPages) {
+    const prev = prevMap.get(`${curr.query}::${curr.page}`);
+    if (!prev) continue;
+    const positionChange = prev.position - curr.position; // positive = improvement
+    if (Math.abs(positionChange) < 3) continue;
+    const severity: InsightSeverity = positionChange < -5 ? 'critical'
+      : positionChange < -3 ? 'warning'
+      : positionChange > 5 ? 'positive' : 'opportunity';
+    results.push({
+      insightType: 'ranking_mover' as const,
+      pageId: curr.page,
+      data: {
+        query: curr.query, pageUrl: curr.page,
+        currentPosition: Math.round(curr.position * 10) / 10,
+        previousPosition: Math.round(prev.position * 10) / 10,
+        positionChange: Math.round(positionChange * 10) / 10,
+        currentClicks: curr.clicks, previousClicks: prev.clicks,
+        impressions: curr.impressions,
+      },
+      severity,
+    });
+  }
+  return results.sort((a, b) => {
+    const aI = Math.abs(a.data.positionChange as number) * (a.data.impressions as number);
+    const bI = Math.abs(b.data.positionChange as number) * (b.data.impressions as number);
+    return bI - aI;
+  }).slice(0, 30);
+}
+
+// ── CTR Opportunities ────────────────────────────────────────────
+
+const CTR_OPPORTUNITY_MIN_IMPRESSIONS = 100;
+const CTR_OPPORTUNITY_THRESHOLD_RATIO = 0.70; // actual CTR must be < 70% of expected
+
+/**
+ * Find query-page pairs where actual CTR is significantly below the
+ * industry-average expected CTR for their position (100+ impressions).
+ * These pages may benefit from title/meta description optimization.
+ */
+export function computeCtrOpportunities(
+  queryPageData: QueryPageRow[],
+): Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
+  const results: Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> = [];
+
+  for (const row of queryPageData) {
+    if (row.impressions < CTR_OPPORTUNITY_MIN_IMPRESSIONS) continue;
+
+    const expectedCtr = expectedCtrForPosition(row.position);
+    // row.ctr from GSC is a decimal (0–1), not a percentage
+    const actualCtr = row.ctr;
+    if (expectedCtr === 0) continue;
+
+    const ctrRatio = actualCtr / expectedCtr;
+    if (ctrRatio >= CTR_OPPORTUNITY_THRESHOLD_RATIO) continue;
+
+    const severity: InsightSeverity = ctrRatio < 0.3 ? 'critical'
+      : ctrRatio < 0.5 ? 'warning'
+      : 'opportunity';
+
+    const ctrGap = Math.round((expectedCtr - actualCtr) * row.impressions);
+
+    results.push({
+      insightType: 'ctr_opportunity' as const,
+      pageId: `${row.page}::${row.query}`,
+      data: {
+        query: row.query,
+        pageUrl: row.page,
+        position: Math.round(row.position * 10) / 10,
+        actualCtr: Math.round(actualCtr * 10000) / 100, // percent with 2 dp
+        expectedCtr: Math.round(expectedCtr * 10000) / 100,
+        ctrRatio: Math.round(ctrRatio * 100) / 100,
+        impressions: row.impressions,
+        estimatedClickGap: Math.max(0, ctrGap),
+      },
+      severity,
+    });
+  }
+
+  // Sort by estimated click gap descending
+  return results
+    .sort((a, b) => (b.data.estimatedClickGap as number) - (a.data.estimatedClickGap as number))
+    .slice(0, 30);
+}
+
+// ── SERP Opportunities ───────────────────────────────────────────
+
+const SERP_OPPORTUNITY_MIN_IMPRESSIONS = 500;
+
+/**
+ * Flag high-impression pages that don't have schema markup.
+ * These are candidates for rich result eligibility.
+ */
+export function computeSerpOpportunities(
+  gscPages: SearchPage[],
+  pagesWithSchema: Set<string>,
+): Array<{ insightType: 'serp_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
+  const results: Array<{ insightType: 'serp_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> = [];
+
+  for (const page of gscPages) {
+    if (page.impressions < SERP_OPPORTUNITY_MIN_IMPRESSIONS) continue;
+
+    // Normalise URL to pathname for schema lookup
+    let pathname: string;
+    try {
+      pathname = new URL(page.page).pathname;
+    } catch {
+      pathname = page.page;
+    }
+
+    if (pagesWithSchema.has(pathname) || pagesWithSchema.has(page.page)) continue;
+
+    const severity: InsightSeverity = page.impressions >= 5000 ? 'warning' : 'opportunity';
+
+    results.push({
+      insightType: 'serp_opportunity' as const,
+      pageId: page.page,
+      data: {
+        pageUrl: page.page,
+        impressions: page.impressions,
+        clicks: page.clicks,
+        position: Math.round(page.position * 10) / 10,
+        ctr: page.ctr,
+        schemaStatus: 'missing',
+      },
+      severity,
+    });
+  }
+
+  return results
+    .sort((a, b) => (b.data.impressions as number) - (a.data.impressions as number))
+    .slice(0, 20);
+}
+
 // ── Orchestrator (lazy evaluation) ───────────────────────────────
 
 const log = createLogger('analytics-intelligence');
@@ -582,6 +679,8 @@ export async function getOrComputeInsights(
 
 /**
  * Compute all insight types for a workspace and persist to SQLite.
+ * Enriches every insight with page titles, strategy alignment, pipeline
+ * status, domain classification, and impact scores.
  */
 async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const ws = getWorkspace(workspaceId);
@@ -590,6 +689,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const siteId = ws.webflowSiteId;
   const gscUrl = ws.gscPropertyUrl;
   const ga4Id = ws.ga4PropertyId;
+
+  // Build enrichment context once for the full cycle
+  const enrichCtx = await buildEnrichmentContext(workspaceId);
 
   // Compute non-overlapping date ranges for decay comparison
   // Current: last 30 days (with 3-day GSC delay)
@@ -608,7 +710,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const previousDateRange: CustomDateRange = { startDate: fmt(prevStart), endDate: fmt(prevEnd) };
 
   // Fetch data in parallel, using the API cache
-  const [gscPages, queryPageData, ga4Pages, previousGscPages] = await Promise.all([
+  const [gscPages, queryPageData, ga4Pages, previousGscPages, previousQueryPageData] = await Promise.all([
     gscUrl && siteId
       ? apiCache.wrap(workspaceId, 'getAllGscPages', { range: currentDateRange }, () =>
           getAllGscPages(siteId, gscUrl, 30, currentDateRange),
@@ -624,13 +726,19 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           getGA4TopPages(ga4Id, 30, 100),
         )
       : [],
-    // Previous period for decay comparison (non-overlapping 30d window)
+    // Previous period GSC pages for decay comparison (non-overlapping 30d window)
     gscUrl && siteId
       ? apiCache.wrap(workspaceId, 'getAllGscPages_prev', { range: previousDateRange }, () =>
           getAllGscPages(siteId, gscUrl, 30, previousDateRange),
         )
       : [],
-  ]) as [SearchPage[], QueryPageRow[], GA4TopPage[], SearchPage[]];
+    // Previous period query-page data for ranking movers
+    gscUrl && siteId
+      ? apiCache.wrap(workspaceId, 'getQueryPageData_prev', { days: 30, maxRows: 2000, range: previousDateRange }, () =>
+          getQueryPageData(siteId, gscUrl, 30, { maxRows: 2000 }),
+        )
+      : [],
+  ]) as [SearchPage[], QueryPageRow[], GA4TopPage[], SearchPage[], QueryPageRow[]];
 
   log.info(
     { workspaceId, gscPages: gscPages.length, queryRows: queryPageData.length, ga4Pages: ga4Pages.length },
@@ -642,14 +750,34 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   // of the current top-N set.
   const cycleStart = new Date().toISOString();
 
+  /** Helper: enrich and upsert a single insight */
+  function enrichAndUpsert(insight: {
+    insightType: InsightType;
+    pageId: string | null;
+    data: Record<string, unknown>;
+    severity: InsightSeverity;
+  }): void {
+    const enrichment = enrichInsight(
+      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data },
+      enrichCtx,
+    );
+    upsertInsight({
+      workspaceId,
+      pageId: insight.pageId,
+      insightType: insight.insightType,
+      data: insight.data,
+      severity: insight.severity,
+      ...enrichment,
+    });
+  }
+
   // Compute each insight type
   if (gscPages.length > 0) {
     const healthInsights = computePageHealthScores(gscPages, ga4Pages);
     for (const insight of healthInsights) {
-      upsertInsight({
-        workspaceId,
-        pageId: insight.pageId,
+      enrichAndUpsert({
         insightType: 'page_health',
+        pageId: insight.pageId,
         data: insight.data as unknown as Record<string, unknown>,
         severity: insight.severity,
       });
@@ -659,26 +787,23 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   }
 
   if (queryPageData.length > 0) {
-    const quickWins = computeQuickWins(queryPageData);
-    for (const insight of quickWins.slice(0, 20)) {
-      // Cap at 20 quick wins
-      upsertInsight({
-        workspaceId,
+    const rankingOpps = computeRankingOpportunities(queryPageData);
+    for (const insight of rankingOpps.slice(0, 20)) {
+      enrichAndUpsert({
+        insightType: 'ranking_opportunity',
         pageId: insight.pageId,
-        insightType: 'quick_win',
         data: insight.data as unknown as Record<string, unknown>,
         severity: insight.severity,
       });
     }
-    deleteStaleInsightsByType(workspaceId, 'quick_win', cycleStart);
-    log.info({ workspaceId, count: Math.min(quickWins.length, 20) }, 'Computed quick wins');
+    deleteStaleInsightsByType(workspaceId, 'ranking_opportunity', cycleStart);
+    log.info({ workspaceId, count: Math.min(rankingOpps.length, 20) }, 'Computed ranking opportunities');
 
     const cannibalization = computeCannibalizationInsights(queryPageData);
     for (const insight of cannibalization.slice(0, 15)) {
-      upsertInsight({
-        workspaceId,
-        pageId: insight.pageId,
+      enrichAndUpsert({
         insightType: 'cannibalization',
+        pageId: insight.pageId,
         data: insight.data as unknown as Record<string, unknown>,
         severity: insight.severity,
       });
@@ -687,29 +812,40 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     log.info({ workspaceId, count: Math.min(cannibalization.length, 15) }, 'Computed cannibalization insights');
   }
 
-  if (gscPages.length > 0 && previousGscPages.length > 0) {
-    const decayInsights = computeContentDecayInsights(gscPages, previousGscPages);
-    for (const insight of decayInsights) {
-      upsertInsight({
-        workspaceId,
-        pageId: insight.pageId,
-        insightType: 'content_decay',
-        data: insight.data as unknown as Record<string, unknown>,
-        severity: insight.severity,
-      });
+  // Content decay — delegate to the standalone content-decay engine
+  {
+    const decayAnalysis = loadDecayAnalysis(workspaceId);
+    if (decayAnalysis && decayAnalysis.decayingPages.length > 0) {
+      for (const page of decayAnalysis.decayingPages) {
+        const severity: InsightSeverity =
+          page.severity === 'critical' ? 'critical'
+          : page.severity === 'warning' ? 'warning'
+          : 'opportunity';
+        enrichAndUpsert({
+          insightType: 'content_decay',
+          pageId: page.page,
+          data: {
+            baselineClicks: page.previousClicks,
+            currentClicks: page.currentClicks,
+            deltaPercent: page.clickDeclinePct,
+            baselinePeriod: 'previous_30d',
+            currentPeriod: 'current_30d',
+          },
+          severity,
+        });
+      }
+      deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
+      log.info({ workspaceId, count: decayAnalysis.decayingPages.length }, 'Loaded content decay insights from decay engine');
     }
-    deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
-    log.info({ workspaceId, count: decayInsights.length }, 'Computed content decay insights');
   }
 
   // Phase 3A: Keyword clustering
   if (queryPageData.length > 0) {
     const clusterInsights = computeKeywordClusterInsights(queryPageData);
     for (const insight of clusterInsights.slice(0, 20)) {
-      upsertInsight({
-        workspaceId,
-        pageId: insight.pageId,
+      enrichAndUpsert({
         insightType: 'keyword_cluster',
+        pageId: insight.pageId,
         data: insight.data as unknown as Record<string, unknown>,
         severity: insight.severity,
       });
@@ -734,10 +870,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           if (gapData.length > 0) {
             const gapInsights = computeCompetitorGapInsights(gapData, queryPageData);
             for (const insight of gapInsights.slice(0, 30)) {
-              upsertInsight({
-                workspaceId,
-                pageId: insight.pageId,
+              enrichAndUpsert({
                 insightType: 'competitor_gap',
+                pageId: insight.pageId,
                 data: insight.data as unknown as Record<string, unknown>,
                 severity: insight.severity,
               });
@@ -761,10 +896,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       if (landingPages.length > 0) {
         const conversionInsights = computeConversionAttributionInsights(landingPages);
         for (const insight of conversionInsights.slice(0, 20)) {
-          upsertInsight({
-            workspaceId,
-            pageId: insight.pageId,
+          enrichAndUpsert({
             insightType: 'conversion_attribution',
+            pageId: insight.pageId,
             data: insight.data as unknown as Record<string, unknown>,
             severity: insight.severity,
           });
@@ -775,5 +909,59 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     } catch (err) {
       log.warn({ err, workspaceId }, 'Failed to compute conversion attribution insights');
     }
+  }
+
+  // Phase 4: New insight types
+  if (queryPageData.length > 0 && previousQueryPageData.length > 0) {
+    const movers = computeRankingMovers(queryPageData, previousQueryPageData);
+    for (const insight of movers) {
+      enrichAndUpsert({
+        insightType: 'ranking_mover',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    deleteStaleInsightsByType(workspaceId, 'ranking_mover', cycleStart);
+    log.info({ workspaceId, count: movers.length }, 'Computed ranking movers');
+  }
+
+  if (queryPageData.length > 0) {
+    const ctrOpps = computeCtrOpportunities(queryPageData);
+    for (const insight of ctrOpps) {
+      enrichAndUpsert({
+        insightType: 'ctr_opportunity',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    deleteStaleInsightsByType(workspaceId, 'ctr_opportunity', cycleStart);
+    log.info({ workspaceId, count: ctrOpps.length }, 'Computed CTR opportunities');
+  }
+
+  if (gscPages.length > 0) {
+    // Load pages that already have schema markup from the DB (graceful fallback)
+    let pagesWithSchema = new Set<string>();
+    try {
+      const schemaDb = await import('./db/index.js');
+      const rows = schemaDb.default.prepare(
+        `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
+      ).all(workspaceId) as Array<{ page_path: string }>;
+      pagesWithSchema = new Set(rows.map(r => r.page_path));
+    } catch {
+      // schema_page_types table may not exist — proceed with empty set
+    }
+    const serpOpps = computeSerpOpportunities(gscPages, pagesWithSchema);
+    for (const insight of serpOpps) {
+      enrichAndUpsert({
+        insightType: 'serp_opportunity',
+        pageId: insight.pageId,
+        data: insight.data,
+        severity: insight.severity,
+      });
+    }
+    deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
+    log.info({ workspaceId, count: serpOpps.length }, 'Computed SERP opportunities');
   }
 }

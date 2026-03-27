@@ -268,7 +268,7 @@ export async function buildSchemaContext(
         // Extract the page URL prefix (before "::") for matching against page_health pageIds
         const quickWinPageUrls = new Set(
           allInsights
-            .filter(i => i.insightType === 'quick_win' && i.pageId)
+            .filter(i => i.insightType === 'ranking_opportunity' && i.pageId)
             .map(i => i.pageId!.split('::')[0]),
         );
         for (const insight of allInsights) {
