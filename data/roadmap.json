@@ -1026,6 +1026,15 @@
           "priority": "P4",
           "notes": "Embeddable site health badge, traffic counter. Passive referral generation.",
           "status": "pending"
+        },
+        {
+          "id": 522,
+          "title": "Typed data contracts audit — replace Record<string, unknown> across codebase",
+          "source": "Connected Intelligence PR review",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Audit all JSON-column stores and cross-layer data flows for untyped Record<string, unknown> patterns. Replace with typed interfaces in shared/types/. Add JSDoc unit-of-measure annotations for percentage/decimal fields. Add shared const objects for string enums used across producer/consumer boundaries. Priority targets: workspace config JSON, audit snapshot data, strategy objects, content pipeline metadata. Pattern established in PR #86 (InsightDataMap, INSIGHT_FILTER_KEYS, JSDoc on CTR/CVR fields).",
+          "status": "pending"
         }
       ]
     },
