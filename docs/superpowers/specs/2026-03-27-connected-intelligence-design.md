@@ -258,6 +258,7 @@ interface EnrichedInsight extends AnalyticsInsight {
 - Merge anomaly detection results into the insight store as `anomaly_digest` type
 - Site-level anomalies (traffic drops, score changes) appear in the Overview priority feed
 - Page-level correlation: when an anomaly is detected, link it to affected page insights
+- **Deduplication:** ongoing anomalies collapse into a single feed entry that updates rather than creating new items each detection cycle. Key on `(workspaceId, anomaly_type, metric)` — if an existing `anomaly_digest` insight matches, update its data (duration, current value) instead of inserting a duplicate. Display as "Traffic down 30% — ongoing for 5 days" rather than 10 separate entries. Only create a new feed entry when the anomaly resolves and a different one appears.
 
 ### 2.4 Insights → Admin Chat (enriched)
 
