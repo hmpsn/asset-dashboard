@@ -296,9 +296,13 @@ export function validateForGoogleRichResults(schema: Record<string, unknown>): V
         }
       }
 
-      // Rich result eligibility: type is eligible if it has no errors from its own rules
-      const typeHasErrors = nodeErrors.some(e => e.type === type);
-      if (RICH_RESULT_TYPES.has(type) && !typeHasErrors) {
+      // Rich result eligibility: type is eligible if ALL its required fields are present
+      const typeRules = RICH_RESULT_RULES[type];
+      const typeMissingRequired = typeRules ? typeRules.required.some(field => {
+        const val = node[field];
+        return val === undefined || val === null || val === '';
+      }) : false;
+      if (RICH_RESULT_TYPES.has(type) && !typeMissingRequired) {
         richResults.push(type);
       }
     }
