@@ -305,6 +305,53 @@ Phase 1 surfaces every computed insight (393 drops + 86 opportunities in product
 - **Feed caps** — Overview: 5 (existing). Detail tabs: 10 with expand (existing). Full "all insights" view: paginated, 25 per page.
 - **Severity recalibration** — review whether 393 "drops" is correct or whether the thresholds are too sensitive. A page going from position 3 → 6 is flagged the same as position 3 → 15. Consider scaling severity by absolute impact (traffic lost), not just position delta magnitude.
 
+### 2.9 Workspace Home Redesign — Action-First Briefing
+
+The current workspace home is a wall of stats and sections with no hierarchy. Redesign it as a **daily briefing** with two distinct sections:
+
+**Section 1: "Action Now"** (urgent, you need to do something)
+- Client content requests waiting for response (from `content_requests` with status `requested` or `changes_requested`)
+- Content in review that needs approval (from `approvals` with pending items)
+- Deliverables ready to send (posts with status `approved` not yet published)
+- Active pipeline items past their target date
+
+This section is **always visible** and shows a count badge. Zero items = green "All clear" state. Items sorted by age (oldest first — longest-waiting client request on top).
+
+**Section 2: "Flag to Client"** (strategic, prep for your next call)
+- **Data-backed upsell talking points** pulled from the insight engine:
+  - Content decay: "3 pages lost significant traffic — recommend content refresh" + estimated click recovery
+  - Schema gaps: "12 pages could qualify for rich results" + potential CTR improvement
+  - Ranking opportunities: "5 keywords within striking distance of page 1" + estimated traffic gain
+  - Competitor gaps: "Competitors rank for 8 keywords you don't cover" + total monthly volume
+- Each item shows: **what to say**, **why it matters** (data), and **what to sell** (the service/product)
+- Items are **not** auto-sent to the client — this is your prep sheet
+- Optional: "Copy talking point" button that formats the data for pasting into Slack/email
+- Tier-aware: only shows upsells for services available on the client's current tier or the next tier up
+
+**What gets removed/demoted from current home:**
+- StatCard row → moves to a compact summary bar (one line, not 8 cards)
+- WeeklyAccomplishments → moves to a collapsible "Recent Activity" section at bottom
+- SeoChangeImpact → embedded within "Flag to Client" when relevant (SEO changes become talking points)
+- RankingsSnapshot → moves to Analytics Hub (where it belongs)
+- ActivityFeed → collapsed by default, bottom of page
+
+**What stays:**
+- PageHeader with workspace name
+- ActiveRequestsAnnotations → absorbed into "Action Now"
+- Data freshness indicator
+
+The goal: open a workspace, spend 30 seconds reading, know exactly what to do and what to sell.
+
+### 2.10 Cross-Workspace Briefing (Command Center)
+
+Complement the per-workspace briefing with a **cross-workspace summary** on the Command Center (root `/` page):
+
+- "3 workspaces need attention" with the top action item per workspace
+- "5 upsell opportunities across all clients" ranked by estimated revenue impact
+- Quick-jump to the workspace that needs you most
+
+This turns the Command Center from a workspace picker into a daily starting point. Implementation: aggregate the top "Action Now" and "Flag to Client" items across all workspaces the admin manages.
+
 ---
 
 ## Phase 3: Client Intelligence
