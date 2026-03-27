@@ -234,12 +234,12 @@ export function AnnotatedTrendChart({
               name={line.label}
             />
           ))}
-          {/* Annotation reference lines */}
+          {/* Annotation reference lines — use whichever Y-axis is present */}
           {annotations.map(ann => (
             <ReferenceLine
               key={ann.id}
               x={ann.date}
-              yAxisId="left"
+              yAxisId={lines.some(l => l.yAxisId === 'left') ? 'left' : 'right'}
               stroke={showLines ? (ANNOTATION_COLORS[ann.category] ?? ANNOTATION_COLORS.other) : 'transparent'}
               strokeDasharray="4 4"
               strokeWidth={1}
