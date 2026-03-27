@@ -290,11 +290,44 @@ interface GapInput {
  * Score and classify competitor keyword gaps.
  * Enriches with our existing GSC position when available.
  */
+/**
+ * Extract brand-like tokens from a domain for branded query detection.
+ * "competitor-site.com" → ["competitor", "site", "competitorsite"]
+ * "acme.co" → ["acme"]
+ */
+function extractBrandTokens(domain: string): string[] {
+  // Strip TLD and www
+  const base = domain.replace(/^www\./, '').replace(/\.(com|co|io|ai|org|net|dev|app)$/i, '');
+  const tokens: string[] = [];
+  // Split on dots and hyphens
+  const parts = base.split(/[.\-]/);
+  for (const p of parts) {
+    if (p.length >= 3) tokens.push(p.toLowerCase());
+  }
+  // Also add the joined form (e.g., "competitorsite" from "competitor-site")
+  if (parts.length > 1) tokens.push(parts.join('').toLowerCase());
+  return tokens;
+}
+
+/** Check if a keyword is likely a branded search for a competitor */
+function isBrandedQuery(keyword: string, competitorBrandTokens: string[]): boolean {
+  const lower = keyword.toLowerCase();
+  return competitorBrandTokens.some(token => lower.includes(token));
+}
+
 export function computeCompetitorGapInsights(
   gapData: GapInput[],
   ourQueryData: QueryPageRow[],
 ): ComputedInsight<CompetitorGapData>[] {
   if (gapData.length === 0) return [];
+
+  // Build brand token sets for each competitor domain to filter branded queries
+  const brandTokensByDomain = new Map<string, string[]>();
+  for (const gap of gapData) {
+    if (!brandTokensByDomain.has(gap.competitorDomain)) {
+      brandTokensByDomain.set(gap.competitorDomain, extractBrandTokens(gap.competitorDomain));
+    }
+  }
 
   // Build a map of our best position per query
   const ourPositions = new Map<string, number>();
@@ -305,7 +338,13 @@ export function computeCompetitorGapInsights(
     }
   }
 
-  const results: ComputedInsight<CompetitorGapData>[] = gapData.map(gap => {
+  // Filter out branded competitor queries — not actionable
+  const filteredGapData = gapData.filter(gap => {
+    const tokens = brandTokensByDomain.get(gap.competitorDomain) ?? [];
+    return !isBrandedQuery(gap.keyword, tokens);
+  });
+
+  const results: ComputedInsight<CompetitorGapData>[] = filteredGapData.map(gap => {
     const ourPosition = ourPositions.get(gap.keyword) ?? null;
 
     let severity: InsightSeverity;
