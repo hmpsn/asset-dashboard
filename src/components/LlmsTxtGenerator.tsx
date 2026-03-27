@@ -5,6 +5,7 @@ import { llmsTxt } from '../api/content';
 
 interface LlmsTxtResult {
   content: string;
+  fullContent: string;
   pageCount: number;
   generatedAt: string;
 }
@@ -19,6 +20,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [previewMode, setPreviewMode] = useState<'index' | 'full'>('index');
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -34,15 +36,15 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
 
   const handleCopy = useCallback(async () => {
     if (!data) return;
+    const text = previewMode === 'full' ? data.fullContent : data.content;
     try {
-      await navigator.clipboard.writeText(data.content);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('LlmsTxtGenerator operation failed:', err);
-      // Fallback for older browsers
       const textarea = document.createElement('textarea');
-      textarea.value = data.content;
+      textarea.value = text;
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
@@ -50,18 +52,22 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-  }, [data]);
+  }, [data, previewMode]);
 
   const handleDownload = useCallback(() => {
-    // Direct link to the download endpoint
     window.open(llmsTxt.downloadUrl(workspaceId), '_blank');
   }, [workspaceId]);
 
-  // Count sections and lines in the generated content
+  const handleDownloadFull = useCallback(() => {
+    window.open(llmsTxt.downloadFullUrl(workspaceId), '_blank');
+  }, [workspaceId]);
+
+  const previewContent = data ? (previewMode === 'full' ? data.fullContent : data.content) : '';
+
   const stats = data ? {
-    lines: data.content.split('\n').filter(l => l.trim()).length,
-    sections: (data.content.match(/^## /gm) || []).length,
-    chars: data.content.length,
+    lines: previewContent.split('\n').filter(l => l.trim()).length,
+    sections: (previewContent.match(/^## /gm) || []).length,
+    chars: previewContent.length,
   } : null;
 
   if (!data && !loading && !error) {
@@ -112,7 +118,14 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
                 >
                   <Download className="w-3 h-3" />
-                  Download .txt
+                  llms.txt
+                </button>
+                <button
+                  onClick={handleDownloadFull}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/15 transition-colors"
+                >
+                  <Download className="w-3 h-3" />
+                  llms-full.txt
                 </button>
               </>
             )}
@@ -131,7 +144,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
       {loading && !data && (
         <div className="flex items-center justify-center py-24 gap-3">
           <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
-          <span className="text-sm text-zinc-400">Generating LLMs.txt…</span>
+          <span className="text-sm text-zinc-400">Generating LLMs.txt with AI summaries…</span>
         </div>
       )}
 
@@ -155,8 +168,24 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
 
           {/* Preview */}
           <SectionCard
-            title="LLMs.txt Preview"
+            title="Preview"
             titleIcon={<FileText className="w-4 h-4 text-teal-400" />}
+            titleExtra={
+              <div className="flex items-center gap-1 ml-2">
+                <button
+                  onClick={() => setPreviewMode('index')}
+                  className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${previewMode === 'index' ? 'bg-teal-500/15 text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  llms.txt
+                </button>
+                <button
+                  onClick={() => setPreviewMode('full')}
+                  className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${previewMode === 'full' ? 'bg-teal-500/15 text-teal-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  llms-full.txt
+                </button>
+              </div>
+            }
             action={
               <button
                 onClick={() => setShowPreview(!showPreview)}
@@ -171,7 +200,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
             {showPreview && (
               <div className="max-h-[500px] overflow-y-auto">
                 <pre className="px-4 py-3 text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed">
-                  {data.content}
+                  {previewContent}
                 </pre>
               </div>
             )}
@@ -191,11 +220,12 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
                 Similar to how <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">robots.txt</code> guides search engine crawlers, LLMs.txt helps AI systems understand your site&apos;s structure and content.
               </p>
               <p>
-                <strong className="text-zinc-300">How to use it:</strong> Download the file and place it at the root of your website (e.g., <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">yoursite.com/llms.txt</code>).
-                This can be done via Webflow&apos;s custom code settings or by hosting it on your CDN.
+                <strong className="text-zinc-300">Two files are generated:</strong> <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">llms.txt</code> is a lightweight index with links and one-line descriptions for quick discovery.
+                <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300 ml-1">llms-full.txt</code> includes AI-generated summaries per page for deep understanding.
               </p>
               <p>
-                <strong className="text-zinc-300">Benefits:</strong> Helps AI assistants accurately describe your business, improves how your site appears in AI-generated summaries, and ensures your content strategy reaches AI-powered search.
+                <strong className="text-zinc-300">How to use:</strong> Download both files and place them at the root of your website (e.g., <code className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-300">yoursite.com/llms.txt</code>).
+                This can be done via Webflow&apos;s custom code settings or by hosting on your CDN.
               </p>
             </div>
           </SectionCard>

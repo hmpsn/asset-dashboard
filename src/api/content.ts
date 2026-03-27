@@ -265,10 +265,13 @@ export const siteArchitecture = {
 
 export const llmsTxt = {
   generate: (wsId: string) =>
-    get<{ content: string; pageCount: number; generatedAt: string }>(`/api/llms-txt/${wsId}`),
+    get<{ content: string; fullContent: string; pageCount: number; generatedAt: string }>(`/api/llms-txt/${wsId}`),
 
   downloadUrl: (wsId: string) =>
     `/api/llms-txt/${wsId}/download`,
+
+  downloadFullUrl: (wsId: string) =>
+    `/api/llms-txt/${wsId}/download-full`,
 };
 
 // ── Content decay ───────────────────────────────────────────────
