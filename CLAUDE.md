@@ -202,6 +202,34 @@ Do not fix during unrelated tasks.
 
 ---
 
+## Parallel Agent Coordination (mandatory before dispatching subagents)
+
+Subagents are fully isolated — no shared state, no awareness of each other. Conflicts happen when two agents touch the same file or depend on output the other hasn't committed yet. Follow this protocol every time:
+
+### 1. Pre-commit shared contracts first
+Before any parallel agents start, identify every type, interface, or function signature that multiple agents will depend on. Define and **commit** these to the branch. Agents read from committed code, not from each other's in-progress work.
+
+Examples of shared contracts: new entries in `shared/types/`, new exports in barrel files (`src/hooks/admin/index.ts`), new query keys in `src/lib/queryKeys.ts`, new DB store functions that multiple routes will call.
+
+### 2. Assign exclusive file ownership
+Each agent task description must include:
+- **Owns** — exhaustive list of files it may create or modify
+- **Must not touch** — any file owned by another parallel agent
+
+If a file needs changes from more than one agent, it becomes a **sequential task** instead. No exceptions.
+
+### 3. Shared files are sequential
+Files commonly needed by multiple agents — route files, `analytics-insights-store.ts`, `shared/types/analytics.ts`, barrel exports — should be handled by one agent (or the orchestrator) after parallel work completes.
+
+### 4. Diff review checkpoint after each parallel batch
+After parallel agents finish, run:
+```bash
+git diff HEAD -- <list of shared files touched>
+```
+Check for: duplicate imports, conflicting function definitions, missed exports, mismatched type names. Fix before starting the next batch.
+
+---
+
 ## Quality Gates
 
 Work is not done until ALL pass:
