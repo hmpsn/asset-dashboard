@@ -21,6 +21,7 @@ import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 
 interface PageKeywordMap {
@@ -71,7 +72,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   // Invalidate intelligence signals cache on WebSocket event
   useWorkspaceEvents(workspaceId, {
-    'intelligence_signals_updated': () => {
+    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
     },
   });

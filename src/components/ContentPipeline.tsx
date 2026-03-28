@@ -4,6 +4,7 @@ import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown } from 'lucide-react';
 import { useContentPipeline } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
@@ -70,7 +71,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
 
   // Invalidate AI suggested briefs when intelligence signals update
   useWorkspaceEvents(workspaceId, {
-    'intelligence_signals_updated': () => {
+    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
     },
   });
