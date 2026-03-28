@@ -11,6 +11,7 @@ import type { Workspace } from './workspaces.js';
 const log = createLogger('monthly-digest');
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_CACHE_ENTRIES = 200; // bound memory: ~1 entry per workspace per active month
 const digestCache = new Map<string, { result: MonthlyDigestData; ts: number }>();
 
 /**
@@ -23,6 +24,9 @@ export async function generateMonthlyDigest(
 ): Promise<MonthlyDigestData> {
   const now = new Date();
   const monthLabel = month ?? now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // Parse the month label into actual dates so period/comparisons reflect the correct month
+  const targetDate = parseMonthLabel(monthLabel, now);
 
   const cacheKey = `${ws.id}:${monthLabel}`;
   const cached = digestCache.get(cacheKey);
@@ -92,8 +96,8 @@ export async function generateMonthlyDigest(
   const result: MonthlyDigestData = {
     month: monthLabel,
     period: {
-      start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
+      start: new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).toISOString(),
+      end: new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).toISOString(),
     },
     summary,
     wins,
@@ -102,6 +106,13 @@ export async function generateMonthlyDigest(
     roiHighlights,
   };
 
+  // Evict oldest entries if cache exceeds size cap
+  if (digestCache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = [...digestCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+    for (let i = 0; i < Math.ceil(MAX_CACHE_ENTRIES / 4); i++) {
+      digestCache.delete(oldest[i][0]);
+    }
+  }
   digestCache.set(cacheKey, { result, ts: now.getTime() });
   return result;
 }
@@ -184,4 +195,13 @@ Only mention specific numbers if they are notable (>10% change). Keep it concise
 
 function fallbackSummary(month: string, wins: number, issues: number): string {
   return `In ${month}, we continued optimizing your site's search performance. ${wins} improvement${wins === 1 ? '' : 's'} were identified and ${issues} issue${issues === 1 ? '' : 's'} were addressed.`;
+}
+
+/**
+ * Parse a month label like "March 2026" into a Date.
+ * Falls back to `fallback` if parsing fails.
+ */
+function parseMonthLabel(label: string, fallback: Date): Date {
+  const parsed = new Date(`${label} 1`);
+  return isNaN(parsed.getTime()) ? fallback : parsed;
 }

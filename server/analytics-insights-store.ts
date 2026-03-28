@@ -40,7 +40,6 @@ const stmts = createStmtCache(() => ({
       @pipeline_status, @anomaly_linked, @impact_score, @domain
     )
     ON CONFLICT(workspace_id, COALESCE(page_id, '__workspace__'), insight_type) DO UPDATE SET
-      id                 = excluded.id,
       data               = excluded.data,
       severity           = excluded.severity,
       computed_at        = excluded.computed_at,
