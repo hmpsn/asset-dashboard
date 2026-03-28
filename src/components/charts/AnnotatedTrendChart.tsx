@@ -1,5 +1,5 @@
 // src/components/charts/AnnotatedTrendChart.tsx
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
   ReferenceLine, CartesianGrid,
@@ -26,9 +26,16 @@ const CATEGORY_LABELS: Record<string, string> = {
 export interface TrendLine {
   key: string;
   color: string;
-  yAxisId: 'left' | 'right';
+  yAxisId: 'left' | 'right';  // kept for backward compat — overridden by dynamic assignment
   label: string;
   active?: boolean;  // whether this line is currently displayed (default true)
+}
+
+export interface ChartCallout {
+  date: string;
+  label: string;
+  detail: string;
+  color: string;
 }
 
 interface AnnotatedTrendChartProps {
@@ -40,6 +47,57 @@ interface AnnotatedTrendChartProps {
   onCreateAnnotation?: (date: string, label: string, category: string) => void;
   onToggleLine?: (key: string) => void;  // callback when a line chip is clicked
   maxActiveLines?: number;                // default 3
+  callouts?: ChartCallout[];              // optional chart callout bubbles
+}
+
+// ── Dynamic Y-axis assignment based on data scale ──
+function assignAxes(
+  activeLines: TrendLine[],
+  data: Record<string, unknown>[],
+): Map<string, 'left' | 'right'> {
+  const assignments = new Map<string, 'left' | 'right'>();
+  if (activeLines.length === 0) return assignments;
+
+  const maxValues = new Map<string, number>();
+  for (const line of activeLines) {
+    let max = 0;
+    for (const row of data) {
+      const v = Number(row[line.key]) || 0;
+      if (v > max) max = v;
+    }
+    maxValues.set(line.key, max || 1);
+  }
+
+  if (activeLines.length === 1) {
+    assignments.set(activeLines[0].key, 'left');
+    return assignments;
+  }
+
+  const sorted = [...activeLines].sort(
+    (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
+  );
+
+  assignments.set(sorted[0].key, 'left');
+  const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[1].key) ?? 1);
+  assignments.set(sorted[1].key, ratio < 10 ? 'left' : 'right');
+
+  if (sorted.length >= 3) {
+    const leftMax = maxValues.get(sorted[0].key) ?? 1;
+    const rightMax = assignments.get(sorted[1].key) === 'right'
+      ? (maxValues.get(sorted[1].key) ?? 1) : 0;
+    const thirdMax = maxValues.get(sorted[2].key) ?? 1;
+
+    if (rightMax === 0) {
+      const ratioToLeft = leftMax / thirdMax;
+      assignments.set(sorted[2].key, ratioToLeft < 10 ? 'left' : 'right');
+    } else {
+      const leftRatio = leftMax / thirdMax;
+      const rightRatio = rightMax > thirdMax ? rightMax / thirdMax : thirdMax / rightMax;
+      assignments.set(sorted[2].key, leftRatio < rightRatio ? 'left' : 'right');
+    }
+  }
+
+  return assignments;
 }
 
 // ── Annotation dot (hover target at top of ReferenceLine) ──
@@ -158,6 +216,7 @@ export function AnnotatedTrendChart({
   onCreateAnnotation,
   onToggleLine,
   maxActiveLines = 3,
+  callouts,
 }: AnnotatedTrendChartProps) {
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -185,36 +244,21 @@ export function AnnotatedTrendChart({
 
   const activeLines = lines.filter(l => l.active !== false);
 
+  // Dynamic Y-axis assignment based on data scale
+  const axisAssignments = useMemo(
+    () => assignAxes(activeLines, data),
+    [activeLines, data],
+  );
+
+  const hasLeftAxis = [...axisAssignments.values()].includes('left');
+  const hasRightAxis = [...axisAssignments.values()].includes('right');
+
+  // Color-code Y-axis labels: use the color of the first active line on that axis
+  const leftAxisColor = activeLines.find(l => axisAssignments.get(l.key) === 'left')?.color ?? '#71717a';
+  const rightAxisColor = activeLines.find(l => axisAssignments.get(l.key) === 'right')?.color ?? '#71717a';
+
   return (
     <div ref={containerRef} className="relative">
-      {onToggleLine && (
-        <div className="flex gap-1.5 mb-3">
-          {lines.map(line => {
-            const isActive = line.active !== false;
-            const atMax = activeLines.length >= maxActiveLines;
-            return (
-              <button
-                key={line.key}
-                onClick={() => onToggleLine(line.key)}
-                disabled={!isActive && atMax}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  isActive
-                    ? 'text-white shadow-sm'
-                    : atMax
-                      ? 'border text-zinc-600 border-zinc-800 cursor-not-allowed'
-                      : 'border hover:border-opacity-60'
-                }`}
-                style={isActive
-                  ? { backgroundColor: line.color }
-                  : { borderColor: `${line.color}60`, color: line.color }
-                }
-              >
-                {line.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={data} onClick={handleChartClick as unknown as (state: unknown) => void}>
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
@@ -228,25 +272,27 @@ export function AnnotatedTrendChart({
               return m && d ? `${Number(m)}/${Number(d)}` : v;
             }}
           />
-          {/* Left Y-axis (only if we have an active left-axis line) */}
-          {activeLines.some(l => l.yAxisId === 'left') && (
+          {/* Left Y-axis (dynamically assigned) */}
+          {hasLeftAxis && (
             <YAxis
               yAxisId="left"
-              tick={{ fill: '#71717a', fontSize: 10 }}
+              tick={{ fill: leftAxisColor, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               width={45}
+              stroke={leftAxisColor}
             />
           )}
-          {/* Right Y-axis (only if we have an active right-axis line) */}
-          {activeLines.some(l => l.yAxisId === 'right') && (
+          {/* Right Y-axis (dynamically assigned) */}
+          {hasRightAxis && (
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fill: '#71717a', fontSize: 10 }}
+              tick={{ fill: rightAxisColor, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               width={45}
+              stroke={rightAxisColor}
             />
           )}
           <Tooltip
@@ -263,7 +309,7 @@ export function AnnotatedTrendChart({
               key={line.key}
               type="monotone"
               dataKey={line.key}
-              yAxisId={line.yAxisId}
+              yAxisId={axisAssignments.get(line.key) ?? 'left'}
               stroke={line.color}
               fill={`${line.color}15`}
               strokeWidth={2}
@@ -276,13 +322,48 @@ export function AnnotatedTrendChart({
             <ReferenceLine
               key={ann.id}
               x={ann.date}
-              yAxisId={activeLines.some(l => l.yAxisId === 'left') ? 'left' : 'right'}
+              yAxisId={hasLeftAxis ? 'left' : 'right'}
               stroke={showLines ? (ANNOTATION_COLORS[ann.category] ?? ANNOTATION_COLORS.other) : 'transparent'}
               strokeDasharray="4 4"
               strokeWidth={1}
               label={({ viewBox }) => (
                 <AnnotationDot x={(viewBox as { x: number }).x} annotation={ann} />
               )}
+            />
+          ))}
+          {/* Callout bubbles — dashed reference lines with tooltip-style labels */}
+          {callouts?.map((callout, i) => (
+            <ReferenceLine
+              key={`callout-${i}`}
+              x={callout.date}
+              yAxisId={hasLeftAxis ? 'left' : 'right'}
+              stroke={callout.color}
+              strokeDasharray="6 3"
+              strokeWidth={1.5}
+              label={({ viewBox }) => {
+                const vx = (viewBox as { x: number }).x;
+                return (
+                  <foreignObject x={vx - 70} y={24} width={140} height={56}>
+                    <div
+                      className="rounded-lg px-2 py-1.5 shadow-lg text-center border"
+                      style={{
+                        backgroundColor: `${callout.color}18`,
+                        borderColor: `${callout.color}40`,
+                      }}
+                    >
+                      <span
+                        className="text-[10px] font-semibold block truncate"
+                        style={{ color: callout.color }}
+                      >
+                        {callout.label}
+                      </span>
+                      <span className="text-[9px] text-zinc-400 block truncate">
+                        {callout.detail}
+                      </span>
+                    </div>
+                  </foreignObject>
+                );
+              }}
             />
           ))}
         </AreaChart>
