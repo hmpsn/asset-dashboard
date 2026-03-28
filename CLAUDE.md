@@ -203,7 +203,8 @@ When dispatching parallel subagents or working on multi-phase features:
 | `.windsurf/workflows/stripe-integration.md` | Payment architecture |
 | `.windsurf/workflows/auth-system.md` | Auth architecture and flows |
 | `.windsurf/workflows/new-feature-checklist.md` | Before/during/after feature implementation |
-| `.windsurf/workflows/deploy.md` | Commit, push, verify deploy |
+| `.windsurf/workflows/deploy.md` | Commit, push, verify deploy (staging → main flow) |
+| `.windsurf/workflows/staging-environment.md` | Staging URLs, DB sync, feature flags, env vars |
 | `.windsurf/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `.windsurf/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
 | `.windsurf/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
