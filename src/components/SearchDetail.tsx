@@ -270,7 +270,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 >Pages</button>
               </div>
 
-              <div className="max-h-[450px] overflow-y-auto">
+              <div className="max-h-[500px] overflow-y-auto">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-zinc-900 z-10">
                   <tr className="border-b border-zinc-800">

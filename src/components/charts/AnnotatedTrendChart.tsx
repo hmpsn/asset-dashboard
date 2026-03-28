@@ -51,6 +51,11 @@ interface AnnotatedTrendChartProps {
 }
 
 // ── Dynamic Y-axis assignment based on data scale ──
+// Rate metrics (CTR, position, bounce rate, percentages) are always forced
+// to the right axis to prevent them from being crushed by volume metrics.
+// This mirrors Google Search Console's approach: counts on left, rates on right.
+const RATE_METRIC_KEYS = new Set(['ctr', 'position', 'bounceRate', 'avgSessionDuration']);
+
 function assignAxes(
   activeLines: TrendLine[],
   data: Record<string, unknown>[],
@@ -58,45 +63,55 @@ function assignAxes(
   const assignments = new Map<string, 'left' | 'right'>();
   if (activeLines.length === 0) return assignments;
 
-  const maxValues = new Map<string, number>();
-  for (const line of activeLines) {
-    let max = 0;
-    for (const row of data) {
-      const v = Number(row[line.key]) || 0;
-      if (v > max) max = v;
-    }
-    maxValues.set(line.key, max || 1);
-  }
+  // Split into volume metrics (left) and rate metrics (right)
+  const volumeLines = activeLines.filter(l => !RATE_METRIC_KEYS.has(l.key));
+  const rateLines = activeLines.filter(l => RATE_METRIC_KEYS.has(l.key));
 
-  if (activeLines.length === 1) {
-    assignments.set(activeLines[0].key, 'left');
+  // If only rate metrics active, put them on left (no need for right axis)
+  if (volumeLines.length === 0) {
+    for (const l of rateLines) assignments.set(l.key, 'left');
     return assignments;
   }
 
-  const sorted = [...activeLines].sort(
-    (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
-  );
+  // If only volume metrics active, use scale-based assignment
+  if (rateLines.length === 0) {
+    if (volumeLines.length === 1) {
+      assignments.set(volumeLines[0].key, 'left');
+      return assignments;
+    }
 
-  assignments.set(sorted[0].key, 'left');
-  const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[1].key) ?? 1);
-  assignments.set(sorted[1].key, ratio < 10 ? 'left' : 'right');
+    // Compute max values for scale comparison
+    const maxValues = new Map<string, number>();
+    for (const line of volumeLines) {
+      let max = 0;
+      for (const row of data) {
+        const v = Number(row[line.key]) || 0;
+        if (v > max) max = v;
+      }
+      maxValues.set(line.key, max || 1);
+    }
 
-  if (sorted.length >= 3) {
-    const leftMax = maxValues.get(sorted[0].key) ?? 1;
-    const rightMax = assignments.get(sorted[1].key) === 'right'
-      ? (maxValues.get(sorted[1].key) ?? 1) : 0;
-    const thirdMax = maxValues.get(sorted[2].key) ?? 1;
+    const sorted = [...volumeLines].sort(
+      (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
+    );
 
-    if (rightMax === 0) {
+    assignments.set(sorted[0].key, 'left');
+    const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[1].key) ?? 1);
+    assignments.set(sorted[1].key, ratio < 10 ? 'left' : 'right');
+
+    if (sorted.length >= 3) {
+      const leftMax = maxValues.get(sorted[0].key) ?? 1;
+      const thirdMax = maxValues.get(sorted[2].key) ?? 1;
       const ratioToLeft = leftMax / thirdMax;
       assignments.set(sorted[2].key, ratioToLeft < 10 ? 'left' : 'right');
-    } else {
-      const leftRatio = leftMax / thirdMax;
-      const rightRatio = rightMax > thirdMax ? rightMax / thirdMax : thirdMax / rightMax;
-      assignments.set(sorted[2].key, leftRatio < rightRatio ? 'left' : 'right');
     }
+
+    return assignments;
   }
 
+  // Mixed: volume metrics on left, rate metrics on right
+  for (const l of volumeLines) assignments.set(l.key, 'left');
+  for (const l of rateLines) assignments.set(l.key, 'right');
   return assignments;
 }
 
