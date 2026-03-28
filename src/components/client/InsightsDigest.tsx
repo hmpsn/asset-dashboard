@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
-import { InsightNarrative } from './InsightNarrative.js';
 import type {
   SearchOverview, SearchQuery, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary, GA4NewVsReturning, GA4OrganicOverview,
@@ -399,8 +398,6 @@ export function InsightsDigest(props: InsightsDigestProps) {
 
   return (
     <div className="space-y-3">
-      <InsightNarrative workspaceId={props.workspaceId} />
-
       <div className="flex items-center gap-2">
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
           <Sparkles className="w-3 h-3 text-teal-400" />
