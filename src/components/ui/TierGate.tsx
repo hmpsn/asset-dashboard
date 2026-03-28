@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Lock, Sparkles, ArrowRight } from 'lucide-react';
 
@@ -33,12 +33,16 @@ interface TierGateProps {
 export function TierGate({ tier, required, feature, teaser, children, className, compact, roiValue, onGateHit }: TierGateProps) {
   const hasAccess = TIER_LEVEL[tier] >= TIER_LEVEL[required];
 
-  // Fire onGateHit callback when gate is blocking
+  // Store callback in ref so callers don't need to memoize it
+  const onGateHitRef = useRef(onGateHit);
+  onGateHitRef.current = onGateHit;
+
+  // Fire onGateHit callback once when gate is blocking (ref keeps dep array stable)
   useEffect(() => {
-    if (!hasAccess && onGateHit) {
-      onGateHit(feature, required);
+    if (!hasAccess && onGateHitRef.current) {
+      onGateHitRef.current(feature, required);
     }
-  }, [hasAccess, feature, required, onGateHit]);
+  }, [hasAccess, feature, required]);
 
   if (hasAccess) return <>{children}</>;
 
