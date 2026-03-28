@@ -1994,7 +1994,7 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) 
 // --- Intelligence Signals ---
 // GET /api/webflow/keyword-strategy/:workspaceId/signals
 import { buildStrategySignals } from '../insight-feedback.js';
-import { getInsights } from '../analytics-insights-store.js';
+// getInsights already imported at top of file
 
 router.get('/api/webflow/keyword-strategy/:workspaceId/signals', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
