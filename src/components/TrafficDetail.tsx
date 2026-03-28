@@ -305,17 +305,17 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       )}
 
       {/* ── 6. Two-column grid — table spans all rows, sidebar cards stack ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_auto_auto_auto] gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_auto_auto_auto] gap-3 min-w-0">
         {/* Left: Top Pages — spans all 4 rows, fixed height with internal scroll */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 lg:row-span-4 flex flex-col" style={{ maxHeight: '80vh' }}>
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 lg:row-span-4 flex flex-col overflow-hidden min-w-0">
           <div className="flex items-center px-4 py-3 border-b border-zinc-800 rounded-t-xl shrink-0">
             <span className="text-sm font-semibold text-zinc-200">Top Pages</span>
           </div>
           <div className="space-y-1 overflow-y-auto flex-1 min-h-0 p-2">
             {topPages.map((p, i) => (
-              <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
-                <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
-                <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
+              <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50 min-w-0">
+                <span className="text-[11px] text-zinc-500 w-5 text-right shrink-0">{i + 1}</span>
+                <span className="text-xs text-zinc-300 flex-1 truncate font-mono min-w-0">{p.path}</span>
                 <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
                 <span className="text-[11px] text-zinc-500 w-14 text-right">{formatNumber(p.users)} u</span>
               </div>
