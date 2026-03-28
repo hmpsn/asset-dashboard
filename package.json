@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "db:migrate": "tsx server/db/migrate-json.ts",
+    "db:sync-staging": "tsx scripts/sync-staging-db.ts",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },

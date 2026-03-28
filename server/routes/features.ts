@@ -2,6 +2,7 @@ import { Router } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { getAllFlags } from '../feature-flags.js';
 
 const router = Router();
 
@@ -17,6 +18,11 @@ router.get('/api/features', (_req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to load features data' });
   }
+});
+
+/** Returns resolved feature flag values for the current environment. */
+router.get('/api/feature-flags', (_req, res) => {
+  res.json(getAllFlags());
 });
 
 export default router;

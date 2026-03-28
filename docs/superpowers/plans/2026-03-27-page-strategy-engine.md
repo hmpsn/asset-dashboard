@@ -10,7 +10,34 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-27-page-strategy-engine-design.md`
 
-**Prerequisite:** Phase 1 (Brandscript Engine) migration 026 must be in place. This plan assumes Phase 1 tables exist.
+**Prerequisite:** Phase 1 (Brandscript Engine) must be **fully complete, committed, and verified** before starting Phase 2. Migration 026, all shared types, all services, and all context builders must be in place.
+
+**Guardrails:** `docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md` — **READ BEFORE DISPATCHING AGENTS.** Contains file ownership maps, task dependency graphs, cross-phase contracts, and missing spec addendum items.
+
+**Coordination rules:** `.windsurf/rules/multi-agent-coordination.md`
+
+---
+
+## Task Dependencies
+
+```
+Sequential foundation:
+  Task 1 (Migration 027) → Task 2 (Shared Types + content.ts extension)
+
+Parallel services (after Task 2):
+  Task 3 (Blueprint CRUD) ∥ Task 4 (Blueprint Generator)
+
+Sequential shared-file tasks (after parallel batch completes + diff review):
+  Task 5 (Routes — reorder before param routes!) — creates server/routes/page-strategy.ts
+  Task 6 (App.ts route registration) — modifies server/app.ts
+  Task 7 (API client additions) — modifies src/api/brand-engine.ts
+
+Parallel frontend (after Task 7):
+  Task 8 (PageStrategyTab) ∥ Task 9 (BlueprintDetail) ∥ Task 10 (VersionHistory)
+
+Sequential shared frontend (after parallel batch completes + diff review):
+  Task 11 (BrandHub.tsx — add Page Strategy tab)
+```
 
 ---
 
@@ -157,17 +184,13 @@ export interface SectionPlanItem {
 
 // ═══ BLUEPRINT ENTRY ═══
 
-// IMPORTANT: BlueprintPageType is defined here for Phase 2 standalone use,
-// but per the Phase 2 spec addendum, the implementer MUST also extend
-// ContentPageType in shared/types/content.ts with the new values
-// (homepage, about, contact, faq, testimonials, custom) and then
-// replace ALL references to BlueprintPageType with ContentPageType
-// across both page-strategy.ts and this file. One enum, one source of truth.
-export type BlueprintPageType =
-  | 'homepage' | 'about' | 'contact' | 'faq' | 'testimonials'
-  | 'blog' | 'landing' | 'service' | 'location' | 'product'
-  | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide'
-  | 'pricing-page' | 'custom';
+// SPEC ADDENDUM §2: Do NOT create a separate BlueprintPageType.
+// Import ContentPageType from content.ts and use it everywhere.
+// Step 2 of this task extends ContentPageType with the new values.
+import type { ContentPageType } from './content';
+
+// Re-export for convenience — all blueprint code uses ContentPageType
+export type { ContentPageType as BlueprintPageType };
 
 export type EntryScope = 'included' | 'recommended';
 export type KeywordSource = 'ai_suggested' | 'semrush' | 'manual';
@@ -581,6 +604,15 @@ export function addEntry(
   const entries = stmts().selectEntriesByBlueprint.all(blueprintId) as EntryRow[];
   const maxOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.sort_order)) : -1;
 
+  // SPEC ADDENDUM §6: Section plan item IDs must be stable UUIDs.
+  // Generate UUIDs for any section plan items that don't already have one.
+  // Phase 3's copy_sections.section_plan_item_id references these — if they change,
+  // approved copy becomes orphaned.
+  const sectionPlan = (data.sectionPlan ?? []).map((item) => ({
+    ...item,
+    id: item.id || randomUUID(),
+  }));
+
   stmts().insertEntry.run({
     id,
     blueprint_id: blueprintId,
@@ -592,7 +624,7 @@ export function addEntry(
     primary_keyword: data.primaryKeyword ?? null,
     secondary_keywords: data.secondaryKeywords ? JSON.stringify(data.secondaryKeywords) : null,
     keyword_source: data.keywordSource ?? null,
-    section_plan: JSON.stringify(data.sectionPlan ?? []),
+    section_plan: JSON.stringify(sectionPlan),
     template_id: data.templateId ?? null,
     matrix_id: null,
     brief_id: null,
@@ -613,6 +645,18 @@ export function updateEntry(
   const existing = rowToEntry(row);
   const now = new Date().toISOString();
 
+  // SPEC ADDENDUM §6: Preserve existing section plan item IDs on update.
+  // Only generate new UUIDs for newly added sections. Never regenerate IDs
+  // for existing sections even if their content, order, or type changes.
+  let sectionPlan = data.sectionPlan;
+  if (sectionPlan) {
+    const existingIds = new Set(existing.sectionPlan.map((s) => s.id));
+    sectionPlan = sectionPlan.map((item) => ({
+      ...item,
+      id: item.id && existingIds.has(item.id) ? item.id : item.id || randomUUID(),
+    }));
+  }
+
   stmts().updateEntry.run({
     id: entryId,
     blueprint_id: blueprintId,
@@ -628,8 +672,8 @@ export function updateEntry(
         ? JSON.stringify(existing.secondaryKeywords)
         : null,
     keyword_source: data.keywordSource ?? existing.keywordSource ?? null,
-    section_plan: data.sectionPlan
-      ? JSON.stringify(data.sectionPlan)
+    section_plan: sectionPlan
+      ? JSON.stringify(sectionPlan)
       : JSON.stringify(existing.sectionPlan),
     template_id: data.templateId ?? existing.templateId ?? null,
     matrix_id: data.matrixId ?? existing.matrixId ?? null,

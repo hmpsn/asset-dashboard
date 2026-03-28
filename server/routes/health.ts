@@ -11,6 +11,7 @@ import { getGoogleCredentials } from '../google-auth.js';
 import { isStripeConfigured } from '../stripe.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
+import db from '../db/index.js';
 
 const router = Router();
 
@@ -154,6 +155,66 @@ router.post('/api/admin/storage/prune-activity', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Activity prune failed' });
   }
+});
+
+// ── DB sync (staging only) ────────────────────────────────────────────────────
+
+/**
+ * Export the SQLite database as a binary download.
+ * Checkpoints the WAL first so the exported file is fully consistent.
+ * Protected by the global APP_PASSWORD middleware.
+ */
+router.get('/api/admin/db-export', (_req, res) => {
+  const dbPath = path.join(DATA_ROOT, 'dashboard.db');
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: 'Database file not found' });
+  }
+  try {
+    db.pragma('wal_checkpoint(FULL)');
+  } catch {
+    // Non-fatal — export proceeds with whatever is in the main file
+  }
+  const stat = fs.statSync(dbPath);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="dashboard.db"');
+  res.setHeader('Content-Length', stat.size);
+  fs.createReadStream(dbPath).pipe(res);
+});
+
+/**
+ * Replace the SQLite database with an uploaded binary.
+ * Only available when ALLOW_DB_IMPORT=true (set on staging, never on production).
+ * Writes to a .incoming file, renames atomically, then exits so Render restarts.
+ */
+router.post('/api/admin/db-import', (req, res) => {
+  if (process.env.ALLOW_DB_IMPORT !== 'true') {
+    return res.status(403).json({ error: 'DB import is not enabled on this environment' });
+  }
+  const dbPath = path.join(DATA_ROOT, 'dashboard.db');
+  const incomingPath = `${dbPath}.incoming`;
+
+  // Collect binary body (express.raw() must be applied at call site)
+  const chunks: Buffer[] = [];
+  req.on('data', (chunk: Buffer) => chunks.push(chunk));
+  req.on('end', () => {
+    const body = Buffer.concat(chunks);
+    if (body.length < 100) {
+      return res.status(400).json({ error: 'Uploaded file appears empty or invalid' });
+    }
+    try {
+      fs.writeFileSync(incomingPath, body);
+      fs.renameSync(incomingPath, dbPath);
+      res.json({ ok: true, bytes: body.length, message: 'Database replaced. Restarting...' });
+      // Give the response time to flush, then restart so the new DB is opened fresh
+      setTimeout(() => process.exit(0), 500);
+    } catch (err) {
+      try { fs.unlinkSync(incomingPath); } catch { /* ignore */ }
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Import failed' });
+    }
+  });
+  req.on('error', (err) => {
+    res.status(500).json({ error: err.message });
+  });
 });
 
 export default router;
