@@ -551,9 +551,9 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             };
             const insightSeverity: InsightSeverity = severityMap[a.severity] ?? 'opportunity';
 
-            // Map anomaly type to insight domain
+            // Map anomaly type to insight domain — must match classifyDomain() in insight-enrichment.ts
             let domain: InsightDomain = 'cross';
-            if (a.type.includes('traffic') || a.type.includes('bounce')) {
+            if (a.type.includes('traffic') || a.type.includes('bounce') || a.type.includes('conversion')) {
               domain = 'traffic';
             } else if (a.type.includes('impression') || a.type.includes('position') || a.type.includes('ctr')) {
               domain = 'search';
