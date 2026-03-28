@@ -24,6 +24,8 @@ import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
 import { createLogger } from '../logger.js';
+import { buildPipelineSignals } from '../insight-feedback.js';
+import { getInsights } from '../analytics-insights-store.js';
 
 const log = createLogger('content-briefs');
 
@@ -365,9 +367,6 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
 });
 
 // --- AI Suggested Briefs (from insight engine feedback loop) ---
-import { buildPipelineSignals } from '../insight-feedback.js';
-import { getInsights } from '../analytics-insights-store.js';
-
 router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const insights = getInsights(req.params.workspaceId);

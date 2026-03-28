@@ -43,6 +43,7 @@ import db from '../db/index.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
+import { buildStrategySignals } from '../insight-feedback.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -1993,8 +1994,6 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) 
 
 // --- Intelligence Signals ---
 // GET /api/webflow/keyword-strategy/:workspaceId/signals
-import { buildStrategySignals } from '../insight-feedback.js';
-// getInsights already imported at top of file
 
 router.get('/api/webflow/keyword-strategy/:workspaceId/signals', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
