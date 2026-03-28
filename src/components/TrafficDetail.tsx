@@ -314,7 +314,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       )}
 
       {/* ── 6. Two-column layout — table left, sidebar right ── */}
-      <div className="flex flex-col lg:flex-row gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-3">
         {/* Left: Top Pages — height matches sidebar via ref measurement */}
         <div
           className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden min-w-0 lg:flex-[2]"

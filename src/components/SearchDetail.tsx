@@ -264,7 +264,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
           />
 
           {/* Step 5+6+7: Two-column layout — table left, sidebar right */}
-          <div className="flex flex-col lg:flex-row gap-3">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-3">
             {/* Left: Data table — height matches sidebar via ref measurement */}
             <div
               className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
