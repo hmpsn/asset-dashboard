@@ -149,15 +149,18 @@ function checkFile(file: string, check: Check): string[] {
 }
 
 // Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'tests', 'test-branding.ts'];
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'tests'];
+// Root-level files to skip (--exclude-dir doesn't work on files)
+const EXCLUDED_FILES = ['test-branding.ts'];
 
 function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
+  const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   const excludeFlag = check.exclude ? `--exclude="${path.basename(check.exclude)}"` : '';
   try {
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     return out.trim() ? out.trim().split('\n').filter(Boolean) : [];
@@ -180,7 +183,8 @@ for (const check of CHECKS) {
     const relevant = changedFiles.filter(f =>
       exts.some(ext => f.endsWith(ext)) &&
       (!check.exclude || !f.includes(check.exclude)) &&
-      !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d)
+      !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) &&
+      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
     );
     for (const file of relevant) {
       matches.push(...checkFile(file, check));
