@@ -86,7 +86,8 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
 
   try {
     const type = req.query.type as InsightType | undefined;
-    const insights = await getOrComputeInsights(ws.id, type);
+    const force = req.query.force === 'true';
+    const insights = await getOrComputeInsights(ws.id, type, { force });
     res.json(insights);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

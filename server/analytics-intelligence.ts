@@ -767,13 +767,14 @@ const log = createLogger('analytics-intelligence');
 export async function getOrComputeInsights(
   workspaceId: string,
   insightType?: InsightType,
+  opts?: { force?: boolean },
 ): Promise<AnalyticsInsight[]> {
   // Always check staleness against ALL workspace insights (not filtered),
   // so a computation cycle that legitimately produced zero results for a
   // given type is recognized as fresh.
   const allExisting = getInsights(workspaceId);
 
-  if (allExisting.length > 0) {
+  if (!opts?.force && allExisting.length > 0) {
     const newestComputedAt = allExisting.reduce(
       (newest, i) => (i.computedAt > newest ? i.computedAt : newest),
       allExisting[0].computedAt,
