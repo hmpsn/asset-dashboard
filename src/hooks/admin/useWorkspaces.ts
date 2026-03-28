@@ -1,14 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from '../../api/client';
 import type { Workspace } from '../../components/WorkspaceSelector';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
-const WORKSPACES_KEY = ['admin-workspaces'] as const;
+export const WORKSPACES_KEY = queryKeys.admin.workspaces();
 
 export function useWorkspaces() {
   return useQuery<Workspace[]>({
     queryKey: WORKSPACES_KEY,
     queryFn: () => get<Workspace[]>('/api/workspaces'),
-    staleTime: 60_000,
+    staleTime: STALE_TIMES.STABLE,
   });
 }
 
@@ -51,4 +53,3 @@ export function useUnlinkSite() {
   });
 }
 
-export { WORKSPACES_KEY };

@@ -8,9 +8,12 @@ import type { SeoAuditResult } from './seo-audit.js';
 import type { SchemaContext } from './schema-suggester.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
-import { getAllGscPages } from './search-console.js';
+import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { getUploadRoot } from './data-dir.js';
+import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
+import { getInsights } from './analytics-insights-store.js';
+import type { PageHealthData } from '../shared/types/analytics.js';
 
 // ── Page Path Utilities ──
 
@@ -161,7 +164,25 @@ export function applySuppressionsToAudit(
 
 // ── Schema Context Builder ──
 
-export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string }[] } {
+export type SchemaAnalyticsMaps = {
+  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>;
+  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>;
+  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>;
+  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>;
+};
+
+// 5-minute TTL cache for analytics maps — prevents repeated API calls on
+// the interactive single-page generation endpoint.
+const analyticsCache: Record<string, { maps: SchemaAnalyticsMaps; ts: number }> = {};
+const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function buildSchemaContext(
+  siteId: string,
+  options?: { includeAnalytics?: boolean },
+): Promise<{
+  ctx: SchemaContext;
+  pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[];
+} & SchemaAnalyticsMaps> {
   const allWs = listWorkspaces();
   const ws = allWs.find(w => w.webflowSiteId === siteId);
   const ctx: SchemaContext = {};
@@ -175,24 +196,16 @@ export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKe
     ctx.workspaceId = ws.id;
     ctx._siteId = siteId;
 
-    // Build knowledge base for schema enrichment (credentials, locations, sameAs URLs, etc.)
-    const kbParts: string[] = [];
-    if (ws.knowledgeBase?.trim()) kbParts.push(ws.knowledgeBase.trim());
-    // Also read knowledge-docs/ folder if it exists
-    try {
-      const kbDir = path.join(getUploadRoot(), ws.folder, 'knowledge-docs');
-      if (fs.existsSync(kbDir)) {
-        const kbFiles = fs.readdirSync(kbDir).filter(f => /\.(txt|md)$/i.test(f)).sort();
-        let kbContent = '';
-        for (const file of kbFiles) {
-          const text = fs.readFileSync(path.join(kbDir, file), 'utf-8').trim();
-          if (text) kbContent += `--- ${file} ---\n${text}\n\n`;
-          if (kbContent.length > 3000) break;
-        }
-        if (kbContent) kbParts.push(kbContent.slice(0, 3000));
-      }
-    } catch { /* knowledge-docs not available */ }
-    if (kbParts.length > 0) ctx.knowledgeBase = kbParts.join('\n\n').slice(0, 4000);
+    // Knowledge base from unified seo-context builder (inline + knowledge-docs/ files)
+    const rawKB = getRawKnowledge(ws.id);
+    if (rawKB) ctx.knowledgeBase = rawKB.slice(0, 4000);
+
+    // Audience personas for richer schema targeting
+    const personasBlock = buildPersonasContext(ws.id);
+    if (personasBlock) ctx._personasBlock = personasBlock;
+
+    // Verified business profile for schema grounding (bypasses page content verification)
+    if (ws.businessProfile) ctx._businessProfile = ws.businessProfile;
   }
   const pageKeywordMap = ws?.keywordStrategy?.pageMap?.map(p => ({
     pagePath: p.pagePath,
@@ -203,7 +216,79 @@ export function buildSchemaContext(siteId: string): { ctx: SchemaContext; pageKe
     contentGaps: p.contentGaps,
     optimizationScore: p.optimizationScore,
   }));
-  return { ctx, pageKeywordMap };
+
+  // Fetch analytics maps when requested (for schema generation routes)
+  let gscMap: SchemaAnalyticsMaps['gscMap'];
+  let ga4Map: SchemaAnalyticsMaps['ga4Map'];
+  let queryPageData: SchemaAnalyticsMaps['queryPageData'];
+  let insightsMap: SchemaAnalyticsMaps['insightsMap'];
+
+  if (options?.includeAnalytics && ws) {
+    const cacheKey = ws.id;
+    const cached = analyticsCache[cacheKey];
+    if (cached && Date.now() - cached.ts < ANALYTICS_CACHE_TTL_MS) {
+      gscMap = cached.maps.gscMap;
+      ga4Map = cached.maps.ga4Map;
+      queryPageData = cached.maps.queryPageData;
+      insightsMap = cached.maps.insightsMap;
+    } else {
+      const [gscResults, ga4Results, qpResults] = await Promise.allSettled([
+        ws.gscPropertyUrl ? getAllGscPages(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
+        ws.ga4PropertyId ? getGA4TopPages(ws.ga4PropertyId, 90, 500) : Promise.resolve([]),
+        ws.gscPropertyUrl ? getQueryPageData(ws.id, ws.gscPropertyUrl, 90) : Promise.resolve([]),
+      ]);
+
+      if (gscResults.status === 'fulfilled' && gscResults.value.length > 0) {
+        gscMap = new Map();
+        for (const p of gscResults.value) {
+          try {
+            const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
+            gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
+          } catch { /* skip malformed URLs */ }
+        }
+      }
+
+      if (ga4Results.status === 'fulfilled' && ga4Results.value.length > 0) {
+        ga4Map = new Map();
+        for (const p of ga4Results.value) {
+          const urlPath = (p.path.startsWith('/') ? p.path : `/${p.path}`).replace(/\/$/, '') || '/';
+          ga4Map.set(urlPath, { pageviews: p.pageviews, users: p.users, avgEngagementTime: p.avgEngagementTime });
+        }
+      }
+
+      if (qpResults.status === 'fulfilled' && qpResults.value.length > 0) {
+        queryPageData = qpResults.value.map(r => ({ query: r.query, page: r.page, impressions: r.impressions, position: r.position }));
+      }
+
+      // Build insights map from intelligence layer (SQLite — synchronous)
+      try {
+        const allInsights = getInsights(ws.id);
+        insightsMap = new Map();
+        // Quick win pageIds are composite keys like "https://example.com/blog::seo tips"
+        // Extract the page URL prefix (before "::") for matching against page_health pageIds
+        const quickWinPageUrls = new Set(
+          allInsights
+            .filter(i => i.insightType === 'ranking_opportunity' && i.pageId)
+            .map(i => i.pageId!.split('::')[0]),
+        );
+        for (const insight of allInsights) {
+          if (insight.insightType === 'page_health' && insight.pageId) {
+            const data = insight.data as unknown as PageHealthData;
+            insightsMap.set(insight.pageId, {
+              healthScore: data.score,
+              healthTrend: data.trend,
+              isQuickWin: quickWinPageUrls.has(insight.pageId),
+            });
+          }
+        }
+      } catch { /* intelligence layer not ready — skip */ }
+
+      // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
+      analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };
+    }
+  }
+
+  return { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap };
 }
 
 // ── Audit Traffic Cache ──

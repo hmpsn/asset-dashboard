@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSafe, getOptional } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import type { AnalyticsInsight } from '../../../shared/types/analytics';
 import type {
   AuditSummary, AuditDetail,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
@@ -13,7 +15,7 @@ import type {
 // ── Activity ──────────────────────────────────────────────────────
 export function useClientActivity(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-activity', wsId],
+    queryKey: queryKeys.client.activity(wsId),
     queryFn: () => getSafe<ActivityLogItem[]>(`/api/public/activity/${wsId}?limit=20`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -23,7 +25,7 @@ export function useClientActivity(wsId: string, enabled: boolean) {
 // ── Rank Tracking ─────────────────────────────────────────────────
 export function useClientRankHistory(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-rank-history', wsId],
+    queryKey: queryKeys.client.rankHistory(wsId),
     queryFn: () => getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -32,7 +34,7 @@ export function useClientRankHistory(wsId: string, enabled: boolean) {
 
 export function useClientLatestRanks(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-latest-ranks', wsId],
+    queryKey: queryKeys.client.latestRanks(wsId),
     queryFn: () => getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -42,7 +44,7 @@ export function useClientLatestRanks(wsId: string, enabled: boolean) {
 // ── Annotations ───────────────────────────────────────────────────
 export function useClientAnnotations(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-annotations', wsId],
+    queryKey: queryKeys.client.annotations(wsId),
     queryFn: () => getSafe<AnnotationItem[]>(`/api/public/annotations/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -52,7 +54,7 @@ export function useClientAnnotations(wsId: string, enabled: boolean) {
 // ── Anomalies ─────────────────────────────────────────────────────
 export function useClientAnomalies(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-anomalies', wsId],
+    queryKey: queryKeys.client.anomalies(wsId),
     queryFn: () => getSafe<AnomalyItem[]>(`/api/public/anomalies/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -62,7 +64,7 @@ export function useClientAnomalies(wsId: string, enabled: boolean) {
 // ── Approvals ─────────────────────────────────────────────────────
 export function useClientApprovals(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-approvals', wsId],
+    queryKey: queryKeys.client.approvals(wsId),
     queryFn: () => getSafe<ApprovalBatch[]>(`/api/public/approvals/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -72,7 +74,7 @@ export function useClientApprovals(wsId: string, enabled: boolean) {
 // ── Client Requests ───────────────────────────────────────────────
 export function useClientRequests(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-requests', wsId],
+    queryKey: queryKeys.client.requests(wsId),
     queryFn: () => getSafe<ClientRequest[]>(`/api/public/requests/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -82,7 +84,7 @@ export function useClientRequests(wsId: string, enabled: boolean) {
 // ── Content Requests ──────────────────────────────────────────────
 export function useClientContentRequests(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-content-requests', wsId],
+    queryKey: queryKeys.client.contentRequests(wsId),
     queryFn: () => getSafe<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`, []),
     enabled,
     select: (d) => (Array.isArray(d) ? d : []),
@@ -92,7 +94,7 @@ export function useClientContentRequests(wsId: string, enabled: boolean) {
 // ── Audit ─────────────────────────────────────────────────────────
 export function useClientAuditSummary(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-audit-summary', wsId],
+    queryKey: queryKeys.client.auditSummary(wsId),
     queryFn: () => getOptional<AuditSummary>(`/api/public/audit-summary/${wsId}`),
     enabled,
     select: (d) => (d?.id ? d : null),
@@ -101,7 +103,7 @@ export function useClientAuditSummary(wsId: string, enabled: boolean) {
 
 export function useClientAuditDetail(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-audit-detail', wsId],
+    queryKey: queryKeys.client.auditDetail(wsId),
     queryFn: () => getOptional<AuditDetail>(`/api/public/audit-detail/${wsId}`),
     enabled,
     select: (d) => (d?.id ? d : null),
@@ -111,7 +113,7 @@ export function useClientAuditDetail(wsId: string, enabled: boolean) {
 // ── Strategy ──────────────────────────────────────────────────────
 export function useClientStrategy(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-strategy', wsId],
+    queryKey: queryKeys.client.strategy(wsId),
     queryFn: () => getOptional<ClientKeywordStrategy>(`/api/public/seo-strategy/${wsId}`),
     enabled,
   });
@@ -120,7 +122,7 @@ export function useClientStrategy(wsId: string, enabled: boolean) {
 // ── Pricing ───────────────────────────────────────────────────────
 export function useClientPricing(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-pricing', wsId],
+    queryKey: queryKeys.client.pricing(wsId),
     queryFn: () => getOptional<PricingData>(`/api/public/pricing/${wsId}`),
     enabled,
   });
@@ -192,9 +194,20 @@ function processContentPlan(plans: ContentPlanMatrix[]): ContentPlanResult {
 
 export function useClientContentPlan(wsId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['client-content-plan', wsId],
+    queryKey: queryKeys.client.contentPlan(wsId),
     queryFn: () => getSafe<ContentPlanMatrix[]>(`/api/public/content-plan/${wsId}`, []),
     enabled,
     select: (d) => processContentPlan(Array.isArray(d) ? d : []),
+  });
+}
+
+
+// ── Analytics Insights ────────────────────────────────────────────
+export function useClientInsights(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.insights(wsId),
+    queryFn: () => getSafe<AnalyticsInsight[]>(`/api/public/insights/${wsId}`, []),
+    enabled,
+    select: (d) => (Array.isArray(d) ? d : []),
   });
 }

@@ -13,6 +13,7 @@ import { saveSchemaPlan } from './schema-store.js';
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import type { SiteArchitectureResult } from './site-architecture.js';
 import { flattenTree } from './site-architecture.js';
+import { crawlCompetitorSchemas, compareSchemas } from './competitor-schema.js';
 
 const log = createLogger('schema-plan');
 
@@ -25,6 +26,8 @@ export interface PlanContext {
   strategy?: KeywordStrategy;
   tokenOverride?: string;
   architectureResult?: SiteArchitectureResult;
+  competitorDomains?: string[];  // Competitor domains for schema gap analysis
+  ourSchemaTypes?: string[];     // Current schema types we're already using
 }
 
 /**
@@ -32,7 +35,7 @@ export interface PlanContext {
  * Returns a plan with canonical entities and page role assignments.
  */
 export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePlan> {
-  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult } = ctx;
+  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult, competitorDomains, ourSchemaTypes } = ctx;
 
   let pageList: PageListItem[];
 
@@ -115,8 +118,33 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
     log.info(`Generating schema plan for ${pageList.length} pages (static + CMS) on ${siteUrl}`);
   }
 
+  // Crawl competitor schema types for gap analysis (best-effort, non-blocking)
+  let competitorSchemaGaps: string[] = [];
+  if (competitorDomains && competitorDomains.length > 0) {
+    try {
+      const domainsToCheck = competitorDomains.slice(0, 2); // Limit to 2 competitors
+      const crawlResults = await Promise.allSettled(
+        domainsToCheck.map(domain => crawlCompetitorSchemas(domain, 20)),
+      );
+      const ours = ourSchemaTypes || [];
+      for (const result of crawlResults) {
+        if (result.status === 'fulfilled') {
+          const comparison = compareSchemas(ours, result.value);
+          for (const t of comparison.typesTheyHaveWeNot) {
+            if (!competitorSchemaGaps.includes(t)) competitorSchemaGaps.push(t);
+          }
+        }
+      }
+      if (competitorSchemaGaps.length > 0) {
+        log.info({ gaps: competitorSchemaGaps }, `Competitor schema gaps identified: ${competitorSchemaGaps.join(', ')}`);
+      }
+    } catch (err) {
+      log.warn({ err }, 'Competitor schema crawl failed — proceeding without gap data');
+    }
+  }
+
   // Try AI-generated plan first
-  const aiPlan = await aiGeneratePlan(pageList, siteUrl, companyName, businessContext, strategy, workspaceId);
+  const aiPlan = await aiGeneratePlan(pageList, siteUrl, companyName, businessContext, strategy, workspaceId, competitorSchemaGaps);
 
   const now = new Date().toISOString();
   const plan: SchemaSitePlan = {
@@ -154,6 +182,7 @@ async function aiGeneratePlan(
   businessContext?: string,
   strategy?: KeywordStrategy,
   workspaceId?: string,
+  competitorSchemaGaps?: string[],
 ): Promise<{ canonicalEntities: CanonicalEntity[]; pageRoles: PageRoleAssignment[] } | null> {
   if (!process.env.OPENAI_API_KEY) return null;
 
@@ -223,11 +252,15 @@ async function aiGeneratePlan(
     }
   }
 
+  const competitorGapBlock = competitorSchemaGaps && competitorSchemaGaps.length > 0
+    ? `\nCOMPETITOR SCHEMA GAPS (schema types competitors use that we don't yet — prioritize assigning these types to relevant pages):\n${competitorSchemaGaps.join(', ')}`
+    : '';
+
   const prompt = `You are a Google Structured Data strategist. Analyze this site's pages and produce a schema site plan.
 
 SITE: ${companyName || '(unknown)'} — ${siteUrl}
 ${businessContext ? `BUSINESS: ${businessContext}` : ''}
-${strategy?.siteKeywords?.length ? `SITE KEYWORDS: ${strategy.siteKeywords.slice(0, 10).join(', ')}` : ''}
+${strategy?.siteKeywords?.length ? `SITE KEYWORDS: ${strategy.siteKeywords.slice(0, 10).join(', ')}` : ''}${competitorGapBlock}
 
 PAGES (${pages.length} total):
 ${pageTable}${collectionSummary}
@@ -239,9 +272,9 @@ ROLES (choose exactly one per page):
 - pillar: The canonical product page for SaaS — owns the primary SoftwareApplication entity
 - service: Service business pages — owns a Service entity with serviceType, areaServed, pricing
 - audience: Persona/use-case pages that describe the same product for a specific audience — reference the pillar's entity, don't create their own
-- lead-gen: Conversion pages (/demo, /contact, /pricing, /signup) — WebPage + BreadcrumbList only, no product entity
+- lead-gen: Conversion pages (/demo, /contact, /signup) — WebPage + BreadcrumbList only, no product entity
 - blog: Blog/article content — Article schema with author
-- about: About/team/careers pages — WebPage only
+- about: About page (top-level /about, /team, /careers) — WebPage only
 - contact: Contact page — WebPage with contact details if available
 - location: Location-specific pages — LocalBusiness schema
 - product: Distinct product pages (different from the main pillar product)
@@ -249,7 +282,20 @@ ROLES (choose exactly one per page):
 - faq: Dedicated FAQ pages with real Q&A content
 - case-study: Case study/customer story — Article schema
 - comparison: Comparison pages (vs competitors) — reference the pillar's entity
+- howto: Step-by-step tutorial/guide pages — HowTo schema with numbered steps eligible for rich results
+- video: Pages featuring a primary video — VideoObject schema eligible for video carousel in search
+- job-posting: Job listing pages — JobPosting schema eligible for Google Jobs rich results
+- course: Course/training pages — Course + CourseInstance schema eligible for Course rich results
+- event: Event pages with dates/venue — Event schema eligible for Event rich results
+- author: Team member/author profile pages — ProfilePage + Person schema
+- review: Review/testimonial pages with ratings — Review + AggregateRating schema
+- pricing: Pricing/plans pages with structured offers — WebPage + Offer array
+- recipe: Recipe pages with ingredients/instructions — Recipe schema eligible for Recipe rich results
 - generic: Anything that doesn't fit above — WebPage + BreadcrumbList only
+
+INDUSTRY SUBTYPES: If the site is in healthcare or financial services, note this in the "notes" field:
+- Medical sites: Use "MedicalOrganization" or "Physician" instead of "LocalBusiness" for the main entity
+- Financial sites: Use "FinancialService" instead of "LocalBusiness" for the main entity
 
 CANONICAL ENTITIES: Identify the DISTINCT products/services this site offers. Most SaaS sites have ONE product.
 - Each entity needs: type (SoftwareApplication or Service), name, canonicalUrl (the pillar page), id (@id format)
@@ -260,16 +306,23 @@ RULES:
 1. There should be exactly ONE homepage
 2. There should be 0-3 pillar pages (most sites have 1)
 3. Pages that describe the SAME product for different audiences are "audience", not "pillar"
-4. /demo, /contact, /request-demo, /get-started, /pricing, /signup, /book → "lead-gen"
+4. /demo, /contact, /request-demo, /get-started, /signup, /book → "lead-gen" (NOT /pricing — that is "pricing")
 5. Blog posts → "blog" — this includes CMS collection pages under /blog/*, /posts/*, /articles/*, /news/*
-6. /about, /team, /careers → "about"
+6. /about → "about" (but individual /team/person-name → "author", individual /careers/job-title → "job-posting")
 7. /faq only if it's a dedicated FAQ page, not a product page with a FAQ section
 8. Comparison pages (/vs-*, /compare-*, /alternative-*) → "comparison"
 9. Partnership pages (/partner-name, /integrations/partner) → "partnership"
 10. CMS collection pages (e.g. /customers/*, /case-studies/*) → "case-study" if they are customer stories
 11. CMS collection pages under /integrations/* or /partners/* → "partnership"
 12. Resource/guide pages → "blog" (Article schema)
-13. You MUST assign a role to EVERY page in the list — do not skip any
+13. Job/careers pages with individual listings → "job-posting"
+14. Course/training/workshop pages → "course"
+15. Event/webinar/conference pages → "event"
+16. Individual team member/author profile pages → "author"
+17. Review/testimonial pages → "review"
+18. /pricing, /plans, /packages → "pricing"
+19. Recipe pages → "recipe"
+20. You MUST assign a role to EVERY page in the list — do not skip any
 
 Return JSON with this exact structure:
 {
@@ -315,7 +368,8 @@ IMPORTANT:
     // Validate and normalize roles
     const validRoles = new Set<string>([
       'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about', 'contact',
-      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'generic',
+      'location', 'product', 'partnership', 'faq', 'case-study', 'comparison', 'howto', 'video',
+      'job-posting', 'course', 'event', 'author', 'review', 'pricing', 'recipe', 'generic',
     ]);
 
     const rawRoles: PageRoleAssignment[] = parsed.pageRoles.map((pr: Record<string, unknown>) => ({
@@ -390,12 +444,21 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
     if (p.isHomepage) {
       role = 'homepage';
       primaryType = 'Organization';
-    } else if (/^\/(demo|contact|request-demo|get-started|pricing|signup|book)/.test(slug)) {
+    } else if (/^\/(demo|contact|request-demo|get-started|signup|book)/.test(slug)) {
       role = 'lead-gen';
     } else if (/^\/(blog|posts?|articles?|news|resources?|guides?)\//.test(slug) || /^\/(blog|posts?|articles?|news)$/.test(slug)) {
       role = 'blog';
       primaryType = 'Article';
-    } else if (/^\/(about|team|careers?)/.test(slug)) {
+    } else if (/^\/(careers?|jobs?|hiring|positions?)\//.test(slug)) {
+      role = 'job-posting';
+      primaryType = 'JobPosting';
+    } else if (/^\/(team|authors?|staff|people)\//.test(slug)) {
+      role = 'author';
+      primaryType = 'ProfilePage';
+    } else if (/^\/(pricing|plans|packages)$/.test(slug)) {
+      role = 'pricing';
+      primaryType = 'WebPage';
+    } else if (/^\/(about|team|careers?)(\/?$)/.test(slug)) {
       role = 'about';
     } else if (/^\/(faq|frequently-asked)/.test(slug)) {
       role = 'faq';
@@ -413,6 +476,24 @@ function buildFallbackRoles(pages: PageListItem[]): PageRoleAssignment[] {
       primaryType = 'Article';
     } else if (/^\/(integrations?|partners?)\//.test(slug)) {
       role = 'partnership';
+    } else if (/^\/(how-to|howto|tutorial|guide)s?\//.test(slug) || /^\/(how-to|howto|tutorial|guide)s?$/.test(slug)) {
+      role = 'howto';
+      primaryType = 'HowTo';
+    } else if (/^\/(video|watch)s?\//.test(slug) || /^\/(video|watch)s?$/.test(slug)) {
+      role = 'video';
+      primaryType = 'VideoObject';
+    } else if (/^\/(courses?|training|workshops?|classes?)\//.test(slug) || /^\/(courses?|training)$/.test(slug)) {
+      role = 'course';
+      primaryType = 'Course';
+    } else if (/^\/(events?|webinars?|meetups?|conferences?)\//.test(slug) || /^\/(events?|webinars?)$/.test(slug)) {
+      role = 'event';
+      primaryType = 'Event';
+    } else if (/^\/(reviews?|testimonials?)/.test(slug)) {
+      role = 'review';
+      primaryType = 'Review';
+    } else if (/^\/(recipes?|cooking|meals?)\//.test(slug)) {
+      role = 'recipe';
+      primaryType = 'Recipe';
     }
 
     return {
@@ -490,6 +571,33 @@ export function buildPlanContextForPage(
       break;
     case 'faq':
       lines.push('\nINSTRUCTION: Use FAQPage only if the page has a real dedicated FAQ section with clearly labeled Q&A pairs.');
+      break;
+    case 'howto':
+      lines.push('\nINSTRUCTION: Use HowTo as mainEntity with step nodes extracted from numbered lists or "Step N:" headings. Include totalTime if mentioned. Add supply/tool arrays only if explicitly listed on the page.');
+      break;
+    case 'video':
+      lines.push('\nINSTRUCTION: Use VideoObject as mainEntity with name, description, uploadDate, and thumbnailUrl from page content. Include embedUrl for YouTube/Vimeo embeds. Omit VideoObject entirely if uploadDate or thumbnailUrl cannot be found in the content.');
+      break;
+    case 'job-posting':
+      lines.push('\nINSTRUCTION: Use JobPosting with title, datePosted, description, hiringOrganization. Include validThrough, employmentType, jobLocation, and baseSalary if available in content.');
+      break;
+    case 'course':
+      lines.push('\nINSTRUCTION: Use Course with name, description, provider. Include CourseInstance with startDate/endDate/courseMode if schedule info is on the page.');
+      break;
+    case 'event':
+      lines.push('\nINSTRUCTION: Use Event with name, startDate, location. Include endDate, offers (ticket info), organizer, and eventStatus if available.');
+      break;
+    case 'author':
+      lines.push('\nINSTRUCTION: Use ProfilePage with mainEntity being a Person node. Include name, jobTitle, knowsAbout, sameAs (social links), and worksFor referencing the Organization.');
+      break;
+    case 'review':
+      lines.push('\nINSTRUCTION: Use Review with itemReviewed, reviewRating, author. If aggregate ratings are shown, include AggregateRating with ratingValue and reviewCount.');
+      break;
+    case 'pricing':
+      lines.push('\nINSTRUCTION: Use WebPage with Offer nodes for each pricing tier. Include name, price, priceCurrency, and description for each plan.');
+      break;
+    case 'recipe':
+      lines.push('\nINSTRUCTION: Use Recipe with name, image, recipeIngredient array, recipeInstructions as HowToStep array. Include cookTime, prepTime, nutrition if available.');
       break;
   }
 

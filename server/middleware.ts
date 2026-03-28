@@ -6,9 +6,10 @@ import fs from 'fs';
 import path from 'path';
 import type express from 'express';
 import multer from 'multer';
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { getUploadRoot } from './data-dir.js';
 import { verifyClientToken, getSafeClientUser } from './client-users.js';
+import { verifyToken as verifyJwtToken } from './auth.js';
 
 // ── Rate Limiting ──
 
@@ -149,6 +150,36 @@ export function getClientActor(req: express.Request, workspaceId: string): { id?
   if (!payload || payload.workspaceId !== workspaceId) return undefined;
   const user = getSafeClientUser(payload.clientUserId);
   return user ? { id: user.id, name: user.name } : undefined;
+}
+
+// ── Client Portal Auth Guard ──
+
+/** Require client portal authentication (JWT or legacy session cookie) on public endpoints.
+ *  Passwordless workspaces (no client password set) are accessible by URL alone. */
+export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const workspaceId = req.params[wsIdParam];
+    // Check JWT token first (preferred)
+    const clientToken = req.cookies?.[`client_user_token_${workspaceId}`];
+    if (clientToken) {
+      const payload = verifyClientToken(clientToken);
+      if (payload && payload.workspaceId === workspaceId) return next();
+    }
+    // Fall back to legacy session cookie (verify HMAC signature)
+    const sessionCookie = req.cookies?.[`client_session_${workspaceId}`];
+    if (sessionCookie && verifyClientSession(workspaceId, sessionCookie)) return next();
+    // Allow admin access (verify JWT signature) so admin dashboard can call these endpoints
+    const jwtToken = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : '');
+    if (jwtToken) {
+      const jwtPayload = verifyJwtToken(jwtToken);
+      if (jwtPayload) return next();
+    }
+    // Passwordless workspaces are accessible by URL (the workspace ID is the credential)
+    const ws = getWorkspace(workspaceId);
+    if (ws && !ws.clientPassword) return next();
+
+    return res.status(401).json({ error: 'Authentication required' });
+  };
 }
 
 // ── File Upload ──

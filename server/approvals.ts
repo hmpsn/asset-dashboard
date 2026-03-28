@@ -1,8 +1,14 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
 import type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
+import { parseJsonFallback } from './db/json-validation.js';
+import { approvalItemSchema } from './schemas/approval-schemas.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('approvals');
 
 // ── SQLite row shape ──
 
@@ -17,46 +23,51 @@ interface BatchRow {
   updated_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO approval_batches (id, workspace_id, site_id, name, items, status, created_at, updated_at)
          VALUES (@id, @workspace_id, @site_id, @name, @items, @status, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM approval_batches WHERE workspace_id = ?`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM approval_batches WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM approval_batches WHERE workspace_id = ?`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id`,
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM approval_batches WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToBatch(row: BatchRow): ApprovalBatch {
+  const rawItems = parseJsonFallback<unknown[]>(row.items, []);
+  let healed = false;
+  let dropped = 0;
+  const items: ApprovalItem[] = [];
+  for (const raw of rawItems) {
+    if (typeof raw !== 'object' || raw === null) { dropped++; continue; }
+    const obj = raw as Record<string, unknown>;
+    // Heal missing status from historical Object.assign bug
+    if (!obj.status) { obj.status = 'pending'; healed = true; }
+    const result = approvalItemSchema.safeParse(obj);
+    if (result.success) items.push(result.data as ApprovalItem);
+    else dropped++;
+  }
+  if (dropped > 0) {
+    log.warn({ batchId: row.id, workspaceId: row.workspace_id, dropped, total: rawItems.length }, 'approval_batches.items: dropped invalid items');
+  }
+  if (healed) {
+    stmts().update.run({ id: row.id, items: JSON.stringify(items), status: row.status, updated_at: new Date().toISOString() });
+  }
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     siteId: row.site_id,
     name: row.name,
-    items: JSON.parse(row.items),
+    items,
     status: row.status as ApprovalBatch['status'],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -120,13 +131,21 @@ export function updateItem(
   const item = batch.items.find(i => i.id === itemId);
   if (!item) return null;
 
-  Object.assign(item, update, { updatedAt: new Date().toISOString() });
+  // Filter out undefined values to prevent overwriting existing fields (e.g. status)
+  const defined = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
+  Object.assign(item, defined, { updatedAt: new Date().toISOString() });
 
-  // Recalculate batch status
+  recalcBatchStatus(batch);
+  return batch;
+}
+
+/** Recalculate batch status from item statuses and persist. */
+function recalcBatchStatus(batch: ApprovalBatch): void {
   const statuses = batch.items.map(i => i.status);
   if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   else if (statuses.every(s => s === 'approved' || s === 'applied')) batch.status = 'approved';
-  else if (statuses.some(s => s === 'approved')) batch.status = 'partial';
+  else if (statuses.every(s => s === 'rejected')) batch.status = 'rejected';
+  else if (statuses.some(s => s === 'approved' || s === 'rejected' || s === 'applied')) batch.status = 'partial';
   else batch.status = 'pending';
 
   batch.updatedAt = new Date().toISOString();
@@ -136,7 +155,6 @@ export function updateItem(
     status: batch.status,
     updated_at: batch.updatedAt,
   });
-  return batch;
 }
 
 export function markBatchApplied(workspaceId: string, batchId: string, itemIds: string[]): ApprovalBatch | null {
@@ -150,15 +168,7 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
     }
   }
 
-  const statuses = batch.items.map(i => i.status);
-  if (statuses.every(s => s === 'applied')) batch.status = 'applied';
-  batch.updatedAt = new Date().toISOString();
-  stmts().update.run({
-    id: batch.id,
-    items: JSON.stringify(batch.items),
-    status: batch.status,
-    updated_at: batch.updatedAt,
-  });
+  recalcBatchStatus(batch);
   return batch;
 }
 

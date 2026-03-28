@@ -78,6 +78,8 @@ export interface ContentGap {
   competitorProof?: string; // e.g. "competitor.com ranks #3"
   // Question keywords related to this gap (for FAQ/AEO targeting)
   questionKeywords?: string[];
+  // SERP feature targeting recommendations
+  serpTargeting?: string[];
 }
 
 export interface QuickWin {
@@ -86,6 +88,7 @@ export interface QuickWin {
   action: string;          // specific action to take
   estimatedImpact: 'high' | 'medium' | 'low';
   rationale: string;
+  roiScore?: number;       // computed ROI score for prioritization
 }
 
 export interface TopicCluster {
@@ -220,6 +223,24 @@ export interface Workspace {
     fullPostLabel?: string;
     briefDescription?: string;
     fullPostDescription?: string;
+  };
+  // SEO data provider preference
+  seoDataProvider?: 'semrush' | 'dataforseo';
+  // Verified business profile for schema generation (bypasses page-content verification)
+  businessProfile?: {
+    phone?: string;
+    email?: string;
+    address?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      country?: string;
+    };
+    socialProfiles?: string[];    // LinkedIn, Facebook, Google Business, etc.
+    openingHours?: string;        // Plain text or structured e.g. "Mon-Fri 9am-5pm"
+    foundedDate?: string;         // ISO date or year
+    numberOfEmployees?: string;   // e.g. "10-50"
   };
   folder: string;
   createdAt: string;

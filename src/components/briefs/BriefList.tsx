@@ -34,6 +34,8 @@ interface ContentBrief {
   referenceUrls?: string[];
   realPeopleAlsoAsk?: string[];
   realTopResults?: { position: number; title: string; url: string }[];
+  titleVariants?: string[];
+  metaDescVariants?: string[];
 }
 
 interface ContentTopicRequest {
@@ -63,6 +65,8 @@ export interface BriefListProps {
   onSetEditingBrief: (id: string | null) => void;
   onGeneratePost: (briefId: string) => void;
   onRegenerateBrief: (briefId: string, feedback: string) => void;
+  onRegenerateOutline?: (briefId: string, feedback?: string) => void;
+  regeneratingOutline?: string | null;
 }
 
 export function BriefList({
@@ -86,6 +90,8 @@ export function BriefList({
   onSetEditingBrief,
   onGeneratePost,
   onRegenerateBrief,
+  onRegenerateOutline,
+  regeneratingOutline,
 }: BriefListProps) {
   const linkedBriefIds = new Set(clientRequests.filter(r => r.briefId).map(r => r.briefId!));
   let standaloneBriefs = briefs.filter(b => !linkedBriefIds.has(b.id));
@@ -172,6 +178,8 @@ export function BriefList({
                   onSetEditingBrief={onSetEditingBrief}
                   onGeneratePost={onGeneratePost}
                   onRegenerate={onRegenerateBrief}
+                  onRegenerateOutline={onRegenerateOutline}
+                  regeneratingOutline={regeneratingOutline}
                   onCopyAsMarkdown={onCopyAsMarkdown}
                   onExportClientHTML={onExportClientHTML}
                   onSendToClient={onSendToClient}

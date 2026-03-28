@@ -4,7 +4,9 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { get } from '../../api/client.js';
+import { get } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
 interface PageMeta {
   id: string;
@@ -16,12 +18,12 @@ interface PageMeta {
 
 export function useSeoEditor(siteId: string) {
   return useQuery({
-    queryKey: ['seo-editor', siteId],
+    queryKey: queryKeys.admin.seoEditor(siteId),
     queryFn: async (): Promise<PageMeta[]> => {
       const response = await get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
       return Array.isArray(response) ? response : [];
     },
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: STALE_TIMES.FAST,
     enabled: !!siteId,
     retry: 1,
   });

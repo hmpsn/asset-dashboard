@@ -1,5 +1,7 @@
 import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { scanRedirects } from './redirect-scanner.js';
+import { checkSiteLinks } from './link-checker.js';
+import type { DeadLink } from './link-checker.js';
 import { runSinglePageSpeed } from './pagespeed.js';
 import { buildSeoContext, buildPageAnalysisContext } from './seo-context.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
@@ -50,6 +52,8 @@ export interface SeoAuditResult {
   pages: PageSeoResult[];
   siteWideIssues: SeoIssue[];
   cwvSummary?: CwvSummary;
+  deadLinkSummary?: { total: number; internal: number; external: number; redirects: number };
+  deadLinkDetails?: DeadLink[];
 }
 
 interface PageMeta {
@@ -118,7 +122,7 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
   } catch { return { subdomain: null, customDomain: null }; }
 }
 
-export async function runSeoAudit(siteId: string, tokenOverride?: string, workspaceId?: string): Promise<SeoAuditResult> {
+export async function runSeoAudit(siteId: string, tokenOverride?: string, workspaceId?: string, skipLinkCheck = false): Promise<SeoAuditResult> {
   const siteInfo = await getSiteInfo(siteId, tokenOverride);
   const baseUrl = siteInfo.subdomain ? `https://${siteInfo.subdomain}.webflow.io` : '';
   // Use custom domain for site-wide checks (robots.txt, sitemap) since webflow.io blocks crawlers by design
@@ -465,10 +469,14 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     }
   }
   // Check which audited pages receive zero inbound internal links
+  // Exclude utility pages that are intentionally unlinked (thank-you, confirmation, etc.)
+  const ORPHAN_UTILITY_PATTERNS = /(?:^|\/)(?:thank[-_]?you|thanks|thankyou|confirmation|success|members?[-_]?only|members?[-_]?area|password[-_]?protected|unsubscribe|opt[-_]?out)(?:\/|$|-|_|$)/i;
   const orphanPages: string[] = [];
   for (const r of results) {
     const pagePath = `/${r.slug}`.replace(/\/$/, '').toLowerCase();
     if (pagePath === '/' || pagePath === '') continue; // Homepage always linked
+    if (isExcludedPage(r.slug, r.page)) continue; // Skip utility pages entirely
+    if (ORPHAN_UTILITY_PATTERNS.test(r.slug)) continue; // Skip intentionally unlinked utility pages
     if (!internalLinkTargets.has(pagePath)) {
       orphanPages.push(r.page || r.slug);
     }
@@ -492,6 +500,20 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       recommendation: `These pages won't appear in search results: ${noindexPages.slice(0, 8).map(p => p.page || p.slug).join(', ')}${noindexPages.length > 8 ? ` (+${noindexPages.length - 8} more)` : ''}. Review and remove noindex if they should be indexed.`,
     });
   }
+
+  // Deduplicate site-wide issues — keyed by check+message to prevent exact duplicates
+  // while preserving distinct issues that share the same check name (e.g. robots-txt missing vs blocking)
+  const seenIssueKeys = new Set<string>();
+  const dedupedIssues: typeof siteWideIssues = [];
+  for (const issue of siteWideIssues) {
+    const key = `${issue.check}::${issue.message}`;
+    if (!seenIssueKeys.has(key)) {
+      seenIssueKeys.add(key);
+      dedupedIssues.push(issue);
+    }
+  }
+  siteWideIssues.length = 0;
+  siteWideIssues.push(...dedupedIssues);
 
   // Auto-assign categories to site-wide issues
   for (const issue of siteWideIssues) {
@@ -646,6 +668,39 @@ Respond in this exact JSON format (only include fields that need fixing):
     ? Math.round(indexedResults.reduce((s, r) => s + r.score, 0) / indexedResults.length)
     : 100;
 
+  // --- Dead link scan (opt-out via skipLinkCheck) ---
+  let deadLinkSummary: SeoAuditResult['deadLinkSummary'] | undefined;
+  let deadLinkDetails: DeadLink[] | undefined;
+  if (!skipLinkCheck) {
+    try {
+      log.info('Running dead link scan...');
+      const linkResult = await checkSiteLinks(siteId, tokenOverride);
+      const internalDead = linkResult.deadLinks.filter(l => l.type === 'internal').length;
+      const externalDead = linkResult.deadLinks.filter(l => l.type === 'external').length;
+      deadLinkSummary = {
+        total: linkResult.deadLinks.length,
+        internal: internalDead,
+        external: externalDead,
+        redirects: linkResult.redirects.length,
+      };
+      deadLinkDetails = linkResult.deadLinks;
+      if (linkResult.deadLinks.length > 0) {
+        siteWideIssues.push({
+          check: 'dead-links',
+          severity: internalDead > 0 ? 'error' : 'warning',
+          message: `${linkResult.deadLinks.length} broken link${linkResult.deadLinks.length > 1 ? 's' : ''} found${internalDead > 0 ? ` (${internalDead} internal)` : ''}`,
+          recommendation: 'Broken links harm user experience and crawlability. Fix or redirect internal broken links immediately; update or remove broken external links.',
+          value: `${linkResult.deadLinks.length} broken`,
+        });
+        // Update counters — dead link scan runs after initial tally
+        if (internalDead > 0) totalErrors++;
+        else totalWarnings++;
+      }
+    } catch (err) {
+      log.error({ err }, 'Dead link scan failed (non-fatal)');
+    }
+  }
+
   return {
     siteScore,
     totalPages: results.length,
@@ -655,5 +710,7 @@ Respond in this exact JSON format (only include fields that need fixing):
     pages: results,
     siteWideIssues,
     cwvSummary: (cwvSummary.mobile || cwvSummary.desktop) ? cwvSummary : undefined,
+    deadLinkSummary,
+    deadLinkDetails,
   };
 }

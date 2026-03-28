@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vite-frontend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "PORT=3002 npm run dev"],
+      "port": 5173
+    },
+    {
+      "name": "express-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:server"],
+      "port": 3002
+    }
+  ]
+}

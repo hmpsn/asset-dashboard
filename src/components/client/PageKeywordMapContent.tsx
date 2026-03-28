@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
 import { post } from '../../api';
 
@@ -68,10 +68,13 @@ function positionColor(pos: number): string {
   return 'text-zinc-500';
 }
 
+const ITEMS_PER_PAGE = 20;
+
 export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback }: PageKeywordMapContentProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Blog', 'Services']));
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
 
   const togglePage = (path: string) => {
     setExpandedPages(prev => {
@@ -81,6 +84,8 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
       return next;
     });
   };
+
+  useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [activeFilter]);
 
   const filteredPages = useMemo(() => {
     switch (activeFilter) {
@@ -105,13 +110,13 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
 
   const groupedPages = useMemo(() => {
     const groups: Record<string, PageMapItem[]> = {};
-    filteredPages.forEach(page => {
+    filteredPages.slice(0, visibleCount).forEach(page => {
       const folder = getPageFolder(page.pagePath);
       if (!groups[folder]) groups[folder] = [];
       groups[folder].push(page);
     });
     return groups;
-  }, [filteredPages]);
+  }, [filteredPages, visibleCount]);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders(prev => {
@@ -150,7 +155,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
       </div>
 
       {/* Grouped Page List */}
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className="max-h-[400px] overflow-y-auto" key={activeFilter}>
         {Object.entries(groupedPages).length === 0 ? (
           <div className="px-4 py-8 text-center">
             <p className="text-[11px] text-zinc-500">No pages match this filter</p>
@@ -397,6 +402,23 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
           ))
         )}
       </div>
+
+      {/* Pagination footer */}
+      {filteredPages.length > ITEMS_PER_PAGE && (
+        <div className="px-4 py-2.5 border-t border-zinc-800/50 flex items-center justify-between">
+          <span className="text-[11px] text-zinc-500">
+            Showing {Math.min(visibleCount, filteredPages.length)} of {filteredPages.length} pages
+          </span>
+          {visibleCount < filteredPages.length && (
+            <button
+              onClick={() => setVisibleCount(v => v + ITEMS_PER_PAGE)}
+              className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors font-medium"
+            >
+              Show {Math.min(ITEMS_PER_PAGE, filteredPages.length - visibleCount)} more
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

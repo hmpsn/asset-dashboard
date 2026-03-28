@@ -1,4 +1,6 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 import type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
@@ -32,21 +34,9 @@ interface RequestRow {
   updated_at: string;
 }
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  selectByKeyword: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO content_topic_requests
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_topic_requests
            (id, workspace_id, topic, target_keyword, intent, priority, rationale, status,
             brief_id, client_note, internal_note, decline_reason, client_feedback,
             source, service_type, page_type, upgraded_at, delivery_url, delivery_notes,
@@ -56,32 +46,29 @@ function stmts(): Stmts {
             @brief_id, @client_note, @internal_note, @decline_reason, @client_feedback,
             @source, @service_type, @page_type, @upgraded_at, @delivery_url, @delivery_notes,
             @target_page_id, @target_page_slug, @comments, @requested_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_topic_requests WHERE workspace_id = ? ORDER BY requested_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
-      ),
-      selectByKeyword: db.prepare(
-        `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND target_keyword = ? AND status != 'declined'`,
-      ),
-      update: db.prepare(
-        `UPDATE content_topic_requests SET
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_topic_requests WHERE workspace_id = ? ORDER BY requested_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
+  ),
+  selectByKeyword: db.prepare(
+    `SELECT * FROM content_topic_requests WHERE workspace_id = ? AND target_keyword = ? AND status != 'declined'`,
+  ),
+  update: db.prepare(
+    `UPDATE content_topic_requests SET
            status = @status, brief_id = @brief_id, client_note = @client_note,
            internal_note = @internal_note, decline_reason = @decline_reason,
            client_feedback = @client_feedback, service_type = @service_type,
            upgraded_at = @upgraded_at, delivery_url = @delivery_url,
            delivery_notes = @delivery_notes, comments = @comments, updated_at = @updated_at
          WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToRequest(row: RequestRow): ContentTopicRequest {
   return {
@@ -106,7 +93,7 @@ function rowToRequest(row: RequestRow): ContentTopicRequest {
     deliveryNotes: row.delivery_notes ?? undefined,
     targetPageId: row.target_page_id ?? undefined,
     targetPageSlug: row.target_page_slug ?? undefined,
-    comments: JSON.parse(row.comments),
+    comments: parseJsonFallback(row.comments, []),
     requestedAt: row.requested_at,
     updatedAt: row.updated_at,
   };

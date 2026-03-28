@@ -5,6 +5,7 @@
 
 import bcrypt from 'bcryptjs';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export type { UserRole, InternalUser as User, SafeInternalUser as SafeUser } from '../shared/types/users.ts';
 import type { UserRole, InternalUser as User, SafeInternalUser as SafeUser } from '../shared/types/users.ts';
@@ -43,42 +44,25 @@ function rowToUser(row: UserRow): User {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectAll: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  selectByEmail: ReturnType<typeof db.prepare>;
-  insert: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-  count: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectAll: db.prepare('SELECT * FROM users'),
-      selectById: db.prepare('SELECT * FROM users WHERE id = ?'),
-      selectByEmail: db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)'),
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectAll: db.prepare('SELECT * FROM users'),
+  selectById: db.prepare('SELECT * FROM users WHERE id = ?'),
+  selectByEmail: db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)'),
+  insert: db.prepare(`
         INSERT INTO users (id, email, name, password_hash, role, workspace_ids,
           avatar_url, last_login_at, created_at, updated_at)
         VALUES (@id, @email, @name, @password_hash, @role, @workspace_ids,
           @avatar_url, @last_login_at, @created_at, @updated_at)
       `),
-      update: db.prepare(`
+  update: db.prepare(`
         UPDATE users SET email = @email, name = @name, password_hash = @password_hash,
           role = @role, workspace_ids = @workspace_ids, avatar_url = @avatar_url,
           last_login_at = @last_login_at, updated_at = @updated_at
         WHERE id = @id
       `),
-      deleteById: db.prepare('DELETE FROM users WHERE id = ?'),
-      count: db.prepare('SELECT COUNT(*) as count FROM users'),
-    };
-  }
-  return _stmts;
-}
+  deleteById: db.prepare('DELETE FROM users WHERE id = ?'),
+  count: db.prepare('SELECT COUNT(*) as count FROM users'),
+}));
 
 // ── CRUD ──
 

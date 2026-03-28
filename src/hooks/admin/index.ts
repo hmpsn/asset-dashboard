@@ -5,7 +5,7 @@ export { useAdminPostsList, useAdminPost, useAdminPostVersions, usePublishTarget
 export { useWorkspaceHomeData } from './useWorkspaceHome';
 export { useWorkspaceOverviewData } from './useWorkspaceOverview';
 export { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule, useSchemaSnapshot, useWebflowPages } from './useAdminSeo';
-export { useWebflowAssets, useAssetAudit } from './useAdminAssets';
+export { useWebflowAssets, useAssetAudit, useCmsImages } from './useAdminAssets';
 export { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY } from './useWorkspaces';
 export { useHealthCheck, HEALTH_KEY } from './useHealthCheck';
 export type { HealthStatus } from './useHealthCheck';

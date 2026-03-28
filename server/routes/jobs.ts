@@ -105,7 +105,7 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages...' });
-            const result = await runSeoAudit(siteId, token, params.workspaceId as string);
+            const result = await runSeoAudit(siteId, token, params.workspaceId as string, params.skipLinkCheck === true);
             // Auto-save snapshot so overview + client dashboard stay in sync
             const ws = getWorkspace(params.workspaceId as string);
             const siteName = getBrandName(ws) || siteId;
@@ -272,7 +272,7 @@ router.post('/api/jobs', async (req, res) => {
       }
 
       case 'bulk-compress': {
-        const { assets, siteId } = params as { assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string }>; siteId: string };
+        const { assets, siteId } = params as { assets: Array<{ assetId: string; imageUrl: string; altText?: string; fileName?: string; cmsUsages?: unknown[] }>; siteId: string };
         if (!assets?.length || !siteId) return res.status(400).json({ error: 'assets and siteId required' });
         const activeBulkCompress = hasActiveJob('bulk-compress', params.workspaceId as string);
         if (activeBulkCompress) return res.status(409).json({ error: 'A bulk compression is already running', jobId: activeBulkCompress.id });
@@ -289,7 +289,7 @@ router.post('/api/jobs', async (req, res) => {
                 const compressRes = await fetch(`http://localhost:${PORT}/api/webflow/compress/${asset.assetId}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', ...(APP_PASSWORD ? { 'x-auth-token': APP_PASSWORD } : {}) },
-                  body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName }),
+                  body: JSON.stringify({ imageUrl: asset.imageUrl, siteId, altText: asset.altText, fileName: asset.fileName, cmsUsages: asset.cmsUsages }),
                 });
                 const r = await compressRes.json() as Record<string, unknown>;
                 results.push({ assetId: asset.assetId, ...r });
@@ -556,7 +556,7 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running', message: 'Scanning pages and generating unified schemas...' });
-            const { ctx, pageKeywordMap } = buildSchemaContext(schemaSiteId);
+            const { ctx, pageKeywordMap, gscMap, ga4Map, queryPageData, insightsMap } = await buildSchemaContext(schemaSiteId, { includeAnalytics: true });
             const schemaWsId = (params.workspaceId as string) || '';
             // Enrich with architecture tree for deterministic breadcrumbs
             if (ctx.workspaceId) {
@@ -575,7 +575,7 @@ router.post('/api/jobs', async (req, res) => {
                 lastSaveTime = now;
                 saveSchemaSnapshot(schemaSiteId, schemaWsId, partial);
               }
-            }, () => isJobCancelled(job.id));
+            }, () => isJobCancelled(job.id), gscMap, ga4Map, queryPageData, insightsMap);
             // Final save — always write the complete result
             if (result.length > 0) {
               saveSchemaSnapshot(schemaSiteId, schemaWsId, result);

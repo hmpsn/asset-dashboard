@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { SectionCard, Badge } from './ui';
 import { useToast } from '../hooks/useToast';
+import { stripe } from '../api';
 
 interface StripeProduct {
   productType: string;
@@ -76,14 +77,14 @@ export function StripeSettings() {
   const [productsExpanded, setProductsExpanded] = useState(false);
 
   useEffect(() => {
-    fetch('/api/stripe/config')
-      .then(r => r.json())
-      .then((data: StripeConfigState) => {
-        setConfig(data);
+    stripe.getConfig()
+      .then((data) => {
+        const cfg = data as StripeConfigState | null;
+        setConfig(cfg);
         // Merge saved products with defaults
-        if (data.products && data.products.length > 0) {
+        if (cfg?.products && cfg.products.length > 0) {
           const merged = DEFAULT_PRODUCTS.map(dp => {
-            const saved = data.products.find(p => p.productType === dp.productType);
+            const saved = cfg.products.find(p => p.productType === dp.productType);
             return saved ? { ...dp, ...saved } : dp;
           });
           setProducts(merged);
@@ -99,18 +100,12 @@ export function StripeSettings() {
     if (!secretKey && !webhookSecret && !publishableKey) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/stripe/config/keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          secretKey: secretKey || undefined,
-          webhookSecret: webhookSecret || undefined,
-          publishableKey: publishableKey || undefined,
-        }),
+      const data = await stripe.saveKeys({
+        secretKey: secretKey || undefined,
+        webhookSecret: webhookSecret || undefined,
+        publishableKey: publishableKey || undefined,
       });
-      if (!res.ok) throw new Error('Failed to save');
-      const data = await res.json();
-      setConfig(data);
+      setConfig(data as StripeConfigState);
       setSecretKey('');
       setWebhookSecret('');
       setPublishableKey('');
@@ -125,12 +120,7 @@ export function StripeSettings() {
   const saveProductConfig = async () => {
     setSavingProducts(true);
     try {
-      const res = await fetch('/api/stripe/config/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products }),
-      });
-      if (!res.ok) throw new Error('Failed to save');
+      await stripe.saveProducts({ products });
       showToast('Product configuration saved', 'success');
     } catch (err) {
       console.error('StripeSettings operation failed:', err);
@@ -142,7 +132,7 @@ export function StripeSettings() {
   const clearConfig = async () => {
     if (!confirm('Remove all Stripe configuration? This cannot be undone.')) return;
     try {
-      await fetch('/api/stripe/config', { method: 'DELETE' });
+      await stripe.deleteConfig();
       setConfig({ configured: false, hasSecretKey: false, hasWebhookSecret: false, hasPublishableKey: false, publishableKey: '', products: [], updatedAt: null });
       setProducts(DEFAULT_PRODUCTS);
       showToast('Stripe configuration cleared', 'success');

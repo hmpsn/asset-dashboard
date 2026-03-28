@@ -9,7 +9,7 @@ import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';
 import { verifyClientSession } from '../middleware.js';
-import { listSnapshots, getLatestSnapshot } from '../reports.js';
+import { listSnapshots, getLatestSnapshot, getLatestSnapshotBefore } from '../reports.js';
 import { getAllGscPages } from '../search-console.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
@@ -253,6 +253,28 @@ router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
   // Apply suppressions so client sees filtered issues and recalculated scores
   const filtered = applySuppressionsToAudit(latest.audit, ws.auditSuppressions || []);
   const history = listSnapshots(ws.webflowSiteId);
+
+  // Compute audit diff against the previous snapshot (what changed since last audit)
+  let auditDiff: { resolved: number; newIssues: number } | undefined;
+  if (latest.previousScore != null) {
+    const prev = getLatestSnapshotBefore(ws.webflowSiteId, latest.id);
+    if (prev) {
+      const prevFiltered = applySuppressionsToAudit(prev.audit, ws.auditSuppressions || []);
+      // Build issue key sets: "check::slug" for each page issue
+      const prevKeys = new Set<string>();
+      for (const page of prevFiltered.pages) {
+        for (const issue of page.issues) prevKeys.add(`${issue.check}::${page.slug}`);
+      }
+      const currKeys = new Set<string>();
+      for (const page of filtered.pages) {
+        for (const issue of page.issues) currKeys.add(`${issue.check}::${page.slug}`);
+      }
+      const resolved = [...prevKeys].filter(k => !currKeys.has(k)).length;
+      const newIssues = [...currKeys].filter(k => !prevKeys.has(k)).length;
+      auditDiff = { resolved, newIssues };
+    }
+  }
+
   res.json({
     id: latest.id,
     createdAt: latest.createdAt,
@@ -261,6 +283,7 @@ router.get('/api/public/audit-detail/:workspaceId', (req, res) => {
     previousScore: latest.previousScore,
     audit: filtered,
     scoreHistory: history.map(h => ({ id: h.id, createdAt: h.createdAt, siteScore: h.siteScore })),
+    auditDiff,
   });
 });
 
@@ -329,8 +352,8 @@ router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const { keyword, status, reason, source } = req.body;
-  if (!keyword || !status || !['approved', 'declined'].includes(status)) {
-    return res.status(400).json({ error: 'keyword and status (approved|declined) required' });
+  if (!keyword || !status || !['approved', 'declined', 'requested'].includes(status)) {
+    return res.status(400).json({ error: 'keyword and status (approved|declined|requested) required' });
   }
   const kw = keyword.toLowerCase().trim();
   const declinedBy = clientPayload?.email || 'client';
@@ -380,7 +403,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
 
   const insert = db.transaction((items: { keyword: string; status: string; reason?: string; source?: string }[]) => {
     for (const item of items) {
-      if (!item.keyword || !['approved', 'declined'].includes(item.status)) continue;
+      if (!item.keyword || !['approved', 'declined', 'requested'].includes(item.status)) continue;
       stmt.run(ws.id, item.keyword.toLowerCase().trim(), item.status, item.reason || null, item.source || 'content_gap', declinedBy);
     }
   });

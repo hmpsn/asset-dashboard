@@ -5,6 +5,7 @@
  * each with a keyword, planned URL, and brief/post tracking.
  */
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import type {
   ContentMatrix,
   MatrixCell,
@@ -45,46 +46,32 @@ interface MatrixRow {
 
 // ── Prepared statements (lazy) ──
 
-interface MatrixStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: MatrixStmts | null = null;
-function stmts(): MatrixStmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO content_matrices
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_matrices
            (id, workspace_id, name, template_id, dimensions, url_pattern,
             keyword_pattern, cells, stats, created_at, updated_at)
          VALUES
            (@id, @workspace_id, @name, @template_id, @dimensions, @url_pattern,
             @keyword_pattern, @cells, @stats, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_matrices WHERE workspace_id = ? ORDER BY updated_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_matrices WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE content_matrices SET
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_matrices WHERE workspace_id = ? ORDER BY updated_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_matrices WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE content_matrices SET
            name = @name, template_id = @template_id, dimensions = @dimensions,
            url_pattern = @url_pattern, keyword_pattern = @keyword_pattern,
            cells = @cells, stats = @stats, updated_at = @updated_at
          WHERE id = @id AND workspace_id = @workspace_id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_matrices WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_matrices WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 // ── Helpers ──
 

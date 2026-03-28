@@ -5,6 +5,7 @@
  * used by content matrices for scalable page generation.
  */
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import type {
   ContentTemplate,
   ContentPageType,
@@ -39,20 +40,9 @@ interface TemplateRow {
 
 // ── Lazy prepared statements ──
 
-interface TemplateStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: TemplateStmts | null = null;
-function stmts(): TemplateStmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO content_templates
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_templates
            (id, workspace_id, name, description, page_type, variables, sections,
             url_pattern, keyword_pattern, title_pattern, meta_desc_pattern,
             cms_field_map, tone_and_style, schema_types, created_at, updated_at)
@@ -60,15 +50,15 @@ function stmts(): TemplateStmts {
            (@id, @workspace_id, @name, @description, @page_type, @variables, @sections,
             @url_pattern, @keyword_pattern, @title_pattern, @meta_desc_pattern,
             @cms_field_map, @tone_and_style, @schema_types, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_templates WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_templates WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE content_templates SET
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_templates WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_templates WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE content_templates SET
            name = @name, description = @description, page_type = @page_type,
            variables = @variables, sections = @sections,
            url_pattern = @url_pattern, keyword_pattern = @keyword_pattern,
@@ -76,14 +66,11 @@ function stmts(): TemplateStmts {
            cms_field_map = @cms_field_map, tone_and_style = @tone_and_style,
            schema_types = @schema_types, updated_at = @updated_at
          WHERE id = @id AND workspace_id = @workspace_id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_templates WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_templates WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 // ── Row ↔ Interface conversion ──
 

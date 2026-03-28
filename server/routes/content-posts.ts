@@ -24,6 +24,7 @@ import {
   getPostVersion,
   revertToVersion,
 } from '../content-posts.js';
+import { scoreVoiceMatch } from '../content-posts-ai.js';
 import { renderPostHTML } from '../post-export-html.js';
 import { assemblePostHtml, generateSlug } from '../html-to-richtext.js';
 import {
@@ -315,6 +316,29 @@ router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert'
   if (!reverted) return res.status(404).json({ error: 'Post or version not found' });
   addActivity(req.params.workspaceId, 'post_reverted', `Reverted "${reverted.title}" to a previous version`);
   res.json(reverted);
+});
+
+// Score brand voice match
+router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  try {
+    const post = getPost(req.params.workspaceId, req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    const brief = getBrief(req.params.workspaceId, post.briefId);
+    if (!brief) return res.status(404).json({ error: 'Brief not found' });
+
+    const { voiceScore, voiceFeedback } = await scoreVoiceMatch(post, brief, req.params.workspaceId);
+    if (voiceScore == null) {
+      return res.status(500).json({ error: voiceFeedback || 'Voice scoring failed' });
+    }
+    const updated = updatePostField(req.params.workspaceId, req.params.postId, { voiceScore, voiceFeedback });
+
+    broadcastToWorkspace(req.params.workspaceId, 'post-updated', { postId: req.params.postId });
+    res.json(updated);
+  } catch (err) {
+    log.error({ err }, `Voice scoring failed for post ${req.params.postId}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg || 'Voice scoring failed' });
+  }
 });
 
 // Delete a post

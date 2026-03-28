@@ -45,6 +45,9 @@ export interface ContentBrief {
     validatedAt: string;
   };
   templateId?: string;
+  // Title/Meta A/B variants (v7)
+  titleVariants?: string[];
+  metaDescVariants?: string[];
 }
 
 export interface PostSection {
@@ -90,6 +93,9 @@ export interface GeneratedPost {
   webflowCollectionId?: string;
   publishedAt?: string;
   publishedSlug?: string;
+  // Brand voice scoring (v2)
+  voiceScore?: number;
+  voiceFeedback?: string;
   createdAt: string;
   updatedAt: string;
 }

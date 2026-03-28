@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen, Pencil, Check, X,
-  Shield, DollarSign, ArrowUp, ArrowDown,
+  Shield, DollarSign, ArrowUp, ArrowDown, ArrowUpRight, Code2, Plus,
 } from 'lucide-react';
+import { adminPath } from '../routes';
 import { scoreColorClass, scoreBgBarClass } from './ui';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
-import { keywords } from '../api/seo';
+import { keywords, rankTracking } from '../api/seo';
 import { useKeywordStrategy } from '../hooks/admin';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
@@ -188,6 +190,7 @@ function opportunityScore(p: StrategyPage) {
 // ── Component ──
 
 export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: keywordData, isLoading: strategyLoading } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
@@ -219,6 +222,23 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   // SEO copy generation state
   const [generatingCopy, setGeneratingCopy] = useState<string | null>(null);
   const [seoCopyResults, setSeoCopyResults] = useState<Map<string, SeoCopy>>(new Map());
+
+  // Rank tracking state
+  const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    rankTracking.keywords(workspaceId)
+      .then(kws => setTrackedKeywords(new Set((kws || []).map(k => k.query))))
+      .catch(() => {});
+  }, [workspaceId]);
+  const trackKeyword = async (kw: string) => {
+    if (!kw || trackedKeywords.has(kw)) return;
+    try {
+      await rankTracking.addKeyword(workspaceId, { query: kw });
+      setTrackedKeywords(prev => new Set(prev).add(kw));
+    } catch {
+      // silently ignore duplicates
+    }
+  };
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Fetch all pages
@@ -715,8 +735,15 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </span>
                   )}
                   {sp?.primaryKeyword && (
-                    <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[180px] truncate">
-                      {sp.primaryKeyword}
+                    <span className="inline-flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded max-w-[200px]">
+                      <span className="truncate">{sp.primaryKeyword}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); trackKeyword(sp.primaryKeyword); }}
+                        title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                        className={`flex-shrink-0 transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'text-emerald-400' : 'text-teal-600 hover:text-teal-300'}`}
+                      >
+                        {trackedKeywords.has(sp.primaryKeyword) ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                      </button>
                     </span>
                   )}
                   {sp?.validated === false && (
@@ -751,7 +778,16 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Primary Keyword</span>
-                          <p className="text-xs text-zinc-200 mt-0.5">{sp.primaryKeyword}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-zinc-200">{sp.primaryKeyword}</p>
+                            <button
+                              onClick={() => trackKeyword(sp.primaryKeyword)}
+                              title={trackedKeywords.has(sp.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(sp.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                            >
+                              {trackedKeywords.has(sp.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
+                            </button>
+                          </div>
                         </div>
                         <button onClick={() => startEdit(page)} className="p-1 text-zinc-500 hover:text-teal-400 transition-colors" title="Edit keywords">
                           <Pencil className="w-3 h-3" />
@@ -910,6 +946,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         <div className="flex items-center gap-2 mb-2">
                           <Target className="w-3.5 h-3.5 text-teal-400" />
                           <span className="text-xs font-medium text-zinc-300">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
+                          <button
+                            onClick={() => trackKeyword(kw.primaryKeyword)}
+                            title={trackedKeywords.has(kw.primaryKeyword) ? 'Tracking' : 'Track in Rank Tracker'}
+                            className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${trackedKeywords.has(kw.primaryKeyword) ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}`}
+                          >
+                            {trackedKeywords.has(kw.primaryKeyword) ? <><Check className="w-2.5 h-2.5" /> Tracking</> : <><Plus className="w-2.5 h-2.5" /> Track</>}
+                          </button>
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
                           {(['inTitle', 'inMeta', 'inContent', 'inSlug'] as const).map(key => {
@@ -1105,6 +1148,37 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       ) : null}
                     </div>
                   )}
+
+                  {/* ── Action bar ── */}
+                  <div className="flex items-center gap-2 pt-3 mt-1 border-t border-zinc-800/60 flex-wrap">
+                    <button
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                    >
+                      <Pencil className="w-3 h-3" /> Fix in SEO Editor
+                    </button>
+                    <button
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                    >
+                      <BookOpen className="w-3 h-3" /> Create Brief
+                    </button>
+                    {(kw?.optimizationIssues?.some(i => /schema|structured data/i.test(i)) || sp?.optimizationIssues?.some(i => /schema|structured data/i.test(i))) && (
+                      <button
+                        onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
+                      >
+                        <Code2 className="w-3 h-3" /> Add Schema
+                      </button>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'))}
+                      className="flex items-center gap-1 text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
+                    >
+                      View full analysis <ArrowUpRight className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

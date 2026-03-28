@@ -18,7 +18,7 @@ import {
 } from '../approvals.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { notifyApprovalReady } from '../email.js';
-import { getClientActor } from '../middleware.js';
+import { getClientActor, requireClientPortalAuth } from '../middleware.js';
 import {
   updateCollectionItem,
   publishCollectionItems,
@@ -38,6 +38,16 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('approvals');
+
+/** Derive the correct page-level edit state from all items targeting that page in a batch. */
+function derivePageStatus(batch: import('../../shared/types/approvals').ApprovalBatch, pageId: string): 'in-review' | 'approved' | 'rejected' {
+  const pageItems = batch.items.filter(i => i.pageId === pageId);
+  const statuses = pageItems.map(i => i.status);
+  if (statuses.every(s => s === 'approved' || s === 'applied')) return 'approved';
+  if (statuses.every(s => s === 'rejected')) return 'rejected';
+  // Mix of pending/approved/rejected → still in review
+  return 'in-review';
+}
 
 const createBatchSchema = z.object({
   siteId: z.string().min(1, 'siteId is required'),
@@ -95,9 +105,12 @@ router.delete('/api/approvals/:workspaceId/:batchId', requireWorkspaceAccess('wo
   if (batch) {
     for (const item of batch.items) {
       if (item.pageId) {
-        // Reset pages that are still "in-review" for this batch back to clean
+        // Reset any page still associated with this batch (in-review, approved, or rejected)
         const state = getPageState(workspaceId, item.pageId);
-        if (state?.status === 'in-review' && state.approvalBatchId === batchId) {
+        if (
+          (state?.status === 'in-review' || state?.status === 'approved' || state?.status === 'rejected') &&
+          state.approvalBatchId === batchId
+        ) {
           clearPageState(workspaceId, item.pageId);
         }
       }
@@ -146,26 +159,33 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
 });
 
 // --- Public Approvals (client dashboard, no auth required) ---
-router.get('/api/public/approvals/:workspaceId', (req, res) => {
+router.get('/api/public/approvals/:workspaceId', requireClientPortalAuth(), (req, res) => {
   res.json(listBatches(req.params.workspaceId));
 });
 
-router.get('/api/public/approvals/:workspaceId/:batchId', (req, res) => {
+router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAuth(), (req, res) => {
   const batch = getBatch(req.params.workspaceId, req.params.batchId);
   if (!batch) return res.status(404).json({ error: 'Batch not found' });
   res.json(batch);
 });
 
-router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', validate(updateItemSchema), (req, res) => {
+router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res) => {
+  // Only include fields that were actually sent — passing undefined would overwrite existing values
+  const update: Partial<Pick<import('../../shared/types/approvals').ApprovalItem, 'status' | 'clientValue' | 'clientNote'>> = {};
+  if (req.body.status !== undefined) update.status = req.body.status;
+  if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
+  if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
   const { status, clientValue, clientNote } = req.body;
-  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, { status, clientValue, clientNote });
+  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
   if (!batch) return res.status(404).json({ error: 'Item not found' });
   // Sync PageEditState when client approves or rejects
   if (status === 'approved' || status === 'rejected') {
     const item = batch.items.find(i => i.id === req.params.itemId);
     if (item) {
+      // Aggregate across all items for this page to avoid last-write-wins on multi-field pages
+      const pageStatus = derivePageStatus(batch, item.pageId);
       const pageStateResult = updatePageState(req.params.workspaceId, item.pageId, {
-        status: status === 'approved' ? 'approved' : 'rejected',
+        status: pageStatus,
         updatedBy: 'client',
         ...(status === 'rejected' && clientNote ? { rejectionNote: clientNote } : {}),
       });
@@ -192,12 +212,31 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', validate(upd
       }
     }
   }
+  // Handle undo — client reverting their approve/reject decision back to pending
+  if (status === 'pending') {
+    const item = batch.items.find(i => i.id === req.params.itemId);
+    if (item?.pageId) {
+      // Aggregate across all items for this page — don't blindly reset to in-review
+      const pageStatus = derivePageStatus(batch, item.pageId);
+      updatePageState(req.params.workspaceId, item.pageId, {
+        status: pageStatus,
+        updatedBy: 'client',
+        ...(pageStatus === 'in-review' ? { rejectionNote: '' } : {}),
+      });
+      const actorInfo = getClientActor(req, req.params.workspaceId);
+      addActivity(req.params.workspaceId, 'approval_reverted',
+        `${actorInfo?.name || 'Client'} reverted ${item.field} decision on ${item.pageTitle || item.pageId}`,
+        undefined,
+        { batchId: req.params.batchId, itemId: item.id, pageId: item.pageId },
+        actorInfo);
+    }
+  }
   broadcastToWorkspace(req.params.workspaceId, 'approval:update', { batchId: req.params.batchId, itemId: req.params.itemId, status });
   res.json(batch);
 });
 
 // Apply approved items to Webflow
-router.post('/api/public/approvals/:workspaceId/:batchId/apply', async (req, res) => {
+router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPortalAuth(), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(400).json({ error: 'No site linked' });
   const batch = getBatch(req.params.workspaceId, req.params.batchId);

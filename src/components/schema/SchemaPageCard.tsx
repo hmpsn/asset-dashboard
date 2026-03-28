@@ -2,21 +2,30 @@
  * SchemaPageCard — Per-page card rendering for schema suggestions.
  * Extracted from SchemaSuggester.tsx per-page rendering logic.
  */
+import { useState } from 'react';
 import {
   ChevronDown, ChevronRight, Copy, CheckCircle,
   AlertCircle, Sparkles, RefreshCw, Upload, Send,
   ArrowRight, GitCompareArrows, Pencil, AlertTriangle,
-  Loader2, Save, Trash2,
+  Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { statusBorderClass } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
+import { SchemaVersionHistory } from './SchemaVersionHistory';
 
 interface SchemaSuggestion {
   type: string;
   reason: string;
   priority: 'high' | 'medium' | 'low';
   template: Record<string, unknown>;
+}
+
+interface RichResultEligibility {
+  type: string;
+  eligible: boolean;
+  feature: string;
+  missingFields?: string[];
 }
 
 interface SchemaPageSuggestion {
@@ -28,6 +37,8 @@ interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
+  lastPublishedAt?: string | null;
 }
 
 interface Recommendation {
@@ -78,6 +89,9 @@ export interface SchemaPageCardProps {
   retracting: boolean;
   retracted: boolean;
   getEffectiveSchema: (pageId: string, original: Record<string, unknown>) => Record<string, unknown>;
+  siteId: string;
+  onRestore: (pageId: string, schema: Record<string, unknown>) => void;
+  validationStatus?: 'valid' | 'warnings' | 'errors';
 }
 
 export function SchemaPageCard({
@@ -90,11 +104,19 @@ export function SchemaPageCard({
   onToggleExpand, onRegenerate, onToggleDiff, onToggleSchemaEdit,
   onSchemaJsonChange, onCopyTemplate, onPublish, onConfirmPublish,
   onSendToClient, onSaveAsTemplate, onRetract, retracting, retracted,
-  getEffectiveSchema,
+  getEffectiveSchema, siteId, onRestore, validationStatus,
 }: SchemaPageCardProps) {
+  const [showHistory, setShowHistory] = useState(false);
   const hasErrors = (page.validationErrors?.length || 0) > 0;
   const schema = page.suggestedSchemas[0];
   const graphTypes = schema ? ((schema.template?.['@graph'] as Record<string, unknown>[]) || []).map(n => n['@type'] as string).filter(Boolean) : [];
+  const eligibleCount = page.richResultsEligibility?.filter(r => r.eligible).length || 0;
+
+  // Stale schema detection: published > 90 days ago
+  const staleDays = page.lastPublishedAt
+    ? Math.floor((Date.now() - new Date(page.lastPublishedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isStale = staleDays !== null && staleDays > 90;
 
   return (
     <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`}>
@@ -121,6 +143,16 @@ export function SchemaPageCard({
               <Sparkles className="w-3 h-3" /> {graphTypes.length} types
             </span>
           )}
+          {eligibleCount > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20" title={`${eligibleCount} rich result type${eligibleCount > 1 ? 's' : ''} eligible`}>
+              <Star className="w-3 h-3" /> {eligibleCount} rich
+            </span>
+          )}
+          {isStale && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20" title={`Published ${staleDays} days ago — consider refreshing`}>
+              <Clock className="w-3 h-3" /> {staleDays}d old
+            </span>
+          )}
           {hasErrors && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <AlertCircle className="w-3 h-3" /> {page.validationErrors!.length}
@@ -140,17 +172,29 @@ export function SchemaPageCard({
           >
             <option value="auto">Auto-detect</option>
             <option value="homepage">Homepage</option>
-            <option value="service">Service</option>
-            <option value="pillar">Pillar / Hub</option>
-            <option value="persona">Persona</option>
+            <option value="pillar">Pillar / Product Page</option>
+            <option value="service">Service Page</option>
+            <option value="audience">Audience / Use Case</option>
+            <option value="lead-gen">Lead-Gen / Conversion</option>
             <option value="blog">Blog Post</option>
             <option value="about">About / Team</option>
             <option value="contact">Contact</option>
             <option value="location">Location</option>
             <option value="product">Product</option>
-            <option value="landing">Landing Page</option>
+            <option value="partnership">Partnership</option>
             <option value="faq">FAQ</option>
             <option value="case-study">Case Study</option>
+            <option value="comparison">Comparison</option>
+            <option value="author">Author Profile</option>
+            <option value="howto">How-To / Tutorial</option>
+            <option value="video">Video Page</option>
+            <option value="job-posting">Job Posting</option>
+            <option value="course">Course / Training</option>
+            <option value="event">Event</option>
+            <option value="review">Review</option>
+            <option value="pricing">Pricing Page</option>
+            <option value="recipe">Recipe</option>
+            <option value="generic">General Page</option>
           </select>
           <button
             onClick={(e) => { e.stopPropagation(); onRegenerate(page.pageId); }}
@@ -229,6 +273,31 @@ export function SchemaPageCard({
             <p className="text-[11px] text-zinc-500 mt-1.5">{schema.reason}</p>
           </div>
 
+          {/* Rich Results Eligibility */}
+          {page.richResultsEligibility && page.richResultsEligibility.length > 0 && (
+            <div className="px-4 py-2 border-b border-zinc-800/50">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Star className="w-3 h-3 text-amber-400" />
+                <div className="text-xs font-medium text-zinc-400">Rich Results</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {page.richResultsEligibility.map((r, i) => (
+                  r.eligible ? (
+                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-green-500/10 text-green-400 border border-green-500/20" title={`Eligible for: ${r.feature}`}>
+                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                      {r.type}: {r.feature}
+                    </span>
+                  ) : (
+                    <span key={i} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-amber-500/10 text-amber-400 border border-amber-500/20" title={`Missing for ${r.feature}: ${r.missingFields?.join(', ')}`}>
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      {r.type}: missing {r.missingFields?.join(', ')}
+                    </span>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Schema preview / diff / editor */}
           <div className="px-4 py-3">
             <div className="flex items-center justify-between mb-2">
@@ -306,7 +375,23 @@ export function SchemaPageCard({
             )}
 
             {/* Publish to Webflow */}
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              {/* Validation status badge */}
+              {validationStatus === 'valid' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
+                  <ShieldCheck className="w-3 h-3" /> Schema valid
+                </span>
+              )}
+              {validationStatus === 'warnings' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <AlertTriangle className="w-3 h-3" /> Warnings
+                </span>
+              )}
+              {validationStatus === 'errors' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-500/10 text-red-400 border border-red-500/20" title="Fix errors before publishing">
+                  <XCircle className="w-3 h-3" /> Fix errors to publish
+                </span>
+              )}
               {!page.pageId.startsWith('cms-') && (
                 published ? (
                   <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
@@ -317,7 +402,7 @@ export function SchemaPageCard({
                     <span className="text-xs text-amber-400">Publish {editedSchemaJson ? 'edited ' : ''}schema to this page&apos;s &lt;head&gt;?</span>
                     <button
                       onClick={() => onPublish(page.pageId, getEffectiveSchema(page.pageId, schema.template))}
-                      disabled={publishing || !!schemaParseError}
+                      disabled={publishing || !!schemaParseError || validationStatus === 'errors'}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 bg-green-600 hover:bg-green-500 text-white"
                     >
                       {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
@@ -401,7 +486,47 @@ export function SchemaPageCard({
                   </button>
                 )
               )}
+              {/* Version History toggle */}
+              <button
+                onClick={() => setShowHistory(h => !h)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  showHistory
+                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                    : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
+                }`}
+                title="View publish version history"
+              >
+                <History className="w-3.5 h-3.5" />
+                History
+              </button>
             </div>
+
+            {/* Stale schema warning */}
+            {isStale && (
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Clock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span className="text-[11px] text-amber-300">
+                  Schema published {staleDays} days ago — consider regenerating to reflect any content changes.
+                </span>
+              </div>
+            )}
+
+            {/* Version history panel */}
+            {showHistory && (
+              <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                <div className="text-xs font-medium text-zinc-400 mb-2 flex items-center gap-1.5">
+                  <History className="w-3 h-3" /> Publish History
+                </div>
+                <SchemaVersionHistory
+                  siteId={siteId}
+                  pageId={page.pageId}
+                  workspaceId={workspaceId}
+                  onRestore={(restoredSchema) => {
+                    onRestore(page.pageId, restoredSchema);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

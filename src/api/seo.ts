@@ -3,6 +3,18 @@ import { get, post, put, patch, del, getSafe, getOptional } from './client';
 import type { SchemaSitePlan, PageRoleAssignment, CanonicalEntity } from '../../shared/types/schema-plan';
 import type { LatestRank, RankHistoryEntry } from '../hooks/useClientData';
 
+export interface StrategyDiff {
+  previousGeneratedAt: string;
+  currentGeneratedAt: string;
+  newKeywords: string[];
+  lostKeywords: string[];
+  newGaps: string[];
+  resolvedGaps: string[];
+  keywordChanges: { pagePath: string; oldKeyword: string; newKeyword: string }[];
+  prevSiteKeywordCount: number;
+  currSiteKeywordCount: number;
+}
+
 // ── Audit ───────────────────────────────────────────────────────
 export const audit = {
   summary: (wsId: string) =>
@@ -25,6 +37,9 @@ export const auditSchedules = {
 
   save: (wsId: string, body: Record<string, unknown>) =>
     post<unknown>(`/api/audit-schedules/${wsId}`, body),
+
+  enable: (wsId: string) =>
+    put<unknown>(`/api/audit-schedules/${wsId}`, { enabled: true }),
 };
 
 // ── Reports / snapshots ─────────────────────────────────────────
@@ -78,6 +93,35 @@ export const schema = {
     getSafe<unknown[]>(`/api/schema/${wsId}/deploy-history`, []),
 };
 
+// ── Schema Validation ───────────────────────────────────────────
+export interface SchemaValidationResult {
+  status: 'valid' | 'warnings' | 'errors';
+  richResults: string[];
+  errors: Array<{ type: string; field: string; message: string }>;
+  warnings: Array<{ type: string; field: string; message: string }>;
+}
+
+export interface SchemaValidationRecord {
+  id: string;
+  pageId: string;
+  status: 'valid' | 'warnings' | 'errors';
+  richResults: string[];
+  errors: Array<{ type: string; message: string }>;
+  warnings: Array<{ type: string; message: string }>;
+  validatedAt: string;
+}
+
+export const schemaValidation = {
+  validate: (siteId: string, body: { pageId: string; schema: Record<string, unknown> }) =>
+    post<SchemaValidationResult>(`/api/webflow/schema-validate/${siteId}`, body),
+
+  getAll: (siteId: string) =>
+    getSafe<SchemaValidationRecord[]>(`/api/webflow/schema-validations/${siteId}`, []),
+
+  get: (siteId: string, pageId: string) =>
+    getOptional<SchemaValidationRecord>(`/api/webflow/schema-validation/${siteId}?pageId=${encodeURIComponent(pageId)}`),
+};
+
 // ── Schema Site Plan ────────────────────────────────────────────
 export const schemaPlan = {
   get: (siteId: string) =>
@@ -122,8 +166,14 @@ export const keywords = {
   patchStrategy: (wsId: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/webflow/keyword-strategy/${wsId}`, body),
 
+  strategyDiff: (wsId: string) =>
+    getOptional<StrategyDiff | null>(`/api/webflow/keyword-strategy/${wsId}/diff`),
+
   semrushStatus: () =>
     getOptional<unknown>('/api/semrush/status'),
+
+  providerStatus: () =>
+    getOptional<{ providers: { name: string; configured: boolean }[] }>('/api/seo-providers/status'),
 
   discoverCompetitors: (wsId: string) =>
     get<{ competitors: Array<{ domain: string; relevance: number; commonKeywords: number; organicKeywords: number; organicTraffic: number }> }>(`/api/semrush/discover-competitors/${wsId}`),
@@ -162,8 +212,17 @@ export const rankTracking = {
     getSafe<LatestRank[]>(`/api/public/rank-tracking/${wsId}/latest`, []),
 };
 
+// ── Backlinks ────────────────────────────────────────────────────
+export const backlinks = {
+  get: (wsId: string) =>
+    getOptional<unknown>(`/api/backlinks/${wsId}`),
+};
+
 // ── Webflow ─────────────────────────────────────────────────────
 export const webflow = {
+  sites: (token: string) =>
+    get<unknown[]>(`/api/webflow/sites?token=${encodeURIComponent(token)}`),
+
   pages: (siteId: string) =>
     get<unknown[]>(`/api/webflow/pages/${siteId}`),
 
@@ -277,6 +336,9 @@ export const seoSuggestions = {
 export const contentPerformance = {
   get: (wsId: string, days?: number) =>
     get<unknown>(`/api/content-performance/${wsId}${days ? `?days=${days}` : ''}`),
+
+  publicGet: (wsId: string) =>
+    getOptional<unknown>(`/api/public/content-performance/${wsId}`),
 
   refresh: (wsId: string) =>
     post<unknown>(`/api/content-performance/${wsId}/refresh`),

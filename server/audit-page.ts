@@ -386,28 +386,33 @@ export function auditPage(
       }
     }
 
-    // AEO-4: FAQ content without FAQPage schema
-    const faqHeadingPattern = /<h[2-4][^>]*>[^<]*(?:FAQ|Frequently\s+Asked|Common\s+Questions)[^<]*<\/h[2-4]>/i;
-    const hasQuestionHeadings = (bodyText.match(/<h[2-4][^>]*>[^<]*\?[^<]*<\/h[2-4]>/gi) || []).length >= 3;
-    const hasFaqSchema = /"FAQPage"/i.test(html);
-    if ((faqHeadingPattern.test(html) || hasQuestionHeadings) && !hasFaqSchema) {
-      issues.push({
-        check: 'aeo-faq-no-schema', severity: 'warning',
-        message: 'FAQ content detected but no FAQPage schema found',
-        recommendation: 'This page has FAQ-structured content (question headings) but no FAQPage JSON-LD schema. Adding FAQ schema dramatically increases citation likelihood — LLMs disproportionately cite FAQ-marked pages because they match question prompts and are cleanly chunked.',
-      });
+    // AEO-4: FAQ content without FAQPage schema (content pages only)
+    if (contentPage) {
+      const faqHeadingPattern = /<h[2-4][^>]*>[^<]*(?:FAQ|Frequently\s+Asked|Common\s+Questions)[^<]*<\/h[2-4]>/i;
+      const hasQuestionHeadings = (bodyText.match(/<h[2-4][^>]*>[^<]*\?[^<]*<\/h[2-4]>/gi) || []).length >= 3;
+      const hasFaqSchema = /"FAQPage"/i.test(html);
+      if ((faqHeadingPattern.test(html) || hasQuestionHeadings) && !hasFaqSchema) {
+        issues.push({
+          check: 'aeo-faq-no-schema', severity: 'warning',
+          message: 'FAQ content detected but no FAQPage schema found',
+          recommendation: 'This page has FAQ-structured content (question headings) but no FAQPage JSON-LD schema. Adding FAQ schema dramatically increases citation likelihood — LLMs disproportionately cite FAQ-marked pages because they match question prompts and are cleanly chunked.',
+        });
+      }
     }
 
-    // AEO-5: Hidden content behind UI (accordions, tabs)
-    const hiddenContentBlocks = (html.match(/<(?:div|section|article)[^>]*(?:style=["'][^"']*display\s*:\s*none|aria-hidden=["']true["']|class=["'][^"']*(?:accordion-body|tab-pane|collapse\b|hidden\b))[^>]*>[\s\S]{100,}?<\/(?:div|section|article)>/gi) || []);
-    if (hiddenContentBlocks.length > 0) {
-      const totalHiddenChars = hiddenContentBlocks.reduce((sum, b) => sum + b.replace(/<[^>]+>/g, '').length, 0);
-      if (totalHiddenChars > 500) {
-        issues.push({
-          check: 'aeo-hidden-content', severity: 'warning',
-          message: `${hiddenContentBlocks.length} content block${hiddenContentBlocks.length > 1 ? 's' : ''} hidden behind UI elements (~${Math.round(totalHiddenChars / 100) * 100} chars)`,
-          recommendation: 'Critical content is hidden behind accordions, tabs, or collapsed sections. LLMs and search crawlers often read only what\'s visible in the initial DOM. Move important answers into the main content flow.',
-        });
+    // AEO-5: Hidden content behind UI (content pages only — service/contact pages
+    // intentionally use accordions for layout, not content hiding)
+    if (contentPage) {
+      const hiddenContentBlocks = (html.match(/<(?:div|section|article)[^>]*(?:style=["'][^"']*display\s*:\s*none|aria-hidden=["']true["']|class=["'][^"']*(?:accordion-body|tab-pane|collapse\b|hidden\b))[^>]*>[\s\S]{100,}?<\/(?:div|section|article)>/gi) || []);
+      if (hiddenContentBlocks.length > 0) {
+        const totalHiddenChars = hiddenContentBlocks.reduce((sum, b) => sum + b.replace(/<[^>]+>/g, '').length, 0);
+        if (totalHiddenChars > 500) {
+          issues.push({
+            check: 'aeo-hidden-content', severity: 'warning',
+            message: `${hiddenContentBlocks.length} content block${hiddenContentBlocks.length > 1 ? 's' : ''} hidden behind UI elements (~${Math.round(totalHiddenChars / 100) * 100} chars)`,
+            recommendation: 'Critical content is hidden behind accordions, tabs, or collapsed sections. LLMs and search crawlers often read only what\'s visible in the initial DOM. Move important answers into the main content flow.',
+          });
+        }
       }
     }
 
@@ -442,22 +447,25 @@ export function auditPage(
       }
     }
 
-    // AEO-7: Dark patterns (aggressive popups, auto-play, interstitials)
-    const hasAutoPlay = /<video[^>]*autoplay/i.test(html) || /<audio[^>]*autoplay/i.test(html);
-    const hasAggressiveModal = /<div[^>]*class=["'][^"']*(?:popup|modal|overlay|interstitial)[^"']*["'][^>]*(?:style=["'][^"']*(?:display\s*:\s*(?:block|flex)|position\s*:\s*fixed))/i.test(html);
-    if (hasAutoPlay) {
-      issues.push({
-        check: 'aeo-dark-patterns', severity: 'info',
-        message: 'Auto-playing media detected',
-        recommendation: 'Auto-play video/audio can trigger spam signals in retrieval systems. Use click-to-play instead.',
-      });
-    }
-    if (hasAggressiveModal) {
-      issues.push({
-        check: 'aeo-dark-patterns', severity: 'info',
-        message: 'Popup/overlay modal detected in initial HTML',
-        recommendation: 'Aggressive popups and interstitials reduce content accessibility for AI retrievers. Avoid overlays that block the main content on load.',
-      });
+    // AEO-7: Dark patterns (content pages only — auto-play is irrelevant on contact/landing pages
+    // which legitimately use background video for design purposes)
+    if (contentPage) {
+      const hasAutoPlay = /<video[^>]*autoplay/i.test(html) || /<audio[^>]*autoplay/i.test(html);
+      const hasAggressiveModal = /<div[^>]*class=["'][^"']*(?:popup|modal|overlay|interstitial)[^"']*["'][^>]*(?:style=["'][^"']*(?:display\s*:\s*(?:block|flex)|position\s*:\s*fixed))/i.test(html);
+      if (hasAutoPlay) {
+        issues.push({
+          check: 'aeo-dark-patterns', severity: 'info',
+          message: 'Auto-playing media detected',
+          recommendation: 'Auto-play video/audio can trigger spam signals in retrieval systems. Use click-to-play instead.',
+        });
+      }
+      if (hasAggressiveModal) {
+        issues.push({
+          check: 'aeo-dark-patterns', severity: 'info',
+          message: 'Popup/overlay modal detected in initial HTML',
+          recommendation: 'Aggressive popups and interstitials reduce content accessibility for AI retrievers. Avoid overlays that block the main content on load.',
+        });
+      }
     }
 
   }

@@ -12,6 +12,7 @@ import { useBetaMode } from './BetaContext';
 import type { PricingModalState } from './StrategyTab';
 import { STUDIO_NAME } from '../../constants';
 import { useContentRequests } from '../../hooks/useContentRequests';
+import { contentPerformance } from '../../api';
 
 interface ContentPerfItem {
   requestId: string;
@@ -53,12 +54,12 @@ export function ContentTab({
   useEffect(() => {
     const hasPublished = contentRequests.some(r => r.status === 'delivered' || r.status === 'published');
     if (!hasPublished) return;
-    fetch(`/api/public/content-performance/${workspaceId}`)
-      .then(r => r.ok ? r.json() : null)
+    contentPerformance.publicGet(workspaceId)
       .then(data => {
-        if (data?.items) {
+        const d = data as { items?: ContentPerfItem[] } | null;
+        if (d?.items) {
           const map: Record<string, ContentPerfItem> = {};
-          for (const item of data.items) map[item.requestId] = item;
+          for (const item of d.items) map[item.requestId] = item;
           setContentPerf(map);
         }
       })

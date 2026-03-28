@@ -23,7 +23,7 @@ export interface ApprovalBatch {
   siteId: string;
   name: string;
   items: ApprovalItem[];
-  status: 'pending' | 'partial' | 'approved' | 'applied';
+  status: 'pending' | 'partial' | 'approved' | 'rejected' | 'applied';
   createdAt: string;
   updatedAt: string;
 }

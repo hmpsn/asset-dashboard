@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link2, Globe, ExternalLink, Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState } from '../ui';
+import { backlinks } from '../../api';
 
 interface BacklinksOverview {
   totalBacklinks: number;
@@ -42,16 +43,9 @@ export function BacklinkProfile({ workspaceId }: Props) {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`/api/backlinks/${workspaceId}`)
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(body.error || `HTTP ${r.status}`);
-        }
-        return r.json();
-      })
-      .then((d: BacklinkData) => { if (!cancelled) setData(d); })
-      .catch(err => { if (!cancelled) setError(err.message); })
+    backlinks.get(workspaceId)
+      .then((d) => { if (!cancelled) setData(d as BacklinkData); })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };

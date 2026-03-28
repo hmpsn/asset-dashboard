@@ -16,6 +16,13 @@ function getToken(tokenOverride?: string): string | null {
   return tokenOverride || process.env.WEBFLOW_API_TOKEN || null;
 }
 
+export interface RichResultEligibility {
+  type: string;
+  eligible: boolean;
+  feature: string;
+  missingFields?: string[];
+}
+
 export interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
@@ -25,6 +32,8 @@ export interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
+  savedPageType?: string;  // Persisted page type from DB
 }
 
 export interface SchemaSuggestion {
@@ -35,7 +44,7 @@ export interface SchemaSuggestion {
 }
 
 // Page type hints for tailored schema generation
-export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'generic';
+export type SchemaPageType = 'auto' | 'homepage' | 'pillar' | 'service' | 'audience' | 'lead-gen' | 'blog' | 'about' | 'contact' | 'location' | 'product' | 'partnership' | 'faq' | 'case-study' | 'comparison' | 'author' | 'howto' | 'video' | 'job-posting' | 'course' | 'event' | 'review' | 'pricing' | 'recipe' | 'generic';
 
 export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   auto: 'Auto-detect',
@@ -54,6 +63,14 @@ export const PAGE_TYPE_LABELS: Record<SchemaPageType, string> = {
   'case-study': 'Case Study',
   comparison: 'Comparison',
   author: 'Author Profile',
+  howto: 'How-To / Tutorial',
+  video: 'Video Page',
+  'job-posting': 'Job Posting',
+  course: 'Course / Training',
+  event: 'Event',
+  review: 'Review',
+  pricing: 'Pricing Page',
+  recipe: 'Recipe',
   generic: 'General Page',
 };
 
@@ -75,8 +92,77 @@ export const PAGE_TYPE_SCHEMA_MAP: Record<SchemaPageType, { primary: string[]; s
   'case-study': { primary: ['Article'], secondary: ['Person', 'CreativeWork', 'BreadcrumbList'] },
   comparison: { primary: ['WebPage'], secondary: ['ItemList', 'BreadcrumbList'] },
   author: { primary: ['Person', 'ProfilePage'], secondary: ['BreadcrumbList'] },
+  howto: { primary: ['HowTo'], secondary: ['Article', 'BreadcrumbList'] },
+  video: { primary: ['VideoObject'], secondary: ['Article', 'BreadcrumbList'] },
+  'job-posting': { primary: ['JobPosting'], secondary: ['BreadcrumbList'] },
+  course: { primary: ['Course'], secondary: ['CourseInstance', 'BreadcrumbList'] },
+  event: { primary: ['Event'], secondary: ['Offer', 'Place', 'BreadcrumbList'] },
+  review: { primary: ['Review'], secondary: ['AggregateRating', 'BreadcrumbList'] },
+  pricing: { primary: ['WebPage'], secondary: ['Offer', 'BreadcrumbList'] },
+  recipe: { primary: ['Recipe'], secondary: ['HowToStep', 'NutritionInformation', 'BreadcrumbList'] },
   generic: { primary: ['WebPage'], secondary: ['BreadcrumbList'] },
 };
+
+// ── Rich Results Eligibility ──────────────────────────────────────────────────
+
+/** Google-supported rich result types and the fields they require. */
+const RICH_RESULTS_ELIGIBLE: Record<string, { feature: string; required: string[] }> = {
+  FAQPage:       { feature: 'FAQ accordion in search',        required: ['mainEntity'] },
+  HowTo:         { feature: 'How-to steps in search',         required: ['name', 'step'] },
+  VideoObject:   { feature: 'Video carousel',                 required: ['name', 'uploadDate', 'thumbnailUrl'] },
+  Article:       { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
+  NewsArticle:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
+  BlogPosting:   { feature: 'Article rich result',            required: ['headline', 'datePublished', 'author', 'image'] },
+  Product:       { feature: 'Product rich result',            required: ['name', 'offers'] },
+  LocalBusiness: { feature: 'Local business panel',           required: ['name', 'address'] },
+  Event:         { feature: 'Event listing',                  required: ['name', 'startDate', 'location'] },
+  Recipe:        { feature: 'Recipe rich result',             required: ['name', 'image', 'recipeIngredient', 'recipeInstructions'] },
+  JobPosting:    { feature: 'Job listing in search',          required: ['title', 'hiringOrganization', 'jobLocation', 'datePosted', 'description'] },
+  BreadcrumbList: { feature: 'Breadcrumb trail in search',    required: ['itemListElement'] },
+  Course:        { feature: 'Course info in search',          required: ['name', 'description', 'provider'] },
+  Review:        { feature: 'Review rich result',             required: ['itemReviewed', 'reviewRating', 'author'] },
+  ProfilePage:   { feature: 'Profile page in search',        required: ['mainEntity'] },
+  MedicalOrganization: { feature: 'Medical business panel',  required: ['name', 'address'] },
+  FinancialService:    { feature: 'Financial service panel',  required: ['name', 'address'] },
+  Speakable:     { feature: 'Speakable for voice assistants', required: ['cssSelector'] },
+};
+
+/**
+ * Check which schema types in a @graph qualify for Google Rich Results,
+ * and what fields are missing for those that don't yet qualify.
+ */
+export function checkRichResultsEligibility(schema: Record<string, unknown>): RichResultEligibility[] {
+  const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(graph)) return [];
+
+  const results: RichResultEligibility[] = [];
+
+  for (const node of graph) {
+    const rawType = node['@type'];
+    const types = Array.isArray(rawType) ? rawType as string[] : (rawType ? [rawType as string] : []);
+    for (const type of types) {
+      if (!type || !RICH_RESULTS_ELIGIBLE[type]) continue;
+
+      const { feature, required } = RICH_RESULTS_ELIGIBLE[type];
+      const missingFields = required.filter(field => {
+        const val = node[field];
+        if (val === undefined || val === null) return true;
+        if (Array.isArray(val) && val.length === 0) return true;
+        if (typeof val === 'string' && val.trim() === '') return true;
+        return false;
+      });
+
+      results.push({
+        type,
+        feature,
+        eligible: missingFields.length === 0,
+        missingFields: missingFields.length > 0 ? missingFields : undefined,
+      });
+    }
+  }
+
+  return results;
+}
 
 // Context from the workspace/strategy for richer schema generation
 export interface SchemaContext {
@@ -98,6 +184,78 @@ export interface SchemaContext {
   _ancestors?: import('./site-architecture.js').SiteNode[];         // Ancestor chain [root, ..., parent, target]
   _briefId?: string;  // Internal: linked content brief ID for E-E-A-T enrichment
   _pageAnalysis?: { topicCluster?: string; contentGaps?: string[]; optimizationScore?: number };  // Internal: from Page Intelligence
+  _personasBlock?: string;  // Internal: audience personas for richer schema targeting
+  _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
+  _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
+  _pageHealthScore?: number;  // Internal: 0-100 from analytics intelligence layer
+  _pageHealthTrend?: 'improving' | 'declining' | 'stable';  // Internal: trend direction
+  _quickWinStatus?: boolean;  // Internal: is this page a quick-win candidate?
+  _faqOpportunities?: Array<{ query: string; impressions: number; position: number }>;  // Internal: question queries from GSC
+  _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
+    phone?: string;
+    email?: string;
+    address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
+    socialProfiles?: string[];
+    openingHours?: string;
+    foundedDate?: string;
+    numberOfEmployees?: string;
+  };
+}
+
+// ── Analytics Intelligence helpers for prompt enrichment ────────────
+
+const QUESTION_PREFIXES = /^(how|what|why|when|where|which|can|do|does|is|are|should|will|would)\b/i;
+
+/**
+ * Extract question-type queries from GSC data that target a specific page.
+ * These are FAQ candidates — questions people search to find this page.
+ */
+export function extractFaqOpportunities(
+  queryPageData: Array<{ query: string; page: string; impressions: number; position: number }>,
+  pageUrl: string,
+): Array<{ query: string; impressions: number; position: number }> {
+  return queryPageData
+    .filter(row => row.page === pageUrl && QUESTION_PREFIXES.test(row.query))
+    .map(({ query, impressions, position }) => ({ query, impressions, position }))
+    .sort((a, b) => b.impressions - a.impressions)
+    .slice(0, 10);
+}
+
+/**
+ * Build the intelligence enrichment block for the schema generation prompt.
+ * Returns empty string if no intelligence data is available.
+ */
+export function buildSchemaIntelligenceBlock(ctx: SchemaContext): string {
+  const lines: string[] = [];
+
+  if (ctx._pageHealthScore != null) {
+    const trend = ctx._pageHealthTrend ? ` (${ctx._pageHealthTrend})` : '';
+    lines.push(`- Page Health Score: ${ctx._pageHealthScore}/100${trend}`);
+  }
+
+  if (ctx._quickWinStatus === true) {
+    lines.push(`- Quick Win: Yes — this page is close to page 1 and worth extra schema richness`);
+  }
+
+  const faqBlock: string[] = [];
+  if (ctx._faqOpportunities && ctx._faqOpportunities.length > 0) {
+    faqBlock.push(`\nFAQ OPPORTUNITIES (question queries people use to find this page — do NOT auto-generate FAQ schema from these; surface as insight only):`);
+    for (const opp of ctx._faqOpportunities) {
+      faqBlock.push(`- "${opp.query}" (${opp.impressions.toLocaleString()} impressions, pos ${Math.round(opp.position)})`);
+    }
+  }
+
+  if (lines.length === 0 && faqBlock.length === 0) return '';
+
+  const parts: string[] = [];
+  if (lines.length > 0) {
+    parts.push(`\nANALYTICS INTELLIGENCE:\n${lines.join('\n')}`);
+  }
+  if (faqBlock.length > 0) {
+    parts.push(faqBlock.join('\n'));
+  }
+
+  return parts.join('\n');
 }
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
@@ -197,6 +355,8 @@ const RECOMMENDED_FIELDS: Record<string, string[]> = {
   BlogPosting: ['publisher'],
   Product: ['offers', 'image'],
   LocalBusiness: ['telephone', 'openingHoursSpecification'],
+  HowTo: ['description', 'totalTime', 'supply', 'tool', 'image'],
+  VideoObject: ['description', 'duration', 'embedUrl', 'contentUrl'],
 };
 
 // Cross-reference rules: { type → field → expected target @type }
@@ -648,7 +808,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
 }
 
 // Content verification: cross-check schema values against actual page content
-function verifySchemaContent(schema: Record<string, unknown>, pageText: string, html: string | null): string[] {
+function verifySchemaContent(schema: Record<string, unknown>, pageText: string, html: string | null, ctx?: SchemaContext): string[] {
   const graph = schema['@graph'] as Record<string, unknown>[] | undefined;
   if (!Array.isArray(graph) || !pageText) return [];
 
@@ -657,25 +817,39 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
   // Also check the raw HTML (lowered) for things like mailto: links, tel: links
   const lowerHtml = (html || '').toLowerCase();
 
+  // Business profile trusted values — bypass page-content checks for these
+  const bp = ctx?._businessProfile;
+  const bpEmail = bp?.email?.toLowerCase();
+  const bpPhone = bp?.phone ? bp.phone.replace(/\D/g, '') : undefined;
+  const bpCity = bp?.address?.city?.toLowerCase();
+  const bpStreet = bp?.address?.street?.toLowerCase();
+  const bpHasHours = !!bp?.openingHours;
+  const bpSocialProfiles = new Set((bp?.socialProfiles || []).map(u => u.toLowerCase()));
+
   for (const node of graph) {
     const type = node['@type'] as string;
     if (!type) continue;
 
     // Check email — must appear in visible text or as mailto: link
+    // Exception: if business profile provides this email, skip the content check
     const email = node['email'] as string | undefined;
     if (email && typeof email === 'string') {
-      if (!lowerText.includes(email.toLowerCase()) && !lowerHtml.includes(`mailto:${email.toLowerCase()}`)) {
+      const emailLower = email.toLowerCase();
+      const trustedByProfile = bpEmail && emailLower === bpEmail;
+      if (!trustedByProfile && !lowerText.includes(emailLower) && !lowerHtml.includes(`mailto:${emailLower}`)) {
         stripped.push(`${type}: removed hallucinated email "${email}" (not found in page content)`);
         delete node['email'];
       }
     }
 
     // Check telephone — must appear in visible text or as tel: link
+    // Exception: if business profile provides a phone, bypass the check for matching digits
     const tel = node['telephone'];
     if (tel) {
       const phones = Array.isArray(tel) ? tel : [tel];
       const verified = phones.filter((p: string) => {
         const digits = String(p).replace(/\D/g, '');
+        if (bpPhone && digits === bpPhone) return true;  // trusted by business profile
         return lowerText.includes(digits) || lowerText.includes(String(p)) || lowerHtml.includes(`tel:${digits}`) || lowerHtml.includes(`tel:+${digits}`);
       });
       if (verified.length === 0) {
@@ -688,18 +862,21 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
     }
 
     // Check address — if PostalAddress exists, verify street/city appear in content
+    // Exception: if business profile provides matching address, bypass the content check
     const address = node['address'] as Record<string, unknown> | undefined;
     if (address && typeof address === 'object' && address['@type'] === 'PostalAddress') {
       const street = (address['streetAddress'] as string || '').toLowerCase();
       const city = (address['addressLocality'] as string || '').toLowerCase();
-      if (street && !lowerText.includes(street) && city && !lowerText.includes(city)) {
+      const trustedByProfile = (bpCity && city === bpCity) || (bpStreet && street === bpStreet);
+      if (!trustedByProfile && street && !lowerText.includes(street) && city && !lowerText.includes(city)) {
         stripped.push(`${type}: removed hallucinated address (street/city not found in page content)`);
         delete node['address'];
       }
     }
 
     // Check openingHoursSpecification — remove if no hours pattern found in content
-    if (node['openingHoursSpecification'] && !lowerText.match(/\d{1,2}:\d{2}\s*(?:am|pm|–|-|to)/i) && !lowerText.match(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
+    // Exception: if business profile provides opening hours, trust it
+    if (node['openingHoursSpecification'] && !bpHasHours && !lowerText.match(/\d{1,2}:\d{2}\s*(?:am|pm|–|-|to)/i) && !lowerText.match(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
       stripped.push(`${type}: removed hallucinated openingHoursSpecification (no hours found in page content)`);
       delete node['openingHoursSpecification'];
     }
@@ -755,13 +932,59 @@ function verifySchemaContent(schema: Record<string, unknown>, pageText: string, 
       }
     }
 
-    // Check sameAs URLs — filter to only URLs that appear in the HTML
+    // Check HowTo steps — verify step names exist in page text; strip hallucinated steps
+    if (type === 'HowTo') {
+      const steps = node['step'] as Record<string, unknown>[] | undefined;
+      if (Array.isArray(steps) && steps.length > 0) {
+        const verified = steps.filter((step: Record<string, unknown>) => {
+          const name = (step['name'] as string || '').toLowerCase().trim();
+          const text = (step['text'] as string || '').toLowerCase().trim();
+          return (name.length > 3 && lowerText.includes(name)) || (text.length > 10 && lowerText.includes(text.slice(0, 30)));
+        });
+        if (verified.length === 0) {
+          stripped.push(`HowTo: removed — none of the ${steps.length} step(s) found in page content`);
+          node['_remove'] = true;
+        } else if (verified.length < steps.length) {
+          stripped.push(`HowTo: removed ${steps.length - verified.length} hallucinated step(s) not found in page content`);
+          node['step'] = verified;
+        }
+      }
+    }
+
+    // Check VideoObject — verify thumbnailUrl and embedUrl/contentUrl exist in HTML
+    if (type === 'VideoObject') {
+      const thumbnailUrl = node['thumbnailUrl'] as string | undefined;
+      const embedUrl = node['embedUrl'] as string | undefined;
+      const contentUrl = node['contentUrl'] as string | undefined;
+      if (thumbnailUrl && !lowerHtml.includes(thumbnailUrl.toLowerCase())) {
+        stripped.push(`VideoObject: removed hallucinated thumbnailUrl "${thumbnailUrl}" (not found in page HTML)`);
+        delete node['thumbnailUrl'];
+      }
+      if (embedUrl && !lowerHtml.includes(embedUrl.toLowerCase().split('?')[0])) {
+        stripped.push(`VideoObject: removed unverified embedUrl "${embedUrl}" (not found in page HTML)`);
+        delete node['embedUrl'];
+      }
+      if (contentUrl && !lowerHtml.includes(contentUrl.toLowerCase())) {
+        stripped.push(`VideoObject: removed unverified contentUrl (not found in page HTML)`);
+        delete node['contentUrl'];
+      }
+      // If thumbnailUrl was stripped, remove the whole VideoObject since it's a required field
+      if (!node['thumbnailUrl']) {
+        stripped.push('VideoObject: removed — thumbnailUrl is required and could not be verified from page content');
+        node['_remove'] = true;
+      }
+    }
+
+    // Check sameAs URLs — filter to only URLs that appear in the HTML or business profile
     const sameAs = node['sameAs'] as string[] | undefined;
     if (Array.isArray(sameAs)) {
-      const verified = sameAs.filter(url => lowerHtml.includes(url.toLowerCase()));
+      const verified = sameAs.filter(url => {
+        const urlLower = url.toLowerCase();
+        return lowerHtml.includes(urlLower) || bpSocialProfiles.has(urlLower);
+      });
       if (verified.length < sameAs.length) {
         const removed = sameAs.length - verified.length;
-        stripped.push(`${type}: removed ${removed} hallucinated sameAs URL(s) (not found in page HTML)`);
+        stripped.push(`${type}: removed ${removed} hallucinated sameAs URL(s) (not found in page HTML or business profile)`);
         if (verified.length === 0) {
           delete node['sameAs'];
         } else {
@@ -876,7 +1099,43 @@ function extractStructuredInfo(html: string) {
   // Extract date
   const dateMatch = html.match(/(?:datetime|published|date)[=:"'\s]*(\d{4}-\d{2}-\d{2})/i);
   const publishDate = dateMatch ? dateMatch[1] : '';
-  return { emails, phones, images, questions, author, publishDate };
+
+  // Extract HowTo steps: <ol><li> items, "Step N:" headings, numbered headings
+  const stepTexts = new Set<string>();
+  // <ol><li> pattern
+  const olMatch = html.match(/<ol[^>]*>([\s\S]*?)<\/ol>/gi);
+  if (olMatch) {
+    for (const ol of olMatch) {
+      const lis = ol.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+      for (const li of lis) {
+        const text = li.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (text.length > 10 && text.length < 200) stepTexts.add(text);
+      }
+    }
+  }
+  // "Step N:" heading patterns
+  const stepHeadings = html.match(/<h[2-4][^>]*>[^<]*(?:step\s+\d+|^\d+\.)[^<]*/gi) || [];
+  for (const h of stepHeadings) {
+    const text = h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (text.length > 5 && text.length < 200) stepTexts.add(text);
+  }
+  const steps = [...stepTexts].slice(0, 15);
+
+  // Extract video URLs: YouTube/Vimeo iframes, <video src>
+  const videoUrls: string[] = [];
+  const iframeSrcs = html.match(/(?:src)=["']([^"']*(?:youtube\.com\/embed|youtube-nocookie\.com\/embed|vimeo\.com\/video|player\.vimeo\.com)[^"']*)["']/gi) || [];
+  for (const src of iframeSrcs) {
+    const m = src.match(/src=["']([^"']+)["']/i);
+    if (m) videoUrls.push(m[1]);
+  }
+  const videoSrcs = html.match(/<video[^>]+src=["']([^"']+)["']/gi) || [];
+  for (const v of videoSrcs) {
+    const m = v.match(/src=["']([^"']+)["']/i);
+    if (m) videoUrls.push(m[1]);
+  }
+  const uniqueVideoUrls = [...new Set(videoUrls)].slice(0, 5);
+
+  return { emails, phones, images, questions, author, publishDate, steps, videoUrls: uniqueVideoUrls };
 }
 
 // Post-process AI output: strip empty arrays, empty strings, and empty objects
@@ -1036,6 +1295,79 @@ function getPageTypeInstructions(pageType: SchemaPageType | undefined, siteUrl: 
 - If this author works for the company, include "worksFor": {"@id": "${siteUrl}/#organization"}
 - BreadcrumbList: Home → [Team/About] → Author Name`,
 
+    howto: `PAGE TYPE INSTRUCTIONS (How-To / Tutorial):
+- MUST include HowTo as mainEntity with: name (the tutorial title), description, step (array of HowToStep)
+- Each HowToStep MUST have: "@type": "HowToStep", "name" (step headline), "text" (detailed instructions)
+- Extract steps from NUMBERED LISTS (<ol><li>) or "Step N:" headings ONLY — do NOT fabricate steps from paragraphs
+- ONLY include steps whose text actually appears in the page content
+- If totalTime is mentioned (e.g. "takes 30 minutes"), include as ISO 8601 duration: "PT30M"
+- If supplies or tools are listed, include "supply": [{"@type": "HowToSupply", "name": "..."}] and "tool": [{"@type": "HowToTool", "name": "..."}]
+- If a featured image exists, include "image" on HowTo
+- If the tutorial also has article-style content, include Article as a secondary node
+- BreadcrumbList: Home → [Category] → Tutorial Title
+- WebPage.mainEntity should reference the HowTo node`,
+
+    video: `PAGE TYPE INSTRUCTIONS (Video Page):
+- MUST include VideoObject as mainEntity with: name, description, uploadDate (ISO 8601), thumbnailUrl
+- uploadDate MUST be a real date from page content — do NOT fabricate; if not found, omit VideoObject entirely
+- thumbnailUrl MUST be a real image URL from page content — do NOT fabricate
+- If a YouTube or Vimeo embed is detected, include "embedUrl" with the embed URL
+- If a direct video file URL is found, include "contentUrl"
+- If transcript text is present, include "transcript" (max 500 chars)
+- If duration is mentioned (e.g. "10:30"), convert to ISO 8601 duration: "PT10M30S"
+- If the page also has article content, include Article as a secondary node alongside VideoObject
+- BreadcrumbList: Home → [Category] → Video Title
+- WebPage.mainEntity should reference the VideoObject node`,
+
+    'job-posting': `PAGE TYPE INSTRUCTIONS (Job Posting):
+- MUST include JobPosting as mainEntity with: title, datePosted (ISO 8601), description, hiringOrganization → Organization
+- Include validThrough (expiry date) if mentioned
+- Include employmentType (FULL_TIME, PART_TIME, CONTRACT, etc.) if specified
+- Include jobLocation with Place + PostalAddress if a work location is given
+- Include baseSalary with MonetaryAmount if salary/compensation is mentioned
+- Include qualifications, skills, educationRequirements if listed
+- BreadcrumbList: Home → Careers → Job Title`,
+
+    course: `PAGE TYPE INSTRUCTIONS (Course / Training):
+- MUST include Course as mainEntity with: name, description, provider → Organization
+- If schedule/dates are provided, include CourseInstance with: startDate, endDate, courseMode (online/onsite/blended)
+- Include Offer with price info if course cost is mentioned
+- Include coursePrerequisites if listed
+- If instructor info is available, include instructor as Person
+- BreadcrumbList: Home → Courses → Course Name`,
+
+    event: `PAGE TYPE INSTRUCTIONS (Event):
+- MUST include Event as mainEntity with: name, startDate (ISO 8601), location (Place with address)
+- Include endDate, eventStatus (EventScheduled/EventCancelled/EventMovedOnline), eventAttendanceMode
+- Include offers (Offer with price, availability, url) if tickets/registration is mentioned
+- Include organizer → Organization
+- Include performer/speaker info as Person nodes if listed
+- BreadcrumbList: Home → Events → Event Name`,
+
+    review: `PAGE TYPE INSTRUCTIONS (Review):
+- MUST include Review as mainEntity with: itemReviewed (Product/Service/Organization), reviewRating (Rating with ratingValue), author → Person
+- If aggregate ratings are shown, include AggregateRating with ratingValue, reviewCount, bestRating
+- Include datePublished if the review date is visible
+- Include reviewBody with the review text
+- BreadcrumbList: Home → Reviews → Review Title`,
+
+    pricing: `PAGE TYPE INSTRUCTIONS (Pricing Page):
+- Use WebPage as primary type
+- Include Offer nodes for each pricing tier/plan with: name, price, priceCurrency, description
+- Use priceSpecification for complex pricing (per-month, per-user, etc.)
+- If free tier exists, include with price "0"
+- Do NOT fabricate pricing — only include what's on the page
+- BreadcrumbList: Home → Pricing`,
+
+    recipe: `PAGE TYPE INSTRUCTIONS (Recipe):
+- MUST include Recipe as mainEntity with: name, image, recipeIngredient (array of strings), recipeInstructions (array of HowToStep)
+- Include cookTime, prepTime, totalTime as ISO 8601 durations if mentioned
+- Include recipeYield (servings) if mentioned
+- Include nutrition (NutritionInformation) if nutritional facts are listed
+- Include author → Person if the recipe author is identified
+- Include recipeCategory and recipeCuisine if identifiable
+- BreadcrumbList: Home → Recipes → Recipe Name`,
+
     generic: `PAGE TYPE INSTRUCTIONS (General Page):
 - Use WebPage + BreadcrumbList as the baseline
 - Include any structured data that's clearly supported by the page content
@@ -1066,7 +1398,7 @@ async function postProcessSchema(
   }
 
   // Step 3: Content verification — strip hallucinated factual claims
-  const contentWarnings = verifySchemaContent(schema, pageContent, html);
+  const contentWarnings = verifySchemaContent(schema, pageContent, html, ctx);
   if (contentWarnings.length > 0) {
     log.info({ warnings: contentWarnings }, 'Content verification stripped hallucinated values');
   }
@@ -1230,7 +1562,7 @@ RULES:
 - Return ONLY the corrected JSON-LD object`;
 
       const fixResult = await callOpenAI({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1',
         messages: [{ role: 'user', content: fixPrompt }],
         maxTokens: 3000,
         temperature: 0.1,
@@ -1296,7 +1628,7 @@ async function aiGenerateUnifiedSchema(
 
   const pageUrl = (!slug || slug === 'index' || slug === 'home') ? baseUrl : `${baseUrl}/${slug}`;
   const pageContent = html ? extractPageContent(html) : '';
-  const info = html ? extractStructuredInfo(html) : { emails: [], phones: [], images: [], questions: [], author: '', publishDate: '' };
+  const info = html ? extractStructuredInfo(html) : { emails: [], phones: [], images: [], questions: [], author: '', publishDate: '', steps: [], videoUrls: [] };
 
   const companyName = ctx.companyName || '(unknown — infer from page content)';
   const siteUrl = ctx.liveDomain ? (ctx.liveDomain.startsWith('http') ? ctx.liveDomain : `https://${ctx.liveDomain}`) : baseUrl;
@@ -1373,8 +1705,25 @@ ${info.emails.length ? `- Emails: ${info.emails.join(', ')}` : ''}
 ${info.phones.length ? `- Phones: ${info.phones.join(', ')}` : ''}
 ${info.images.length ? `- Key Images: ${info.images.slice(0, 3).join(', ')}` : ''}
 ${info.questions.length ? `- FAQ Questions Found: ${info.questions.join(' | ')}` : ''}
+${info.steps.length ? `- How-To Steps Detected (${info.steps.length}): ${info.steps.slice(0, 5).map((s, i) => `Step ${i + 1}: ${s.slice(0, 80)}`).join(' | ')}` : ''}
+${info.videoUrls.length ? `- Video Embed URLs Detected: ${info.videoUrls.join(', ')}` : ''}
+${(ctx._gscPageData || ctx._ga4PageData) ? `
+SEARCH PERFORMANCE (this page — use to prioritize richness and breadth of schema):
+${ctx._gscPageData ? `- GSC: ${ctx._gscPageData.impressions.toLocaleString()} impressions/90d | ${ctx._gscPageData.clicks.toLocaleString()} clicks | Avg Position: ${ctx._gscPageData.position.toFixed(1)} | CTR: ${ctx._gscPageData.ctr.toFixed(1)}%` : ''}
+${ctx._ga4PageData ? `- GA4: ${ctx._ga4PageData.pageviews.toLocaleString()} pageviews/90d | ${ctx._ga4PageData.users.toLocaleString()} users | Avg Engagement: ${Math.round(ctx._ga4PageData.avgEngagementTime)}s` : ''}
+High-impression pages with poor position (>10) are prime candidates for rich result schema types like FAQPage, HowTo, and Article.` : ''}
+${buildSchemaIntelligenceBlock(ctx)}
 ${getPageTypeInstructions(ctx.pageType, siteUrl)}
 ${ctx._planContext || ''}
+${ctx._personasBlock ? `\n${ctx._personasBlock}` : ''}
+${ctx._businessProfile ? `\nTRUSTED BUSINESS PROFILE (verified by admin — use these values directly, they do NOT need to appear in page content):
+${ctx._businessProfile.phone ? `- Phone: ${ctx._businessProfile.phone}` : ''}
+${ctx._businessProfile.email ? `- Email: ${ctx._businessProfile.email}` : ''}
+${ctx._businessProfile.address ? `- Address: ${[ctx._businessProfile.address.street, ctx._businessProfile.address.city, ctx._businessProfile.address.state, ctx._businessProfile.address.zip, ctx._businessProfile.address.country].filter(Boolean).join(', ')}` : ''}
+${ctx._businessProfile.socialProfiles?.length ? `- Social/External Profiles (use for Organization.sameAs): ${ctx._businessProfile.socialProfiles.join(', ')}` : ''}
+${ctx._businessProfile.openingHours ? `- Opening Hours: ${ctx._businessProfile.openingHours}` : ''}
+${ctx._businessProfile.foundedDate ? `- Founded: ${ctx._businessProfile.foundedDate}` : ''}
+${ctx._businessProfile.numberOfEmployees ? `- Employees: ${ctx._businessProfile.numberOfEmployees}` : ''}` : ''}
 PAGE CONTENT (excerpt):
 ${pageContent.slice(0, 3000)}
 
@@ -1447,12 +1796,14 @@ PROPERTY RULES — enforced by automated validation:
 30. "knowsAbout" should contain 3-5 concise domain expertise terms, not 10+ verbose phrases
 31. Keep "description" fields concise — aim for 1-3 sentences (50-200 words). Move detailed feature lists to other properties (featureList, serviceType) rather than cramming them into description.
 32. WebPage "description" should closely mirror the page's meta description when available — do not rewrite or heavily embellish it.
+33. HOWTO PAGES: If "How-To Steps Detected" are listed above in PAGE INFO, use those EXACT steps for HowToStep nodes — do NOT paraphrase or reorder. Each HowToStep "name" must be a direct match to step text from the page. Duration in "totalTime" must appear explicitly in the page content. "supply" and "tool" arrays only if explicitly listed on the page.
+34. VIDEO PAGES: If "Video Embed URLs Detected" are listed above in PAGE INFO, use the EXACT URL for "embedUrl". "uploadDate" and "thumbnailUrl" MUST come from page content — omit VideoObject entirely if these cannot be found. "duration" must be formatted as ISO 8601 (e.g. "PT5M30S") and must appear in the page content. If both a VideoObject and article content are present, include both as top-level @graph nodes.
 
 Return ONLY the JSON-LD object. No markdown, no explanation, no wrapping.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,
@@ -1550,6 +1901,10 @@ export async function generateSchemaForPage(
   pageId: string,
   tokenOverride?: string,
   ctx: SchemaContext = {},
+  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
+  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
+  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
+  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -1574,6 +1929,27 @@ export async function generateSchemaForPage(
   if (sitePlan && !ctx._planContext) {
     const pagePath = isHomepage ? '/' : (slug ? `/${slug}` : '/');
     ctx._planContext = buildPlanContextForPage(sitePlan, pagePath) || undefined;
+  }
+
+  // Inject per-page analytics if maps were provided
+  if (gscMap || ga4Map) {
+    const lookupPath = (isHomepage ? '/' : (slug ? `/${slug}` : '/')).replace(/\/$/, '') || '/';
+    if (gscMap) ctx._gscPageData = gscMap.get(lookupPath);
+    if (ga4Map) ctx._ga4PageData = ga4Map.get(lookupPath);
+  }
+
+  // Inject intelligence layer data (health score, quick win, FAQ opportunities)
+  const pageUrl = (!slug || slug === 'index') ? baseUrl : `${baseUrl}/${slug}`;
+  if (insightsMap) {
+    const insightData = insightsMap.get(pageUrl);
+    if (insightData) {
+      ctx._pageHealthScore = insightData.healthScore;
+      ctx._pageHealthTrend = insightData.healthTrend as SchemaContext['_pageHealthTrend'];
+      ctx._quickWinStatus = insightData.isQuickWin;
+    }
+  }
+  if (queryPageData) {
+    ctx._faqOpportunities = extractFaqOpportunities(queryPageData, pageUrl);
   }
 
   // Try AI unified schema first
@@ -1607,6 +1983,11 @@ export async function generateSchemaForPage(
     validationErrors = validateUnifiedSchema(fallback);
   }
 
+  // Compute Rich Results eligibility from the generated schema
+  const richResultsEligibility = suggestedSchemas[0]?.template
+    ? checkRichResultsEligibility(suggestedSchemas[0].template)
+    : undefined;
+
   return {
     pageId,
     pageTitle: meta.title,
@@ -1616,6 +1997,8 @@ export async function generateSchemaForPage(
     existingSchemaJson: existingSchemaJson.length > 0 ? existingSchemaJson : undefined,
     suggestedSchemas,
     validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+    richResultsEligibility: richResultsEligibility?.length ? richResultsEligibility : undefined,
+    savedPageType: ctx.pageType && ctx.pageType !== 'auto' ? ctx.pageType : undefined,
   };
 }
 
@@ -1626,6 +2009,10 @@ export async function generateSchemaSuggestions(
   pageKeywordMap?: { pagePath: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent?: string; topicCluster?: string; contentGaps?: string[]; optimizationScore?: number }[],
   onProgress?: (partial: SchemaPageSuggestion[], done: boolean, message: string) => void,
   isCancelled?: () => boolean,
+  gscMap?: Map<string, { clicks: number; impressions: number; position: number; ctr: number }>,
+  ga4Map?: Map<string, { pageviews: number; users: number; avgEngagementTime: number }>,
+  queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
+  insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion[]> {
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   const liveDomain = ctx.liveDomain;
@@ -1697,13 +2084,22 @@ export async function generateSchemaSuggestions(
 
         // Build page-specific context (use full path for nested pages)
         const lookupPath = pagePath || `/${page.slug}`;
+        const normalizedPath = (isHomepage ? '/' : lookupPath).replace(/\/$/, '') || '/';
         const planContext = sitePlan ? buildPlanContextForPage(sitePlan, isHomepage ? '/' : lookupPath) : '';
+        const fullPageUrl = isHomepage ? baseUrl : `${baseUrl}${lookupPath}`;
+        const insightData = insightsMap?.get(fullPageUrl);
         const pageCtx: SchemaContext = {
           ...ctx,
           pageKeywords: getPageKeywords(lookupPath),
           searchIntent: getPageIntent(lookupPath),
           _planContext: planContext || undefined,
           _pageAnalysis: getPageAnalysis(lookupPath),
+          _gscPageData: gscMap?.get(normalizedPath),
+          _ga4PageData: ga4Map?.get(normalizedPath),
+          _pageHealthScore: insightData?.healthScore,
+          _pageHealthTrend: insightData?.healthTrend as SchemaContext['_pageHealthTrend'],
+          _quickWinStatus: insightData?.isQuickWin,
+          _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, fullPageUrl) : undefined,
         };
 
         let suggestedSchemas: SchemaSuggestion[];
@@ -1780,11 +2176,19 @@ export async function generateSchemaSuggestions(
           const htmlTitle = html ? (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '') : '';
           const { types: existingSchemas, json: existingSchemaJson } = html ? extractExistingSchemas(html) : { types: [], json: [] };
 
+          const cmsNormalizedPath = (item.path.startsWith('/') ? item.path : `/${item.path}`).replace(/\/$/, '') || '/';
+          const cmsInsightData = insightsMap?.get(item.url);
           const pageCtx: SchemaContext = {
             ...ctx,
             pageKeywords: getPageKeywords(slug),
             searchIntent: getPageIntent(slug),
             _pageAnalysis: getPageAnalysis(slug),
+            _gscPageData: gscMap?.get(cmsNormalizedPath),
+            _ga4PageData: ga4Map?.get(cmsNormalizedPath),
+            _pageHealthScore: cmsInsightData?.healthScore,
+            _pageHealthTrend: cmsInsightData?.healthTrend as SchemaContext['_pageHealthTrend'],
+            _quickWinStatus: cmsInsightData?.isQuickWin,
+            _faqOpportunities: queryPageData ? extractFaqOpportunities(queryPageData, item.url) : undefined,
           };
 
           let suggestedSchemas: SchemaSuggestion[];
@@ -1951,7 +2355,7 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
 
   try {
     const aiResult = await callOpenAI({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.2,

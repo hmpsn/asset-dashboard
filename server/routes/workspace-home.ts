@@ -14,6 +14,7 @@ import { listChurnSignals } from '../churn-signals.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listTemplates } from '../content-templates.js';
+import { loadDecayAnalysis } from '../content-decay.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('workspace-home');
@@ -70,6 +71,23 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     safe(Promise.resolve(listTemplates(req.params.id)), []),
   ]);
 
+  // Content decay — synchronous SQLite read, wrapped for safety
+  let contentDecay = null;
+  try { contentDecay = loadDecayAnalysis(req.params.id)?.summary ?? null; } catch (err) { log.warn({ err }, 'workspace-home partial fetch failed'); }
+
+  // Weekly accomplishments — aggregate activity from last 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const recentActivity = (activity as Array<{ type: string; createdAt: string }>)
+    .filter(a => new Date(a.createdAt) >= sevenDaysAgo);
+  const weeklySummary = {
+    seoUpdates: recentActivity.filter(a => a.type === 'seo_updated' || a.type === 'approval_applied').length,
+    auditsRun: recentActivity.filter(a => a.type === 'audit_completed').length,
+    contentGenerated: recentActivity.filter(a => a.type === 'brief_generated' || a.type === 'post_generated').length,
+    contentPublished: recentActivity.filter(a => a.type === 'content_published').length,
+    requestsResolved: recentActivity.filter(a => a.type === 'request_resolved').length,
+  };
+  const weeklyTotal = Object.values(weeklySummary).reduce((s, n) => s + n, 0);
+
   // Derive content pipeline summary
   const allCells = (matrices as Array<{ cells?: Array<{ status: string }> }>).flatMap(m => m.cells || []);
   const contentPipeline = {
@@ -94,6 +112,8 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     ga4Data,
     comparison,
     contentPipeline,
+    contentDecay,
+    weeklySummary: weeklyTotal > 0 ? weeklySummary : null,
   });
 });
 

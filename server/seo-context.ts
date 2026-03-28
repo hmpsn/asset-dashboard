@@ -26,12 +26,35 @@ export interface SeoContext {
   strategy: KeywordStrategy | undefined;
 }
 
+// ── TTL cache for buildSeoContext (5-minute expiry) ──
+
+const seoContextCache = new Map<string, { value: SeoContext; expiry: number }>();
+const SEO_CONTEXT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Clear cached SEO context. Call when workspace settings change. */
+export function clearSeoContextCache(workspaceId?: string): void {
+  if (workspaceId) {
+    // Clear all keys for this workspace (any pagePath variant)
+    for (const key of seoContextCache.keys()) {
+      if (key.startsWith(`${workspaceId}:`)) seoContextCache.delete(key);
+    }
+  } else {
+    seoContextCache.clear();
+  }
+}
+
 /**
  * Build SEO context from a workspace's keyword strategy.
+ * Results are cached for 5 minutes per workspace+pagePath combination.
  * @param workspaceId - workspace to look up
  * @param pagePath - optional page path to find page-specific keywords
  */
 export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoContext {
+  if (workspaceId) {
+    const cacheKey = `${workspaceId}:${pagePath || ''}`;
+    const cached = seoContextCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiry) return cached.value;
+  }
   const empty: SeoContext = { keywordBlock: '', brandVoiceBlock: '', businessContext: '', personasBlock: '', knowledgeBlock: '', fullContext: '', strategy: undefined };
   if (!workspaceId) return empty;
 
@@ -57,7 +80,9 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
 
   if (!strategy) {
     const fullContext = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
-    return { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    const result: SeoContext = { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+    return result;
   }
 
   let keywordBlock = '';
@@ -93,7 +118,14 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
   }
 
   const fullContext = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
-  return { keywordBlock, brandVoiceBlock, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
+  const result: SeoContext = { keywordBlock, brandVoiceBlock, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
+
+  // Cache result
+  if (workspaceId) {
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+  }
+
+  return result;
 }
 
 /**
@@ -124,27 +156,29 @@ function readBrandDocs(workspaceFolder: string): string {
 }
 
 /**
+ * Get raw knowledge content for a workspace (inline + knowledge-docs/ files, no header).
+ * Use this when you need the raw text — e.g. for schema generation prompts that add their own header.
+ */
+export function getRawKnowledge(workspaceId: string): string {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return '';
+
+  const parts: string[] = [];
+  if (ws.knowledgeBase?.trim()) parts.push(ws.knowledgeBase.trim());
+  const docsContent = readKnowledgeDocs(ws.folder);
+  if (docsContent) parts.push(docsContent);
+  return parts.join('\n\n');
+}
+
+/**
  * Build a global knowledge base block for AI chatbot prompts.
  * Combines the workspace's knowledgeBase field + any .txt/.md files in knowledge-docs/.
  */
 export function buildKnowledgeBase(workspaceId?: string): string {
   if (!workspaceId) return '';
-  const ws = getWorkspace(workspaceId);
-  if (!ws) return '';
-
-  const parts: string[] = [];
-
-  // Inline knowledge base field
-  if (ws.knowledgeBase?.trim()) {
-    parts.push(ws.knowledgeBase.trim());
-  }
-
-  // Read knowledge-docs/ folder
-  const docsContent = readKnowledgeDocs(ws.folder);
-  if (docsContent) parts.push(docsContent);
-
-  if (parts.length === 0) return '';
-  return `\n\nBUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${parts.join('\n\n')}`;
+  const raw = getRawKnowledge(workspaceId);
+  if (!raw) return '';
+  return `\n\nBUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${raw}`;
 }
 
 /**

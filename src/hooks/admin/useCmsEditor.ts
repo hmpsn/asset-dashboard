@@ -4,7 +4,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { get, getSafe } from '../../api/client.js';
+import { get, getSafe } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface SeoField {
   id: string;
@@ -61,7 +62,7 @@ interface CmsEditorData {
 
 export function useCmsEditor(siteId: string, workspaceId?: string) {
   return useQuery({
-    queryKey: ['cms-editor', siteId, workspaceId],
+    queryKey: queryKeys.admin.cmsEditor(siteId, workspaceId),
     queryFn: async (): Promise<CmsEditorData> => {
       const [collectionsData, approvalBatchesData] = await Promise.all([
         get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`).catch(() => []),
@@ -81,7 +82,7 @@ export function useCmsEditor(siteId: string, workspaceId?: string) {
 
 export function useCmsCollections(siteId: string) {
   return useQuery({
-    queryKey: ['cms-collections', siteId],
+    queryKey: queryKeys.admin.cmsCollections(siteId),
     queryFn: async (): Promise<CmsCollection[]> => {
       const data = await get<CmsCollection[]>(`/api/webflow/cms-seo/${siteId}`);
       return data;

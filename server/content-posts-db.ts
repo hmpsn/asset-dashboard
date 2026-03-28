@@ -3,8 +3,11 @@
  * Handles all SQLite persistence for generated posts and their version snapshots.
  */
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { postSectionSchema, reviewChecklistSchema } from './schemas/content-schemas.js';
 
 const log = createLogger('content-posts-db');
 
@@ -32,16 +35,10 @@ interface PostRow {
   published_at: string | null;
   published_slug: string | null;
   review_checklist: string | null;
+  voice_score: number | null;
+  voice_feedback: string | null;
   created_at: string;
   updated_at: string;
-}
-
-interface PostStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
 }
 
 // ── Version history types ──
@@ -82,20 +79,9 @@ interface VersionRow {
   created_at: string;
 }
 
-interface VersionStmts {
-  insert: ReturnType<typeof db.prepare>;
-  listByPost: ReturnType<typeof db.prepare>;
-  getById: ReturnType<typeof db.prepare>;
-  countByPost: ReturnType<typeof db.prepare>;
-  deleteByPost: ReturnType<typeof db.prepare>;
-}
-
-let _vStmts: VersionStmts | null = null;
-function vStmts(): VersionStmts {
-  if (!_vStmts) {
-    _vStmts = {
-      insert: db.prepare(
-        `INSERT INTO content_post_versions
+const vStmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_post_versions
            (id, post_id, workspace_id, version_number, trigger, trigger_detail,
             title, meta_description, introduction, sections, conclusion,
             seo_title, seo_meta_description, total_word_count, created_at)
@@ -103,23 +89,20 @@ function vStmts(): VersionStmts {
            (@id, @post_id, @workspace_id, @version_number, @trigger, @trigger_detail,
             @title, @meta_description, @introduction, @sections, @conclusion,
             @seo_title, @seo_meta_description, @total_word_count, @created_at)`,
-      ),
-      listByPost: db.prepare(
-        `SELECT * FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC`,
-      ),
-      getById: db.prepare(
-        `SELECT * FROM content_post_versions WHERE id = ? AND workspace_id = ?`,
-      ),
-      countByPost: db.prepare(
-        `SELECT COUNT(*) as cnt FROM content_post_versions WHERE post_id = ?`,
-      ),
-      deleteByPost: db.prepare(
-        `DELETE FROM content_post_versions WHERE post_id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _vStmts;
-}
+  ),
+  listByPost: db.prepare(
+    `SELECT * FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC`,
+  ),
+  getById: db.prepare(
+    `SELECT * FROM content_post_versions WHERE id = ? AND workspace_id = ?`,
+  ),
+  countByPost: db.prepare(
+    `SELECT COUNT(*) as cnt FROM content_post_versions WHERE post_id = ?`,
+  ),
+  deleteByPost: db.prepare(
+    `DELETE FROM content_post_versions WHERE post_id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToVersion(row: VersionRow): PostVersion {
   return {
@@ -132,7 +115,7 @@ function rowToVersion(row: VersionRow): PostVersion {
     title: row.title,
     metaDescription: row.meta_description,
     introduction: row.introduction,
-    sections: JSON.parse(row.sections),
+    sections: parseJsonSafeArray(row.sections, postSectionSchema, { field: 'sections', table: 'content_post_versions' }),
     conclusion: row.conclusion,
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,
@@ -141,33 +124,32 @@ function rowToVersion(row: VersionRow): PostVersion {
   };
 }
 
-let _stmts: PostStmts | null = null;
-function stmts(): PostStmts {
-  if (!_stmts) {
-    _stmts = {
-      // Note: INSERT omits webflow_* / published_* columns intentionally.
-      // savePost() routes existing rows to UPDATE (which includes them).
-      // New posts never have publish data so omitting here is safe.
-      insert: db.prepare(
-        `INSERT OR REPLACE INTO content_posts
+const stmts = createStmtCache(() => ({
+  // Note: INSERT omits webflow_* / published_* columns intentionally.
+  // savePost() routes existing rows to UPDATE (which includes them).
+  // New posts never have publish data so omitting here is safe.
+  insert: db.prepare(
+    `INSERT OR REPLACE INTO content_posts
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist, created_at, updated_at)
+            unification_note, review_checklist, voice_score, voice_feedback,
+            created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist, @created_at, @updated_at)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_posts WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE content_posts SET
+            @unification_note, @review_checklist, @voice_score, @voice_feedback,
+            @created_at, @updated_at)`,
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_posts WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_posts WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE content_posts SET
            title = @title, meta_description = @meta_description,
            introduction = @introduction, sections = @sections, conclusion = @conclusion,
            seo_title = @seo_title, seo_meta_description = @seo_meta_description,
@@ -176,16 +158,14 @@ function stmts(): PostStmts {
            unification_note = @unification_note, review_checklist = @review_checklist,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
+           voice_score = @voice_score, voice_feedback = @voice_feedback,
            updated_at = @updated_at
          WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToPost(row: PostRow): GeneratedPost {
   return {
@@ -196,7 +176,7 @@ function rowToPost(row: PostRow): GeneratedPost {
     title: row.title,
     metaDescription: row.meta_description,
     introduction: row.introduction,
-    sections: JSON.parse(row.sections),
+    sections: parseJsonSafeArray(row.sections, postSectionSchema, { field: 'sections', table: 'content_posts' }),
     conclusion: row.conclusion,
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,
@@ -209,7 +189,14 @@ function rowToPost(row: PostRow): GeneratedPost {
     webflowCollectionId: row.webflow_collection_id ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedSlug: row.published_slug ?? undefined,
-    reviewChecklist: row.review_checklist ? JSON.parse(row.review_checklist) : undefined,
+    reviewChecklist: row.review_checklist
+      ? parseJsonSafe(row.review_checklist, reviewChecklistSchema, {
+          factual_accuracy: false, brand_voice: false, internal_links: false,
+          no_hallucinations: false, meta_optimized: false, word_count_target: false,
+        }, { field: 'review_checklist', table: 'content_posts' })
+      : undefined,
+    voiceScore: row.voice_score ?? undefined,
+    voiceFeedback: row.voice_feedback ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -238,6 +225,8 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     published_at: post.publishedAt ?? null,
     published_slug: post.publishedSlug ?? null,
     review_checklist: post.reviewChecklist ? JSON.stringify(post.reviewChecklist) : null,
+    voice_score: post.voiceScore ?? null,
+    voice_feedback: post.voiceFeedback ?? null,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
   };

@@ -4,7 +4,9 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { get } from '../../api/client.js';
+import { get } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import { STALE_TIMES } from '../../lib/queryClient';
 
 interface AnomalyAlert {
   id: string;
@@ -27,7 +29,7 @@ interface AnomalyAlert {
 
 export function useAnomalyAlerts(workspaceId: string, isAdmin: boolean = true) {
   return useQuery({
-    queryKey: ['anomaly-alerts', workspaceId],
+    queryKey: queryKeys.admin.anomalyAlerts(workspaceId),
     queryFn: async (): Promise<AnomalyAlert[]> => {
       const endpoint = isAdmin 
         ? `/api/anomalies/${workspaceId}`
@@ -35,7 +37,7 @@ export function useAnomalyAlerts(workspaceId: string, isAdmin: boolean = true) {
       const response = await get<AnomalyAlert[]>(endpoint);
       return Array.isArray(response) ? response : [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: STALE_TIMES.STABLE,
     enabled: !!workspaceId && isAdmin,
     retry: 1,
     refetchInterval: 10 * 60 * 1000, // Auto-refresh every 10 minutes

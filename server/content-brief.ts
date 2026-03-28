@@ -1,12 +1,86 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from './seo-context.js';
-import type { KeywordMetrics, RelatedKeyword } from './semrush.js';
+import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
+import { getInsights } from './analytics-insights-store.js';
+import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief } from '../shared/types/content.ts';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import {
+  outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
+  schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
+} from './schemas/content-schemas.js';
+import { z } from 'zod';
+
+// ── Analytics Intelligence for brief enrichment ──
+
+interface BriefIntelligenceInput {
+  targetKeyword: string;
+  workspaceId: string;
+  cannibalizationInsights?: Array<{ query: string; pages: string[]; positions: number[] }>;
+  decayInsights?: Array<{ pageId: string; deltaPercent: number; baselineClicks: number; currentClicks: number }>;
+  quickWins?: Array<{ pageUrl: string; query: string; currentPosition: number; estimatedTrafficGain: number }>;
+  pageHealthScores?: Array<{ pageId: string; score: number; trend: string }>;
+}
+
+/**
+ * Build an analytics intelligence block for the content brief generation prompt.
+ * Injects cannibalization warnings, decay context, quick wins, and page health data.
+ */
+export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): string {
+  const sections: string[] = [];
+
+  // Cannibalization: pages already competing for target keyword
+  const matching = opts.cannibalizationInsights?.filter(
+    c => c.query.toLowerCase() === opts.targetKeyword.toLowerCase(),
+  );
+  if (matching?.length) {
+    const lines = matching.map(c => {
+      const pageList = c.pages.map((p, i) => {
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch { return p; }
+      }).join(', ');
+      return `- "${c.query}": ${pageList}`;
+    });
+    sections.push(`CANNIBALIZATION WARNING — You already rank for this keyword on existing pages; consider updating vs creating new:\n${lines.join('\n')}`);
+  }
+
+  // Content decay: related pages losing traffic
+  if (opts.decayInsights?.length) {
+    const lines = opts.decayInsights.map(d => {
+      let path: string;
+      try { path = new URL(d.pageId).pathname; } catch { path = d.pageId; }
+      return `- ${path}: ${d.deltaPercent}% change (${d.baselineClicks} → ${d.currentClicks} clicks)`;
+    });
+    sections.push(`CONTENT DECAY — Existing content on this topic is losing traffic; brief should address freshness:\n${lines.join('\n')}`);
+  }
+
+  // Quick wins: related queries close to page 1
+  if (opts.quickWins?.length) {
+    const lines = opts.quickWins.map(q =>
+      `- "${q.query}" at pos ${Math.round(q.currentPosition)}, est. +${q.estimatedTrafficGain} clicks/mo if improved`,
+    );
+    sections.push(`QUICK WIN OPPORTUNITIES — Related queries that are close to page 1:\n${lines.join('\n')}`);
+  }
+
+  // Page health: related pages' overall scores
+  if (opts.pageHealthScores?.length) {
+    const lines = opts.pageHealthScores.map(p => {
+      let path: string;
+      try { path = new URL(p.pageId).pathname; } catch { path = p.pageId; }
+      return `- ${path}: ${p.score}/100 (${p.trend})`;
+    });
+    sections.push(`PAGE HEALTH — Related pages' health scores:\n${lines.join('\n')}`);
+  }
+
+  if (sections.length === 0) return '';
+
+  return `\n\nANALYTICS INTELLIGENCE (from intelligence layer — use to inform content strategy):\n\n${sections.join('\n\n')}`;
+}
 
 // ── SQLite row shape ──
 
@@ -44,22 +118,13 @@ interface BriefRow {
   keyword_source: string | null;
   keyword_validation: string | null;
   template_id: string | null;
+  title_variants: string | null;
+  meta_desc_variants: string | null;
 }
 
-interface BriefStmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  update: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: BriefStmts | null = null;
-function stmts(): BriefStmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(
-        `INSERT INTO content_briefs
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(
+    `INSERT INTO content_briefs
            (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
             suggested_meta_desc, outline, word_count_target, intent, audience,
             competitor_insights, internal_link_suggestions, created_at,
@@ -67,7 +132,8 @@ function stmts(): BriefStmts {
             topical_entities, serp_analysis, difficulty_score, traffic_potential,
             cta_recommendations, eeat_guidance, content_checklist, schema_recommendations,
             page_type, reference_urls, real_people_also_ask, real_top_results,
-            keyword_locked, keyword_source, keyword_validation, template_id)
+            keyword_locked, keyword_source, keyword_validation, template_id,
+            title_variants, meta_desc_variants)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -76,16 +142,17 @@ function stmts(): BriefStmts {
             @topical_entities, @serp_analysis, @difficulty_score, @traffic_potential,
             @cta_recommendations, @eeat_guidance, @content_checklist, @schema_recommendations,
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
-            @keyword_locked, @keyword_source, @keyword_validation, @template_id)`,
-      ),
-      selectByWorkspace: db.prepare(
-        `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
-      ),
-      selectById: db.prepare(
-        `SELECT * FROM content_briefs WHERE id = ? AND workspace_id = ?`,
-      ),
-      update: db.prepare(
-        `UPDATE content_briefs SET
+            @keyword_locked, @keyword_source, @keyword_validation, @template_id,
+            @title_variants, @meta_desc_variants)`,
+  ),
+  selectByWorkspace: db.prepare(
+    `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM content_briefs WHERE id = ? AND workspace_id = ?`,
+  ),
+  update: db.prepare(
+    `UPDATE content_briefs SET
            target_keyword = @target_keyword, secondary_keywords = @secondary_keywords,
            suggested_title = @suggested_title, suggested_meta_desc = @suggested_meta_desc,
            outline = @outline, word_count_target = @word_count_target, intent = @intent,
@@ -100,52 +167,62 @@ function stmts(): BriefStmts {
            page_type = @page_type, reference_urls = @reference_urls,
            real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
-           keyword_validation = @keyword_validation, template_id = @template_id
+           keyword_validation = @keyword_validation, template_id = @template_id,
+           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants
          WHERE id = @id`,
-      ),
-      deleteById: db.prepare(
-        `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
-      ),
-    };
-  }
-  return _stmts;
-}
+  ),
+  deleteById: db.prepare(
+    `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 function rowToBrief(row: BriefRow): ContentBrief {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     targetKeyword: row.target_keyword,
-    secondaryKeywords: JSON.parse(row.secondary_keywords),
+    secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { field: 'secondary_keywords', table: 'content_briefs' }),
     suggestedTitle: row.suggested_title,
     suggestedMetaDesc: row.suggested_meta_desc,
-    outline: JSON.parse(row.outline),
+    outline: parseJsonSafeArray(row.outline, outlineItemSchema, { field: 'outline', table: 'content_briefs' }),
     wordCountTarget: row.word_count_target,
     intent: row.intent,
     audience: row.audience,
     competitorInsights: row.competitor_insights,
-    internalLinkSuggestions: JSON.parse(row.internal_link_suggestions),
+    internalLinkSuggestions: parseJsonSafeArray(row.internal_link_suggestions, z.string(), { field: 'internal_link_suggestions', table: 'content_briefs' }),
     createdAt: row.created_at,
     executiveSummary: row.executive_summary ?? undefined,
     contentFormat: row.content_format ?? undefined,
     toneAndStyle: row.tone_and_style ?? undefined,
-    peopleAlsoAsk: row.people_also_ask ? JSON.parse(row.people_also_ask) : undefined,
-    topicalEntities: row.topical_entities ? JSON.parse(row.topical_entities) : undefined,
-    serpAnalysis: row.serp_analysis ? JSON.parse(row.serp_analysis) : undefined,
+    peopleAlsoAsk: row.people_also_ask ? parseJsonSafeArray(row.people_also_ask, z.string(), { field: 'people_also_ask', table: 'content_briefs' }) : undefined,
+    topicalEntities: row.topical_entities ? parseJsonSafeArray(row.topical_entities, z.string(), { field: 'topical_entities', table: 'content_briefs' }) : undefined,
+    serpAnalysis: row.serp_analysis
+      ? parseJsonSafe(row.serp_analysis, serpAnalysisSchema, null, { field: 'serp_analysis', table: 'content_briefs' }) ?? undefined
+      : undefined,
     difficultyScore: row.difficulty_score ?? undefined,
     trafficPotential: row.traffic_potential ?? undefined,
-    ctaRecommendations: row.cta_recommendations ? JSON.parse(row.cta_recommendations) : undefined,
-    eeatGuidance: row.eeat_guidance ? JSON.parse(row.eeat_guidance) : undefined,
-    contentChecklist: row.content_checklist ? JSON.parse(row.content_checklist) : undefined,
-    schemaRecommendations: row.schema_recommendations ? JSON.parse(row.schema_recommendations) : undefined,
+    ctaRecommendations: row.cta_recommendations ? parseJsonSafeArray(row.cta_recommendations, z.string(), { field: 'cta_recommendations', table: 'content_briefs' }) : undefined,
+    eeatGuidance: row.eeat_guidance
+      ? parseJsonSafe(row.eeat_guidance, eeatGuidanceSchema, null, { field: 'eeat_guidance', table: 'content_briefs' }) ?? undefined
+      : undefined,
+    contentChecklist: row.content_checklist ? parseJsonSafeArray(row.content_checklist, z.string(), { field: 'content_checklist', table: 'content_briefs' }) : undefined,
+    schemaRecommendations: row.schema_recommendations
+      ? parseJsonSafeArray(row.schema_recommendations, schemaRecommendationSchema, { field: 'schema_recommendations', table: 'content_briefs' })
+      : undefined,
     pageType: row.page_type as ContentBrief['pageType'] ?? undefined,
-    referenceUrls: row.reference_urls ? JSON.parse(row.reference_urls) : undefined,
-    realPeopleAlsoAsk: row.real_people_also_ask ? JSON.parse(row.real_people_also_ask) : undefined,
-    realTopResults: row.real_top_results ? JSON.parse(row.real_top_results) : undefined,
+    referenceUrls: row.reference_urls ? parseJsonSafeArray(row.reference_urls, z.string(), { field: 'reference_urls', table: 'content_briefs' }) : undefined,
+    realPeopleAlsoAsk: row.real_people_also_ask ? parseJsonSafeArray(row.real_people_also_ask, z.string(), { field: 'real_people_also_ask', table: 'content_briefs' }) : undefined,
+    realTopResults: row.real_top_results
+      ? parseJsonSafeArray(row.real_top_results, realTopResultSchema, { field: 'real_top_results', table: 'content_briefs' })
+      : undefined,
     keywordLocked: row.keyword_locked ? true : undefined,
     keywordSource: (row.keyword_source as ContentBrief['keywordSource']) ?? undefined,
-    keywordValidation: row.keyword_validation ? JSON.parse(row.keyword_validation) : undefined,
+    keywordValidation: row.keyword_validation
+      ? parseJsonSafe(row.keyword_validation, keywordValidationSchema, null, { field: 'keyword_validation', table: 'content_briefs' }) ?? undefined
+      : undefined,
     templateId: row.template_id ?? undefined,
+    titleVariants: row.title_variants ? parseJsonSafeArray(row.title_variants, z.string(), { field: 'title_variants', table: 'content_briefs' }) : undefined,
+    metaDescVariants: row.meta_desc_variants ? parseJsonSafeArray(row.meta_desc_variants, z.string(), { field: 'meta_desc_variants', table: 'content_briefs' }) : undefined,
   };
 }
 
@@ -183,6 +260,8 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     keyword_source: brief.keywordSource ?? null,
     keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
     template_id: brief.templateId ?? null,
+    title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
+    meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
   };
 }
 
@@ -436,7 +515,9 @@ Return the complete brief as valid JSON with these fields:
 {
   "executiveSummary": "...",
   "suggestedTitle": "...",
+  "titleVariants": ["Alternative title 2", "Alternative title 3"],
   "suggestedMetaDesc": "...",
+  "metaDescVariants": ["Alternative meta description 2", "Alternative meta description 3"],
   "secondaryKeywords": [...],
   "contentFormat": "...",
   "toneAndStyle": "...",
@@ -504,10 +585,16 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || existingBrief.eeatGuidance,
     contentChecklist: (parsed.contentChecklist as string[]) || existingBrief.contentChecklist,
     schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || existingBrief.schemaRecommendations,
+    titleVariants: (parsed.titleVariants as string[]) || existingBrief.titleVariants,
+    metaDescVariants: (parsed.metaDescVariants as string[]) || existingBrief.metaDescVariants,
     pageType: existingBrief.pageType,
     referenceUrls: existingBrief.referenceUrls,
     realPeopleAlsoAsk: existingBrief.realPeopleAlsoAsk,
     realTopResults: existingBrief.realTopResults,
+    keywordLocked: existingBrief.keywordLocked,
+    keywordSource: existingBrief.keywordSource,
+    keywordValidation: existingBrief.keywordValidation,
+    templateId: existingBrief.templateId,
   };
 
   stmts().insert.run({
@@ -540,9 +627,91 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     reference_urls: newBrief.referenceUrls ? JSON.stringify(newBrief.referenceUrls) : null,
     real_people_also_ask: newBrief.realPeopleAlsoAsk ? JSON.stringify(newBrief.realPeopleAlsoAsk) : null,
     real_top_results: newBrief.realTopResults ? JSON.stringify(newBrief.realTopResults) : null,
+    keyword_locked: newBrief.keywordLocked ? 1 : 0,
+    keyword_source: newBrief.keywordSource ?? null,
+    keyword_validation: newBrief.keywordValidation ? JSON.stringify(newBrief.keywordValidation) : null,
+    template_id: newBrief.templateId ?? null,
+    title_variants: newBrief.titleVariants ? JSON.stringify(newBrief.titleVariants) : null,
+    meta_desc_variants: newBrief.metaDescVariants ? JSON.stringify(newBrief.metaDescVariants) : null,
   });
 
   return newBrief;
+}
+
+/**
+ * Regenerate ONLY the outline of an existing brief, preserving all other fields.
+ * Optionally accepts user feedback to guide the new outline.
+ */
+export async function regenerateOutline(
+  workspaceId: string,
+  briefId: string,
+  feedback?: string,
+): Promise<ContentBrief | null> {
+  const existingBrief = getBrief(workspaceId, briefId);
+  if (!existingBrief) return null;
+
+  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId);
+  const ptConfig = getPageTypeConfig(existingBrief.pageType);
+
+  const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
+
+  const prompt = `You are an expert SEO content strategist. Your task is to regenerate ONLY the content outline for a brief.
+
+Target keyword: ${existingBrief.targetKeyword}
+Content format: ${existingBrief.contentFormat || 'guide'}
+Page type: ${existingBrief.pageType || 'blog'}
+Title: ${existingBrief.suggestedTitle}
+Word count target: ${existingBrief.wordCountTarget}
+Intent: ${existingBrief.intent}
+Audience: ${existingBrief.audience}
+${keywordBlock}${brandVoiceBlock}
+
+Current outline:
+${currentOutline}
+
+${feedback ? `User feedback on the outline:\n${feedback}\n` : ''}
+Generate a new outline that ${feedback ? 'addresses the feedback above' : 'takes a fresh approach to the topic structure'}.
+
+Return ONLY valid JSON — an array of section objects:
+[
+  { "heading": "H2 heading text", "subheadings": ["H3 subtopic 1", "H3 subtopic 2"], "notes": "Detailed guidance (3-5 sentences)", "wordCount": ${ptConfig.avgSectionWords}, "keywords": ["keywords for this section"] }
+]
+
+Rules:
+- The FIRST section must directly answer the query (ANSWER-FIRST for AEO)
+- ${ptConfig.sectionRange} sections total
+- Each section should have 2-4 subheadings
+- Include secondary keywords: ${existingBrief.secondaryKeywords.join(', ')}
+- Do NOT use generic headings like "Introduction" or "Conclusion" — those are handled separately
+- Vary section types (how-to steps, comparisons, data tables, case studies, FAQs)`;
+
+  const aiResult = await callOpenAI({
+    model: 'gpt-4.1',
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 4000,
+    temperature: 0.6,
+    feature: 'content-brief-outline-regen',
+    workspaceId,
+  });
+
+  // Parse the outline from the response
+  let newOutline: ContentBrief['outline'];
+  try {
+    const raw = aiResult.text || '[]';
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+    const parsed = JSON.parse(cleaned);
+    // Handle both { outline: [...] } and direct array
+    newOutline = Array.isArray(parsed) ? parsed : (parsed.outline || parsed.sections || []);
+    if (!Array.isArray(newOutline) || newOutline.length === 0) {
+      throw new Error('Empty outline returned');
+    }
+  } catch {
+    throw new Error('Failed to parse regenerated outline');
+  }
+
+  // Update only the outline field
+  const updated = updateBrief(workspaceId, briefId, { outline: newOutline });
+  return updated;
 }
 
 export async function generateBrief(
@@ -672,6 +841,31 @@ The outline sections MUST match the following template sections in order. You ma
     ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post.`
     : '';
 
+  // Analytics intelligence from the intelligence layer
+  let intelligenceBlock = '';
+  try {
+    const allInsights = getInsights(workspaceId);
+    if (allInsights.length > 0) {
+      intelligenceBlock = buildBriefIntelligenceBlock({
+        targetKeyword,
+        workspaceId,
+        cannibalizationInsights: allInsights
+          .filter(i => i.insightType === 'cannibalization')
+          .map(i => i.data as unknown as CannibalizationData),
+        decayInsights: allInsights
+          .filter(i => i.insightType === 'content_decay')
+          .map(i => ({ pageId: i.pageId || '', ...(i.data as unknown as ContentDecayData) })),
+        quickWins: allInsights
+          .filter(i => i.insightType === 'ranking_opportunity')
+          .map(i => i.data as unknown as QuickWinData)
+          .map(d => ({ pageUrl: d.pageUrl, query: d.query, currentPosition: d.currentPosition, estimatedTrafficGain: d.estimatedTrafficGain })),
+        pageHealthScores: allInsights
+          .filter(i => i.insightType === 'page_health' && i.pageId)
+          .map(i => ({ pageId: i.pageId!, ...(i.data as unknown as PageHealthData) })),
+      });
+    }
+  } catch { /* intelligence layer not ready — skip */ }
+
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
@@ -680,13 +874,15 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${intelligenceBlock}
 
 Generate a content brief in the following JSON format:
 {
   "executiveSummary": "2-3 sentence plain-English summary of why this content matters and its strategic value. Write from the reader's perspective (what THEY gain), not the brand's perspective (do NOT say 'position [brand] as an expert' or 'reinforce authority')",
-  "suggestedTitle": "SEO-optimized title tag (50-60 chars)",
-  "suggestedMetaDesc": "Compelling meta description (150-160 chars)",
+  "suggestedTitle": "SEO-optimized title tag (50-60 chars) — your top recommendation",
+  "titleVariants": ["Alternative title option 2 (50-60 chars)", "Alternative title option 3 (50-60 chars)"],
+  "suggestedMetaDesc": "Compelling meta description (150-160 chars) — your top recommendation",
+  "metaDescVariants": ["Alternative meta description 2 (150-160 chars)", "Alternative meta description 3 (150-160 chars)"],
   "secondaryKeywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"],
   "contentFormat": "The recommended format: guide, listicle, how-to, comparison, FAQ, case-study, pillar-page, or landing-page",
   "toneAndStyle": "Specific tone and style guidance for the writer (e.g., authoritative but approachable, data-driven, conversational)",
@@ -808,6 +1004,8 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     eeatGuidance: (parsed.eeatGuidance as ContentBrief['eeatGuidance']) || undefined,
     contentChecklist: (parsed.contentChecklist as string[]) || undefined,
     schemaRecommendations: (parsed.schemaRecommendations as ContentBrief['schemaRecommendations']) || undefined,
+    titleVariants: (parsed.titleVariants as string[]) || undefined,
+    metaDescVariants: (parsed.metaDescVariants as string[]) || undefined,
     pageType: (context.pageType as ContentBrief['pageType']) || undefined,
     // Persist real SERP data so post generation can use it
     realPeopleAlsoAsk: context.serpData?.peopleAlsoAsk?.length ? context.serpData.peopleAlsoAsk : undefined,
@@ -856,6 +1054,8 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keyword_source: brief.keywordSource ?? null,
     keyword_validation: brief.keywordValidation ? JSON.stringify(brief.keywordValidation) : null,
     template_id: brief.templateId ?? null,
+    title_variants: brief.titleVariants ? JSON.stringify(brief.titleVariants) : null,
+    meta_desc_variants: brief.metaDescVariants ? JSON.stringify(brief.metaDescVariants) : null,
   });
 
   return brief;

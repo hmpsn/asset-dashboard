@@ -48,6 +48,16 @@ export interface CwvSummary {
   desktop?: CwvStrategyResult;
 }
 
+export interface DeadLinkItem {
+  url: string;
+  status: number | string;
+  statusText: string;
+  foundOn: string;
+  foundOnSlug: string;
+  anchorText: string;
+  type: 'internal' | 'external';
+}
+
 export interface SeoAuditResult {
   siteScore: number;
   totalPages: number;
@@ -57,6 +67,8 @@ export interface SeoAuditResult {
   pages: PageSeoResult[];
   siteWideIssues: SeoIssue[];
   cwvSummary?: CwvSummary;
+  deadLinkSummary?: { total: number; internal: number; external: number; redirects: number };
+  deadLinkDetails?: DeadLinkItem[];
 }
 
 export interface SnapshotSummary {

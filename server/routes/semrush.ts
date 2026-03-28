@@ -7,9 +7,8 @@ const router = Router();
 
 import {
   isSemrushConfigured, estimateCreditCost, clearSemrushCache,
-  getDomainOverview, getDomainOrganicKeywords, getKeywordGap,
-  getBacklinksOverview, getOrganicCompetitors,
 } from '../semrush.js';
+import { getConfiguredProvider, getBacklinksProvider, listProviders } from '../seo-data-provider.js';
 import { listWorkspaces, getWorkspace, updateWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
@@ -27,21 +26,28 @@ router.get('/api/semrush/competitive-intel/:workspaceId', async (req, res) => {
   const ws = listWorkspaces().find(w => w.id === workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
+  const provider = getConfiguredProvider(ws.seoDataProvider);
+  if (!provider) return res.status(503).json({ error: 'No SEO data provider configured' });
+
   const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
   try {
     // Fetch domain overviews in parallel (my domain + up to 3 competitors)
+    // Use backlinks-specific provider which falls back to SEMRush if DataForSEO lacks subscription
+    const blProvider = getBacklinksProvider(ws.seoDataProvider);
     const allDomains = [myDomain, ...competitors.slice(0, 3)];
     const [overviews, backlinks, keywordGaps] = await Promise.all([
-      Promise.all(allDomains.map(d => getDomainOverview(d, workspaceId).catch(() => null))),
-      Promise.all(allDomains.map(d => getBacklinksOverview(d, workspaceId).catch(() => null))),
-      getKeywordGap(myDomain, competitors.slice(0, 3), workspaceId, 30).catch(() => []),
+      Promise.all(allDomains.map(d => provider.getDomainOverview(d, workspaceId).catch(() => null))),
+      blProvider
+        ? Promise.all(allDomains.map(d => blProvider.getBacklinksOverview(d, workspaceId).catch(() => null)))
+        : Promise.resolve(allDomains.map(() => null)),
+      provider.getKeywordGap(myDomain, competitors.slice(0, 3), workspaceId, 30).catch(() => []),
     ]);
 
     // Get top keywords for each domain (parallel, limit 20 for speed)
     const topKeywords = await Promise.all(
-      allDomains.map(d => getDomainOrganicKeywords(d, workspaceId, 20).catch(() => []))
+      allDomains.map(d => provider.getDomainKeywords(d, workspaceId, 20).catch(() => []))
     );
 
     const domains = allDomains.map((domain, i) => ({
@@ -67,10 +73,11 @@ router.get('/api/semrush/discover-competitors/:workspaceId', async (req, res) =>
   const myDomain = (ws.liveDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   if (!myDomain) return res.status(400).json({ error: 'Workspace has no live domain configured' });
 
-  if (!isSemrushConfigured()) return res.status(400).json({ error: 'SEMRush API key not configured' });
+  const provider = getConfiguredProvider(ws.seoDataProvider);
+  if (!provider) return res.status(400).json({ error: 'No SEO data provider configured' });
 
   try {
-    const competitors = await getOrganicCompetitors(myDomain, ws.id, 10);
+    const competitors = await provider.getCompetitors(myDomain, ws.id, 10);
     // Filter out the site's own domain and subdomains
     const filtered = competitors.filter(c =>
       !c.domain.includes(myDomain) && !myDomain.includes(c.domain)
@@ -105,6 +112,11 @@ router.post('/api/semrush/competitors/:workspaceId', (req, res) => {
 // --- SEMRush Utilities ---
 router.get('/api/semrush/status', (_req, res) => {
   res.json({ configured: isSemrushConfigured() });
+});
+
+// Unified SEO data provider status
+router.get('/api/seo-providers/status', (_req, res) => {
+  res.json({ providers: listProviders() });
 });
 
 router.post('/api/semrush/estimate', (req, res) => {

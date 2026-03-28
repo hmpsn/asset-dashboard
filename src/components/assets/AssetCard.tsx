@@ -3,8 +3,9 @@
  * Extracted from AssetBrowser.tsx asset grid row.
  */
 import {
-  FileText, ExternalLink, Check, X, Loader2, Minimize2, Sparkles, Wand2,
+  FileText, ExternalLink, Check, X, Loader2, Minimize2, Sparkles, Wand2, Database,
 } from 'lucide-react';
+import type { CmsImageUsage } from '../../../shared/types/cms-images';
 
 interface Asset {
   id: string;
@@ -35,6 +36,8 @@ export interface AssetCardProps {
   renameDraft: string;
   renameLoading: boolean;
   unusedFlag: boolean;
+  cmsUsages?: CmsImageUsage[];
+  compressDisabled?: boolean;
   onToggleSelect: (id: string) => void;
   onEditAlt: (assetId: string, currentAlt: string) => void;
   onCancelEditAlt: () => void;
@@ -50,10 +53,16 @@ export interface AssetCardProps {
 
 export function AssetCard({
   asset, selected, editingAlt, altDraft, generatingAlt, compressing,
-  renamingId, renameDraft, renameLoading, unusedFlag,
+  renamingId, renameDraft, renameLoading, unusedFlag, cmsUsages, compressDisabled,
   onToggleSelect, onEditAlt, onCancelEditAlt, onSaveAlt, onAltDraftChange,
   onGenerateAlt, onCompress, onSmartRename, onSaveRename, onCancelRename, onRenameDraftChange,
 }: AssetCardProps) {
+  // Summarize CMS usages: "Blog Posts → Body" or "2 collections" if multiple
+  const cmsLabel = cmsUsages && cmsUsages.length > 0
+    ? cmsUsages.length === 1
+      ? `${cmsUsages[0].collectionName} → ${cmsUsages[0].fieldDisplayName}`
+      : `${new Set(cmsUsages.map(u => u.collectionId)).size} CMS collections`
+    : null;
   return (
     <div
       className={`grid grid-cols-[32px_48px_1fr_200px_80px_100px] gap-3 px-3 py-2 rounded-lg items-center text-sm transition-colors ${
@@ -115,6 +124,15 @@ export function AssetCard({
             )}
             {unusedFlag && (
               <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-red-900/40 text-red-400 leading-none">Unused</span>
+            )}
+            {cmsLabel && (
+              <span
+                className="shrink-0 flex items-center gap-0.5 px-1 py-0.5 rounded text-[11px] font-semibold bg-blue-900/40 text-blue-400 leading-none"
+                title={`Used in CMS: ${cmsUsages!.map(u => `${u.collectionName} → ${u.fieldDisplayName} (${u.fieldType})`).join(', ')}`}
+              >
+                <Database className="w-2.5 h-2.5" />
+                {cmsLabel}
+              </span>
             )}
             <button
               onClick={() => onSmartRename(asset)}
@@ -185,10 +203,10 @@ export function AssetCard({
         </button>
         {asset.size > 0 && (
           <button
-            onClick={() => onCompress(asset)}
-            disabled={compressing}
-            className="p-1.5 rounded text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 transition-colors"
-            title="Compress image"
+            onClick={() => !compressDisabled && onCompress(asset)}
+            disabled={compressing || compressDisabled}
+            className={`p-1.5 rounded transition-colors ${compressDisabled ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-500 hover:text-blue-400 hover:bg-zinc-800'}`}
+            title={compressDisabled ? 'Compress unavailable for inline RichText images' : 'Compress image'}
           >
             {compressing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />

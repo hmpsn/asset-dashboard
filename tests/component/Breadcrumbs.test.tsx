@@ -111,7 +111,7 @@ describe('Breadcrumbs', () => {
   it('TAB_LABELS has entries for known tabs', () => {
     expect(TAB_LABELS['home']).toBe('Home');
     expect(TAB_LABELS['seo-audit']).toBe('Site Audit');
-    expect(TAB_LABELS['search']).toBe('Search Console');
+    expect(TAB_LABELS['analytics-hub']).toBe('Analytics');
     expect(TAB_LABELS['settings']).toBe('Settings');
     expect(TAB_LABELS['revenue']).toBe('Revenue');
   });

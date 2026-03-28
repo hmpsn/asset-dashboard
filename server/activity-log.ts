@@ -4,6 +4,7 @@
  */
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
@@ -17,6 +18,7 @@ export type ActivityType =
   | 'audit_completed'
   | 'request_resolved'
   | 'approval_applied'
+  | 'approval_reverted'
   | 'seo_updated'
   | 'images_optimized'
   | 'links_fixed'
@@ -96,47 +98,30 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  insert: ReturnType<typeof db.prepare>;
-  selectByWorkspace: ReturnType<typeof db.prepare>;
-  selectAll: ReturnType<typeof db.prepare>;
-  selectClientVisible: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-  countAll: ReturnType<typeof db.prepare>;
-  pruneOldest: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      insert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  insert: db.prepare(`
         INSERT INTO activity_log (id, workspace_id, type, title, description, metadata,
           actor_id, actor_name, created_at)
         VALUES (@id, @workspace_id, @type, @title, @description, @metadata,
           @actor_id, @actor_name, @created_at)
       `),
-      selectByWorkspace: db.prepare(
-        'SELECT * FROM activity_log WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?',
-      ),
-      selectAll: db.prepare(
-        'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
-      ),
-      selectClientVisible: db.prepare(
-        `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
-      ),
-      deleteById: db.prepare('DELETE FROM activity_log WHERE id = ?'),
-      countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
-      pruneOldest: db.prepare(`
+  selectByWorkspace: db.prepare(
+    'SELECT * FROM activity_log WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?',
+  ),
+  selectAll: db.prepare(
+    'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
+  ),
+  selectClientVisible: db.prepare(
+    `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
+  ),
+  deleteById: db.prepare('DELETE FROM activity_log WHERE id = ?'),
+  countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
+  pruneOldest: db.prepare(`
         DELETE FROM activity_log WHERE id IN (
           SELECT id FROM activity_log ORDER BY created_at ASC LIMIT ?
         )
       `),
-    };
-  }
-  return _stmts;
-}
+}));
 
 // ── Public API ──
 

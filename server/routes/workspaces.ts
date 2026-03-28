@@ -46,6 +46,7 @@ import {
   clearPageState,
   clearPageStatesByStatus,
 } from '../workspaces.js';
+import { clearSeoContextCache } from '../seo-context.js';
 
 // Workspaces
 router.get('/api/workspaces', (_req, res) => {
@@ -200,6 +201,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
+  clearSeoContextCache(req.params.id); // Invalidate cached AI context
   // Strip token from response to avoid leaking to frontend
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
   broadcast('workspace:updated', safe);
@@ -277,6 +279,30 @@ async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPag
 
   return { scraped, pagesSummary };
 }
+
+// --- Business Profile (verified business data for schema generation) ---
+const businessProfileSchema = z.object({
+  phone: z.string().max(30).optional(),
+  email: z.string().email().optional(),
+  address: z.object({
+    street: z.string().max(200).optional(),
+    city: z.string().max(100).optional(),
+    state: z.string().max(100).optional(),
+    zip: z.string().max(20).optional(),
+    country: z.string().max(100).optional(),
+  }).optional(),
+  socialProfiles: z.array(z.string().url()).max(10).optional(),
+  openingHours: z.string().max(500).optional(),
+  foundedDate: z.string().max(20).optional(),
+  numberOfEmployees: z.string().max(50).optional(),
+});
+
+router.put('/api/workspaces/:id/business-profile', requireWorkspaceAccess(), validate(businessProfileSchema), (req, res) => {
+  const ws = updateWorkspace(req.params.id, { businessProfile: req.body });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  broadcastToWorkspace(req.params.id, 'workspace:updated', { businessProfile: ws.businessProfile });
+  res.json({ businessProfile: ws.businessProfile });
+});
 
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {

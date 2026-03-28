@@ -15,7 +15,19 @@ export type SchemaPageRole =
   | 'faq'
   | 'case-study'
   | 'comparison'
+  | 'howto'
+  | 'video'
+  | 'job-posting'
+  | 'course'
+  | 'event'
+  | 'author'
+  | 'review'
+  | 'pricing'
+  | 'recipe'
   | 'generic';
+
+/** Industry subtypes — detected by AI based on page content terminology */
+export type SchemaIndustrySubtype = 'medical' | 'financial' | null;
 
 export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
   homepage: 'Homepage',
@@ -32,6 +44,15 @@ export const SCHEMA_ROLE_LABELS: Record<SchemaPageRole, string> = {
   faq: 'FAQ',
   'case-study': 'Case Study',
   comparison: 'Comparison',
+  howto: 'How-To / Tutorial',
+  video: 'Video Page',
+  'job-posting': 'Job Posting',
+  course: 'Course / Training',
+  event: 'Event',
+  author: 'Author / Profile',
+  review: 'Review',
+  pricing: 'Pricing Page',
+  recipe: 'Recipe',
   generic: 'General Page',
 };
 
@@ -51,6 +72,15 @@ export const SCHEMA_ROLE_CLIENT_DESC: Record<SchemaPageRole, string> = {
   faq: 'FAQ answers eligible for Google FAQ rich results (expandable in search)',
   'case-study': 'Article markup with client details — breadcrumb in search',
   comparison: 'Page info with product reference — breadcrumb in search',
+  howto: 'Step-by-step how-to markup eligible for How-To rich results in Google',
+  video: 'Video markup eligible for video carousel and video rich results in Google',
+  'job-posting': 'Job listing eligible for Google Jobs rich results with salary, location, and apply button',
+  course: 'Course/training markup eligible for Course rich results in Google',
+  event: 'Event markup with dates and venue — eligible for Event rich results in Google',
+  author: 'Author/team profile page with expertise signals — eligible for ProfilePage rich results',
+  review: 'Review markup with ratings — eligible for Review rich results in Google',
+  pricing: 'Pricing page with structured offer data — partial rich results eligibility',
+  recipe: 'Recipe markup with ingredients and steps — eligible for Recipe rich results in Google',
   generic: 'Basic page info — breadcrumb navigation in search',
 };
 
@@ -74,7 +104,7 @@ export const SCHEMA_ROLE_INDEX: Record<SchemaPageRole, { description: string; ex
   },
   'lead-gen': {
     description: 'Conversion-focused pages with CTAs. Gets minimal WebPage + BreadcrumbList only — no product or service entities.',
-    examples: ['/demo', '/pricing', '/get-started', '/signup', '/book-a-call'],
+    examples: ['/demo', '/get-started', '/signup', '/book-a-call'],
   },
   blog: {
     description: 'Blog posts, articles, news, guides, and other editorial content. Gets Article schema with author and dates.',
@@ -112,6 +142,42 @@ export const SCHEMA_ROLE_INDEX: Record<SchemaPageRole, { description: string; ex
     description: 'Competitor comparison pages. References the main product entity — mentions competitor products.',
     examples: ['/vs-competitor', '/compare/us-vs-them', '/alternatives/competitor-name'],
   },
+  howto: {
+    description: 'Step-by-step tutorial or guide pages. Gets HowTo schema with numbered steps — eligible for Google How-To rich results.',
+    examples: ['/how-to/set-up-account', '/tutorials/getting-started', '/guides/seo-checklist'],
+  },
+  video: {
+    description: 'Pages featuring a primary video. Gets VideoObject schema — eligible for Google video carousel and rich results.',
+    examples: ['/videos/product-demo', '/watch/tutorial-overview', '/video-library/webinar-recap'],
+  },
+  'job-posting': {
+    description: 'Job listing pages with title, description, salary, and application details. Gets JobPosting schema — eligible for Google Jobs rich results.',
+    examples: ['/careers/software-engineer', '/jobs/marketing-manager', '/hiring/designer'],
+  },
+  course: {
+    description: 'Course or training program pages with curriculum, schedule, and enrollment. Gets Course + CourseInstance schema — eligible for Course rich results.',
+    examples: ['/courses/seo-101', '/training/web-development', '/workshops/design-thinking'],
+  },
+  event: {
+    description: 'Event pages with dates, venue, and registration. Gets Event schema — eligible for Event rich results.',
+    examples: ['/events/annual-conference', '/webinars/seo-masterclass', '/meetups/tech-talks'],
+  },
+  author: {
+    description: 'Author or team member profile pages. Gets ProfilePage + Person schema with expertise signals — eligible for limited rich results.',
+    examples: ['/team/jane-doe', '/authors/john-smith', '/about/leadership/ceo'],
+  },
+  review: {
+    description: 'Review or testimonial pages with ratings. Gets Review + AggregateRating schema — eligible for Review rich results.',
+    examples: ['/reviews/widget-pro', '/testimonials', '/ratings/service-comparison'],
+  },
+  pricing: {
+    description: 'Pricing pages with plan/tier details. Gets WebPage + Offer array — partial rich results eligibility.',
+    examples: ['/pricing', '/plans', '/packages'],
+  },
+  recipe: {
+    description: 'Recipe pages with ingredients, instructions, and cooking details. Gets Recipe schema — eligible for Recipe rich results.',
+    examples: ['/recipes/chocolate-cake', '/cooking/pasta-carbonara', '/meals/quick-lunch'],
+  },
   generic: {
     description: 'Pages that don\'t fit another category. Gets basic WebPage + BreadcrumbList markup.',
     examples: ['/privacy-policy', '/terms', '/thank-you'],
@@ -133,6 +199,7 @@ export interface PageRoleAssignment {
   primaryType: string;    // main @type: 'WebPage', 'SoftwareApplication', 'Article', etc.
   entityRefs: string[];   // @ids this page should reference (not create)
   notes?: string;         // AI guidance for this specific page
+  industrySubtype?: SchemaIndustrySubtype; // medical/financial — overrides LocalBusiness with specialized type
 }
 
 export interface SchemaSitePlan {

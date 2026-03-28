@@ -1,8 +1,8 @@
 /**
- * backlinks routes — lightweight backlink profile overview via SEMRush
+ * backlinks routes — lightweight backlink profile overview via SEO data provider
  */
 import { Router } from 'express';
-import { getBacklinksOverview, getTopReferringDomains, isSemrushConfigured } from '../semrush.js';
+import { getBacklinksProvider } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
@@ -14,8 +14,9 @@ router.get('/api/backlinks/:workspaceId', async (req, res) => {
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  if (!isSemrushConfigured()) {
-    return res.status(503).json({ error: 'SEMRush is not configured. Set SEMRUSH_API_KEY to enable backlink data.' });
+  const provider = getBacklinksProvider(ws.seoDataProvider);
+  if (!provider) {
+    return res.status(503).json({ error: 'No SEO data provider configured. Set SEMRUSH_API_KEY or DATAFORSEO_LOGIN to enable backlink data.' });
   }
 
   // Derive domain from liveDomain or webflowSiteName
@@ -26,8 +27,8 @@ router.get('/api/backlinks/:workspaceId', async (req, res) => {
 
   try {
     const [overview, referringDomains] = await Promise.all([
-      getBacklinksOverview(domain, workspaceId),
-      getTopReferringDomains(domain, workspaceId, 15),
+      provider.getBacklinksOverview(domain, workspaceId),
+      provider.getReferringDomains(domain, workspaceId, 15),
     ]);
 
     log.info(`Backlink profile for ${domain}: ${overview?.totalBacklinks ?? 0} backlinks, ${overview?.referringDomains ?? 0} referring domains`);

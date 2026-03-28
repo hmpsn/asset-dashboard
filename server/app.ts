@@ -38,6 +38,7 @@ import webflowKeywordsRoutes from './routes/webflow-keywords.js';
 import webflowAltTextRoutes from './routes/webflow-alt-text.js';
 import webflowOrganizeRoutes from './routes/webflow-organize.js';
 import webflowCmsRoutes from './routes/webflow-cms.js';
+import webflowCmsImagesRoutes from './routes/webflow-cms-images.js';
 import webflowSeoRoutes from './routes/webflow-seo.js';
 import webflowSchemaRoutes from './routes/webflow-schema.js';
 import webflowPagespeedRoutes from './routes/webflow-pagespeed.js';
@@ -91,6 +92,13 @@ import siteArchitectureRoutes from './routes/site-architecture.js';
 import llmsTxtRoutes from './routes/llms-txt.js';
 import competitorSchemaRoutes from './routes/competitor-schema.js';
 import { aiStatsRoutes } from './routes/ai-stats.js';
+import { registerProvider } from './seo-data-provider.js';
+import { SemrushProvider } from './providers/semrush-provider.js';
+import { DataForSeoProvider } from './providers/dataforseo-provider.js';
+
+// ─── Register SEO data providers ───
+registerProvider('semrush', new SemrushProvider());
+registerProvider('dataforseo', new DataForSeoProvider());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -267,6 +275,7 @@ export function createApp(): express.Express {
   app.use(webflowAltTextRoutes);
   app.use(webflowOrganizeRoutes);
   app.use(webflowCmsRoutes);
+  app.use(webflowCmsImagesRoutes);
   app.use(webflowSeoRoutes);
   app.use(webflowSchemaRoutes);
   app.use(webflowPagespeedRoutes);

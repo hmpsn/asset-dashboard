@@ -13,6 +13,14 @@ export type {
   AudiencePersona, Workspace,
 } from '../shared/types/workspace.ts';
 import type { PageEditStatus, PageEditState, Workspace } from '../shared/types/workspace.ts';
+import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
+import {
+  eventDisplayConfigSchema, eventGroupSchema,
+  keywordStrategySchema,
+  contentPricingSchema, portalContactSchema, auditSuppressionSchema,
+  publishTargetSchema, businessProfileSchema, audiencePersonaSchema,
+} from './schemas/workspace-schemas.js';
+import { z } from 'zod';
 
 // ── Brand name resolution ──
 
@@ -69,6 +77,8 @@ interface WorkspaceRow {
   portal_contacts: string | null;
   audit_suppressions: string | null;
   publish_target: string | null;
+  business_profile: string | null;
+  seo_data_provider: string | null;
   created_at: string;
 }
 
@@ -104,11 +114,11 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.client_password) ws.clientPassword = row.client_password;
   if (row.client_email) ws.clientEmail = row.client_email;
   if (row.live_domain) ws.liveDomain = row.live_domain;
-  if (row.event_config) ws.eventConfig = JSON.parse(row.event_config);
-  if (row.event_groups) ws.eventGroups = JSON.parse(row.event_groups);
-  if (row.keyword_strategy) ws.keywordStrategy = JSON.parse(row.keyword_strategy);
-  if (row.competitor_domains) ws.competitorDomains = JSON.parse(row.competitor_domains);
-  if (row.personas) ws.personas = JSON.parse(row.personas);
+  if (row.event_config) ws.eventConfig = parseJsonSafeArray(row.event_config, eventDisplayConfigSchema, { workspaceId: row.id, field: 'event_config', table: 'workspaces' });
+  if (row.event_groups) ws.eventGroups = parseJsonSafeArray(row.event_groups, eventGroupSchema, { workspaceId: row.id, field: 'event_groups', table: 'workspaces' });
+  if (row.keyword_strategy) ws.keywordStrategy = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, { siteKeywords: [], pageMap: [], opportunities: [] }, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
+  if (row.competitor_domains) ws.competitorDomains = parseJsonSafeArray(row.competitor_domains, z.string(), { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
+  if (row.personas) ws.personas = parseJsonSafeArray(row.personas, audiencePersonaSchema, { workspaceId: row.id, field: 'personas', table: 'workspaces' });
   if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
   if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
   if (row.analytics_client_view !== null) ws.analyticsClientView = !!row.analytics_client_view;
@@ -125,10 +135,18 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.stripe_subscription_id) ws.stripeSubscriptionId = row.stripe_subscription_id;
   if (row.onboarding_enabled !== null) ws.onboardingEnabled = !!row.onboarding_enabled;
   if (row.onboarding_completed !== null) ws.onboardingCompleted = !!row.onboarding_completed;
-  if (row.content_pricing) ws.contentPricing = JSON.parse(row.content_pricing);
-  if (row.portal_contacts) ws.portalContacts = JSON.parse(row.portal_contacts);
-  if (row.audit_suppressions) ws.auditSuppressions = JSON.parse(row.audit_suppressions);
-  if (row.publish_target) ws.publishTarget = JSON.parse(row.publish_target);
+  if (row.content_pricing) ws.contentPricing = parseJsonSafe(row.content_pricing, contentPricingSchema, { briefPrice: 0, fullPostPrice: 0, currency: 'USD' }, { workspaceId: row.id, field: 'content_pricing', table: 'workspaces' });
+  if (row.portal_contacts) ws.portalContacts = parseJsonSafeArray(row.portal_contacts, portalContactSchema, { workspaceId: row.id, field: 'portal_contacts', table: 'workspaces' });
+  if (row.audit_suppressions) ws.auditSuppressions = parseJsonSafeArray(row.audit_suppressions, auditSuppressionSchema, { workspaceId: row.id, field: 'audit_suppressions', table: 'workspaces' });
+  if (row.publish_target) {
+    const pt = parseJsonSafe(row.publish_target, publishTargetSchema, null, { workspaceId: row.id, field: 'publish_target', table: 'workspaces' });
+    if (pt) ws.publishTarget = pt;
+  }
+  if (row.seo_data_provider) ws.seoDataProvider = row.seo_data_provider as 'semrush' | 'dataforseo';
+  if (row.business_profile) {
+    const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
+    if (bp) ws.businessProfile = bp;
+  }
   return ws;
 }
 
@@ -142,8 +160,8 @@ function attachPageStates(ws: Workspace): Workspace {
         pageId: r.page_id,
         slug: r.slug ?? undefined,
         status: r.status as PageEditStatus,
-        auditIssues: r.audit_issues ? JSON.parse(r.audit_issues) : undefined,
-        fields: r.fields ? JSON.parse(r.fields) : undefined,
+        auditIssues: r.audit_issues ? parseJsonSafeArray(r.audit_issues, z.string(), { workspaceId: ws.id, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
+        fields: r.fields ? parseJsonSafeArray(r.fields, z.string(), { workspaceId: ws.id, field: 'fields', table: 'page_edit_states' }) : undefined,
         source: r.source as PageEditState['source'] ?? undefined,
         approvalBatchId: r.approval_batch_id ?? undefined,
         contentRequestId: r.content_request_id ?? undefined,
@@ -320,6 +338,8 @@ function workspaceToParams(ws: Workspace) {
     portal_contacts: ws.portalContacts ? JSON.stringify(ws.portalContacts) : null,
     audit_suppressions: ws.auditSuppressions ? JSON.stringify(ws.auditSuppressions) : null,
     publish_target: ws.publishTarget ? JSON.stringify(ws.publishTarget) : null,
+    seo_data_provider: ws.seoDataProvider || null,
+    business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     created_at: ws.createdAt,
   };
 }
@@ -382,7 +402,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -410,7 +430,8 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     tier: 'tier', trialEndsAt: 'trial_ends_at',
     onboardingEnabled: 'onboarding_enabled', onboardingCompleted: 'onboarding_completed',
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
-    publishTarget: 'publish_target',
+    publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
+    businessProfile: 'business_profile',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
@@ -524,8 +545,8 @@ export function updatePageState(
       pageId: existingRow.page_id,
       slug: existingRow.slug ?? undefined,
       status: existingRow.status as PageEditStatus,
-      auditIssues: existingRow.audit_issues ? JSON.parse(existingRow.audit_issues) : undefined,
-      fields: existingRow.fields ? JSON.parse(existingRow.fields) : undefined,
+      auditIssues: existingRow.audit_issues ? parseJsonSafeArray(existingRow.audit_issues, z.string(), { workspaceId, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
+      fields: existingRow.fields ? parseJsonSafeArray(existingRow.fields, z.string(), { workspaceId, field: 'fields', table: 'page_edit_states' }) : undefined,
       source: existingRow.source as PageEditState['source'] ?? undefined,
       approvalBatchId: existingRow.approval_batch_id ?? undefined,
       contentRequestId: existingRow.content_request_id ?? undefined,
@@ -580,8 +601,8 @@ export function getPageState(workspaceId: string, pageId: string): PageEditState
     pageId: row.page_id,
     slug: row.slug ?? undefined,
     status: row.status as PageEditStatus,
-    auditIssues: row.audit_issues ? JSON.parse(row.audit_issues) : undefined,
-    fields: row.fields ? JSON.parse(row.fields) : undefined,
+    auditIssues: row.audit_issues ? parseJsonSafeArray(row.audit_issues, z.string(), { workspaceId, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
+    fields: row.fields ? parseJsonSafeArray(row.fields, z.string(), { workspaceId, field: 'fields', table: 'page_edit_states' }) : undefined,
     source: row.source as PageEditState['source'] ?? undefined,
     approvalBatchId: row.approval_batch_id ?? undefined,
     contentRequestId: row.content_request_id ?? undefined,
@@ -601,8 +622,8 @@ export function getAllPageStates(workspaceId: string): Record<string, PageEditSt
       pageId: row.page_id,
       slug: row.slug ?? undefined,
       status: row.status as PageEditStatus,
-      auditIssues: row.audit_issues ? JSON.parse(row.audit_issues) : undefined,
-      fields: row.fields ? JSON.parse(row.fields) : undefined,
+      auditIssues: row.audit_issues ? parseJsonSafeArray(row.audit_issues, z.string(), { workspaceId, field: 'audit_issues', table: 'page_edit_states' }) : undefined,
+      fields: row.fields ? parseJsonSafeArray(row.fields, z.string(), { workspaceId, field: 'fields', table: 'page_edit_states' }) : undefined,
       source: row.source as PageEditState['source'] ?? undefined,
       approvalBatchId: row.approval_batch_id ?? undefined,
       contentRequestId: row.content_request_id ?? undefined,

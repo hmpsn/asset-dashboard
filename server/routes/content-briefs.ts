@@ -14,11 +14,13 @@ import {
   deleteBrief,
   generateBrief,
   regenerateBrief,
+  regenerateOutline,
 } from '../content-brief.js';
 import { createContentRequest, updateContentRequest } from '../content-requests.js';
 import { notifyClientBriefReady } from '../email.js';
 import { getSearchOverview } from '../search-console.js';
-import { isSemrushConfigured, getKeywordOverview, getRelatedKeywords } from '../semrush.js';
+import { getConfiguredProvider } from '../seo-data-provider.js';
+import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
 import { createLogger } from '../logger.js';
@@ -76,18 +78,19 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
     const existingPages = ws ? await getAllSitePages(ws) : [];
 
-    // Gather SEMRush data if configured
-    let semrushMetrics: import('../semrush.js').KeywordMetrics | undefined;
-    let semrushRelated: import('../semrush.js').RelatedKeyword[] | undefined;
-    if (isSemrushConfigured()) {
+    // Gather SEO keyword data if a provider is configured
+    let semrushMetrics: KeywordMetrics | undefined;
+    let semrushRelated: RelatedKeyword[] | undefined;
+    const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([
-          getKeywordOverview([targetKeyword], req.params.workspaceId),
-          getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
+          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId),
+          seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
         ]);
         if (metrics.length > 0) semrushMetrics = metrics[0];
         if (related.length > 0) semrushRelated = related;
-      } catch (e) { log.error({ err: e }, 'SEMRush brief enrichment error'); }
+      } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
     }
 
     // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---
@@ -164,6 +167,19 @@ router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorks
   }
 });
 
+// Regenerate outline only (preserves all other brief fields)
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+  try {
+    const { feedback } = req.body || {};
+    const result = await regenerateOutline(req.params.workspaceId, req.params.briefId, feedback);
+    if (!result) return res.status(404).json({ error: 'Brief not found' });
+    log.info(`REGENERATED OUTLINE for brief ${req.params.briefId} in workspace ${req.params.workspaceId}`);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to regenerate outline' });
+  }
+});
+
 // Export a brief as branded HTML
 router.get('/api/content-briefs/:workspaceId/:briefId/export', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
@@ -229,19 +245,21 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
   const { keyword } = req.body;
   if (!keyword) return res.status(400).json({ error: 'keyword is required' });
 
-  if (!isSemrushConfigured()) {
-    // No SEMRush — return a stub validation so the flow isn't blocked
+  const kwWs = getWorkspace(req.params.workspaceId);
+  const kwProvider = getConfiguredProvider(kwWs?.seoDataProvider);
+  if (!kwProvider) {
+    // No SEO provider — return a stub validation so the flow isn't blocked
     return res.json({
       keyword,
       valid: true,
       source: 'manual' as const,
       metrics: null,
-      message: 'SEMRush not configured — keyword accepted without validation',
+      message: 'No SEO data provider configured — keyword accepted without validation',
     });
   }
 
   try {
-    const metrics = await getKeywordOverview([keyword], req.params.workspaceId);
+    const metrics = await kwProvider.getKeywordMetrics([keyword], req.params.workspaceId);
     const kw = metrics[0];
 
     if (!kw) {
@@ -291,7 +309,9 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
     return res.status(400).json({ error: 'keywords array is required' });
   }
 
-  if (!isSemrushConfigured()) {
+  const bulkWs = getWorkspace(req.params.workspaceId);
+  const bulkProvider = getConfiguredProvider(bulkWs?.seoDataProvider);
+  if (!bulkProvider) {
     return res.json({
       results: keywords.map((kw: string) => ({
         keyword: kw,
@@ -299,13 +319,12 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
         source: 'manual' as const,
         metrics: null,
       })),
-      message: 'SEMRush not configured — all keywords accepted without validation',
+      message: 'No SEO data provider configured — all keywords accepted without validation',
     });
   }
 
   try {
-    // SEMRush getKeywordOverview already handles batching
-    const metrics = await getKeywordOverview(keywords.slice(0, 50), req.params.workspaceId);
+    const metrics = await bulkProvider.getKeywordMetrics(keywords.slice(0, 50), req.params.workspaceId);
     const metricsMap = new Map(metrics.map(m => [m.keyword.toLowerCase(), m]));
 
     const results = keywords.slice(0, 50).map((kw: string) => {

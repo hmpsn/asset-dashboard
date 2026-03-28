@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, getTokenForSite, getClientPortalUrl } from './workspaces.js';
 import { runSeoAudit } from './seo-audit.js';
 import { saveSnapshot, getLatestSnapshotBefore } from './reports.js';
@@ -42,21 +43,10 @@ function rowToSchedule(row: AuditScheduleRow): AuditSchedule {
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
-interface Stmts {
-  selectAll: ReturnType<typeof db.prepare>;
-  selectById: ReturnType<typeof db.prepare>;
-  upsert: ReturnType<typeof db.prepare>;
-  deleteById: ReturnType<typeof db.prepare>;
-}
-
-let _stmts: Stmts | null = null;
-
-function stmts(): Stmts {
-  if (!_stmts) {
-    _stmts = {
-      selectAll: db.prepare('SELECT * FROM audit_schedules'),
-      selectById: db.prepare('SELECT * FROM audit_schedules WHERE workspace_id = ?'),
-      upsert: db.prepare(`
+const stmts = createStmtCache(() => ({
+  selectAll: db.prepare('SELECT * FROM audit_schedules'),
+  selectById: db.prepare('SELECT * FROM audit_schedules WHERE workspace_id = ?'),
+  upsert: db.prepare(`
         INSERT INTO audit_schedules (workspace_id, enabled, interval_days, score_drop_threshold,
           last_run_at, last_score)
         VALUES (@workspace_id, @enabled, @interval_days, @score_drop_threshold,
@@ -66,11 +56,8 @@ function stmts(): Stmts {
           score_drop_threshold = @score_drop_threshold,
           last_run_at = @last_run_at, last_score = @last_score
       `),
-      deleteById: db.prepare('DELETE FROM audit_schedules WHERE workspace_id = ?'),
-    };
-  }
-  return _stmts;
-}
+  deleteById: db.prepare('DELETE FROM audit_schedules WHERE workspace_id = ?'),
+}));
 
 export function getSchedule(workspaceId: string): AuditSchedule | null {
   const row = stmts().selectById.get(workspaceId) as AuditScheduleRow | undefined;

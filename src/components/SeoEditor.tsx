@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { put, post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Loader2, Upload, Check, AlertCircle, Wand2, Sparkles,
+  Loader2, Upload, Check, AlertCircle, Wand2, Sparkles, RefreshCw,
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions, keywords } from '../api/seo';
+import { workspaces } from '../api';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
@@ -243,6 +244,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setSaved(prev => new Set(prev).add(pageId));
       // Refresh page edit states to reflect the new 'live' status
       refreshStates();
+      // Invalidate audit cache so the audit reflects updated SEO status
+      queryClient.invalidateQueries({ queryKey: ['admin-audit'] });
       setTimeout(() => setSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
     } catch (err) {
       console.error('Save failed:', err);
@@ -669,6 +672,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         )}
         <div className="flex-1" />
         <button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] })}
+          className="p-1.5 rounded text-zinc-500 hover:text-teal-400 hover:bg-zinc-800 transition-colors"
+          title="Refresh pages from Webflow"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+        <button
           onClick={() => handleBulkFix('title')}
           disabled={bulkFixing || missingTitles === 0}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
@@ -720,6 +730,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         <PendingApprovals
           workspaceId={workspaceId}
           refreshKey={approvalRefreshKey}
+          nameFilter="SEO"
           onRetracted={() => refreshStates()}
         />
       )}
@@ -855,8 +866,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
             onClearTracking={workspaceId ? async (pageId) => {
               try {
-                const res = await fetch(`/api/workspaces/${workspaceId}/page-states/${pageId}`, { method: 'DELETE' });
-                if (res.ok) refreshStates();
+                await workspaces.deletePageState(workspaceId, pageId);
+                refreshStates();
               } catch (err) { console.error('SeoEditor operation failed:', err); }
             } : undefined}
             errorState={errorStates[page.id] || null}

@@ -30,6 +30,13 @@ interface SchemaSuggestion {
   template: Record<string, unknown>;
 }
 
+interface RichResultEligibility {
+  type: string;
+  eligible: boolean;
+  feature: string;
+  missingFields?: string[];
+}
+
 interface SchemaPageSuggestion {
   pageId: string;
   pageTitle: string;
@@ -39,6 +46,8 @@ interface SchemaPageSuggestion {
   existingSchemaJson?: Record<string, unknown>[];
   suggestedSchemas: SchemaSuggestion[];
   validationErrors?: string[];
+  richResultsEligibility?: RichResultEligibility[];
+  lastPublishedAt?: string | null;
 }
 
 interface CmsTemplatePage {
@@ -141,8 +150,30 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       setData(snapshotData.results as SchemaPageSuggestion[]);
       setSnapshotDate(snapshotData.createdAt);
       setStarted(true);
+      // Hydrate page types from savedPageType on each result (don't overwrite locally-set types)
+      const typesFromSnapshot: Record<string, string> = {};
+      for (const r of snapshotData.results as SchemaPageSuggestion[]) {
+        if ((r as unknown as { savedPageType?: string }).savedPageType) {
+          typesFromSnapshot[r.pageId] = (r as unknown as { savedPageType?: string }).savedPageType!;
+        }
+      }
+      if (Object.keys(typesFromSnapshot).length > 0) {
+        setPageTypes(prev => ({ ...typesFromSnapshot, ...prev }));
+      }
     }
   }, [snapshotData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load persisted page types from server on mount
+  useEffect(() => {
+    if (!siteId) return;
+    getSafe<{ pageTypes: Record<string, string> }>(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageTypes: {} })
+      .then(({ pageTypes: saved }) => {
+        if (saved && Object.keys(saved).length > 0) {
+          setPageTypes(prev => ({ ...saved, ...prev }));
+        }
+      })
+      .catch(() => { /* ignore — page types are non-critical */ });
+  }, [siteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load all pages — React Query
   const { data: fetchedPages = [] } = useWebflowPages(siteId);
@@ -267,11 +298,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       const result = await post<SchemaPageSuggestion>(`/api/webflow/schema-suggestions/${siteId}/page`, { pageId });
       setData(prev => {
         if (!prev) return prev;
+        // Full replacement — preserve lastPublishedAt which comes from the
+        // snapshot endpoint annotation, not the generate response.
         return prev.map(p => p.pageId === pageId ? {
-          ...p,
-          suggestedSchemas: result.suggestedSchemas,
-          existingSchemas: result.existingSchemas,
-          validationErrors: result.validationErrors,
+          ...result,
+          lastPublishedAt: p.lastPublishedAt,
         } : p);
       });
       setExpanded(prev => new Set(prev).add(pageId));
@@ -807,6 +838,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         <PendingApprovals
           workspaceId={workspaceId}
           refreshKey={approvalRefreshKey}
+          nameFilter="Schema"
           onRetracted={() => setApprovalRefreshKey(k => k + 1)}
         />
       )}
@@ -960,7 +992,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               isHomepage={!page.slug || page.slug === '/' || page.slug === 'index' || page.slug === 'home'}
               savingTemplate={savingTemplate}
               templateSaved={templateSaved}
-              onPageTypeChange={(pid, t) => setPageTypes(prev => ({ ...prev, [pid]: t }))}
+              onPageTypeChange={(pid, t) => {
+                setPageTypes(prev => ({ ...prev, [pid]: t }));
+                // Persist to server (fire-and-forget)
+                put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch(() => {});
+              }}
               onToggleExpand={toggleExpand}
               onRegenerate={regeneratePage}
               onToggleDiff={toggleDiff}
@@ -986,6 +1022,26 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
               retracting={retractingPages.has(page.pageId)}
               retracted={retractedPages.has(page.pageId)}
               getEffectiveSchema={getEffectiveSchema}
+              siteId={siteId}
+              onRestore={(pageId, restoredSchema) => {
+                // Update local data with the restored schema
+                setData(prev => {
+                  if (!prev) return prev;
+                  return prev.map(p => {
+                    if (p.pageId !== pageId) return p;
+                    return {
+                      ...p,
+                      suggestedSchemas: [{
+                        ...(p.suggestedSchemas[0] || { type: 'restored', priority: 'high' as const }),
+                        template: restoredSchema,
+                        reason: `Restored from version history (${new Date().toLocaleDateString()})`,
+                      }],
+                      lastPublishedAt: new Date().toISOString(),
+                    };
+                  });
+                });
+                setPublished(prev => new Set(prev).add(pageId));
+              }}
             />
           );
         })}

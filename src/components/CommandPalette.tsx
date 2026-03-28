@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auditSchedules, anomalies } from '../api';
 import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
@@ -26,10 +27,8 @@ interface CommandPaletteProps {
 
 const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: string; needsSite?: boolean }> = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, group: '' },
-  { id: 'search', label: 'Search Console', icon: Search, group: 'Analytics', needsSite: true },
-  { id: 'analytics', label: 'Google Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
+  { id: 'analytics-hub', label: 'Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
   { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Analytics', needsSite: true },
-  { id: 'annotations', label: 'Annotations', icon: Flag, group: 'Analytics', needsSite: true },
   { id: 'seo-audit', label: 'Site Audit', icon: Globe, group: 'Site Health', needsSite: true },
   { id: 'performance', label: 'Performance', icon: Gauge, group: 'Site Health', needsSite: true },
   { id: 'links', label: 'Links', icon: Link2, group: 'Site Health', needsSite: true },
@@ -145,7 +144,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Start SEO site audit',
         icon: Shield,
         type: 'action',
-        action: () => { fetch(`/api/audit-schedules/${selectedWorkspace!.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) }); addRecent('action:run-audit'); },
+        action: () => { auditSchedules.enable(selectedWorkspace!.id); addRecent('action:run-audit'); },
       });
       result.push({
         id: 'action:generate-schema',
@@ -169,7 +168,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Run anomaly detection now',
         icon: Zap,
         type: 'action',
-        action: () => { fetch('/api/anomalies/scan', { method: 'POST' }); addRecent('action:scan-anomalies'); },
+        action: () => { anomalies.scan(); addRecent('action:scan-anomalies'); },
       });
       result.push({
         id: 'action:create-template',
