@@ -259,7 +259,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             {/* Left: Data table with inline Queries/Pages toggle */}
             <SectionCard noPadding>
               {/* Inline toggle header */}
-              <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800 shrink-0">
+              <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800">
                 <button
                   className={`text-xs font-semibold pb-1 ${tableView === 'queries' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-zinc-500'}`}
                   onClick={() => setTableView('queries')}
@@ -270,7 +270,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 >Pages</button>
               </div>
 
-              <div className="overflow-y-auto flex-1">
+              <div className="overflow-y-auto max-h-[60vh]">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-zinc-900 z-10">
                   <tr className="border-b border-zinc-800">
