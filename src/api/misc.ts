@@ -1,6 +1,7 @@
 // ── Miscellaneous API endpoints ────────────────────────────────────
 import { get, post, patch, del, getSafe, getOptional, postForm } from './client';
 import type { ContentSubscription, ContentSubscriptionPlanConfig } from '../../shared/types/content';
+import type { FeaturesData } from '../../shared/types/features';
 
 // ── Requests (client requests / support tickets) ────────────────
 export const requests = {
@@ -169,6 +170,11 @@ export const roadmap = {
 
   updateItem: (itemId: number, body: Record<string, unknown>) =>
     patch<unknown>(`/api/roadmap/item/${itemId}`, body),
+};
+
+// ── Features ─────────────────────────────────────────────────────
+export const features = {
+  get: () => get<FeaturesData>('/api/features'),
 };
 
 // ── Recommendations ─────────────────────────────────────────────
