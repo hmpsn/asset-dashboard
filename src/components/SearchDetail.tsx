@@ -256,10 +256,10 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
 
           {/* Step 5+6+7: Two-column grid — table spans all rows, sidebar cards stack */}
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-3 gap-3">
-            {/* Left: Data table — spans all 3 rows */}
-            <SectionCard noPadding className="lg:row-span-3 flex flex-col max-h-[80vh]">
+            {/* Left: Data table — spans all 3 rows, fixed height with internal scroll */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 lg:row-span-3 flex flex-col" style={{ maxHeight: '80vh' }}>
               {/* Inline toggle header */}
-              <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800">
+              <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800 shrink-0">
                 <button
                   className={`text-xs font-semibold pb-1 ${tableView === 'queries' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-zinc-500'}`}
                   onClick={() => setTableView('queries')}
@@ -345,7 +345,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 </tbody>
               </table>
               </div>
-            </SectionCard>
+            </div>
 
             {/* Right column: each card occupies one grid row */}
               {devices.length > 0 && (
