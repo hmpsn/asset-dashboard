@@ -30,6 +30,8 @@ These bugs were found in Phase 2. Each one costs 1–3 hours to diagnose. Read t
 | **parseJsonSafe** | Never call `JSON.parse()` directly on a DB column. Use `parseJsonFallback` from `server/db/json-validation.ts`. Applies to `insight.auditIssues` in `insight-narrative.ts`. |
 | **Full test suite** | After completing each group of tasks, run `npx vitest run` (full suite). Build passing ≠ tests passing. |
 | **Subagent diff review** | After Tasks 1–4 complete in parallel, manually diff all modified shared files (`shared/types/analytics.ts`, `src/lib/queryKeys.ts`, `analytics-insights-store.ts`) before proceeding to Task 5. |
+| **Producer/consumer contract gaps** | When a function produces enum values consumed by downstream code, the producer must actually emit every value downstream checks for. `checkStrategyAlignment` never returned `'misaligned'` — its consumer in `buildStrategySignals()` was dead code. In Phase 3: use `Record<InsightType, ...>` for the narrative template map so TypeScript enforces all cases at compile time. Write pipeline tests that exercise the real producer, not tests that fabricate the output value directly. |
+| **Shared URL normalization** | `roi-attribution.ts` stores `page_url` and the digest builder compares it against insight `pageId` values. Use a single shared `normalizePath()` helper (strip leading/trailing slashes, lowercase) at both the write path and the lookup path — never duplicate inline `.replace()` calls. |
 
 ---
 
@@ -374,6 +376,14 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
 > ```
 > Bare `JSON.parse` on a DB TEXT column can throw if the stored value is malformed or null.
 
+> ⚠️ **Phase 2 lesson — exhaustive InsightType map (producer/consumer contract):** The plan code uses `Record<string, () => ...>` for `narrativeMap` then falls through to a default for unknown types. This is the same pattern as `checkStrategyAlignment` never returning `'misaligned'` — a missing case silently produces wrong output. Replace with an exhaustive typed map:
+> ```typescript
+> import type { InsightType } from '../shared/types/analytics.js';
+> // Exhaustive map: TypeScript will error if a new InsightType is added without a narrative
+> const narrativeMap: Partial<Record<InsightType, () => { headline: string; narrative: string; impact?: string }>> = { ... };
+> ```
+> Also: unit tests for `toClientInsight()` must pass real `InsightType` values from the union (e.g., `'ranking_mover'`, `'page_health'`) — not fabricated strings — so TypeScript catches any mismatch at test compile time.
+
 - [ ] **Step 2: Write tests**
 
 ```typescript
@@ -479,6 +489,19 @@ Tracks which optimizations led to which metric improvements.
 >     getHighlights: db.prepare(`SELECT * FROM roi_attributions WHERE ...`),
 >     getUnmeasured: db.prepare(`SELECT * FROM roi_attributions WHERE measured_at IS NULL ...`),
 >   };
+> }
+> ```
+
+> ⚠️ **Phase 2 lesson — shared URL normalization:** `roi-attribution.ts` stores `page_url` and the digest builder will later compare it against insight `pageId` values. The Phase 2 slug normalization bug (`buildAuditIssuesMap` stripped only the leading slash, `getAuditIssuesForPage` stripped both) happened because two places normalized independently. Prevent the same bug here: define a single `normalizePath()` helper at the top of `roi-attribution.ts` and use it at **both** the write path (when storing `page_url`) and the lookup path (when matching against insight records):
+> ```typescript
+> function normalizePath(url: string): string {
+>   try {
+>     // Strip domain if present
+>     const pathname = url.startsWith('http') ? new URL(url).pathname : url;
+>     return pathname.toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+>   } catch {
+>     return url.toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+>   }
 > }
 > ```
 
