@@ -182,7 +182,7 @@ export function deleteStaleInsightsByType(
   olderThan: string,
 ): number {
   const stmt = db.prepare(
-    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ?`,
+    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL`,
   );
   const info = stmt.run(workspaceId, insightType, olderThan);
   return info.changes;
