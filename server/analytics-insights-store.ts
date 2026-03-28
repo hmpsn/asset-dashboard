@@ -56,10 +56,10 @@ const stmts = createStmtCache(() => ({
       -- background recomputation must not un-resolve admin work.
   `),
   selectByWorkspace: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ? ORDER BY impact_score DESC LIMIT 25`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? ORDER BY impact_score DESC`,
   ),
   selectByWorkspaceAndType: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? ORDER BY impact_score DESC LIMIT 25`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? ORDER BY impact_score DESC`,
   ),
   selectOne: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND page_id IS ? AND insight_type = ?`,
@@ -74,7 +74,7 @@ const stmts = createStmtCache(() => ({
     `UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`,
   ),
   selectUnresolved: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC LIMIT 25`,
   ),
   selectById: db.prepare(
     `SELECT * FROM analytics_insights WHERE id = ? AND workspace_id = ?`,

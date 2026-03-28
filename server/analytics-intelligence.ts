@@ -760,7 +760,8 @@ export async function getOrComputeInsights(
       allExisting[0].computedAt,
     );
     if (!isStale(newestComputedAt)) {
-      return insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+      const fresh = insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+      return fresh.slice(0, 25);
     }
   }
 
@@ -769,11 +770,13 @@ export async function getOrComputeInsights(
     await computeAndPersistInsights(workspaceId);
   } catch (err) {
     log.warn({ err, workspaceId }, 'Failed to compute fresh insights, returning stale data');
-    // Return stale data if we have it
-    if (allExisting.length > 0) return insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+    if (allExisting.length > 0) {
+      const stale = insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+      return stale.slice(0, 25);
+    }
   }
 
-  return getInsights(workspaceId, insightType);
+  return getInsights(workspaceId, insightType).slice(0, 25);
 }
 
 /**

@@ -25,7 +25,7 @@ router.get('/api/insights/:workspaceId/queue', requireWorkspaceAccess('workspace
 router.put(
   '/api/insights/:workspaceId/:insightId/resolve',
   requireWorkspaceAccess('workspaceId'),
-  validate(z.object({ body: z.object({ status: z.enum(['in_progress', 'resolved']), note: z.string().optional() }) })),
+  validate(z.object({ status: z.enum(['in_progress', 'resolved']), note: z.string().optional() })),
   (req, res) => {
     const workspaceId = req.params.workspaceId;
     const { status, note } = req.body as { status: 'in_progress' | 'resolved'; note?: string };
