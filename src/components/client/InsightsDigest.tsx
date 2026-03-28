@@ -398,6 +398,20 @@ const SEVERITY_TO_COLOR: Record<string, string> = {
   critical: 'red',
 };
 
+const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: ClientTab }>> = {
+  ranking_mover: { label: 'View search data', tab: 'performance' },
+  ctr_opportunity: { label: 'View search data', tab: 'performance' },
+  ranking_opportunity: { label: 'View opportunities', tab: 'performance' },
+  content_decay: { label: 'View search data', tab: 'performance' },
+  page_health: { label: 'View site health', tab: 'health' },
+  cannibalization: { label: 'View strategy', tab: 'strategy' },
+  keyword_cluster: { label: 'View strategy', tab: 'strategy' },
+  competitor_gap: { label: 'View strategy', tab: 'strategy' },
+  conversion_attribution: { label: 'View analytics', tab: 'performance' },
+  serp_opportunity: { label: 'View site health', tab: 'health' },
+  anomaly_digest: { label: 'View analytics', tab: 'performance' },
+};
+
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {
   return insights.map(i => {
     let body = i.narrative;
@@ -413,6 +427,7 @@ function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {
       headline: i.headline,
       body,
       detail: detail.length > 0 ? detail : undefined,
+      action: INSIGHT_TYPE_ACTIONS[i.type],
       priority: Math.max(1, 6 - Math.ceil(i.impactScore / 20)),
       sentiment: SEVERITY_TO_SENTIMENT[i.severity] ?? 'neutral',
     };
