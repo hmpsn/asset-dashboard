@@ -392,8 +392,8 @@ async function buildAuditIssuesMap(workspaceId: string): Promise<Map<string, str
         .slice(0, MAX_AUDIT_ISSUES_PER_PAGE)
         .map((i: SeoIssue) => i.message);
 
-      // Store under normalised slug (lowercase, no leading slash)
-      const normSlug = (page.slug || '').toLowerCase().replace(/^\//, '');
+      // Store under normalised slug (lowercase, no leading or trailing slash)
+      const normSlug = (page.slug || '').toLowerCase().replace(/^\//, '').replace(/\/$/, '');
       if (normSlug) {
         map.set(normSlug, messages);
       }
