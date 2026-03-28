@@ -18,6 +18,21 @@
 
 ---
 
+## Phase 2 Lessons — Read Before Starting
+
+These bugs were found in Phase 2. Each one costs 1–3 hours to diagnose. Read this section before writing any code.
+
+| Lesson | Rule |
+|--------|------|
+| **stmts() cache** | Never use bare `db.prepare()` inside exported functions. Add all statements to the module-level `stmts()` cache object. `roi-attribution.ts` and the new store functions in Task 5 are particularly at risk. |
+| **Imports at top** | Add all `import` statements at the top of the file alongside existing imports. Never put an import next to the code that uses it. After editing any file, run `grep -n "^import" <file> \| tail -20` to verify no imports appeared past line 30. |
+| **Route ordering** | Literal path segments must be registered **before** `/:paramId` routes at the same path depth. Before adding any route to an existing router, grep for existing param routes at the same depth. `public-analytics.ts` may have catch-alls. |
+| **parseJsonSafe** | Never call `JSON.parse()` directly on a DB column. Use `parseJsonFallback` from `server/db/json-validation.ts`. Applies to `insight.auditIssues` in `insight-narrative.ts`. |
+| **Full test suite** | After completing each group of tasks, run `npx vitest run` (full suite). Build passing ≠ tests passing. |
+| **Subagent diff review** | After Tasks 1–4 complete in parallel, manually diff all modified shared files (`shared/types/analytics.ts`, `src/lib/queryKeys.ts`, `analytics-insights-store.ts`) before proceeding to Task 5. |
+
+---
+
 ## Pre-flight Checklist
 
 Before starting Phase 3, verify Phase 2 is fully landed:
@@ -351,6 +366,14 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
 - No purple color in any component rendering these
 - Never expose `strategy_alignment` or `keyword_cluster` to clients
 
+> ⚠️ **Phase 2 lesson — `parseJsonSafe` for DB columns:** The plan code calls `JSON.parse(insight.auditIssues)` directly. Replace with:
+> ```typescript
+> import { parseJsonFallback } from './db/json-validation.js';
+> const issues = parseJsonFallback<string[]>(insight.auditIssues, []);
+> const count = issues.length;
+> ```
+> Bare `JSON.parse` on a DB TEXT column can throw if the stored value is malformed or null.
+
 - [ ] **Step 2: Write tests**
 
 ```typescript
@@ -441,6 +464,23 @@ Caps at 15 insights for client view. Sorted by impact score."
 - Create: `tests/unit/roi-attribution.test.ts`
 
 Tracks which optimizations led to which metric improvements.
+
+> ⚠️ **Phase 2 lesson — stmts() cache required:** The plan code below uses bare `db.prepare()` inside exported functions. This re-compiles statements on every call. When writing `roi-attribution.ts`, add all prepared statements to a module-level `stmts()` cache object instead:
+> ```typescript
+> let cache: ReturnType<typeof buildStmts> | undefined;
+> function stmts() {
+>   return cache ??= buildStmts();
+> }
+> function buildStmts() {
+>   const db = getDb();
+>   return {
+>     insert: db.prepare(`INSERT INTO roi_attributions ...`),
+>     updateOutcome: db.prepare(`UPDATE roi_attributions SET ...`),
+>     getHighlights: db.prepare(`SELECT * FROM roi_attributions WHERE ...`),
+>     getUnmeasured: db.prepare(`SELECT * FROM roi_attributions WHERE measured_at IS NULL ...`),
+>   };
+> }
+> ```
 
 - [ ] **Step 1: Write the ROI module**
 
@@ -809,6 +849,18 @@ deterministic fallback. Outcome-oriented language throughout."
 
 Add resolution workflow functions to the insight store.
 
+> ⚠️ **Phase 2 lesson — stmts() cache required:** The plan code below calls `db.prepare()` inline in `resolveInsight()`, `getUnresolvedInsights()`, and `getInsightById()`. Add these to the existing `stmts()` cache in `analytics-insights-store.ts` instead:
+> ```typescript
+> // Add to the stmts() cache object in analytics-insights-store.ts:
+> updateResolution: getDb().prepare(`UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`),
+> selectUnresolved: getDb().prepare(`SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC`),
+> selectById: getDb().prepare(`SELECT * FROM analytics_insights WHERE id = ?`),
+> ```
+
+> ⚠️ **Plan bug — `resolveInsight()` return value:** The plan calls `getInsight(workspaceId, undefined as any, undefined as any)` after the update — this is wrong. Use the new `getInsightById(insightId)` function to return the updated insight.
+
+> ⚠️ **Phase 2 lesson — check imports at top:** When adding functions to `analytics-insights-store.ts`, all import statements must remain at the top of the file. No new imports should be added mid-file.
+
 - [ ] **Step 1: Add resolution functions**
 
 ```typescript
@@ -908,6 +960,15 @@ API endpoints for resolution workflow + action queue."
 
 **Files:**
 - Modify: `server/routes/public-analytics.ts`
+
+> ⚠️ **Phase 2 lesson — route ordering + imports at top of file:**
+> Before adding these routes, run:
+> ```bash
+> grep -n "router\.\(get\|put\|post\|delete\)" server/routes/public-analytics.ts | head -30
+> ```
+> If any route exists with the pattern `/:workspaceId/:anything`, register `/narrative` and `/digest` **before** it. Express matches in registration order — a catch-all param route will shadow literal segments.
+>
+> Also check for existing imports before adding `buildClientInsights` and `generateMonthlyDigest` — add them at the top of the file alongside existing imports.
 
 - [ ] **Step 1: Add client narrative endpoint**
 
@@ -1280,11 +1341,13 @@ Feeds into workspace activity log."
 - Modify: `BRAND_DESIGN_LANGUAGE.md`
 - Modify: `data/roadmap.json`
 
-- [ ] **Step 1: Run all tests**
+- [ ] **Step 1: Run FULL test suite**
 
 ```bash
-npx vitest run tests/unit/insight-narrative.test.ts tests/unit/roi-attribution.test.ts
+npx vitest run
 ```
+
+The full suite must show **zero failures**. Running only the new test files is not sufficient — Phase 2 found that partial test runs mask cross-module regressions.
 
 - [ ] **Step 2: Full build verification**
 
@@ -1350,3 +1413,14 @@ Task 11 (Verification + Docs) ── depends on ALL ─────────�
 - Task 4 depends on both 2 and 3
 - Tasks 8 + 9 + 10 can run in parallel once Task 7 completes
 - Task 11 waits for all
+
+**Required diff review checkpoints (Phase 2 lesson):**
+After parallel groups complete, manually review diffs in shared files before proceeding:
+
+1. **After Tasks 2 + 3 + 5 complete** (before starting Task 4, 6, 7): diff `shared/types/analytics.ts`, `server/analytics-insights-store.ts` — check for conflicts or duplicates
+2. **After Tasks 8 + 9 + 10 complete** (before Task 11): diff `src/lib/queryKeys.ts`, `src/hooks/client/`, `src/hooks/admin/` — check for duplicate keys or import conflicts
+
+```bash
+# Review the combined diff of shared files after parallel tasks
+git diff HEAD -- shared/types/ server/analytics-insights-store.ts src/lib/queryKeys.ts
+```
