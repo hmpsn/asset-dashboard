@@ -90,6 +90,10 @@ export function classifyDomain(type: InsightType): InsightDomain {
     'conversion_attribution',
   ];
 
+  // anomaly_digest domain is set explicitly by the anomaly detection loop
+  // based on anomaly type (traffic/search/cross), so this fallback to 'cross'
+  // is only hit if anomaly_digest goes through the standard enrichment path.
+
   if (searchTypes.includes(type)) return 'search';
   if (trafficTypes.includes(type)) return 'traffic';
   return 'cross';

@@ -3,7 +3,7 @@ import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';
 import { Badge } from '../ui/Badge.js';
 import { TrendingUp, AlertTriangle, Target } from 'lucide-react';
-import type { StrategySignal } from '../../../server/insight-feedback.js';
+import type { StrategySignal } from '../../../shared/types/insights.js';
 
 interface Props {
   workspaceId: string;

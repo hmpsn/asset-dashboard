@@ -21,6 +21,28 @@ export interface FeedAction {
   icon?: string;            // lucide icon name
 }
 
+/** Strategy intelligence signal derived from insight engine feedback loop */
+export interface StrategySignal {
+  type: 'momentum' | 'misalignment' | 'content_gap';
+  keyword: string;
+  pageUrl?: string;
+  pageTitle?: string;
+  detail: string;
+  insightId: string;
+  impactScore: number;
+}
+
+/** Content pipeline signal derived from insight engine feedback loop */
+export interface PipelineSignal {
+  type: 'suggested_brief' | 'refresh_suggestion';
+  pageUrl?: string;
+  pageTitle?: string;
+  keyword?: string;
+  detail: string;
+  insightId: string;
+  impactScore: number;
+}
+
 /** Summary counts for the pill badges on Overview */
 export interface SummaryCount {
   label: string;

@@ -9,30 +9,12 @@ import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { StrategySignal, PipelineSignal } from '../shared/types/insights.js';
 
 const log = createLogger('insight-feedback');
 
-// ── Signal types ──────────────────────────────────────────────────
-
-export interface StrategySignal {
-  type: 'momentum' | 'misalignment' | 'content_gap';
-  keyword: string;
-  pageUrl?: string;
-  pageTitle?: string;
-  detail: string;
-  insightId: string;
-  impactScore: number;
-}
-
-export interface PipelineSignal {
-  type: 'suggested_brief' | 'refresh_suggestion';
-  pageUrl?: string;
-  pageTitle?: string;
-  keyword?: string;
-  detail: string;
-  insightId: string;
-  impactScore: number;
-}
+// Re-export signal types from shared boundary for backward compatibility
+export type { StrategySignal, PipelineSignal };
 
 // ── Orchestrator ──────────────────────────────────────────────────
 
