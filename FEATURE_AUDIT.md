@@ -1,6 +1,8 @@
-# Asset Dashboard — Feature Audit
+# hmpsn.studio — Platform Feature Audit
 
-A brief value assessment of every feature in the platform, covering what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **252 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+
+> **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
@@ -966,27 +968,6 @@ A brief value assessment of every feature in the platform, covering what it does
 
 ---
 
-## Summary
-
-| Category | Feature Count | Primary Value Driver |
-|----------|:---:|---|
-| SEO & Technical | 12 | Audit, fix, and optimize faster than manual tools |
-| Analytics & Tracking | 5 | Unified data view replaces platform-hopping |
-| Content & Strategy | 8 | Strategy → brief → AI post generation → review → delivery pipeline + client feedback + participation |
-| Client Communication | 8 | Structured workflows + automated reports + expanded notifications + feedback widget |
-| Client Self-Service | 10 | 24/7 data access, onboarding, plans, cart, order tracking |
-| AI & Intelligence | 5 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness |
-| Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
-| Security | 1 | Helmet, HTTPS, rate limiting, input sanitization |
-| Monetization | 1 | Stripe Checkout, admin settings, payment tracking, trials, encrypted config |
-| Platform & UX | 10 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage |
-| Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 5 | Server refactor (56 route modules + 3 shared modules + server module splits), frontend component decomposition (11 extracted directories), React Query migration (4 phases + App.tsx shell shipped) |
-
-**71 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
-
----
-
 ## Future Additions
 
 Items to revisit as budget/tier upgrades allow or when priorities shift.
@@ -1289,13 +1270,41 @@ When the user asks to update this document with recent features, follow this pro
 ### 80. AEO — Answer Engine Optimization
 **What it does:** Comprehensive Answer Engine Optimization system shipped as Sprint H, driven by beta client feedback. Three feature groups:
 
-**1. AEO Trust Audit (8 new checks in `seo-audit.ts`):** Per-page checks for author/reviewer attribution (meta tag, Person schema, byline classes, "reviewed by" patterns), last-updated date detection (dateModified schema, visible date text, `<time>` elements), answer-first content structure (flags generic intros after H1 — "Welcome to…", "Are you looking for…"), FAQ content without FAQPage schema, hidden content behind accordions/tabs/collapsed sections (>500 chars behind display:none/aria-hidden), citation/reference density (two-tier: zero external citations AND links without authority domains like .gov/.edu/pubmed/ADA/NIH), dark pattern detection (autoplay media, aggressive modal overlays). Site-wide check for missing trust pages (/about, /contact) with healthcare recommendations (/editorial-policy, /corrections, /medical-review-board).
+**Agency value:** Improves platform functionality and team efficiency.
 
-**2. Schema Suggester Expansion (`schema-suggester.ts`):** Healthcare schema types (MedicalBusiness, Dentist, Physician, MedicalProcedure with procedureType/howPerformed/preparation/followup), HowTo for procedural content, Dataset schema for data-heavy pages, author + reviewedBy Person with credentials on all Article/BlogPosting schemas, sameAs entity linking on Organization (Google Business, LinkedIn, Yelp, association profiles — only from actual page content, never fabricated). **Knowledge Base integration:** `buildSchemaContext()` in `helpers.ts` now reads workspace `knowledgeBase` field + `knowledge-docs/` folder files (truncated to 4000 chars) and injects into the schema AI prompt as BUSINESS KNOWLEDGE BASE. Schema AI can now use staff credentials, locations, social profiles, and association memberships from the KB to enrich Organization, Physician, LocalBusiness, and sameAs schemas — without needing that data on every page's HTML.
+**Client value:** Better platform experience.
 
-**3. Content Brief & Writing Rules Enhancement (`content-brief.ts`, `content-posts.ts`):** AEO rules block in brief generation prompt (answer-first layout, citation density targets, definition block guidance, comparison table requirements, FAQ quality rules, author/date checklist items). Three new AEO-optimized page types: provider-profile (Physician schema, credential-forward, encyclopedic), procedure-guide (MedicalProcedure schema, citation-dense, definition blocks, comparison tables, indications/contraindications/costs/risks/alternatives), pricing-page (Dataset schema, methodology section required, measurable fields only). Citation-worthy writing rules added to WRITING_QUALITY_RULES: claim discipline, evidence framing, encyclopedic neutral tone for medical content, definition block pattern, comparison content rules.
+**Mutual:** Compound improvements across the platform.
 
-**4. AEO Recommendation Engine (`recommendations.ts`):** All 8 AEO audit checks now flow into the existing Recommendation Engine as a dedicated `aeo` RecType. Custom insight text generators for each AEO check explain *why* each issue matters for AI visibility (with traffic-aware variants showing clicks at risk). `aeo-author`, `aeo-answer-first`, and `aeo-trust-pages` added to CRITICAL_CHECKS — these become "Fix Now" recommendations on high-traffic pages. AEO product mapping enables purchasable fix upsells: `aeo_page_review` ($99) and `aeo_site_review` ($499, 5+ pages).
+
+### 1. AEO Trust Audit (8 new checks in `seo-audit.ts`):** Per-page checks for author/reviewer attribution (meta tag, Person schema, byline classes, "reviewed by" patterns), last-updated date detection (dateModified schema, visible date text, `<time>` elements), answer-first content structure (flags generic intros after H1 — "Welcome to…", "Are you looking for…"), FAQ content without FAQPage schema, hidden content behind accordions/tabs/collapsed sections (>500 chars behind display:none/aria-hidden), citation/reference density (two-tier: zero external citations AND links without authority domains like .gov/.edu/pubmed/ADA/NIH), dark pattern detection (autoplay media, aggressive modal overlays). Site-wide check for missing trust pages (/about, /contact) with healthcare recommendations (/editorial-policy, /corrections, /medical-review-board).
+
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 2. Schema Suggester Expansion (`schema-suggester.ts`):** Healthcare schema types (MedicalBusiness, Dentist, Physician, MedicalProcedure with procedureType/howPerformed/preparation/followup), HowTo for procedural content, Dataset schema for data-heavy pages, author + reviewedBy Person with credentials on all Article/BlogPosting schemas, sameAs entity linking on Organization (Google Business, LinkedIn, Yelp, association profiles — only from actual page content, never fabricated). **Knowledge Base integration:** `buildSchemaContext()` in `helpers.ts` now reads workspace `knowledgeBase` field + `knowledge-docs/` folder files (truncated to 4000 chars) and injects into the schema AI prompt as BUSINESS KNOWLEDGE BASE. Schema AI can now use staff credentials, locations, social profiles, and association memberships from the KB to enrich Organization, Physician, LocalBusiness, and sameAs schemas — without needing that data on every page's HTML.
+
+**Agency value:** Better structured data quality with less manual effort. Automated processes reduce schema deployment time.
+
+**Client value:** Richer search result appearances and better Google understanding of site structure.
+
+**Mutual:** Higher-quality structured data drives better search visibility for both sides.
+
+
+### 3. Content Brief & Writing Rules Enhancement (`content-brief.ts`, `content-posts.ts`):** AEO rules block in brief generation prompt (answer-first layout, citation density targets, definition block guidance, comparison table requirements, FAQ quality rules, author/date checklist items). Three new AEO-optimized page types: provider-profile (Physician schema, credential-forward, encyclopedic), procedure-guide (MedicalProcedure schema, citation-dense, definition blocks, comparison tables, indications/contraindications/costs/risks/alternatives), pricing-page (Dataset schema, methodology section required, measurable fields only). Citation-worthy writing rules added to WRITING_QUALITY_RULES: claim discipline, evidence framing, encyclopedic neutral tone for medical content, definition block pattern, comparison content rules.
+
+**Agency value:** Better structured data quality with less manual effort. Automated processes reduce schema deployment time.
+
+**Client value:** Richer search result appearances and better Google understanding of site structure.
+
+**Mutual:** Higher-quality structured data drives better search visibility for both sides.
+
+
+### 4. AEO Recommendation Engine (`recommendations.ts`):** All 8 AEO audit checks now flow into the existing Recommendation Engine as a dedicated `aeo` RecType. Custom insight text generators for each AEO check explain *why* each issue matters for AI visibility (with traffic-aware variants showing clicks at risk). `aeo-author`, `aeo-answer-first`, and `aeo-trust-pages` added to CRITICAL_CHECKS — these become "Fix Now" recommendations on high-traffic pages. AEO product mapping enables purchasable fix upsells: `aeo_page_review` ($99) and `aeo_site_review` ($499, 5+ pages).
 
 **Agency value:** Every audit now surfaces AEO opportunities alongside traditional SEO issues as structured, prioritized recommendations. Content briefs automatically produce LLM-citeable content structure. Schema generation handles healthcare verticals natively and enriches from the knowledge base. The platform doesn't just optimize for Google — it optimizes for ChatGPT, Perplexity, and every AI answer engine.
 
@@ -2037,334 +2046,864 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
-## Summary
+## Platform Features — Continued
 
-| Category | Feature Count | Primary Value Driver |
-|----------|:---:|---|
-| SEO & Technical | 22 | Audit, fix, and optimize faster than manual tools + AEO trust signals + change impact tracking + content decay detection + site architecture planner + schema coverage/priority/impact tracking |
-| Analytics & Tracking | 7 | Unified data view replaces platform-hopping + AI time-saved tracking |
-| Content & Strategy | 41 | Strategy → brief → AI post generation → review → delivery pipeline + audit-to-request + not-yet-ranking action plan + version history + review checklist + content calendar + content templates + keyword pre-assignment + content matrices + keyword recommendations + cannibalization detection + content planner export + client review flow + LLMs.txt generator + matrix status timeline + title/meta variants + outline-only regen + voice scoring + client keyword requests + SERP targeting + strategy diff + ROI quick wins |
-| Client Communication | 11 | Structured workflows + automated reports + expanded notifications + feedback widget + email capture funnel + audit completion email + content plan review alerts |
-| Client Self-Service | 18 | 24/7 data access, onboarding, plans, cart, order tracking, glossary, questionnaire, ROI upgrade prompts, shareable report permalinks, content pipeline status cards + post-publish performance |
-| AI & Intelligence | 7 | Full-spectrum AI advisor + revenue engine + knowledge base + recommendations engine + context completeness + usage dashboard + AEO page review |
-| Auth & Access Control | 3 | Internal user accounts, workspace ACL, client user accounts |
-| Security | 2 | Helmet, HTTPS, rate limiting, input sanitization, Turnstile CAPTCHA, credential stuffing protection, weekly npm audit |
-| Monetization | 3 | Stripe Checkout + Subscriptions, admin settings, payment tracking, trials, encrypted config, billing portal, recurring content subscriptions |
-| Platform & UX | 21 | Design system, styleguide, cross-linking, sales tooling, roadmap, cockpit, workspace home, page state model, work orders, request linkage, admin UX overhaul, landing page, mobile guard, Recharts, portal OG/favicon, sidebar color accents, AI Usage standalone page, Growth Opportunities reframe, strategy→planner bridge |
-| Data Architecture | 3 | PageEditState model, cross-store writes, activity feed for client actions |
-| Architecture | 8 | Server refactor (48 route modules + 3 shared modules), frontend component decomposition, React Router, typed API client, shared types, analytics data layer + API client consolidation, centralized query keys + WS invalidation + GA4 base hook, SEO data provider abstraction layer |
-| Infrastructure | 7 | Structured logging (Pino), Sentry error monitoring, CI/CD pipeline, graceful shutdown, off-site backups (S3 + integrity verification), E2E tests, job persistence, anomaly deploy guard |
-
-**184 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
-
-Current feature count: **184**. Last updated: March 2026 (DataForSEO provider + SEO data abstraction layer).
-
-### Recent Additions (March 2026)
-
-**116. Brief Regeneration with Feedback**
+### 116. Brief Regeneration with Feedback
 **What it does:** Regenerate an existing content brief with user instructions. AI receives the previous brief + feedback, produces a refined version. New brief gets a new ID — original is preserved for version history. Purple "Regenerate" button in BriefDetail with inline feedback textarea.
 **Files:** `server/content-brief.ts` (`regenerateBrief`), `server/routes/content-briefs.ts`, `src/components/briefs/BriefDetail.tsx`, `src/components/ContentBriefs.tsx`
 
-**117. Client Brief Export (Download)**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 117. Client Brief Export (Download)
 **What it does:** Clients can download content briefs as branded HTML files from the content tab. Public endpoint `GET /api/public/content-brief/:wsId/:briefId/export` returns the brief rendered via `renderBriefHTML` with Content-Disposition attachment header.
 **Files:** `server/routes/public-content.ts`, `src/components/client/ContentTab.tsx`
 
-**118. Data Export / Portability (CSV/JSON)**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 118. Data Export / Portability (CSV/JSON)
 **What it does:** Admin can export workspace data (content briefs, content requests, keyword strategy, activity log, payments) as CSV or JSON. "Data Export" tab added to Workspace Settings with download buttons for each dataset.
 **Files:** `server/routes/data-export.ts` (new), `server/app.ts`, `src/components/WorkspaceSettings.tsx`
 
-**119. Revenue Analytics Dashboard**
+**Agency value:** Faster navigation and better operational visibility.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** Reduced friction in daily platform usage.
+
+
+### 119. Revenue Analytics Dashboard
 **What it does:** Admin-only dashboard showing total revenue, current month vs previous month, revenue by client, revenue by product type, monthly trend chart (12 months), and recent transactions table. Accessible via DollarSign icon in sidebar utility bar and emerald "Revenue" button in Command Center header at `/revenue`. Only displays webhook-confirmed paid transactions.
 **Files:** `server/routes/revenue.ts` (new), `server/payments.ts` (`listAllPayments`), `server/app.ts`, `src/components/RevenueDashboard.tsx` (new), `src/components/WorkspaceOverview.tsx` (header button), `src/App.tsx`, `src/routes.ts`
 
-**120. Sidebar Tool Tooltips**
+**Agency value:** Better visibility into platform economics and ROI metrics.
+
+**Client value:** Actionable intelligence derived from real search and traffic data.
+
+**Mutual:** Data-driven decisions backed by automated analysis.
+
+
+### 120. Sidebar Tool Tooltips
 **What it does:** Every sidebar navigation item now has a descriptive tooltip (via `title` attribute) explaining what that tool does. Descriptions added to all items across Analytics, Site Health, SEO, and Content groups.
 **Files:** `src/App.tsx` (navGroups type + desc field + title rendering)
 
-**121. WorkspaceHome Data Freshness Indicators**
+**Agency value:** Faster navigation and better operational visibility.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** Reduced friction in daily platform usage.
+
+
+### 121. WorkspaceHome Data Freshness Indicators
 **What it does:** Dashboard header shows relative "last updated" timestamp (e.g. "Just now", "5m ago") with Clock icon. Turns amber when data is >1 hour stale. Manual "Refresh" button re-fetches all data sources. 30-second tick keeps relative time accurate.
 **Files:** `src/components/WorkspaceHome.tsx`
 
-**122. Consistent Back Navigation**
+**Agency value:** Faster navigation and better operational visibility.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** Reduced friction in daily platform usage.
+
+
+### 122. Consistent Back Navigation
 **What it does:** ArrowLeft back button appears in breadcrumb bar when viewing a workspace tab (not home). Clicking it navigates back to workspace home. Provides consistent spatial navigation alongside the breadcrumb hierarchy.
 **Files:** `src/App.tsx`
 
-**123. Brand Documents Upload UI**
+**Agency value:** Faster navigation and better operational visibility.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** Reduced friction in daily platform usage.
+
+
+### 123. Brand Documents Upload UI
 **What it does:** Drag-and-drop upload zone for .txt/.md brand documents in the Brand & AI hub. Files are stored in the workspace's `brand-docs/` folder and automatically injected into all AI prompts via `readBrandDocs()`. Supports upload, list with file sizes, and delete with hover-reveal X button.
 **Files:** `server/routes/brand-docs.ts` (new), `server/app.ts`, `src/components/BrandHub.tsx`
 
-**124. SEO Education Tips (Per-Tab First-Visit)**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 124. SEO Education Tips (Per-Tab First-Visit)
 **What it does:** Contextual SEO education tips appear on first visit to each client dashboard tab. Each tip explains what the tab shows and why it matters, with an expandable "Learn more" section for SEO basics. Dismissible with "Got it" — state persisted in localStorage per workspace+tab. Covers overview, performance, health, strategy, content, and ROI tabs.
 **Files:** `src/components/client/SeoEducationTip.tsx` (new), `src/components/ClientDashboard.tsx`
 
-**125. Bundle Optimization & Dependency Audit**
+**Agency value:** Fewer support questions. Clients learn SEO concepts in context.
+
+**Client value:** Plain-language explanations for every metric and tool.
+
+**Mutual:** Knowledge transfer happens passively through platform usage.
+
+
+### 125. Bundle Optimization & Dependency Audit
 **What it does:** Verified Lucide tree-shaking (each icon individually code-split), added vendor chunk splitting via `manualChunks` in Vite config (react-vendor, stripe), and lazy-loaded StripePaymentForm so the Stripe SDK only loads when a payment is initiated. Main bundle split from 366 kB into 188 kB (app) + 190 kB (react-vendor) for independent caching. ClientDashboard reduced from 379 → 359 kB by extracting Stripe into a 13 kB lazy chunk. Total JS unchanged (~1,947 kB) but initial page load and long-term caching significantly improved.
 **Files:** `vite.config.ts` (manualChunks), `src/components/ClientDashboard.tsx` (lazy Stripe import)
 
-**126. Lightweight Backlink Profile Overview**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 126. Lightweight Backlink Profile Overview
 **What it does:** Domain-level backlink profile section in the Strategy tab powered by SEMRush Backlinks API. Shows total backlinks, referring domains, follow/nofollow ratio, link types (text/image), and a sortable table of top 15 referring domains with backlink counts and first/last seen dates. Domains are clickable external links. Data cached for 48 hours. Gracefully handles missing SEMRush config with an informational message.
 **Files:** `server/semrush.ts` (`getBacklinksOverview`, `getTopReferringDomains`), `server/routes/backlinks.ts` (new), `server/app.ts`, `src/components/strategy/BacklinkProfile.tsx` (new), `src/components/KeywordStrategy.tsx`
 
-**127. Bulk Page Operations in SEO Editor**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 127. Bulk Page Operations in SEO Editor
 **What it does:** Multi-select pages in the SEO Editor and apply bulk operations. Two modes: (1) Pattern Apply — append/prepend text to selected pages' titles or descriptions with instant preview and length-aware truncation. (2) Bulk AI Rewrite — concurrent AI rewriting (3 at a time) with dry-run preview showing old→new diff for each page before committing. Toolbar appears when pages are selected with field picker, action buttons, and progress bar during application. Both modes push changes to Webflow via the existing SEO update API.
 **Files:** `server/routes/webflow-seo.ts` (2 new POST routes: `seo-pattern-apply`, `seo-bulk-rewrite`), `shared/types/workspace.ts` (extended `source` union), `src/components/SeoEditor.tsx` (bulk state, handlers, toolbar + preview UI)
 
-**128. Competitive Intelligence Hub**
+**Agency value:** Faster operations, lower API costs, and more reliable infrastructure.
+
+**Client value:** N/A — internal improvement. Indirectly improves platform speed and reliability.
+
+**Mutual:** Better performance and lower costs compound across every user and every operation.
+
+
+### 128. Competitive Intelligence Hub
 **What it does:** SEMRush-powered competitive intelligence section in the Strategy tab. Fetches domain overview metrics (organic traffic, keywords, traffic value), backlink data, keyword gaps, and top keywords for your domain vs up to 3 competitors — all in parallel. UI shows stat cards for your domain, expandable competitor panels with side-by-side comparison bars (traffic, keywords, referring domains, traffic value), competitor top keywords table, and a collapsible keyword gaps section sorted by traffic potential. Requires SEMRush in "full" mode with competitor domains configured.
 **Files:** `server/semrush.ts` (`getDomainOverview` — new `domain_ranks` API function), `server/routes/semrush.ts` (new `GET /api/semrush/competitive-intel/:workspaceId`), `src/components/strategy/CompetitiveIntel.tsx` (new), `src/components/KeywordStrategy.tsx`
 
-**129. AI Internal Linking Engine Enhancements**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 129. AI Internal Linking Engine Enhancements
 **What it does:** Extends the internal linking analysis with orphan page detection and per-page link health scoring. Each page gets a 0-100 health score based on inbound + outbound link counts. Orphan pages (zero inbound links, excluding homepage) are flagged with a dedicated expandable warning section showing path, title, and outbound count. Frontend adds: 5-column stat bar (High/Medium/Low priority + Orphan Pages + Avg Link Score), collapsible orphan pages panel, list/grouped view toggle (group suggestions by source page for batch implementation), and one-click copy-to-clipboard for HTML link snippets (`<a href="...">anchor</a>`).
 **Files:** `server/internal-links.ts` (`PageLinkHealth` interface, orphan detection, per-page scoring), `src/components/InternalLinks.tsx` (orphan UI, grouped view, copy buttons)
 
-**133. Pattern-Based Audit Suppression**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 133. Pattern-Based Audit Suppression
 **What it does:** Extends the audit suppression system to support glob-pattern matching (e.g., `blog/*`, `resources/*`) in addition to per-page exact-slug suppressions. When viewing an audit issue on a page with a path prefix (e.g., `blog/some-post`), the overflow menu now shows a "Suppress for blog/*" button that creates a single pattern-based suppression matching all pages under that prefix. Pattern suppressions are applied both server-side (in `applySuppressionsToAudit`) and client-side (in the `effectiveData` memo) using a `globToRegex` converter. The suppression badge distinguishes "X page + Y pattern suppressed". Unsuppress-all properly handles both types.
 **Files:** `server/helpers.ts` (`globToRegex`, `AuditSuppression.pagePattern`, updated `applySuppressionsToAudit`), `server/routes/workspaces.ts` (POST/DELETE support `pagePattern`), `shared/types/workspace.ts` (`pagePattern` field), `src/components/SeoAudit.tsx` (`suppressPattern` handler, pattern-aware `effectiveData` memo, updated unsuppress-all), `src/components/audit/AuditIssueRow.tsx` (`onSuppressPattern` prop, "Suppress for prefix/*" menu item), `src/components/audit/AuditBatchActions.tsx` (pattern-aware badge display)
 
-**131. SEO Audit: Visibility-Aware Content Checks**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 131. SEO Audit: Visibility-Aware Content Checks
 **What it does:** Adds a `stripHiddenElements()` pre-processing step to the SEO audit engine that removes elements hidden via `display:none`, `visibility:hidden`, or Webflow's `w-condition-invisible` class before running content checks. This eliminates false-positive "duplicate H1" warnings on pages with conditional CMS hero sections (e.g., two hero blocks where only one is visible based on resource type). Also improves accuracy of heading hierarchy, img-alt, content length, internal links, link text, and AEO answer-first checks by only analyzing visible content. Technical/head checks (canonical, viewport, robots, schema, HTML size, etc.) still run against full HTML.
 **Files:** `server/seo-audit-html.ts` (`stripHiddenElements` — new export), `server/audit-page.ts` (imports `stripHiddenElements`, creates `visibleHtml` before content checks)
 
-**137. AEO Review: Full-Site Page Discovery (Static + CMS)**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 137. AEO Review: Full-Site Page Discovery (Static + CMS)
 **What it does:** Fixes the AEO page analysis batch review to include CMS collection pages (blog posts, resources, etc.), not just Webflow static pages. Previously, the batch route only pulled pages from the audit snapshot that already had `aeo-` issues — if the sitemap failed during the audit or CMS pages had no existing AEO issues, they were silently excluded. Now the route discovers pages directly: (1) Static pages from the Webflow API, (2) CMS/collection pages from sitemap.xml. Pages are prioritized by content-type (blog/articles rank highest via `isContentPage()`) and existing AEO issue count, then the top N are sent for AI review. Falls back to audit snapshot pages if discovery fails.
 **Files:** `server/routes/aeo-review.ts` (rewrote batch `/site` route with `listPages` + `discoverCmsUrls` discovery, priority scoring, fallback logic)
 
-**135. Noindex Page Awareness in SEO Audit**
+**Agency value:** Improves platform functionality and team efficiency.
+
+**Client value:** Better platform experience.
+
+**Mutual:** Compound improvements across the platform.
+
+
+### 135. Noindex Page Awareness in SEO Audit
 **What it does:** Pages marked with `<meta name="robots" content="noindex">` are now detected and handled specially: (1) Their issues are excluded from the site health score average — only indexed pages count. (2) The noindex detection issue itself is downgraded from `warning` to `info` severity (no score impact). (3) A "noindex" badge appears next to the page name in the audit list. (4) When expanded, a banner explains: "This page is marked noindex — issues listed below won't affect crawlability or search rankings and are excluded from the site health score." Issues are still shown for visibility so you can fix them if you later re-index the page.
 **Files:** `server/audit-page.ts` (`noindex` flag on `PageSeoResult`, detection + info severity), `server/seo-audit.ts` (exclude noindex from `siteScore` average), `server/helpers.ts` (exclude noindex from suppression recalc), `src/components/audit/types.ts` (`noindex?: boolean` on interface), `src/components/SeoAudit.tsx` (noindex badge, expanded banner, exclude from `effectiveData` score)
 
-**139. Schema Generator: Enhanced Validation & Auto-Fix**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 139. Schema Generator: Enhanced Validation & Auto-Fix
 **What it does:** Adds comprehensive post-generation validation and auto-fix to the schema generator, catching issues that previously slipped through: (1) **Invalid property detection** — flags non-existent Schema.org properties commonly hallucinated by AI (`industry`, `founded`, `headquarters` on Organization; `features`, `benefits` on Service; etc.) and auto-strips them. (2) **Cross-reference validation** — verifies that Service→provider, WebPage→isPartOf, Article→publisher references point to real nodes in the @graph. (3) **Phone format validation** — detects malformed telephone values (missing separators, wrong digit count) and auto-removes them. (4) **Keyword-stuffing detection** — flags serviceType arrays with >3 entries and auto-trims to 3. (5) **Recommended field warnings** — surfaces missing-but-recommended fields (logo/sameAs on Organization, provider on Service, isPartOf on WebPage, etc.). (6) **Enhanced AI prompt** — 6 new rules instructing GPT to avoid invalid properties, use proper cross-references, format phone numbers correctly, and keep serviceType concise.
 **Files:** `server/schema-suggester.ts` (added `RECOMMENDED_FIELDS`, `CROSS_REF_RULES`, `INVALID_PROPERTIES` maps, `isValidPhone()`, `autoFixSchema()`, enhanced `validateGraphNode()` with 6 validation categories, updated AI prompt with rules 21-26)
 
-**138. AI Page Rewriter — Full-Page Split Chat**
+**Agency value:** Better structured data quality with less manual effort. Automated processes reduce schema deployment time.
+
+**Client value:** Richer search result appearances and better Google understanding of site structure.
+
+**Mutual:** Higher-quality structured data drives better search visibility for both sides.
+
+
+### 138. AI Page Rewriter — Full-Page Split Chat
 **What it does:** A dedicated full-page AI rewriting tool with a two-pane layout: chat on the left, page content on the right. Load any page by URL — the tool fetches it, extracts content/headings/audit issues, and displays them in the content pane. Chat with GPT-4.1 to get specific rewrite suggestions, AEO optimizations, FAQ sections, heading improvements, and more. The AI has full context: page content, audit issues, keyword strategy, brand voice, knowledge base, and a new **Rewriting Playbook** — configurable per-workspace instructions for how pages should be rewritten (AEO rules, structure preferences, formatting standards). Quick-prompt buttons for common rewrite tasks. Markdown rendering in chat responses with copy-to-clipboard. Conversation memory via chat sessions.
 **Files:** `server/routes/rewrite-chat.ts` (new — POST `/api/rewrite-chat/:workspaceId` chat endpoint + POST `.../load-page` content loader), `server/db/migrations/011-rewrite-playbook.sql` (new — adds `rewrite_playbook` column to workspaces), `shared/types/workspace.ts` (`rewritePlaybook` field), `server/workspaces.ts` (`WorkspaceRow` + `rowToWorkspace` + `columnMap`), `server/app.ts` (mount route), `src/components/PageRewriteChat.tsx` (new — full-page two-pane component), `src/components/BrandHub.tsx` (Rewriting Playbook section with textarea + save), `src/routes.ts` (`rewrite` Page type), `src/App.tsx` (lazy load, sidebar nav, routing)
 
-**136. Fix Intermittent Suppress Button**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 136. Fix Intermittent Suppress Button
 **What it does:** Fixes the single-page "Suppress Issue" button in the audit overflow menu sometimes not firing. Root cause: click events could be swallowed during React re-renders before the handler executed. Fix: (1) All overflow menu item buttons now use `onMouseDown` with `e.stopPropagation()` instead of `onClick` — `mousedown` fires before any potential re-render can unmount the element. (2) Suppress callbacks now close the menu synchronously (`setActionMenuKey(null)`) before firing the async API call, matching the pattern used by "Send to Client" and "Add to Tasks" buttons.
 **Files:** `src/components/audit/AuditIssueRow.tsx` (`OverflowMenu` buttons → `onMouseDown`, suppress callback wrappers close menu synchronously)
 
-**134. Industry-Standard Audit Scoring & Page-Type-Aware Checks**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 134. Industry-Standard Audit Scoring & Page-Type-Aware Checks
 **What it does:** Two improvements to the SEO audit scoring system: (1) Rebalances score deduction weights to match industry tools like SEMRush and Ahrefs — info/notice issues now have zero score impact, warning and error deductions are ~50% softer. A well-maintained site now scores 80-95 instead of 50-65. New weights: critical error -15 (was -20), other error -10 (was -12), critical warning -5 (was -10), moderate warning -3 (was -6), other warning -2 (was -4), info 0 (was -1). (2) Adds page-type detection via `isContentPage(slug)` — AEO editorial checks (author attribution, last-updated date, answer-first structure, external citations) now only run on content/article pages (blog/, articles/, resources/, guides/, etc.), not on homepages or service pages where they're irrelevant noise. Universal AEO checks (FAQ schema, hidden content, dark patterns) still run everywhere.
 **Files:** `server/audit-page.ts` (`isContentPage()` export, AEO check gating, new scoring weights), `server/helpers.ts` (matching weights in `applySuppressionsToAudit`), `src/components/audit/types.ts` (scoring weight comments), `src/components/SeoAudit.tsx` (matching weights in `effectiveData` memo)
 
-**132. Fix Cross-Workspace Audit Data Leakage**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 132. Fix Cross-Workspace Audit Data Leakage
 **What it does:** Fixes a bug where the admin SeoAudit page showed the same audit data (Swish Dental) on all workspaces. Root cause: the job-restoration logic in `SeoAudit.tsx` searched the global `jobs` array for any completed `seo-audit` job without filtering by `workspaceId`. Now both the `existingJob` and `runningJob` lookups filter by `j.workspaceId === workspaceId` so each workspace only sees its own audit jobs.
 **Files:** `src/components/SeoAudit.tsx` (added `workspaceId` filter to job lookups at lines 362-368)
 
-**130. Sitemap-Based Link Discovery + Live Domain UI**
+**Agency value:** Improves audit accuracy and reliability. More actionable results mean faster client value delivery.
+
+**Client value:** More accurate site health data and recommendations. Fewer false positives mean clearer action items.
+
+**Mutual:** Trust in the audit system — scores and recommendations reflect reality.
+
+
+### 130. Sitemap-Based Link Discovery + Live Domain UI
 **What it does:** Rewrites the internal links page discovery to use `/sitemap.xml` as the primary source, catching all CMS collection pages that the Webflow API misses. Falls back to Webflow API + crawl-based discovery if sitemap is unavailable. Caps at 100 pages for cost control. Adds browser-like User-Agent headers so Cloudflare doesn't block fetches from cloud IPs. Fixes double-protocol bug where liveDomain with `https://` prefix got another `https://` prepended. Adds `attemptedPageCount` tracking and context-aware diagnostic messaging (amber warnings for fetch failures vs green "no gaps" for genuine success). Adds editable Live Domain field to Workspace Settings → Connections tab so users can see and correct the domain used for crawling. Extracts real `<title>` tags from fetched pages for better naming.
 **Files:** `server/internal-links.ts` (`fetchSitemapUrls`, `FETCH_HEADERS`, `attemptedPageCount`, baseUrl normalization), `src/components/InternalLinks.tsx` (diagnostic messaging), `src/components/settings/ConnectionsTab.tsx` (Live Domain field), `src/components/WorkspaceSettings.tsx` (saveLiveDomain prop)
 
-**133. SEO Editor Per-Page Send to Client**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 133. SEO Editor Per-Page Send to Client
 **What it does:** Adds a per-page "Send to Client" button in SEO Editor alongside "Save to Webflow". When the admin edits a page's SEO title or description, they can send just that page's changes to the client approval queue without batch-selecting. Also renames the bulk approval button from "Send for Approval" to "Send to Client" for consistency with Schema Suggester. Uses the existing `/api/approvals/:workspaceId` endpoint with changed field detection.
 **Files:** `src/components/SeoEditor.tsx` (sendPageToClient function, sendingPage/sentPage state), `src/components/editor/PageEditRow.tsx` (Send to Client button + new props), `src/components/editor/ApprovalPanel.tsx` (label rename)
 
-**134. Editable Workspace Name**
+
+**Agency value:** Send individual page changes to the client approval queue without batch-selecting. Faster workflow for one-off metadata fixes.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** More granular approval workflow — single-page changes don't need to wait for a batch.
+
+### 134. Editable Workspace Name
 **What it does:** Workspace Settings header now shows an inline-editable workspace name. Hover reveals a pencil icon; click to enter edit mode with Enter/Escape keyboard support and check/X button controls. Saves via PATCH `/api/workspaces/:id` with `{ name }`. Useful for removing unwanted suffixes (e.g. "AI") from workspace names that were auto-populated from Webflow site names.
 **Files:** `src/components/WorkspaceSettings.tsx` (editingName/nameDraft/savingName state, inline edit UI with Pencil/Check/X icons)
 
-**135. Schema Generator Page Type Selector**
+
+**Agency value:** Fix workspace names that were auto-populated with unwanted suffixes from Webflow. Inline editing without navigating to a settings page.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** Clean workspace names improve the professionalism of the Command Center.
+
+### 135. Schema Generator Page Type Selector
 **What it does:** Three improvements to the Schema Generator: (1) All pages auto-load on mount so users see the full page list immediately without clicking "Single Page". (2) Each page row has a page type dropdown (Auto-detect, Homepage, Service, Pillar, Persona, Blog, About, Contact, Location, Product, Landing, FAQ, Case Study) that the user can set before generating schemas. (3) The selected page type is passed to the backend AI prompt as a "Page Type" hint, enabling more accurate schema generation — e.g. selecting "Service Page" ensures Service schema nodes, "FAQ" ensures FAQPage schema. Backend adds `SchemaPageType` type and `pageType` field to `SchemaContext`.
 **Files:** `server/schema-suggester.ts` (SchemaPageType type, PAGE_TYPE_LABELS, pageType in SchemaContext + AI prompt), `server/routes/webflow-schema.ts` (accepts pageType in single-page endpoint), `src/components/SchemaSuggester.tsx` (pageTypes state, auto-load useEffect, initial view with page list + type selectors), `src/components/schema/PagePicker.tsx` (InitialPagePicker no longer used)
 
-**137. Schema Post-Processing Pipeline (Content Verification + AI Auto-Fix)**
+
+**Agency value:** Override AI auto-detection with explicit page type hints. All pages load on mount for faster schema generation workflow.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** More accurate schema generation from explicit page type context. Eliminates 'why did the AI generate Service schema on my blog?' confusion.
+
+### 137. Schema Post-Processing Pipeline (Content Verification + AI Auto-Fix)
 **What it does:** Adds a 7-step post-processing pipeline to schema generation that eliminates hallucinated data and fixes structural errors without manual intervention. (1) Content Verification cross-checks all factual claims (emails, phones, addresses, opening hours, geo coordinates, sameAs URLs) against the actual page HTML — anything not found in the source content is automatically stripped. (2) Programmatic cross-reference injection guarantees WebSite.publisher, WebPage.isPartOf, WebPage.mainEntity, Service/SoftwareApplication.provider, and Article.publisher are always present via @id references. (3) AI Auto-Fix Loop sends the schema + validation errors back to GPT-4.1-mini for one targeted correction pass if fixable errors remain. Also hardened email extraction to reject package names (e.g. "lumious-components@1.0.6") and phone extraction to use visible text only (stripped of script/style tags). Anti-fragmentation rules prevent the AI from creating separate Service nodes for product features.
 **Files:** `server/schema-suggester.ts` (verifySchemaContent, injectCrossReferences, postProcessSchema pipeline, extractStructuredInfo hardening, prompt anti-fragmentation rules)
 
-**138. Unified Site Template for Schema Generation**
+
+**Agency value:** 7-step automated pipeline catches hallucinated data, fixes structural errors, and verifies facts against page HTML — all without manual intervention.
+
+**Client value:** N/A — admin-only improvement. Indirectly prevents broken schemas from reaching client sites.
+
+**Mutual:** Production-ready schemas with minimal manual review. Content verification prevents fabricated contact info from being published.
+
+### 138. Unified Site Template for Schema Generation
 **What it does:** Two-phase schema generation per Google best practices. Homepage generation produces full Organization node (name, description, logo, knowsAbout, sameAs) and WebSite node, which are saved as the "site template" in SQLite. Subsequent subpage generations load the template and replace AI-generated Organization/WebSite with minimal stubs (@id, name, url only). This ensures consistent company info across all pages, saves AI tokens, and follows Google's recommendation to put full Organization markup only on the homepage. Missing Organization, WebSite, and BreadcrumbList nodes are auto-injected when absent. Falls back to current behavior if no template is saved yet.
 **Files:** `server/db/migrations/012-schema-site-template.sql` (schema_site_templates table), `server/schema-store.ts` (saveSiteTemplate, getSiteTemplate), `server/schema-suggester.ts` (postProcessSchema template logic, injectCrossReferences node injection, prompt requirements 3-4 updated), `server/helpers.ts` (_siteId in buildSchemaContext)
 
-**136. Brand Name Resolution Fix**
+
+**Agency value:** Consistent Organization/WebSite info across all pages without redundant AI generation. Follows Google best practices for entity distribution.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves schema consistency on client sites.
+
+**Mutual:** Better structured data consistency + reduced AI token costs. Homepage gets full entities; subpages get efficient stubs.
+
+### 136. Brand Name Resolution Fix
 **What it does:** Fixes bug where Webflow's internal site name (e.g. "copy of Faros AI") was injected into AI-generated SEO titles, meta descriptions, and chat prompts instead of the actual business/workspace name. Introduces `getBrandName(ws)` helper that prioritizes `ws.name` over `ws.webflowSiteName` and strips "Copy of" prefix. Replaces all `webflowSiteName || name` patterns across 6 server files.
 **Files:** `server/workspaces.ts` (getBrandName helper), `server/routes/webflow-seo.ts`, `server/routes/jobs.ts`, `server/seo-audit.ts`, `server/admin-chat-context.ts`, `server/routes/public-analytics.ts`
 
-**140. Send to Client for Standalone Content Briefs**
+
+**Agency value:** AI-generated content now uses the actual business name instead of Webflow's internal site name. No more 'copy of Faros AI' in SEO titles.
+
+**Client value:** Correct brand name in all AI outputs — titles, descriptions, chat prompts, and generated content.
+
+**Mutual:** A small fix with outsized impact. Wrong brand names in SEO titles erode client trust instantly.
+
+### 140. Send to Client for Standalone Content Briefs
 **What it does:** Adds a "Send to Client" button on standalone content briefs (those not already linked to a content request). Clicking creates a linked content topic request with status `client_review` and sends an email notification. The button shows a loading spinner during the send operation and the brief's action bar updates after sending.
 **Files:** `server/routes/content-briefs.ts` (POST `/:briefId/send-to-client` endpoint), `src/components/ContentBriefs.tsx` (`handleSendToClient`, `sendingToClient` state), `src/components/briefs/BriefList.tsx` (prop passthrough), `src/components/briefs/BriefDetail.tsx` (Send to Client button with loading state)
 
-**141. Professional Branded Blog Post PDF Export**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 141. Professional Branded Blog Post PDF Export
 **What it does:** Adds a branded, print-ready HTML export for blog posts matching the content brief export styling. Includes HMPSN Studio logo, teal accent branding, key metrics strip (word count, target, sections, status), SEO search engine preview, table of contents, full post content with styled headings/blockquotes/tables/code, review checklist with pass/pending indicators, and a branded footer. Print-ready with `@page` rules, page break management, and a floating "Save as PDF" bar. Available via "Export PDF" button (teal-accented) in the PostEditor toolbar.
 **Files:** `server/post-export-html.ts` (new — `renderPostHTML`), `server/routes/content-posts.ts` (GET `/:postId/export/pdf` route), `src/components/PostEditor.tsx` (`exportPDF` function + button)
 
-**142. AI Auto-Review Checklist for Blog Posts**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 142. AI Auto-Review Checklist for Blog Posts
 **What it does:** Adds an "AI Pre-Check" button to the review checklist panel in PostEditor. When clicked, sends the post content to GPT-4.1-mini which evaluates each of the 6 checklist items (factual accuracy, brand voice, internal links, no hallucinations, meta optimization, word count target) and returns pass/fail with a brief reason. Items that pass are auto-checked. Each checklist item shows an "AI: Pass" (green) or "AI: Review" (amber) badge with the AI's reasoning below it. Failed items get an amber-highlighted explanation to guide the reviewer.
 **Files:** `server/routes/content-posts.ts` (POST `/:postId/ai-review` endpoint), `src/components/post-editor/ReviewChecklist.tsx` (`onRunAIReview` prop, `AIReviewResult` type, AI Pre-Check button, result badges/reasons), `src/api/content.ts` (`aiReview` method), `src/components/PostEditor.tsx` (wired `onRunAIReview` callback)
 
-**143. Page Type → Schema Type Mapping + Prompt Injection (D1)**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 143. Page Type → Schema Type Mapping + Prompt Injection (D1)
 **What it does:** Adds a deterministic `PAGE_TYPE_SCHEMA_MAP` constant that maps each `SchemaPageType` (homepage, service, blog, location, etc.) to recommended primary and secondary Schema.org types. When a page's type is known (not `'auto'`), the mapping is injected into the AI prompt as a `SCHEMA TYPE GUIDANCE` block, directing the model to focus on populating the recommended types with accurate properties rather than guessing which types to use. The `'auto'` mode remains unchanged — the AI decides types as before. The map is exported so other modules (D2, D3) can import it for template binding and hub page detection.
 **Files:** `server/schema-suggester.ts` (`PAGE_TYPE_SCHEMA_MAP` constant, `schemaTypeGuidance` injection in `aiGenerateUnifiedSchema()`)
 
-**144. Template → Schema Template Binding (D2)**
+
+**Agency value:** Deterministic mapping from page types to Schema.org types eliminates AI guesswork for typed pages. Foundation for template binding and hub detection.
+
+**Client value:** N/A — admin-only architectural improvement.
+
+**Mutual:** More accurate schema generation with lower AI token costs for explicitly typed pages.
+
+### 144. Template → Schema Template Binding (D2)
 **What it does:** Binds Schema.org types to content templates so matrix cells inherit expected schema types. Adds `schemaTypes?: string[]` to `ContentTemplate` and `expectedSchemaTypes?: string[]` to `MatrixCell`. When a template is created or updated, `schemaTypes` is auto-populated from `PAGE_TYPE_SCHEMA_MAP` based on the template's `pageType` (unless explicitly overridden). When matrix cells are generated, they inherit the template's schema types as `expectedSchemaTypes`. The CellDetailPanel UI displays purple badges for each expected schema type. A new `getSchemaTypesForTemplate()` helper is exported for use by D7 (pre-generation). A DB migration (017) adds the `schema_types` column to `content_templates`.
 **Files:** `shared/types/content.ts`, `src/components/matrix/types.ts`, `server/content-matrices.ts` (`getSchemaTypesForTemplate`, `generateCells` schema inheritance), `server/content-templates.ts` (auto-populate on create/update), `src/components/matrix/CellDetailPanel.tsx` (schema badge display), `server/db/migrations/017-template-schema-types.sql`
 
-**145. Hub Page → CollectionPage/ItemList Auto-Suggest (D3)**
+
+**Agency value:** Content templates automatically carry schema type expectations to matrix cells. Every planned page knows what structured data it should have before generation starts.
+
+**Client value:** N/A — admin-only feature. Purple badges show expected schema types on each cell.
+
+**Mutual:** Schema planning happens at template definition time, not after content is published.
+
+### 145. Hub Page → CollectionPage/ItemList Auto-Suggest (D3)
 **What it does:** Automatically detects hub pages (pages with 2+ existing child pages in the architecture tree) and injects `CollectionPage` schema with an `ItemList` of child page references. Adds a `getChildNodes()` helper to `site-architecture.ts` that finds a node by path and returns its direct children with content. In `injectCrossReferences()`, when the architecture tree is available, the current page's children are counted — if there are 2 or more existing child pages, a `CollectionPage` node is added to the `@graph` with `hasPart` listing each child as a `ListItem` with position, URL, and name. Only existing pages (not planned) are included. Gracefully skips if no architecture tree is available or if CollectionPage/ItemList already exists.
 **Files:** `server/site-architecture.ts` (`getChildNodes()` helper), `server/schema-suggester.ts` (hub page detection + CollectionPage injection in `injectCrossReferences()`)
 
-**146. Sibling/Parent-Child Relationship Enrichment (D5)**
+
+**Agency value:** Automatic CollectionPage/ItemList schema for hub pages with child content. Zero configuration — derived purely from the architecture tree.
+
+**Client value:** N/A — admin-only improvement.
+
+**Mutual:** Google understands the parent-child relationship between hub pages and their content. Better sitelinks and rich results.
+
+### 146. Sibling/Parent-Child Relationship Enrichment (D5)
 **What it does:** Uses the architecture tree to enrich WebPage schema nodes with structural relationships. Adds `getParentNode()`, `getSiblingNodes()`, and `getChildNodes()` helpers to `site-architecture.ts`. In `injectCrossReferences()`, when the architecture tree is available: (1) `isPartOf` is set to the actual parent page (overriding the generic WebSite reference) with full `@type`, `@id`, `name`, and `url`; (2) `relatedLink` is populated with up to 5 sibling page URLs; (3) `hasPart` lists child pages as `WebPage` references. Only existing pages are included. All enrichment is a graceful no-op when no tree data is available and never overrides existing values (except `isPartOf` which upgrades from WebSite to parent page).
 **Files:** `server/site-architecture.ts` (`getParentNode()`, `getSiblingNodes()`, `getChildNodes()` helpers), `server/schema-suggester.ts` (relationship injection in `injectCrossReferences()`)
 
-**147. Competitor Schema Intelligence (D4)**
+
+**Agency value:** Architecture-derived schema enrichment adds parent references, sibling links, and child pages to WebPage nodes. More accurate structural data without AI token costs.
+
+**Client value:** N/A — admin-only improvement.
+
+**Mutual:** Richer structured data that helps search engines understand site hierarchy and navigate between related pages.
+
+### 147. Competitor Schema Intelligence (D4)
 **What it does:** Crawls competitor websites (from workspace `competitorDomains` config), extracts JSON-LD schemas from up to 10 pages per domain (homepage + sitemap URLs), and compares schema type coverage against our site. Implements rate limiting (max 2 concurrent fetches, 500ms between batches, 10s timeout per page) and 24-hour file-based caching to avoid redundant crawls. Provides a `compareSchemas()` function that surfaces opportunities — schema types competitors use that we don't — along with shared types and coverage percentages. Results are exposed via a REST endpoint that reads the workspace's competitor domains and returns crawl results plus comparisons.
 **Files:** `server/competitor-schema.ts` (`crawlCompetitorSchemas()`, `compareSchemas()`, caching, rate-limited fetcher), `server/routes/competitor-schema.ts` (`GET /api/competitor-schema/:workspaceId`), `server/app.ts` (route registration)
 
-**148. Brief E-E-A-T → Author/Publisher Schema Enrichment (D6)**
+
+**Agency value:** Automated competitor schema crawling with rate-limited fetching and 24-hour caching. Identifies schema types competitors use that we don't.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Data-driven schema prioritization — deploy the schema types your competitors already benefit from.
+
+### 148. Brief E-E-A-T → Author/Publisher Schema Enrichment (D6)
 **What it does:** When a content brief is linked to schema generation via `_briefId` on `SchemaContext`, extracts E-E-A-T (Experience, Expertise, Authoritativeness, Trust) guidance from the brief's `eeatGuidance` field and enriches the schema in two ways: (1) Injects author credential context into the AI prompt so the LLM generates accurate Person nodes with real author data; (2) In post-processing, if an Article/BlogPosting/NewsArticle node exists without an `author` field, pre-populates it with a Person node containing the extracted author name, job title, and expertise topics. The `extractEeatFromBrief()` function uses regex patterns to extract structured author names, credentials (Dr, MD, PhD, etc.), and expertise topics from the free-text E-E-A-T guidance fields. Gracefully degrades: if no brief is linked, no `eeatGuidance` exists, or no usable data can be extracted, the feature is a complete no-op.
 **Files:** `server/schema-suggester.ts` (`extractEeatFromBrief()`, `_briefId` on `SchemaContext`, E-E-A-T prompt injection in `aiGenerateUnifiedSchema()`, author post-processing in `postProcessSchema()`)
 
-**149. Planned Page Schema Pre-Generation (D7)**
+
+**Agency value:** E-E-A-T data from content briefs automatically enriches schema generation. Author credentials and expertise flow from brief to structured data without manual entry.
+
+**Client value:** N/A — admin-only improvement.
+
+**Mutual:** Closes the loop between content strategy (E-E-A-T guidance) and technical SEO (schema markup). Author data flows seamlessly.
+
+### 149. Planned Page Schema Pre-Generation (D7)
 **What it does:** Auto-generates lightweight JSON-LD schema skeletons when matrix cells transition to `brief_generated` or `approved` status, so schemas are ready to apply on publish — no AI call needed. The `generateSchemaSkeleton()` function builds a deterministic `@graph` containing WebPage (with URL from `plannedUrl`), BreadcrumbList (placeholder), Organization reference, and a primary type node (e.g., BlogPosting with headline from `targetKeyword`) based on the cell's `expectedSchemaTypes` or the template's `pageType` mapping. Skeletons are stored in a `pending_schemas` SQLite table with status lifecycle: `pending` → `applied` (on publish) or `stale` (if keyword/URL changes after generation). `queueSchemaPreGeneration()` is called async and non-blocking from `updateMatrixCell()`. A `GET /api/pending-schemas/:workspaceId` endpoint lists all pending schemas for a workspace. `markSchemaStale()` is triggered when a cell's `targetKeyword` or `customKeyword` changes. Gracefully degrades: if the matrix, cell, or template is missing, the pre-generation silently skips.
 **Files:** `server/schema-queue.ts` (`generateSchemaSkeleton()`, `queueSchemaPreGeneration()`, `listPendingSchemas()`, `markSchemaApplied()`, `markSchemaStale()`), `server/content-matrices.ts` (pre-generation trigger in `updateMatrixCell()`, stale marking on keyword change), `server/routes/webflow-schema.ts` (`GET /api/pending-schemas/:workspaceId` endpoint), `server/db/migrations/018-pending-schemas.sql`
-**151. SEMRush Question Keywords + Trend Direction + SERP Feature Targeting**
+
+**Agency value:** Lightweight schema skeletons generated automatically when matrix cells reach brief or approval stage. Schemas are ready to apply the moment content is published.
+
+**Client value:** N/A — admin-only improvement.
+
+**Mutual:** Zero-delay schema deployment for published content. Pre-generation eliminates the post-publish 'now generate schemas' step.
+
+### 151. SEMRush Question Keywords + Trend Direction + SERP Feature Targeting
 **What it does:** Adds three new data enrichments to the keyword strategy: (1) **Question Keywords** — fetches question-based search queries via SEMRush `phrase_questions` API (full mode only), injected into AI context as FAQ/AEO targeting opportunities. Top 5 seed keywords × 10 questions each. Cached 24h. Question keywords attached to relevant content gaps. (2) **Keyword Trend Direction** — parses 12-month volume trend from SEMRush `Td` field on domain organic keywords, computes `rising`/`declining`/`stable` (±15% threshold, comparing avg of first 3 vs last 3 months). Enriched onto content gaps. UI badges: green ↑ Rising, red ↓ Declining, gray — Stable. (3) **SERP Feature Targeting** — parses SEMRush `Fk` field (comma-separated SERP feature codes) into human-readable labels. Maps 18 feature types (featured_snippet, people_also_ask, video, local_pack, etc.). Content gaps badged with "Featured Snippet" (yellow) and "PAA" (cyan) when present. Both admin and client views show the new badges.
 **Files:** `server/semrush.ts` (`getQuestionKeywords()`, `trendDirection()`, `parseSerpFeatures()`, `hasSerpOpportunity()`, `QuestionKeyword` interface, `SERP_FEATURE_MAP`, `Td`/`Fk` on `DomainKeyword`), `server/routes/keyword-strategy.ts` (question keyword fetching, trend/SERP enrichment of content gaps, question keyword attachment), `shared/types/workspace.ts` (`trendDirection`, `serpFeatures`, `questionKeywords` on ContentGap, `questionKeywords` on KeywordStrategy), `src/components/strategy/ContentGaps.tsx` (trend/SERP/question badges), `src/components/client/StrategyTab.tsx` (trend/SERP badges), `src/components/client/types.ts` (updated ClientKeywordStrategy)
 
-**152. Topical Authority Clustering (AI-Powered)**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 152. Topical Authority Clustering (AI-Powered)
 **What it does:** Uses AI (GPT-4.1-mini via `callStrategyAI`) to semantically group keywords from the keyword pool into 5-10 business-relevant topic clusters, then measures site coverage per cluster. The AI prompt receives business context + knowledge base to ensure clusters align with actual business capabilities, service areas, and content pillars — not generic 2-word phrases. For each cluster: counts owned keywords (those the site ranks for in SEMRush), calculates coverage percentage, computes average position, identifies top competitor coverage, and lists gap keywords. Clusters sorted by lowest coverage first (biggest opportunity). Admin UI: `TopicClusters` component with coverage bars (green ≥70%, amber ≥40%, red <40%), competitor alerts, and gap keyword pills. Top 150 keywords by volume fed to AI. Gracefully skips if AI call fails. Requires ≥10 keywords in pool to activate.
 **Files:** `server/routes/keyword-strategy.ts` (AI topic clustering logic after strategy generation), `shared/types/workspace.ts` (`TopicCluster` interface, `topicClusters` on KeywordStrategy), `src/components/strategy/TopicClusters.tsx` (component), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
 
-**153. Keyword Cannibalization Detection + Canonical Recommender**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 153. Keyword Cannibalization Detection + Canonical Recommender
 **What it does:** Detects keyword cannibalization by cross-referencing the keyword map (primary keyword assignments) with GSC data (multiple pages ranking for same query). Two detection layers: (1) keyword map — flags when AI assigns the same primary keyword to 2+ pages; (2) GSC — identifies queries where 2+ pages receive >10 impressions. Merges both sources. Severity: `high` (3+ pages or 2 pages both in top 20), `medium` (2 pages). Each item includes per-page position, impressions, clicks, and data source. **Canonical Recommender:** Analyzes page metrics to determine the best canonical page and recommends one of four actions: `canonical_tag` (secondary pages have some traffic — add `<link rel="canonical">` to preserve them), `redirect_301` (secondary pages have no traffic — consolidate authority), `differentiate` (both pages rank competitively — retarget secondary to long-tail variant), or `noindex`. Recommendation includes the specific canonical URL and action-specific guidance. Admin UI: `CannibalizationAlert` component with severity badges, per-page metrics, source labels (GSC/map), action type badges (Canonical Tag/301 Redirect/Differentiate/Noindex with icons), canonical path display, and actionable recommendations.
 **Files:** `server/routes/keyword-strategy.ts` (cannibalization detection + canonical recommender logic), `shared/types/workspace.ts` (`CannibalizationItem` interface, `cannibalization` on KeywordStrategy), `src/components/strategy/CannibalizationAlert.tsx` (component with action badges), `src/components/KeywordStrategy.tsx` (wiring), `src/components/client/types.ts` (updated type)
 
-**154. Churn Signals 'At Risk' Badge in Workspace Overview**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 154. Churn Signals 'At Risk' Badge in Workspace Overview
 **What it does:** Surfaces churn risk directly on workspace cards in the Command Center. The `/api/workspace-overview` endpoint now returns `churnSignals: { critical, warning }` counts per workspace. Cards show a red/amber "At Risk" badge (with Flag icon) when critical or warning churn signals exist. Card borders highlight red for critical, amber for warning. The Needs Attention section also shows an aggregate "X workspaces at risk of churn" alert item, priority-sorted between anomalies and requests.
 **Files:** `server/routes/workspaces.ts` (churn signal aggregation in workspace-overview), `src/hooks/admin/useWorkspaceOverview.ts` (`churnSignals` on `WorkspaceSummary`), `src/components/WorkspaceOverview.tsx` (At Risk badge, border logic, attention item)
 
-**155. Content Decay Alert Card in Pipeline**
+**Agency value:** Faster navigation and better operational visibility.
+
+**Client value:** N/A — admin-only feature.
+
+**Mutual:** Reduced friction in daily platform usage.
+
+
+### 155. Content Decay Alert Card in Pipeline
 **What it does:** Shows a dismissible alert banner in the Content Pipeline when decaying pages are detected. Fetches `/api/content-decay/:wsId` alongside the pipeline summary on mount. Displays total decaying pages, critical/warning counts, and average decline percentage. Red styling for critical, amber for warning. Dismissible per session via X button.
 **Files:** `src/components/ContentPipeline.tsx` (decay fetch, alert card rendering, dismiss state)
 
-**156. Approval Reminders 'Send Reminder' Button**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 156. Approval Reminders 'Send Reminder' Button
 **What it does:** Adds a manual "Remind" button to each pending approval batch in the PendingApprovals component. Clicking sends an approval reminder email to the workspace's client email via `POST /api/approvals/:wsId/:batchId/remind`. The endpoint validates the batch has pending items, calculates stale days, and sends a branded reminder email using `renderApprovalReminder()`. Button shows loading state while sending and transitions to a green "Sent" confirmation after success. Appears only when a batch has pending items.
 **Files:** `server/routes/approvals.ts` (remind endpoint), `src/api/misc.ts` (`approvals.remind()`), `src/components/PendingApprovals.tsx` (Remind button, state management)
 
-**157. Schema Strategy Isolation — Removed from Client Inbox**
+**Agency value:** Reduces client management overhead. Better client self-service means fewer support requests.
+
+**Client value:** Better portal experience with clearer navigation and more actionable data.
+
+**Mutual:** Both sides save time. Clients get better tools; agency gets fewer support tickets.
+
+
+### 157. Schema Strategy Isolation — Removed from Client Inbox
 **What it does:** Schema strategy plans no longer create approval batches in the client Inbox tab. The `POST /api/webflow/schema-plan/:siteId/send-to-client` endpoint now updates plan status to `sent_to_client` and sends email notification without creating approval items. Schema strategy review lives exclusively in the dedicated Schema tab (`SchemaReviewTab`) with condensed page-role view, gut-check approve/reject, and comment support. Individual per-page schema approvals (JSON-LD implementations) still use the standard approval system for future 1-by-1 review.
 **Files:** `server/routes/webflow-schema.ts` (removed `createBatch` call, removed `SCHEMA_ROLE_CLIENT_DESC` import), `src/api/seo.ts` (updated `sendToClient` return type), `src/components/client/SchemaReviewTab.tsx` (migrated empty state to `EmptyState` component), `src/components/client/ApprovalsTab.tsx` (migrated empty state to `EmptyState` component)
 
-**158. SearchTab Redesign — Insight-First Layout**
+**Agency value:** Better structured data quality with less manual effort. Automated processes reduce schema deployment time.
+
+**Client value:** Richer search result appearances and better Google understanding of site structure.
+
+**Mutual:** Higher-quality structured data drives better search visibility for both sides.
+
+
+### 158. SearchTab Redesign — Insight-First Layout
 **What it does:** Redesigned the client Search Performance tab with an insight-first hierarchy. Added AI-style natural language takeaway summary (Sparkles icon + `buildTakeaway()`) at the top. Insight cards now render full-width for single cards or 2-col grid for multiple. Raw queries/pages tables moved to a collapsible "Raw Data" section (default collapsed) with chevron toggle and count summary. Visual flow: takeaway → metrics bar → insights → health summary → trend chart → rank tracking → annotations → collapsible tables.
 **Files:** `src/components/client/SearchTab.tsx` (full redesign with collapsible tables, AI takeaway, responsive insight cards)
 
-**159. Test Coverage — Admin Hooks + Layout Components**
+**Agency value:** Improves platform functionality and team efficiency.
+
+**Client value:** Better platform experience.
+
+**Mutual:** Compound improvements across the platform.
+
+
+### 159. Test Coverage — Admin Hooks + Layout Components
 **What it does:** Added 37 new component/hook tests covering: `useWorkspaces` (6 tests: fetch, create, delete, link, unlink), `useHealthCheck` (3 tests: fetch, both-keys, error), `useQueue` (3 tests: fetch, empty, error), `Sidebar` (12 tests: nav rendering, group labels, active tab highlighting, disabled states, badge counts, navigation, theme toggle, logout, collapsible groups), `Breadcrumbs` (13 tests: Command Center link, workspace display, tab labels, back arrow, global tabs, request badges, notification bell, command palette trigger).
 **Files:** `tests/component/useWorkspaces.test.tsx`, `tests/component/useHealthCheck.test.tsx`, `tests/component/useQueue.test.tsx`, `tests/component/Sidebar.test.tsx`, `tests/component/Breadcrumbs.test.tsx`
 
-**160. Email Throttle & Anti-Spam System**
+**Agency value:** Faster operations, lower API costs, and more reliable infrastructure.
+
+**Client value:** N/A — internal improvement. Indirectly improves platform speed and reliability.
+
+**Mutual:** Better performance and lower costs compound across every user and every operation.
+
+
+### 160. Email Throttle & Anti-Spam System
 **What it does:** Prevents client inbox spam with a multi-layer email throttle. (1) **Status emails** (request status changes, team responses) are held and sent as a single morning digest at 9 AM ET instead of immediately — max 1/day per client. (2) **Audit emails** (audit complete, audit improved, recommendations ready) throttled to max 1 per 14 days per client. (3) **Action emails** (approval ready, brief ready, content published, fixes applied) max 3/day per client. (4) **Alert emails** (anomaly, audit alert) max 1/day per client. (5) **Global daily cap** of 5 non-transactional emails per client per day. (6) Transactional emails (password reset, welcome, trial warning) are never throttled. Sends tracked in `email_sends` SQLite table with auto-cleanup of records > 30 days. Integrated into batching queue (`flushBucket`), approval reminders, manual reminder endpoint (returns 429 if throttled), and monthly reports. Configurable via `EMAIL_DIGEST_HOUR` and `EMAIL_DIGEST_TZ` env vars.
 **Files:** `server/email-throttle.ts` (throttle module: category mapping, rate checks, morning digest helpers, cleanup scheduler), `server/db/migrations/022-email-throttle.sql` (`email_sends` table), `server/email-queue.ts` (throttle check in `flushBucket`, morning digest timer for status events, overdue detection on restore), `server/approval-reminders.ts` (throttle + recordSend), `server/routes/approvals.ts` (manual remind endpoint throttle + 429 response), `server/monthly-report.ts` (recordSend), `server/startup.ts` (startThrottleCleanup)
 
-**161. Client Strategy UI Refinements + Keyword Tracking Auto-Seed + Content Pipeline Integration**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 161. Client Strategy UI Refinements + Keyword Tracking Auto-Seed + Content Pipeline Integration
 **What it does:** Five improvements to the client-facing content strategy interface: (1) **Content Opportunities simplified voting** — removed duplicative up/down arrow voting, kept only "Relevant" / "Not relevant" buttons (renamed from "Approve"). Cleaner UX, one voting mechanism. (2) **Growth Opportunities sort** — "Almost there" items (pages with impressions but not yet ranking) now always appear at the top of the list, surfacing quick wins first. (3) **Page Performance Map GSC fix** — fixed bug where expanded pages showed "No GSC data" despite data existing. Root cause: the public endpoint stripped `gscKeywords` and `previousPosition` fields from the response. Now both fields are included, enabling per-keyword GSC tables and trend indicators in the client view. (4) **Keyword Tracking auto-seed + client add** — strategy keywords (siteKeywords + page primaryKeywords) are automatically seeded into rank tracking on strategy generation. Clients can also add their own keywords via a new input in the Target Keywords section, with remove buttons for client-added keywords. New public endpoints: `GET/POST/DELETE /api/public/tracked-keywords/:workspaceId`. (5) **Client keywords → content pipeline** — client-tracked keywords are injected into the strategy keyword pool with `source: 'client'` flag. The AI batch prompt highlights them as "CLIENT-REQUESTED KEYWORDS" for priority page assignment. The master prompt instructs the AI to generate content gaps for any client keyword not already covered by an existing page. This means client-added keywords flow through the entire pipeline: keyword pool → page assignments → content opportunities → briefs → copy.
 **Files:** `src/components/client/StrategyTab.tsx` (voting simplification, growth sort, tracked keyword UI), `server/routes/public-content.ts` (added `gscKeywords`/`previousPosition` to pageMap response, new tracked-keywords endpoints), `server/routes/keyword-strategy.ts` (auto-seed rank tracking after strategy generation, client keywords in keyword pool with `source:'client'`, CLIENT-REQUESTED KEYWORDS section in batch prompt, high-priority content gap rule in master prompt), `shared/types/workspace.ts` (added `previousPosition` to `PageKeywordMap`)
 
-**162. Unified AI Context Architecture**
+**Agency value:** Streamlines content production pipeline. Less manual work, more consistent output.
+
+**Client value:** Better content deliverables with transparent status tracking.
+
+**Mutual:** Faster content lifecycle from strategy to delivery.
+
+
+### 162. Unified AI Context Architecture
 **What it does:** Refactors `buildSeoContext()` in `server/seo-context.ts` to be the single source of truth for all AI context. The `SeoContext` return object now includes `personasBlock`, `knowledgeBlock`, and a `fullContext` convenience string (all blocks joined) in addition to the existing `keywordBlock`, `brandVoiceBlock`, `businessContext`, and `strategy`. All 13 AI feature call sites updated to use the unified return — no more separate `buildPersonasContext()`/`buildKnowledgeBase()` imports scattered across the codebase. **5 features that previously had no KB/persona context are now wired up:** SEO audit auto-fix suggestions, Google Search Console chat, keyword analysis, content decay refresh recommendations, and content post AI review. The separate functions still exist for backward compatibility but are only called internally by `buildSeoContext()`.
 **Files:** `server/seo-context.ts` (expanded `SeoContext` interface + `buildSeoContext()`), `server/routes/webflow-seo.ts`, `server/admin-chat-context.ts`, `server/content-posts-ai.ts`, `server/content-brief.ts`, `server/aeo-page-review.ts`, `server/routes/rewrite-chat.ts`, `server/internal-links.ts`, `server/routes/keyword-strategy.ts`, `server/routes/public-analytics.ts`, `server/seo-audit.ts`, `server/routes/google.ts`, `server/routes/webflow-keywords.ts`, `server/content-decay.ts`, `server/routes/content-posts.ts`
 
-**163. Persisted Page Analysis → AI Rewrite Integration**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 163. Persisted Page Analysis → AI Rewrite Integration
 **What it does:** Closes the loop between platform recommendations and AI-generated content. Page Analysis (optimizationIssues, recommendations, contentGaps) generated by keyword analysis is now **persisted** to the workspace's `keywordStrategy.pageMap` via a new `/api/webflow/keyword-analysis/persist` endpoint. When generating SEO titles/descriptions (single or bulk), the AI rewrite prompt automatically includes any persisted page analysis via `buildPageAnalysisContext()` — ensuring the AI addresses the platform's own recommendations. The SEO Editor gains an "Analyze Page" button per page that runs keyword analysis and auto-persists results. Pages with analysis show a green "Analysis on file" indicator, and the "AI Generate Both" button tooltip reflects when analysis is available. The `PageKeywordMap` type now includes `optimizationIssues`, `recommendations`, `contentGaps`, `optimizationScore`, and `analysisGeneratedAt` fields.
 **Files:** `shared/types/workspace.ts` (extended `PageKeywordMap`), `server/routes/webflow-keywords.ts` (persist endpoint), `server/seo-context.ts` (`buildPageAnalysisContext()`), `server/routes/webflow-seo.ts` (wired into single + bulk rewrite prompts), `src/api/seo.ts` (`persistAnalysis` API method), `src/components/SeoEditor.tsx` (`analyzePage` handler + strategy query for analysis status), `src/components/editor/PageEditRow.tsx` (Analyze Page button + status indicator)
 
-**164. Unified Title + Description Generation ("Generate Both")**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 164. Unified Title + Description Generation ("Generate Both")
 **What it does:** Adds `field='both'` mode to both single-page and bulk SEO rewrite endpoints. The AI generates 3 paired title + description sets in a single call, ensuring they feel unified — the title hooks attention, the description closes the click. Each pair takes a different angle (keyword-intent, differentiator, searcher-match). Frontend: "AI Generate Both" button on each page in the SEO Editor, paired variation picker showing title + description side-by-side with character counters, bulk "AI Rewrite Both" button in BulkOperations. Paired suggestions are saved as aligned rows (one title, one description) so variation indices match.
 **Files:** `server/routes/webflow-seo.ts` (both mode in single + bulk endpoints), `src/components/SeoEditor.tsx` (aiRewrite + bulkAiRewrite updated), `src/components/editor/PageEditRow.tsx` (Generate Both button + paired picker UI), `src/components/editor/BulkOperations.tsx` (AI Rewrite Both button)
 
-**165. Bulk Page Analysis ("Analyze All Pages") + CMS Collection Pages**
+**Agency value:** Improves platform functionality and team efficiency.
+
+**Client value:** Better platform experience.
+
+**Mutual:** Compound improvements across the platform.
+
+
+### 165. Bulk Page Analysis ("Analyze All Pages") + CMS Collection Pages
 **What it does:** Adds "Analyze All Pages" bulk buttons to both the SEO Editor and the Page Analysis page. In the SEO Editor, the button appears above the search bar and sequentially analyzes every page that doesn't already have analysis on file, with live progress and cancel support. In the Page Analysis page (`KeywordAnalysis`), the same pattern — sequential bulk analysis with progress counter. Analysis results are now **auto-persisted** to the workspace's `keywordStrategy.pageMap` from both locations. The Page Analysis page now fetches **all pages** (static + CMS collection pages) via a new `/api/webflow/all-pages/:siteId` endpoint that discovers CMS pages from the sitemap. CMS pages display a violet "CMS" badge in the page list. The `KeywordAnalysis` component now accepts an optional `workspaceId` prop for persistence.
 **Files:** `server/routes/webflow.ts` (new `/api/webflow/all-pages/:siteId` endpoint with CMS discovery), `src/components/KeywordAnalysis.tsx` (workspaceId prop, all-pages fetch, auto-persist, Analyze All button, CMS badges, bulk progress UI), `src/components/SeoEditor.tsx` (Analyze All Pages button + bulk analysis handler), `src/components/KeywordStrategy.tsx` (passes workspaceId to KeywordAnalysis)
 
-**166. Page Analysis Context Wired into AI Features**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 166. Page Analysis Context Wired into AI Features
 **What it does:** Extends `buildPageAnalysisContext()` from SEO rewrites to three additional AI features that work with specific pages: (1) **Rewrite Chat** — the page's optimization issues, recommendations, and content gaps are injected into the system prompt so the AI rewrite assistant can address them directly. (2) **Content Decay** — refresh recommendations now include the page's prior analysis context for more targeted recovery plans. (3) **SEO Audit Auto-Fix** — AI-generated meta tag suggestions now account for the page's flagged issues and recommendations. All three features already had `buildSeoContext()` for keyword/brand context; this adds the per-page analysis layer on top.
 **Files:** `server/routes/rewrite-chat.ts` (import + inject `buildPageAnalysisContext`), `server/content-decay.ts` (import + inject into refresh recommendation prompt), `server/seo-audit.ts` (import + inject into auto-fix prompt)
 
-**167. Page Intelligence — Unified Per-Page SEO Tab**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 167. Page Intelligence — Unified Per-Page SEO Tab
 **What it does:** Merges the former "Page Keyword Map" (inline keyword editing, metrics, SEO copy) and "Page Analysis" (AI optimization scores, issues, recommendations, content gaps) into a single dedicated sidebar tab called **Page Intelligence**. Each page row shows keyword metrics (volume, difficulty, CPC, position), search intent, optimization score, and expandable detail panels for AI analysis, keyword editing, and SEO copy generation. Strategy tab cleaned up to focus on site-level strategy insights (summary dashboard, ranking distribution, content gaps, topic clusters, competitive intel) without the per-page detail that now lives in Page Intelligence. Deep-linking via `fixContext` supported. Command Palette updated.
 **Files:** `src/components/PageIntelligence.tsx` (new unified component — 790 lines), `src/routes.ts` (added `page-intelligence` to Page type), `src/components/layout/Sidebar.tsx` (new nav item in SEO group), `src/App.tsx` (lazy import + render case with fixContext), `src/components/CommandPalette.tsx` (new palette entry), `src/components/KeywordStrategy.tsx` (removed Page Analysis sub-tab, PageKeywordMapPanel, related state/imports; strategy tab now strategy-only)
 
-**168. Page Intelligence — Full Analysis Persistence, Hydration & Cross-Feature Integration**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 168. Page Intelligence — Full Analysis Persistence, Hydration & Cross-Feature Integration
 **What it does:** Three enhancements: (1) All 15 AI analysis fields now persisted to strategy.pageMap (was 7) and hydrated back into the UI on load so full reports survive page reloads. (2) `buildPageAnalysisContext()` enriched with optimization score, keyword presence gaps, competitor keywords, topic cluster, and difficulty — feeds into 5 AI features (rewrite chat, SEO bulk rewrite, single rewrite, audit auto-fix, content decay). (3) Analysis data wired into 3 additional features: Schema Generator receives topicCluster/contentGaps/optimizationScore via `_pageAnalysis` context; Content Brief Generator matches target keyword to pageMap and injects analysis data; Internal Links annotates pages with topic clusters and groups cluster summaries for intra-cluster linking priority.
 **Files:** `shared/types/workspace.ts` (8 new fields on PageKeywordMap), `server/routes/webflow-keywords.ts` (expanded persist endpoint), `src/components/PageIntelligence.tsx` (full persist call, hydration effect, KeywordData/StrategyPage interfaces), `server/seo-context.ts` (enriched buildPageAnalysisContext), `server/schema-suggester.ts` (_pageAnalysis on SchemaContext, getPageAnalysis helper, wired into pageCtx), `server/helpers.ts` (enriched buildSchemaContext pageKeywordMap), `server/content-brief.ts` (keyword→page matching + pageAnalysisBlock injection), `server/internal-links.ts` (topic cluster annotations + cluster summary block)
 
-**169. Page Intelligence — Fix These First Priority Queue**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 169. Page Intelligence — Fix These First Priority Queue
 **What it does:** Auto-prioritized "Fix These First" section at the top of Page Intelligence. Ranks analyzed pages by impact = impressions × (100 - optimizationScore) / 100. High-traffic pages with low scores surface first. Shows top 5 pages with color-coded score badges, impression counts, and impact numbers. Click any row to expand its full analysis. Only appears when analyzed pages with score < 75 exist.
 **Files:** `src/components/PageIntelligence.tsx` (fixQueue computation + amber-themed UI section)
 
-**170. Page Analysis — CMS Title/Meta Extraction + Live Domain Fetch**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 170. Page Analysis — CMS Title/Meta Extraction + Live Domain Fetch
 **What it does:** Fixes incorrect "missing title/meta" flags on CMS collection items (blogs). Root cause: the page-html endpoint only tried the webflow.io subdomain (CMS pages often 404 there) and never extracted title/meta from HTML. Now: (1) Tries live domain first, falls back to webflow.io. (2) Extracts `<title>` and `<meta name="description">` from fetched HTML. (3) Returns `seoTitle` and `metaDescription` alongside body text. (4) Frontend uses HTML-extracted values for CMS pages that lack Webflow API seo data. Same fix applied to the all-pages endpoint sitemap discovery.
 **Files:** `server/routes/webflow-seo.ts` (page-html endpoint: live domain priority, HTML title/meta extraction, returns seoTitle+metaDescription), `src/components/PageIntelligence.tsx` (uses effectiveTitle/effectiveMeta from HTML when page.seo is missing)
 
-**171. Page Analysis — Background Job System**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 171. Page Analysis — Background Job System
 **What it does:** Moves bulk "Analyze All Pages" from a frontend Promise.all loop (blocked navigation, lost on refresh) to the server-side background job system. Job type `page-analysis` in `server/routes/jobs.ts`: discovers all pages (static + CMS via sitemap), fetches HTML for each, extracts title/meta/content, calls GPT-4.1-mini keyword analysis with SEMRush enrichment, and auto-persists all 15 analysis fields to workspace keywordStrategy.pageMap. Processes in batches of 3 with 1.5s rate limiting. Cancellable via WebSocket. Frontend watches job progress via `useBackgroundTasks` hook. TaskPanel shows "Page Analysis" label. Activity log records completion.
 **Files:** `server/routes/jobs.ts` (new `page-analysis` job case — ~270 lines), `server/activity-log.ts` (added `page_analysis` to ActivityType), `src/components/PageIntelligence.tsx` (useBackgroundTasks integration, job progress watching, cancel wiring), `src/components/TaskPanel.tsx` (type label)
 
-**172. SEO Editor — Full Collection Item Pagination**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 172. SEO Editor — Full Collection Item Pagination
 **What it does:** Fixes blog collection showing ~95 items instead of ~130. Root cause: Webflow API caps responses at 100 items per request, and the cms-seo endpoint wasn't paginating. Now: (1) Paginate through ALL items with do/while loop. (2) Sitemap discovery tries live domain first (CMS pages often only in live sitemap). (3) CMS page discovery cap in all-pages endpoint raised from 100 to 500.
 **Files:** `server/routes/webflow-cms.ts` (pagination loop, live domain sitemap discovery), `server/routes/webflow.ts` (CMS URL cap raised to 500)
 
-**173. Stale Chunk Auto-Reload (`lazyWithRetry`)**
+**Agency value:** Faster operations, lower API costs, and more reliable infrastructure.
+
+**Client value:** N/A — internal improvement. Indirectly improves platform speed and reliability.
+
+**Mutual:** Better performance and lower costs compound across every user and every operation.
+
+
+### 173. Stale Chunk Auto-Reload (`lazyWithRetry`)
 **What it does:** Eliminates "media failed to load — Failed to fetch dynamically imported module" errors after deploys. When Vite rebuilds, chunk filenames change (content hashing), but browsers cache old HTML referencing old filenames. `lazyWithRetry()` wraps every `React.lazy()` call — catches the 404 on stale chunks, does a single `window.location.reload()` to fetch new HTML, and uses a `sessionStorage` flag to prevent infinite reload loops. Covers all ~40 lazy imports across App.tsx, SeoAudit.tsx, ContentPipeline.tsx, and ClientDashboard.tsx.
 **Files:** `src/lib/lazyWithRetry.ts` (new utility), `src/App.tsx` (35 lazy→lazyWithRetry), `src/components/SeoAudit.tsx` (3 lazy→lazyWithRetry), `src/components/ContentPipeline.tsx` (4 lazy→lazyWithRetry), `src/components/ClientDashboard.tsx` (1 lazy→lazyWithRetry)
 
-**174. Page Analysis Path Matching Fix + AI Context Accuracy**
+**Agency value:** Faster operations, lower API costs, and more reliable infrastructure.
+
+**Client value:** N/A — internal improvement. Indirectly improves platform speed and reliability.
+
+**Mutual:** Better performance and lower costs compound across every user and every operation.
+
+
+### 174. Page Analysis Path Matching Fix + AI Context Accuracy
 **What it does:** Fixes a critical bug where fuzzy `includes()`-based path matching caused every page to falsely match the homepage (`/`) entry in the keyword strategy pageMap. Since every path contains `/`, `normalized.includes(p.pagePath)` was always true for the homepage entry. Result: (1) Bulk page analysis overwrote the homepage entry instead of creating new entries — only 7 of 256 pages persisted. (2) All AI features (SEO rewrites, keyword analysis, content scoring, search chat) received the homepage's keywords instead of the correct page's keywords. Fix: replaced `includes()` matching with exact path comparison + trailing-slash normalization across 5 instances in 4 files. Also fixed the Page Intelligence frontend to display `publishedPath` for nested pages (e.g., `/platform/engineering-efficiency` instead of `/engineering-efficiency`).
 **Files:** `server/routes/jobs.ts` (persistence + skip filter), `server/routes/webflow-keywords.ts` (individual analysis persistence), `server/routes/webflow-seo.ts` (SEO copy page context), `server/seo-context.ts` (2 instances — buildSeoContext + buildPageAnalysisContext), `src/components/PageIntelligence.tsx` (path display)
 
-**175. Shared Path Utilities + Clear-on-Reanalyze**
+**Agency value:** All per-page SEO data in one place. Priority queue answers 'where should I start?' instantly.
+
+**Client value:** N/A — admin-only tool.
+
+**Mutual:** Faster, more targeted SEO work. Analysis persists and compounds across features.
+
+
+### 175. Shared Path Utilities + Clear-on-Reanalyze
 **What it does:** Extracts duplicated path logic into shared utilities to prevent future bugs like #174. (1) `normalizePath()` — ensure leading `/`, strip trailing `/`. (2) `matchPagePath(a, b)` — exact match with normalization. (3) `findPageMapEntry(pageMap, path)` — find a pageMap entry by normalized path. (4) `resolvePagePath(page)` — resolve canonical path from `publishedPath` or `slug`. All 7 `pageMap.find()` call sites and 16 `publishedPath || slug` patterns now use shared utilities. Frontend gets mirrored `src/lib/pathUtils.ts`. Also: "Re-analyze All" now clears stale analysis fields (scores, recommendations, etc.) from all pageMap entries before starting, so removed pages don't retain ghost data. Keyword assignments are preserved.
 **Files:** `server/helpers.ts` (4 new exports), `src/lib/pathUtils.ts` (new), 16 server files updated to use `resolvePagePath`, 5 server files updated to use `findPageMapEntry`, `src/components/PageIntelligence.tsx` (uses `normalizePath` + `resolvePagePath`), `server/routes/jobs.ts` (clear-on-forceRefresh logic)
 
-**176. Normalized page_keywords Table (pageMap → SQLite)**
+**Agency value:** Faster operations, lower API costs, and more reliable infrastructure.
+
+**Client value:** N/A — internal improvement. Indirectly improves platform speed and reliability.
+
+**Mutual:** Better performance and lower costs compound across every user and every operation.
+
+
+### 176. Normalized page_keywords Table (pageMap → SQLite)
 **What it does:** Extracts `keywordStrategy.pageMap` from the workspace JSON blob into a dedicated `page_keywords` SQLite table. Previously, every read/write of any page's keyword data required deserializing/serializing the entire keywordStrategy JSON blob (which grows to 100KB+ for large sites). Now: (1) Per-page reads use indexed `SELECT` by `(workspace_id, page_path)` — O(1) instead of O(N) scan. (2) Per-page writes use `INSERT OR REPLACE` — no read-modify-write of entire blob. (3) Batch analysis uses `upsertPageKeywordsBatch()` in a single transaction. (4) `clearAnalysisFields()` resets scores/recommendations in one SQL UPDATE. (5) Migration function (`migrateFromJsonBlob`) runs idempotently on startup to move existing data. (6) GET endpoints reassemble `pageMap` array for backward-compatible API responses. (7) All 13 reader/writer call sites updated to use the new table.
 **Files:** `server/db/migrations/024-page-keywords.sql` (table + indexes), `server/page-keywords.ts` (CRUD module with 12 exports), `server/index.ts` (migration hook), `server/routes/keyword-strategy.ts` (POST/GET/PATCH endpoints), `server/routes/jobs.ts` (batch analysis persistence), `server/routes/webflow-keywords.ts` (individual page analysis), `server/routes/webflow-seo.ts` (SEO copy context), `server/routes/public-content.ts` (public strategy + fix recommendations), `server/routes/content-requests.ts` (getAllSitePages), `server/seo-context.ts` (3 functions), `server/ai-context-check.ts` (strategy status check), `server/llms-txt-generator.ts` (page enrichment), `server/site-architecture.ts` (tree builder), `server/internal-links.ts` (keyword context), `server/cannibalization-detection.ts` (conflict detection)
 
-**177. SEMRush Cache TTL Optimization + Unified Domain Organic Limit**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 177. SEMRush Cache TTL Optimization + Unified Domain Organic Limit
 **What it does:** Two quick wins to reduce SEMRush API credit consumption: (1) Extended cache TTLs based on data volatility — keyword metrics 7d→30d, related/question keywords 7d→30d, domain overview 48h→7d, backlinks 48h→7d, organic competitors 72h→14d. Domain organic rankings stay at 7d (rankings shift weekly). Named constants (`CACHE_TTL_KEYWORD`, `CACHE_TTL_RELATED`, etc.) replace magic numbers. (2) Unified domain organic fetch limit to 200 for both quick and full strategy modes. Previously quick mode used limit=100, but `getKeywordGap` internally re-fetches the client domain with limit=200 — different limit = different cache key = duplicate API call costing ~2,000 credits. Standardizing to 200 ensures all callers share the same cache entry.
 **Files:** `server/semrush.ts` (7 named TTL constants, 9 `readCache` call sites updated), `server/routes/keyword-strategy.ts` (unified limit)
 
-**179. Unified Bulk → Single-Page AI Rewrite Flow (Static + CMS) + Session Persistence**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 179. Unified Bulk → Single-Page AI Rewrite Flow (Static + CMS) + Session Persistence
 **What it does:** Simplified bulk AI rewrite to call the existing single-page `aiRewrite` function for each selected page/item (with concurrency of 3), instead of using a separate bulk server endpoint. Benefits: (1) Single code path — any improvement to single-page rewrite (audit context, heading extraction, 1500-char content excerpt) automatically applies to bulk. (2) Results populate **progressively** into each page card as they complete — first variation auto-selects into inputs, variation picker appears in-card. (3) All selected pages auto-expand so users can watch results appear. (4) Results persist as unsaved edits until another action is taken (save to Webflow, send to client, regenerate, etc.). Works for both **static pages** (SeoEditor) and **CMS collection items** (CmsEditor). CMS bulk rewrite supports 4 target modes: Names, Titles, Descriptions, or All SEO fields. Auto-expands parent collections + items during processing. **Session persistence:** Edits, variations, and expanded state are synced to React Query cache so they survive both Pages ↔ CMS tab switches (via `display:none` rendering) and admin-level tab switches (via RQ cache restore on remount). On remount, the initialization `useEffect` is skipped once if cached edits exist, preventing AI-generated values from being overwritten by original Webflow data. Also fixed pre-existing `aiLoading` type bug in CmsEditor (was `Set<string>` but used as `Record<string, boolean>`).
 **Files:** `src/components/SeoEditorWrapper.tsx` (display:none instead of conditional rendering), `src/components/SeoEditor.tsx` (`bulkAiRewrite` + RQ cache persistence for edits/variations/expanded), `src/components/CmsEditor.tsx` (new `bulkAiRewrite` + RQ cache persistence for edits/variations/expandedItems/expandedCollections/dirty; `aiLoading` type fix)
 
-**178. Global Cross-Workspace Keyword Metrics Cache + Pre-Enrichment Skip**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 178. Global Cross-Workspace Keyword Metrics Cache + Pre-Enrichment Skip
 **What it does:** Two major SEMRush credit optimizations: (1) **Global keyword_metrics_cache SQLite table** — keyword volume/difficulty/CPC is the same regardless of which workspace asks, so a shared L1 cache eliminates duplicate lookups across workspaces in the same industry. `getKeywordOverview` now checks: L1 (global SQLite) → L2 (per-workspace file cache) → L3 (SEMRush API). File cache hits backfill the global table. API results write to both caches. Saves 30-50% of `keyword_overview` credits across the platform. (2) **Pre-enrichment skip in strategy generation** — post-AI keyword validation now checks domain organic data (already fetched earlier in the same run) and existing `page_keywords` entries (from previous runs) before calling SEMRush API. Only keywords not found in either source trigger API calls. On re-runs of the same strategy, this can eliminate 60-90% of validation API calls since most keywords are unchanged. Combined with the global cache, re-running a strategy on the same workspace uses near-zero SEMRush credits for keyword validation.
 **Files:** `server/db/migrations/025-keyword-metrics-cache.sql` (table + index), `server/keyword-metrics-cache.ts` (CRUD module: getCachedMetrics, getCachedMetricsBatch, cacheMetrics, cacheMetricsBatch, cleanupStaleEntries), `server/semrush.ts` (L1/L2 cache chain in getKeywordOverview), `server/routes/keyword-strategy.ts` (pre-enrichment skip in post-AI validation)
 
-**180. Platform Unification — Phase 3: Route Deduplication + API Client Consolidation**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 180. Platform Unification — Phase 3: Route Deduplication + API Client Consolidation
 **What it does:** Eliminates duplicated analytics data fetching and raw `fetch()` calls across the codebase. (1) **Shared analytics layer** — new `server/analytics-data.ts` exports 6 wrapper functions (`fetchSearchOverview`, `fetchPerformanceTrend`, `fetchSearchDevices`, `fetchSearchCountries`, `fetchSearchTypes`, `fetchSearchComparison`) that normalize the search-console.ts API with consistent optional `dateRange` support. Both `routes/google.ts` (admin) and `routes/public-analytics.ts` (client) now import from this shared layer instead of duplicating search-console.ts imports. (2) **New API wrappers** — adds `stripe`, `auth`, `keywordFeedback`, `trackedKeywords`, `businessPriorities` to `src/api/misc.ts`; adds `backlinks`, `webflow.sites`, `auditSchedules.enable`, `contentPerformance.publicGet` to `src/api/seo.ts`; adds `workspaces.deletePageState` to `src/api/workspaces.ts`. (3) **Component migration** — 9 components migrated from raw `fetch()` to typed API client: BrandHub, StripeSettings, WorkspaceSelector, CommandPalette, ContentTab, StrategyTab, SeoEditor, Sidebar, BacklinkProfile. Streaming endpoints (ContentBriefs export, PostEditor PDF, AssetBrowser bulk-alt, KeywordStrategy SSE) correctly kept as raw fetch since they stream binary/NDJSON. (4) **Duplicate removed** — `rankTracking` export deleted from `src/api/misc.ts`; canonical version in `src/api/seo.ts` is the single source of truth.
 **Files:** `server/analytics-data.ts` (new), `server/routes/google.ts`, `server/routes/public-analytics.ts`, `src/api/misc.ts`, `src/api/seo.ts`, `src/api/workspaces.ts`, `src/api/index.ts`, `src/components/BrandHub.tsx`, `src/components/StripeSettings.tsx`, `src/components/WorkspaceSelector.tsx`, `src/components/CommandPalette.tsx`, `src/components/SeoEditor.tsx`, `src/components/client/ContentTab.tsx`, `src/components/client/StrategyTab.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/strategy/BacklinkProfile.tsx`
 
-**181. Platform Unification — Phase 4: Frontend Cache Layer**
+**Agency value:** Reduces client management overhead. Better client self-service means fewer support requests.
+
+**Client value:** Better portal experience with clearer navigation and more actionable data.
+
+**Mutual:** Both sides save time. Clients get better tools; agency gets fewer support tickets.
+
+
+### 181. Platform Unification — Phase 4: Frontend Cache Layer
 **What it does:** Standardizes React Query cache infrastructure across all 23+ hook files. (1) **Centralized query keys** — new `src/lib/queryKeys.ts` exports a typed factory object (`queryKeys.admin.*`, `queryKeys.client.*`, `queryKeys.shared.*`) covering every query in the platform. GA4/GSC keys restructured to hierarchical format (`['admin-ga4', wsId, 'overview', days]`) enabling prefix-based workspace-level invalidation. (2) **Stale time constants** — `src/lib/queryClient.ts` exports `STALE_TIMES` (`STABLE: 5min`, `NORMAL: 60s`, `FAST: 30s`, `REALTIME: 0`); health/workspace/publish-target queries upgraded to STABLE, queue/editor to FAST. (3) **Shared GA4 base hook** — new `src/hooks/shared/useGA4Base.ts` consolidates 11+ `useQuery` calls shared by `useAdminGA4` and `useClientGA4`. Both GA4 hooks refactored to thin wrappers that delegate to the base (eliminating ~100 lines of duplication). (4) **Centralized WS→cache invalidation** — new `src/lib/wsEvents.ts` mirrors server WS_EVENTS/ADMIN_EVENTS constants; new `src/hooks/useWsInvalidation.ts` maps 12 workspace-scoped WS events to React Query invalidations (approvals, requests, content requests, activity, audit, anomalies, content published, workspace updates, work orders). Wired into `App.tsx`'s Dashboard component; App.tsx WS string literals replaced with `ADMIN_EVENTS` typed constants.
 **Files:** `src/lib/queryKeys.ts` (new), `src/lib/wsEvents.ts` (new), `src/hooks/shared/useGA4Base.ts` (new), `src/hooks/useWsInvalidation.ts` (new), `src/lib/queryClient.ts`, `src/App.tsx`, `src/hooks/admin/useAdminGA4.ts`, `src/hooks/client/useClientGA4.ts`, `src/hooks/admin/useAdminSearch.ts`, `src/hooks/client/useClientSearch.ts`, `src/hooks/client/useClientQueries.ts`, `src/hooks/useClientData.ts`, `src/hooks/useAuditSummary.ts`, `src/hooks/useRecommendations.ts`, `src/hooks/usePageEditStates.ts`, and 14 additional admin hook files
 
+**Agency value:** Faster operations, lower API costs, and more reliable infrastructure.
+
+**Client value:** N/A — internal improvement. Indirectly improves platform speed and reliability.
+
+**Mutual:** Better performance and lower costs compound across every user and every operation.
+
+
 ---
 
-**150. AI Keyword Assignment Engine + Competitor-Enriched Strategy**
+### 150. AI Keyword Assignment Engine + Competitor-Enriched Strategy
 **What it does:** Overhauls the keyword strategy generator from an AI keyword *inventor* to a keyword *assigner*. The AI now picks keywords from a verified pool of real search terms (SEMRush domain keywords, GSC queries, competitor keywords, keyword gaps, related keywords) instead of hallucinating them. Reduces SEMRush "ERROR 50 :: NOTHING FOUND" responses (wasted API credits on non-existent keywords). Key changes: (1) Keyword pool built from 5 data sources — SEMRush domain organic, GSC queries, competitor domain keywords, keyword gap analysis, and related keywords. (2) AI batch prompt rewritten to enforce pool assignment with `(invented)` suffix for any keywords not in pool. (3) Pre-enrichment: keywords from pool get real volume/difficulty immediately without extra SEMRush lookups. (4) SEMRush lookups capped at 30 and filtered to ≤5-word keywords. (5) Auto-discovery of organic competitors via SEMRush `domain_organic_organic` API when none provided. (6) Competitor keywords fetched in both quick and full modes. (7) Keyword gap analysis runs in both modes. (8) Related keywords in full mode only. (9) Master prompt enhanced: content gaps must cite competitorProof (which competitor ranks and at what position). (10) Auto-discovered competitors persisted to workspace. (11) Frontend: Auto-Discover button in strategy settings calls SEMRush API, saves results, pre-populates competitor input. Saved competitors load on mount. Content gap cards display orange competitor proof badges in both admin and client views.
 **Files:** `server/routes/keyword-strategy.ts` (pool construction, batch prompt rewrite, master prompt enhancement, competitor data gathering, pre-enrichment), `server/semrush.ts` (`getOrganicCompetitors()`), `server/routes/semrush.ts` (discover-competitors + save-competitors endpoints), `shared/types/workspace.ts` (`competitorProof` on ContentGap), `src/api/seo.ts` (discoverCompetitors, saveCompetitors), `src/components/KeywordStrategy.tsx` (auto-discover UI, persistent competitor loading), `src/components/strategy/ContentGaps.tsx` (competitorProof display), `src/components/client/StrategyTab.tsx` (competitorProof display), `src/components/client/types.ts` (competitorProof on client type)
 
-**182. Analytics Intelligence Layer — Phase 1 (Foundation)**
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+### 182. Analytics Intelligence Layer — Phase 1 (Foundation)
 **What it does:** Establishes the infrastructure for background-computed analytics insights stored in SQLite and surfaced to clients via insight cards. (1) **`analytics_insights` table** (migration 035) — stores computed insights keyed by `(workspace_id, page_id, insight_type)` with UNIQUE constraint ensuring one row per dimension, auto-replaced on refresh. Supports 7 insight types: `page_health`, `quick_win`, `content_decay`, `cannibalization`, `keyword_cluster`, `competitor_gap`, `conversion_attribution`. (2) **`server/analytics-insights-store.ts`** — CRUD module with `upsertInsight`, `getInsights`, `getInsight`, `deleteInsightsForWorkspace`; handles conflict-replace (upsert semantics), type-safe `InsightType` and `InsightSeverity` unions. (3) **`server/api-cache.ts`** — 15-minute in-memory TTL cache for GSC/GA4 API responses, keyed by `(workspaceId, functionName, paramsHash)`. `createApiCache()` factory + singleton `apiCache`. Methods: `get`, `set`, `wrap` (transparent cache-or-fetch), `invalidate` (workspace-level purge). (4) **`GET /api/public/insights/:workspaceId`** — new endpoint in `public-analytics.ts`; optional `?type=insight_type` filter; returns 404 for unknown workspace. (5) **`InsightCards` component** — 3-card layout for the client dashboard: Traffic Momentum (page health trends), Quick Wins (positions 4-20 with estimated traffic gain), Top Performers (conversion data + health scores). Tier-aware: Free → upgrade nudge; Growth → feature links; Premium → "Your strategist is tracking this". (6) **`useClientInsights` hook** — React Query hook fetching `/api/public/insights/:wsId`, registered in `queryKeys.client.insights`. (7) **Shared types** — `AnalyticsInsight`, `InsightType`, `InsightSeverity`, and 7 insight data shapes (`PageHealthData`, `QuickWinData`, `ContentDecayData`, etc.) added to `shared/types/analytics.ts`.
 
 **Phase 1B** (Opus): `server/analytics-intelligence.ts` — lazy computation engine with 6-hour TTL. Pure functions for: (1) **Page Health Scores** (0–100): position component (0–30), traffic component (0–25, normalized vs site max), CTR component (0–20, actual vs expected CTR at position), engagement component (0–25, GA4 engagement time). Severity: positive ≥70, opportunity ≥40, warning ≥20, critical <20. (2) **Quick Wins**: GSC query-page rows at positions 4–20 with ≥50 impressions; estimates traffic gain from reaching position 3 using industry-average CTR curves. (3) **Content Decay**: current vs previous 30-day GSC clicks; flags >20% decline. Severity: critical >50%, warning >30%. (4) **Cannibalization**: groups `getQueryPageData()` by query, flags 2+ pages competing in top 20. Sorted by total impressions (most impactful first). Orchestrator fetches GSC/GA4 data in parallel via `apiCache.wrap()`, computes all insight types, and persists via `upsertInsight()`. Public endpoint upgraded from synchronous store read to `getOrComputeInsights()` with lazy evaluation. 25 new unit tests covering all 4 algorithms + staleness check.
 
 **Files:** `server/db/migrations/035-analytics-insights.sql` (new), `server/analytics-insights-store.ts` (new), `server/api-cache.ts` (new), `server/routes/public-analytics.ts` (insights endpoint), `src/components/client/InsightCards.tsx` (new), `src/hooks/client/useClientQueries.ts` (useClientInsights), `src/lib/queryKeys.ts` (insights key), `shared/types/analytics.ts` (insight types), `tests/unit/analytics-insights-store.test.ts` (new, 10 tests), `tests/unit/api-cache.test.ts` (new, 8 tests), `tests/integration/insights-routes.test.ts` (new, 4 tests), `tests/component/InsightCards.test.tsx` (new, 6 tests)
 
-**183. Analytics Intelligence — Phase 2 (AI Engine Enrichment)**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 183. Analytics Intelligence — Phase 2 (AI Engine Enrichment)
 **What it does:** Enriches the three AI generation engines (schema pipeline, content briefs, chat advisor) with analytics intelligence data from the Phase 1 intelligence layer. (1) **Schema pipeline enrichment** (`server/schema-suggester.ts`): Added `_pageHealthScore`, `_pageHealthTrend`, `_quickWinStatus`, and `_faqOpportunities` fields to `SchemaContext`. New `buildSchemaIntelligenceBlock()` injects page health score, quick win status, and FAQ opportunity questions into the schema generation prompt (appears after the SEARCH PERFORMANCE block). New `extractFaqOpportunities()` filters GSC query-page data for question-type queries (how/what/why/when/where/which/can/do/does/is/are) targeting a specific page, sorted by impressions, capped at 10. `buildSchemaContext()` in `helpers.ts` extended to also fetch `getQueryPageData()` and build an `insightsMap` from the intelligence layer (SQLite, synchronous). All 3 callers (`webflow-schema.ts` routes, `jobs.ts` bulk generation) pass the new data through. (2) **Content brief enrichment** (`server/content-brief.ts`): New `buildBriefIntelligenceBlock()` constructs prompt sections for: cannibalization warnings (existing pages competing for target keyword — suggests updating vs creating new), content decay context (related pages losing traffic — suggests freshness), quick win opportunities (related queries close to page 1), page health scores for related pages. Wired into `generateBrief()` prompt assembly using `getInsights()` from the intelligence store. (3) **Chat advisor enhancement** (`server/admin-chat-context.ts`): Added `'insights'` context category with patterns for "what should I work on", "priorities", "quick wins", "declining", "cannibalization", "page health". New `buildInsightsContext()` formats all 4 insight types (health scores worst-first, quick wins by traffic gain, decay by severity, cannibalization) into a structured text block. Triggered on `insights`, `general`, or `strategy` category match. 36 new tests across 3 test files.
 **Files:** `server/schema-suggester.ts` (SchemaContext fields + buildSchemaIntelligenceBlock + extractFaqOpportunities + prompt injection + generateSchemaForPage/generateSchemaSuggestions signature updates), `server/helpers.ts` (buildSchemaContext extended with queryPageData + insightsMap), `server/content-brief.ts` (buildBriefIntelligenceBlock + generateBrief wiring), `server/admin-chat-context.ts` (insights category + buildInsightsContext + assembleAdminContext wiring), `server/routes/webflow-schema.ts` (pass-through updates), `server/routes/jobs.ts` (pass-through updates), `tests/unit/schema-intelligence-enrichment.test.ts` (new, 16 tests), `tests/unit/content-brief-enrichment.test.ts` (new, 7 tests), `tests/unit/chat-context-insights.test.ts` (new, 13 tests)
 
-**184. Analytics Intelligence — Phase 3 (Advanced Intelligence)**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 184. Analytics Intelligence — Phase 3 (Advanced Intelligence)
 **What it does:** Adds three advanced intelligence computation algorithms to the analytics intelligence layer and wires them into the chat advisor context. (1) **Keyword Clustering** (`computeKeywordClusterInsights`): Groups GSC queries into topic clusters using a Union-Find algorithm with two merge strategies — word-level Jaccard similarity (≥0.3 threshold) and page co-occurrence (queries sharing the same top-ranking page). Each cluster gets a label (highest-impression query), aggregate impressions, average position, and a pillar page (the URL with the most combined impressions across cluster queries). Severity: positive (≥2000 impressions, avg pos ≤10), opportunity (≥500 impressions), warning (avg pos >15). Capped at 20 clusters. (2) **Competitor Gap Analysis** (`computeCompetitorGapInsights`): Uses the `SeoDataProvider` abstraction (`getConfiguredProvider()`) to work with both SEMRush and DataForSEO. Fetches competitor keyword gaps, enriches with our GSC positions, and scores by volume/difficulty. Auto-discovers competitors via `getCompetitors()` if none configured. Severity: critical (volume ≥1000, difficulty <50, we don't rank), warning (volume ≥500, difficulty <60, we don't rank), opportunity otherwise. Capped at 30 gaps. (3) **Conversion Attribution** (`computeConversionAttributionInsights`): Maps GA4 organic landing pages to conversion rates. Filters pages with ≥10 sessions, computes `conversionRate = (conversions / sessions) * 100`. Severity: positive (≥5%), opportunity (≥2%), warning (≥0.5%), critical (<0.5%). Capped at 20 pages. All three wired into `computeAndPersistInsights()` orchestrator with independent try/catch blocks. Chat advisor (`buildInsightsContext`) enriched with keyword clusters, competitor gaps, and conversion attribution sections. 20 new unit tests for the 3 algorithms.
 **Files:** `server/analytics-intelligence.ts` (3 new compute functions + orchestrator wiring), `server/admin-chat-context.ts` (3 new insight type sections in buildInsightsContext), `tests/unit/analytics-intelligence-phase3.test.ts` (new, 20 tests)
 
-**185. Analytics Intelligence — Phase 4 (Strategy Engine + Client Polish)**
+**Agency value:** Better AI outputs across all features. Richer context means fewer revision cycles.
+
+**Client value:** N/A — admin-only improvement. Indirectly improves all AI-generated content.
+
+**Mutual:** Higher-quality AI outputs reduce manual editing and speed up delivery.
+
+
+### 185. Analytics Intelligence — Phase 4 (Strategy Engine + Client Polish)
 **What it does:** Completes the analytics intelligence feature set with five sub-tasks: (1) **Strategy generation enrichment** (`buildStrategyIntelligenceBlock()` in `keyword-strategy.ts`): Injects keyword clusters (topic groups from GSC queries with aggregate metrics), competitor gaps (sorted by volume, capped at 15), performance deltas (declining keywords from content decay insights), and conversion-weighted page data into the master strategy prompt. AI gets explicit instructions to use clusters for site keyword themes, competitor gaps for content gap priorities, and conversion data to protect "money pages". Wired via `getInsights()` from intelligence layer. (2) **2 new client insight cards** (`InsightCards.tsx`): Schema Opportunities card — shows high-traffic pages that could benefit from structured data, tier-gated with upgrade CTA for free. Content Health card — shows decaying content with estimated session recovery from refresh, sorted by severity. Grid upgraded from 3-column to responsive 3-column layout with 5 cards. (3) **Analytics annotations** — New `analytics_annotations` SQLite table (migration 036) with CRUD module (`analytics-annotations.ts`): `createAnnotation()`, `getAnnotations()` (filters by date range + category), `updateAnnotation()`, `deleteAnnotation()`. 4 admin routes (GET/POST/PATCH/DELETE) + 1 public route for client dashboard. Categories: site_change, algorithm_update, campaign, other. (4) **Content calendar intelligence** (`content-calendar-intelligence.ts`): `suggestPublishDates()` derives actionable recommendations from decay insights (refresh) and quick wins (promote), prioritized by severity, deduplicated by page URL, capped at 15. (5) **GSC pagination** (`paginateGscQuery()` in `search-console.ts`): Generic async pagination helper fetches multiple pages using startRow parameter, up to configurable maxRows (default 2000). `getQueryPageData()` upgraded with `maxRows` option — intelligence computation now fetches 2000 rows instead of 500 for more comprehensive keyword/page analysis. 35 new TDD tests across 5 test files.
 **Files:** `server/routes/keyword-strategy.ts` (buildStrategyIntelligenceBlock + intelligence wiring into master prompt), `src/components/client/InsightCards.tsx` (SchemaOpportunitiesCard + ContentHealthCard + 5-card grid), `server/db/migrations/036-analytics-annotations.sql` (new), `server/analytics-annotations.ts` (new), `server/routes/google.ts` (annotation CRUD routes), `server/content-calendar-intelligence.ts` (new), `server/search-console.ts` (paginateGscQuery + getQueryPageData maxRows), `server/analytics-intelligence.ts` (paginated getQueryPageData call), `tests/unit/strategy-intelligence-enrichment.test.ts` (new, 8 tests), `tests/unit/gsc-pagination.test.ts` (new, 6 tests), `tests/unit/analytics-annotations.test.ts` (new, 8 tests), `tests/unit/content-calendar-intelligence.test.ts` (new, 6 tests), `tests/component/InsightCardsPhase4.test.tsx` (new, 7 tests)
+
+**Agency value:** Data-driven strategy decisions backed by real search data. Automates manual research tasks.
+
+**Client value:** Clear, actionable strategy recommendations grounded in market data.
+
+**Mutual:** Strategy conversations backed by evidence, not guesswork.
+
+
+---
+
+## Platform Summary
+
+| Category | Feature Count | Primary Value Driver |
+|----------|:---:|---|
+| SEO & Technical | 55+ | Audit, fix, optimize, AEO trust signals, schema intelligence, page analysis, site architecture, link health |
+| Content & Strategy | 45+ | Strategy → brief → AI post → review → publish pipeline, content matrices, templates, keyword intelligence, competitive analysis |
+| Analytics & Tracking | 15+ | Connected Intelligence Engine, insights computation, rank tracking, revenue analytics, AI usage tracking |
+| AI & Intelligence | 15+ | Full-spectrum AI advisors, knowledge base, brand voice, recommendations engine, unified context architecture, AEO page review |
+| Client Portal | 30+ | 24/7 data access, approvals, onboarding, plans, feedback, strategy participation, content plan review, email capture |
+| Monetization | 8+ | Stripe Checkout + Subscriptions, self-service cart, billing portal, recurring content subscriptions, ROI-backed upgrade prompts |
+| Auth & Security | 7+ | Internal users, workspace ACL, client users, Helmet/HTTPS, rate limiting, CAPTCHA, credential stuffing protection |
+| Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
+| Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
+
+**252 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+
+Current feature count: **252**. Last updated: March 2026.
