@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
   Target, FileText, Globe, Sparkles, CheckCircle2, Layers,
-  ArrowRight, ChevronDown, type LucideIcon,
+  ArrowRight, ChevronDown, Activity, type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
+import { useClientInsights } from '../../hooks/client/useClientInsights';
+import type { ClientInsight } from '../../../shared/types/narrative.js';
+import type { InsightType } from '../../../shared/types/analytics.js';
 import type {
   SearchOverview, SearchQuery, AuditSummary, AuditDetail,
   GA4Overview, GA4ConversionSummary, GA4NewVsReturning, GA4OrganicOverview,
@@ -364,6 +367,74 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
   return cards;
 }
 
+// ─── Server Insight Mapping ───
+
+const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
+  ranking_mover: TrendingUp,
+  ctr_opportunity: MousePointer,
+  content_decay: TrendingDown,
+  page_health: Activity,
+  ranking_opportunity: Target,
+  cannibalization: Layers,
+  keyword_cluster: Sparkles,
+  competitor_gap: Users,
+  conversion_attribution: Zap,
+  serp_opportunity: Globe,
+  strategy_alignment: FileText,
+  anomaly_digest: Shield,
+};
+
+const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
+  positive: 'positive',
+  opportunity: 'opportunity',
+  warning: 'negative',
+  critical: 'negative',
+};
+
+const SEVERITY_TO_COLOR: Record<string, string> = {
+  positive: 'green',
+  opportunity: 'amber',
+  warning: 'amber',
+  critical: 'red',
+};
+
+function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {
+  return insights.map(i => {
+    let body = i.narrative;
+    if (i.impact) body += ` ${i.impact}`;
+
+    const detail: string[] = [];
+    if (i.actionTaken) detail.push(`Action taken: ${i.actionTaken}`);
+
+    return {
+      id: `server-${i.id}`,
+      icon: INSIGHT_TYPE_ICONS[i.type] ?? Sparkles,
+      color: SEVERITY_TO_COLOR[i.severity] ?? 'amber',
+      headline: i.headline,
+      body,
+      detail: detail.length > 0 ? detail : undefined,
+      priority: Math.max(1, 6 - Math.ceil(i.impactScore / 20)),
+      sentiment: SEVERITY_TO_SENTIMENT[i.severity] ?? 'neutral',
+    };
+  });
+}
+
+function mergeInsights(local: DigestInsight[], server: DigestInsight[]): DigestInsight[] {
+  // Server insights first, then local — deduplicate by id
+  const seen = new Set<string>();
+  const merged: DigestInsight[] = [];
+  for (const item of [...server, ...local]) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      merged.push(item);
+    }
+  }
+  // Re-sort by priority, then sentiment weight
+  const sentimentWeight = { negative: 0, opportunity: 1, positive: 2, neutral: 3 };
+  merged.sort((a, b) => a.priority - b.priority || sentimentWeight[a.sentiment] - sentimentWeight[b.sentiment]);
+  return merged;
+}
+
 // ─── Color Maps ───
 
 const COLORS: Record<string, { text: string; badge: string }> = {
@@ -386,13 +457,17 @@ const SENTIMENT_LABELS: Record<string, string> = {
 export function InsightsDigest(props: InsightsDigestProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
-  const insights = generateInsights(props);
+  const { data: serverData } = useClientInsights(props.workspaceId);
   const [expanded, setExpanded] = useState(false);
+
+  const localInsights = generateInsights(props);
+  const serverInsights = mapServerInsights(serverData?.insights ?? []);
+  const insights = mergeInsights(localInsights, serverInsights);
 
   if (insights.length === 0) return null;
 
   const INITIAL_COUNT = 4;
-  const all = insights.slice(0, 8);
+  const all = insights.slice(0, 10);
   const visible = expanded ? all : all.slice(0, INITIAL_COUNT);
   const hasMore = all.length > INITIAL_COUNT;
 
