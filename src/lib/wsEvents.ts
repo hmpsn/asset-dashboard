@@ -22,6 +22,7 @@ export const WS_EVENTS = {
   WORK_ORDER_UPDATE: 'work-order:update',
   ANOMALIES_UPDATE: 'anomalies:update',
   CONTENT_PUBLISHED: 'content:published',
+  INSIGHT_RESOLVED: 'insight_resolved',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

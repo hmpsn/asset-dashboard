@@ -31,7 +31,7 @@ router.put(
     const { status, note } = req.body as { status: 'in_progress' | 'resolved'; note?: string };
     const updated = resolveInsight(req.params.insightId, workspaceId, status, note);
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
-    addActivity(workspaceId, `Insight ${status}: ${note ?? ''}`);
+    addActivity(workspaceId, 'insight_resolved', `Insight ${status}${note ? ': ' + note : ''}`);
     broadcastToWorkspace(workspaceId, 'insight_resolved', { insightId: req.params.insightId, status });
     res.json(updated);
   },

@@ -79,5 +79,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
+    [WS_EVENTS.INSIGHT_RESOLVED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
+    },
   });
 }

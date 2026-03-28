@@ -52,6 +52,7 @@ export type ActivityType =
   | 'invoice_paid'
   | 'invoice_failed'
   | 'page_analysis'
+  | 'insight_resolved'
   | 'note';
 
 export interface ActivityEntry {

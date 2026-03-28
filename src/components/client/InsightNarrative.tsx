@@ -1,3 +1,4 @@
+// CLIENT-FACING
 import { useClientInsights } from '../../hooks/client/useClientInsights.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { EmptyState } from '../ui/EmptyState.js';

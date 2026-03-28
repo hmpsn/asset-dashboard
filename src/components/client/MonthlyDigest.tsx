@@ -1,3 +1,4 @@
+// CLIENT-FACING
 import { useMonthlyDigest } from '../../hooks/client/useMonthlyDigest.js';
 import { SectionCard } from '../ui/SectionCard.js';
 import { Skeleton } from '../ui/Skeleton.js';
