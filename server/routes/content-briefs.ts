@@ -24,6 +24,8 @@ import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
 import { createLogger } from '../logger.js';
+import { buildPipelineSignals } from '../insight-feedback.js';
+import { getInsights } from '../analytics-insights-store.js';
 
 const log = createLogger('content-briefs');
 
@@ -33,6 +35,18 @@ router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspace
   const briefs = listBriefs(req.params.workspaceId);
   log.info(`LIST ${req.params.workspaceId}: ${briefs.length} briefs found`);
   res.json(briefs);
+});
+
+// AI Suggested Briefs — must be registered BEFORE /:briefId to avoid param shadowing
+router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const insights = getInsights(req.params.workspaceId);
+    const signals = buildPipelineSignals(insights);
+    res.json({ signals });
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to build pipeline signals');
+    res.json({ signals: [] });
+  }
 });
 
 // Get a specific brief

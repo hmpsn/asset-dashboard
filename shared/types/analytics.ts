@@ -321,6 +321,18 @@ export interface SerpOpportunityData {
   schemaStatus: 'missing' | 'partial' | 'complete';
 }
 
+/** Data shape for anomaly_digest insights */
+export interface AnomalyDigestData {
+  anomalyType: string;
+  metric: string;
+  currentValue: number;
+  expectedValue: number;
+  deviationPercent: number;
+  durationDays: number;
+  firstDetected: string;
+  severity: string;
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -336,7 +348,7 @@ export interface InsightDataMap {
   ctr_opportunity: CtrOpportunityData;
   serp_opportunity: SerpOpportunityData;
   strategy_alignment: Record<string, unknown>;
-  anomaly_digest: Record<string, unknown>;
+  anomaly_digest: AnomalyDigestData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

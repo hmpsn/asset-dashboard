@@ -4,7 +4,9 @@ import {
   computeImpactScore,
   classifyDomain,
   cleanSlugToTitle,
+  checkStrategyAlignment,
 } from '../../server/insight-enrichment.js';
+import type { PageKeywordMap } from '../../shared/types/workspace.js';
 
 describe('insight-enrichment', () => {
   describe('cleanSlugToTitle', () => {
@@ -40,6 +42,64 @@ describe('insight-enrichment', () => {
       expect(classifyDomain('competitor_gap')).toBe('cross');
       expect(classifyDomain('strategy_alignment')).toBe('cross');
       expect(classifyDomain('anomaly_digest')).toBe('cross');
+    });
+  });
+
+  describe('checkStrategyAlignment', () => {
+    function makeMap(pagePath: string, primaryKeyword: string, secondaryKeywords: string[] = []): Map<string, PageKeywordMap> {
+      const entry: PageKeywordMap = {
+        pagePath,
+        pageTitle: 'Test Page',
+        primaryKeyword,
+        secondaryKeywords,
+      };
+      return new Map([[pagePath, entry]]);
+    }
+
+    it('returns untracked when page is not in strategy map', () => {
+      const map = makeMap('/about', 'about us');
+      const result = checkStrategyAlignment('/services', map);
+      expect(result.alignment).toBe('untracked');
+      expect(result.keyword).toBeNull();
+    });
+
+    it('returns aligned when actual keyword matches primary keyword', () => {
+      const map = makeMap('/services', 'seo agency');
+      const result = checkStrategyAlignment('/services', map, 'seo agency');
+      expect(result.alignment).toBe('aligned');
+      expect(result.keyword).toBe('seo agency');
+    });
+
+    it('returns aligned when actual keyword matches a secondary keyword', () => {
+      const map = makeMap('/services', 'seo agency', ['digital marketing', 'seo services']);
+      const result = checkStrategyAlignment('/services', map, 'seo services');
+      expect(result.alignment).toBe('aligned');
+    });
+
+    it('returns misaligned when page is in strategy but ranking for a different keyword', () => {
+      const map = makeMap('/services', 'seo agency');
+      // Page should target "seo agency" but this insight is about "web design"
+      const result = checkStrategyAlignment('/services', map, 'web design');
+      expect(result.alignment).toBe('misaligned');
+      expect(result.keyword).toBe('seo agency');
+    });
+
+    it('returns aligned (not misaligned) when no actualKeyword is provided', () => {
+      const map = makeMap('/services', 'seo agency');
+      const result = checkStrategyAlignment('/services', map);
+      expect(result.alignment).toBe('aligned');
+    });
+
+    it('normalises URL to pathname for lookup', () => {
+      const map = makeMap('/services', 'seo agency');
+      const result = checkStrategyAlignment('https://example.com/services', map, 'web design');
+      expect(result.alignment).toBe('misaligned');
+    });
+
+    it('comparison is case-insensitive', () => {
+      const map = makeMap('/services', 'SEO Agency');
+      const result = checkStrategyAlignment('/services', map, 'seo agency');
+      expect(result.alignment).toBe('aligned');
     });
   });
 

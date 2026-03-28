@@ -16,6 +16,8 @@ import type {
 } from '../shared/types/analytics.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
 import type { ContentBrief, GeneratedPost } from '../shared/types/content.js';
+import type { SeoIssue } from './audit-page.js';
+import { getValidation } from './schema-validator.js';
 
 const log = createLogger('insight-enrichment');
 
@@ -91,6 +93,10 @@ export function classifyDomain(type: InsightType): InsightDomain {
     'conversion_attribution',
   ];
 
+  // anomaly_digest domain is set explicitly by the anomaly detection loop
+  // based on anomaly type (traffic/search/cross), so this fallback to 'cross'
+  // is only hit if anomaly_digest goes through the standard enrichment path.
+
   if (searchTypes.includes(type)) return 'search';
   if (trafficTypes.includes(type)) return 'traffic';
   return 'cross';
@@ -124,6 +130,7 @@ export function computeImpactScore(
   // content_decay: currentClicks, baselineClicks
   // cannibalization/keyword_cluster: totalImpressions
   // conversion_attribution: sessions
+  // anomaly_digest: expectedValue (the baseline metric magnitude)
   const traffic =
     (data.clicks as number | undefined) ??
     (data.currentClicks as number | undefined) ??
@@ -133,6 +140,7 @@ export function computeImpactScore(
     (data.sessions as number | undefined) ??
     (data.pageviews as number | undefined) ??
     (data.baselineClicks as number | undefined) ??
+    (data.expectedValue as number | undefined) ??
     0;
 
   const bonus = Math.min(Math.log10(Math.max(traffic, 1)) * 10, 50);
@@ -202,10 +210,14 @@ export interface StrategyAlignmentResult {
  * Checks whether a page is targeted in the keyword strategy.
  *
  * strategyPageMap: Map<pagePath, PageKeywordMap> (normalised paths as keys)
+ * actualKeyword: the query this insight is actually about (e.g. data.query).
+ *   When provided and the page IS in strategy, we compare it against
+ *   primaryKeyword + secondaryKeywords. A mismatch → 'misaligned'.
  */
 export function checkStrategyAlignment(
   pageId: string | null,
   strategyPageMap: Map<string, PageKeywordMap>,
+  actualKeyword?: string | null,
 ): StrategyAlignmentResult {
   if (!pageId) return { keyword: null, alignment: null };
 
@@ -226,10 +238,25 @@ export function checkStrategyAlignment(
     return { keyword: null, alignment: 'untracked' };
   }
 
-  // Page is in strategy — consider it aligned if it has a primary keyword
+  if (!entry.primaryKeyword) {
+    return { keyword: null, alignment: 'untracked' };
+  }
+
+  // Page is in strategy with a primary keyword.
+  // If we know what keyword this insight is actually about, check alignment.
+  if (actualKeyword) {
+    const normalize = (s: string) => s.toLowerCase().trim();
+    const target = normalize(entry.primaryKeyword);
+    const secondary = (entry.secondaryKeywords ?? []).map(normalize);
+    const actual = normalize(actualKeyword);
+    if (actual !== target && !secondary.includes(actual)) {
+      return { keyword: entry.primaryKeyword, alignment: 'misaligned' };
+    }
+  }
+
   return {
-    keyword: entry.primaryKeyword || null,
-    alignment: entry.primaryKeyword ? 'aligned' : 'untracked',
+    keyword: entry.primaryKeyword,
+    alignment: 'aligned',
   };
 }
 
@@ -292,13 +319,151 @@ export function checkPipelineStatus(
   return null;
 }
 
+// ── Schema gap detection ──────────────────────────────────────────────────────
+
+/**
+ * Returns schema gap descriptions for a page based on stored schema validations.
+ *
+ * Looks up the schema_validations table for the given page and extracts:
+ *   - Validation errors (missing required fields)
+ *   - Validation warnings (missing recommended fields)
+ *   - Rich result eligibility gaps
+ *
+ * Returns an empty array if no validation data exists (never blocks enrichment).
+ */
+export function getSchemaGapsForPage(workspaceId: string, pageUrl: string): string[] {
+  try {
+    // Try exact match first, then pathname-only match
+    let validation = getValidation(workspaceId, pageUrl);
+
+    if (!validation && (pageUrl.startsWith('http://') || pageUrl.startsWith('https://'))) {
+      try {
+        const pathname = new URL(pageUrl).pathname;
+        validation = getValidation(workspaceId, pathname);
+      } catch {
+        // invalid URL, skip pathname fallback
+      }
+    }
+
+    if (!validation) return [];
+
+    const gaps: string[] = [];
+
+    // Extract error-level gaps (missing required fields)
+    if (Array.isArray(validation.errors)) {
+      for (const err of validation.errors) {
+        if (err && typeof err === 'object' && 'message' in err) {
+          gaps.push((err as { message: string }).message);
+        }
+      }
+    }
+
+    // Extract warning-level gaps (missing recommended fields)
+    if (Array.isArray(validation.warnings)) {
+      for (const warn of validation.warnings) {
+        if (warn && typeof warn === 'object' && 'message' in warn) {
+          gaps.push((warn as { message: string }).message);
+        }
+      }
+    }
+
+    // Flag if page has no rich result eligibility
+    if (!Array.isArray(validation.richResults) || validation.richResults.length === 0) {
+      gaps.push('No rich result types detected — consider adding structured data');
+    }
+
+    return gaps;
+  } catch (err) {
+    log.warn({ workspaceId, pageUrl, err }, 'Schema gap lookup failed — skipping');
+    return [];
+  }
+}
+
 // ── Enrichment context ────────────────────────────────────────────────────────
 
 export interface EnrichmentContext {
+  workspaceId: string;
   titleMap: Map<string, string>;
   strategyPageMap: Map<string, PageKeywordMap>;
   briefs: ContentBrief[];
   posts: GeneratedPost[];
+  /** Map of normalised page slug → top audit issues (error/warning only, max 5) */
+  auditPageIssuesMap: Map<string, string[]>;
+}
+
+// ── Audit issue lookup ────────────────────────────────────────────────────────
+
+/** Max audit issues to attach per page */
+const MAX_AUDIT_ISSUES_PER_PAGE = 5;
+
+/**
+ * Builds a map of page slug → top error/warning issue messages from the latest
+ * audit snapshot. Keyed by normalised slug (lowercase, no leading slash) so
+ * lookups from pageId URLs work reliably.
+ *
+ * Returns an empty map when no audit data exists — never throws.
+ */
+async function buildAuditIssuesMap(workspaceId: string): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+
+  try {
+    // Dynamic imports to avoid circular deps
+    const { getWorkspace } = await import('./workspaces.js');
+    const { getLatestSnapshot } = await import('./reports.js');
+
+    const workspace = getWorkspace(workspaceId);
+    if (!workspace?.webflowSiteId) return map;
+
+    const snapshot = getLatestSnapshot(workspace.webflowSiteId);
+    if (!snapshot?.audit?.pages) return map;
+
+    for (const page of snapshot.audit.pages) {
+      // Filter to actionable issues only (errors and warnings)
+      const actionable = page.issues.filter(
+        (i: SeoIssue) => i.severity === 'error' || i.severity === 'warning',
+      );
+      if (actionable.length === 0) continue;
+
+      // Take top N issue messages
+      const messages = actionable
+        .slice(0, MAX_AUDIT_ISSUES_PER_PAGE)
+        .map((i: SeoIssue) => i.message);
+
+      // Store under normalised slug (lowercase, no leading or trailing slash)
+      const normSlug = (page.slug || '').toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+      if (normSlug) {
+        map.set(normSlug, messages);
+      }
+    }
+  } catch (err) {
+    log.warn({ workspaceId, err }, 'audit snapshot unavailable for enrichment context');
+  }
+
+  return map;
+}
+
+/**
+ * Looks up audit issues for a specific page URL/path from the pre-built map.
+ * Returns an empty array when no issues found.
+ */
+export function getAuditIssuesForPage(
+  pageId: string | null,
+  auditMap: Map<string, string[]>,
+): string[] {
+  if (!pageId || auditMap.size === 0) return [];
+
+  // Normalise pageId to a slug for matching
+  let pathname = pageId;
+  if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
+    try {
+      pathname = new URL(pageId).pathname;
+    } catch {
+      // keep original
+    }
+  }
+
+  const normSlug = pathname.toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+  return auditMap.get(normSlug) ?? [];
 }
 
 /**
@@ -343,7 +508,10 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
     log.warn({ workspaceId, err }, 'content-posts-db unavailable for enrichment context');
   }
 
-  return { titleMap, strategyPageMap, briefs, posts };
+  // Load audit issues map (page slug → top error/warning messages)
+  const auditPageIssuesMap = await buildAuditIssuesMap(workspaceId);
+
+  return { workspaceId, titleMap, strategyPageMap, briefs, posts, auditPageIssuesMap };
 }
 
 // ── Main enrichment function ──────────────────────────────────────────────────
@@ -353,6 +521,7 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
  *   - pageTitle (resolved from titleMap or slug)
  *   - strategyKeyword + strategyAlignment
  *   - pipelineStatus
+ *   - auditIssues (page_health: linked SEO audit issues; serp_opportunity: schema gaps)
  *   - impactScore
  *   - domain
  *
@@ -368,8 +537,12 @@ export function enrichInsight(
   // Page title
   enriched.pageTitle = resolvePageTitle(insight.pageId, ctx.titleMap);
 
-  // Strategy alignment
-  const alignment = checkStrategyAlignment(insight.pageId, ctx.strategyPageMap);
+  // Strategy alignment — extract the actual ranking keyword from insight data
+  // so checkStrategyAlignment can detect misalignment (page ranked for a term
+  // that doesn't match its strategy target).
+  const insightData = insight.data as Record<string, unknown> | null | undefined;
+  const actualKeyword = typeof insightData?.query === 'string' ? insightData.query : null;
+  const alignment = checkStrategyAlignment(insight.pageId, ctx.strategyPageMap, actualKeyword);
   enriched.strategyKeyword = alignment.keyword;
   enriched.strategyAlignment = alignment.alignment;
 
@@ -381,6 +554,31 @@ export function enrichInsight(
 
   // Domain classification
   enriched.domain = classifyDomain(insight.insightType);
+
+  // Audit issues — attach linked audit issues for page_health insights
+  if (insight.insightType === 'page_health' && insight.pageId) {
+    try {
+      const auditIssues = getAuditIssuesForPage(insight.pageId, ctx.auditPageIssuesMap);
+      if (auditIssues.length > 0) {
+        enriched.auditIssues = JSON.stringify(auditIssues);
+      }
+    } catch (err) {
+      // Enrichment failure must never block insight storage
+      log.warn({ insightType: insight.insightType, pageId: insight.pageId, err }, 'audit issue enrichment failed');
+    }
+  }
+
+  // Schema gap enrichment for SERP opportunity insights
+  if (insight.insightType === 'serp_opportunity' && insight.pageId) {
+    try {
+      const schemaGaps = getSchemaGapsForPage(ctx.workspaceId, insight.pageId);
+      if (schemaGaps.length > 0) {
+        enriched.auditIssues = JSON.stringify(schemaGaps);
+      }
+    } catch (err) {
+      log.warn({ insightType: insight.insightType, pageId: insight.pageId, err }, 'Schema gap enrichment failed');
+    }
+  }
 
   return enriched;
 }

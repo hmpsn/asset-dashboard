@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
+import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain, AnomalyDigestData } from '../shared/types/analytics.js';
 import { parseJsonFallback } from './db/json-validation.js';
 
 // ── SQLite row shape ──
@@ -61,6 +61,9 @@ const stmts = createStmtCache(() => ({
   ),
   deleteByWorkspace: db.prepare(
     `DELETE FROM analytics_insights WHERE workspace_id = ?`,
+  ),
+  selectByDomain: db.prepare(
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
   ),
 }));
 
@@ -166,4 +169,45 @@ export function deleteStaleInsightsByType(
   );
   const info = stmt.run(workspaceId, insightType, olderThan);
   return info.changes;
+}
+
+// ── Anomaly Digest helpers ──────────────────────────────────────
+
+/**
+ * Upsert an anomaly digest insight with deduplication.
+ * The dedupKey becomes the pageId so the partial unique index
+ * (workspace_id, insight_type, page_id WHERE insight_type='anomaly_digest')
+ * prevents duplicate rows for the same anomaly type + metric combo.
+ */
+export function upsertAnomalyDigestInsight(params: {
+  workspaceId: string;
+  anomalyType: string;
+  metric: string;
+  data: AnomalyDigestData;
+  severity: InsightSeverity;
+  domain: InsightDomain;
+  impactScore: number;
+}): AnalyticsInsight {
+  const dedupKey = `anomaly:${params.anomalyType}:${params.metric}`;
+  return upsertInsight({
+    workspaceId: params.workspaceId,
+    pageId: dedupKey,
+    insightType: 'anomaly_digest',
+    data: params.data as unknown as Record<string, unknown>,
+    severity: params.severity,
+    anomalyLinked: true,
+    impactScore: params.impactScore,
+    domain: params.domain,
+  });
+}
+
+/**
+ * Fetch insights for a workspace filtered by domain, ordered by impact_score DESC.
+ */
+export function getInsightsByDomain(
+  workspaceId: string,
+  domain: string,
+): AnalyticsInsight[] {
+  const rows = stmts().selectByDomain.all(workspaceId, domain) as InsightRow[];
+  return rows.map(rowToInsight);
 }

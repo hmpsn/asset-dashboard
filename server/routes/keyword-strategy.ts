@@ -43,6 +43,7 @@ import db from '../db/index.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
+import { buildStrategySignals } from '../insight-feedback.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -1989,6 +1990,22 @@ router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) 
   const kw = decodeURIComponent(req.params.keyword).toLowerCase().trim();
   db.prepare('DELETE FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').run(ws.id, kw);
   res.json({ deleted: kw });
+});
+
+// --- Intelligence Signals ---
+// GET /api/webflow/keyword-strategy/:workspaceId/signals
+
+router.get('/api/webflow/keyword-strategy/:workspaceId/signals', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  try {
+    const insights = getInsights(ws.id);
+    const signals = buildStrategySignals(insights);
+    res.json({ signals });
+  } catch (err) {
+    log.error({ err, workspaceId: ws.id }, 'Failed to build strategy signals');
+    res.json({ signals: [] });
+  }
 });
 
 export default router;

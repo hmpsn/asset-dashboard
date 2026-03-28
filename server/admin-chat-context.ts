@@ -23,6 +23,7 @@ import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
 import { listChurnSignals } from './churn-signals.js';
 import { listAnomalies } from './anomaly-detection.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { getPageSpeed, getPageWeight, getLinkCheck } from './performance-store.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
@@ -144,16 +145,22 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
 
   const sections: string[] = [];
 
-  // Page Health summary — top 10 by score, worst first
+  // Page Health summary — top 10 by score, worst first (enriched with titles + audit issues)
   const healthInsights = insights
     .filter(i => i.insightType === 'page_health')
-    .map(i => ({ pageId: i.pageId, ...(i.data as unknown as PageHealthData), severity: i.severity }))
+    .map(i => ({ pageId: i.pageId, pageTitle: i.pageTitle, strategyAlignment: i.strategyAlignment, auditIssues: i.auditIssues, pipelineStatus: i.pipelineStatus, ...(i.data as unknown as PageHealthData), severity: i.severity }))
     .sort((a, b) => a.score - b.score);
   if (healthInsights.length > 0) {
     const lines = healthInsights.slice(0, 10).map(h => {
-      let path: string;
-      try { path = new URL(h.pageId || '').pathname; } catch { path = h.pageId || '(unknown)'; }
-      return `  ${path}: ${h.score}/100 (${h.trend}) — ${h.clicks} clicks, pos ${h.position?.toFixed?.(1) ?? h.position}`;
+      const title = h.pageTitle || (() => { try { return new URL(h.pageId || '').pathname; } catch { return h.pageId || '(unknown)'; } })();
+      let line = `  ${title}: ${h.score}/100 (${h.trend}) — ${h.clicks} clicks, pos ${h.position?.toFixed?.(1) ?? h.position}`;
+      if (h.strategyAlignment && h.strategyAlignment !== 'untracked') line += ` — strategy: ${h.strategyAlignment}`;
+      if (h.pipelineStatus) line += ` — pipeline: ${h.pipelineStatus}`;
+      if (h.auditIssues) {
+        const issues = parseJsonFallback<string[]>(h.auditIssues, []);
+        if (issues.length > 0) line += ` — ${issues.length} audit issue(s)`;
+      }
+      return line;
     });
     sections.push(`PAGE HEALTH SCORES (worst first):\n${lines.join('\n')}`);
   }
@@ -161,12 +168,16 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   // Ranking opportunities
   const quickWins = insights
     .filter(i => i.insightType === 'ranking_opportunity')
-    .map(i => i.data as unknown as QuickWinData)
+    .map(i => ({ ...i.data as unknown as QuickWinData, pageTitle: i.pageTitle, strategyAlignment: i.strategyAlignment, pipelineStatus: i.pipelineStatus }))
     .sort((a, b) => b.estimatedTrafficGain - a.estimatedTrafficGain);
   if (quickWins.length > 0) {
-    const lines = quickWins.slice(0, 10).map(q =>
-      `  "${q.query}" — pos ${Math.round(q.currentPosition)}, est. +${q.estimatedTrafficGain} clicks/mo if improved`,
-    );
+    const lines = quickWins.slice(0, 10).map(q => {
+      let line = `  "${q.query}" — pos ${Math.round(q.currentPosition)}, est. +${q.estimatedTrafficGain} clicks/mo if improved`;
+      if (q.pageTitle) line += ` (${q.pageTitle})`;
+      if (q.strategyAlignment && q.strategyAlignment !== 'untracked') line += ` [strategy: ${q.strategyAlignment}]`;
+      if (q.pipelineStatus) line += ` [pipeline: ${q.pipelineStatus}]`;
+      return line;
+    });
     sections.push(`QUICK WINS (pages close to page 1):\n${lines.join('\n')}`);
   }
 
@@ -236,6 +247,22 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
       return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR (${c.conversions} conversions, ${c.sessions} sessions)`;
     });
     sections.push(`CONVERSION ATTRIBUTION (pages driving conversions):\n${lines.join('\n')}`);
+  }
+
+  // Anomaly digest insights
+  const anomalyInsights = insights.filter(i => i.insightType === 'anomaly_digest');
+  if (anomalyInsights.length > 0) {
+    const lines = anomalyInsights.slice(0, 8).map(a => {
+      const data = a.data as Record<string, unknown>;
+      return `  ${data.anomalyType}: ${data.metric} deviated ${data.deviationPercent}% (ongoing for ${data.durationDays} day(s))`;
+    });
+    sections.push(`ANOMALY DIGEST (active anomalies tracked in insight feed):\n${lines.join('\n')}`);
+  }
+
+  // Proactive critical insight summary
+  const criticalInsights = insights.filter(i => i.severity === 'critical');
+  if (criticalInsights.length > 0) {
+    sections.push(`⚠️ ${criticalInsights.length} CRITICAL INSIGHTS requiring attention — proactively mention these when relevant.`);
   }
 
   if (sections.length === 0) return '';

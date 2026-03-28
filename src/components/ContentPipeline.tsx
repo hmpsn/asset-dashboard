@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown } from 'lucide-react';
 import { useContentPipeline } from '../hooks/admin';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { queryKeys } from '../lib/queryKeys';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
+import { AiSuggested } from './pipeline/AiSuggested';
 import type { FixContext } from '../App';
 
 const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
@@ -59,8 +63,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
   const [decayDismissed, setDecayDismissed] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
+  const queryClient = useQueryClient();
+
   // React Query hook replaces manual data fetching
   const { data: pipelineData, isLoading } = useContentPipeline(workspaceId);
+
+  // Invalidate AI suggested briefs when intelligence signals update
+  useWorkspaceEvents(workspaceId, {
+    'intelligence_signals_updated': () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    },
+  });
   
   const summary = pipelineData?.summary;
   const decay = pipelineData?.decay;
@@ -77,6 +90,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
   const handleExport = (dataset: string, format: 'csv' | 'json') => {
     window.open(`/api/export/${workspaceId}/${dataset}?format=${format}`, '_blank');
     setExportOpen(false);
+  };
+
+  // Navigate to briefs tab when an AI-suggested brief is actioned
+  const handleCreateBrief = () => {
+    setActiveTab('briefs');
   };
 
   return (
@@ -118,6 +136,9 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
           </button>
         </div>
       )}
+
+      {/* AI-suggested briefs from insight engine */}
+      <AiSuggested workspaceId={workspaceId} onCreateBrief={handleCreateBrief} />
 
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
