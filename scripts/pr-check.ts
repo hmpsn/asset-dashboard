@@ -27,8 +27,8 @@ const SCAN_ALL = process.argv.includes('--all');
 
 function getChangedFiles(): string[] {
   try {
-    // Try against staging first, then main, then just staged+unstaged changes
-    for (const base of ['origin/staging', 'origin/main', 'HEAD']) {
+    // On a PR branch: diff against staging or main
+    for (const base of ['origin/staging', 'origin/main']) {
       try {
         const out = execSync(`git diff --name-only ${base} 2>/dev/null`, {
           cwd: ROOT,
@@ -38,6 +38,17 @@ function getChangedFiles(): string[] {
       } catch {
         // try next
       }
+    }
+    // On a push to main/staging (squash merge): diff against previous commit
+    // This prevents full-scan mode from flagging the entire codebase
+    try {
+      const out = execSync(`git diff --name-only HEAD~1 2>/dev/null`, {
+        cwd: ROOT,
+        encoding: 'utf-8',
+      }).trim();
+      if (out) return out.split('\n').filter(Boolean);
+    } catch {
+      // no previous commit (initial commit) — fall through to empty
     }
     return [];
   } catch {
@@ -123,12 +134,16 @@ function checkFile(file: string, check: Check): string[] {
   }
 }
 
+// Directories that should never be scanned (vendor code, test fixtures, build output)
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'tests', 'test-branding.ts'];
+
 function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
+  const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFlag = check.exclude ? `--exclude="${path.basename(check.exclude)}"` : '';
   try {
     const out = execSync(
-      `grep -rn ${globs} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
     return out.trim() ? out.trim().split('\n').filter(Boolean) : [];
@@ -150,7 +165,8 @@ for (const check of CHECKS) {
     const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
     const relevant = changedFiles.filter(f =>
       exts.some(ext => f.endsWith(ext)) &&
-      (!check.exclude || !f.includes(check.exclude))
+      (!check.exclude || !f.includes(check.exclude)) &&
+      !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d)
     );
     for (const file of relevant) {
       matches.push(...checkFile(file, check));
