@@ -2,8 +2,11 @@ import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import { getROIHighlights } from './roi-attribution.js';
 import { callOpenAI } from './openai-helpers.js';
+import { getSearchPeriodComparison } from './search-console.js';
+import { getGA4PeriodComparison } from './google-analytics.js';
 import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { Workspace } from './workspaces.js';
 
 const log = createLogger('monthly-digest');
 
@@ -15,18 +18,18 @@ const digestCache = new Map<string, { result: MonthlyDigestData; ts: number }>()
  * Aggregates insights, anomalies, and ROI data into a client-facing narrative.
  */
 export async function generateMonthlyDigest(
-  workspaceId: string,
+  ws: Workspace,
   month?: string, // "March 2026" — defaults to current month
 ): Promise<MonthlyDigestData> {
   const now = new Date();
   const monthLabel = month ?? now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  const cacheKey = `${workspaceId}:${monthLabel}`;
+  const cacheKey = `${ws.id}:${monthLabel}`;
   const cached = digestCache.get(cacheKey);
   if (cached && now.getTime() - cached.ts < CACHE_TTL_MS) return cached.result;
 
-  const insights = getInsights(workspaceId);
-  const roiHighlights = getROIHighlights(workspaceId, 5);
+  const insights = getInsights(ws.id);
+  const roiHighlights = getROIHighlights(ws.id, 5);
 
   // Wins: positive severity or positive ranking mover
   const wins = insights
@@ -44,11 +47,40 @@ export async function generateMonthlyDigest(
       insightId: i.id,
     }));
 
-  // Metric changes — placeholder until GSC/GA4 period comparison is wired
+  // Fetch GSC + GA4 period comparisons concurrently; degrade gracefully if unavailable
+  const COMPARISON_DAYS = 28;
+  let clicksChange = 0;
+  let impressionsChange = 0;
+  let avgPositionChange = 0;
+
+  const [gscResult, ga4Result] = await Promise.allSettled([
+    ws.gscPropertyUrl
+      ? getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS)
+      : Promise.reject(new Error('GSC not configured')),
+    ws.ga4PropertyId
+      ? getGA4PeriodComparison(ws.ga4PropertyId, COMPARISON_DAYS)
+      : Promise.reject(new Error('GA4 not configured')),
+  ]);
+
+  if (gscResult.status === 'fulfilled') {
+    const { changePercent, change } = gscResult.value;
+    clicksChange = changePercent.clicks;
+    impressionsChange = changePercent.impressions;
+    // Negate: lower position = better rank, so improvement is a negative change
+    avgPositionChange = +(-change.position).toFixed(1);
+  } else {
+    log.debug({ workspaceId: ws.id }, 'GSC comparison unavailable for digest metrics');
+  }
+
+  if (ga4Result.status === 'fulfilled') {
+    // GA4 sessions available for future metrics expansion — currently GSC covers clicks/impressions
+    void ga4Result.value;
+  }
+
   const metrics = {
-    clicksChange: 0,
-    impressionsChange: 0,
-    avgPositionChange: 0,
+    clicksChange,
+    impressionsChange,
+    avgPositionChange,
     pagesOptimized: issuesAddressed.length,
   };
 
@@ -110,8 +142,18 @@ async function generateDigestSummary(
   wins: DigestItem[],
   issues: DigestItem[],
   roi: ROIHighlight[],
-  metrics: { pagesOptimized: number },
+  metrics: { clicksChange: number; impressionsChange: number; avgPositionChange: number; pagesOptimized: number },
 ): Promise<string> {
+  const clicksTrend = metrics.clicksChange > 0 ? `+${metrics.clicksChange.toFixed(1)}%` : metrics.clicksChange < 0 ? `${metrics.clicksChange.toFixed(1)}%` : null;
+  const impressionsTrend = metrics.impressionsChange > 0 ? `+${metrics.impressionsChange.toFixed(1)}%` : metrics.impressionsChange < 0 ? `${metrics.impressionsChange.toFixed(1)}%` : null;
+  const positionTrend = metrics.avgPositionChange > 0 ? `improved ${metrics.avgPositionChange} spot${metrics.avgPositionChange !== 1 ? 's' : ''}` : null;
+
+  const metricLines = [
+    clicksTrend ? `Search clicks: ${clicksTrend}` : null,
+    impressionsTrend ? `Impressions: ${impressionsTrend}` : null,
+    positionTrend ? `Average ranking position: ${positionTrend}` : null,
+  ].filter(Boolean).join('\n');
+
   try {
     const prompt = `Write a 2-3 sentence monthly performance summary for a website client.
 Month: ${month}
@@ -119,9 +161,10 @@ Wins: ${wins.length} improvements identified
 Issues addressed: ${issues.length} optimizations completed
 Pages optimized: ${metrics.pagesOptimized}
 ROI highlights: ${roi.length} measurable improvements
+${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
 
 Tone: Professional, outcome-focused, reassuring. No jargon. Use "we" language.
-Do NOT include specific numbers unless they're impressive. Keep it concise.`;
+Only mention specific numbers if they are notable (>10% change). Keep it concise.`;
 
     const result = await callOpenAI({
       model: 'gpt-4.1',

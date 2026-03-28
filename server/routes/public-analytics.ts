@@ -72,7 +72,7 @@ router.get('/api/public/insights/:workspaceId/digest', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
-    const digest = await generateMonthlyDigest(ws.id);
+    const digest = await generateMonthlyDigest(ws);
     res.json(digest);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
