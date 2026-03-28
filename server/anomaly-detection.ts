@@ -547,7 +547,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             const severityMap: Record<string, InsightSeverity> = {
               critical: 'critical',
               warning: 'warning',
-              positive: 'opportunity',
+              positive: 'positive',
             };
             const insightSeverity: InsightSeverity = severityMap[a.severity] ?? 'opportunity';
 
