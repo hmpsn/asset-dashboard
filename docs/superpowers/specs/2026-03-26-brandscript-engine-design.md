@@ -485,3 +485,124 @@ All new features live within the existing **Brand Hub** tab, reorganized into su
 - **Design handoff / wireframe integration** — Phase 2-3
 - **Logo or visual identity** — handled outside the platform
 - **Client portal for brand review** — can be added later; initial version is admin-only with export for client sharing
+
+---
+
+## Addendum: Forward-Compatibility Requirements (Added 2026-03-27)
+
+> These requirements were identified during the holistic cross-phase review. They ensure Phase 1 components are ready for Phase 2 and Phase 3 integration without retrofitting.
+
+### 1. SteeringChat Must Include Auto-Summarization
+
+The `SteeringChat` component (used by Voice Calibration in Phase 1, then reused by Brand Identity and Copy Pipeline in Phase 3) must include conversation auto-summarization from day one.
+
+**Why this matters:** Phase 3 copy review will produce 10+ rounds of steering per section across dozens of pages. Without summarization, the context window fills with stale notes and the AI loses focus on the latest direction. The existing `rewrite-chat.ts` already implements this pattern — after 6+ messages, prior messages are summarized into a condensed context block.
+
+**Implementation requirements:**
+- After 6 steering exchanges within a single calibration/refinement session, auto-summarize prior exchanges into a condensed block
+- The summary preserves: key directions given, what was rejected, what was approved, and the current trajectory
+- Recent exchanges (last 3) remain in full — only older ones get summarized
+- Summarization uses GPT-4.1-mini (cheap, structured task)
+- Store the summary on the session record (`voice_calibration_sessions.steering_notes` or equivalent)
+
+**Anti-pattern to avoid:** Do NOT just truncate old messages. Summarize them. Truncation loses critical context like "we already tried a formal tone and the user hated it."
+
+**Reference implementation:** `server/routes/rewrite-chat.ts` — look for the `summarizeConversation` pattern.
+
+### 2. Voice Sample Source Enum Must Support Future Sources
+
+The `voice_samples.source` field currently accepts: `manual`, `transcript_extraction`, `calibration_loop`.
+
+**Add to the type definition (not the migration — it's a TEXT field):**
+- `copy_approved` — for Phase 3, when approved copy sections are saved back as voice samples
+- `identity_approved` — for Phase 1 itself, when approved brand identity deliverables (taglines, elevator pitches) are saved as samples
+
+**Why this matters:** Phase 3's most powerful learning mechanism is routing approved copy back as voice samples. If the type enum doesn't include `copy_approved`, the implementer will either skip the feature or invent an inconsistent value.
+
+**In `shared/types/brand-engine.ts`:**
+```typescript
+export type VoiceSampleSource =
+  | 'manual'
+  | 'transcript_extraction'
+  | 'calibration_loop'
+  | 'copy_approved'        // Phase 3: approved copy sections become samples
+  | 'identity_approved';   // Phase 1: approved taglines/pitches become samples
+```
+
+**Use this type everywhere** — never use raw strings for source values.
+
+### 3. SEO Context Builders Must Support Emphasis Parameters
+
+The new builder functions added to `seo-context.ts` (`buildBrandscriptContext()`, `buildVoiceProfileContext()`, `buildIdentityContext()`) must accept an optional `emphasis` parameter that controls output verbosity.
+
+**Why this matters:** Phase 3 uses smart context selection — a homepage generation emphasizes brand identity and messaging pillars, while a location page emphasizes local keywords and NAP data. Without emphasis control, every generation gets the same massive context payload, diluting the AI's attention.
+
+**Interface:**
+```typescript
+type ContextEmphasis = 'full' | 'summary' | 'minimal';
+
+function buildBrandscriptContext(
+  workspaceId: string,
+  emphasis?: ContextEmphasis  // defaults to 'full'
+): string;
+
+function buildVoiceProfileContext(
+  workspaceId: string,
+  emphasis?: ContextEmphasis
+): string;
+
+function buildIdentityContext(
+  workspaceId: string,
+  emphasis?: ContextEmphasis
+): string;
+```
+
+**Behavior:**
+- `full` — include everything (all sections, all samples, all deliverables). Default for Phase 1 usage.
+- `summary` — include key items only (first 2 voice samples, top 3 messaging pillars, mission statement only). For pages where this context is secondary.
+- `minimal` — one-paragraph summary of the brand. For pages where this context is background only.
+
+**Critical rule:** Always default to `full` if no emphasis is provided. Phase 1 callers should not need to change. This is a non-breaking extension.
+
+### 4. Voice Calibration Sessions Must Track Prompt Metadata
+
+The `voice_calibration_sessions` table stores `prompt_type` (e.g., `hero_headline`, `about_intro`). Phase 3 will query this data to find the best voice samples per section type.
+
+**Ensure these prompt_type values align with Phase 2's SectionType enum:**
+```
+hero_headline    → hero
+about_intro      → about-team
+service_body     → features-benefits
+cta_copy         → cta
+faq_answer       → faq
+testimonial_copy → testimonials
+```
+
+**Implementation requirement:** Create a mapping constant that the Phase 1 implementer uses:
+```typescript
+export const PROMPT_TYPE_TO_SECTION_TYPE: Record<string, string> = {
+  'hero_headline': 'hero',
+  'about_intro': 'about-team',
+  'service_body': 'features-benefits',
+  'cta_copy': 'cta',
+  'faq_answer': 'faq',
+  'testimonial_copy': 'testimonials',
+  'blog_intro': 'content-body',
+  'meta_description': 'seo-meta',
+};
+```
+
+This lets Phase 3 query: "give me the best-rated calibration output for `hero` sections" and use it as additional voice context.
+
+### 5. Brand Identity Deliverables Should Auto-Create Voice Samples
+
+When a tagline, elevator pitch, or tone-of-voice example is approved in the Brand Identity Generator, it should automatically be saved as a voice sample with `source: 'identity_approved'` and the appropriate `context_tag`.
+
+**Mapping:**
+- Approved tagline → voice sample with `context_tag: 'headline'`
+- Approved elevator pitch → voice sample with `context_tag: 'body'`
+- Approved tone example (from Brand Voice Guidelines deliverable) → voice sample with matching `context_tag`
+
+**Why this matters:** These are high-quality, client-approved examples of the brand voice. Not using them as voice samples wastes the best training data the system produces.
+
+**Implementation:** Add a post-approval hook in `server/brand-identity.ts` that calls `addVoiceSample()` from `server/voice-calibration.ts`. Keep it simple — one function call after status changes to `approved`.

@@ -36,7 +36,7 @@
 | `server/app.ts` | Import and register page-strategy route file |
 | `src/api/brand-engine.ts` | Add blueprint, entry, and generation API functions |
 | `src/components/BrandHub.tsx` | Add Page Strategy section alongside existing Brand Hub sections |
-| `shared/types/content.ts` | Extend `TemplateSection` with `narrativeRole`, `brandNote`, `seoNote` fields |
+| `shared/types/content.ts` | Extend `TemplateSection` with `narrativeRole`, `brandNote`, `seoNote` fields; extend `ContentPageType` with Phase 2 page types |
 
 ---
 
@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS blueprint_entries (
   section_plan        TEXT NOT NULL DEFAULT '[]',
   template_id         TEXT,
   matrix_id           TEXT,
+  brief_id            TEXT,  -- FK to content_briefs (populated by Phase 3 auto-brief generation)
   notes               TEXT,
   created_at          TEXT NOT NULL,
   updated_at          TEXT NOT NULL
@@ -156,6 +157,12 @@ export interface SectionPlanItem {
 
 // ═══ BLUEPRINT ENTRY ═══
 
+// IMPORTANT: BlueprintPageType is defined here for Phase 2 standalone use,
+// but per the Phase 2 spec addendum, the implementer MUST also extend
+// ContentPageType in shared/types/content.ts with the new values
+// (homepage, about, contact, faq, testimonials, custom) and then
+// replace ALL references to BlueprintPageType with ContentPageType
+// across both page-strategy.ts and this file. One enum, one source of truth.
 export type BlueprintPageType =
   | 'homepage' | 'about' | 'contact' | 'faq' | 'testimonials'
   | 'blog' | 'landing' | 'service' | 'location' | 'product'
@@ -179,6 +186,7 @@ export interface BlueprintEntry {
   sectionPlan: SectionPlanItem[];
   templateId?: string;
   matrixId?: string;
+  briefId?: string;   // Populated by Phase 3 auto-brief generation
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -326,6 +334,7 @@ interface EntryRow {
   section_plan: string;
   template_id: string | null;
   matrix_id: string | null;
+  brief_id: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -391,11 +400,11 @@ function stmts(): Stmts {
         `INSERT INTO blueprint_entries
            (id, blueprint_id, name, page_type, scope, sort_order, is_collection,
             primary_keyword, secondary_keywords, keyword_source, section_plan,
-            template_id, matrix_id, notes, created_at, updated_at)
+            template_id, matrix_id, brief_id, notes, created_at, updated_at)
          VALUES
            (@id, @blueprint_id, @name, @page_type, @scope, @sort_order, @is_collection,
             @primary_keyword, @secondary_keywords, @keyword_source, @section_plan,
-            @template_id, @matrix_id, @notes, @created_at, @updated_at)`,
+            @template_id, @matrix_id, @brief_id, @notes, @created_at, @updated_at)`,
       ),
       selectEntriesByBlueprint: db.prepare(
         `SELECT * FROM blueprint_entries WHERE blueprint_id = ? ORDER BY sort_order ASC`,
@@ -409,7 +418,7 @@ function stmts(): Stmts {
            is_collection = @is_collection, primary_keyword = @primary_keyword,
            secondary_keywords = @secondary_keywords, keyword_source = @keyword_source,
            section_plan = @section_plan, template_id = @template_id, matrix_id = @matrix_id,
-           notes = @notes, updated_at = @updated_at
+           brief_id = @brief_id, notes = @notes, updated_at = @updated_at
          WHERE id = @id AND blueprint_id = @blueprint_id`,
       ),
       deleteEntry: db.prepare(
@@ -468,6 +477,7 @@ function rowToEntry(row: EntryRow): BlueprintEntry {
     sectionPlan: JSON.parse(row.section_plan) as SectionPlanItem[],
     templateId: row.template_id ?? undefined,
     matrixId: row.matrix_id ?? undefined,
+    briefId: row.brief_id ?? undefined,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -585,6 +595,7 @@ export function addEntry(
     section_plan: JSON.stringify(data.sectionPlan ?? []),
     template_id: data.templateId ?? null,
     matrix_id: null,
+    brief_id: null,
     notes: data.notes ?? null,
     created_at: now,
     updated_at: now,
@@ -622,6 +633,7 @@ export function updateEntry(
       : JSON.stringify(existing.sectionPlan),
     template_id: data.templateId ?? existing.templateId ?? null,
     matrix_id: data.matrixId ?? existing.matrixId ?? null,
+    brief_id: data.briefId ?? existing.briefId ?? null,
     notes: data.notes ?? existing.notes ?? null,
     updated_at: now,
   });
