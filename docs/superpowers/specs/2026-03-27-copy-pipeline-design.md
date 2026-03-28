@@ -394,3 +394,306 @@ Phase 3 depends on both Phase 1 and Phase 2:
 - **From Phase 2:** Blueprint entries with section plans, keyword assignments, narrative roles, brand/SEO notes, page type templates, Content Matrix integration for scaled collections
 
 Phase 3 is the culmination — it uses everything built in Phases 1 and 2 to produce the final output.
+
+---
+
+## Addendum: Holistic Review Enhancements (Added 2026-03-27)
+
+> These enhancements were identified during the cross-phase holistic review. They leverage existing codebase infrastructure to make copy generation significantly more powerful without adding UI complexity.
+
+### Enhancement 1: Content Brief as Intermediate Enrichment Step
+
+**The single highest-value addition to this spec.**
+
+Before generating copy for a blueprint entry, auto-generate a Content Brief using the existing `generateBrief()` function from `server/content-brief.ts`. This enriches the section plan with data the existing brief system already knows how to gather:
+
+- Real People Also Ask questions from SERP scraping
+- Top-ranking competitor page summaries (what's already ranking — what to beat)
+- E-E-A-T guidance (experience, expertise, authority, trust signals)
+- Internal link suggestions (which other pages to cross-link)
+- Topical entities for topical authority
+- CTA recommendations
+- Schema.org recommendations per page type
+- Keyword validation with volume/difficulty metrics
+
+**Updated pipeline flow:**
+```
+Blueprint Entry (strategy)
+    ↓
+Auto-Generate Content Brief (enrichment — existing function, no new code)
+    ↓
+Generate Copy (using brief as detailed creative brief)
+    ↓
+Quality Check (WRITING_QUALITY_RULES scan)
+    ↓
+Review + Steer → feedback loops
+```
+
+**Implementation requirements:**
+- Call `generateBrief()` per blueprint entry before copy generation
+- Store the brief ID on the blueprint entry (`brief_id` FK — added in Phase 2 addendum)
+- Pass the full brief data into the copy generation prompt as Layer 4.5 (between Page Strategy and Cross-Page Awareness)
+- If brief generation fails (SEMrush rate limit, etc.), proceed with copy generation using the section plan alone — degrade gracefully, never block
+- For batch generation, generate briefs in parallel before copy generation starts
+
+**Critical rule:** Do NOT skip brief generation to save time. The brief provides the competitive intelligence that makes copy actually rank. Without it, copy is on-brand but SEO-blind beyond basic keyword placement.
+
+### Enhancement 2: Writing Quality Rules Integration
+
+The existing `WRITING_QUALITY_RULES` block from `server/content-posts-ai.ts` must be injected into every copy generation prompt. This is a string constant — zero implementation cost.
+
+**What it includes:**
+- 25+ forbidden AI cliche phrases ("Did you know...", "In today's world...", "Let's dive in...", "game-changing", "secret sauce", etc.)
+- Structural anti-patterns (no section-end summaries, varied list lengths, no repeated metaphors across sections)
+- Fabrication rules (never invent statistics, never invent quotes)
+- Brand mention limits (max 2-3 in entire article, none in first paragraph)
+
+**Implementation:**
+```typescript
+import { WRITING_QUALITY_RULES } from './content-posts-ai.js';
+
+// Add to Layer 8 (Generation Rules) in the copy generation prompt:
+const generationRules = `
+${WRITING_QUALITY_RULES}
+
+ADDITIONAL COPY-SPECIFIC RULES:
+- Headlines: clarity and hook over cleverness
+- CTAs: always include primary + secondary option
+- FAQs: address real objections, not softballs
+- Consistent terminology across all sections
+`;
+```
+
+**If `WRITING_QUALITY_RULES` is not currently exported, export it.** Do not copy-paste the rules into a new constant.
+
+### Enhancement 3: AEO Principles in Copy Generation
+
+FAQ sections, educational content, and service page body copy must be generated with AEO (Answer Engine Optimization) principles baked in from the start — not just applied as a post-hoc review.
+
+**AEO rules to add to the generation prompt:**
+- Write for AI citation-worthiness (encyclopedic precision + brand voice)
+- Replace superlatives with evidence ("market-leading" → specific metric or proof point)
+- Use "According to [specific source]..." framing when referencing data
+- Definition blocks are disproportionately cited by AI — include clear definitions for key terms
+- FAQ answers must be concise, direct, and self-contained (each answer should make sense without reading the question)
+- Comparison content needs measurable fields with units, not vague claims
+
+**Source:** Extract AEO rules from `server/aeo-page-review.ts` prompt. Do not duplicate — import or reference the same rules.
+
+### Enhancement 4: Auto Quality Check on Generated Copy
+
+After copy is generated but before it enters `draft` status, run a lightweight quality scan. This is a regex/pattern check — no AI call needed.
+
+**Scan for:**
+- Any phrase from the `WRITING_QUALITY_RULES` forbidden list
+- Keyword stuffing (same keyword appearing more than 3x in a single section)
+- Word count violations (section copy more than 50% over or under the target)
+- Missing elements (hero section without a headline, CTA without an action verb)
+- Guardrail violations (check against voice profile guardrails — forbidden words, required terminology)
+
+**Output:** Quality flag per section. Flagged sections get a warning badge in the review UI: "Auto-check: contains forbidden phrase 'in today's world'" so you can fix it before reviewing.
+
+**Implementation:** Pure JavaScript string matching. No AI call. Runs synchronously after generation returns. Add the quality flags to the `copy_sections` table as a `quality_flags` JSON column (nullable).
+
+**Add to `copy_sections` table:**
+```sql
+quality_flags TEXT  -- JSON array of {type, message, severity} or NULL if clean
+```
+
+### Enhancement 5: Page-Type-Specific Generation Instructions
+
+The existing content brief system has battle-tested page type configs with word count ranges, section counts, and writing style guidance per type. Copy generation MUST use these rather than generic instructions.
+
+**Implementation:**
+```typescript
+import { PAGE_TYPE_CONFIGS } from './content-brief.js';
+
+// When generating copy for a service page:
+const config = PAGE_TYPE_CONFIGS['service'];
+// config.writingStyle → "Professional, benefit-focused, trust-building..."
+// config.wordCountRange → { min: 1500, max: 2500 }
+// config.sectionCount → { min: 5, max: 8 }
+```
+
+**If `PAGE_TYPE_CONFIGS` is not currently exported, export it.**
+
+Include the page type's `writingStyle` as additional context in the generation prompt. This gives the AI page-type-appropriate instructions without the user needing to configure anything.
+
+### Enhancement 6: Smart Context Selection by Page Type
+
+Not every page needs the same weight of context. A homepage generation should emphasize brand identity; a location page should emphasize local SEO.
+
+**Emphasis mapping:**
+```typescript
+const PAGE_TYPE_CONTEXT_EMPHASIS: Record<string, {
+  brandscript: ContextEmphasis;
+  voice: ContextEmphasis;
+  identity: ContextEmphasis;
+  seo: ContextEmphasis;
+}> = {
+  homepage:  { brandscript: 'full', voice: 'full', identity: 'full', seo: 'summary' },
+  about:     { brandscript: 'full', voice: 'full', identity: 'full', seo: 'minimal' },
+  service:   { brandscript: 'summary', voice: 'full', identity: 'summary', seo: 'full' },
+  location:  { brandscript: 'minimal', voice: 'summary', identity: 'minimal', seo: 'full' },
+  blog:      { brandscript: 'summary', voice: 'full', identity: 'minimal', seo: 'full' },
+  faq:       { brandscript: 'summary', voice: 'summary', identity: 'minimal', seo: 'summary' },
+  contact:   { brandscript: 'minimal', voice: 'summary', identity: 'minimal', seo: 'minimal' },
+};
+```
+
+**Uses the `ContextEmphasis` parameter added to seo-context.ts builders in the Phase 1 addendum.**
+
+### Enhancement 7: Internal Link Suggestions in Copy
+
+The content brief system already generates internal link suggestions. When generating copy, include the full site map from the blueprint so the AI can:
+- Suggest natural internal links within body copy
+- Reference other pages in CTAs ("Learn more about our [service name]")
+- Cross-link FAQ answers to relevant service pages
+
+**Implementation:** Include a "SITE MAP FOR INTERNAL LINKING" block in Layer 5 (Cross-Page Awareness) listing all blueprint entries with their names, page types, and primary keywords. The AI uses this to create contextually relevant internal links.
+
+### Enhancement 8: Competitor Content Awareness
+
+For service, product, and blog pages, the auto-generated brief includes competitor content summaries from SERP data. Include these in the copy generation prompt as:
+
+```
+COMPETITOR CONTENT (differentiate from these — don't repeat their approach):
+1. [Competitor Page Title] — [Summary of their angle, tone, key points]
+2. [Competitor Page Title] — [Summary]
+3. [Competitor Page Title] — [Summary]
+
+Your copy should: address the same topic but with a unique angle, use the brand voice (not a generic version of their tone), and include proof points they don't have.
+```
+
+**This data comes from the auto-generated brief — no additional API calls.**
+
+### Enhancement 9: Bidirectional Voice Feedback Loop
+
+When copy is steered during review, the steering notes should feed back into the Phase 1 voice profile — not just the copy intelligence table.
+
+**Two feedback paths:**
+
+**Path A: Copy Intelligence (existing in spec)** — workspace-level patterns extracted from steering notes. "Use 'patients' not 'clients'" → copy intelligence rule.
+
+**Path B: Voice Profile Refinement (new)** — when steering notes indicate a voice issue (not just a content issue), update the voice profile:
+- Steering note contains tone language ("too formal", "more playful", "less corporate") → adjust voice DNA trait scores
+- Steering note references specific words ("don't use 'synergy'") → add to voice guardrails
+- Approved section is markedly different from existing voice samples → add as a new voice sample with `source: 'copy_approved'`
+
+**Detection logic:** GPT-4.1-mini classifies each steering note as `content_feedback` (adjust this section's content) or `voice_feedback` (adjust the overall voice profile). Content feedback stays in copy intelligence. Voice feedback propagates to the voice profile.
+
+**Implementation:** After copy intelligence extraction runs, check for voice-classified patterns and call the appropriate voice profile update functions from `server/voice-calibration.ts`.
+
+**Critical rule:** Voice profile changes from copy feedback should be flagged for review, not applied silently. Show a notification: "Based on your copy feedback, we suggest adding 'never use synergy' to your voice guardrails. [Apply] [Dismiss]"
+
+### Enhancement 10: Approved Copy as Training Data
+
+Every approved copy section is a high-quality, client-vetted example of on-brand writing for that section type. These should automatically feed the voice sample pool.
+
+**Rules:**
+- When a section is approved, save it as a voice sample with `source: 'copy_approved'` and `context_tag` matching the section type (hero → 'headline', cta → 'cta', faq → 'faq', etc.)
+- Cap at 3 copy-approved samples per context_tag to avoid overwhelming the voice samples
+- Newer approved samples replace older ones (FIFO per context_tag)
+- Only save sections with status `approved` — never `draft` or `client_review`
+
+**Mapping from section type to voice sample context_tag:**
+```typescript
+const SECTION_TYPE_TO_CONTEXT_TAG: Record<string, string> = {
+  'hero': 'headline',
+  'problem': 'body',
+  'solution': 'body',
+  'features-benefits': 'body',
+  'process': 'body',
+  'social-proof': 'body',
+  'testimonials': 'body',
+  'faq': 'faq',
+  'cta': 'cta',
+  'about-team': 'about',
+  'content-body': 'body',
+};
+```
+
+**This is the system's most powerful self-improvement mechanism.** The more copy you approve, the better the voice samples get, the better future copy gets. Virtuous cycle.
+
+### Enhancement 11: Brief Quality Feedback Loop
+
+Track which auto-generated briefs produce copy that's approved on first try vs. heavily steered. Use this signal to improve future brief generation.
+
+**Implementation:**
+- When copy for an entry is fully approved, record `first_try_approval_rate` on the brief (what % of sections were approved without regeneration)
+- After 10+ briefs in a workspace, identify patterns: "service page briefs need more competitor differentiation" or "blog briefs produce good copy — no changes needed"
+- Surface these insights in the brief generation prompt for future briefs: "In this workspace, service page briefs perform better with detailed competitor analysis. Include extra competitor context."
+
+**Data:** Add `copy_approval_rate` (REAL, nullable) column to `content_briefs` table. Updated by Phase 3 when all sections for a linked entry are approved.
+
+### Enhancement 12: Quality Rules Evolution
+
+When copy intelligence extracts a pattern that appears 3+ times, the platform should suggest elevating it to a voice guardrail or a writing quality rule.
+
+**Flow:**
+1. Copy intelligence pattern "avoid passive voice in CTAs" appears in 3+ steering notes
+2. Platform suggests: "This pattern has appeared 3 times. Add as a voice guardrail? [Add to Guardrails] [Keep as Intelligence Only]"
+3. If added to guardrails, it becomes a hard boundary checked by both the generation prompt and the auto quality scan
+
+**Implementation:** Add a `frequency` counter to `copy_intelligence` table. Increment each time the same pattern is extracted. When frequency hits threshold (3), flag for promotion.
+
+**Add to `copy_intelligence` table:**
+```sql
+frequency INTEGER NOT NULL DEFAULT 1  -- how many times this pattern has been observed
+```
+
+### Enhancement 13: Steering Chat Auto-Summarization
+
+The SteeringChat component (built in Phase 1, reused in Phase 3) must include conversation auto-summarization per the Phase 1 addendum.
+
+**Phase 3 specific requirements:**
+- Summarization triggers after 6 steering exchanges within a single section's review
+- Summary preserves: directions given, what was rejected, what was approved, current trajectory
+- Recent 3 exchanges remain in full
+- Summary is stored in `copy_sections.steering_history` as a `{type: 'summary', content: '...'}` entry
+
+### Enhancement 14: Reuse Client Review Workflow
+
+The existing content plan review system (`server/routes/content-plan-review.ts`) has client approval batches, sample-then-batch-approve flow, and per-cell flagging. Phase 3's client copy review should extend this pattern rather than building from scratch.
+
+**What to reuse:**
+- Client review link generation (share via URL)
+- Batch approval mechanics (approve multiple sections at once)
+- Client comment/flag pattern
+- Review status tracking
+
+**What's new (Phase 3 adds):**
+- Inline suggesting mode (client can edit text, not just approve/flag)
+- Per-section review (existing system is per-cell, which maps to per-entry)
+
+### Updated Data Model Changes
+
+Based on the enhancements above, the following changes to the Phase 3 data model:
+
+**`copy_sections` — add column:**
+```sql
+quality_flags TEXT  -- JSON array of {type, message, severity} or NULL if clean
+```
+
+**`copy_intelligence` — add column:**
+```sql
+frequency INTEGER NOT NULL DEFAULT 1  -- observation count for promotion detection
+```
+
+**`content_briefs` (existing table) — add column:**
+```sql
+copy_approval_rate REAL  -- % of linked copy sections approved without regeneration
+```
+
+### Updated AI Model Strategy
+
+| Task | Model | Reasoning |
+|---|---|---|
+| Full page copy generation | Claude Sonnet 4 | Creative work requiring full brand context |
+| Section regeneration with steering | Claude Sonnet 4 | Creative refinement with surgical guidance |
+| SEO title + meta description | GPT-4.1-mini | Constrained format, keyword-focused |
+| Copy intelligence extraction | GPT-4.1-mini | Structured pattern extraction from steering notes |
+| Steering note classification (content vs. voice) | GPT-4.1-mini | Binary classification — fast, cheap |
+| Auto quality check | No AI — regex/pattern matching | Synchronous, free, instant |
+| Brief quality analysis | GPT-4.1-mini | Structured pattern analysis after 10+ briefs |
+| Annotation + reasoning | Included in main generation call | No separate call needed |
