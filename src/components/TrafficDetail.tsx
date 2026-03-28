@@ -308,8 +308,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
         {/* Left: Top Pages table */}
         <SectionCard title="Top Pages">
-          <div className="space-y-1 max-h-[350px] overflow-y-auto">
-            {topPages.slice(0, 15).map((p, i) => (
+          <div className="space-y-1 overflow-y-auto flex-1">
+            {topPages.map((p, i) => (
               <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
                 <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
                 <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
