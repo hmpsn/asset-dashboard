@@ -135,6 +135,22 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 
 ---
 
+## Multi-Agent Coordination (mandatory)
+
+> Full rules: `.windsurf/rules/multi-agent-coordination.md`
+
+When dispatching parallel subagents or working on multi-phase features:
+
+1. **Pre-commit shared contracts** — types, function signatures, barrel exports must be committed before any agent starts. Agents read from committed code, never uncommitted state.
+2. **Exclusive file ownership** — every file touched during parallel work has exactly one owner. No file may be modified by two agents concurrently. Shared files (app.ts, seo-context.ts, BrandHub.tsx, api client files) are sequential tasks.
+3. **Diff review after each batch** — after all parallel agents complete, review diffs, grep for duplicate imports, run tsc + full test suite before dispatching the next batch.
+4. **Explicit task dependency graphs** — every multi-task plan must include a dependency section. "Obviously sequential" is not acceptable — dispatchers don't infer dependencies.
+5. **Spec amendment → plan sync** — when a spec is amended, every plan referencing it must be updated in the same commit. Addendums without plan updates create invisible gaps.
+6. **Cross-phase contracts** — multi-phase features require a companion guardrails doc listing what each phase exports for downstream consumption (tables, functions, types, components).
+7. **File ownership in dispatch prompts** — when dispatching implementer subagents, include explicit "Files you OWN" and "Files you must NOT touch" lists.
+
+---
+
 ## Code Conventions
 
 - **TypeScript strict** — no `any` unless unavoidable
@@ -188,6 +204,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `.windsurf/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `.windsurf/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
 | `.windsurf/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
+| `.windsurf/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
 
 ---
 
