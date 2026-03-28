@@ -222,7 +222,7 @@ export interface AnalyticsInsight {
   impactScore?: number;
   domain?: InsightDomain;
   // Resolution tracking (Phase 3)
-  resolutionStatus?: 'unresolved' | 'in_progress' | 'resolved' | null;
+  resolutionStatus?: 'in_progress' | 'resolved' | null;
   resolutionNote?: string | null;
   resolvedAt?: string | null;
 }

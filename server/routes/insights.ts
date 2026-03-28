@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { z } from '../middleware/validate.js';
-import { validate } from '../middleware/validate.js';
+import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -26,7 +25,7 @@ router.get('/api/insights/:workspaceId/queue', requireWorkspaceAccess('workspace
 router.put(
   '/api/insights/:workspaceId/:insightId/resolve',
   requireWorkspaceAccess('workspaceId'),
-  validate(z.object({ status: z.enum(['in_progress', 'resolved']), note: z.string().optional() })),
+  validate(z.object({ status: z.enum(['in_progress', 'resolved']), note: z.string().max(500).optional() })),
   (req, res) => {
     const workspaceId = req.params.workspaceId;
     const { status, note } = req.body as { status: 'in_progress' | 'resolved'; note?: string };

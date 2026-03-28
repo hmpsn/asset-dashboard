@@ -84,5 +84,10 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
     },
+    [WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    },
   });
 }
