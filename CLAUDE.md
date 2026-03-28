@@ -141,7 +141,8 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **User-facing strings**: follow `.windsurf/workflows/ui-vocabulary.md` canonical labels
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
-- **DB patterns**: lazy prepared statements, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts` — never bare `JSON.parse` on DB columns.
+- **Imports**: always at top of file, grouped with existing imports. Never add imports mid-file next to the code that uses them — this breaks the oxc parser used by vitest/vite and violates code conventions. When adding code to an existing file, check existing imports first (`grep -n '^import' <file>`).
+- **DB patterns**: lazy prepared statements via `createStmtCache()`/`stmts()`, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts` — never bare `JSON.parse` on DB columns. Never use local `let` variables inside functions for prepared statement caching — the `if (!stmt)` guard is useless on a local variable that's re-initialized every call.
 - **Array validation from DB** — when Zod-validating a JSON array column, validate items individually (filter out bad items) rather than validating the whole array (which drops ALL items if any one fails). Use `parseJsonSafeArray(raw, itemSchema, context)` from `server/db/json-validation.ts`. See `server/approvals.ts` `rowToBatch` for the pattern.
 - **Zod schema field names** — when writing Zod schemas for existing TypeScript interfaces, always cross-reference field names against the source interface in `shared/types/`. Zod won't flag name mismatches at compile time — a required field with a wrong name silently fails `safeParse` at runtime, returning the fallback instead of real data.
 - **Schema vs stored shape** — DB column schemas must reflect what is actually stored, not the in-memory assembled object. If a write path deliberately omits a field (e.g. storing it in a separate table), that field must be `.optional()` in the Zod schema. A required field absent from the stored blob causes every `parseJsonSafe` call to silently return the empty fallback, destroying all real data. See `keywordStrategySchema.pageMap` as the canonical example.
@@ -206,7 +207,9 @@ Work is not done until ALL pass:
 
 - [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
 - [ ] `npx vite build` — builds successfully
+- [ ] `npx vitest run` — full test suite passes (not just new tests)
 - [ ] `FEATURE_AUDIT.md` updated (if feature work)
 - [ ] `data/roadmap.json` updated (if roadmap item)
 - [ ] `BRAND_DESIGN_LANGUAGE.md` updated (if UI changed)
 - [ ] No `violet` or `indigo` in `src/components/`
+- [ ] If subagents were used: review `git diff` for duplicate imports, conflicting edits, missed patterns
