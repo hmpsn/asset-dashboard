@@ -28,6 +28,7 @@ import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights, deleteStaleInsightsByType } from './analytics-insights-store.js';
 import { buildEnrichmentContext, enrichInsight } from './insight-enrichment.js';
 import { loadDecayAnalysis } from './content-decay.js';
+import { runFeedbackLoops } from './insight-feedback.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
@@ -1038,4 +1039,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
     log.info({ workspaceId, count: serpOpps.length }, 'Computed SERP opportunities');
   }
+
+  // Phase 2 feedback loops: push signals to Strategy & Pipeline
+  // Non-fatal — runFeedbackLoops has its own try/catch
+  runFeedbackLoops(workspaceId);
 }

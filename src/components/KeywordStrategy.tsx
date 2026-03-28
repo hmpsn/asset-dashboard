@@ -17,8 +17,11 @@ import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './strategy/CannibalizationAlert';
 import { StrategyDiff } from './strategy/StrategyDiff';
+import { IntelligenceSignals } from './strategy/IntelligenceSignals';
 import { keywords, rankTracking } from '../api/seo';
 import { workspaces } from '../api';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { queryKeys } from '../lib/queryKeys';
 
 interface PageKeywordMap {
   pagePath: string;
@@ -65,6 +68,13 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
+
+  // Invalidate intelligence signals cache on WebSocket event
+  useWorkspaceEvents(workspaceId, {
+    'intelligence_signals_updated': () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
+    },
+  });
 
   // Seed trackedKeywords from server on mount so buttons reflect actual state
   useEffect(() => {
@@ -282,6 +292,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       {!strategy && !generating && (
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
       )}
+
+      <IntelligenceSignals workspaceId={workspaceId} />
 
       {/* Progress Indicator */}
       {generating && progressStep && (

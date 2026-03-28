@@ -164,6 +164,17 @@ A comprehensive value assessment of every feature in the platform — **253 feat
 
 ---
 
+### 13. Connected Intelligence Engine — Phase 2: Feedback Loops
+**What it does:** Wires the insight engine's intelligence into the platform's other major systems. **Anomaly Digest:** Anomaly detection results (12h cycle) now flow into the insight store as `anomaly_digest` entries with deduplication — ongoing anomalies update in place rather than creating duplicates, keyed on `(workspaceId, anomaly_type, metric)`. **Feedback Loops:** After insight computation, the orchestrator (`insight-feedback.ts`) generates strategy signals (momentum keywords, misalignment flags, content gaps) and pipeline signals (suggested briefs, refresh suggestions) and broadcasts via WebSocket. **Strategy Intelligence Signals:** New section in KeywordStrategyPanel showing momentum keywords, strategy misalignments, and content gap suggestions derived from the insight engine. **AI Suggested Briefs:** New section in ContentPipeline showing suggested briefs from ranking opportunities and refresh suggestions from content decay. **Admin Chat enrichment:** `buildInsightsContext` now includes page titles, strategy alignment, pipeline status, audit issue counts, and anomaly digest data. Critical insights trigger proactive mentions. **Audit annotation:** Page health insights include linked audit issues (top 5 error/warning). **Schema enrichment:** SERP opportunity insights include schema validation gaps.
+
+**Agency value:** Insights are now actionable — they push directly into the strategy and content pipeline with one-click brief creation. Admin Chat gives data-backed answers to "what should I work on?" Anomalies surface in the priority feed alongside regular insights, not in a separate silo.
+
+**Client value:** (Indirect — Phase 3 will expose narrative versions.) The underlying intelligence is now richer, supporting future client-facing insight narratives and ROI attribution.
+
+**Mutual:** Feedback loops close the intelligence cycle — insights inform strategy, strategy informs content, content results become new insights.
+
+---
+
 ### 14. Annotations
 **What it does:** Mark specific dates on analytics charts with labels (e.g., "Launched new homepage," "Google core update," "Started ad campaign").
 
