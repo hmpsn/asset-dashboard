@@ -22,6 +22,9 @@ interface InsightRow {
   anomaly_linked: number | null;
   impact_score: number | null;
   domain: string | null;
+  resolution_status: string | null;
+  resolution_note: string | null;
+  resolved_at: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -65,6 +68,15 @@ const stmts = createStmtCache(() => ({
   selectByDomain: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
   ),
+  updateResolution: db.prepare(
+    `UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`,
+  ),
+  selectUnresolved: db.prepare(
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM analytics_insights WHERE id = ?`,
+  ),
 }));
 
 function rowToInsight(row: InsightRow): AnalyticsInsight {
@@ -84,6 +96,9 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     anomalyLinked: row.anomaly_linked != null ? row.anomaly_linked !== 0 : undefined,
     impactScore: row.impact_score ?? undefined,
     domain: (row.domain as InsightDomain) ?? undefined,
+    resolutionStatus: row.resolution_status ?? null,
+    resolutionNote: row.resolution_note ?? null,
+    resolvedAt: row.resolved_at ?? null,
   };
 }
 
@@ -209,5 +224,28 @@ export function getInsightsByDomain(
   domain: string,
 ): AnalyticsInsight[] {
   const rows = stmts().selectByDomain.all(workspaceId, domain) as InsightRow[];
+  return rows.map(rowToInsight);
+}
+
+// ── Resolution tracking ──────────────────────────────────────────
+
+export function getInsightById(id: string): AnalyticsInsight | undefined {
+  const row = stmts().selectById.get(id) as InsightRow | undefined;
+  return row ? rowToInsight(row) : undefined;
+}
+
+export function resolveInsight(
+  insightId: string,
+  workspaceId: string,
+  status: 'in_progress' | 'resolved',
+  note?: string,
+): AnalyticsInsight | undefined {
+  const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
+  stmts().updateResolution.run(status, note ?? null, resolvedAt, insightId, workspaceId);
+  return getInsightById(insightId);
+}
+
+export function getUnresolvedInsights(workspaceId: string): AnalyticsInsight[] {
+  const rows = stmts().selectUnresolved.all(workspaceId) as InsightRow[];
   return rows.map(rowToInsight);
 }
