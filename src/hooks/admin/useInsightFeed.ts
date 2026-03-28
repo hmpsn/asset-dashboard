@@ -194,6 +194,26 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
   const context = contextParts.join(' · ');
   const domain = insight.domain ?? 'cross';
 
+  // Build expandable details for insight types with drill-down data
+  let details: string[] | undefined;
+  if (insight.insightType === 'cannibalization') {
+    const pages = data.pages as string[] | undefined;
+    if (Array.isArray(pages) && pages.length > 0) {
+      const positions = data.positions as number[] | undefined;
+      details = pages.map((p, i) => {
+        const pos = positions?.[i];
+        try { p = new URL(p).pathname; } catch { /* use as-is */ }
+        return pos !== undefined ? `${p} — position ${pos}` : p;
+      });
+    }
+  } else if (insight.insightType === 'keyword_cluster') {
+    const queries = data.queries as string[] | undefined;
+    if (Array.isArray(queries) && queries.length > 0) {
+      details = queries.slice(0, 10);
+      if (queries.length > 10) details.push(`+ ${queries.length - 10} more queries`);
+    }
+  }
+
   return {
     id: insight.id,
     type: insight.insightType,
@@ -204,6 +224,7 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
     pageUrl: insight.pageId ?? undefined,
     domain,
     impactScore: insight.impactScore ?? 0,
+    details,
   };
 }
 

@@ -25,6 +25,7 @@ const FILTER_CHIPS = [
 
 export function InsightFeed({ feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll }: InsightFeedProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   let filtered = domain ? feed.filter(f => f.domain === domain || f.domain === 'cross') : feed;
 
@@ -40,7 +41,9 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
   }
 
   const totalFiltered = filtered.length;
-  const displayed = limit ? filtered.slice(0, limit) : filtered;
+  const effectiveLimit = expanded ? undefined : limit;
+  const displayed = effectiveLimit ? filtered.slice(0, effectiveLimit) : filtered;
+  const hasMore = limit && !expanded && totalFiltered > limit;
 
   return (
     <div className="space-y-3">
@@ -75,10 +78,24 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
           {activeFilter ? 'No insights match this filter' : 'No insights available yet — check back after analytics sync'}
         </div>
       )}
-      {onViewAll && totalFiltered > (limit ?? Infinity) && (
+      {onViewAll && totalFiltered > (limit ?? Infinity) && !expanded && (
         <div className="text-center pt-1">
           <button onClick={onViewAll} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
             View all {totalFiltered} insights →
+          </button>
+        </div>
+      )}
+      {!onViewAll && hasMore && (
+        <div className="text-center pt-1">
+          <button onClick={() => setExpanded(true)} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
+            Show all {totalFiltered} insights →
+          </button>
+        </div>
+      )}
+      {expanded && limit && totalFiltered > limit && (
+        <div className="text-center pt-1">
+          <button onClick={() => setExpanded(false)} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+            Show less
           </button>
         </div>
       )}

@@ -232,6 +232,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 loading={feedLoading}
                 domain="search"
                 showFilterChips
+                limit={10}
               />
             </>
           )}

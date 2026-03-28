@@ -129,15 +129,37 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       {/* ═══════ INSIGHTS TAB ═══════ */}
       {tab === 'insights' && (
         <div className="space-y-4">
-          {/* Insight Feed — traffic domain, priority first */}
-          <InsightFeed
-            feed={feed}
-            loading={feedLoading}
-            domain="traffic"
-            showFilterChips
-          />
+          {/* Chart first — mirrors SearchDetail pattern */}
+          {overviewData.trendData.length > 1 && (
+            <SectionCard title="Traffic Trend">
+              <AnnotatedTrendChart
+                data={overviewData.trendData}
+                lines={TRAFFIC_LINES.map(l => ({ ...l, active: activeTrafficLines.has(l.key) }))}
+                annotations={overviewData.annotations}
+                dateKey="date"
+                height={220}
+                onCreateAnnotation={
+                  overviewData.createAnnotation.mutate
+                    ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
+                    : undefined
+                }
+                onToggleLine={(key) => {
+                  setActiveTrafficLines(prev => {
+                    const next = new Set(prev);
+                    if (next.has(key)) {
+                      if (next.size > 1) next.delete(key);
+                    } else if (next.size < 3) {
+                      next.add(key);
+                    }
+                    return next;
+                  });
+                }}
+                maxActiveLines={3}
+              />
+            </SectionCard>
+          )}
 
-          {/* Traffic Health Summary */}
+          {/* Traffic Health Summary — above the feed for visibility */}
           <SectionCard title="Traffic Health Summary">
             <div className="grid grid-cols-4 gap-3">
               <div className="text-center">
@@ -166,6 +188,15 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               </div>
             </div>
           </SectionCard>
+
+          {/* Insight Feed — traffic domain, capped at 10 */}
+          <InsightFeed
+            feed={feed}
+            loading={feedLoading}
+            domain="traffic"
+            showFilterChips
+            limit={10}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             {/* Growth Signals */}

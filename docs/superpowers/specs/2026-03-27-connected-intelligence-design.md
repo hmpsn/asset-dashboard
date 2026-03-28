@@ -215,6 +215,13 @@ interface EnrichedInsight extends AnalyticsInsight {
 2. Webflow page metadata title
 3. Cleaned slug fallback: `/blog/best-ai-coding-agents` → "Best AI Coding Agents"
 
+**Dual score display for page_health insights:**
+The platform has two distinct page scores that measure different things:
+- **Performance Score** (health score from `computePageHealthScores`): traffic performance — clicks, impressions, position, CTR, engagement. Low score = "nobody's finding this page."
+- **Optimization Score** (from keyword analysis `optimizationScore`): on-page SEO quality — keyword in title/meta/content/URL, secondary keywords present. Low score = "the content needs SEO work."
+
+Both scores should display together in the InsightFeed for `page_health` insights: "Performance: 16 · Optimization: 75" — this tells the user whether the problem is content quality or discoverability. Requires pulling `optimizationScore` from `page_keywords` during enrichment (add to `EnrichedInsight`).
+
 ### 1.7 Loading States
 
 **Progressive rendering:**
@@ -287,6 +294,64 @@ interface EnrichedInsight extends AnalyticsInsight {
 - Cross-reference `schema_page_types` with page impressions/clicks
 - "This page gets 50K impressions but has no Article schema — adding it could improve CTR"
 
+### 2.8 Signal-to-Noise Tuning — Actionable Feed, Not Fire Hose
+
+Phase 1 surfaces every computed insight (393 drops + 86 opportunities in production). This overwhelms rather than guides. Phase 2 should tune the feed to feel like a prioritized work list:
+
+- **Minimum impact threshold** — insights below a configurable impact score don't appear in the feed (still stored in DB for completeness, just hidden from default view). Start with bottom 20% filtered.
+- **Consolidation** — group related insights instead of showing each individually. "5 pages lost position for 'ai coding' queries" instead of 5 separate ranking_mover items for the same keyword cluster.
+- **Staleness** — insights older than 30 days auto-demote in the feed. A ranking drop from 6 weeks ago that hasn't been resolved isn't actionable anymore — it's context.
+- **Resolution tracking** — mark insights as "addressed" when a brief is created, content is refreshed, or schema is added. Resolved insights move to a "Recently addressed" collapsible, not the main feed.
+- **Feed caps** — Overview: 5 (existing). Detail tabs: 10 with expand (existing). Full "all insights" view: paginated, 25 per page.
+- **Severity recalibration** — review whether 393 "drops" is correct or whether the thresholds are too sensitive. A page going from position 3 → 6 is flagged the same as position 3 → 15. Consider scaling severity by absolute impact (traffic lost), not just position delta magnitude.
+
+### 2.9 Workspace Home Redesign — Action-First Briefing
+
+The current workspace home is a wall of stats and sections with no hierarchy. Redesign it as a **daily briefing** with two distinct sections:
+
+**Section 1: "Action Now"** (urgent, you need to do something)
+- Client content requests waiting for response (from `content_requests` with status `requested` or `changes_requested`)
+- Content in review that needs approval (from `approvals` with pending items)
+- Deliverables ready to send (posts with status `approved` not yet published)
+- Active pipeline items past their target date
+
+This section is **always visible** and shows a count badge. Zero items = green "All clear" state. Items sorted by age (oldest first — longest-waiting client request on top).
+
+**Section 2: "Flag to Client"** (strategic, prep for your next call)
+- **Data-backed upsell talking points** pulled from the insight engine:
+  - Content decay: "3 pages lost significant traffic — recommend content refresh" + estimated click recovery
+  - Schema gaps: "12 pages could qualify for rich results" + potential CTR improvement
+  - Ranking opportunities: "5 keywords within striking distance of page 1" + estimated traffic gain
+  - Competitor gaps: "Competitors rank for 8 keywords you don't cover" + total monthly volume
+- Each item shows: **what to say**, **why it matters** (data), and **what to sell** (the service/product)
+- Items are **not** auto-sent to the client — this is your prep sheet
+- Optional: "Copy talking point" button that formats the data for pasting into Slack/email
+- Tier-aware: only shows upsells for services available on the client's current tier or the next tier up
+
+**What gets removed/demoted from current home:**
+- StatCard row → moves to a compact summary bar (one line, not 8 cards)
+- WeeklyAccomplishments → moves to a collapsible "Recent Activity" section at bottom
+- SeoChangeImpact → embedded within "Flag to Client" when relevant (SEO changes become talking points)
+- RankingsSnapshot → moves to Analytics Hub (where it belongs)
+- ActivityFeed → collapsed by default, bottom of page
+
+**What stays:**
+- PageHeader with workspace name
+- ActiveRequestsAnnotations → absorbed into "Action Now"
+- Data freshness indicator
+
+The goal: open a workspace, spend 30 seconds reading, know exactly what to do and what to sell.
+
+### 2.10 Cross-Workspace Briefing (Command Center)
+
+Complement the per-workspace briefing with a **cross-workspace summary** on the Command Center (root `/` page):
+
+- "3 workspaces need attention" with the top action item per workspace
+- "5 upsell opportunities across all clients" ranked by estimated revenue impact
+- Quick-jump to the workspace that needs you most
+
+This turns the Command Center from a workspace picker into a daily starting point. Implementation: aggregate the top "Action Now" and "Flag to Client" items across all workspaces the admin manages.
+
 ---
 
 ## Phase 3: Client Intelligence
@@ -295,10 +360,23 @@ interface EnrichedInsight extends AnalyticsInsight {
 
 Different insight framing for the client dashboard:
 - Admin sees: "What should I do next" (action-oriented, technical)
-- Client sees: "Here's why we're valuable" (narrative, outcome-oriented)
+- Client sees: "Here's what's happening + here's what you can do" (informative, revenue-driving)
+
+**Critical framing rule:** Client narratives must NEVER imply work is being done unless the client has purchased that service. The pattern is: **observation → context → CTA that drives revenue**.
+
+| ❌ Never say | ✅ Say instead |
+|-------------|---------------|
+| "We're working on a recovery plan" | "A content refresh could help recover this ranking." + **[Request Content Refresh]** |
+| "We're monitoring this trend" | "3 pages are showing content decay." + **[View Recommendations]** |
+| "Our team is addressing this" | "Schema markup typically improves CTR by 20-30%." + **[Learn About Schema]** |
 
 Example admin: "Claude Code Limits Guide dropped to page 2 — position 4 → 11, lost ~2,400 clicks/mo"
-Example client: "We detected a ranking change on your Claude Code Limits page and are working on a recovery plan"
+Example client: "Your Claude Code Limits page dropped from position 4 to 11 this week. A content refresh could help recover this ranking." + **[Request Content Refresh]**
+
+Every client-facing insight should end with either:
+- A **purchase CTA** ("Request Content Refresh", "Order Schema Markup", "Upgrade to Growth")
+- A **self-service action** ("Review in Strategy", "Check Audit Details")
+- **Nothing** (for positive insights — "Your best content drove 78 conversions this month" needs no CTA)
 
 ### 3.2 ROI Attribution
 
@@ -323,6 +401,34 @@ Example client: "We detected a ranking change on your Claude Code Limits page an
 - Admin-specific view: unresolved insights as a work queue
 - Track resolution: "Resolved — brief created", "Resolved — content refreshed"
 - Feeds into workspace activity log
+
+### 3.6 AI Insight Narratives (Growth + Premium Feature)
+
+**Tier:** Growth and Premium. Gated via `TierGate` — Free tier sees computational insights only, Growth/Premium get AI narratives. This makes AI narratives a compelling reason to upgrade from Free to Growth.
+
+**Refresh:** Weekly (not daily). Computed once per week per workspace on a scheduled job. Stored in DB alongside the computational insight. Cost: ~$0.01-0.02/workspace/week (~$0.50-1.00/workspace/year).
+
+**What it adds:**
+- Human-readable explanations on top of computational insights: "Your SEO tips page dropped 4 positions — likely related to the March core update. Competitors have added 2026 benchmarks you're missing."
+- Cross-referencing that formulas can't do: "This ranking drop is expected — you have a content refresh in progress that should recover it."
+- Smart prioritization narrative: "Focus on these 3 pages first — they drive 60% of your organic traffic and all show CTR below expected."
+
+**What it does NOT do:**
+- Does NOT auto-generate briefs or content (that's a paid service, not a free automation)
+- Does NOT auto-create pipeline items (recommendations surface as CTAs: "Request Content Refresh" → drives purchase flow)
+- Does NOT replace computational insights (AI narratives layer ON TOP of the existing feed, not instead of it)
+
+**Implementation:**
+- Single GPT-4.1-mini call per workspace per week, batching top 15 insights with enrichment context
+- Stored as `ai_narrative` field on each insight row (nullable, populated only for Growth/Premium)
+- Frontend: `InsightFeedItem` shows narrative below the context line when available, styled differently (italic, lighter color)
+- Admin view: always shows AI narratives (agency pays for Premium, not the client)
+- Client view: shows narrative framed as "Our analysis" (Phase 3.1 narrative framing applies)
+
+**Revenue alignment:**
+- AI narratives make the value of the platform more visible → justifies Growth/Premium pricing
+- Recommendations end in CTAs that drive content purchases → revenue, not cost
+- Weekly cadence means clients check in regularly → engagement, not churn
 
 ---
 

@@ -188,7 +188,7 @@ export function AnnotatedTrendChart({
   return (
     <div ref={containerRef} className="relative">
       {onToggleLine && (
-        <div className="flex gap-1 mb-2">
+        <div className="flex gap-1.5 mb-3">
           {lines.map(line => {
             const isActive = line.active !== false;
             const atMax = activeLines.length >= maxActiveLines;
@@ -197,9 +197,9 @@ export function AnnotatedTrendChart({
                 key={line.key}
                 onClick={() => onToggleLine(line.key)}
                 disabled={!isActive && atMax}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   isActive
-                    ? 'text-white'
+                    ? 'text-white shadow-sm'
                     : atMax
                       ? 'border text-zinc-600 border-zinc-800 cursor-not-allowed'
                       : 'border hover:border-opacity-60'

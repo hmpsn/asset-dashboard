@@ -21,6 +21,16 @@ const log = createLogger('insight-enrichment');
 
 // ── Pure utility functions ────────────────────────────────────────────────────
 
+/** Known acronyms that should be fully uppercased in title-cased text. */
+const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
+
+/** Title-case a single word, uppercasing known acronyms. */
+function titleCaseWord(word: string): string {
+  return ACRONYMS.has(word.toLowerCase())
+    ? word.toUpperCase()
+    : word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 /**
  * Converts a URL path or full URL into a human-readable title.
  *
@@ -53,18 +63,11 @@ export function cleanSlugToTitle(urlOrPath: string): string {
 
   const slug = segments[segments.length - 1];
 
-  // Known acronyms that should be fully uppercased even though they appear lowercase in slugs.
-  const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
-
   // Convert hyphens/underscores to spaces and title-case each word.
   return slug
     .replace(/[-_]/g, ' ')
     .split(' ')
-    .map((word) =>
-      ACRONYMS.has(word.toLowerCase())
-        ? word.toUpperCase()
-        : word.charAt(0).toUpperCase() + word.slice(1),
-    )
+    .map(titleCaseWord)
     .join(' ');
 }
 
@@ -151,6 +154,21 @@ export function resolvePageTitle(
   titleMap: Map<string, string>,
 ): string | null {
   if (!pageId) return null;
+
+  // Handle composite pageIds (e.g., "page::query", "cannibalization::query", "cluster::label")
+  // Split on :: and use the meaningful part for title resolution
+  if (pageId.includes('::')) {
+    const [left, right] = pageId.split('::', 2);
+    // If left is a URL, resolve it as the page title
+    if (left.startsWith('http://') || left.startsWith('https://') || left.startsWith('/')) {
+      const title = resolvePageTitle(left, titleMap);
+      return title;
+    }
+    // For non-URL prefixes (cannibalization::, cluster::), use the right part as a readable label
+    if (right) {
+      return right.split(/\s+/).map(titleCaseWord).join(' ');
+    }
+  }
 
   // Exact match first
   const exactTitle = titleMap.get(pageId);

@@ -74,13 +74,19 @@ export function isStale(computedAt: string | undefined, maxAgeMs: number = DEFAU
  * - CTR      (0–20):  actual CTR vs expected CTR for that position
  * - Engagement (0–25): GA4 engagement time normalized (0–180s → 0–25)
  */
+const PAGE_HEALTH_MIN_IMPRESSIONS = 50; // Skip pages with negligible visibility
+
 export function computePageHealthScores(
   gscPages: SearchPage[],
   ga4Pages: GA4TopPage[],
 ): ComputedInsight<PageHealthData>[] {
   if (gscPages.length === 0) return [];
 
-  const maxClicks = Math.max(...gscPages.map(p => p.clicks), 1);
+  // Filter out pages with negligible traffic — scoring them produces noise
+  const significantPages = gscPages.filter(p => p.impressions >= PAGE_HEALTH_MIN_IMPRESSIONS);
+  if (significantPages.length === 0) return [];
+
+  const maxClicks = Math.max(...significantPages.map(p => p.clicks), 1);
 
   // Index GA4 pages by path for O(1) lookup
   const ga4Map = new Map<string, GA4TopPage>();
@@ -88,7 +94,7 @@ export function computePageHealthScores(
     ga4Map.set(p.path, p);
   }
 
-  return gscPages.map(page => {
+  return significantPages.map(page => {
     // Extract path from full URL for GA4 matching
     let pagePath: string;
     try {
@@ -215,6 +221,7 @@ export function computeCannibalizationInsights(
     rows.sort((a, b) => a.position - b.position);
 
     const totalImpressions = rows.reduce((sum, r) => sum + r.impressions, 0);
+    if (totalImpressions < 100) continue; // Skip low-visibility cannibalization — not worth acting on
 
     results.push({
       pageId: `cannibalization::${query}`, // use query as key so each gets its own DB row
@@ -290,11 +297,54 @@ interface GapInput {
  * Score and classify competitor keyword gaps.
  * Enriches with our existing GSC position when available.
  */
+/**
+ * Extract brand-like tokens from a domain for branded query detection.
+ * "competitor-site.com" → ["competitor", "site", "competitorsite"]
+ * "acme.co" → ["acme"]
+ */
+function extractBrandTokens(domain: string): string[] {
+  // Strip TLD and www
+  const base = domain.replace(/^www\./, '').replace(/\.(com|co|io|ai|org|net|dev|app)$/i, '');
+  const tokens: string[] = [];
+  // Split on dots and hyphens
+  const parts = base.split(/[.\-]/);
+  for (const p of parts) {
+    if (p.length >= 3) tokens.push(p.toLowerCase());
+  }
+  // Also add the joined form (e.g., "competitorsite" from "competitor-site")
+  if (parts.length > 1) tokens.push(parts.join('').toLowerCase());
+  return tokens;
+}
+
+/** Check if a keyword is likely a branded search for a competitor.
+ * Uses word-boundary matching to avoid false positives from short tokens
+ * that are also common industry terms (e.g. "seo" from seo.com).
+ */
+function isBrandedQuery(keyword: string, competitorBrandTokens: string[]): boolean {
+  const lower = keyword.toLowerCase();
+  return competitorBrandTokens.some(token => {
+    // Short tokens (< 5 chars) are too likely to match common words
+    // e.g. "seo" from seo.com, "web" from web.io, "hub" from hub.io
+    if (token.length < 5) return false;
+    // Word-boundary match to avoid substring false positives
+    const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    return regex.test(lower);
+  });
+}
+
 export function computeCompetitorGapInsights(
   gapData: GapInput[],
   ourQueryData: QueryPageRow[],
 ): ComputedInsight<CompetitorGapData>[] {
   if (gapData.length === 0) return [];
+
+  // Build brand token sets for each competitor domain to filter branded queries
+  const brandTokensByDomain = new Map<string, string[]>();
+  for (const gap of gapData) {
+    if (!brandTokensByDomain.has(gap.competitorDomain)) {
+      brandTokensByDomain.set(gap.competitorDomain, extractBrandTokens(gap.competitorDomain));
+    }
+  }
 
   // Build a map of our best position per query
   const ourPositions = new Map<string, number>();
@@ -305,7 +355,14 @@ export function computeCompetitorGapInsights(
     }
   }
 
-  const results: ComputedInsight<CompetitorGapData>[] = gapData.map(gap => {
+  // Filter out branded competitor queries and low-volume keywords — not actionable
+  const filteredGapData = gapData.filter(gap => {
+    if (gap.volume < 50) return false; // Skip keywords with negligible search volume
+    const tokens = brandTokensByDomain.get(gap.competitorDomain) ?? [];
+    return !isBrandedQuery(gap.keyword, tokens);
+  });
+
+  const results: ComputedInsight<CompetitorGapData>[] = filteredGapData.map(gap => {
     const ourPosition = ourPositions.get(gap.keyword) ?? null;
 
     let severity: InsightSeverity;
@@ -444,6 +501,7 @@ export function computeKeywordClusterInsights(
   for (const [, queries] of clusters) {
     const rows = queries.map(q => bestByQuery.get(q)!);
     const totalImpressions = rows.reduce((sum, r) => sum + r.impressions, 0);
+    if (totalImpressions < 100) continue; // Skip low-visibility clusters — not worth strategic attention
     const avgPosition = rows.reduce((sum, r) => sum + r.position, 0) / rows.length;
 
     // Identify pillar page: page with most combined impressions for this cluster
@@ -506,6 +564,7 @@ export function computeRankingMovers(
     prevMap.set(`${row.query}::${row.page}`, row);
   }
   for (const curr of currentQueryPages) {
+    if (curr.impressions < 50) continue; // Skip low-visibility queries — position changes are noise
     const prev = prevMap.get(`${curr.query}::${curr.page}`);
     if (!prev) continue;
     const positionChange = prev.position - curr.position; // positive = improvement
@@ -822,7 +881,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   {
     const decayAnalysis = loadDecayAnalysis(workspaceId);
     if (decayAnalysis && decayAnalysis.decayingPages.length > 0) {
-      for (const page of decayAnalysis.decayingPages) {
+      // Only surface decay that's both percentage-significant AND volume-significant.
+      // A page dropping from 20→17 clicks (-15%) isn't actionable even though it exceeds
+      // the decay engine's 10% threshold. Require minimum baseline AND minimum absolute loss.
+      const significantDecay = decayAnalysis.decayingPages.filter(p =>
+        p.previousClicks >= 20 && // meaningful baseline
+        Math.abs(p.previousClicks - p.currentClicks) >= 5 // lost at least 5 clicks
+      );
+      for (const page of significantDecay) {
         const severity: InsightSeverity =
           page.severity === 'critical' ? 'critical'
           : page.severity === 'warning' ? 'warning'
@@ -840,7 +906,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           severity,
         });
       }
-      log.info({ workspaceId, count: decayAnalysis.decayingPages.length }, 'Loaded content decay insights from decay engine');
+      log.info({ workspaceId, count: significantDecay.length, filtered: decayAnalysis.decayingPages.length - significantDecay.length }, 'Loaded content decay insights from decay engine');
     }
     // Always prune stale decay insights — even when the decay engine
     // returns null/empty, old decay insights should be removed
