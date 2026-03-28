@@ -1,5 +1,5 @@
 // server/roi-attribution.ts
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
@@ -70,7 +70,7 @@ export function recordOptimization(params: {
   impressionsBefore?: number;
   positionBefore?: number;
 }): string {
-  const id = uuidv4();
+  const id = randomUUID();
   const now = new Date().toISOString();
   const normalizedUrl = normalizePath(params.pageUrl);
 
