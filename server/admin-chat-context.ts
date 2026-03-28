@@ -23,6 +23,7 @@ import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
 import { listChurnSignals } from './churn-signals.js';
 import { listAnomalies } from './anomaly-detection.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { getPageSpeed, getPageWeight, getLinkCheck } from './performance-store.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
@@ -156,7 +157,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
       if (h.strategyAlignment && h.strategyAlignment !== 'untracked') line += ` — strategy: ${h.strategyAlignment}`;
       if (h.pipelineStatus) line += ` — pipeline: ${h.pipelineStatus}`;
       if (h.auditIssues) {
-        try { const issues = JSON.parse(h.auditIssues); if (Array.isArray(issues) && issues.length > 0) line += ` — ${issues.length} audit issue(s)`; } catch { /* ignore */ }
+        const issues = parseJsonFallback<string[]>(h.auditIssues, []);
+        if (issues.length > 0) line += ` — ${issues.length} audit issue(s)`;
       }
       return line;
     });
