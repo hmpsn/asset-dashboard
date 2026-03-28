@@ -57,7 +57,7 @@ function expectedCtrForPosition(pos: number): number {
 
 // ── Staleness check ──────────────────────────────────────────────
 
-const DEFAULT_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
+const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — analytics data refreshes at most once per day
 
 export function isStale(computedAt: string | undefined, maxAgeMs: number = DEFAULT_MAX_AGE_MS): boolean {
   if (!computedAt) return true;

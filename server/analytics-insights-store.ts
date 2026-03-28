@@ -56,10 +56,10 @@ const stmts = createStmtCache(() => ({
       -- background recomputation must not un-resolve admin work.
   `),
   selectByWorkspace: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ?`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? ORDER BY impact_score DESC LIMIT 25`,
   ),
   selectByWorkspaceAndType: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND insight_type = ?`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? ORDER BY impact_score DESC LIMIT 25`,
   ),
   selectOne: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND page_id IS ? AND insight_type = ?`,
