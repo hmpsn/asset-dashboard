@@ -57,6 +57,7 @@ const ContentSubscriptions = lazyWithRetry(() => import('./components/ContentSub
 const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const BrandHub = lazyWithRetry(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
 const RevenueDashboard = lazyWithRetry(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
+const FeatureLibrary = lazyWithRetry(() => import('./components/FeatureLibrary'));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
@@ -133,7 +134,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const { data: queue = [] } = useQueue();
 
   // Derive tab and workspace ID from URL path
-  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue']), []);
+  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features']), []);
   const { tab, urlWorkspaceId } = useMemo(() => {
     const p = location.pathname;
     const wsTabMatch = p.match(/^\/ws\/([^/]+)\/(.+)$/);
@@ -302,6 +303,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'prospect') return <SalesReport />;
     if (tab === 'ai-usage') return <AIUsagePage />;
     if (tab === 'revenue') return <RevenueDashboard />;
+    if (tab === 'features') return <FeatureLibrary />;
 
     if (!selected) {
       return <WorkspaceOverview onSelectWorkspace={(id) => {
