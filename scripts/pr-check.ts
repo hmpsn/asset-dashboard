@@ -27,7 +27,21 @@ const SCAN_ALL = process.argv.includes('--all');
 
 function getChangedFiles(): string[] {
   try {
-    // On a PR branch: diff against staging or main
+    // In GitHub Actions PR context, GITHUB_BASE_REF is set (e.g., "main")
+    const ghBase = process.env.GITHUB_BASE_REF;
+    if (ghBase) {
+      try {
+        const out = execSync(`git diff --name-only origin/${ghBase}...HEAD 2>/dev/null`, {
+          cwd: ROOT,
+          encoding: 'utf-8',
+        }).trim();
+        if (out) return out.split('\n').filter(Boolean);
+      } catch {
+        // fall through
+      }
+    }
+
+    // Local dev: diff against staging or main
     for (const base of ['origin/staging', 'origin/main']) {
       try {
         const out = execSync(`git diff --name-only ${base} 2>/dev/null`, {
@@ -39,8 +53,8 @@ function getChangedFiles(): string[] {
         // try next
       }
     }
+
     // On a push to main/staging (squash merge): diff against previous commit
-    // This prevents full-scan mode from flagging the entire codebase
     try {
       const out = execSync(`git diff --name-only HEAD~1 2>/dev/null`, {
         cwd: ROOT,
