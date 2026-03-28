@@ -146,6 +146,85 @@ Phase 3 adds client-facing insight views. The framing rules are strict:
 
 ---
 
+## 7. Implementation Process Guardrails (Phase 2 Lessons)
+
+These rules apply to **every task** in Phase 3 implementation. Each one maps to a real bug found in Phase 2.
+
+### 7.1 DB Statement Caching — Use `stmts()`, Never Bare `db.prepare()`
+
+Any function in `analytics-insights-store.ts` or `roi-attribution.ts` that calls `db.prepare()` inline will re-compile the statement on every call. Use the module-level `stmts()` cache pattern instead.
+
+**Pattern:**
+```typescript
+// ✅ Correct — compiled once
+function stmts() {
+  return cache ??= {
+    selectUnresolved: getDb().prepare(`SELECT * FROM analytics_insights WHERE ...`),
+    updateResolution: getDb().prepare(`UPDATE analytics_insights SET ...`),
+  };
+}
+
+// ❌ Wrong — compiles on every call
+export function getUnresolvedInsights(workspaceId: string) {
+  const db = getDb();
+  return db.prepare(`SELECT * FROM analytics_insights WHERE ...`).all(workspaceId);
+}
+```
+
+The plan code for `roi-attribution.ts`, `resolveInsight()`, `getUnresolvedInsights()`, and `getInsightById()` uses bare `db.prepare()`. When implementing, move all prepared statements into the `stmts()` cache.
+
+### 7.2 Imports at Top of File Only
+
+When modifying an existing file (e.g. `analytics-insights-store.ts`, `routes/public-analytics.ts`), add **all** new `import` statements at the top of the file alongside existing imports. Never add imports adjacent to the code that uses them — even if the plan shows them that way.
+
+**Verification after each file edit:**
+```bash
+grep -n "^import" server/the-file-you-edited.ts | tail -20
+```
+Confirm there are no import blocks after line ~30 (past the header imports section).
+
+### 7.3 Express Route Ordering — Literal Before Param
+
+Any new route with a **literal segment** at the same path level as an existing `/:paramId` route will be unreachable unless registered first.
+
+**Before adding a route, check:**
+```bash
+grep -n "router\.\(get\|put\|post\|delete\)" server/routes/the-file.ts
+```
+If an existing `/:workspaceId/:anythingElse` param route is present, your literal route (e.g., `/:workspaceId/narrative`) must appear **before** it in the file.
+
+Phase 3's `/api/public/insights/:workspaceId/narrative` and `/:workspaceId/digest` go into `public-analytics.ts`. Check whether that file has a `/:workspaceId/:tab` style catch-all.
+
+### 7.4 `parseJsonSafe` for All Inline JSON Parsing
+
+Code in `insight-narrative.ts` that calls `JSON.parse(insight.auditIssues)` directly must instead use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts`. Bare `JSON.parse` on DB columns can throw if the stored value is malformed.
+
+```typescript
+// ✅ Correct
+import { parseJsonFallback } from './db/json-validation.js';
+const issues = parseJsonFallback<string[]>(insight.auditIssues, []);
+
+// ❌ Wrong
+const issues = JSON.parse(insight.auditIssues);
+```
+
+### 7.5 Full Test Suite Before Finishing
+
+The quality gate for Phase 3 is `npx vitest run` (full suite, not just the new test files). A passing build does not mean tests pass. Run the full suite and verify zero failures before marking complete.
+
+```bash
+npx tsc --noEmit --skipLibCheck && npx vite build && npx vitest run
+```
+
+### 7.6 Subagent Diff Review After Parallel Tasks
+
+After parallel subagents complete Tasks 1–4 (which involve different modules), do a combined diff review before starting Tasks 5+. Check for:
+- Duplicate imports in any shared file
+- Conflicting additions to `shared/types/analytics.ts` or `src/lib/queryKeys.ts`
+- `rowToInsight()` mapping all new resolution fields
+
+---
+
 ## Phase Acceptance Checklists
 
 ### Phase 1 Gate
@@ -178,10 +257,37 @@ Before marking Phase 2 complete, verify ALL of the following:
 
 Before marking Phase 3 complete, verify ALL of the following:
 
-- [ ] No admin-framed insight text in any component under `src/components/client/`
-- [ ] `grep -r "purple-" src/components/client/` returns zero matches
-- [ ] All premium insight features wrapped in `<TierGate>`
-- [ ] ROI attribution: at least one content pipeline action links to a subsequent metric change — verify the data model supports the linkage
-- [ ] Monthly digest generation tested end-to-end (trigger → generate → verify output structure)
+**Client Framing:**
+- [ ] No admin-framed insight text in any component under `src/components/client/` — no position numbers, no CTR%, no jargon
+- [ ] `grep -r "purple-" src/components/client/` — zero matches
+- [ ] `strategy_alignment` and `keyword_cluster` insight types are excluded from `buildClientInsights()` — verify with grep or unit test
+- [ ] All client components have `// CLIENT-FACING` comment at top of file
+- [ ] All premium client insight features wrapped in `<TierGate tier="growth">` (or higher)
+
+**ROI Attribution:**
+- [ ] Migration 040 is applied — `roi_attributions` table exists (`SELECT name FROM sqlite_master WHERE type='table' AND name='roi_attributions'`)
+- [ ] `recordOptimization()` inserts a row with `clicks_before`, `impressions_before`, `position_before` populated from actual GSC data (not zeros)
+- [ ] `measureOutcome()` updates the row after `measurement_window_days` (default 14)
+- [ ] `getROIHighlights()` returns typed `ROIHighlight[]` — not `any[]` — with `pageTitle`, `action`, `result`, `clicksGained`
+- [ ] At minimum, `brief_published` action type is wired to `recordOptimization()` in the content publish path
+
+**Monthly Digest:**
+- [ ] `generateMonthlyDigest()` returns all required sections: `summary`, `wins`, `issuesAddressed`, `metrics`, `roiHighlights`
+- [ ] `summary` field is non-empty — either AI-generated or deterministic fallback (never empty string)
+- [ ] `GET /api/public/insights/:workspaceId/digest` responds 200 with valid `MonthlyDigestData` shape (test with `curl` or Vitest integration test)
+- [ ] `MonthlyDigest` client component renders without crashing when `roiHighlights` is empty array
+
+**Admin Action Queue:**
+- [ ] `resolveInsight()` updates `resolution_status` in `analytics_insights` — confirm with a DB query after calling it
+- [ ] `getUnresolvedInsights()` excludes resolved items — confirm it doesn't return rows where `resolution_status = 'resolved'`
+- [ ] `PUT /api/admin/insights/:insightId/resolve` broadcasts `insight_resolved` event via `broadcastToWorkspace`
+- [ ] Frontend `useWebSocket` handler for `insight_resolved` invalidates `actionQueue` React Query key
+
+**Process Guardrails:**
+- [ ] All new DB statements in `roi-attribution.ts` and `analytics-insights-store.ts` use `stmts()` cache, not bare `db.prepare()` (Section 7.1)
+- [ ] No imports added mid-file in any modified route file (Section 7.2)
+- [ ] `/narrative` and `/digest` routes in `public-analytics.ts` registered before any `/:workspaceId/:param` catch-all (Section 7.3)
+- [ ] `parseJsonSafe`/`parseJsonFallback` used wherever `insight.auditIssues` or other JSON columns are parsed (Section 7.4)
+- [ ] `npx vitest run` — zero failures (full suite, not just new tests — Section 7.5)
 - [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
 - [ ] `npx vite build` — clean
