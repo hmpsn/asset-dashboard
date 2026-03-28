@@ -44,6 +44,7 @@ Every completed task must include:
 3. **`BRAND_DESIGN_LANGUAGE.md`** — update if any UI colors/components/patterns changed.
 4. **Build verify** — `npx tsc --noEmit --skipLibCheck && npx vite build`
 5. **Summarize** — what was done, what docs updated, what's next.
+6. **`data/features.json`** — if the completed feature is client-impactful or sales-relevant, add/update its entry. Not every feature belongs here — only ones you'd mention on a sales call.
 
 ### Decision framework
 
