@@ -39,7 +39,7 @@ export function ActionQueue({ workspaceId }: Props) {
 
   if (isLoading) {
     return (
-      <SectionCard title="Action Queue" icon={AlertTriangle}>
+      <SectionCard title="Action Queue" titleIcon={<AlertTriangle className="w-4 h-4 text-zinc-400" />}>
         <div className="space-y-3">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
         </div>
@@ -49,17 +49,18 @@ export function ActionQueue({ workspaceId }: Props) {
 
   if (!items.length) {
     return (
-      <SectionCard title="Action Queue" icon={AlertTriangle}>
+      <SectionCard title="Action Queue" titleIcon={<AlertTriangle className="w-4 h-4 text-zinc-400" />}>
         <EmptyState
-          message="All caught up"
-          detail="No unresolved critical or warning insights at this time"
+          icon={CheckCircle}
+          title="All caught up"
+          description="No unresolved critical or warning insights at this time"
         />
       </SectionCard>
     );
   }
 
   return (
-    <SectionCard title={`Action Queue (${items.length})`} icon={AlertTriangle}>
+    <SectionCard title={`Action Queue (${items.length})`} titleIcon={<AlertTriangle className="w-4 h-4 text-zinc-400" />}>
       <div className="space-y-2">
         {items.map(item => {
           const isExpanded = expandedId === item.id;

@@ -26,7 +26,10 @@ export async function generateMonthlyDigest(
 
   const cacheKey = `${ws.id}:${monthLabel}`;
   const cached = digestCache.get(cacheKey);
-  if (cached && now.getTime() - cached.ts < CACHE_TTL_MS) return cached.result;
+  if (cached) {
+    if (now.getTime() - cached.ts < CACHE_TTL_MS) return cached.result;
+    digestCache.delete(cacheKey); // evict expired entry
+  }
 
   const insights = getInsights(ws.id);
   const roiHighlights = getROIHighlights(ws.id, 5);
