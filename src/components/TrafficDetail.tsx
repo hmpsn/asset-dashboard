@@ -304,11 +304,11 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         </SectionCard>
       )}
 
-      {/* ── 6. Two-column: Top Pages (left) + Breakdowns sidebar (right) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
-        {/* Left: Top Pages table */}
-        <SectionCard title="Top Pages">
-          <div className="space-y-1 overflow-y-auto max-h-[60vh]">
+      {/* ── 6. Two-column grid — table spans all rows, sidebar cards stack ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-4 gap-3">
+        {/* Left: Top Pages — spans all 4 rows */}
+        <SectionCard title="Top Pages" className="lg:row-span-4 flex flex-col max-h-[80vh]">
+          <div className="space-y-1 overflow-y-auto flex-1 min-h-0">
             {topPages.map((p, i) => (
               <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
                 <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
@@ -321,8 +321,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           </div>
         </SectionCard>
 
-        {/* Right: Breakdowns sidebar — Sources ABOVE Devices ABOVE Countries */}
-        <div className="space-y-3">
+        {/* Right column: each card occupies one grid row */}
           <SectionCard title="Traffic Sources">
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {sources.slice(0, 10).map((s, i) => {
@@ -403,7 +402,6 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               <EmptyState icon={Target} title="No segment data" description="No new vs returning data available." className="py-4" />
             )}
           </SectionCard>
-        </div>
       </div>
 
       {/* ── 9. Events & Conversions (collapsible, collapsed by default) ── */}

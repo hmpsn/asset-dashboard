@@ -254,10 +254,10 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             limit={5}
           />
 
-          {/* Step 5+6+7: Two-column layout — data table + breakdowns sidebar */}
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
-            {/* Left: Data table with inline Queries/Pages toggle */}
-            <SectionCard noPadding>
+          {/* Step 5+6+7: Two-column grid — table spans all rows, sidebar cards stack */}
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-3 gap-3">
+            {/* Left: Data table — spans all 3 rows */}
+            <SectionCard noPadding className="lg:row-span-3 flex flex-col max-h-[80vh]">
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800">
                 <button
@@ -270,7 +270,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 >Pages</button>
               </div>
 
-              <div className="overflow-y-auto max-h-[60vh]">
+              <div className="overflow-y-auto flex-1 min-h-0">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-zinc-900 z-10">
                   <tr className="border-b border-zinc-800">
@@ -347,8 +347,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               </div>
             </SectionCard>
 
-            {/* Right: Breakdowns sidebar */}
-            <div className="space-y-3">
+            {/* Right column: each card occupies one grid row */}
               {devices.length > 0 && (
                 <SectionCard title="Devices">
                   <div className="space-y-2.5">
@@ -419,7 +418,6 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                   </div>
                 </SectionCard>
               )}
-            </div>
           </div>
         </>
       )}
