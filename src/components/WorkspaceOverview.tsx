@@ -9,7 +9,7 @@ import {
   Globe, Shield, MessageSquare, ClipboardCheck, AlertTriangle,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Minus, Loader2,
   Search, BarChart3, Lock, ExternalLink, Bell, Activity, FileText, Zap,
-  Map, Rocket, FileSearch, Clock, DollarSign, Flag,
+  Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers,
   MessageSquarePlus, Bug, Lightbulb, MessageCircle, Send,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
@@ -121,6 +121,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
             </button>
             <button onClick={() => navigate('/revenue')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-400/80 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all">
               <DollarSign className="w-3.5 h-3.5" /> Revenue
+            </button>
+            <button onClick={() => navigate('/features')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-teal-400/80 hover:text-teal-300 bg-teal-500/5 hover:bg-teal-500/10 border border-teal-500/20 transition-all">
+              <Layers className="w-3.5 h-3.5" /> Features
             </button>
           </div>
         }
