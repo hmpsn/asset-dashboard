@@ -192,10 +192,14 @@ export interface StrategyAlignmentResult {
  * Checks whether a page is targeted in the keyword strategy.
  *
  * strategyPageMap: Map<pagePath, PageKeywordMap> (normalised paths as keys)
+ * actualKeyword: the query this insight is actually about (e.g. data.query).
+ *   When provided and the page IS in strategy, we compare it against
+ *   primaryKeyword + secondaryKeywords. A mismatch → 'misaligned'.
  */
 export function checkStrategyAlignment(
   pageId: string | null,
   strategyPageMap: Map<string, PageKeywordMap>,
+  actualKeyword?: string | null,
 ): StrategyAlignmentResult {
   if (!pageId) return { keyword: null, alignment: null };
 
@@ -216,10 +220,25 @@ export function checkStrategyAlignment(
     return { keyword: null, alignment: 'untracked' };
   }
 
-  // Page is in strategy — consider it aligned if it has a primary keyword
+  if (!entry.primaryKeyword) {
+    return { keyword: null, alignment: 'untracked' };
+  }
+
+  // Page is in strategy with a primary keyword.
+  // If we know what keyword this insight is actually about, check alignment.
+  if (actualKeyword) {
+    const normalize = (s: string) => s.toLowerCase().trim();
+    const target = normalize(entry.primaryKeyword);
+    const secondary = (entry.secondaryKeywords ?? []).map(normalize);
+    const actual = normalize(actualKeyword);
+    if (actual !== target && !secondary.includes(actual)) {
+      return { keyword: entry.primaryKeyword, alignment: 'misaligned' };
+    }
+  }
+
   return {
-    keyword: entry.primaryKeyword || null,
-    alignment: entry.primaryKeyword ? 'aligned' : 'untracked',
+    keyword: entry.primaryKeyword,
+    alignment: 'aligned',
   };
 }
 
@@ -500,8 +519,12 @@ export function enrichInsight(
   // Page title
   enriched.pageTitle = resolvePageTitle(insight.pageId, ctx.titleMap);
 
-  // Strategy alignment
-  const alignment = checkStrategyAlignment(insight.pageId, ctx.strategyPageMap);
+  // Strategy alignment — extract the actual ranking keyword from insight data
+  // so checkStrategyAlignment can detect misalignment (page ranked for a term
+  // that doesn't match its strategy target).
+  const insightData = insight.data as Record<string, unknown> | null | undefined;
+  const actualKeyword = typeof insightData?.query === 'string' ? insightData.query : null;
+  const alignment = checkStrategyAlignment(insight.pageId, ctx.strategyPageMap, actualKeyword);
   enriched.strategyKeyword = alignment.keyword;
   enriched.strategyAlignment = alignment.alignment;
 
