@@ -191,8 +191,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             <MetricToggleCard
               label="Clicks"
               value={fmtNum(overview.totalClicks)}
-              delta={hasDelta ? fmtDelta(comparison!.change.clicks) : '\u2014'}
-              deltaPositive={hasDelta ? isDeltaPositive(comparison!.change.clicks) : true}
+              delta={hasDelta ? fmtDelta(comparison!.changePercent.clicks, '%') : '\u2014'}
+              deltaPositive={hasDelta ? isDeltaPositive(comparison!.changePercent.clicks) : true}
               color="#60a5fa"
               active={activeSearchLines.has('clicks')}
               onClick={() => handleToggleLine('clicks')}
@@ -200,8 +200,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             <MetricToggleCard
               label="Impressions"
               value={fmtNum(overview.totalImpressions)}
-              delta={hasDelta ? fmtDelta(comparison!.change.impressions) : '\u2014'}
-              deltaPositive={hasDelta ? isDeltaPositive(comparison!.change.impressions) : true}
+              delta={hasDelta ? fmtDelta(comparison!.changePercent.impressions, '%') : '\u2014'}
+              deltaPositive={hasDelta ? isDeltaPositive(comparison!.changePercent.impressions) : true}
               color="#8b5cf6"
               active={activeSearchLines.has('impressions')}
               onClick={() => handleToggleLine('impressions')}
@@ -209,7 +209,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             <MetricToggleCard
               label="CTR"
               value={`${overview.avgCtr}%`}
-              delta={hasDelta ? fmtDelta(comparison!.change.ctr, '%') : '\u2014'}
+              delta={hasDelta ? fmtDelta(comparison!.change.ctr, 'pt') : '\u2014'}
               deltaPositive={hasDelta ? isDeltaPositive(comparison!.change.ctr) : true}
               color="#f59e0b"
               active={activeSearchLines.has('ctr')}

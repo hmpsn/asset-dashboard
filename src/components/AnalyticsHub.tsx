@@ -1,10 +1,11 @@
 // src/components/AnalyticsHub.tsx
 import { useState } from 'react';
-import { BarChart3, Search, Activity } from 'lucide-react';
+import { BarChart3, Search, Activity, StickyNote } from 'lucide-react';
 import { PageHeader, TabBar } from './ui';
 import { AnalyticsOverview } from './AnalyticsOverview';
 import { SearchDetail } from './SearchDetail';
 import { TrafficDetail } from './TrafficDetail';
+import { AnalyticsAnnotations } from './AnalyticsAnnotations';
 
 interface Props {
   workspaceId: string;
@@ -13,12 +14,13 @@ interface Props {
   ga4PropertyId?: string;
 }
 
-type HubTab = 'overview' | 'search-performance' | 'site-traffic';
+type HubTab = 'overview' | 'search-performance' | 'site-traffic' | 'annotations';
 
 const HUB_TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'search-performance', label: 'Search Performance', icon: Search },
   { id: 'site-traffic', label: 'Site Traffic', icon: Activity },
+  { id: 'annotations', label: 'Annotations', icon: StickyNote },
 ] as const;
 
 export function AnalyticsHub({ workspaceId, siteId, gscPropertyUrl, ga4PropertyId }: Props) {
@@ -61,6 +63,10 @@ export function AnalyticsHub({ workspaceId, siteId, gscPropertyUrl, ga4PropertyI
           workspaceId={workspaceId}
           ga4PropertyId={ga4PropertyId}
         />
+      )}
+
+      {tab === 'annotations' && (
+        <AnalyticsAnnotations workspaceId={workspaceId} />
       )}
     </div>
   );

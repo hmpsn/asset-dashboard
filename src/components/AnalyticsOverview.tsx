@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { BarChart3, Loader2 } from 'lucide-react';
 import { MetricToggleCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH } from './ui';
 import { AnnotatedTrendChart, type TrendLine } from './charts/AnnotatedTrendChart';
-import { AnalyticsAnnotations } from './AnalyticsAnnotations';
+
 import { InsightFeed } from './insights';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
@@ -70,7 +70,8 @@ const GSC_CARDS: CardConfig[] = [
   },
 ];
 
-const GA4_CARDS: CardConfig[] = [
+const ALL_CARDS: CardConfig[] = [
+  ...GSC_CARDS,
   {
     key: 'users',
     label: 'Users',
@@ -154,54 +155,30 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
         <DateRangeSelector options={DATE_PRESETS_SEARCH} selected={days} onChange={setDays} />
       </div>
 
-      {/* Search Performance metric cards */}
-      {overview.hasGsc && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Search Performance</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {GSC_CARDS.map(card => {
-              const delta = card.getDelta(overview);
-              return (
-                <MetricToggleCard
-                  key={card.key}
-                  label={card.label}
-                  value={card.formatValue(overview)}
-                  delta={formatDeltaLabel(delta)}
-                  deltaPositive={isDeltaPositive(delta)}
-                  color={card.color}
-                  active={activeLines.has(card.key)}
-                  onClick={() => handleToggleLine(card.key)}
-                  invertDelta={card.invertDelta}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Site Traffic metric cards */}
-      {overview.hasGa4 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Site Traffic</p>
-          <div className="grid grid-cols-2 gap-3 sm:w-1/2">
-            {GA4_CARDS.map(card => {
-              const delta = card.getDelta(overview);
-              return (
-                <MetricToggleCard
-                  key={card.key}
-                  label={card.label}
-                  value={card.formatValue(overview)}
-                  delta={formatDeltaLabel(delta)}
-                  deltaPositive={isDeltaPositive(delta)}
-                  color={card.color}
-                  active={activeLines.has(card.key)}
-                  onClick={() => handleToggleLine(card.key)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Metric cards — single row of up to 6 */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {ALL_CARDS
+          .filter(card => {
+            if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;
+            return overview.hasGa4;
+          })
+          .map(card => {
+            const delta = card.getDelta(overview);
+            return (
+              <MetricToggleCard
+                key={card.key}
+                label={card.label}
+                value={card.formatValue(overview)}
+                delta={formatDeltaLabel(delta)}
+                deltaPositive={isDeltaPositive(delta)}
+                color={card.color}
+                active={activeLines.has(card.key)}
+                onClick={() => handleToggleLine(card.key)}
+                invertDelta={card.invertDelta}
+              />
+            );
+          })}
+      </div>
 
       {/* Unified trend chart with toggle cards above */}
       <SectionCard
@@ -231,8 +208,6 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
         />
       </SectionCard>
 
-      {/* Annotations CRUD */}
-      <AnalyticsAnnotations workspaceId={workspaceId} />
     </div>
   );
 }

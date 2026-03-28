@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Globe, Monitor, Smartphone, Tablet,
   BarChart3, Zap, Target, Leaf, ArrowRight,
-  UserPlus, UserCheck, FileText, TrendingUp, Eye, AlertTriangle,
+  UserPlus, UserCheck, FileText, TrendingUp, Eye,
 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, DataList, EmptyState, MetricToggleCard } from './ui';
 import { DATE_PRESETS_FULL } from './ui';
@@ -44,7 +44,7 @@ const TRAFFIC_LINES: TrendLine[] = [
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
   const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
-  const [eventsExpanded, setEventsExpanded] = useState(false);
+  const [eventsExpanded, setEventsExpanded] = useState(true);
 
   const queryClient = useQueryClient();
 
@@ -304,60 +304,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         </SectionCard>
       )}
 
-      {/* ── 6. New vs Returning Users ── */}
-      <SectionCard title="New vs Returning">
-        {newVsReturning.length > 0 ? (
-          <div className="space-y-3">
-            {newVsReturning.map(seg => {
-              const isNew = seg.segment.toLowerCase() === 'new';
-              const Icon = isNew ? UserPlus : UserCheck;
-              return (
-                <div key={seg.segment}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1.5">
-                      <Icon className={`w-3.5 h-3.5 ${isNew ? 'text-cyan-400' : 'text-emerald-400'}`} />
-                      <span className="text-xs text-zinc-300 capitalize">{seg.segment}</span>
-                    </div>
-                    <span className="text-xs text-zinc-500">{seg.percentage}%</span>
-                  </div>
-                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1">
-                    <div className={`h-full rounded-full transition-all ${isNew ? 'bg-cyan-500' : 'bg-emerald-500'}`} style={{ width: `${seg.percentage}%` }} />
-                  </div>
-                  <div className="flex items-center gap-3 text-[10px] text-zinc-500">
-                    <span>{seg.users.toLocaleString()} users</span>
-                    <span>{seg.engagementRate}% engaged</span>
-                    <span>{formatDuration(seg.avgEngagementTime)}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState icon={Target} title="No segment data" description="No new vs returning data available for the selected time period." className="py-4" />
-        )}
-      </SectionCard>
-
-      {/* ── 7. Next Steps suggestions ── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
-        <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Next steps →</span>
-        {organic && organic.shareOfTotalUsers < 30 && (
-          <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-            <Leaf className="w-3 h-3" /> Organic share is low — build a <strong className="text-teal-400">Keyword Strategy</strong>
-          </span>
-        )}
-        {overview.bounceRate > 60 && (
-          <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-            <AlertTriangle className="w-3 h-3" /> High bounce rate — review landing pages in <strong className="text-teal-400">SEO Editor</strong>
-          </span>
-        )}
-        {conversions.length === 0 && (
-          <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-            <Zap className="w-3 h-3" /> No events tracked — set up conversion tracking
-          </span>
-        )}
-      </div>
-
-      {/* ── 8. Two-column: Top Pages (left) + Breakdowns sidebar (right) ── */}
+      {/* ── 6. Two-column: Top Pages (left) + Breakdowns sidebar (right) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
         {/* Left: Top Pages table */}
         <SectionCard title="Top Pages">
@@ -422,6 +369,39 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               items={countries.map(c => ({ label: c.country, value: formatNumber(c.users) }))}
               maxHeight="200px"
             />
+          </SectionCard>
+
+          {/* New vs Returning */}
+          <SectionCard title="New vs Returning">
+            {newVsReturning.length > 0 ? (
+              <div className="space-y-3">
+                {newVsReturning.map(seg => {
+                  const isNew = seg.segment.toLowerCase() === 'new';
+                  const Icon = isNew ? UserPlus : UserCheck;
+                  return (
+                    <div key={seg.segment}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Icon className={`w-3.5 h-3.5 ${isNew ? 'text-cyan-400' : 'text-emerald-400'}`} />
+                          <span className="text-xs text-zinc-300 capitalize">{seg.segment}</span>
+                        </div>
+                        <span className="text-xs text-zinc-500">{seg.percentage}%</span>
+                      </div>
+                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1">
+                        <div className={`h-full rounded-full transition-all ${isNew ? 'bg-cyan-500' : 'bg-emerald-500'}`} style={{ width: `${seg.percentage}%` }} />
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+                        <span>{seg.users.toLocaleString()} users</span>
+                        <span>{seg.engagementRate}% engaged</span>
+                        <span>{formatDuration(seg.avgEngagementTime)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState icon={Target} title="No segment data" description="No new vs returning data available." className="py-4" />
+            )}
           </SectionCard>
         </div>
       </div>
