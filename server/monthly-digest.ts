@@ -13,6 +13,8 @@ const log = createLogger('monthly-digest');
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_CACHE_ENTRIES = 200; // bound memory: ~1 entry per workspace per active month
 const digestCache = new Map<string, { result: MonthlyDigestData; ts: number }>();
+// In-flight dedup: concurrent requests for the same key share one computation
+const inflightDigests = new Map<string, Promise<MonthlyDigestData>>();
 
 /**
  * Generate a monthly performance digest for a workspace.
@@ -23,7 +25,7 @@ export async function generateMonthlyDigest(
   month?: string, // "March 2026" — defaults to current month
 ): Promise<MonthlyDigestData> {
   const now = new Date();
-  const monthLabel = month ?? now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const monthLabel = month ?? now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   // Parse the month label into actual dates so period/comparisons reflect the correct month
   const targetDate = parseMonthLabel(monthLabel, now);
@@ -35,6 +37,26 @@ export async function generateMonthlyDigest(
     digestCache.delete(cacheKey); // evict expired entry
   }
 
+  // Coalesce concurrent requests — only one OpenAI call per cache key
+  const inflight = inflightDigests.get(cacheKey);
+  if (inflight) return inflight;
+
+  const promise = computeDigest(ws, monthLabel, targetDate, now);
+  inflightDigests.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    inflightDigests.delete(cacheKey);
+  }
+}
+
+async function computeDigest(
+  ws: Workspace,
+  monthLabel: string,
+  targetDate: Date,
+  now: Date,
+): Promise<MonthlyDigestData> {
+  const cacheKey = `${ws.id}:${monthLabel}`;
   const insights = getInsights(ws.id);
   const roiHighlights = getROIHighlights(ws.id, 5);
 

@@ -47,17 +47,3 @@ export interface ROIHighlight {
   clicksGained: number;
 }
 
-/** Admin action queue item */
-export interface AdminActionItem {
-  insightId: string;
-  insightType: InsightType;
-  pageTitle?: string;
-  pageUrl?: string;
-  severity: InsightSeverity;
-  headline: string;
-  impactScore: number;
-  resolutionStatus: 'unresolved' | 'in_progress' | 'resolved';
-  resolutionNote?: string;
-  resolvedAt?: string;
-  createdAt: string;
-}
