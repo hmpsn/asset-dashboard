@@ -25,7 +25,7 @@ import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
-import { upsertAnomalyDigestInsight } from './analytics-insights-store.js';
+import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
@@ -559,8 +559,13 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               domain = 'search';
             }
 
+            // Preserve firstDetected from existing insight for accurate duration tracking
+            const dedupKey = `anomaly:${a.type}:${a.metric}`;
+            const existing = getInsight(a.workspaceId, dedupKey, 'anomaly_digest');
+            const existingData = existing?.data as AnomalyDigestData | undefined;
+            const firstDetected = existingData?.firstDetected ?? a.detectedAt;
             const durationDays = Math.max(1, Math.ceil(
-              (Date.now() - new Date(a.detectedAt).getTime()) / 86400000,
+              (Date.now() - new Date(firstDetected).getTime()) / 86400000,
             ));
 
             const digestData: AnomalyDigestData = {
@@ -570,7 +575,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               expectedValue: a.previousValue,
               deviationPercent: a.changePct,
               durationDays,
-              firstDetected: a.detectedAt,
+              firstDetected,
               severity: a.severity,
             };
 

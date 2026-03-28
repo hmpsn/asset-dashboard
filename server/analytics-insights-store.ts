@@ -62,6 +62,9 @@ const stmts = createStmtCache(() => ({
   deleteByWorkspace: db.prepare(
     `DELETE FROM analytics_insights WHERE workspace_id = ?`,
   ),
+  selectByDomain: db.prepare(
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
+  ),
 }));
 
 function rowToInsight(row: InsightRow): AnalyticsInsight {
@@ -205,12 +208,6 @@ export function getInsightsByDomain(
   workspaceId: string,
   domain: string,
 ): AnalyticsInsight[] {
-  let selectByDomain: ReturnType<typeof db.prepare> | undefined;
-  if (!selectByDomain) {
-    selectByDomain = db.prepare(
-      `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
-    );
-  }
-  const rows = selectByDomain.all(workspaceId, domain) as InsightRow[];
+  const rows = stmts().selectByDomain.all(workspaceId, domain) as InsightRow[];
   return rows.map(rowToInsight);
 }
