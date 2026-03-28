@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { resolveInsight, getUnresolvedInsights } from '../analytics-insights-store.js';
 
 const router = Router();
@@ -32,7 +33,7 @@ router.put(
     const updated = resolveInsight(req.params.insightId, workspaceId, status, note);
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
     addActivity(workspaceId, 'insight_resolved', `Insight ${status}${note ? ': ' + note : ''}`);
-    broadcastToWorkspace(workspaceId, 'insight_resolved', { insightId: req.params.insightId, status });
+    broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });
     res.json(updated);
   },
 );

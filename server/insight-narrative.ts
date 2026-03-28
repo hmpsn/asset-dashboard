@@ -70,8 +70,15 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
         narrative: improved
           ? `This page has moved up in search results. We'll continue optimizing to maintain this momentum.`
           : `We've detected a position change and are working on a recovery plan.`,
-        impact: data.estimatedClickImpact
-          ? `Estimated impact: ${Math.abs(Number(data.estimatedClickImpact)).toLocaleString()} monthly visits`
+        impact: (data.currentClicks != null && data.previousClicks != null)
+          ? (() => {
+              const delta = Number(data.currentClicks) - Number(data.previousClicks);
+              return delta > 0
+                ? `+${delta.toLocaleString()} additional monthly clicks`
+                : delta < 0
+                ? `${Math.abs(delta).toLocaleString()} fewer monthly clicks`
+                : undefined;
+            })()
           : undefined,
       };
     },

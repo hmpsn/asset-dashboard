@@ -54,8 +54,8 @@ export async function generateMonthlyDigest(
   let avgPositionChange = 0;
 
   const [gscResult, ga4Result] = await Promise.allSettled([
-    ws.gscPropertyUrl
-      ? getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS)
+    ws.webflowSiteId && ws.gscPropertyUrl
+      ? getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, COMPARISON_DAYS)
       : Promise.reject(new Error('GSC not configured')),
     ws.ga4PropertyId
       ? getGA4PeriodComparison(ws.ga4PropertyId, COMPARISON_DAYS)
