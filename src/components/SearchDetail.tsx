@@ -270,8 +270,9 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 >Pages</button>
               </div>
 
+              <div className="max-h-[450px] overflow-y-auto">
               <table className="w-full text-xs">
-                <thead>
+                <thead className="sticky top-0 bg-zinc-900 z-10">
                   <tr className="border-b border-zinc-800">
                     <th className="text-left py-3 px-4 text-zinc-500 font-medium">
                       {tableView === 'queries' ? 'Query' : 'Page'}
@@ -343,6 +344,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                   })}
                 </tbody>
               </table>
+              </div>
             </SectionCard>
 
             {/* Right: Breakdowns sidebar */}
