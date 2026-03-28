@@ -7,6 +7,9 @@ import type { AnalyticsInsight } from '../shared/types/analytics.js';
 
 const log = createLogger('monthly-digest');
 
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const digestCache = new Map<string, { result: MonthlyDigestData; ts: number }>();
+
 /**
  * Generate a monthly performance digest for a workspace.
  * Aggregates insights, anomalies, and ROI data into a client-facing narrative.
@@ -17,6 +20,10 @@ export async function generateMonthlyDigest(
 ): Promise<MonthlyDigestData> {
   const now = new Date();
   const monthLabel = month ?? now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const cacheKey = `${workspaceId}:${monthLabel}`;
+  const cached = digestCache.get(cacheKey);
+  if (cached && now.getTime() - cached.ts < CACHE_TTL_MS) return cached.result;
 
   const insights = getInsights(workspaceId);
   const roiHighlights = getROIHighlights(workspaceId, 5);
@@ -47,7 +54,7 @@ export async function generateMonthlyDigest(
 
   const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics);
 
-  return {
+  const result: MonthlyDigestData = {
     month: monthLabel,
     period: {
       start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
@@ -59,6 +66,9 @@ export async function generateMonthlyDigest(
     metrics,
     roiHighlights,
   };
+
+  digestCache.set(cacheKey, { result, ts: now.getTime() });
+  return result;
 }
 
 function isPositiveMove(insight: AnalyticsInsight): boolean {
