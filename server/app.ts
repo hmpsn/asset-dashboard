@@ -92,6 +92,7 @@ import siteArchitectureRoutes from './routes/site-architecture.js';
 import llmsTxtRoutes from './routes/llms-txt.js';
 import competitorSchemaRoutes from './routes/competitor-schema.js';
 import { aiStatsRoutes } from './routes/ai-stats.js';
+import featuresRouter from './routes/features.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -329,6 +330,7 @@ export function createApp(): express.Express {
   app.use(llmsTxtRoutes);
   app.use(competitorSchemaRoutes);
   app.use('/api/ai-stats', verifyAdminToken, aiStatsRoutes);
+  app.use(featuresRouter);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);
