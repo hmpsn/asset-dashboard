@@ -3681,7 +3681,8 @@
           "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
           "est": "5h",
           "priority": "P2",
-          "status": "pending"
+          "status": "done",
+          "notes": "Shipped — Client-facing insight narratives (InsightNarrative.tsx), ROI attribution tracking (roi-attribution.ts + roi_attributions table), monthly performance digest (MonthlyDigest.tsx + monthly-digest.ts), upsell signal tracking on TierGate (onGateHit callback), admin action queue with resolution workflow (ActionQueue.tsx + resolveInsight). Resolution tracking fields added to analytics_insights (migration 040). New shared types in narrative.ts."
         }
       ]
     }

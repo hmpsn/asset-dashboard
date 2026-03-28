@@ -107,7 +107,10 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
-| **TierGate** | `TierGate.tsx` | Growth: `teal`, Premium: `amber` | Blurred preview + overlay lock. Exports `TierBadge` |
+| **TierGate** | `TierGate.tsx` | Growth: `teal`, Premium: `amber` | Blurred preview + overlay lock. Exports `TierBadge`. `onGateHit` callback (optional) fires when gate blocks access for upsell tracking. |
+| **InsightNarrative** | `client/InsightNarrative.tsx` | Blue=opportunity, amber=warning, red=critical, emerald=positive, teal=actionTaken | Client-facing only. No purple. |
+| **MonthlyDigest** | `client/MonthlyDigest.tsx` | Emerald=wins, blue=ROI highlights, teal=pages optimized count | Growth-gated. No purple. |
+| **ActionQueue** | `admin/ActionQueue.tsx` | Blue=impact scores (data), teal=resolve CTA (action) | Admin-only. No purple. |
 | **DataList** | `DataList.tsx` | Rank: `text-zinc-500`, label: `text-zinc-300`, value: `text-zinc-400` | Optional ranking numbers |
 
 ### Helper Functions (`constants.ts`)
