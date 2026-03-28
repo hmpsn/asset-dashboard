@@ -119,7 +119,7 @@ Do NOT include specific numbers unless they're impressive. Keep it concise.`;
       maxTokens: 200,
     });
 
-    return result ?? fallbackSummary(month, wins.length, issues.length);
+    return result || fallbackSummary(month, wins.length, issues.length);
   } catch (err) {
     log.warn({ err }, 'AI digest summary failed — using fallback');
     return fallbackSummary(month, wins.length, issues.length);
