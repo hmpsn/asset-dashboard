@@ -82,6 +82,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.INSIGHT_RESOLVED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
     },
   });
 }

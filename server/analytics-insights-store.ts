@@ -79,6 +79,9 @@ const stmts = createStmtCache(() => ({
   selectById: db.prepare(
     `SELECT * FROM analytics_insights WHERE id = ? AND workspace_id = ?`,
   ),
+  deleteStaleByType: db.prepare(
+    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL`,
+  ),
 }));
 
 function rowToInsight(row: InsightRow): AnalyticsInsight {
@@ -181,10 +184,7 @@ export function deleteStaleInsightsByType(
   insightType: InsightType,
   olderThan: string,
 ): number {
-  const stmt = db.prepare(
-    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL`,
-  );
-  const info = stmt.run(workspaceId, insightType, olderThan);
+  const info = stmts().deleteStaleByType.run(workspaceId, insightType, olderThan);
   return info.changes;
 }
 
