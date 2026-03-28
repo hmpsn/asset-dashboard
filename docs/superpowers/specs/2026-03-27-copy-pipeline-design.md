@@ -685,6 +685,391 @@ frequency INTEGER NOT NULL DEFAULT 1  -- observation count for promotion detecti
 copy_approval_rate REAL  -- % of linked copy sections approved without regeneration
 ```
 
+### Enhancement 15: Full Platform Context Integration
+
+**The enhancement that prevents the Copy & Brand Engine from being an isolated monolith.**
+
+Add two new builder functions to `seo-context.ts` that inject copy engine intelligence into EVERY AI call across the entire platform:
+
+**Function 1: `buildCopyIntelligenceContext(workspaceId)`**
+
+Pulls all active `copy_intelligence` patterns for the workspace and formats them as a context block. This block is included in `fullContext` alongside the existing brand voice, knowledge base, and persona blocks.
+
+```typescript
+export function buildCopyIntelligenceContext(workspaceId: string): string {
+  // Query copy_intelligence WHERE workspace_id = ? AND active = 1
+  // Group by pattern_type (terminology, tone, structure, keyword_usage)
+  // Format as:
+  // LEARNED COPY PATTERNS:
+  //   Terminology: use "patients" not "clients", use "office" not "clinic"
+  //   Tone: shorter headlines preferred, more conversational FAQ answers
+  //   Structure: always lead hero with transformation, never passive voice in CTAs
+  //   Keywords: "affordable" performs better than "cost-effective" for this audience
+}
+```
+
+**Effect:** When the SEO editor generates a title, it knows to use "patients." When the CMS editor generates variations, it uses the learned tone. When a content brief is generated, it applies structural patterns. Every feature gets smarter from copy review — not just the copy pipeline.
+
+**Function 2: `buildBlueprintContext(workspaceId, pagePath?)`**
+
+If a blueprint exists for the workspace, and optionally matches a specific page path or keyword, pulls the relevant strategy context.
+
+```typescript
+export function buildBlueprintContext(
+  workspaceId: string,
+  pagePath?: string,
+  pageKeyword?: string
+): string {
+  // 1. Find active blueprint for workspace
+  // 2. If pagePath or pageKeyword provided, find matching entry
+  // 3. If matched, include:
+  //    - Entry's section plan with narrative roles
+  //    - Entry's keyword assignments
+  //    - Approved copy for consistency reference (if any)
+  //    - Entry's brand notes and SEO notes
+  // 4. If no specific match, include blueprint overview:
+  //    - All page names and types (for internal linking context)
+  //    - Overall keyword distribution (for cannibalization prevention)
+  //    - CTA strategy (which pages are conversion points)
+}
+```
+
+**Effect:** When the page rewrite chat works on a page that has a blueprint entry, it knows the strategic intent. When the SEO editor generates a meta description, it can reference the approved hero headline for consistency. When a content brief is generated for a page in the blueprint, it pulls the section plan and keywords instead of starting from scratch.
+
+**Integration point — update `buildSeoContext()` in `seo-context.ts`:**
+```typescript
+export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoContext {
+  // ... existing blocks ...
+  const copyIntelligenceBlock = workspaceId
+    ? buildCopyIntelligenceContext(workspaceId)
+    : '';
+  const blueprintBlock = workspaceId
+    ? buildBlueprintContext(workspaceId, pagePath)
+    : '';
+
+  return {
+    // ... existing fields ...
+    copyIntelligenceBlock,  // NEW
+    blueprintBlock,         // NEW
+    fullContext: [
+      keywordBlock, brandVoiceBlock, businessContext,
+      personasBlock, knowledgeBlock,
+      copyIntelligenceBlock, blueprintBlock,  // NEW — appended to fullContext
+    ].filter(Boolean).join('\n\n'),
+  };
+}
+```
+
+**Critical rules:**
+- These blocks are added to the END of `fullContext`, not the beginning. Existing context takes priority for backwards compatibility.
+- If no blueprint or copy intelligence exists, the blocks are empty strings. Zero impact on existing behavior.
+- The `SeoContext` return type must be updated to include the new optional fields. Use TypeScript optional fields to maintain backwards compatibility.
+- Performance: these are SQLite queries against indexed tables. Sub-millisecond. Do not cache — the data changes as copy is approved and intelligence is extracted.
+
+**Every existing feature that calls `buildSeoContext()` automatically benefits.** This is the list from the codebase:
+- Content brief generation (`content-brief.ts`)
+- Full post generation (`content-posts-ai.ts`)
+- Page rewrite chat (`routes/rewrite-chat.ts`)
+- AEO page review (`aeo-page-review.ts`)
+- SEO copy panel
+- CMS editor AI variations
+- Content decay refresh recommendations
+- Admin chat context assembly
+- Keyword analysis
+- Any future AI feature
+
+### Enhancement 16: Client Onboarding Questionnaire → Brandscript Auto-Population
+
+When creating a brandscript for a workspace that has completed the onboarding questionnaire, offer to auto-populate brandscript sections from questionnaire data.
+
+**Questionnaire field → Brandscript section mapping:**
+
+| Questionnaire Field | Brandscript Section | How |
+|---|---|---|
+| `audience`, `painPoints`, `goals` | Character | "Your customer is [audience]. They want [goals]. They struggle with [painPoints]." |
+| `painPoints`, `objections` | Problem | External: [painPoints]. Internal: [objections/fears]. |
+| `differentiators`, `whatYouDoBetter` | Guide | Authority: [differentiators]. Empathy: [whatYouDoBetter framed as understanding]. |
+| `services`, `description` | Plan | Steps: [services framed as process steps]. |
+| `brandPersonality` (12 trait selections) | Voice DNA | Map selections to voice DNA trait scores. |
+| `avoidWords` | Voice Guardrails | Add each word to the forbidden words list. |
+| `competitors`, `whatTheyDoBetter` | Competitive context | Store as competitor intelligence for blueprint generator. |
+| `referenceUrls` | Voice Samples input | Queue for discovery ingestion as `existing_copy` source type. |
+
+**Implementation:**
+- When the user clicks "Create Brandscript" and the workspace has questionnaire data, show a prompt: "We have onboarding responses for this client. Use them as a starting point? [Yes, pre-fill] [No, start blank]"
+- If yes, pre-fill the brandscript sections with AI-structured content from the questionnaire fields. Use GPT-4.1-mini for this structuring — it's a transformation task, not creative.
+- The user then refines the pre-filled sections. This is not auto-complete — it's a head start.
+
+**Also auto-populate voice guardrails:** The questionnaire's `avoidWords` field should automatically populate voice profile guardrails as forbidden words. No AI call needed — direct mapping.
+
+**Critical rule:** Never silently overwrite. If the workspace already has a brandscript or voice profile with data, do not offer to overwrite. Only offer pre-fill on fresh/empty instances.
+
+**Phase 1 implementation note:** This enhancement is triggered in Phase 1 (brandscript creation), but the questionnaire data already exists. Add a function to `server/brandscript.ts`:
+```typescript
+export function prefillFromQuestionnaire(workspaceId: string, brandscriptId: string): void {
+  // 1. Read questionnaire responses from workspace settings
+  // 2. Map fields to brandscript sections per table above
+  // 3. Call AI to structure the raw data into polished section content
+  // 4. Insert as brandscript_sections with status 'draft'
+}
+```
+
+### Enhancement 17: Content Decay → Copy Pipeline (Closed Loop)
+
+When the content decay system flags a page losing traffic, connect it to the copy pipeline for automated refresh.
+
+**Detection → Action flow:**
+
+```
+Content decay detects page losing 30%+ clicks
+    ↓
+Check: Does this page have a blueprint entry?
+    ↓ YES                              ↓ NO
+Check what's declining              Offer to create a blueprint entry
+(which sections lost traffic?)       for this page and generate fresh copy
+    ↓
+Suggest section-specific refresh:
+- Refresh FAQ with updated PAA questions from SERP
+- Refresh hero if click-through-rate declined
+- Refresh body if time-on-page declined
+    ↓
+Auto-generate refreshed brief (new SERP data, new competitors)
+    ↓
+Regenerate copy for specific sections
+    ↓
+Review + approve → publish → monitor decay reversal
+```
+
+**Implementation points:**
+
+1. **In `server/content-decay.ts`** — after detecting a decaying page, query `blueprint_entries` to check if a blueprint entry exists with a matching keyword or page path.
+
+2. **New function: `suggestCopyRefresh(workspaceId, pageUrl, decayData)`** — analyzes what's declining and maps to specific blueprint entry sections that need refresh. Returns a list of recommended section regenerations with rationale.
+
+3. **UI integration** — in the content decay panel, if a blueprint entry exists, show a "Refresh Copy" button that navigates to the blueprint entry's copy view with the recommended sections pre-selected for regeneration.
+
+4. **Post-refresh tracking** — when refreshed copy is published, tag the content_decay record with `refresh_date`. Track whether the decay reverses in the following 30 days. Store the outcome in copy intelligence: "refreshing FAQ sections reversed decay for service pages."
+
+**Critical rule:** Never auto-refresh copy without review. The system suggests and pre-selects — the human approves and publishes.
+
+### Enhancement 18: Admin Chat → Blueprint + Copy Awareness
+
+Add blueprint and copy data as new data sources in the admin chat context assembly.
+
+**New data sources for `admin-chat-context.ts`:**
+
+```typescript
+// Add to the data source assembly in assembleAdminContext():
+
+// Blueprint overview
+if (categories.includes('strategy') || categories.includes('content')) {
+  const blueprints = listBlueprints(workspaceId);
+  if (blueprints.length > 0) {
+    const active = blueprints.find(b => b.status === 'active') ?? blueprints[0];
+    const fullBp = getBlueprint(workspaceId, active.id);
+    sections.push({
+      title: 'SITE BLUEPRINT',
+      content: formatBlueprintForChat(fullBp),
+    });
+    dataSources.push('site_blueprint');
+  }
+}
+
+// Copy status
+if (categories.includes('content') || categories.includes('copy')) {
+  const copyStatus = getCopyStatusSummary(workspaceId);
+  if (copyStatus) {
+    sections.push({
+      title: 'COPY PIPELINE STATUS',
+      content: copyStatus, // "12/20 pages have approved copy. 5 in review. 3 pending."
+    });
+    dataSources.push('copy_pipeline');
+  }
+}
+
+// Copy intelligence patterns
+if (categories.includes('brand') || categories.includes('content')) {
+  const patterns = getActiveIntelligence(workspaceId);
+  if (patterns.length > 0) {
+    sections.push({
+      title: 'COPY INTELLIGENCE',
+      content: patterns.map(p => `- [${p.patternType}] ${p.pattern}`).join('\n'),
+    });
+    dataSources.push('copy_intelligence');
+  }
+}
+```
+
+**Questions the admin chat can now answer:**
+- "What's our page strategy?" → pulls blueprint overview
+- "How much copy is approved?" → pulls copy pipeline status
+- "What keywords are we targeting across the site?" → pulls blueprint keyword map
+- "What copy patterns have we learned?" → pulls copy intelligence
+- "Which pages still need copy?" → pulls entries with pending copy status
+- "What's the upsell opportunity?" → pulls `recommended` scope entries
+
+**Question classification:** Add `'copy'` and `'blueprint'` as recognized question categories in the classifier. Map keywords: "copy", "blueprint", "page strategy", "copy status", "approved copy", "upsell" → relevant categories.
+
+### Enhancement 19: GSC Performance → Post-Publish Copy Refinement
+
+After copy is published to Webflow, GSC data creates a feedback loop for continuous copy improvement.
+
+**Two feedback mechanisms:**
+
+**Mechanism A: Keyword Drift Detection**
+- When a published page's GSC data shows it ranking for keywords different from its blueprint primary keyword, flag it.
+- Example: Page targets "dental implants Austin" but GSC shows top impressions for "affordable dental implants near me."
+- Action: Suggest updating the blueprint entry's primary keyword and regenerating the SEO title/meta to lean into what's actually working.
+
+**Implementation:**
+```typescript
+// Run weekly (or on-demand) per workspace:
+export async function detectKeywordDrift(workspaceId: string): Promise<KeywordDrift[]> {
+  // 1. Get all blueprint entries with approved, published copy
+  // 2. For each, fetch GSC queries for that page path (top 10 by impressions)
+  // 3. Compare GSC top queries against blueprint primary/secondary keywords
+  // 4. If GSC #1 query !== primary keyword, flag as drift
+  // Return: array of { entryId, targetKeyword, actualTopKeyword, impressions, position }
+}
+```
+
+**Mechanism B: Performance-Correlated Copy Intelligence**
+- After 30+ days of GSC data post-publish, correlate copy characteristics with performance.
+- "Pages with hero sections under 20 words have 15% higher CTR" → copy intelligence pattern with `source: 'gsc_correlation'`.
+- This is a longer-term analysis — run monthly or on-demand.
+
+**Critical rule:** Keyword drift suggestions are recommendations, not auto-changes. Show in the admin dashboard or copy review UI: "This page is ranking for a different keyword than targeted. Consider adjusting? [Review] [Dismiss]"
+
+**Data dependency:** Requires the workspace to have GSC connected and the page to be published. If either is missing, this enhancement is silently skipped — no errors.
+
+### Enhancement 20: Site Architecture ↔ Blueprint (Bidirectional)
+
+**Direction 1: Import existing site architecture into blueprint**
+
+For site refresh projects where the Webflow site already exists:
+- The site architecture feature builds a URL tree from Webflow pages
+- The blueprint generator should offer: "Import existing site structure as a starting point? [Import] [Generate fresh]"
+- If imported, each existing page becomes a blueprint entry with page type auto-detected from URL patterns and page content
+- Keywords are pre-populated from existing GSC data if available
+- Entries are marked `included` by default (they already exist)
+- The AI then suggests additional pages as `recommended` (gaps in the current site)
+
+**Implementation:**
+```typescript
+export async function importFromSiteArchitecture(
+  workspaceId: string,
+  blueprintId: string
+): Promise<BlueprintEntry[]> {
+  // 1. Fetch site architecture URL tree for the workspace
+  // 2. For each page: detect page type from URL pattern (/services/* → service, /about → about, etc.)
+  // 3. Create blueprint entry per page with auto-detected type
+  // 4. Pull GSC top keywords per page URL as primary keywords
+  // 5. Generate default section plans per page type
+  // Return: created entries
+}
+```
+
+**Direction 2: Export blueprint to site architecture**
+
+For new sites where pages don't exist yet:
+- When a blueprint is finalized, its entries should appear in the site architecture view as "planned" pages
+- This gives the designer a preview of the site structure before anything is built in Webflow
+- Once pages are built in Webflow and synced, the planned entries link to actual URLs
+
+**Implementation:** Add a `planned_pages` data source to the site architecture view. Query blueprint entries where `scope = 'included'` and no Webflow page exists yet. Display with a "planned" badge alongside the existing URL tree.
+
+**Critical rule:** Import is additive — it never deletes existing blueprint entries. If the user imports a site architecture into a blueprint that already has entries, new entries are appended. Duplicates are detected by page name similarity and flagged for review.
+
+### Enhancement 21: Audience Personas ← Brandscript Character Sync
+
+When a brandscript is approved (status changes to finalized/active), offer to sync brandscript Character data into the existing audience personas.
+
+**Sync mapping:**
+
+| Brandscript Section | Persona Field | Sync Behavior |
+|---|---|---|
+| Character → "what they want" | Persona goals | Merge (append new goals, don't overwrite) |
+| Problem → external problems | Persona pain points | Merge |
+| Problem → internal problems | Persona emotional pain points | Merge |
+| Problem → philosophical problem | Persona values/motivations | Merge |
+| Success → transformation | Persona desired outcomes | Merge |
+| Objection Handling (Identity) | Persona objections | Merge |
+| Customer Journey (Identity) | Persona buying stage context | Enrich existing stage descriptions |
+
+**Implementation:**
+- After a brandscript is approved, show notification: "Brandscript approved. Sync character insights to audience personas? [Sync] [Skip]"
+- If synced, use GPT-4.1-mini to extract structured persona fields from the brandscript section content and merge them with existing persona data
+- Merge behavior is ALWAYS additive — never overwrite existing persona content. Append with a source tag: `[from brandscript]`
+- If the workspace has multiple personas, the AI maps brandscript insights to the most relevant persona(s)
+
+**Downstream effect:** Every AI feature that uses persona context (content briefs, blog posts, SEO copy, admin chat) immediately gets richer audience understanding. The brandscript's deep discovery data elevates the entire platform's audience intelligence.
+
+**Critical rule:** Sync is opt-in and additive. Never auto-sync. Never overwrite. Always show what will be added and let the user confirm.
+
+---
+
+### Complete Integration Map — All Three Phases + Existing Platform
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     EXISTING PLATFORM                           │
+│                                                                  │
+│  Onboarding ──→ Phase 1 ──→ seo-context.ts ──→ ALL AI Features │
+│  Questionnaire   Brandscript   (enriched)       ├─ Content Briefs│
+│       │          Voice Profile                  ├─ Post Gen      │
+│       │          Brand Identity                 ├─ SEO Editor    │
+│       │              │                          ├─ CMS Editor    │
+│       │              ▼                          ├─ Rewrite Chat  │
+│       │         Phase 2                         ├─ AEO Review    │
+│       │         Blueprint ◄──── Site Arch       ├─ Admin Chat    │
+│       │         Page Strategy    (import)       ├─ Decay Refresh │
+│       │              │                          └─ All others    │
+│       │              ▼                                           │
+│       │         Phase 3                                          │
+│       │         Copy Pipeline                                    │
+│       │          │       │                                       │
+│       │    Approved    Steering                                  │
+│       │    Copy         Notes                                    │
+│       │     │            │                                       │
+│       │     ▼            ▼                                       │
+│       │  Voice        Copy Intelligence ──→ seo-context.ts      │
+│       │  Samples      (workspace-level)     (feeds ALL features)│
+│       │     │                                                    │
+│       │     ▼                                                    │
+│       │  Voice Profile (improved) ──→ seo-context.ts            │
+│       │                                                          │
+│       │  Published Copy                                          │
+│       │     │                                                    │
+│       │     ▼                                                    │
+│       │  GSC Tracking ──→ Keyword Drift ──→ Copy Refinement     │
+│       │     │                                                    │
+│       │     ▼                                                    │
+│       │  Content Decay ──→ Copy Refresh ──→ Re-publish          │
+│       │                                                          │
+│       │  Brandscript Character ──→ Audience Personas (enriched) │
+│       │                           (feeds ALL AI via personas)    │
+│       │                                                          │
+│       │  Blueprint ──→ Site Architecture (planned pages view)    │
+│       │                                                          │
+│       │  Admin Chat ◄── Blueprint + Copy Status + Intelligence  │
+│       │                                                          │
+│       └──────────────────────────────────────────────────────────┘
+
+THREE CLOSED LOOPS:
+
+Loop 1 (Brand Intelligence):
+  Questionnaire → Brandscript → Voice → Copy Gen → Approved Copy
+  → Voice Samples → Better Copy → More Approved Copy → ...
+
+Loop 2 (SEO Performance):
+  Keywords → Blueprint → Copy → Publish → GSC → Decay Detection
+  → Copy Refresh → Publish → GSC → ...
+
+Loop 3 (Cross-Platform Learning):
+  Copy Steering → Copy Intelligence → seo-context.ts → ALL features
+  → Better AI output everywhere → Less steering needed → ...
+```
+
 ### Updated AI Model Strategy
 
 | Task | Model | Reasoning |
@@ -696,4 +1081,8 @@ copy_approval_rate REAL  -- % of linked copy sections approved without regenerat
 | Steering note classification (content vs. voice) | GPT-4.1-mini | Binary classification — fast, cheap |
 | Auto quality check | No AI — regex/pattern matching | Synchronous, free, instant |
 | Brief quality analysis | GPT-4.1-mini | Structured pattern analysis after 10+ briefs |
+| Questionnaire → brandscript structuring | GPT-4.1-mini | Data transformation, not creative |
+| Content decay → refresh suggestion | Claude Sonnet 4 | Needs to understand what's declining and why |
+| Keyword drift detection | No AI — data comparison | GSC query vs. blueprint keyword matching |
+| Persona sync from brandscript | GPT-4.1-mini | Structured field extraction and mapping |
 | Annotation + reasoning | Included in main generation call | No separate call needed |
