@@ -316,10 +316,20 @@ function extractBrandTokens(domain: string): string[] {
   return tokens;
 }
 
-/** Check if a keyword is likely a branded search for a competitor */
+/** Check if a keyword is likely a branded search for a competitor.
+ * Uses word-boundary matching to avoid false positives from short tokens
+ * that are also common industry terms (e.g. "seo" from seo.com).
+ */
 function isBrandedQuery(keyword: string, competitorBrandTokens: string[]): boolean {
   const lower = keyword.toLowerCase();
-  return competitorBrandTokens.some(token => lower.includes(token));
+  return competitorBrandTokens.some(token => {
+    // Short tokens (< 5 chars) are too likely to match common words
+    // e.g. "seo" from seo.com, "web" from web.io, "hub" from hub.io
+    if (token.length < 5) return false;
+    // Word-boundary match to avoid substring false positives
+    const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    return regex.test(lower);
+  });
 }
 
 export function computeCompetitorGapInsights(
