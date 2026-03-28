@@ -43,6 +43,25 @@ interface ComputedInsight<T> {
   severity: InsightSeverity;
 }
 
+// ── URL normalization for page deduplication ─────────────────────
+// GSC can return multiple URL variants for the same logical page
+// (trailing slashes, query params, fragments). Normalize before
+// using as grouping keys or DB page_id values.
+
+function normalizePageUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    // Strip query params & fragment — same page content
+    let path = u.pathname;
+    // Strip trailing slash (keep root '/')
+    if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+    return `${u.origin}${path}`;
+  } catch {
+    // Not a valid URL — strip trailing slash as best-effort
+    return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
+  }
+}
+
 // ── Expected CTR by position (industry average approximation) ────
 
 const EXPECTED_CTR_BY_POSITION: Record<number, number> = {
@@ -841,6 +860,13 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         )
       : [],
   ]) as [SearchPage[], QueryPageRow[], GA4TopPage[], SearchPage[], QueryPageRow[]];
+
+  // Normalize page URLs to prevent duplicates from URL variants
+  // (trailing slashes, query params, fragments for the same logical page)
+  for (const p of gscPages) p.page = normalizePageUrl(p.page);
+  for (const p of previousGscPages) p.page = normalizePageUrl(p.page);
+  for (const r of queryPageData) r.page = normalizePageUrl(r.page);
+  for (const r of previousQueryPageData) r.page = normalizePageUrl(r.page);
 
   log.info(
     { workspaceId, gscPages: gscPages.length, queryRows: queryPageData.length, ga4Pages: ga4Pages.length },
