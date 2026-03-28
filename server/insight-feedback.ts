@@ -86,10 +86,15 @@ export function buildStrategySignals(insights: AnalyticsInsight[]): StrategySign
     // Competitor gap → content gap suggestions
     if (insight.insightType === 'competitor_gap' && insight.data) {
       const data = insight.data as Record<string, unknown>;
+      const ourPosition = data.ourPosition as number | null | undefined;
+      const competitorPosition = data.competitorPosition as number | undefined;
+      const detail = ourPosition != null
+        ? `Competitor ranking position ${competitorPosition ?? '?'} for "${data.keyword}" — you rank #${ourPosition}, consider optimizing`
+        : `Competitors ranking for "${data.keyword}" — no content targeting this`;
       signals.push({
         type: 'content_gap',
         keyword: (data.keyword as string) ?? 'unknown',
-        detail: `Competitors ranking for "${data.keyword}" — no content targeting this`,
+        detail,
         insightId: insight.id,
         impactScore: insight.impactScore ?? 0,
       });

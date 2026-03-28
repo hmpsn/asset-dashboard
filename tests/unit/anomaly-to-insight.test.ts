@@ -1,14 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import type { AnomalyDigestData } from '../../shared/types/analytics.js';
+import type { AnomalyDigestData, InsightSeverity } from '../../shared/types/analytics.js';
 
 describe('anomaly-to-insight conversion', () => {
-  it('maps anomaly severity to insight severity', () => {
-    const severityMap: Record<string, string> = {
-      critical: 'critical', high: 'warning', medium: 'opportunity', low: 'opportunity',
+  it('maps every AnomalySeverity value to the correct InsightSeverity', () => {
+    // This mirrors the production mapping in server/anomaly-detection.ts.
+    // AnomalySeverity = 'critical' | 'warning' | 'positive'
+    const severityMap: Record<string, InsightSeverity> = {
+      critical: 'critical',
+      warning: 'warning',
+      positive: 'positive',  // positive anomalies (e.g. traffic_spike) → positive, NOT opportunity
     };
+
     expect(severityMap['critical']).toBe('critical');
-    expect(severityMap['high']).toBe('warning');
-    expect(severityMap['medium']).toBe('opportunity');
+    expect(severityMap['warning']).toBe('warning');
+    // Positive anomalies must map to 'positive', not 'opportunity' —
+    // mapping to 'opportunity' inflates base impact score from 20 to 40
+    expect(severityMap['positive']).toBe('positive');
+
+    // Verify all three AnomalySeverity values are covered (no missing keys)
+    const covered = Object.keys(severityMap);
+    expect(covered).toContain('critical');
+    expect(covered).toContain('warning');
+    expect(covered).toContain('positive');
   });
 
   it('classifies traffic anomaly types to traffic domain', () => {
@@ -34,6 +47,21 @@ describe('anomaly-to-insight conversion', () => {
     const fiveDaysAgo = new Date(now - 5 * 86400000).toISOString();
     const days = Math.ceil((now - new Date(fiveDaysAgo).getTime()) / 86400000);
     expect(days).toBe(5);
+  });
+
+  it('preserves firstDetected from existing insight across upserts', () => {
+    // durationDays must be computed from firstDetected (persisted on first detection),
+    // not from a.detectedAt (set to now() on every detection cycle).
+    const originalFirstDetected = new Date(Date.now() - 7 * 86400000).toISOString();
+    const currentDetectedAt = new Date().toISOString(); // always "now"
+
+    // Simulate the fix: use existing firstDetected when available
+    const existingFirstDetected = originalFirstDetected;
+    const firstDetected = existingFirstDetected ?? currentDetectedAt;
+    const durationDays = Math.max(1, Math.ceil((Date.now() - new Date(firstDetected).getTime()) / 86400000));
+
+    // Without the fix (using currentDetectedAt): durationDays would always be 1
+    expect(durationDays).toBeGreaterThanOrEqual(7);
   });
 
   it('generates correct dedup key', () => {

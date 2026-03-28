@@ -92,6 +92,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
     setExportOpen(false);
   };
 
+  // Navigate to briefs tab when an AI-suggested brief is actioned
+  const handleCreateBrief = () => {
+    setActiveTab('briefs');
+  };
+
   return (
     <div className="space-y-4">
       {/* Health summary bar */}
@@ -133,7 +138,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
       )}
 
       {/* AI-suggested briefs from insight engine */}
-      <AiSuggested workspaceId={workspaceId} />
+      <AiSuggested workspaceId={workspaceId} onCreateBrief={handleCreateBrief} />
 
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
