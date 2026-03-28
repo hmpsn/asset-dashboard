@@ -5,7 +5,7 @@ import {
   BarChart3, Zap, Target, Leaf, ArrowRight,
   UserPlus, UserCheck, FileText, TrendingUp, Eye, AlertTriangle,
 } from 'lucide-react';
-import { SectionCard, TabBar, DateRangeSelector, DataList, EmptyState } from './ui';
+import { SectionCard, DateRangeSelector, DataList, EmptyState, MetricToggleCard } from './ui';
 import { DATE_PRESETS_FULL } from './ui';
 import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import { useAdminGA4 } from '../hooks/admin';
@@ -14,8 +14,6 @@ import { useInsightFeed } from '../hooks/admin/useInsightFeed';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine } from './charts/AnnotatedTrendChart';
 import { InsightFeed } from './insights';
-
-type DataTab = 'insights' | 'breakdown' | 'events';
 
 interface Props {
   workspaceId: string;
@@ -45,8 +43,8 @@ const TRAFFIC_LINES: TrendLine[] = [
 
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [tab, setTab] = useState<DataTab>('insights');
   const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
+  const [eventsExpanded, setEventsExpanded] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -115,261 +113,271 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         </div>
       </div>
 
-      {/* Tab navigation */}
-      <TabBar
-        tabs={[
-          { id: 'insights', label: 'Traffic Insights', icon: Target },
-          { id: 'breakdown', label: 'Breakdown', icon: BarChart3 },
-          { id: 'events', label: 'Events', icon: Zap },
-        ]}
-        active={tab}
-        onChange={id => setTab(id as DataTab)}
-      />
+      {/* ── 1. MetricToggleCards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <MetricToggleCard
+          label="Users"
+          value={formatNumber(overview.totalUsers)}
+          delta={comparison ? `${comparison.changePercent.users > 0 ? '+' : ''}${comparison.changePercent.users}%` : '—'}
+          deltaPositive={(comparison?.changePercent.users ?? 0) >= 0}
+          color="#14b8a6"
+          active={activeTrafficLines.has('users')}
+          onClick={() => setActiveTrafficLines(prev => {
+            const next = new Set(prev);
+            if (next.has('users')) { if (next.size > 1) next.delete('users'); } else if (next.size < 3) { next.add('users'); }
+            return next;
+          })}
+        />
+        <MetricToggleCard
+          label="Sessions"
+          value={formatNumber(overview.totalSessions)}
+          delta={comparison ? `${comparison.changePercent.sessions > 0 ? '+' : ''}${comparison.changePercent.sessions}%` : '—'}
+          deltaPositive={(comparison?.changePercent.sessions ?? 0) >= 0}
+          color="#3b82f6"
+          active={activeTrafficLines.has('sessions')}
+          onClick={() => setActiveTrafficLines(prev => {
+            const next = new Set(prev);
+            if (next.has('sessions')) { if (next.size > 1) next.delete('sessions'); } else if (next.size < 3) { next.add('sessions'); }
+            return next;
+          })}
+        />
+        <MetricToggleCard
+          label="Bounce Rate"
+          value={`${overview.bounceRate}%`}
+          delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate}%` : '—'}
+          deltaPositive={(comparison?.change.bounceRate ?? 0) >= 0}
+          invertDelta
+          color="#f97316"
+          active
+          onClick={() => {}}
+        />
+        <MetricToggleCard
+          label="Avg Duration"
+          value={formatDuration(overview.avgSessionDuration)}
+          delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
+          deltaPositive={(comparison?.change.avgSessionDuration ?? 0) >= 0}
+          color="#a78bfa"
+          active
+          onClick={() => {}}
+        />
+      </div>
 
-      {/* ═══════ INSIGHTS TAB ═══════ */}
-      {tab === 'insights' && (
-        <div className="space-y-4">
-          {/* Chart first — mirrors SearchDetail pattern */}
-          {overviewData.trendData.length > 1 && (
-            <SectionCard title="Traffic Trend">
-              <AnnotatedTrendChart
-                data={overviewData.trendData}
-                lines={TRAFFIC_LINES.map(l => ({ ...l, active: activeTrafficLines.has(l.key) }))}
-                annotations={overviewData.annotations}
-                dateKey="date"
-                height={220}
-                onCreateAnnotation={
-                  overviewData.createAnnotation.mutate
-                    ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
-                    : undefined
+      {/* ── 2. Traffic Trend Chart (always visible) ── */}
+      {overviewData.trendData.length > 1 && (
+        <SectionCard title="Traffic Trend">
+          <AnnotatedTrendChart
+            data={overviewData.trendData}
+            lines={TRAFFIC_LINES.map(l => ({ ...l, active: activeTrafficLines.has(l.key) }))}
+            annotations={overviewData.annotations}
+            dateKey="date"
+            height={220}
+            onCreateAnnotation={
+              overviewData.createAnnotation.mutate
+                ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
+                : undefined
+            }
+            onToggleLine={(key) => {
+              setActiveTrafficLines(prev => {
+                const next = new Set(prev);
+                if (next.has(key)) {
+                  if (next.size > 1) next.delete(key);
+                } else if (next.size < 3) {
+                  next.add(key);
                 }
-                onToggleLine={(key) => {
-                  setActiveTrafficLines(prev => {
-                    const next = new Set(prev);
-                    if (next.has(key)) {
-                      if (next.size > 1) next.delete(key);
-                    } else if (next.size < 3) {
-                      next.add(key);
-                    }
-                    return next;
-                  });
-                }}
-                maxActiveLines={3}
-              />
-            </SectionCard>
-          )}
-
-          {/* Traffic Health Summary — above the feed for visibility */}
-          <SectionCard title="Traffic Health Summary">
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center">
-                <div className={`text-lg font-bold ${overview.bounceRate < 50 ? 'text-green-400' : overview.bounceRate < 65 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {overview.bounceRate}%
-                </div>
-                <div className="text-[11px] text-zinc-500">Bounce Rate</div>
-              </div>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${overview.avgSessionDuration > 120 ? 'text-green-400' : overview.avgSessionDuration > 60 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {formatDuration(overview.avgSessionDuration)}
-                </div>
-                <div className="text-[11px] text-zinc-500">Avg Session</div>
-              </div>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${organic ? (organic.shareOfTotalUsers > 30 ? 'text-green-400' : organic.shareOfTotalUsers > 15 ? 'text-amber-400' : 'text-red-400') : 'text-zinc-500'}`}>
-                  {organic ? `${organic.shareOfTotalUsers}%` : '—'}
-                </div>
-                <div className="text-[11px] text-zinc-500">Organic Share</div>
-              </div>
-              <div className="text-center">
-                <div className={`text-lg font-bold ${conversions.length > 3 ? 'text-green-400' : conversions.length > 0 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {conversions.length}
-                </div>
-                <div className="text-[11px] text-zinc-500">Tracked Events</div>
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* Insight Feed — traffic domain, capped at 10 */}
-          <InsightFeed
-            feed={feed}
-            loading={feedLoading}
-            domain="traffic"
-            showFilterChips
-            limit={10}
+                return next;
+              });
+            }}
+            maxActiveLines={3}
           />
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Growth Signals */}
-            {comparison && (
-              <SectionCard title="Growth Signals" titleIcon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
-                <div className="space-y-2">
-                  {[
-                    { label: 'User growth', value: comparison.changePercent.users },
-                    { label: 'Session growth', value: comparison.changePercent.sessions },
-                    { label: 'Pageview growth', value: comparison.changePercent.pageviews },
-                  ].map(g => (
-                    <div key={g.label} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                      <span className="text-zinc-400">{g.label}</span>
-                      <span className={`font-medium ${g.value > 0 ? 'text-emerald-400' : g.value < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                        {g.value > 0 ? '+' : ''}{g.value}%
-                      </span>
-                    </div>
-                  ))}
-                  {comparison.change.bounceRate !== 0 && (
-                    <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                      <span className="text-zinc-400">Bounce rate change</span>
-                      <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </SectionCard>
-            )}
-
-            {/* Engagement Analysis */}
-            <SectionCard title="Engagement Analysis" titleIcon={<Eye className="w-4 h-4 text-blue-400" />}>
-              <div className="space-y-2">
-                {newVsReturning.map(seg => (
-                  <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                    <span className="text-zinc-400 capitalize">{seg.segment} user engagement</span>
-                    <span className={`font-medium ${seg.engagementRate > 60 ? 'text-green-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
-                      {seg.engagementRate}%
-                    </span>
-                  </div>
-                ))}
-                {topPages.length > 0 && (
-                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                    <span className="text-zinc-400">Top page avg. engagement</span>
-                    <span className="text-zinc-300 font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
-                  </div>
-                )}
-                {organic && (
-                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
-                    <span className="text-zinc-400">Organic avg. engagement</span>
-                    <span className="text-zinc-300 font-medium">{formatDuration(organic.avgEngagementTime)}</span>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
-          </div>
-
-          {/* Organic vs Total */}
-          {organic && (
-            <SectionCard title="Organic vs All Traffic" titleIcon={<Leaf className="w-4 h-4 text-emerald-400" />}>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-[11px] text-zinc-500 mb-2">Users</div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="h-2 flex-1 bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${organic.shareOfTotalUsers}%` }} />
-                    </div>
-                    <span className="text-[11px] text-emerald-400 font-medium w-10 text-right">{organic.shareOfTotalUsers}%</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-500">{formatNumber(organic.organicUsers)} of {formatNumber(overview.totalUsers)}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-zinc-500 mb-2">Bounce Rate</div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-emerald-400">{organic.organicBounceRate}%</div>
-                      <div className="text-[10px] text-zinc-500">Organic</div>
-                    </div>
-                    <div className="text-zinc-700">vs</div>
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-zinc-300">{overview.bounceRate}%</div>
-                      <div className="text-[10px] text-zinc-500">All</div>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-zinc-500 mb-2">Engagement</div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-emerald-400">{organic.engagementRate}%</div>
-                      <div className="text-[10px] text-zinc-500">Organic</div>
-                    </div>
-                    <div className="text-zinc-700">vs</div>
-                    <div className="text-center flex-1">
-                      <div className="text-sm font-bold text-zinc-300">{overview.newUserPercentage}%</div>
-                      <div className="text-[10px] text-zinc-500">New Users</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {/* Next Steps */}
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
-            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Next steps →</span>
-            {organic && organic.shareOfTotalUsers < 30 && (
-              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <Leaf className="w-3 h-3" /> Organic share is low — build a <strong className="text-teal-400">Keyword Strategy</strong>
-              </span>
-            )}
-            {overview.bounceRate > 60 && (
-              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <AlertTriangle className="w-3 h-3" /> High bounce rate — review landing pages in <strong className="text-teal-400">SEO Editor</strong>
-              </span>
-            )}
-            {conversions.length === 0 && (
-              <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
-                <Zap className="w-3 h-3" /> No events tracked — set up conversion tracking
-              </span>
-            )}
-          </div>
-        </div>
+        </SectionCard>
       )}
 
-      {/* ═══════ BREAKDOWN TAB ═══════ */}
-      {tab === 'breakdown' && (<>
-        {/* Annotated Trend Chart */}
-        {overviewData.trendData.length > 1 && (
-          <SectionCard title="Daily Trend">
-            <AnnotatedTrendChart
-              data={overviewData.trendData}
-              lines={TRAFFIC_LINES.map(l => ({ ...l, active: activeTrafficLines.has(l.key) }))}
-              annotations={overviewData.annotations}
-              onCreateAnnotation={
-                overviewData.createAnnotation.mutate
-                  ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
-                  : undefined
-              }
-              onToggleLine={(key) => {
-                setActiveTrafficLines(prev => {
-                  const next = new Set(prev);
-                  if (next.has(key)) {
-                    if (next.size > 1) next.delete(key); // keep at least 1 active
-                  } else if (next.size < 3) {
-                    next.add(key);
-                  }
-                  return next;
-                });
-              }}
-              maxActiveLines={3}
-            />
+      {/* ── 3. Compact Traffic Insights Feed ── */}
+      <InsightFeed
+        feed={feed}
+        loading={feedLoading}
+        domain="traffic"
+        showFilterChips
+        limit={5}
+      />
+
+      {/* ── 4. Growth Signals + Engagement Analysis (side by side) ── */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Growth Signals */}
+        {comparison && (
+          <SectionCard title="Growth Signals" titleIcon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
+            <div className="space-y-2">
+              {[
+                { label: 'User growth', value: comparison.changePercent.users },
+                { label: 'Session growth', value: comparison.changePercent.sessions },
+                { label: 'Pageview growth', value: comparison.changePercent.pageviews },
+              ].map(g => (
+                <div key={g.label} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                  <span className="text-zinc-400">{g.label}</span>
+                  <span className={`font-medium ${g.value > 0 ? 'text-emerald-400' : g.value < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                    {g.value > 0 ? '+' : ''}{g.value}%
+                  </span>
+                </div>
+              ))}
+              {comparison.change.bounceRate !== 0 && (
+                <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                  <span className="text-zinc-400">Bounce rate change</span>
+                  <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}%
+                  </span>
+                </div>
+              )}
+            </div>
           </SectionCard>
         )}
 
-        {/* Top Pages (richer) + Sources (with bars) */}
-        <div className="grid grid-cols-2 gap-4">
-          <SectionCard title="Top Pages">
-            <div className="space-y-1 max-h-[350px] overflow-y-auto">
-              {topPages.slice(0, 15).map((p, i) => (
-                <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
-                  <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
-                  <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
-                  <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
-                  <span className="text-[11px] text-zinc-500 w-14 text-right">{formatNumber(p.users)} u</span>
-                </div>
-              ))}
-              {topPages.length === 0 && <EmptyState icon={FileText} title="No top pages data" description="No page data available for the selected time period." className="py-4" />}
-            </div>
-          </SectionCard>
+        {/* Engagement Analysis */}
+        <SectionCard title="Engagement Analysis" titleIcon={<Eye className="w-4 h-4 text-blue-400" />}>
+          <div className="space-y-2">
+            {newVsReturning.map(seg => (
+              <div key={seg.segment} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                <span className="text-zinc-400 capitalize">{seg.segment} user engagement</span>
+                <span className={`font-medium ${seg.engagementRate > 60 ? 'text-green-400' : seg.engagementRate > 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {seg.engagementRate}%
+                </span>
+              </div>
+            ))}
+            {topPages.length > 0 && (
+              <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                <span className="text-zinc-400">Top page avg. engagement</span>
+                <span className="text-zinc-300 font-medium">{formatDuration(topPages[0].avgEngagementTime)}</span>
+              </div>
+            )}
+            {organic && (
+              <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
+                <span className="text-zinc-400">Organic avg. engagement</span>
+                <span className="text-zinc-300 font-medium">{formatDuration(organic.avgEngagementTime)}</span>
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      </div>
 
+      {/* ── 5. Organic vs All Traffic ── */}
+      {organic && (
+        <SectionCard title="Organic vs All Traffic" titleIcon={<Leaf className="w-4 h-4 text-emerald-400" />}>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-[11px] text-zinc-500 mb-2">Users</div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="h-2 flex-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${organic.shareOfTotalUsers}%` }} />
+                </div>
+                <span className="text-[11px] text-emerald-400 font-medium w-10 text-right">{organic.shareOfTotalUsers}%</span>
+              </div>
+              <div className="text-[10px] text-zinc-500">{formatNumber(organic.organicUsers)} of {formatNumber(overview.totalUsers)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-zinc-500 mb-2">Bounce Rate</div>
+              <div className="flex items-center gap-3">
+                <div className="text-center flex-1">
+                  <div className="text-sm font-bold text-emerald-400">{organic.organicBounceRate}%</div>
+                  <div className="text-[10px] text-zinc-500">Organic</div>
+                </div>
+                <div className="text-zinc-700">vs</div>
+                <div className="text-center flex-1">
+                  <div className="text-sm font-bold text-zinc-300">{overview.bounceRate}%</div>
+                  <div className="text-[10px] text-zinc-500">All</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-zinc-500 mb-2">Engagement</div>
+              <div className="flex items-center gap-3">
+                <div className="text-center flex-1">
+                  <div className="text-sm font-bold text-emerald-400">{organic.engagementRate}%</div>
+                  <div className="text-[10px] text-zinc-500">Organic</div>
+                </div>
+                <div className="text-zinc-700">vs</div>
+                <div className="text-center flex-1">
+                  <div className="text-sm font-bold text-zinc-300">{overview.newUserPercentage}%</div>
+                  <div className="text-[10px] text-zinc-500">New Users</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* ── 6. New vs Returning Users ── */}
+      <SectionCard title="New vs Returning">
+        {newVsReturning.length > 0 ? (
+          <div className="space-y-3">
+            {newVsReturning.map(seg => {
+              const isNew = seg.segment.toLowerCase() === 'new';
+              const Icon = isNew ? UserPlus : UserCheck;
+              return (
+                <div key={seg.segment}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Icon className={`w-3.5 h-3.5 ${isNew ? 'text-cyan-400' : 'text-emerald-400'}`} />
+                      <span className="text-xs text-zinc-300 capitalize">{seg.segment}</span>
+                    </div>
+                    <span className="text-xs text-zinc-500">{seg.percentage}%</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1">
+                    <div className={`h-full rounded-full transition-all ${isNew ? 'bg-cyan-500' : 'bg-emerald-500'}`} style={{ width: `${seg.percentage}%` }} />
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+                    <span>{seg.users.toLocaleString()} users</span>
+                    <span>{seg.engagementRate}% engaged</span>
+                    <span>{formatDuration(seg.avgEngagementTime)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState icon={Target} title="No segment data" description="No new vs returning data available for the selected time period." className="py-4" />
+        )}
+      </SectionCard>
+
+      {/* ── 7. Next Steps suggestions ── */}
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
+        <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Next steps →</span>
+        {organic && organic.shareOfTotalUsers < 30 && (
+          <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+            <Leaf className="w-3 h-3" /> Organic share is low — build a <strong className="text-teal-400">Keyword Strategy</strong>
+          </span>
+        )}
+        {overview.bounceRate > 60 && (
+          <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+            <AlertTriangle className="w-3 h-3" /> High bounce rate — review landing pages in <strong className="text-teal-400">SEO Editor</strong>
+          </span>
+        )}
+        {conversions.length === 0 && (
+          <span className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
+            <Zap className="w-3 h-3" /> No events tracked — set up conversion tracking
+          </span>
+        )}
+      </div>
+
+      {/* ── 8. Two-column: Top Pages (left) + Breakdowns sidebar (right) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-3">
+        {/* Left: Top Pages table */}
+        <SectionCard title="Top Pages">
+          <div className="space-y-1 max-h-[350px] overflow-y-auto">
+            {topPages.slice(0, 15).map((p, i) => (
+              <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
+                <span className="text-[11px] text-zinc-500 w-5 text-right">{i + 1}</span>
+                <span className="text-xs text-zinc-300 flex-1 truncate font-mono">{p.path}</span>
+                <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+                <span className="text-[11px] text-zinc-500 w-14 text-right">{formatNumber(p.users)} u</span>
+              </div>
+            ))}
+            {topPages.length === 0 && <EmptyState icon={FileText} title="No top pages data" description="No page data available for the selected time period." className="py-4" />}
+          </div>
+        </SectionCard>
+
+        {/* Right: Breakdowns sidebar — Sources ABOVE Devices ABOVE Countries */}
+        <div className="space-y-3">
           <SectionCard title="Traffic Sources">
-            <div className="space-y-2 max-h-[350px] overflow-y-auto">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {sources.slice(0, 10).map((s, i) => {
                 const totalSessions = sources.reduce((sum, x) => sum + x.sessions, 0);
                 const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
@@ -387,10 +395,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               {sources.length === 0 && <EmptyState icon={Globe} title="No traffic sources data" description="No source data available for the selected time period." className="py-4" />}
             </div>
           </SectionCard>
-        </div>
 
-        {/* Devices + Countries + New vs Returning */}
-        <div className="grid grid-cols-3 gap-4">
           <SectionCard title="Devices">
             <div className="space-y-2">
               {devices.map(d => (
@@ -418,124 +423,87 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               maxHeight="200px"
             />
           </SectionCard>
+        </div>
+      </div>
 
-          <SectionCard title="New vs Returning">
-            {newVsReturning.length > 0 ? (
-              <div className="space-y-3">
-                {newVsReturning.map(seg => {
-                  const isNew = seg.segment.toLowerCase() === 'new';
-                  const Icon = isNew ? UserPlus : UserCheck;
-                  return (
-                    <div key={seg.segment}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <Icon className={`w-3.5 h-3.5 ${isNew ? 'text-cyan-400' : 'text-emerald-400'}`} />
-                          <span className="text-xs text-zinc-300 capitalize">{seg.segment}</span>
-                        </div>
-                        <span className="text-xs text-zinc-500">{seg.percentage}%</span>
-                      </div>
-                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1">
-                        <div className={`h-full rounded-full transition-all ${isNew ? 'bg-cyan-500' : 'bg-emerald-500'}`} style={{ width: `${seg.percentage}%` }} />
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px] text-zinc-500">
-                        <span>{seg.users.toLocaleString()} users</span>
-                        <span>{seg.engagementRate}% engaged</span>
-                        <span>{formatDuration(seg.avgEngagementTime)}</span>
+      {/* ── 9. Events & Conversions (collapsible, collapsed by default) ── */}
+      <SectionCard>
+        <button
+          onClick={() => setEventsExpanded(!eventsExpanded)}
+          className="w-full flex items-center justify-between text-sm font-semibold text-zinc-200"
+        >
+          <span>Events &amp; Conversions</span>
+          <span className="text-xs text-zinc-500">
+            {conversions.length} tracked event{conversions.length !== 1 ? 's' : ''} {eventsExpanded ? '▴' : '▾'}
+          </span>
+        </button>
+        {eventsExpanded && (
+          <div className="mt-4 space-y-4">
+            {/* Key Events grid */}
+            {conversions.length > 0 ? (
+              <div>
+                <div className="text-xs text-zinc-500 font-medium mb-2 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" /> Key Events
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {conversions.map((c, i) => (
+                    <div key={i} className="bg-zinc-800/30 rounded-lg border border-zinc-800 p-3">
+                      <div className="text-[11px] text-zinc-400 truncate mb-1">{c.eventName.replace(/_/g, ' ')}</div>
+                      <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-zinc-500">{c.users.toLocaleString()} users</span>
+                        {c.rate > 0 && <span className="text-[11px] font-medium text-emerald-400">{c.rate}%</span>}
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
             ) : (
-              <EmptyState icon={Target} title="No events data" description="No event data available for the selected time period." className="py-4" />
+              <div className="text-center py-6">
+                <Zap className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                <p className="text-xs text-zinc-500">No custom events tracked yet</p>
+              </div>
             )}
-          </SectionCard>
-        </div>
 
-        {/* Organic Search Overview */}
-        {organic && (
-          <SectionCard title="Organic Search" titleIcon={<Leaf className="w-4 h-4 text-emerald-400" />}>
-            <div className="grid grid-cols-4 gap-4">
+            {/* Landing Pages table */}
+            {landingPages.length > 0 && (
               <div>
-                <div className="text-[11px] text-zinc-500 mb-1">Organic Users</div>
-                <div className="text-lg font-bold text-emerald-400">{formatNumber(organic.organicUsers)}</div>
-                <div className="text-[11px] text-zinc-500 mt-0.5">{organic.shareOfTotalUsers}% of total</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-zinc-500 mb-1">Organic Sessions</div>
-                <div className="text-lg font-bold text-zinc-200">{formatNumber(organic.organicSessions)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-zinc-500 mb-1">Engagement Rate</div>
-                <div className={`text-lg font-bold ${organic.engagementRate > 50 ? 'text-green-400' : 'text-amber-400'}`}>{organic.engagementRate}%</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-zinc-500 mb-1">Organic Bounce</div>
-                <div className={`text-lg font-bold ${organic.organicBounceRate > 60 ? 'text-red-400' : 'text-green-400'}`}>{organic.organicBounceRate}%</div>
-              </div>
-            </div>
-          </SectionCard>
-        )}
-      </>)}
-
-      {/* ═══════ EVENTS TAB ═══════ */}
-      {tab === 'events' && (<>
-        {conversions.length > 0 ? (
-          <SectionCard title="Key Events" titleIcon={<Zap className="w-4 h-4 text-amber-400" />}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {conversions.map((c, i) => (
-                <div key={i} className="bg-zinc-800/30 rounded-lg border border-zinc-800 p-3">
-                  <div className="text-[11px] text-zinc-400 truncate mb-1">{c.eventName.replace(/_/g, ' ')}</div>
-                  <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-zinc-500">{c.users.toLocaleString()} users</span>
-                    {c.rate > 0 && <span className="text-[11px] font-medium text-emerald-400">{c.rate}%</span>}
-                  </div>
+                <div className="text-xs text-zinc-500 font-medium mb-2 flex items-center gap-1.5">
+                  <ArrowRight className="w-3.5 h-3.5 text-teal-400" /> Top Landing Pages
                 </div>
-              ))}
-            </div>
-          </SectionCard>
-        ) : (
-          <SectionCard>
-            <div className="text-center py-8">
-              <Zap className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-              <p className="text-xs text-zinc-500">No custom events tracked yet</p>
-            </div>
-          </SectionCard>
+                <div className="rounded-lg border border-zinc-800 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                        <th className="text-left py-3 px-4 text-zinc-500 font-medium">Landing Page</th>
+                        <th className="text-right py-3 px-3 text-zinc-500 font-medium">Sessions</th>
+                        <th className="text-right py-3 px-3 text-zinc-500 font-medium">Users</th>
+                        <th className="text-right py-3 px-3 text-zinc-500 font-medium">Bounce</th>
+                        <th className="text-right py-3 px-3 text-zinc-500 font-medium">Conversions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {landingPages.slice(0, 20).map((p, i) => (
+                        <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                          <td className="py-2.5 px-4 text-zinc-300 truncate max-w-[300px] font-mono">{p.landingPage}</td>
+                          <td className="py-2.5 px-3 text-right text-blue-400">{p.sessions.toLocaleString()}</td>
+                          <td className="py-2.5 px-3 text-right text-zinc-400">{p.users.toLocaleString()}</td>
+                          <td className="py-2.5 px-3 text-right">
+                            <span className={p.bounceRate > 70 ? 'text-red-400' : p.bounceRate > 50 ? 'text-amber-400' : 'text-green-400'}>
+                              {p.bounceRate}%
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-emerald-400">{p.conversions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         )}
-
-        {/* Landing Pages table */}
-        {landingPages.length > 0 && (
-          <SectionCard title="Top Landing Pages" titleIcon={<ArrowRight className="w-4 h-4 text-teal-400" />} noPadding>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left py-3 px-4 text-zinc-500 font-medium">Landing Page</th>
-                  <th className="text-right py-3 px-3 text-zinc-500 font-medium">Sessions</th>
-                  <th className="text-right py-3 px-3 text-zinc-500 font-medium">Users</th>
-                  <th className="text-right py-3 px-3 text-zinc-500 font-medium">Bounce</th>
-                  <th className="text-right py-3 px-3 text-zinc-500 font-medium">Conversions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {landingPages.slice(0, 20).map((p, i) => (
-                  <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="py-2.5 px-4 text-zinc-300 truncate max-w-[300px] font-mono">{p.landingPage}</td>
-                    <td className="py-2.5 px-3 text-right text-blue-400">{p.sessions.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-zinc-400">{p.users.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span className={p.bounceRate > 70 ? 'text-red-400' : p.bounceRate > 50 ? 'text-amber-400' : 'text-green-400'}>
-                        {p.bounceRate}%
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-400">{p.conversions}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </SectionCard>
-        )}
-      </>)}
+      </SectionCard>
 
     </div>
   );
