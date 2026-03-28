@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **252 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **253 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -2047,6 +2047,18 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 253. Feature Library Dashboard
+**What it does:** Admin-facing internal sales reference page at `/features` powered by `data/features.json`. Shows 60 curated, sales-relevant features with two toggleable views: By Pain Point (groups features under common prospect questions like "When they ask about site health") and By Platform Area (groups by category). Instant search across titles, descriptions, and tags. Feature cards show tier badges (free/growth/premium/admin), impact indicators, and client-facing flags. Accessible from Command Center header nav and Command Palette (Cmd+K). `data/features.json` is maintained alongside `FEATURE_AUDIT.md` via the post-task checklist and cascade update prompt.
+**Files:** `data/features.json`, `shared/types/features.ts`, `server/routes/features.ts`, `src/api/misc.ts`, `src/components/FeatureLibrary.tsx`, `src/routes.ts`, `src/App.tsx`, `src/components/WorkspaceOverview.tsx`, `src/components/CommandPalette.tsx`
+
+**Agency value:** During sales calls, instantly find the right feature to mention for any prospect question. No more scrolling through 2,900 lines of FEATURE_AUDIT.md — search or browse by pain point.
+
+**Client value:** N/A — internal agency tool.
+
+**Mutual:** Better sales conversations lead to better-matched clients who actually use the platform's capabilities.
+
+---
+
 ## Platform Features — Continued
 
 ### 116. Brief Regeneration with Feedback
@@ -2905,6 +2917,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**252 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**253 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 Current feature count: **252**. Last updated: March 2026.
