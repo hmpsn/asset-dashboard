@@ -3,20 +3,25 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
+import { normalizePath } from './helpers.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
 
 const log = createLogger('roi-attribution');
 
 // ── Path normalization ─────────────────────────────────────────────────────
-// Used at BOTH write and read paths to ensure consistent lookup.
-// Strips leading and trailing slashes, lowercases.
-function normalizePath(url: string): string {
+// Wraps the shared normalizePath helper (which ensures a leading slash and strips
+// trailing slashes) with full-URL support so callers can pass either a path or a
+// complete URL. Using the shared helper guarantees ROI page_url values are in the
+// same format as insight page_id values for reliable cross-referencing.
+function normalizePageUrl(url: string): string {
   try {
-    const pathname = url.startsWith('http') ? new URL(url).pathname : url;
-    return pathname.toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+    if (url.startsWith('http')) {
+      return normalizePath(new URL(url).pathname);
+    }
   } catch {
-    return url.toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+    // fall through to shared normalizePath on the raw string
   }
+  return normalizePath(url);
 }
 
 // ── Prepared statement cache ───────────────────────────────────────────────
@@ -72,7 +77,7 @@ export function recordOptimization(params: {
 }): string {
   const id = randomUUID();
   const now = new Date().toISOString();
-  const normalizedUrl = normalizePath(params.pageUrl);
+  const normalizedUrl = normalizePageUrl(params.pageUrl);
 
   stmts().insert.run(
     id, params.workspaceId, params.actionType, now, normalizedUrl, params.description,

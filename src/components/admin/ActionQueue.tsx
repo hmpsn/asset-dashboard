@@ -29,7 +29,7 @@ export function ActionQueue({ workspaceId }: Props) {
 
   const resolveMutation = useMutation({
     mutationFn: ({ insightId, status, note }: { insightId: string; status: 'in_progress' | 'resolved'; note?: string }) =>
-      put(`/api/insights/${insightId}/resolve`, { workspaceId, status, note }),
+      put(`/api/insights/${workspaceId}/${insightId}/resolve`, { status, note }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
     },

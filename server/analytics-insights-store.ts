@@ -75,7 +75,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC`,
   ),
   selectById: db.prepare(
-    `SELECT * FROM analytics_insights WHERE id = ?`,
+    `SELECT * FROM analytics_insights WHERE id = ? AND workspace_id = ?`,
   ),
 }));
 
@@ -229,8 +229,8 @@ export function getInsightsByDomain(
 
 // ── Resolution tracking ──────────────────────────────────────────
 
-export function getInsightById(id: string): AnalyticsInsight | undefined {
-  const row = stmts().selectById.get(id) as InsightRow | undefined;
+export function getInsightById(id: string, workspaceId: string): AnalyticsInsight | undefined {
+  const row = stmts().selectById.get(id, workspaceId) as InsightRow | undefined;
   return row ? rowToInsight(row) : undefined;
 }
 
@@ -241,8 +241,10 @@ export function resolveInsight(
   note?: string,
 ): AnalyticsInsight | undefined {
   const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
-  stmts().updateResolution.run(status, note ?? null, resolvedAt, insightId, workspaceId);
-  return getInsightById(insightId);
+  const changes = stmts().updateResolution.run(status, note ?? null, resolvedAt, insightId, workspaceId);
+  // If workspace_id didn't match, UPDATE affects 0 rows — return undefined so the route sends 404
+  if (changes.changes === 0) return undefined;
+  return getInsightById(insightId, workspaceId);
 }
 
 export function getUnresolvedInsights(workspaceId: string): AnalyticsInsight[] {

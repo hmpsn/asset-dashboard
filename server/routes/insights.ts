@@ -20,12 +20,15 @@ router.get('/api/insights/:workspaceId/queue', requireWorkspaceAccess('workspace
   }
 });
 
-// PUT /api/insights/:insightId/resolve — mark insight in_progress or resolved
+// PUT /api/insights/:workspaceId/:insightId/resolve — mark insight in_progress or resolved
+// workspaceId in path enables requireWorkspaceAccess authorization middleware
 router.put(
-  '/api/insights/:insightId/resolve',
-  validate(z.object({ body: z.object({ workspaceId: z.string(), status: z.enum(['in_progress', 'resolved']), note: z.string().optional() }) })),
+  '/api/insights/:workspaceId/:insightId/resolve',
+  requireWorkspaceAccess('workspaceId'),
+  validate(z.object({ body: z.object({ status: z.enum(['in_progress', 'resolved']), note: z.string().optional() }) })),
   (req, res) => {
-    const { workspaceId, status, note } = req.body as { workspaceId: string; status: 'in_progress' | 'resolved'; note?: string };
+    const workspaceId = req.params.workspaceId;
+    const { status, note } = req.body as { status: 'in_progress' | 'resolved'; note?: string };
     const updated = resolveInsight(req.params.insightId, workspaceId, status, note);
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
     addActivity(workspaceId, `Insight ${status}: ${note ?? ''}`);
