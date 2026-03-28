@@ -71,6 +71,7 @@ Every completed task must include:
 | `npx vitest run` | Unit + integration + component tests |
 | `npx playwright test` | E2E tests (requires server running) |
 | `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints |
+| `npx tsx scripts/pr-check.ts` | Automated pre-PR checklist (color violations, JSON.parse, hard-coded names) |
 
 **Always verify after changes:** `npx tsc --noEmit --skipLibCheck && npx vite build`
 
@@ -135,6 +136,22 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 
 ---
 
+## Multi-Agent Coordination (mandatory)
+
+> Full rules: `.windsurf/rules/multi-agent-coordination.md`
+
+When dispatching parallel subagents or working on multi-phase features:
+
+1. **Pre-commit shared contracts** — types, function signatures, barrel exports must be committed before any agent starts. Agents read from committed code, never uncommitted state.
+2. **Exclusive file ownership** — every file touched during parallel work has exactly one owner. No file may be modified by two agents concurrently. Shared files (app.ts, seo-context.ts, BrandHub.tsx, api client files) are sequential tasks.
+3. **Diff review after each batch** — after all parallel agents complete, review diffs, grep for duplicate imports, run tsc + full test suite before dispatching the next batch.
+4. **Explicit task dependency graphs** — every multi-task plan must include a dependency section. "Obviously sequential" is not acceptable — dispatchers don't infer dependencies.
+5. **Spec amendment → plan sync** — when a spec is amended, every plan referencing it must be updated in the same commit. Addendums without plan updates create invisible gaps.
+6. **Cross-phase contracts** — multi-phase features require a companion guardrails doc listing what each phase exports for downstream consumption (tables, functions, types, components).
+7. **File ownership in dispatch prompts** — when dispatching implementer subagents, include explicit "Files you OWN" and "Files you must NOT touch" lists.
+
+---
+
 ## Code Conventions
 
 - **TypeScript strict** — no `any` unless unavoidable
@@ -156,6 +173,8 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
   5. `src/components/CommandPalette.tsx` — remove from `NAV_ITEMS`
   6. Grep for `adminPath(*, 'old-route')` — update any navigation targets
   7. Tests referencing the old route value
+- **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature.
+- **Staging before main** — all PRs merge into `staging` first. After verifying on the staging deploy, merge `staging` → `main` to release to production. Never merge an unverified PR directly to `main`.
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
 - **Test assertions on collections** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously, hiding real failures. Pattern: `expect(arr.length).toBeGreaterThan(0); expect(arr.every(fn)).toBe(true);`
 - **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `.windsurf/rules/analytics-insights.md`.
@@ -188,6 +207,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 | `.windsurf/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `.windsurf/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
 | `.windsurf/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
+| `.windsurf/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
 
 ---
 
@@ -241,4 +261,6 @@ Work is not done until ALL pass:
 - [ ] `data/roadmap.json` updated (if roadmap item)
 - [ ] `BRAND_DESIGN_LANGUAGE.md` updated (if UI changed)
 - [ ] No `violet` or `indigo` in `src/components/`
+- [ ] `npx tsx scripts/pr-check.ts` — zero errors
 - [ ] If subagents were used: review `git diff` for duplicate imports, conflicting edits, missed patterns
+- [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.

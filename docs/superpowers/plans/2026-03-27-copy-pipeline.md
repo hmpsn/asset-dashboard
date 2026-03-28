@@ -10,7 +10,35 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-27-copy-pipeline-design.md` (includes 21-enhancement addendum)
 
-**Prerequisites:** Phase 1 (migration 026) and Phase 2 (migration 027) must be in place. This plan assumes all Phase 1 and Phase 2 tables, services, and types exist.
+**Prerequisites:** Phase 1 AND Phase 2 must be **fully complete, committed, and verified** before starting Phase 3. All Phase 1 and Phase 2 tables, services, types, and context builders must be in place.
+
+**Guardrails:** `docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md` — **READ BEFORE DISPATCHING AGENTS.** Contains file ownership maps, task dependency graphs, cross-phase contracts, and known gotchas.
+
+**Coordination rules:** `.windsurf/rules/multi-agent-coordination.md`
+
+---
+
+## Task Dependencies (Tier 1 — Core Pipeline)
+
+```
+Sequential foundation:
+  Task 1 (Migration 028) → Task 2 (Shared Types) → Task 3 (Export existing constants)
+
+Parallel services (after Task 3):
+  Task 4 (Copy Review Service) ∥ Task 5 (Copy Generation Engine) ∥ Task 6 (Copy Intelligence) ∥ Task 7 (Copy Export)
+
+Sequential shared-file tasks (after parallel batch completes + diff review):
+  Task 8 (SEO Context additions) — modifies server/seo-context.ts
+  Task 9 (Routes) — creates server/routes/copy-pipeline.ts
+  Task 10 (App.ts route registration) — modifies server/app.ts
+  Task 11 (API client additions) — modifies src/api/brand-engine.ts
+
+Parallel frontend (after Task 11):
+  Task 12 (CopyReviewPanel) ∥ Task 13 (BatchGenerationPanel) ∥ Task 14 (CopyExportPanel) ∥ Task 15 (CopyIntelligenceManager)
+
+Sequential integration:
+  Task 16 (BlueprintDetail.tsx — add Copy tab)
+```
 
 ---
 

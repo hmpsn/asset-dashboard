@@ -10,6 +10,34 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-26-brandscript-engine-design.md`
 
+**Guardrails:** `docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md` — **READ BEFORE DISPATCHING AGENTS.** Contains file ownership maps, task dependency graphs, cross-phase contracts, and missing spec addendum items that must be implemented.
+
+**Coordination rules:** `.windsurf/rules/multi-agent-coordination.md`
+
+---
+
+## Task Dependencies
+
+```
+Sequential foundation:
+  Task 1 (Migration 026) → Task 2 (Shared Types)
+
+Parallel services (after Task 2):
+  Task 3 (Brandscript Service) ∥ Task 4 (Discovery Ingestion) ∥ Task 5 (Voice Calibration) ∥ Task 6 (Brand Identity)
+
+Sequential shared-file tasks (after parallel batch completes + diff review):
+  Task 7 (SEO Context Builders) — modifies server/seo-context.ts
+  Task 8 (App.ts Route Registration) — modifies server/app.ts
+  Task 9 (Brand Engine API Client) — creates src/api/brand-engine.ts
+
+Parallel frontend (after Task 9):
+  Task 10 (BrandscriptTab) ∥ Task 11 (DiscoveryTab) ∥ Task 12 (VoiceTab) ∥ Task 13 (IdentityTab)
+
+Sequential shared frontend (after parallel batch completes + diff review):
+  Task 14 (SteeringChat — shared component)
+  Task 15 (BrandHub.tsx integration)
+```
+
 ---
 
 ## File Structure
@@ -291,7 +319,32 @@ export interface DiscoveryExtraction {
 
 export type VoiceProfileStatus = 'draft' | 'calibrating' | 'calibrated';
 export type VoiceSampleContext = 'headline' | 'body' | 'cta' | 'about' | 'service' | 'social' | 'seo';
-export type VoiceSampleSource = 'manual' | 'transcript_extraction' | 'calibration_loop';
+// Phase 1 sources + forward-compatible values for Phase 1 identity approval and Phase 3 copy approval
+export type VoiceSampleSource =
+  | 'manual'
+  | 'transcript_extraction'
+  | 'calibration_loop'
+  | 'identity_approved'    // Phase 1: approved taglines/pitches become samples
+  | 'copy_approved';       // Phase 3: approved copy sections become samples
+
+// ═══ CONTEXT EMPHASIS (for seo-context.ts builders) ═══
+// Controls verbosity of brand context injected into AI prompts.
+// Phase 1 callers default to 'full'. Phase 3 uses 'summary'/'minimal' for smart context selection.
+export type ContextEmphasis = 'full' | 'summary' | 'minimal';
+
+// ═══ PROMPT TYPE → SECTION TYPE MAPPING ═══
+// Maps Phase 1 calibration prompt types to Phase 2 section types.
+// Phase 3 uses this to find the best-rated calibration output per section type.
+export const PROMPT_TYPE_TO_SECTION_TYPE: Record<string, string> = {
+  'hero_headline': 'hero',
+  'about_intro': 'about-team',
+  'service_body': 'features-benefits',
+  'cta_copy': 'cta',
+  'faq_answer': 'faq',
+  'testimonial_copy': 'testimonials',
+  'blog_intro': 'content-body',
+  'meta_description': 'seo-meta',
+};
 
 export interface ToneSpectrum {
   formal_casual: number;       // 1-10 scale, 10 = most casual
@@ -1529,7 +1582,11 @@ This follows the same patterns as Tasks 3-5. Key functions:
 - `getDeliverable(workspaceId, id)` — get single deliverable with version history
 - `generateDeliverable(workspaceId, deliverableType)` — AI generates a deliverable using brandscript + voice profile + discovery extractions as context
 - `refineDeliverable(workspaceId, id, direction)` — conversational steering, creates new version
-- `approveDeliverable(workspaceId, id)` — mark as approved
+- `approveDeliverable(workspaceId, id)` — mark as approved. **Spec Addendum §5:** When a tagline, elevator pitch, or tone example is approved, auto-call `addVoiceSample()` from `server/voice-calibration.ts` with `source: 'identity_approved'` and the appropriate `context_tag`:
+  - Approved tagline → `context_tag: 'headline'`
+  - Approved elevator pitch → `context_tag: 'body'`
+  - Approved tone example → matching `context_tag`
+  Import `addVoiceSample` from `./voice-calibration.js`. Keep it simple — one function call after status changes to `approved`.
 - `exportDeliverables(workspaceId, tier?)` — export as markdown text
 
 The AI prompt for generation should include:
@@ -1572,21 +1629,35 @@ import { getBrandscript, listBrandscripts } from './brandscript.js';
 import { getVoiceProfile } from './voice-calibration.js';
 import { listDeliverables } from './brand-identity.js';
 
-export function buildBrandscriptContext(workspaceId: string): string {
+// Spec Addendum §3: All three builders accept optional emphasis parameter.
+// 'full' = everything (default for Phase 1 callers).
+// 'summary' = key items only (Phase 3: secondary context pages).
+// 'minimal' = one-paragraph summary (Phase 3: background context).
+import type { ContextEmphasis } from '../shared/types/brand-engine.js';
+
+export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   const scripts = listBrandscripts(workspaceId);
   if (scripts.length === 0) return '';
 
   const bs = scripts[0]; // Use most recent
-  const sections = bs.sections
-    .filter(sec => sec.content?.trim())
+  const filledSections = bs.sections.filter(sec => sec.content?.trim());
+
+  if (filledSections.length === 0) return '';
+
+  if (emphasis === 'minimal') {
+    // One-paragraph summary: just the framework type and first section
+    const first = filledSections[0];
+    return `\n\nBRAND NARRATIVE (${bs.frameworkType}): ${first.title} — ${first.content?.slice(0, 200)}...`;
+  }
+
+  const sections = (emphasis === 'summary' ? filledSections.slice(0, 3) : filledSections)
     .map(sec => `  ${sec.title}: ${sec.content}`)
     .join('\n');
 
-  if (!sections) return '';
   return `\n\nBRAND NARRATIVE (${bs.frameworkType} framework):\n${sections}`;
 }
 
-export function buildVoiceProfileContext(workspaceId: string): string {
+export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   const profile = getVoiceProfile(workspaceId);
   if (!profile) return '';
 
@@ -1618,12 +1689,22 @@ export function buildVoiceProfileContext(workspaceId: string): string {
   return `\n\nBRAND VOICE PROFILE (you MUST match this voice — do not deviate):\n${parts.join('\n')}`;
 }
 
-export function buildIdentityContext(workspaceId: string): string {
+export function buildIdentityContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   const deliverables = listDeliverables(workspaceId).filter(d => d.status === 'approved');
   if (deliverables.length === 0) return '';
 
+  if (emphasis === 'minimal') {
+    // Just mission statement if available
+    const mission = deliverables.find(d => d.deliverableType === 'mission');
+    return mission ? `\n\nBRAND MISSION: ${mission.content.slice(0, 200)}` : '';
+  }
+
+  const selected = emphasis === 'summary'
+    ? deliverables.filter(d => ['mission', 'messaging_pillars', 'tagline'].includes(d.deliverableType))
+    : deliverables;
+
   const parts: string[] = [];
-  for (const d of deliverables) {
+  for (const d of selected) {
     parts.push(`  ${d.deliverableType.replace(/_/g, ' ').toUpperCase()}: ${d.content.slice(0, 500)}`);
   }
 
@@ -1923,6 +2004,7 @@ Features:
 - Submit sends direction, shows loading, displays refined result
 - Version history sidebar/dropdown to revert to previous versions
 - Extends the `PageRewriteChat.tsx` interaction pattern
+- **Auto-summarization (Spec Addendum §1):** After 6 steering exchanges within a single session, auto-summarize prior exchanges (except the 3 most recent) into a condensed context block. The summary preserves: key directions given, what was rejected, what was approved, and the current trajectory. Summarization uses GPT-4.1-mini via `callOpenAI`. Store the summary on the session record (`steeringNotes` field). Reference implementation: `server/routes/rewrite-chat.ts` — look for the `summarizeConversation` pattern. **Do NOT just truncate old messages. Summarize them.** Truncation loses critical context like "we already tried a formal tone and the user hated it."
 
 - [ ] **Step 2: Commit**
 
