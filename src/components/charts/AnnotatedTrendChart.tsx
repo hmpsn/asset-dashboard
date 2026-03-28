@@ -50,11 +50,11 @@ interface AnnotatedTrendChartProps {
   callouts?: ChartCallout[];              // optional chart callout bubbles
 }
 
-// ── Dynamic Y-axis assignment based on data scale ──
-// Rate metrics (CTR, position, bounce rate, percentages) are always forced
-// to the right axis to prevent them from being crushed by volume metrics.
-// This mirrors Google Search Console's approach: counts on left, rates on right.
-const RATE_METRIC_KEYS = new Set(['ctr', 'position', 'bounceRate', 'avgSessionDuration']);
+// ── Dynamic Y-axis assignment ──
+// Uses the TrendLine.yAxisId hint as the primary grouping signal.
+// When all active lines share the same hint, use scale-based splitting
+// so different-magnitude metrics get independent axes.
+// When lines have mixed hints (left + right), respect the hints directly.
 
 function assignAxes(
   activeLines: TrendLine[],
@@ -63,55 +63,70 @@ function assignAxes(
   const assignments = new Map<string, 'left' | 'right'>();
   if (activeLines.length === 0) return assignments;
 
-  // Split into volume metrics (left) and rate metrics (right)
-  const volumeLines = activeLines.filter(l => !RATE_METRIC_KEYS.has(l.key));
-  const rateLines = activeLines.filter(l => RATE_METRIC_KEYS.has(l.key));
-
-  // If only rate metrics active, put them on left (no need for right axis)
-  if (volumeLines.length === 0) {
-    for (const l of rateLines) assignments.set(l.key, 'left');
+  // If only 1 line, always left
+  if (activeLines.length === 1) {
+    assignments.set(activeLines[0].key, 'left');
     return assignments;
   }
 
-  // If only volume metrics active, use scale-based assignment
-  if (rateLines.length === 0) {
-    if (volumeLines.length === 1) {
-      assignments.set(volumeLines[0].key, 'left');
-      return assignments;
-    }
+  // Check if lines have mixed yAxisId hints (e.g., clicks=left, ctr=right)
+  const hasLeftHint = activeLines.some(l => l.yAxisId === 'left');
+  const hasRightHint = activeLines.some(l => l.yAxisId === 'right');
 
-    // Compute max values for scale comparison
-    const maxValues = new Map<string, number>();
-    for (const line of volumeLines) {
-      let max = 0;
-      for (const row of data) {
-        const v = Number(row[line.key]) || 0;
-        if (v > max) max = v;
+  if (hasLeftHint && hasRightHint) {
+    // Mixed hints: start by respecting them
+    for (const l of activeLines) assignments.set(l.key, l.yAxisId);
+
+    // Check if left-hinted metrics have divergent scales — if so, move smaller to right
+    const leftLines = activeLines.filter(l => l.yAxisId === 'left');
+    if (leftLines.length >= 2) {
+      const maxValues = new Map<string, number>();
+      for (const line of leftLines) {
+        let max = 0;
+        for (const row of data) {
+          const v = Number(row[line.key]) || 0;
+          if (v > max) max = v;
+        }
+        maxValues.set(line.key, max || 1);
       }
-      maxValues.set(line.key, max || 1);
-    }
-
-    const sorted = [...volumeLines].sort(
-      (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
-    );
-
-    assignments.set(sorted[0].key, 'left');
-    const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[1].key) ?? 1);
-    assignments.set(sorted[1].key, ratio < 10 ? 'left' : 'right');
-
-    if (sorted.length >= 3) {
-      const leftMax = maxValues.get(sorted[0].key) ?? 1;
-      const thirdMax = maxValues.get(sorted[2].key) ?? 1;
-      const ratioToLeft = leftMax / thirdMax;
-      assignments.set(sorted[2].key, ratioToLeft < 10 ? 'left' : 'right');
+      const sorted = [...leftLines].sort(
+        (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
+      );
+      for (let i = 1; i < sorted.length; i++) {
+        const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[i].key) ?? 1);
+        if (ratio >= 10) assignments.set(sorted[i].key, 'right');
+      }
     }
 
     return assignments;
   }
 
-  // Mixed: volume metrics on left, rate metrics on right
-  for (const l of volumeLines) assignments.set(l.key, 'left');
-  for (const l of rateLines) assignments.set(l.key, 'right');
+  // All lines share the same hint — use scale-based splitting
+  const maxValues = new Map<string, number>();
+  for (const line of activeLines) {
+    let max = 0;
+    for (const row of data) {
+      const v = Number(row[line.key]) || 0;
+      if (v > max) max = v;
+    }
+    maxValues.set(line.key, max || 1);
+  }
+
+  const sorted = [...activeLines].sort(
+    (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
+  );
+
+  assignments.set(sorted[0].key, 'left');
+  const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[1].key) ?? 1);
+  assignments.set(sorted[1].key, ratio < 10 ? 'left' : 'right');
+
+  if (sorted.length >= 3) {
+    const leftMax = maxValues.get(sorted[0].key) ?? 1;
+    const thirdMax = maxValues.get(sorted[2].key) ?? 1;
+    const ratioToLeft = leftMax / thirdMax;
+    assignments.set(sorted[2].key, ratioToLeft < 10 ? 'left' : 'right');
+  }
+
   return assignments;
 }
 
