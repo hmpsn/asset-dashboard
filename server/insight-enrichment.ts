@@ -16,6 +16,8 @@ import type {
 } from '../shared/types/analytics.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
 import type { ContentBrief, GeneratedPost } from '../shared/types/content.js';
+import type { SeoIssue } from './audit-page.js';
+import { getValidation } from './schema-validator.js';
 
 const log = createLogger('insight-enrichment');
 
@@ -274,13 +276,151 @@ export function checkPipelineStatus(
   return null;
 }
 
+// ── Schema gap detection ──────────────────────────────────────────────────────
+
+/**
+ * Returns schema gap descriptions for a page based on stored schema validations.
+ *
+ * Looks up the schema_validations table for the given page and extracts:
+ *   - Validation errors (missing required fields)
+ *   - Validation warnings (missing recommended fields)
+ *   - Rich result eligibility gaps
+ *
+ * Returns an empty array if no validation data exists (never blocks enrichment).
+ */
+export function getSchemaGapsForPage(workspaceId: string, pageUrl: string): string[] {
+  try {
+    // Try exact match first, then pathname-only match
+    let validation = getValidation(workspaceId, pageUrl);
+
+    if (!validation && (pageUrl.startsWith('http://') || pageUrl.startsWith('https://'))) {
+      try {
+        const pathname = new URL(pageUrl).pathname;
+        validation = getValidation(workspaceId, pathname);
+      } catch {
+        // invalid URL, skip pathname fallback
+      }
+    }
+
+    if (!validation) return [];
+
+    const gaps: string[] = [];
+
+    // Extract error-level gaps (missing required fields)
+    if (Array.isArray(validation.errors)) {
+      for (const err of validation.errors) {
+        if (err && typeof err === 'object' && 'message' in err) {
+          gaps.push((err as { message: string }).message);
+        }
+      }
+    }
+
+    // Extract warning-level gaps (missing recommended fields)
+    if (Array.isArray(validation.warnings)) {
+      for (const warn of validation.warnings) {
+        if (warn && typeof warn === 'object' && 'message' in warn) {
+          gaps.push((warn as { message: string }).message);
+        }
+      }
+    }
+
+    // Flag if page has no rich result eligibility
+    if (!Array.isArray(validation.richResults) || validation.richResults.length === 0) {
+      gaps.push('No rich result types detected — consider adding structured data');
+    }
+
+    return gaps;
+  } catch (err) {
+    log.warn({ workspaceId, pageUrl, err }, 'Schema gap lookup failed — skipping');
+    return [];
+  }
+}
+
 // ── Enrichment context ────────────────────────────────────────────────────────
 
 export interface EnrichmentContext {
+  workspaceId: string;
   titleMap: Map<string, string>;
   strategyPageMap: Map<string, PageKeywordMap>;
   briefs: ContentBrief[];
   posts: GeneratedPost[];
+  /** Map of normalised page slug → top audit issues (error/warning only, max 5) */
+  auditPageIssuesMap: Map<string, string[]>;
+}
+
+// ── Audit issue lookup ────────────────────────────────────────────────────────
+
+/** Max audit issues to attach per page */
+const MAX_AUDIT_ISSUES_PER_PAGE = 5;
+
+/**
+ * Builds a map of page slug → top error/warning issue messages from the latest
+ * audit snapshot. Keyed by normalised slug (lowercase, no leading slash) so
+ * lookups from pageId URLs work reliably.
+ *
+ * Returns an empty map when no audit data exists — never throws.
+ */
+async function buildAuditIssuesMap(workspaceId: string): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+
+  try {
+    // Dynamic imports to avoid circular deps
+    const { getWorkspace } = await import('./workspaces.js');
+    const { getLatestSnapshot } = await import('./reports.js');
+
+    const workspace = getWorkspace(workspaceId);
+    if (!workspace?.webflowSiteId) return map;
+
+    const snapshot = getLatestSnapshot(workspace.webflowSiteId);
+    if (!snapshot?.audit?.pages) return map;
+
+    for (const page of snapshot.audit.pages) {
+      // Filter to actionable issues only (errors and warnings)
+      const actionable = page.issues.filter(
+        (i: SeoIssue) => i.severity === 'error' || i.severity === 'warning',
+      );
+      if (actionable.length === 0) continue;
+
+      // Take top N issue messages
+      const messages = actionable
+        .slice(0, MAX_AUDIT_ISSUES_PER_PAGE)
+        .map((i: SeoIssue) => i.message);
+
+      // Store under normalised slug (lowercase, no leading slash)
+      const normSlug = (page.slug || '').toLowerCase().replace(/^\//, '');
+      if (normSlug) {
+        map.set(normSlug, messages);
+      }
+    }
+  } catch (err) {
+    log.warn({ workspaceId, err }, 'audit snapshot unavailable for enrichment context');
+  }
+
+  return map;
+}
+
+/**
+ * Looks up audit issues for a specific page URL/path from the pre-built map.
+ * Returns an empty array when no issues found.
+ */
+export function getAuditIssuesForPage(
+  pageId: string | null,
+  auditMap: Map<string, string[]>,
+): string[] {
+  if (!pageId || auditMap.size === 0) return [];
+
+  // Normalise pageId to a slug for matching
+  let pathname = pageId;
+  if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
+    try {
+      pathname = new URL(pageId).pathname;
+    } catch {
+      // keep original
+    }
+  }
+
+  const normSlug = pathname.toLowerCase().replace(/^\//, '').replace(/\/$/, '');
+  return auditMap.get(normSlug) ?? [];
 }
 
 /**
@@ -325,7 +465,10 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
     log.warn({ workspaceId, err }, 'content-posts-db unavailable for enrichment context');
   }
 
-  return { titleMap, strategyPageMap, briefs, posts };
+  // Load audit issues map (page slug → top error/warning messages)
+  const auditPageIssuesMap = await buildAuditIssuesMap(workspaceId);
+
+  return { workspaceId, titleMap, strategyPageMap, briefs, posts, auditPageIssuesMap };
 }
 
 // ── Main enrichment function ──────────────────────────────────────────────────
@@ -335,6 +478,7 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
  *   - pageTitle (resolved from titleMap or slug)
  *   - strategyKeyword + strategyAlignment
  *   - pipelineStatus
+ *   - auditIssues (page_health: linked SEO audit issues; serp_opportunity: schema gaps)
  *   - impactScore
  *   - domain
  *
@@ -363,6 +507,31 @@ export function enrichInsight(
 
   // Domain classification
   enriched.domain = classifyDomain(insight.insightType);
+
+  // Audit issues — attach linked audit issues for page_health insights
+  if (insight.insightType === 'page_health' && insight.pageId) {
+    try {
+      const auditIssues = getAuditIssuesForPage(insight.pageId, ctx.auditPageIssuesMap);
+      if (auditIssues.length > 0) {
+        enriched.auditIssues = JSON.stringify(auditIssues);
+      }
+    } catch (err) {
+      // Enrichment failure must never block insight storage
+      log.warn({ insightType: insight.insightType, pageId: insight.pageId, err }, 'audit issue enrichment failed');
+    }
+  }
+
+  // Schema gap enrichment for SERP opportunity insights
+  if (insight.insightType === 'serp_opportunity' && insight.pageId) {
+    try {
+      const schemaGaps = getSchemaGapsForPage(ctx.workspaceId, insight.pageId);
+      if (schemaGaps.length > 0) {
+        enriched.auditIssues = JSON.stringify(schemaGaps);
+      }
+    } catch (err) {
+      log.warn({ insightType: insight.insightType, pageId: insight.pageId, err }, 'Schema gap enrichment failed');
+    }
+  }
 
   return enriched;
 }

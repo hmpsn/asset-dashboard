@@ -364,4 +364,19 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
   }
 });
 
+// --- AI Suggested Briefs (from insight engine feedback loop) ---
+import { buildPipelineSignals } from '../insight-feedback.js';
+import { getInsights } from '../analytics-insights-store.js';
+
+router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const insights = getInsights(req.params.workspaceId);
+    const signals = buildPipelineSignals(insights);
+    res.json({ signals });
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to build pipeline signals');
+    res.json({ signals: [] });
+  }
+});
+
 export default router;

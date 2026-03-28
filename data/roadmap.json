@@ -3641,6 +3641,40 @@
           "shippedAt": "2026-03-26"
         }
       ]
+    },
+    {
+      "id": "sprint-connected-intelligence",
+      "title": "Connected Intelligence Engine",
+      "items": [
+        {
+          "id": 525,
+          "title": "Connected Intelligence Engine — Phase 1 (Hub UX + Enrichment)",
+          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
+          "est": "6h",
+          "priority": "P1",
+          "notes": "Shipped — Insight-first tab structure, InsightFeed + SummaryPills components, AnnotatedTrendChart with toggleable lines, new insight types (ranking_mover, ctr_opportunity, serp_opportunity), insight enrichment (page titles, strategy alignment, pipeline status, domain classification, impact scores), content decay delegation, progressive loading states.",
+          "status": "done",
+          "shippedAt": "2026-03-27"
+        },
+        {
+          "id": 526,
+          "title": "Connected Intelligence Engine — Phase 2 (Feedback Loops)",
+          "source": "docs/superpowers/plans/2026-03-27-connected-intelligence-phase2.md",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — Anomaly digest wiring with dedup (upsertAnomalyDigestInsight, unique index). Feedback loop orchestrator (insight-feedback.ts) generates strategy signals + pipeline signals, broadcasts via WebSocket. API endpoints for strategy signals and pipeline suggestions. React Query hooks. Intelligence Signals UI in KeywordStrategy panel. AI Suggested section in ContentPipeline. Admin chat context enriched with titles, alignment, pipeline status, anomaly digest, critical insight proactive mentions. Audit issues annotated on page health. Schema gaps enriched on SERP opportunities. 21 unit tests.",
+          "status": "done",
+          "shippedAt": "2026-03-27"
+        },
+        {
+          "id": 527,
+          "title": "Connected Intelligence Engine — Phase 3 (Client Intelligence)",
+          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
+          "est": "5h",
+          "priority": "P2",
+          "status": "pending"
+        }
+      ]
     }
   ]
 }

@@ -25,6 +25,9 @@ import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
+import { upsertAnomalyDigestInsight } from './analytics-insights-store.js';
+import { computeImpactScore } from './insight-enrichment.js';
+import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
 const log = createLogger('anomaly');
 
@@ -536,6 +539,55 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             warnings: warnings.length,
             positive: positive.length,
           });
+        }
+
+        // ── Write anomaly digest insights (deduped via unique index) ──
+        for (const a of detected) {
+          try {
+            const severityMap: Record<string, InsightSeverity> = {
+              critical: 'critical',
+              warning: 'warning',
+              positive: 'opportunity',
+            };
+            const insightSeverity: InsightSeverity = severityMap[a.severity] ?? 'opportunity';
+
+            // Map anomaly type to insight domain
+            let domain: InsightDomain = 'cross';
+            if (a.type.includes('traffic') || a.type.includes('bounce')) {
+              domain = 'traffic';
+            } else if (a.type.includes('impression') || a.type.includes('position') || a.type.includes('ctr')) {
+              domain = 'search';
+            }
+
+            const durationDays = Math.max(1, Math.ceil(
+              (Date.now() - new Date(a.detectedAt).getTime()) / 86400000,
+            ));
+
+            const digestData: AnomalyDigestData = {
+              anomalyType: a.type,
+              metric: a.metric,
+              currentValue: a.currentValue,
+              expectedValue: a.previousValue,
+              deviationPercent: a.changePct,
+              durationDays,
+              firstDetected: a.detectedAt,
+              severity: a.severity,
+            };
+
+            const impactScore = computeImpactScore(insightSeverity, digestData as unknown as Record<string, unknown>);
+
+            upsertAnomalyDigestInsight({
+              workspaceId: a.workspaceId,
+              anomalyType: a.type,
+              metric: a.metric,
+              data: digestData,
+              severity: insightSeverity,
+              domain,
+              impactScore,
+            });
+          } catch (digestErr) {
+            log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');
+          }
         }
       }
     } catch (err) {
