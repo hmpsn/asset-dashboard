@@ -70,6 +70,7 @@ import workOrdersRoutes from './routes/work-orders.js';
 import recommendationsRoutes from './routes/recommendations.js';
 import churnSignalsRoutes from './routes/churn-signals.js';
 import anomaliesRoutes from './routes/anomalies.js';
+import insightsRoutes from './routes/insights.js';
 import miscRoutes from './routes/misc.js';
 import feedbackRoutes from './routes/feedback.js';
 import publicFeedbackRoutes from './routes/public-feedback.js';
@@ -308,6 +309,7 @@ export function createApp(): express.Express {
   app.use(recommendationsRoutes);
   app.use(churnSignalsRoutes);
   app.use(anomaliesRoutes);
+  app.use(insightsRoutes);
   app.use(miscRoutes);
   app.use(feedbackRoutes);
   app.use(publicFeedbackRoutes);

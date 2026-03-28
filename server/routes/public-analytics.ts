@@ -46,9 +46,39 @@ import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
 import { getWorkspace, getBrandName } from '../workspaces.js';
 import { getOrComputeInsights } from '../analytics-intelligence.js';
+import { buildClientInsights } from '../insight-narrative.js';
+import { generateMonthlyDigest } from '../monthly-digest.js';
 import type { InsightType } from '../../shared/types/analytics.js';
 
-// ── Analytics insights endpoint ──────────────────────────────────
+// ── Analytics insights endpoints ─────────────────────────────────
+// NOTE: Literal sub-paths (/narrative, /digest) registered BEFORE /:workspaceId
+// to prevent Express param shadowing.
+
+// GET /api/public/insights/:workspaceId/narrative — client-framed insights
+router.get('/api/public/insights/:workspaceId/narrative', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  try {
+    const insights = buildClientInsights(ws.id);
+    res.json({ insights });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// GET /api/public/insights/:workspaceId/digest — monthly performance digest
+router.get('/api/public/insights/:workspaceId/digest', async (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  try {
+    const digest = await generateMonthlyDigest(ws.id);
+    res.json(digest);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
 
 router.get('/api/public/insights/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
