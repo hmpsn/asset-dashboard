@@ -37,6 +37,18 @@ router.get('/api/content-briefs/:workspaceId', requireWorkspaceAccess('workspace
   res.json(briefs);
 });
 
+// AI Suggested Briefs — must be registered BEFORE /:briefId to avoid param shadowing
+router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const insights = getInsights(req.params.workspaceId);
+    const signals = buildPipelineSignals(insights);
+    res.json({ signals });
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to build pipeline signals');
+    res.json({ signals: [] });
+  }
+});
+
 // Get a specific brief
 router.get('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   log.info(`GET ${req.params.workspaceId}/${req.params.briefId}`);
@@ -363,18 +375,6 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
       })),
       message: 'SEMRush lookup failed — all keywords accepted without validation',
     });
-  }
-});
-
-// --- AI Suggested Briefs (from insight engine feedback loop) ---
-router.get('/api/content-briefs/:workspaceId/suggested', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  try {
-    const insights = getInsights(req.params.workspaceId);
-    const signals = buildPipelineSignals(insights);
-    res.json({ signals });
-  } catch (err) {
-    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to build pipeline signals');
-    res.json({ signals: [] });
   }
 });
 

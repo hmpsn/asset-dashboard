@@ -19,3 +19,5 @@ export { useAnomalyAlerts } from './useAnomalyAlerts';
 export { useKeywordStrategy } from './useKeywordStrategy';
 export { useSeoEditor } from './useSeoEditor';
 export { useAdminROI } from './useAdminROI';
+export { useIntelligenceSignals } from './useIntelligenceSignals';
+export { useAiSuggestedBriefs } from './useAiSuggestedBriefs';

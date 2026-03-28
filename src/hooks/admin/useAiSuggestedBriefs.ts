@@ -8,7 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
-import type { PipelineSignal } from '../../../server/insight-feedback.js';
+import type { PipelineSignal } from '../../../shared/types/insights.js';
 
 interface SuggestedResponse {
   signals: PipelineSignal[];
