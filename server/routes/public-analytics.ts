@@ -2,6 +2,7 @@
  * public-analytics routes — extracted from server/index.ts
  */
 import { Router } from 'express';
+import { verifyToken } from '../auth.js';
 
 const router = Router();
 
@@ -86,7 +87,10 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
 
   try {
     const type = req.query.type as InsightType | undefined;
-    const force = req.query.force === 'true';
+    // Only allow force recompute for authenticated admin users
+    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token;
+    const payload = token ? verifyToken(token) : null;
+    const force = req.query.force === 'true' && payload?.role === 'admin';
     const insights = await getOrComputeInsights(ws.id, type, { force });
     res.json(insights);
   } catch (err) {

@@ -62,6 +62,60 @@ function normalizePageUrl(url: string): string {
   }
 }
 
+/**
+ * Clone + normalize + deduplicate SearchPage arrays.
+ * Merges metrics for URL variants of the same page (sum clicks/impressions,
+ * weighted-average position/CTR).
+ */
+function deduplicatePages(pages: SearchPage[]): SearchPage[] {
+  const map = new Map<string, SearchPage>();
+  for (const p of pages) {
+    const key = normalizePageUrl(p.page);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...p, page: key });
+    } else {
+      const totalImpressions = existing.impressions + p.impressions;
+      existing.clicks += p.clicks;
+      existing.position = totalImpressions > 0
+        ? (existing.position * existing.impressions + p.position * p.impressions) / totalImpressions
+        : existing.position;
+      existing.ctr = totalImpressions > 0
+        ? (existing.ctr * existing.impressions + p.ctr * p.impressions) / totalImpressions
+        : existing.ctr;
+      existing.impressions = totalImpressions;
+    }
+  }
+  return Array.from(map.values());
+}
+
+/**
+ * Clone + normalize + deduplicate QueryPageRow arrays.
+ * Merges metrics for rows sharing the same (query, normalized page).
+ */
+function deduplicateQueryPages(rows: QueryPageRow[]): QueryPageRow[] {
+  const map = new Map<string, QueryPageRow>();
+  for (const r of rows) {
+    const normPage = normalizePageUrl(r.page);
+    const key = `${r.query}::${normPage}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...r, page: normPage });
+    } else {
+      const totalImpressions = existing.impressions + r.impressions;
+      existing.clicks += r.clicks;
+      existing.position = totalImpressions > 0
+        ? (existing.position * existing.impressions + r.position * r.impressions) / totalImpressions
+        : existing.position;
+      existing.ctr = totalImpressions > 0
+        ? (existing.ctr * existing.impressions + r.ctr * r.impressions) / totalImpressions
+        : existing.ctr;
+      existing.impressions = totalImpressions;
+    }
+  }
+  return Array.from(map.values());
+}
+
 // ── Expected CTR by position (industry average approximation) ────
 
 const EXPECTED_CTR_BY_POSITION: Record<number, number> = {
@@ -901,12 +955,13 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       : [],
   ]) as [SearchPage[], QueryPageRow[], GA4TopPage[], SearchPage[], QueryPageRow[]];
 
-  // Normalize page URLs to prevent duplicates from URL variants
-  // (trailing slashes, query params, fragments for the same logical page)
-  for (const p of gscPages) p.page = normalizePageUrl(p.page);
-  for (const p of previousGscPages) p.page = normalizePageUrl(p.page);
-  for (const r of queryPageData) r.page = normalizePageUrl(r.page);
-  for (const r of previousQueryPageData) r.page = normalizePageUrl(r.page);
+  // Clone, normalize, and deduplicate — merges metrics for URL variants
+  // (trailing slashes, query params, fragments) of the same logical page.
+  // Cloning avoids mutating apiCache shared references.
+  const normGscPages = deduplicatePages(gscPages);
+  const normPrevGscPages = deduplicatePages(previousGscPages);
+  const normQueryPageData = deduplicateQueryPages(queryPageData);
+  const normPrevQueryPageData = deduplicateQueryPages(previousQueryPageData);
 
   log.info(
     { workspaceId, gscPages: gscPages.length, queryRows: queryPageData.length, ga4Pages: ga4Pages.length },
@@ -939,9 +994,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     });
   }
 
-  // Compute each insight type
-  if (gscPages.length > 0) {
-    const healthInsights = computePageHealthScores(gscPages, ga4Pages);
+  // Compute each insight type — use normalized arrays to prevent URL-variant duplicates
+  if (normGscPages.length > 0) {
+    const healthInsights = computePageHealthScores(normGscPages, ga4Pages);
     for (const insight of healthInsights) {
       enrichAndUpsert({
         insightType: 'page_health',
@@ -954,8 +1009,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     log.info({ workspaceId, count: healthInsights.length }, 'Computed page health scores');
   }
 
-  if (queryPageData.length > 0) {
-    const rankingOpps = computeRankingOpportunities(queryPageData);
+  if (normQueryPageData.length > 0) {
+    const rankingOpps = computeRankingOpportunities(normQueryPageData);
     for (const insight of rankingOpps.slice(0, 20)) {
       enrichAndUpsert({
         insightType: 'ranking_opportunity',
@@ -967,7 +1022,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     deleteStaleInsightsByType(workspaceId, 'ranking_opportunity', cycleStart);
     log.info({ workspaceId, count: Math.min(rankingOpps.length, 20) }, 'Computed ranking opportunities');
 
-    const cannibalization = computeCannibalizationInsights(queryPageData);
+    const cannibalization = computeCannibalizationInsights(normQueryPageData);
     for (const insight of cannibalization.slice(0, 15)) {
       enrichAndUpsert({
         insightType: 'cannibalization',
@@ -1017,8 +1072,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   }
 
   // Phase 3A: Keyword clustering
-  if (queryPageData.length > 0) {
-    const clusterInsights = computeKeywordClusterInsights(queryPageData);
+  if (normQueryPageData.length > 0) {
+    const clusterInsights = computeKeywordClusterInsights(normQueryPageData);
     for (const insight of clusterInsights.slice(0, 20)) {
       enrichAndUpsert({
         insightType: 'keyword_cluster',
@@ -1045,7 +1100,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
             provider.getKeywordGap(ws.liveDomain!, competitors, workspaceId, 50),
           );
           if (gapData.length > 0) {
-            const gapInsights = computeCompetitorGapInsights(gapData, queryPageData);
+            const gapInsights = computeCompetitorGapInsights(gapData, normQueryPageData);
             for (const insight of gapInsights.slice(0, 30)) {
               enrichAndUpsert({
                 insightType: 'competitor_gap',
@@ -1089,8 +1144,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   }
 
   // Phase 4: New insight types
-  if (queryPageData.length > 0 && previousQueryPageData.length > 0) {
-    const movers = computeRankingMovers(queryPageData, previousQueryPageData);
+  if (normQueryPageData.length > 0 && normPrevQueryPageData.length > 0) {
+    const movers = computeRankingMovers(normQueryPageData, normPrevQueryPageData);
     for (const insight of movers) {
       enrichAndUpsert({
         insightType: 'ranking_mover',
@@ -1103,8 +1158,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     log.info({ workspaceId, count: movers.length }, 'Computed ranking movers');
   }
 
-  if (queryPageData.length > 0) {
-    const ctrOpps = computeCtrOpportunities(queryPageData);
+  if (normQueryPageData.length > 0) {
+    const ctrOpps = computeCtrOpportunities(normQueryPageData);
     for (const insight of ctrOpps) {
       enrichAndUpsert({
         insightType: 'ctr_opportunity',
@@ -1117,7 +1172,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     log.info({ workspaceId, count: ctrOpps.length }, 'Computed CTR opportunities');
   }
 
-  if (gscPages.length > 0) {
+  if (normGscPages.length > 0) {
     // Load pages that already have schema markup from the DB (graceful fallback)
     let pagesWithSchema = new Set<string>();
     try {
@@ -1129,7 +1184,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     } catch {
       // schema_page_types table may not exist — proceed with empty set
     }
-    const serpOpps = computeSerpOpportunities(gscPages, pagesWithSchema);
+    const serpOpps = computeSerpOpportunities(normGscPages, pagesWithSchema);
     for (const insight of serpOpps) {
       enrichAndUpsert({
         insightType: 'serp_opportunity',

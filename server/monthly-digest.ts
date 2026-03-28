@@ -206,9 +206,10 @@ Only mention specific numbers if they are notable (>10% change). Keep it concise
       model: 'gpt-4.1',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
+      feature: 'monthly-digest',
     });
 
-    return result || fallbackSummary(month, wins.length, issues.length);
+    return result.text || fallbackSummary(month, wins.length, issues.length);
   } catch (err) {
     log.warn({ err }, 'AI digest summary failed — using fallback');
     return fallbackSummary(month, wins.length, issues.length);
