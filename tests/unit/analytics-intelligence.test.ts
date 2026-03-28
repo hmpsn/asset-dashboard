@@ -130,10 +130,10 @@ describe('computeRankingOpportunities', () => {
     expect(seoTips.data.pageUrl).toBe('https://example.com/blog/seo-tips');
   });
 
-  it('uses composite page::query as pageId for unique DB rows', () => {
+  it('uses page URL only as pageId so DB UNIQUE constraint deduplicates per page', () => {
     const results = computeRankingOpportunities(queryPageData);
     const seoTips = results.find(r => r.data.query === 'seo tips for beginners')!;
-    expect(seoTips.pageId).toBe('https://example.com/blog/seo-tips::seo tips for beginners');
+    expect(seoTips.pageId).toBe('https://example.com/blog/seo-tips');
   });
 
   it('sorts by estimated traffic gain descending', () => {

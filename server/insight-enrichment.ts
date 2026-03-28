@@ -418,6 +418,7 @@ async function buildAuditIssuesMap(workspaceId: string): Promise<Map<string, str
     if (!snapshot?.audit?.pages) return map;
 
     for (const page of snapshot.audit.pages) {
+      if (!Array.isArray(page.issues)) continue;
       // Filter to actionable issues only (errors and warnings)
       const actionable = page.issues.filter(
         (i: SeoIssue) => i.severity === 'error' || i.severity === 'warning',

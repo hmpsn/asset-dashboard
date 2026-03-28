@@ -41,6 +41,12 @@ export const WS_EVENTS = {
 
   // Content publishing
   CONTENT_PUBLISHED: 'content:published',
+
+  // Insights / action queue
+  INSIGHT_RESOLVED: 'insight:resolved',
+
+  // Intelligence signals (keyword strategy + content pipeline)
+  INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

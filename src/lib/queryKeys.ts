@@ -57,6 +57,7 @@ export const queryKeys = {
     insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
+    actionQueue: (wsId: string) => ['admin-action-queue', wsId] as const,
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
@@ -98,6 +99,8 @@ export const queryKeys = {
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentPlan: (wsId: string) => ['client-content-plan', wsId] as const,
     insights: (wsId: string) => ['client-insights', wsId] as const,
+    clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
+    monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

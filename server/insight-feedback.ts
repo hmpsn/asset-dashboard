@@ -8,6 +8,7 @@
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { StrategySignal, PipelineSignal } from '../shared/types/insights.js';
 
@@ -37,7 +38,7 @@ export function runFeedbackLoops(workspaceId: string): void {
         pipelineSignals: pipelineSignals.length,
       }, 'feedback loops generated signals');
 
-      broadcastToWorkspace(workspaceId, 'intelligence_signals_updated', {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
         strategyCount: strategySignals.length,
         pipelineCount: pipelineSignals.length,
       });

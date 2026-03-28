@@ -22,6 +22,9 @@ interface InsightRow {
   anomaly_linked: number | null;
   impact_score: number | null;
   domain: string | null;
+  resolution_status: string | null;
+  resolution_note: string | null;
+  resolved_at: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -37,7 +40,6 @@ const stmts = createStmtCache(() => ({
       @pipeline_status, @anomaly_linked, @impact_score, @domain
     )
     ON CONFLICT(workspace_id, COALESCE(page_id, '__workspace__'), insight_type) DO UPDATE SET
-      id                 = excluded.id,
       data               = excluded.data,
       severity           = excluded.severity,
       computed_at        = excluded.computed_at,
@@ -49,12 +51,14 @@ const stmts = createStmtCache(() => ({
       anomaly_linked     = excluded.anomaly_linked,
       impact_score       = excluded.impact_score,
       domain             = excluded.domain
+      -- resolution_status, resolution_note, resolved_at intentionally omitted:
+      -- background recomputation must not un-resolve admin work.
   `),
   selectByWorkspace: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ?`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? ORDER BY impact_score DESC`,
   ),
   selectByWorkspaceAndType: db.prepare(
-    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND insight_type = ?`,
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? ORDER BY impact_score DESC`,
   ),
   selectOne: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND page_id IS ? AND insight_type = ?`,
@@ -64,6 +68,18 @@ const stmts = createStmtCache(() => ({
   ),
   selectByDomain: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
+  ),
+  updateResolution: db.prepare(
+    `UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`,
+  ),
+  selectUnresolved: db.prepare(
+    `SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC LIMIT 25`,
+  ),
+  selectById: db.prepare(
+    `SELECT * FROM analytics_insights WHERE id = ? AND workspace_id = ?`,
+  ),
+  deleteStaleByType: db.prepare(
+    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL`,
   ),
 }));
 
@@ -84,6 +100,9 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     anomalyLinked: row.anomaly_linked != null ? row.anomaly_linked !== 0 : undefined,
     impactScore: row.impact_score ?? undefined,
     domain: (row.domain as InsightDomain) ?? undefined,
+    resolutionStatus: row.resolution_status ?? null,
+    resolutionNote: row.resolution_note ?? null,
+    resolvedAt: row.resolved_at ?? null,
   };
 }
 
@@ -164,10 +183,7 @@ export function deleteStaleInsightsByType(
   insightType: InsightType,
   olderThan: string,
 ): number {
-  const stmt = db.prepare(
-    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ?`,
-  );
-  const info = stmt.run(workspaceId, insightType, olderThan);
+  const info = stmts().deleteStaleByType.run(workspaceId, insightType, olderThan);
   return info.changes;
 }
 
@@ -209,5 +225,30 @@ export function getInsightsByDomain(
   domain: string,
 ): AnalyticsInsight[] {
   const rows = stmts().selectByDomain.all(workspaceId, domain) as InsightRow[];
+  return rows.map(rowToInsight);
+}
+
+// ── Resolution tracking ──────────────────────────────────────────
+
+export function getInsightById(id: string, workspaceId: string): AnalyticsInsight | undefined {
+  const row = stmts().selectById.get(id, workspaceId) as InsightRow | undefined;
+  return row ? rowToInsight(row) : undefined;
+}
+
+export function resolveInsight(
+  insightId: string,
+  workspaceId: string,
+  status: 'in_progress' | 'resolved',
+  note?: string,
+): AnalyticsInsight | undefined {
+  const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
+  const changes = stmts().updateResolution.run(status, note ?? null, resolvedAt, insightId, workspaceId);
+  // If workspace_id didn't match, UPDATE affects 0 rows — return undefined so the route sends 404
+  if (changes.changes === 0) return undefined;
+  return getInsightById(insightId, workspaceId);
+}
+
+export function getUnresolvedInsights(workspaceId: string): AnalyticsInsight[] {
+  const rows = stmts().selectUnresolved.all(workspaceId) as InsightRow[];
   return rows.map(rowToInsight);
 }

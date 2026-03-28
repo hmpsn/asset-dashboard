@@ -221,6 +221,10 @@ export interface AnalyticsInsight {
   anomalyLinked?: boolean;
   impactScore?: number;
   domain?: InsightDomain;
+  // Resolution tracking (Phase 3)
+  resolutionStatus?: 'in_progress' | 'resolved' | null;
+  resolutionNote?: string | null;
+  resolvedAt?: string | null;
 }
 
 // ── Insight data shapes (used in data JSON field) ─────────────────

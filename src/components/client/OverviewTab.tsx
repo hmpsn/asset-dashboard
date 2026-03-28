@@ -2,11 +2,14 @@ import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
   Sparkles, Activity, FileText, Search,
 } from 'lucide-react';
+import { MonthlyDigest } from './MonthlyDigest';
+import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
 import { StatCard } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
+import { InsightNarrative } from './InsightNarrative';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
@@ -253,10 +256,20 @@ export function OverviewTab({
       return null;
     })()}
 
+    {/* Monthly performance digest */}
+    <ErrorBoundary label="Monthly Digest">
+      <MonthlyDigest workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
+
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
       {/* Left column (3/5) — Insights feed */}
       <div className="lg:col-span-3 space-y-5">
+        {/* Server-computed insight narratives */}
+        <ErrorBoundary label="Insight Narrative">
+          <InsightNarrative workspaceId={workspaceId} />
+        </ErrorBoundary>
+
         {/* AI-generated insights digest */}
         <ErrorBoundary label="Insights Digest">
           <InsightsDigest

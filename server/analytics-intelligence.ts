@@ -57,7 +57,7 @@ function expectedCtrForPosition(pos: number): number {
 
 // ── Staleness check ──────────────────────────────────────────────
 
-const DEFAULT_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
+const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — analytics data refreshes at most once per day
 
 export function isStale(computedAt: string | undefined, maxAgeMs: number = DEFAULT_MAX_AGE_MS): boolean {
   if (!computedAt) return true;
@@ -171,23 +171,31 @@ export function computeRankingOpportunities(
       row.impressions >= QUICK_WIN_MIN_IMPRESSIONS,
   );
 
-  const results: ComputedInsight<QuickWinData>[] = candidates.map(row => {
-    const targetCtr = expectedCtrForPosition(3); // position 3 target
-    const estimatedTrafficGain = Math.round(row.impressions * targetCtr - row.clicks);
+  // Group by page URL — keep only the highest-traffic-gain query per page so the
+  // UNIQUE constraint (workspace_id, page_id, insight_type) works as intended and
+  // the same page doesn't surface multiple times in the UI.
+  const targetCtr = expectedCtrForPosition(3);
+  const bestByPage = new Map<string, { row: QueryPageRow; gain: number }>();
+  for (const row of candidates) {
+    const gain = Math.max(0, Math.round(row.impressions * targetCtr - row.clicks));
+    const existing = bestByPage.get(row.page);
+    if (!existing || gain > existing.gain) {
+      bestByPage.set(row.page, { row, gain });
+    }
+  }
 
-    return {
-      pageId: `${row.page}::${row.query}`, // composite key so each query-page pair gets its own DB row
-      insightType: 'ranking_opportunity',
-      data: {
-        query: row.query,
-        currentPosition: row.position,
-        impressions: row.impressions,
-        estimatedTrafficGain: Math.max(0, estimatedTrafficGain),
-        pageUrl: row.page,
-      },
-      severity: 'opportunity' as const,
-    };
-  });
+  const results: ComputedInsight<QuickWinData>[] = Array.from(bestByPage.values()).map(({ row, gain }) => ({
+    pageId: row.page, // page URL only — lets DB UNIQUE constraint deduplicate correctly
+    insightType: 'ranking_opportunity',
+    data: {
+      query: row.query,
+      currentPosition: row.position,
+      impressions: row.impressions,
+      estimatedTrafficGain: gain,
+      pageUrl: row.page,
+    },
+    severity: 'opportunity' as const,
+  }));
 
   // Sort by estimated traffic gain descending
   results.sort((a, b) => b.data.estimatedTrafficGain - a.data.estimatedTrafficGain);
@@ -559,11 +567,17 @@ export function computeRankingMovers(
   currentQueryPages: QueryPageRow[],
   previousQueryPages: QueryPageRow[],
 ): Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
-  const results: Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> = [];
   const prevMap = new Map<string, QueryPageRow>();
   for (const row of previousQueryPages) {
     prevMap.set(`${row.query}::${row.page}`, row);
   }
+
+  // Collect all significant movers, then deduplicate to one entry per page URL.
+  // Keeping the query with the highest impact (|positionChange| × impressions) ensures
+  // the DB UNIQUE constraint (workspace_id, page_id, insight_type) works as intended.
+  type MoverCandidate = { insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity; impact: number };
+  const bestByPage = new Map<string, MoverCandidate>();
+
   for (const curr of currentQueryPages) {
     if (curr.impressions < 50) continue; // Skip low-visibility queries — position changes are noise
     const prev = prevMap.get(`${curr.query}::${curr.page}`);
@@ -573,20 +587,29 @@ export function computeRankingMovers(
     const severity: InsightSeverity = positionChange < -5 ? 'critical'
       : positionChange < -3 ? 'warning'
       : positionChange > 5 ? 'positive' : 'opportunity';
-    results.push({
-      insightType: 'ranking_mover' as const,
-      pageId: `${curr.page}::${curr.query}`,
-      data: {
-        query: curr.query, pageUrl: curr.page,
-        currentPosition: Math.round(curr.position * 10) / 10,
-        previousPosition: Math.round(prev.position * 10) / 10,
-        positionChange: Math.round(positionChange * 10) / 10,
-        currentClicks: curr.clicks, previousClicks: prev.clicks,
-        impressions: curr.impressions,
-      },
-      severity,
-    });
+    const impact = Math.abs(positionChange) * curr.impressions;
+    const existing = bestByPage.get(curr.page);
+    if (!existing || impact > existing.impact) {
+      bestByPage.set(curr.page, {
+        insightType: 'ranking_mover' as const,
+        pageId: curr.page, // page URL only — lets DB UNIQUE constraint deduplicate correctly
+        data: {
+          query: curr.query, pageUrl: curr.page,
+          currentPosition: Math.round(curr.position * 10) / 10,
+          previousPosition: Math.round(prev.position * 10) / 10,
+          positionChange: Math.round(positionChange * 10) / 10,
+          currentClicks: curr.clicks, previousClicks: prev.clicks,
+          impressions: curr.impressions,
+        },
+        severity,
+        impact,
+      });
+    }
   }
+
+  const results: Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> =
+    Array.from(bestByPage.values());
+
   return results.sort((a, b) => {
     const aI = Math.abs(a.data.positionChange as number) * (a.data.impressions as number);
     const bI = Math.abs(b.data.positionChange as number) * (b.data.impressions as number);
@@ -607,7 +630,10 @@ const CTR_OPPORTUNITY_THRESHOLD_RATIO = 0.70; // actual CTR must be < 70% of exp
 export function computeCtrOpportunities(
   queryPageData: QueryPageRow[],
 ): Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
-  const results: Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> = [];
+  // Group by page URL — keep only the highest click-gap query per page so the
+  // DB UNIQUE constraint (workspace_id, page_id, insight_type) works as intended.
+  type CtrCandidate = { insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity; clickGap: number };
+  const bestByPage = new Map<string, CtrCandidate>();
 
   for (const row of queryPageData) {
     if (row.impressions < CTR_OPPORTUNITY_MIN_IMPRESSIONS) continue;
@@ -631,23 +657,30 @@ export function computeCtrOpportunities(
       : 'opportunity';
 
     const ctrGap = Math.round((expectedCtr - actualCtrDecimal) * row.impressions);
-
-    results.push({
-      insightType: 'ctr_opportunity' as const,
-      pageId: `${row.page}::${row.query}`,
-      data: {
-        query: row.query,
-        pageUrl: row.page,
-        position: Math.round(row.position * 10) / 10,
-        actualCtr: row.ctr, // already a percentage from GSC
-        expectedCtr: Math.round(expectedCtr * 100 * 10) / 10, // convert decimal to percentage
-        ctrRatio: Math.round(ctrRatio * 100) / 100,
-        impressions: row.impressions,
-        estimatedClickGap: Math.max(0, ctrGap),
-      },
-      severity,
-    });
+    const clickGap = Math.max(0, ctrGap);
+    const existing = bestByPage.get(row.page);
+    if (!existing || clickGap > existing.clickGap) {
+      bestByPage.set(row.page, {
+        insightType: 'ctr_opportunity' as const,
+        pageId: row.page, // page URL only — lets DB UNIQUE constraint deduplicate correctly
+        data: {
+          query: row.query,
+          pageUrl: row.page,
+          position: Math.round(row.position * 10) / 10,
+          actualCtr: row.ctr, // already a percentage from GSC
+          expectedCtr: Math.round(expectedCtr * 100 * 10) / 10, // convert decimal to percentage
+          ctrRatio: Math.round(ctrRatio * 100) / 100,
+          impressions: row.impressions,
+          estimatedClickGap: clickGap,
+        },
+        severity,
+        clickGap,
+      });
+    }
   }
+
+  const results: Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> =
+    Array.from(bestByPage.values());
 
   // Sort by estimated click gap descending
   return results
@@ -727,7 +760,8 @@ export async function getOrComputeInsights(
       allExisting[0].computedAt,
     );
     if (!isStale(newestComputedAt)) {
-      return insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+      const fresh = insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+      return fresh.slice(0, 25);
     }
   }
 
@@ -736,11 +770,13 @@ export async function getOrComputeInsights(
     await computeAndPersistInsights(workspaceId);
   } catch (err) {
     log.warn({ err, workspaceId }, 'Failed to compute fresh insights, returning stale data');
-    // Return stale data if we have it
-    if (allExisting.length > 0) return insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+    if (allExisting.length > 0) {
+      const stale = insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
+      return stale.slice(0, 25);
+    }
   }
 
-  return getInsights(workspaceId, insightType);
+  return getInsights(workspaceId, insightType).slice(0, 25);
 }
 
 /**
