@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
@@ -73,6 +73,15 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
   const [activeSearchLines, setActiveSearchLines] = useState<Set<string>>(new Set(['clicks', 'impressions']));
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarHeight, setSidebarHeight] = useState(0);
+
+  useEffect(() => {
+    if (sidebarRef.current) {
+      const h = sidebarRef.current.offsetHeight;
+      if (h > 0 && h !== sidebarHeight) setSidebarHeight(h);
+    }
+  });
 
   const {
     overview, trend, devices, countries, searchTypes,
@@ -254,10 +263,13 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             limit={5}
           />
 
-          {/* Step 5+6+7: Two-column grid — table spans all rows, sidebar cards stack */}
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-3 gap-3">
-            {/* Left: Data table — spans all 3 rows, height set by sidebar */}
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 lg:row-span-3 flex flex-col overflow-hidden min-w-0">
+          {/* Step 5+6+7: Two-column layout — table left, sidebar right */}
+          <div className="flex flex-col lg:flex-row gap-3">
+            {/* Left: Data table — height matches sidebar via ref measurement */}
+            <div
+              className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
+              style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+            >
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800 shrink-0">
                 <button
@@ -347,7 +359,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               </div>
             </div>
 
-            {/* Right column: each card occupies one grid row */}
+            {/* Right: Sidebar cards — ref measured to set table height */}
+            <div ref={sidebarRef} className="lg:flex-1 space-y-3">
               {devices.length > 0 && (
                 <SectionCard title="Devices">
                   <div className="space-y-2.5">
@@ -418,6 +431,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                   </div>
                 </SectionCard>
               )}
+            </div>
           </div>
         </>
       )}

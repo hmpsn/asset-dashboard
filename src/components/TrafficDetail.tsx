@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Globe, Monitor, Smartphone, Tablet,
@@ -45,6 +45,15 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
   const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
   const [eventsExpanded, setEventsExpanded] = useState(true);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarHeight, setSidebarHeight] = useState(0);
+
+  useEffect(() => {
+    if (sidebarRef.current) {
+      const h = sidebarRef.current.offsetHeight;
+      if (h > 0 && h !== sidebarHeight) setSidebarHeight(h);
+    }
+  });
 
   const queryClient = useQueryClient();
 
@@ -304,10 +313,13 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         </SectionCard>
       )}
 
-      {/* ── 6. Two-column grid — table spans all rows, sidebar cards stack ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_auto_auto_auto] gap-3 min-w-0">
-        {/* Left: Top Pages — spans all 4 rows, fixed height with internal scroll */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 lg:row-span-4 flex flex-col overflow-hidden min-w-0">
+      {/* ── 6. Two-column layout — table left, sidebar right ── */}
+      <div className="flex flex-col lg:flex-row gap-3">
+        {/* Left: Top Pages — height matches sidebar via ref measurement */}
+        <div
+          className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden min-w-0 lg:flex-[2]"
+          style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+        >
           <div className="flex items-center px-4 py-3 border-b border-zinc-800 rounded-t-xl shrink-0">
             <span className="text-sm font-semibold text-zinc-200">Top Pages</span>
           </div>
@@ -324,7 +336,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           </div>
         </div>
 
-        {/* Right column: each card occupies one grid row */}
+        {/* Right: Sidebar cards — ref measured to set table height */}
+        <div ref={sidebarRef} className="lg:flex-1 space-y-3">
           <SectionCard title="Traffic Sources">
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {sources.slice(0, 10).map((s, i) => {
@@ -405,6 +418,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               <EmptyState icon={Target} title="No segment data" description="No new vs returning data available." className="py-4" />
             )}
           </SectionCard>
+        </div>
       </div>
 
       {/* ── 9. Events & Conversions (collapsible, collapsed by default) ── */}
