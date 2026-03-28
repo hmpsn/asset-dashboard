@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Lock, Sparkles, ArrowRight } from 'lucide-react';
 
@@ -26,10 +27,18 @@ interface TierGateProps {
   className?: string;
   compact?: boolean;
   roiValue?: number | null;
+  onGateHit?: (feature: string, requiredTier: string) => void;
 }
 
-export function TierGate({ tier, required, feature, teaser, children, className, compact, roiValue }: TierGateProps) {
+export function TierGate({ tier, required, feature, teaser, children, className, compact, roiValue, onGateHit }: TierGateProps) {
   const hasAccess = TIER_LEVEL[tier] >= TIER_LEVEL[required];
+
+  // Fire onGateHit callback when gate is blocking
+  useEffect(() => {
+    if (!hasAccess && onGateHit) {
+      onGateHit(feature, required);
+    }
+  }, [hasAccess, feature, required, onGateHit]);
 
   if (hasAccess) return <>{children}</>;
 

@@ -2,6 +2,8 @@ import {
   AlertTriangle, Users, MousePointerClick, Eye, BarChart3, Shield, Target,
   Sparkles, Activity, FileText, Search,
 } from 'lucide-react';
+import { MonthlyDigest } from './MonthlyDigest';
+import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
 import { StatCard } from '../ui';
 import { Explainer } from './SeoGlossary';
@@ -252,6 +254,11 @@ export function OverviewTab({
       
       return null;
     })()}
+
+    {/* Monthly performance digest */}
+    <ErrorBoundary label="Monthly Digest">
+      <MonthlyDigest workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
 
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
