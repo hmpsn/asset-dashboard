@@ -90,7 +90,7 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
     // Only allow force recompute for authenticated admin users
     const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token;
     const payload = token ? verifyToken(token) : null;
-    const force = req.query.force === 'true' && payload?.role === 'admin';
+    const force = req.query.force === 'true' && (payload?.role === 'admin' || payload?.role === 'owner');
     const insights = await getOrComputeInsights(ws.id, type, { force });
     res.json(insights);
   } catch (err) {
