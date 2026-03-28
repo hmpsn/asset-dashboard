@@ -127,6 +127,7 @@ export function computeImpactScore(
   // content_decay: currentClicks, baselineClicks
   // cannibalization/keyword_cluster: totalImpressions
   // conversion_attribution: sessions
+  // anomaly_digest: expectedValue (the baseline metric magnitude)
   const traffic =
     (data.clicks as number | undefined) ??
     (data.currentClicks as number | undefined) ??
@@ -136,6 +137,7 @@ export function computeImpactScore(
     (data.sessions as number | undefined) ??
     (data.pageviews as number | undefined) ??
     (data.baselineClicks as number | undefined) ??
+    (data.expectedValue as number | undefined) ??
     0;
 
   const bonus = Math.min(Math.log10(Math.max(traffic, 1)) * 10, 50);
