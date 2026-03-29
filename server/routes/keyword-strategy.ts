@@ -1853,7 +1853,7 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
   if (!prev) return res.json(null);
 
   const prevStrategy = parseJsonFallback(prev.strategy_json, {});
-  const prevPageMap = parseJsonFallback(prev.page_map_json, {});
+  const prevPageMap = parseJsonFallback(prev.page_map_json, []);
   const currentPageMap = listPageKeywords(ws.id);
 
   // Compute diffs

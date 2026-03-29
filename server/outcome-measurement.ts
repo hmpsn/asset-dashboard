@@ -170,9 +170,11 @@ async function scoreActionAtCheckpoint(
 
   const currentSnapshot = await fetchCurrentMetrics(action);
 
-  // Edge case: insufficient data — check impressions on baseline
+  // Edge case: insufficient data — only applies to search-impression-based metrics.
+  // Non-search metrics (page_health_score, voice_score, content_produced, etc.) skip this check.
+  const SEARCH_METRICS = new Set(['position', 'clicks', 'impressions', 'ctr']);
   const baselineImpressions = action.baselineSnapshot.impressions ?? 0;
-  if (baselineImpressions < MIN_IMPRESSIONS_FOR_DATA) {
+  if (SEARCH_METRICS.has(primaryMetric) && baselineImpressions < MIN_IMPRESSIONS_FOR_DATA) {
     const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
     const outcome = recordOutcome({
       actionId: action.id,
