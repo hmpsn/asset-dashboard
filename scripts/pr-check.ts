@@ -15,6 +15,8 @@
  *   - Hard-coded "hmpsn.studio" strings (use STUDIO_NAME constant)
  *   - Local prepared statement caching (use createStmtCache/stmts())
  *   - Raw fetch() in components (use typed API client)
+ *   - z.array(z.unknown()) on server (use parseJsonSafeArray + typed schema)
+ *   - Bare SUM() in db.prepare() strings (use COALESCE to avoid NULL aggregates)
  */
 
 import { execSync, execFileSync } from 'child_process';
@@ -133,6 +135,22 @@ const CHECKS: Check[] = [
     pattern: 'let stmt',
     fileGlobs: ['*.ts'],
     message: 'Use createStmtCache()/stmts() for prepared statements. Local `let stmt` guards are useless.',
+    severity: 'warn',
+  },
+  {
+    name: 'z.array(z.unknown()) on server',
+    pattern: 'z\\.array\\(z\\.unknown\\(\\)\\)',
+    fileGlobs: ['*.ts'],
+    exclude: 'server/db/json-validation.ts',
+    message: 'Use parseJsonSafeArray(raw, typedItemSchema, context) — z.unknown() bypasses per-item validation and requires unsafe casts.',
+    severity: 'error',
+  },
+  {
+    name: 'Bare SUM() without COALESCE in db.prepare',
+    pattern: 'SUM\\([^)]+\\)(?!.*COALESCE)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',
     severity: 'warn',
   },
 ];
