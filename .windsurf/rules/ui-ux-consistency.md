@@ -159,6 +159,57 @@ Use the established typography scale consistently:
 - Body text: `text-sm text-zinc-400`
 - Small text: `text-[11px] text-zinc-500`
 
+## Rule 11: Two-Column Table + Sidebar Layouts
+
+When a data table and a sidebar of cards need to sit side-by-side with the table matching the sidebar's height:
+
+**CSS cannot solve this alone.** CSS grid `stretch` and flex `stretch` make the shorter element match the taller one — but when the table has hundreds of rows, IT becomes the taller element and the sidebar stretches to match (useless). `max-height` with fixed values doesn't adapt to different sidebar content heights.
+
+**Solution: measure the sidebar via `useRef` + `useEffect`, set the table's `maxHeight` to match.**
+
+```tsx
+const sidebarRef = useRef<HTMLDivElement>(null);
+const [sidebarHeight, setSidebarHeight] = useState(0);
+
+useEffect(() => {
+  if (sidebarRef.current) {
+    const h = sidebarRef.current.offsetHeight;
+    if (h > 0 && h !== sidebarHeight) setSidebarHeight(h);
+  }
+});
+
+// Layout:
+<div className="flex flex-col lg:flex-row lg:items-start gap-3">
+  {/* Table — height matches sidebar */}
+  <div
+    className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden min-w-0 lg:flex-[2]"
+    style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+  >
+    <div className="... shrink-0">{/* header */}</div>
+    <div className="overflow-y-auto flex-1 min-h-0">{/* scrollable content */}</div>
+  </div>
+
+  {/* Sidebar — ref measured, natural height */}
+  <div ref={sidebarRef} className="lg:flex-1 space-y-3">
+    <SectionCard>...</SectionCard>
+    <SectionCard>...</SectionCard>
+  </div>
+</div>
+```
+
+**Key details:**
+- Use `lg:items-start` on the flex container so the sidebar renders at its natural height (not stretched to match the table)
+- The table container must be `flex flex-col overflow-hidden` — SectionCard's nested div structure breaks height propagation, so build the table container as a direct div
+- The scroll area inside needs `flex-1 min-h-0 overflow-y-auto`
+- Add `min-w-0` on the table container and row items to prevent long text from overflowing the grid width
+- The `useEffect` runs on every render to catch sidebar height changes from data loading
+
+**Anti-patterns:**
+- ❌ `max-h-[500px]` — doesn't adapt to sidebar content
+- ❌ CSS grid `row-span` with `auto` rows — table content determines row height, not sidebar
+- ❌ SectionCard with `className="flex flex-col"` — the inner content div doesn't get `flex-1`
+- ❌ `flex stretch` without `items-start` — sidebar stretches to match table, ref measures stretched height (circular)
+
 ---
 
 **Enforcement**: These rules are checked during code review. Violations must be fixed before merge.
