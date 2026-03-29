@@ -163,7 +163,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   };
 
   if (auditDetail) return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
@@ -427,7 +427,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
 
               {/* Page Cards */}
-              <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+              <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-zinc-400" />
