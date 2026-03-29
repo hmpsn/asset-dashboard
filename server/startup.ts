@@ -8,6 +8,7 @@ import { clearTestModeCustomerIds } from './stripe.js';
 import { startTrialReminders } from './trial-reminders.js';
 import { startChurnSignalScheduler } from './churn-signals.js';
 import { startAnomalyDetection } from './anomaly-detection.js';
+import { startOutcomeCrons } from './outcome-crons.js';
 
 /** Start all background schedulers and queues. */
 export function startSchedulers() {
@@ -21,4 +22,5 @@ export function startSchedulers() {
   startTrialReminders();
   startChurnSignalScheduler();
   startAnomalyDetection();
+  startOutcomeCrons();
 }

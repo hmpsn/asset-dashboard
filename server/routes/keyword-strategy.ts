@@ -45,6 +45,8 @@ import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData }
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { recordAction } from '../outcome-tracking.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -666,6 +668,22 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (requestedKeywords.length > 0) {
       businessSection += `\nCLIENT-REQUESTED KEYWORDS (the client has submitted these keyword ideas — give them HIGH PRIORITY in page assignments and content gap suggestions. If no existing page covers a requested keyword, it MUST appear as a content gap):\n${requestedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
       log.info(`Injecting ${requestedKeywords.length} client-requested keywords into AI prompt`);
+    }
+
+    // Adaptive pipeline: inject workspace learnings for difficulty range guidance
+    if (isFeatureEnabled('outcome-adaptive-pipeline')) {
+      try {
+        const learnings = getWorkspaceLearnings(ws.id);
+        if (learnings) {
+          const block = formatLearningsForPrompt(learnings, 'strategy');
+          if (block) {
+            businessSection += `\n\n${block}\n`;
+            log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
+          }
+        }
+      } catch (err) {
+        log.warn({ err }, 'Failed to inject workspace learnings into strategy prompt');
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
