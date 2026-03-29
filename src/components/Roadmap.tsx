@@ -206,10 +206,10 @@ export function Roadmap() {
 
       {/* Progress overview */}
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="Total Items" value={total} icon={Map} iconColor="#2dd4bf" />
-        <StatCard label="Completed" value={done} icon={CheckCircle2} iconColor="#4ade80" />
-        <StatCard label="In Progress" value={inProgress} icon={Clock} iconColor="#fbbf24" />
-        <StatCard label="Completion" value={total > 0 ? `${Math.round((done / total) * 100)}%` : '0%'} icon={Rocket} iconColor="#60a5fa" />
+        <StatCard label="Total Items" value={total} icon={Map} iconColor="#2dd4bf" size="hero" />
+        <StatCard label="Completed" value={done} icon={CheckCircle2} iconColor="#4ade80" size="hero" />
+        <StatCard label="In Progress" value={inProgress} icon={Clock} iconColor="#fbbf24" size="hero" />
+        <StatCard label="Completion" value={total > 0 ? `${Math.round((done / total) * 100)}%` : '0%'} icon={Rocket} iconColor="#60a5fa" size="hero" />
       </div>
 
       {/* Shipping velocity chart */}

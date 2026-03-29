@@ -161,7 +161,7 @@ function PageWeight({ siteId }: Props) {
   const heavyPages = data.pages.filter(p => p.totalSize > 2 * 1024 * 1024).length;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">

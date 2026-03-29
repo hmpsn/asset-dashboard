@@ -105,7 +105,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   if (!overview) return null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Date range + loading indicator */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</p>

@@ -204,9 +204,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             deltaLabel=" pts"
             sub={`${audit.errors} errors · ${audit.warnings} warnings`}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
+            size="hero"
           />
         ) : (
-          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} />
+          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} size="hero" />
         )}
 
         {searchData ? (
@@ -217,9 +218,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             iconColor="#22d3ee"
             sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+            size="hero"
           />
         ) : (
-          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} />
+          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" />
         )}
 
         {ga4Data ? (
@@ -232,9 +234,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             deltaLabel="%"
             sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+            size="hero"
           />
         ) : (
-          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} />
+          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" />
         )}
 
         <StatCard
@@ -244,6 +247,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : '#71717a'}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
+          size="hero"
         />
 
         {roiData && (
@@ -254,6 +258,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             iconColor="#22c55e"
             sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
             onClick={() => navigate(`/client/${workspaceId}/roi`)}
+            size="hero"
           />
         )}
 
@@ -265,6 +270,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             iconColor={contentDecayData.critical > 0 ? '#f87171' : '#fbbf24'}
             sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk` : `${contentDecayData.warning} pages declining`}
             onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+            size="hero"
           />
         )}
 
@@ -278,6 +284,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               iconColor="#71717a"
               sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
               onClick={() => navigate(adminPath(workspaceId, 'content'))}
+              size="hero"
             />
           );
         })()}

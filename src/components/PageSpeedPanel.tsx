@@ -406,7 +406,7 @@ export function PageSpeedPanel({ siteId }: Props) {
   const v = data.averageVitals;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Strategy toggle + re-run */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">

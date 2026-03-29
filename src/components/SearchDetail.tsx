@@ -96,7 +96,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Date range selector */}
       <div className="flex items-center justify-end">
         <DateRangeSelector
