@@ -34,6 +34,7 @@ import {
   clearPageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { recordAction } from '../outcome-tracking.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
@@ -302,6 +303,29 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
   }
 
   broadcastToWorkspace(req.params.workspaceId, 'approval:applied', { batchId: req.params.batchId, applied: appliedIds.length });
+
+  // Record for outcome tracking — meta updates
+  try {
+    for (const item of approved) {
+      if (item.field === 'seoTitle' || item.field === 'seoDescription') {
+        recordAction({
+          workspaceId: req.params.workspaceId,
+          actionType: 'meta_updated',
+          sourceType: 'approval',
+          sourceId: req.params.batchId,
+          pageUrl: item.pageSlug ? `/${item.pageSlug}` : null,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          attribution: 'platform_executed',
+        });
+      }
+    }
+  } catch (err) {
+    log.warn({ err, batchId: req.params.batchId }, 'Failed to record outcome action for approval apply');
+  }
+
   res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
 });
 

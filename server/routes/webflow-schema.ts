@@ -28,6 +28,7 @@ import {
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { recordAction } from '../outcome-tracking.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
 import {
@@ -193,6 +194,26 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     }
 
     res.json({ success: true, published });
+
+    // Record for outcome tracking
+    try {
+      recordAction({
+        workspaceId: pubWs?.id || '',
+        actionType: 'schema_deployed',
+        sourceType: 'schema',
+        sourceId: pageId,
+        pageUrl: req.body.pageSlug ? `/${req.body.pageSlug}` : null,
+        targetKeyword: null,
+        baselineSnapshot: {
+          captured_at: new Date().toISOString(),
+          rich_result_eligible: true,
+          rich_result_appearing: false,
+        },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err, pageId }, 'Failed to record outcome action for schema deployment');
+    }
 
     // Trigger background llms.txt regeneration after schema publish
     try {

@@ -4,8 +4,8 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
+import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
 import {
   generateRecommendations,
   loadRecommendations,
@@ -14,6 +14,9 @@ import {
 } from '../recommendations.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
+
+const log = createLogger('routes:recommendations');
+const router = Router();
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
@@ -90,6 +93,23 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
         source: 'recommendation',
         recommendationId: rec.id,
       });
+    }
+    // Record for outcome tracking
+    try {
+      recordAction({
+        workspaceId: req.params.workspaceId,
+        actionType: 'audit_fix_applied',
+        sourceType: 'recommendation',
+        sourceId: req.params.recId,
+        pageUrl: rec.affectedPages?.[0] ?? null,
+        targetKeyword: null,
+        baselineSnapshot: {
+          captured_at: new Date().toISOString(),
+        },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err, recId: req.params.recId }, 'Failed to record outcome action for recommendation completion');
     }
   }
   res.json(rec);

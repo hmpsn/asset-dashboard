@@ -26,6 +26,7 @@ import { getAllSitePages } from './content-requests.js';
 import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
+import { recordAction } from '../outcome-tracking.js';
 
 const log = createLogger('content-briefs');
 
@@ -160,6 +161,25 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       ga4PagePerformance: ga4Performance.length > 0 ? ga4Performance : undefined,
       styleExamples: stylePages.length > 0 ? stylePages : undefined,
     });
+
+    // Record for outcome tracking
+    try {
+      recordAction({
+        workspaceId: req.params.workspaceId,
+        actionType: 'brief_created',
+        sourceType: 'brief',
+        sourceId: brief.id,
+        pageUrl: null,
+        targetKeyword: targetKeyword,
+        baselineSnapshot: {
+          captured_at: new Date().toISOString(),
+        },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err, keyword: targetKeyword }, 'Failed to record outcome action for brief creation');
+    }
+
     res.json(brief);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });

@@ -5,6 +5,10 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { resolveInsight, getUnresolvedInsights } from '../analytics-insights-store.js';
+import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
+
+const log = createLogger('insights');
 
 const router = Router();
 
@@ -33,6 +37,29 @@ router.put(
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
     addActivity(workspaceId, 'insight_resolved', `Insight ${status}${note ? ': ' + note : ''}`);
     broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });
+    // Record for outcome tracking
+    try {
+      const insightData = updated.data as Record<string, unknown> | undefined;
+      recordAction({
+        workspaceId,
+        actionType: 'insight_acted_on',
+        sourceType: 'insight',
+        sourceId: req.params.insightId,
+        pageUrl: updated.pageId ?? null,
+        targetKeyword: (insightData?.query as string) ?? (insightData?.keyword as string) ?? null,
+        baselineSnapshot: {
+          captured_at: new Date().toISOString(),
+          position: insightData?.currentPosition as number | undefined,
+          clicks: insightData?.clicks as number | undefined,
+          impressions: insightData?.impressions as number | undefined,
+          ctr: insightData?.ctr as number | undefined,
+          page_health_score: insightData?.score as number | undefined,
+        },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err, insightId: req.params.insightId }, 'Failed to record outcome action for insight');
+    }
     res.json(updated);
   },
 );
