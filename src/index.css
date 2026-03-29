@@ -228,6 +228,42 @@ nav button[class*="bg-teal-500"] {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* ─── Noise texture overlay ─── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scanReveal {
+  from { clip-path: inset(0 0 0 0); }
+  to { clip-path: inset(100% 0 0 0); }
+}
+@keyframes scanBeam {
+  0% { top: -1px; opacity: 1; }
+  85% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes ringGlowIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes numberFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ─── Client Dashboard Light Theme ─── */
 
 /* === Base === */
