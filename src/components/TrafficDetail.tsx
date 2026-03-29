@@ -194,7 +194,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       />
 
       {/* ── 4. Growth Signals + Engagement Analysis (side by side) ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${comparison ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {/* Growth Signals */}
         {comparison && (
           <SectionCard title="Growth Signals" titleIcon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
