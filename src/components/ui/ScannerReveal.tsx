@@ -21,7 +21,6 @@ export function ScannerReveal({ children }: ScannerRevealProps) {
           zIndex: 10,
           backgroundColor: '#0f1219',
           animation: 'scanReveal 0.85s cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
-          animationFillMode: 'forwards',
           pointerEvents: 'none',
         }}
       />
@@ -48,7 +47,6 @@ export function ScannerReveal({ children }: ScannerRevealProps) {
           boxShadow:
             '0 0 8px 2px rgba(45,212,191,0.12), 0 0 24px 4px rgba(45,212,191,0.06)',
           animation: 'scanBeam 0.85s cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
-          animationFillMode: 'forwards',
           pointerEvents: 'none',
         }}
       />
