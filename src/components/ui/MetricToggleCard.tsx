@@ -23,7 +23,7 @@ export function MetricToggleCard({
       <div className="text-lg font-bold text-zinc-200 leading-tight mt-0.5">
         {value}
       </div>
-      <div className={`text-[9px] mt-0.5 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+      <div className={`text-[9px] mt-0.5 ${delta === '—' || delta === '+0.0%' || delta === '0.0%' || delta === '0' ? 'text-zinc-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
         {delta}
       </div>
     </>

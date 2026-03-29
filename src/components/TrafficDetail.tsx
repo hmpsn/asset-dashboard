@@ -156,7 +156,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <MetricToggleCard
           label="Avg Duration"
           value={formatDuration(overview.avgSessionDuration)}
-          delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
+          delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : comparison.change.avgSessionDuration < 0 ? '-' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
           deltaPositive={(comparison?.change.avgSessionDuration ?? 0) > 0}
           color="#22d3ee"
           active
@@ -311,7 +311,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50 min-w-0">
                 <span className="text-[11px] text-zinc-500 w-5 text-right shrink-0">{i + 1}</span>
                 <span className="text-xs text-zinc-300 flex-1 truncate font-mono min-w-0">{p.path}</span>
-                <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+                <span className="text-xs text-blue-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
                 <span className="text-[11px] text-zinc-500 w-14 text-right">{formatNumber(p.users)} u</span>
               </div>
             ))}
@@ -354,7 +354,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                       <span className="text-zinc-500">{d.percentage}%</span>
                     </div>
                     <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${d.percentage}%` }} />
+                      <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${d.percentage}%` }} />
                     </div>
                   </div>
                   <span className="text-xs text-zinc-500 tabular-nums w-10 text-right">{formatNumber(d.users)}</span>

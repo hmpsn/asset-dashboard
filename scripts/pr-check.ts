@@ -83,6 +83,7 @@ type Check = {
   pattern: string;
   fileGlobs: string[];
   exclude?: string;
+  pathFilter?: string;  // only scan files under this path prefix
   message: string;
   severity: 'error' | 'warn';
 };
@@ -92,6 +93,7 @@ const CHECKS: Check[] = [
     name: 'Purple in client components',
     pattern: 'purple-',
     fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/components/client/',
     message: 'Purple is admin-only (Three Laws of Color). Use teal for actions, blue for data.',
     severity: 'error',
   },
@@ -184,6 +186,7 @@ for (const check of CHECKS) {
     const relevant = changedFiles.filter(f =>
       exts.some(ext => f.endsWith(ext)) &&
       (!check.exclude || !f.includes(check.exclude)) &&
+      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
       !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) &&
       !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
     );
@@ -191,8 +194,8 @@ for (const check of CHECKS) {
       matches.push(...checkFile(file, check));
     }
   } else {
-    // Full scan
-    matches = checkDirectory('.', check);
+    // Full scan — scope to pathFilter if set
+    matches = checkDirectory(check.pathFilter ?? '.', check);
   }
 
   if (matches.length === 0) {
