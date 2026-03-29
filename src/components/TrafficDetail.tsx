@@ -44,7 +44,7 @@ const TRAFFIC_LINES: TrendLine[] = [
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
   const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
-  const [eventsExpanded, setEventsExpanded] = useState(true);
+  const [eventsExpanded, setEventsExpanded] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarHeight, setSidebarHeight] = useState(0);
 
@@ -165,7 +165,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           value={formatDuration(overview.avgSessionDuration)}
           delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
           deltaPositive={(comparison?.change.avgSessionDuration ?? 0) >= 0}
-          color="#a78bfa"
+          color="#22d3ee"
           active
           onClick={() => {}}
         />

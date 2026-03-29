@@ -272,7 +272,12 @@ export function AnnotatedTrendChart({
     [onCreateAnnotation, annotations],
   );
 
-  const activeLines = lines.filter(l => l.active !== false);
+  const activeLines = useMemo(
+    () => lines.filter(l => l.active !== false),
+    // Stable dependency: serialize active keys instead of comparing array reference
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines.map(l => `${l.key}:${l.active}`).join(',')],
+  );
 
   // Dynamic Y-axis assignment based on data scale
   const axisAssignments = useMemo(

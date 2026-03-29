@@ -304,16 +304,10 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 </thead>
                 <tbody>
                   {tableView === 'queries' && sortQueries(overview.topQueries).map((q, i) => {
-                    const badge = badgeMap.get(q.query);
                     return (
-                      <tr key={i} className={`border-b border-zinc-800/50 hover:bg-zinc-800/30 ${rowTint(badge)}`}>
+                      <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                         <td className="py-2.5 px-4 text-zinc-300 font-medium">
                           {q.query}
-                          {badge && (
-                            <span className={`text-[7px] font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
-                              {badge.label}
-                            </span>
-                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
                         <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
