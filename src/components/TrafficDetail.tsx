@@ -154,20 +154,20 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           label="Bounce Rate"
           value={`${overview.bounceRate}%`}
           delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate.toFixed(1)}pt` : '—'}
-          deltaPositive={(comparison?.change.bounceRate ?? 0) >= 0}
+          deltaPositive={(comparison?.change.bounceRate ?? 0) > 0}
           invertDelta
           color="#f97316"
           active
-          onClick={() => {}}
+          displayOnly
         />
         <MetricToggleCard
           label="Avg Duration"
           value={formatDuration(overview.avgSessionDuration)}
           delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
-          deltaPositive={(comparison?.change.avgSessionDuration ?? 0) >= 0}
+          deltaPositive={(comparison?.change.avgSessionDuration ?? 0) > 0}
           color="#22d3ee"
           active
-          onClick={() => {}}
+          displayOnly
         />
       </div>
 

@@ -19,7 +19,7 @@ interface Props {
 const ALL_OVERVIEW_LINES: TrendLine[] = [
   { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
   { key: 'impressions', color: '#8b5cf6', yAxisId: 'left', label: 'Impressions' },
-  { key: 'ctr', color: '#f59e0b', yAxisId: 'left', label: 'Avg CTR' },
+  { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'Avg CTR' },
   { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
   { key: 'users', color: '#14b8a6', yAxisId: 'right', label: 'Users' },
   { key: 'sessions', color: '#3b82f6', yAxisId: 'right', label: 'Sessions' },
