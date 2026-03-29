@@ -263,5 +263,5 @@ Work is not done until ALL pass:
 - [ ] `BRAND_DESIGN_LANGUAGE.md` updated (if UI changed)
 - [ ] No `violet` or `indigo` in `src/components/`
 - [ ] `npx tsx scripts/pr-check.ts` — zero errors
-- [ ] If subagents were used: review `git diff` for duplicate imports, conflicting edits, missed patterns
+- [ ] If subagents were used: invoke `scaled-code-review` skill for parallel batch output (10+ files), or `superpowers:requesting-code-review` for single-task output. Fix Critical/Important issues before proceeding.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.

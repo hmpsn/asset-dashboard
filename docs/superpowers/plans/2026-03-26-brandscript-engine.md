@@ -4,7 +4,9 @@
 
 **Goal:** Add a structured brandscript system, discovery ingestion from transcripts/docs/website crawl, voice calibration with conversational steering, and brand identity deliverable generation to the existing Brand Hub.
 
-**Architecture:** Four new server-side modules (`brandscript.ts`, `discovery-ingestion.ts`, `voice-calibration.ts`, `brand-identity.ts`) with corresponding route files, a single new migration (`026-brandscript-engine.sql`), frontend API layer (`src/api/brand-engine.ts`), and four new Brand Hub sub-tab components. The existing `seo-context.ts` gets extended with three new builder functions. All AI calls go through the existing `callAnthropic` / `callOpenAI` helpers.
+**Architecture:** Four new server-side modules (`brandscript.ts`, `discovery-ingestion.ts`, `voice-calibration.ts`, `brand-identity.ts`) with corresponding route files, a single new migration (`041-brandscript-engine.sql`), frontend API layer (`src/api/brand-engine.ts`), and four new Brand Hub sub-tab components. The existing `seo-context.ts` gets extended with three new builder functions. All AI calls go through the existing `callAnthropic` / `callOpenAI` helpers.
+
+> **⚠️ AMENDMENTS:** A pattern alignment audit (2026-03-28) identified 9 corrections to the inline code blocks below. See the **Amendments** section at the bottom of this file. Implementers MUST apply those corrections — the inline code is the original draft, amendments override it.
 
 **Tech Stack:** better-sqlite3, Express, React, Claude Sonnet 4 (creative), GPT-4.1-mini (structured), multer (file upload), existing `callAnthropic`/`callOpenAI` wrappers.
 
@@ -25,7 +27,9 @@ Sequential foundation:
 Parallel services (after Task 2):
   Task 3 (Brandscript Service) ∥ Task 4 (Discovery Ingestion) ∥ Task 5 (Voice Calibration) ∥ Task 6 (Brand Identity)
 
-Sequential shared-file tasks (after parallel batch completes + diff review):
+▶ CHECKPOINT: Invoke `scaled-code-review` on Tasks 3-6 output. Fix Critical/Important before proceeding.
+
+Sequential shared-file tasks (after review):
   Task 7 (SEO Context Builders) — modifies server/seo-context.ts
   Task 8 (App.ts Route Registration) — modifies server/app.ts
   Task 9 (Brand Engine API Client) — creates src/api/brand-engine.ts
@@ -33,7 +37,9 @@ Sequential shared-file tasks (after parallel batch completes + diff review):
 Parallel frontend (after Task 9):
   Task 10 (BrandscriptTab) ∥ Task 11 (DiscoveryTab) ∥ Task 12 (VoiceTab) ∥ Task 13 (IdentityTab)
 
-Sequential shared frontend (after parallel batch completes + diff review):
+▶ CHECKPOINT: Invoke `scaled-code-review` on Tasks 10-13 output. Fix Critical/Important before proceeding.
+
+Sequential shared frontend (after review):
   Task 14 (SteeringChat — shared component)
   Task 15 (BrandHub.tsx integration)
 ```
@@ -2074,3 +2080,170 @@ Add the Brandscript Engine to the shipped features list. Note Phase 2 and Phase 
 git add docs/
 git commit -m "docs: add brandscript engine to feature documentation"
 ```
+
+---
+
+## Amendments (2026-03-28): Pattern Alignment Audit
+
+> These amendments were identified by auditing the plan against the current codebase (migrations 001-040, 26+ server modules, 15+ route files). **Every agent dispatcher and implementer MUST apply these corrections.** The inline code blocks above reflect the original plan — these amendments override them.
+
+### Amendment 1: Migration Number — 026 → 041
+
+Migration 026 already exists (`026-missing-indexes.sql`). The current highest migration is 040.
+
+**Change:** All references to `026-brandscript-engine.sql` become `041-brandscript-engine.sql`.
+
+Affected locations:
+- Task 1: filename, step descriptions, commit message
+- Guardrails doc: file ownership map, task dependency graph, model assignments
+
+Downstream impact: Phase 2 migration becomes **042**, Phase 3 becomes **043**.
+
+### Amendment 2: ID Generation — `genId()` → `randomUUID()` Convention
+
+The codebase uses `crypto.randomUUID()` with short prefixed IDs (e.g., `ab_${randomUUID().slice(0, 8)}`). The plan's `genId(prefix)` function (timestamp-based) does not exist anywhere in the codebase.
+
+**Change:** Replace all `genId(prefix)` calls with the canonical pattern:
+
+```typescript
+import { randomUUID } from 'crypto';
+
+// Use short prefixed UUIDs matching the codebase convention:
+const id = `bs_${randomUUID().slice(0, 8)}`;   // brandscript
+const id = `bss_${randomUUID().slice(0, 8)}`;  // brandscript section
+const id = `src_${randomUUID().slice(0, 8)}`;  // discovery source
+const id = `ext_${randomUUID().slice(0, 8)}`;  // discovery extraction
+const id = `vp_${randomUUID().slice(0, 8)}`;   // voice profile
+const id = `vs_${randomUUID().slice(0, 8)}`;   // voice sample
+const id = `cal_${randomUUID().slice(0, 8)}`;  // calibration session
+const id = `bid_${randomUUID().slice(0, 8)}`;  // brand identity deliverable
+const id = `biv_${randomUUID().slice(0, 8)}`;  // brand identity version
+```
+
+Remove all `genId()` function definitions from Tasks 3, 4, 5, 6.
+
+### Amendment 3: Prepared Statement Caching — Manual → `createStmtCache()`
+
+The codebase uses `createStmtCache()` from `server/db/stmt-cache.ts` (26 files, 165 occurrences). The plan's manual `let _s: Stmts | null = null; function s()` pattern is non-canonical.
+
+**Change:** Replace all manual stmt caching with:
+
+```typescript
+import { createStmtCache } from './db/stmt-cache.js';
+
+const stmts = createStmtCache(() => ({
+  listByWorkspace: db.prepare(`SELECT * FROM ...`),
+  getById: db.prepare(`SELECT * FROM ...`),
+  // etc.
+}));
+
+// Usage: stmts().listByWorkspace.all(workspaceId)
+```
+
+Remove the `Stmts` interface, `_s` variable, and `s()` function from Tasks 3, 4, 5, 6. The `createStmtCache` utility handles lazy initialization identically but with the canonical API.
+
+### Amendment 4: Route Registration — Consolidate in Task 8
+
+Tasks 3, 4, 5, and 6 each include a step to register their routes in `server/app.ts`. This violates the guardrails' file ownership map, which assigns `server/app.ts` exclusively to Task 8.
+
+**Change:**
+- **Tasks 3, 4, 5, 6:** Remove "Register in app.ts" steps. Remove `server/app.ts` from their commit file lists. These tasks only create their own files.
+- **Task 8 (renamed from "Frontend API Client" to "Route Registration + API Client"):** This task now handles ALL four route registrations in `app.ts` AND creates the frontend API client. Alternatively, keep Task 8 as app.ts-only and Task 9 as API client — the key constraint is that app.ts is touched only once, after all four services are committed.
+
+Updated Task 8 scope:
+```typescript
+// server/app.ts — add all four route imports + registrations in one commit
+import brandscriptRoutes from './routes/brandscript.js';
+import discoveryIngestionRoutes from './routes/discovery-ingestion.js';
+import voiceCalibrationRoutes from './routes/voice-calibration.js';
+import brandIdentityRoutes from './routes/brand-identity.js';
+
+// In the app.use() section:
+app.use(brandscriptRoutes);
+app.use(discoveryIngestionRoutes);
+app.use(voiceCalibrationRoutes);
+app.use(brandIdentityRoutes);
+```
+
+### Amendment 5: Route Parameter Naming — `:wsId` → `:workspaceId`
+
+The codebase universally uses `:workspaceId` with `requireWorkspaceAccess('workspaceId')`. The plan uses `:wsId` with `requireWorkspaceAccess('wsId')`.
+
+**Change:** All route definitions in Tasks 3-6 route files must use `:workspaceId`:
+
+```typescript
+// Before (plan):
+router.get('/api/brandscripts/:wsId', requireWorkspaceAccess('wsId'), ...)
+// After (amended):
+router.get('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceId'), ...)
+```
+
+Apply to ALL routes in: `server/routes/brandscript.ts`, `server/routes/discovery-ingestion.ts`, `server/routes/voice-calibration.ts`, `server/routes/brand-identity.ts`.
+
+The frontend API client (Task 9) parameter names (`wsId` in function signatures) are fine — those are just internal JS variable names, not route params. But keep them consistent with codebase style if desired.
+
+### Amendment 6: Structured Logging — Add `createLogger()`
+
+All recent server modules use `createLogger()` from `server/logger.ts`. The plan's server modules omit logging entirely.
+
+**Change:** Add to each server module (Tasks 3, 4, 5, 6, 7):
+
+```typescript
+import { createLogger } from './logger.js';
+const log = createLogger('brandscript');        // Task 3
+const log = createLogger('discovery-ingestion'); // Task 4
+const log = createLogger('voice-calibration');   // Task 5
+const log = createLogger('brand-identity');      // Task 6
+```
+
+Use `log.info()` for significant operations (AI calls, file processing), `log.debug()` for routine operations, and `log.error()` in catch blocks.
+
+### Amendment 7: Safe JSON Column Parsing — `parseJsonFallback()`
+
+The codebase uses `parseJsonFallback()` and `parseJsonSafe()` from `server/db/json-validation.ts` for all JSON column reads. The plan uses bare `JSON.parse()` in `rowToProfile()`, `rowToTemplate()`, `rowToSession()`.
+
+**Change:** Replace bare `JSON.parse` on DB columns with safe parsing:
+
+```typescript
+import { parseJsonFallback } from './db/json-validation.js';
+
+// Before (plan):
+voiceDNA: row.voice_dna_json ? JSON.parse(row.voice_dna_json) : undefined,
+
+// After (amended):
+voiceDNA: row.voice_dna_json ? parseJsonFallback(row.voice_dna_json, null, 'voice_dna_json') ?? undefined : undefined,
+```
+
+Apply to all `rowToX()` converters that parse JSON columns: `rowToTemplate` (sections_json), `rowToProfile` (voice_dna_json, guardrails_json, context_modifiers_json), `rowToSession` (variations_json).
+
+### Amendment 8: Task Numbering Realignment
+
+The plan has 16 tasks but the guardrails list 15 in the file ownership map. The discrepancy:
+- Plan Tasks 1-15 map to guardrails Tasks 1-15
+- Plan Task 16 (Documentation Update) is not in guardrails but is required by CLAUDE.md quality gates
+
+The guardrails plan-level task numbering is correct as a subset. Task 16 is post-implementation housekeeping. No structural change needed, just noting the discrepancy for dispatchers.
+
+### Amendment 9: BrandHub.tsx — Tab Integration Pattern
+
+The current BrandHub.tsx is a single-file component with inline brand voice, knowledge base, and personas sections. There is no existing tab system.
+
+The plan's Task 9 (now Task 9/10 depending on renumbering) introduces sub-tab navigation. This is correct, but implementers should note:
+- Use the existing `TabBar` component from `src/components/ui/` rather than hand-rolling tab markup
+- Existing state (brandVoice, kbDraft, localPersonas, etc.) stays in BrandHub.tsx — new tabs receive `workspaceId` as a prop and manage their own data via React Query hooks
+- The "Knowledge Base" tab wraps the existing brand voice textarea + knowledge base textarea + brand docs section
+- The "Personas" tab wraps the existing personas section
+
+### Summary of Amendments
+
+| # | What | Where in plan | Impact |
+|---|------|--------------|--------|
+| 1 | Migration 026 → 041 | Task 1, guardrails | All references |
+| 2 | `genId()` → `randomUUID()` | Tasks 3-6 | All ID generation |
+| 3 | Manual stmt cache → `createStmtCache()` | Tasks 3-6 | All DB access |
+| 4 | app.ts registration → Task 8 only | Tasks 3-6 steps removed, Task 8 expanded | File ownership |
+| 5 | `:wsId` → `:workspaceId` | Tasks 3-6 route files | All route definitions |
+| 6 | Add `createLogger()` | Tasks 3-7 | All server modules |
+| 7 | `JSON.parse` → `parseJsonFallback()` | Tasks 3-6 row converters | All JSON column reads |
+| 8 | Task 16 not in guardrails | Documentation only | No structural change |
+| 9 | TabBar component for BrandHub | Task 9/15 | Use UI primitive |
