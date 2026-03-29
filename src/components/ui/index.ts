@@ -16,6 +16,7 @@ export { ErrorState, NetworkError, DataError, PermissionError } from './ErrorSta
 export { TabBar } from './TabBar';
 export { TierGate, TierBadge, type Tier } from './TierGate';
 export { AIContextIndicator } from './AIContextIndicator';
+export { ScannerReveal } from './ScannerReveal';
 export { Skeleton, StatCardSkeleton, SectionCardSkeleton, OverviewSkeleton, AnalyticsSkeleton } from './Skeleton';
 export {
   scoreColor,

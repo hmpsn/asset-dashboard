@@ -12,7 +12,7 @@ import {
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
 } from 'lucide-react';
 const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
-import { type Tier, Skeleton, OverviewSkeleton } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { STUDIO_NAME } from '../constants';
 import { HealthTab } from './client/HealthTab';
@@ -789,7 +789,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6 space-y-5">
+      <main className="max-w-6xl mx-auto px-6 py-6">
+        <ScannerReveal>
+        <div className="space-y-8">
 
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
@@ -1015,6 +1017,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           </ErrorBoundary>
         )}
 
+        </div>
+        </ScannerReveal>
       </main>
 
       {/* ── SEO Upgrade Modal ── */}
