@@ -143,6 +143,7 @@ export function OverviewTab({
               sub={card.sub}
               delta={card.delta}
               deltaLabel="%"
+              staggerIndex={i}
             />
           ))}
         </div>
