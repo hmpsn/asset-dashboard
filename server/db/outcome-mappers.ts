@@ -1,14 +1,14 @@
 // server/db/outcome-mappers.ts
 // Row interfaces and mappers for outcome tracking tables
 
-import { parseJsonSafe } from './json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './json-validation.js';
 import {
   baselineSnapshotSchema,
   trailingHistorySchema,
   actionContextSchema,
   deltaSummarySchema,
   competitorContextSchema,
-  playbookSequenceSchema,
+  playbookStepSchema,
   playbookOutcomeSchema,
   workspaceLearningsDataSchema,
 } from '../schemas/outcome-schemas.js';
@@ -143,7 +143,7 @@ export function rowToActionPlaybook(row: ActionPlaybookRow): ActionPlaybook {
     workspaceId: row.workspace_id,
     name: row.name,
     triggerCondition: row.trigger_condition,
-    actionSequence: parseJsonSafe(row.action_sequence, playbookSequenceSchema, [] as PlaybookStep[], { field: 'action_sequence', table: 'action_playbooks' }),
+    actionSequence: parseJsonSafeArray(row.action_sequence, playbookStepSchema, { field: 'action_sequence', table: 'action_playbooks' }),
     historicalWinRate: row.historical_win_rate,
     sampleSize: row.sample_size,
     confidence: row.confidence as ActionPlaybook['confidence'],

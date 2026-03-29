@@ -173,8 +173,10 @@ async function scoreActionAtCheckpoint(
   // Edge case: insufficient data — only applies to search-impression-based metrics.
   // Non-search metrics (page_health_score, voice_score, content_produced, etc.) skip this check.
   const SEARCH_METRICS = new Set(['position', 'clicks', 'impressions', 'ctr']);
-  const baselineImpressions = action.baselineSnapshot.impressions ?? 0;
-  if (SEARCH_METRICS.has(primaryMetric) && baselineImpressions < MIN_IMPRESSIONS_FOR_DATA) {
+  // Only apply the insufficient_data gate when impressions was explicitly captured
+  // (undefined means the baseline was recorded without GSC data — don't block scoring)
+  const baselineImpressions = action.baselineSnapshot.impressions;
+  if (SEARCH_METRICS.has(primaryMetric) && baselineImpressions !== undefined && baselineImpressions < MIN_IMPRESSIONS_FOR_DATA) {
     const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
     const outcome = recordOutcome({
       actionId: action.id,
