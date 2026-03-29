@@ -299,7 +299,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
   }, [name, description, pageType, variables, sections, urlPattern, keywordPattern, toneAndStyle, templateId, workspaceId, initialTemplate.createdAt, onSave]);
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-6 space-y-5">
+    <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button onClick={onCancel} className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">

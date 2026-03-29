@@ -42,7 +42,7 @@ export function ConnectionsTab({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Webflow */}
       <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
