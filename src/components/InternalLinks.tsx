@@ -168,11 +168,11 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-5 gap-3">
-        <StatCard label="High Priority" value={counts.high} valueColor="text-red-400" />
-        <StatCard label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
-        <StatCard label="Low Priority" value={counts.low} valueColor="text-blue-400" />
-        <StatCard label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-zinc-400'} />
-        <StatCard label="Avg Link Score" value={data.pageHealth?.length ? Math.round(data.pageHealth.reduce((s, p) => s + p.score, 0) / data.pageHealth.length) : '—'} sub="/100" />
+        <StatCard size="hero" label="High Priority" value={counts.high} valueColor="text-red-400" />
+        <StatCard size="hero" label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
+        <StatCard size="hero" label="Low Priority" value={counts.low} valueColor="text-blue-400" />
+        <StatCard size="hero" label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-zinc-400'} />
+        <StatCard size="hero" label="Avg Link Score" value={data.pageHealth?.length ? Math.round(data.pageHealth.reduce((s, p) => s + p.score, 0) / data.pageHealth.length) : '—'} sub="/100" />
       </div>
 
       {/* Orphan Pages Warning */}

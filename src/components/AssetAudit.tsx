@@ -258,7 +258,7 @@ function AssetAudit({ siteId }: Props) {
   const scoreColor = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
         <button

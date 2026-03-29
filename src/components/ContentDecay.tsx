@@ -95,7 +95,7 @@ export default function ContentDecay({ workspaceId }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

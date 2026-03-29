@@ -222,7 +222,7 @@ export function AeoReview({ workspaceId }: Props) {
     : 0;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Summary bar */}
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">

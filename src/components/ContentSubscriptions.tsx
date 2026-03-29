@@ -78,7 +78,7 @@ export function ContentSubscriptions({ workspaceId }: Props) {
   const activeSub = subs.find(s => s.status === 'active' || s.status === 'pending' || s.status === 'past_due');
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <PageHeader
         title="Content Subscriptions"
         subtitle="Recurring monthly content packages"
