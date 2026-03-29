@@ -196,7 +196,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
       {overview && !isLoading && (
         <>
           {/* Step 1: MetricToggleCards */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-3">
             <MetricToggleCard
               label="Clicks"
               value={fmtNum(overview.totalClicks)}
@@ -267,8 +267,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
           <div className="flex flex-col lg:flex-row lg:items-start gap-3">
             {/* Left: Data table — height matches sidebar via ref measurement */}
             <div
-              className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
-              style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+              className="bg-zinc-900 border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
+            style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined, borderRadius: '10px 24px 10px 24px' }}
             >
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800 shrink-0">
