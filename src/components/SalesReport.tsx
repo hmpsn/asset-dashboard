@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
-import { scoreColorClass } from './ui';
+import { scoreColorClass, MetricRing, MetricRingSvg } from './ui';
 import { salesReport as salesReportApi } from '../api/misc';
 
 interface SalesIssue {
@@ -46,20 +46,6 @@ interface ReportSummary {
   errors: number;
   warnings: number;
   generatedAt: string;
-}
-
-function scoreBorderClass(score: number): string {
-  if (score >= 80) return 'bg-green-500/10 border-green-500/30';
-  if (score >= 60) return 'bg-amber-500/10 border-amber-500/30';
-  if (score >= 40) return 'bg-orange-500/10 border-orange-500/30';
-  return 'bg-red-500/10 border-red-500/30';
-}
-
-function scoreLabel(score: number): string {
-  if (score >= 80) return 'Strong';
-  if (score >= 60) return 'Needs Work';
-  if (score >= 40) return 'At Risk';
-  return 'Critical';
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -216,7 +202,7 @@ export function SalesReport() {
                   onClick={() => loadReport(h.id)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`text-lg font-bold ${scoreColorClass(h.siteScore)}`}>{h.siteScore}</div>
+                    <MetricRingSvg score={h.siteScore} size={36} />
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate text-zinc-200">{h.siteName}</div>
                       <div className="text-xs truncate text-zinc-500">{h.url}</div>
@@ -285,10 +271,7 @@ export function SalesReport() {
         <p className="text-xs mt-0.5 text-zinc-500">{r.url}</p>
 
         <div className="flex justify-center mt-4">
-          <div className={`w-28 h-28 rounded-full border-4 flex flex-col items-center justify-center ${scoreBorderClass(r.siteScore)}`}>
-            <span className={`text-3xl font-black ${scoreColorClass(r.siteScore)}`}>{r.siteScore}</span>
-            <span className={`text-xs font-semibold ${scoreColorClass(r.siteScore)}`}>{scoreLabel(r.siteScore)}</span>
-          </div>
+          <MetricRing score={r.siteScore} size={112} />
         </div>
 
         <div className="flex justify-center gap-6 mt-4">
@@ -397,7 +380,7 @@ export function SalesReport() {
                   ? <ChevronDown className="w-4 h-4 shrink-0 text-zinc-500" />
                   : <ChevronRight className="w-4 h-4 shrink-0 text-zinc-500" />
                 }
-                <div className={`text-sm font-bold w-8 text-center ${scoreColorClass(page.score)}`}>{page.score}</div>
+                <MetricRingSvg score={page.score} size={32} />
                 <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium text-zinc-200">{page.page}</span>
                 </div>
