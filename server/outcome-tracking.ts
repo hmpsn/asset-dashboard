@@ -228,11 +228,18 @@ export function getRecentActions(workspaceId: string, limit = 50): TrackedAction
 }
 
 export function archiveOldActions(): { archived: number } {
-  const archiveResult = stmts().archiveOld.run();
-  if (archiveResult.changes > 0) {
-    stmts().archiveOldOutcomes.run();
-    stmts().deleteArchived.run(); // CASCADE removes action_outcomes rows
-    log.info({ archived: archiveResult.changes }, 'Archived old tracked actions');
+  const doArchive = db.transaction(() => {
+    const archiveResult = stmts().archiveOld.run();
+    if (archiveResult.changes > 0) {
+      stmts().archiveOldOutcomes.run();
+      stmts().deleteArchived.run(); // CASCADE removes action_outcomes rows
+    }
+    return archiveResult.changes;
+  });
+
+  const archived = doArchive();
+  if (archived > 0) {
+    log.info({ archived }, 'Archived old tracked actions');
   }
-  return { archived: archiveResult.changes };
+  return { archived };
 }
