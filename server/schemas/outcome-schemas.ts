@@ -161,4 +161,5 @@ export const scoringConfigEntrySchema = z.object({
 });
 
 export const scoringConfigSchema = z.record(actionTypeEnum, scoringConfigEntrySchema);
-export const scoringConfigOverrideSchema = scoringConfigSchema.partial();
+// z.record() does not support .partial(); override schema allows any subset of action types
+export const scoringConfigOverrideSchema = z.record(actionTypeEnum, scoringConfigEntrySchema.partial());
