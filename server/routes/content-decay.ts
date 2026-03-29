@@ -6,7 +6,7 @@ import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } 
 import { getWorkspace } from '../workspaces.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { createLogger } from '../logger.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 
 const router = Router();
 const log = createLogger('content-decay');
@@ -43,12 +43,15 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
 
     try {
       for (const rec of updated.decayingPages?.slice(0, 3) ?? []) {
+        const sourceId = rec.page ?? null;
+        if (!sourceId) continue;
+        if (getActionBySource('content_decay', sourceId)) continue;
         recordAction({
           workspaceId: req.params.workspaceId,
           actionType: 'content_refreshed',
           sourceType: 'content_decay',
-          sourceId: null,
-          pageUrl: rec.page ?? null,
+          sourceId,
+          pageUrl: sourceId,
           targetKeyword: null,
           baselineSnapshot: { captured_at: new Date().toISOString() },
           attribution: 'not_acted_on',

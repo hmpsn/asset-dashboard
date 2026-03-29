@@ -9,7 +9,7 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     thresholds: { strong_win: 10, win: 3, neutral_band: 1 },
   },
   insight_acted_on: {
-    primary_metric: 'varies',
+    primary_metric: 'clicks',
     thresholds: { strong_win: 30, win: 15, neutral_band: 10 },
   },
   strategy_keyword_added: {

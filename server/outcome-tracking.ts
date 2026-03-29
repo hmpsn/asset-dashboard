@@ -54,8 +54,8 @@ const stmts = createStmtCache(() => ({
   countByWorkspace: db.prepare(`
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN measurement_complete = 1 THEN 1 ELSE 0 END) AS scored,
-      SUM(CASE WHEN measurement_complete = 0 THEN 1 ELSE 0 END) AS pending
+      COALESCE(SUM(CASE WHEN measurement_complete = 1 THEN 1 ELSE 0 END), 0) AS scored,
+      COALESCE(SUM(CASE WHEN measurement_complete = 0 THEN 1 ELSE 0 END), 0) AS pending
     FROM tracked_actions WHERE workspace_id = ?
   `),
   getRecentByWorkspace: db.prepare(`

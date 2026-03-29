@@ -95,7 +95,7 @@ function ContentSection({ data }: ContentSectionProps) {
           {data.voiceScoreCorrelation !== null && (
             <div>
               <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-0.5">Voice Score Correlation</p>
-              <p className="text-sm font-bold text-zinc-200">{(data.voiceScoreCorrelation * 100).toFixed(0)}%</p>
+              <p className="text-sm font-bold text-zinc-200">{data.voiceScoreCorrelation > 0 ? '+' : ''}{data.voiceScoreCorrelation.toFixed(1)} pts</p>
             </div>
           )}
         </div>
