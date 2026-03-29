@@ -115,7 +115,7 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
     overallWinRate,
     strongWinRate: totalScored > 0 ? totalStrongWins / totalScored : 0,
     totalTracked: counts.total,
-    totalScored: counts.scored,
+    totalScored,
     pendingMeasurement: counts.pending,
     byCategory,
     trend,
