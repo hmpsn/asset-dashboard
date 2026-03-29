@@ -4,7 +4,7 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafe } from './db/json-validation.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
 import { z } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
@@ -157,10 +157,14 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
   const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
   if (!row) return 0;
 
-  const recommendations = parseJsonSafe(
+  const recommendationSchema = z.object({
+    id: z.string(),
+    status: z.string(),
+    affectedPages: z.array(z.string()).optional(),
+  });
+  const recommendations = parseJsonSafeArray(
     row.recommendations,
-    z.array(z.unknown()),
-    [] as Recommendation[],
+    recommendationSchema,
     { field: 'recommendations', table: 'recommendation_sets' },
   ) as Recommendation[];
 
