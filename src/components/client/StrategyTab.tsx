@@ -369,8 +369,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+              <div className="w-6 h-6 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                <Briefcase className="w-3.5 h-3.5 text-teal-400" />
               </div>
               <div className="text-left">
                 <div className="text-sm font-medium text-zinc-200">Your Business Priorities</div>
@@ -397,7 +397,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50 group">
                       <span className={`text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
                         p.category === 'growth' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        p.category === 'brand' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' :
+                        p.category === 'brand' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' :
                         p.category === 'product' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                         p.category === 'audience' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                         p.category === 'competitive' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
@@ -424,7 +424,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <select
                   value={newPriorityCategory}
                   onChange={e => setNewPriorityCategory(e.target.value)}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-zinc-300 focus:outline-none focus:border-violet-500"
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-zinc-300 focus:outline-none focus:border-teal-500"
                 >
                   <option value="growth">Growth</option>
                   <option value="brand">Brand</option>
@@ -443,7 +443,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                   placeholder="e.g., We're launching a new product line in Q3..."
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-violet-500"
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500"
                 />
                 <button
                   onClick={() => {
@@ -453,7 +453,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                   disabled={!newPriority.trim() || savingPriorities || priorities.length >= 10}
-                  className="px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-[11px] text-violet-300 font-medium hover:bg-violet-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
                 >
                   <Plus className="w-3 h-3" /> Add
                 </button>
@@ -676,7 +676,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         ) : planStatus ? (
                           <button
                             onClick={() => onTabChange?.('content-plan')}
-                            className="flex items-center gap-1 text-[11px] text-violet-400 bg-violet-500/10 px-2.5 py-1.5 rounded-lg border border-violet-500/20 flex-shrink-0 hover:bg-violet-500/20 transition-colors"
+                            className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20 transition-colors"
                             title="View in Content Plan"
                           >
                             <Layers className="w-3.5 h-3.5" />

@@ -589,15 +589,15 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <h3 className="text-sm font-semibold text-zinc-200">Page Intelligence</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {unifiedPages.length} pages
-            {cmsCount > 0 && <span className="text-violet-400"> · {cmsCount} CMS</span>}
+            {cmsCount > 0 && <span className="text-purple-400"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
             {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
         {/* Analyze All */}
         {bulkProgress ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+          <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
             <span className="text-xs text-zinc-300">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
             <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
           </div>
@@ -607,7 +607,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               <button
                 onClick={() => analyzeAllPages(false)}
                 disabled={analyzing.size > 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Analyze Remaining ({unifiedPages.length - analyzedCount})
@@ -619,7 +619,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 ${
                 analyzedCount > 0
                   ? 'bg-zinc-700 hover:bg-zinc-600 text-zinc-200'
-                  : 'bg-violet-600/80 hover:bg-violet-500/80 text-white'
+                  : 'bg-purple-600/80 hover:bg-purple-500/80 text-white'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -722,7 +722,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-zinc-300 truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/20 shrink-0">CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20 shrink-0">CMS</span>
                       )}
                     </div>
                     <span className="text-[11px] text-zinc-500 font-mono">{page.path}</span>

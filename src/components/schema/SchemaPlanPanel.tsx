@@ -32,7 +32,7 @@ const ROLE_COLORS: Record<SchemaPageRole, string> = {
   contact: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
   location: 'bg-green-500/15 text-green-300 border-green-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  partnership: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+  partnership: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   'case-study': 'bg-pink-500/15 text-pink-300 border-pink-500/30',
   comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
