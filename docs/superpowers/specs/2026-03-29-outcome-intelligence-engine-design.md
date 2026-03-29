@@ -788,3 +788,327 @@ interface Playbook {
 - Custom ML models / fine-tuning (learnings are prompt-injected, not model-trained)
 - Real-time outcome scoring (daily batch is sufficient)
 - Client self-service action tracking (admin-only for v1)
+
+---
+
+## Addendum A: Exact Integration Points
+
+Every recording hook maps to a specific file, route, and function in the existing codebase. This is the authoritative reference for where to add `recordAction()` calls.
+
+### Hook Map
+
+| Event | File | Route | Hook Location | Data Available at Hook |
+|---|---|---|---|---|
+| **Insight resolved** | `server/routes/insights.ts` | `PUT /api/insights/:workspaceId/:insightId/resolve` | After `resolveInsight()` returns (~line 34) | `workspaceId`, `insightId`, `status` (in_progress/resolved), `note`, `updated` object |
+| **Content published** | `server/routes/content-posts.ts` | `PATCH /api/content-posts/:workspaceId/:postId` | After `publishCollectionItems()` succeeds (~line 175) | `workspaceId`, `postId`, `targetKeyword`, `slug`, `webflowItemId`, `publishedAt` |
+| **Brief created** | `server/routes/content-briefs.ts` | `POST /api/content-briefs/:workspaceId/generate` | After `generateBrief()` returns (~line 150) | `workspaceId`, `brief.id`, `targetKeyword`, `suggestedTitle`, `intent`, `wordCountTarget` |
+| **Strategy keyword added** | `server/routes/keyword-strategy.ts` | `POST /api/webflow/keyword-strategy/:workspaceId` | After strategy is saved (~line 150+) | `workspaceId`, keyword clusters, competitor gaps, performance metrics |
+| **Schema deployed** | `server/routes/webflow-schema.ts` | `POST /api/webflow/schema-publish/:siteId` | After `publishSchemaToPage()` (~line 147) | `siteId`, `pageId`, schema type (JSON-LD object), validation results |
+| **Audit fix applied** | `server/routes/recommendations.ts` | `PATCH /api/public/recommendations/:workspaceId/:recId` | When `status === 'completed'` (~line 57-93) | `workspaceId`, `recId`, `priority`, `affectedPages[]` |
+| **Internal link added** | `server/routes/webflow-analysis.ts` | `GET /api/webflow/internal-links/:siteId` | After `saveInternalLinks()` (~line 245) | `siteId`, `workspaceId`, suggestions with `{fromPage, toPage, anchorText, reason, priority}` |
+| **Meta tag updated** | `server/routes/approvals.ts` | `POST /api/public/approvals/:workspaceId/:batchId/apply` | After `updatePageSeo()` (~line 274) | `workspaceId`, `batchId`, approved items with `{field, pageId, proposedValue}` |
+| **Content refreshed** | `server/routes/content-decay.ts` | `POST /api/content-decay/:workspaceId/recommendations` | After `generateBatchRecommendations()` (~line 39) | `workspaceId`, `maxPages`, decay analysis with `{recommendations[], pages[]}` |
+| **Approval workflow** | `server/routes/approvals.ts` | `PATCH /api/public/approvals/:workspaceId/:batchId/:itemId` | Lines 201-231 (approve/reject/revert) | `workspaceId`, `batchId`, `itemId`, `status`, time-to-approval |
+| **Brand voice updated** | `server/routes/workspaces.ts` | `PUT /api/workspaces/:id/business-profile` | After save (~line 303) | `workspaceId`, `businessProfile` object with voice guidelines |
+| **Voice generated** | `server/routes/workspaces.ts` | `POST /api/workspaces/:id/generate-brand-voice` | After generation (~line 440) | `workspaceId`, generated voice guide with tone, style, vocabulary |
+
+### Activity Types to Add
+
+New entries needed in `server/activity-log.ts` `ActivityType` union (existing types shown for reference):
+
+```typescript
+// Existing (relevant):
+// 'insight_resolved', 'content_published', 'brief_generated',
+// 'approval_applied', 'schema_published', 'content_updated'
+
+// New:
+| 'outcome_scored'          // When a 30/60/90-day checkpoint completes
+| 'external_action_detected' // When external execution is detected
+| 'playbook_suggested'      // When a playbook pattern is discovered
+| 'learnings_updated'       // When workspace learnings are recomputed (admin-visible)
+```
+
+---
+
+## Addendum B: API Endpoints
+
+### New REST Endpoints
+
+```
+# Action tracking
+GET    /api/outcomes/:workspaceId/actions           # List tracked actions (filterable by type, status, score)
+GET    /api/outcomes/:workspaceId/actions/:actionId  # Single action with all checkpoints
+POST   /api/outcomes/:workspaceId/actions/:actionId/note  # Admin adds context note to action
+
+# Outcome data
+GET    /api/outcomes/:workspaceId/scorecard          # Aggregate win/loss stats for dashboard
+GET    /api/outcomes/:workspaceId/top-wins            # Highest-impact outcomes
+GET    /api/outcomes/:workspaceId/timeline            # Action timeline with scores
+
+# Learnings
+GET    /api/outcomes/:workspaceId/learnings           # Current workspace learnings (what AI sees)
+PATCH  /api/outcomes/:workspaceId/learnings/:id/override  # Admin overrides a specific learning
+
+# Playbooks (Phase 3)
+GET    /api/outcomes/:workspaceId/playbooks           # Discovered playbooks
+PATCH  /api/outcomes/:workspaceId/playbooks/:id       # Enable/disable auto-execution
+
+# Client-facing (public routes)
+GET    /api/public/outcomes/:workspaceId/summary      # Tiered summary (respects workspace tier)
+GET    /api/public/outcomes/:workspaceId/wins          # "We Called It" highlights
+```
+
+### Route Organization
+
+New route file: `server/routes/outcomes.ts`
+- Mounted at `/api/outcomes` and `/api/public/outcomes`
+- Follows existing pattern from `server/routes/insights.ts`
+- Admin routes use `authenticateToken` middleware
+- Public routes use `authenticateClientToken` middleware
+
+---
+
+## Addendum C: WebSocket Events + React Query Keys
+
+### New WebSocket Events
+
+Add to both `server/ws-events.ts` and `src/lib/wsEvents.ts`:
+
+```typescript
+// Convention: 'category:action' (lowercase, colon-separated)
+OUTCOME_SCORED: 'outcome:scored',               // 7/30/60/90-day checkpoint completed
+EXTERNAL_ACTION_DETECTED: 'outcome:external',   // External execution detected
+LEARNINGS_UPDATED: 'outcome:learnings_updated',  // Daily learnings recomputation
+PLAYBOOK_DISCOVERED: 'outcome:playbook',         // New playbook pattern found
+```
+
+### New React Query Keys
+
+Add to `src/lib/queryKeys.ts`:
+
+```typescript
+admin: {
+  // ... existing keys ...
+  outcomeActions: (wsId: string) => ['admin-outcome-actions', wsId] as const,
+  outcomeScorecard: (wsId: string) => ['admin-outcome-scorecard', wsId] as const,
+  outcomeTimeline: (wsId: string) => ['admin-outcome-timeline', wsId] as const,
+  outcomeLearnings: (wsId: string) => ['admin-outcome-learnings', wsId] as const,
+  outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,
+  outcomeTopWins: (wsId: string) => ['admin-outcome-top-wins', wsId] as const,
+},
+client: {
+  // ... existing keys ...
+  outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
+  outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
+}
+```
+
+### WebSocket → Query Invalidation Map
+
+```typescript
+// In useWebSocket handler:
+'outcome:scored'             → invalidate ['admin-outcome-actions', wsId],
+                               ['admin-outcome-scorecard', wsId],
+                               ['admin-outcome-timeline', wsId],
+                               ['admin-outcome-top-wins', wsId]
+'outcome:external'           → invalidate ['admin-outcome-actions', wsId],
+                               ['client-outcome-wins', wsId]
+'outcome:learnings_updated'  → invalidate ['admin-outcome-learnings', wsId]
+'outcome:playbook'           → invalidate ['admin-outcome-playbooks', wsId]
+```
+
+---
+
+## Addendum D: Feature Flags
+
+Add to `shared/types/feature-flags.ts`:
+
+```typescript
+export const FEATURE_FLAGS = {
+  // ... existing flags ...
+  'outcome-tracking': false,           // Phase 0+1: action registry, measurement, backfill
+  'outcome-dashboard': false,          // Phase 1b: admin scorecard and learnings panel
+  'outcome-ai-injection': false,       // Phase 1b: learnings injected into AI prompts
+  'outcome-client-reporting': false,   // Phase 2: client-facing outcome views
+  'outcome-external-detection': false, // Phase 2: external execution detection
+  'outcome-adaptive-pipeline': false,  // Phase 3: pipeline auto-prioritization
+  'outcome-playbooks': false,          // Phase 3: action playbook discovery
+  'outcome-predictive': false,         // Phase 3: risk scores, proactive alerts
+} as const;
+```
+
+**Env var pattern:** `FEATURE_OUTCOME_TRACKING=true` enables `'outcome-tracking'`.
+
+**Rollout order:**
+1. `outcome-tracking` — enables recording hooks and measurement cron (no UI)
+2. `outcome-dashboard` + `outcome-ai-injection` — enables admin visibility and AI improvements
+3. `outcome-client-reporting` + `outcome-external-detection` — enables client-facing features
+4. `outcome-adaptive-pipeline` + `outcome-playbooks` + `outcome-predictive` — enables Phase 3
+
+---
+
+## Addendum E: UI Placement + Navigation
+
+### Admin Dashboard
+
+**New Page:** `'outcomes'` added to `Page` type in `src/routes.ts`
+
+**Sidebar placement:** Under the Analytics group, after "Performance":
+```
+Analytics Hub
+Performance
+Content Performance
+→ Outcomes        ← NEW
+```
+
+**Components to build:**
+
+| Component | Location | Primitives Used |
+|---|---|---|
+| `OutcomeDashboard.tsx` | `src/components/admin/outcomes/` | `PageHeader`, `SectionCard`, `TabBar` |
+| `OutcomeScorecard.tsx` | Same | `StatCard`, `MetricRing` for win rate |
+| `OutcomeActionFeed.tsx` | Same | `DataList`, `StatusBadge`, `Badge` |
+| `OutcomeTopWins.tsx` | Same | `SectionCard`, `CompactStatBar` |
+| `OutcomeLearningsPanel.tsx` | Same | `SectionCard` with toggleable overrides |
+| `OutcomeTimeline.tsx` | Same | Custom timeline (follows activity log pattern) |
+
+**Client Dashboard integration:**
+
+| Component | Location | Tier Gate |
+|---|---|---|
+| `ClientOutcomeSummary.tsx` | `src/components/client/` | Free: top 3 wins. Growth+: full. Premium: with competitor context |
+| `ClientWeCalledIt.tsx` | Same | Growth+: top 1. Premium: all |
+
+**Empty States (pre-data):**
+
+| State | Message | CTA |
+|---|---|---|
+| No tracked actions yet | "Outcomes tracking is active. As you act on insights, publish content, and deploy fixes, results will appear here." | None (passive) |
+| Actions tracked but no scores yet | "12 actions are being tracked. First results will appear in 7 days." | View pending actions |
+| Backfill complete, learnings available | "Based on your history, we've already identified patterns." | View learnings |
+
+### Route Registration Checklist
+
+Per CLAUDE.md route conventions:
+1. `src/routes.ts` — add `'outcomes'` to `Page` union
+2. `src/App.tsx` — add `renderContent()` case
+3. `src/components/layout/Sidebar.tsx` — add sidebar entry under Analytics
+4. `src/components/layout/Breadcrumbs.tsx` — add to `TAB_LABELS`
+5. `src/components/CommandPalette.tsx` — add to `NAV_ITEMS`
+
+---
+
+## Addendum F: Migration SQL
+
+```sql
+-- Migration: 044_outcome_tracking.sql
+
+CREATE TABLE IF NOT EXISTS tracked_actions (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT,
+  page_url TEXT,
+  target_keyword TEXT,
+  baseline_snapshot TEXT NOT NULL DEFAULT '{}',
+  trailing_history TEXT NOT NULL DEFAULT '{}',
+  attribution TEXT NOT NULL DEFAULT 'not_acted_on',
+  measurement_window INTEGER NOT NULL DEFAULT 90,
+  measurement_complete INTEGER NOT NULL DEFAULT 0,
+  source_flag TEXT NOT NULL DEFAULT 'live',
+  baseline_confidence TEXT NOT NULL DEFAULT 'exact',
+  context TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_tracked_actions_workspace ON tracked_actions(workspace_id, action_type);
+CREATE INDEX idx_tracked_actions_attribution ON tracked_actions(workspace_id, attribution);
+CREATE INDEX idx_tracked_actions_created ON tracked_actions(workspace_id, created_at);
+CREATE INDEX idx_tracked_actions_page ON tracked_actions(workspace_id, page_url);
+CREATE INDEX idx_tracked_actions_measurement ON tracked_actions(measurement_complete, created_at);
+
+CREATE TABLE IF NOT EXISTS action_outcomes (
+  id TEXT PRIMARY KEY,
+  action_id TEXT NOT NULL,
+  checkpoint_days INTEGER NOT NULL,
+  metrics_snapshot TEXT NOT NULL DEFAULT '{}',
+  score TEXT,
+  delta_summary TEXT NOT NULL DEFAULT '{}',
+  competitor_context TEXT NOT NULL DEFAULT '{}',
+  measured_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (action_id) REFERENCES tracked_actions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_action_outcomes_action ON action_outcomes(action_id, checkpoint_days);
+CREATE UNIQUE INDEX idx_action_outcomes_unique ON action_outcomes(action_id, checkpoint_days);
+
+CREATE TABLE IF NOT EXISTS workspace_learnings (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL UNIQUE,
+  learnings TEXT NOT NULL DEFAULT '{}',
+  computed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS action_playbooks (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  trigger_condition TEXT NOT NULL,
+  action_sequence TEXT NOT NULL DEFAULT '[]',
+  historical_win_rate REAL NOT NULL DEFAULT 0,
+  sample_size INTEGER NOT NULL DEFAULT 0,
+  confidence TEXT NOT NULL DEFAULT 'low',
+  average_outcome TEXT NOT NULL DEFAULT '{}',
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_action_playbooks_workspace ON action_playbooks(workspace_id);
+```
+
+---
+
+## Addendum G: Testing Strategy
+
+### Unit Tests
+
+| Module | Test Focus |
+|---|---|
+| `server/outcome-tracking.ts` | `recordAction()` creates correct baseline snapshots per action type |
+| `server/outcome-measurement.ts` | Scoring logic: verify thresholds produce correct scores for each action type |
+| `server/outcome-measurement.ts` | Edge cases: page deleted, insufficient data, multi-action pages |
+| `server/workspace-learnings.ts` | Learnings computation: correct aggregation, confidence thresholds, formatting |
+| `server/workspace-learnings.ts` | Cache behavior: stale cache served on error, daily refresh |
+| `server/outcome-backfill.ts` | Backfill: correct source mapping, estimated vs exact baselines, skip-on-error |
+| `server/external-detection.ts` | Detection signals: schema appeared, content changed, meta updated |
+| `server/external-detection.ts` | False positive handling: two-check confirmation |
+| `server/outcome-playbooks.ts` | Pattern detection: correct sequence matching, threshold enforcement |
+
+### Integration Tests
+
+| Test | Verifies |
+|---|---|
+| Publish content → action recorded → 7-day check → scored | Full lifecycle |
+| Resolve insight → action recorded → metrics fetched → scored | Insight flow |
+| Backfill script → learnings computed → AI prompt includes learnings | Backfill → AI loop |
+| External detection → attribution changed → "We Called It" generated | External flow |
+| Multiple actions on same page → all scored, multi-action flag set | Multi-action handling |
+
+### Test Data Strategy
+
+- Tests use deterministic GSC/GA4 mock data with known outcomes
+- Backfill tests use seeded DB with known historical records
+- Scoring tests cover all 5 outcome scores for each action type
+- Empty array assertions always check `length > 0` first (per CLAUDE.md)
+
+### What NOT to Test (per CLAUDE.md)
+
+- Don't test SQLite internals or migration SQL directly
+- Don't test React Query caching behavior (trust the library)
+- Don't test WebSocket delivery (covered by existing ws tests)
