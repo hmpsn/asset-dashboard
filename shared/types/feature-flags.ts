@@ -24,6 +24,16 @@ export const FEATURE_FLAGS = {
 
   // White-label
   'white-label': false,
+
+  // Outcome Intelligence Engine
+  'outcome-tracking': false,
+  'outcome-dashboard': false,
+  'outcome-ai-injection': false,
+  'outcome-client-reporting': false,
+  'outcome-external-detection': false,
+  'outcome-adaptive-pipeline': false,
+  'outcome-playbooks': false,
+  'outcome-predictive': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;

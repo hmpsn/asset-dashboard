@@ -47,6 +47,12 @@ export const WS_EVENTS = {
 
   // Intelligence signals (keyword strategy + content pipeline)
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
+
+  // Outcome tracking
+  OUTCOME_SCORED: 'outcome:scored',
+  OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
+  OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
+  OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

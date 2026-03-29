@@ -53,6 +53,10 @@ export type ActivityType =
   | 'invoice_failed'
   | 'page_analysis'
   | 'insight_resolved'
+  | 'outcome_scored'
+  | 'external_action_detected'
+  | 'playbook_suggested'
+  | 'learnings_updated'
   | 'note';
 
 export interface ActivityEntry {
