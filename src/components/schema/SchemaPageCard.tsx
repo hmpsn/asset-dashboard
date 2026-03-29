@@ -119,7 +119,7 @@ export function SchemaPageCard({
   const isStale = staleDays !== null && staleDays > 90;
 
   return (
-    <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`}>
+    <div className={`bg-zinc-900 border overflow-hidden ${statusBorderClass(editState?.status) || (hasErrors ? 'border-amber-500/30' : 'border-zinc-800')}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           onClick={() => onToggleExpand(page.pageId)}

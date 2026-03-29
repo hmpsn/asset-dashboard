@@ -231,7 +231,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header + Strategy Health Score */}
       <div className="flex items-center justify-between">
         <div>
@@ -242,7 +242,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
       {/* Unvalidated strategy note */}
       {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
+        <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-start gap-2.5" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-amber-300/90 leading-relaxed">
             Keyword volume and difficulty metrics are currently unavailable for this strategy. The recommendations are based on AI analysis and site content.

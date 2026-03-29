@@ -44,7 +44,7 @@ export function CmsTemplatePanel({
     <>
       {/* CMS Template Panel */}
       {showCmsPanel && (
-        <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
+        <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
             <span className="text-xs font-medium text-amber-300">CMS Collection Templates</span>
             <button onClick={onClose} className="text-[11px] text-zinc-500 hover:text-zinc-400">Close</button>
@@ -74,7 +74,7 @@ export function CmsTemplatePanel({
 
       {/* CMS Template Result */}
       {cmsTemplateResult && (
-        <div className="w-full max-w-2xl bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
+        <div className="w-full max-w-2xl bg-zinc-900 border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-2.5 border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <div>

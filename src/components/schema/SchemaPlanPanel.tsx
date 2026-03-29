@@ -162,7 +162,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   // No plan yet — show generate button
   if (!plan) {
     return (
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 space-y-3">
+      <div className="bg-zinc-900/50 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-teal-400" />
           <span className="text-sm font-medium text-zinc-200">Schema Site Plan</span>
@@ -194,7 +194,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   }, {} as Record<string, number>);
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="bg-zinc-900/50 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}

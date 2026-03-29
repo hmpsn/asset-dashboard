@@ -81,7 +81,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
         const isRestored = restored === entry.id;
 
         return (
-          <div key={entry.id} className="rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden">
+          <div key={entry.id} className="border border-zinc-800 bg-zinc-950 overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center gap-2 px-3 py-2">
               <button
                 onClick={() => setExpandedId(isExpanded ? null : entry.id)}

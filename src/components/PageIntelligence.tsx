@@ -582,7 +582,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -692,7 +692,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       </div>
 
       {/* Page List */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);
@@ -915,7 +915,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Score + Intent + Difficulty */}
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Optimization</div>
                           <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}<span className="text-xs font-normal text-zinc-500">/100</span>
@@ -924,7 +924,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">{intentIcon(kw.searchIntent)}</span>
@@ -934,7 +934,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             </div>
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
                           <div className={`text-lg font-bold capitalize ${difficultyTextColor(kw.estimatedDifficulty)}`}>{kw.estimatedDifficulty}</div>
                           <div className="text-[11px] text-zinc-500 mt-0.5">Cluster: {kw.topicCluster}</div>
@@ -942,7 +942,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       </div>
 
                       {/* Primary keyword presence */}
-                      <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                      <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                         <div className="flex items-center gap-2 mb-2">
                           <Target className="w-3.5 h-3.5 text-teal-400" />
                           <span className="text-xs font-medium text-zinc-300">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
@@ -970,7 +970,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Keywords grid */}
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <Tag className="w-3.5 h-3.5 text-blue-400" />
                             <span className="text-xs font-medium text-zinc-300">Secondary Keywords</span>
@@ -981,7 +981,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             ))}
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <TrendingUp className="w-3.5 h-3.5 text-green-400" />
                             <span className="text-xs font-medium text-zinc-300">Long-Tail Keywords</span>
@@ -996,7 +996,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Competitor keywords */}
                       {kw.competitorKeywords.length > 0 && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-3.5 h-3.5 text-amber-400" />
                             <span className="text-xs font-medium text-zinc-300">Competitor Keywords</span>
@@ -1015,7 +1015,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Issues & Recommendations</span>
 
                           {kw.contentGaps.length > 0 && (
-                            <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                            <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                               <div className="flex items-center gap-2 mb-2">
                                 <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
                                 <span className="text-xs font-medium text-zinc-300">Content Gaps</span>
@@ -1032,7 +1032,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                           <div className="grid grid-cols-2 gap-3">
                             {kw.optimizationIssues.length > 0 && (
-                              <div className="bg-zinc-900 rounded-lg p-3 border border-red-500/20">
+                              <div className="bg-zinc-900 p-3 border border-red-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <AlertCircle className="w-3.5 h-3.5 text-red-400" />
                                   <span className="text-xs font-medium text-zinc-300">Issues</span>
@@ -1045,7 +1045,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               </div>
                             )}
                             {kw.recommendations.length > 0 && (
-                              <div className="bg-zinc-900 rounded-lg p-3 border border-green-500/20">
+                              <div className="bg-zinc-900 p-3 border border-green-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <Sparkles className="w-3.5 h-3.5 text-green-400" />
                                   <span className="text-xs font-medium text-zinc-300">Recommendations</span>
@@ -1063,7 +1063,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Content metrics */}
                       {cs && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-3">
                             <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
                             <span className="text-xs font-medium text-zinc-300">Content Metrics</span>

@@ -69,7 +69,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
   };
 
   return (<>
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <MessageSquare className="w-5 h-5 text-teal-400" />
@@ -184,7 +184,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
       {/* Empty state */}
       {!requestsLoading && requests.length === 0 && !showNewRequest && (
         <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <MessageSquare className="w-8 h-8 text-zinc-700" />
           </div>
           <h3 className="text-sm font-medium text-zinc-400 mb-1">Need something? We're here to help</h3>
