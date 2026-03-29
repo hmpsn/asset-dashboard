@@ -131,9 +131,22 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
     overview.createAnnotation.mutate({ date, label, category });
   };
 
+  // Visible card/line keys based on connected integrations
+  const visibleKeys = new Set(
+    ALL_CARDS
+      .filter(card => {
+        if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;
+        return overview.hasGa4;
+      })
+      .map(card => card.key),
+  );
+
+  // Prune phantom entries (e.g., 'users' when only GSC connected)
+  const effectiveActive = new Set([...activeLines].filter(k => visibleKeys.has(k)));
+
   const handleToggleLine = (key: string) => {
     setActiveLines(prev => {
-      const next = new Set(prev);
+      const next = new Set([...prev].filter(k => visibleKeys.has(k)));
       if (next.has(key)) {
         if (next.size > 1) next.delete(key); // keep at least 1 active
       } else if (next.size < 3) {
@@ -144,11 +157,8 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
   };
 
   const chartLines = ALL_OVERVIEW_LINES
-    .filter(l => {
-      if (['clicks', 'impressions', 'ctr', 'position'].includes(l.key)) return overview.hasGsc;
-      return overview.hasGa4;
-    })
-    .map(l => ({ ...l, active: activeLines.has(l.key) }));
+    .filter(l => visibleKeys.has(l.key))
+    .map(l => ({ ...l, active: effectiveActive.has(l.key) }));
 
   return (
     <div className="space-y-6">
@@ -160,10 +170,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
       {/* Metric cards — single row of up to 6 */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {ALL_CARDS
-          .filter(card => {
-            if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;
-            return overview.hasGa4;
-          })
+          .filter(card => visibleKeys.has(card.key))
           .map(card => {
             const delta = card.getDelta(overview);
             return (
@@ -174,7 +181,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
                 delta={formatDeltaLabel(delta, card.deltaSuffix ?? '%')}
                 deltaPositive={isDeltaPositive(delta)}
                 color={card.color}
-                active={activeLines.has(card.key)}
+                active={effectiveActive.has(card.key)}
                 onClick={() => handleToggleLine(card.key)}
                 invertDelta={card.invertDelta}
               />
@@ -183,20 +190,22 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
       </div>
 
       {/* Unified trend chart with toggle cards above */}
-      <SectionCard
-        title="Performance Trend"
-        titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
-      >
-        <AnnotatedTrendChart
-          data={overview.trendData}
-          lines={chartLines}
-          annotations={overview.annotations}
-          onCreateAnnotation={handleCreateAnnotation}
-          onToggleLine={handleToggleLine}
-          maxActiveLines={3}
-          height={260}
-        />
-      </SectionCard>
+      {overview.trendData.length > 0 && (
+        <SectionCard
+          title="Performance Trend"
+          titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
+        >
+          <AnnotatedTrendChart
+            data={overview.trendData}
+            lines={chartLines}
+            annotations={overview.annotations}
+            onCreateAnnotation={handleCreateAnnotation}
+            onToggleLine={handleToggleLine}
+            maxActiveLines={3}
+            height={260}
+          />
+        </SectionCard>
+      )}
 
       {/* Priority insight feed */}
       <SectionCard title="Priority Insights">
