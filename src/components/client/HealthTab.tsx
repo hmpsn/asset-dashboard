@@ -429,7 +429,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                   </div>
                   <span className="text-[11px] text-zinc-500">Top {sortedPages.length}</span>
                 </div>
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-3">
                   {sortedPages.map(page => {
                     const errs = page.issues.filter(i => i.severity === 'error').length;
                     const warns = page.issues.filter(i => i.severity === 'warning').length;
@@ -533,7 +533,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           </div>
           
           <div className="p-3">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {auditDetail.audit.siteWideIssues.slice(0, 3).map((issue, i) => {
                 const sc = SEV[issue.severity];
                 return (
