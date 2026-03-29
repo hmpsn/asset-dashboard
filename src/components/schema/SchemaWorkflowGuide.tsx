@@ -122,7 +122,7 @@ const AUTO_FEATURES = [
 
 export function SchemaWorkflowGuide() {
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-8 max-w-3xl">
       {/* Header */}
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-zinc-200">Schema Workflow Guide</h2>
@@ -136,7 +136,7 @@ export function SchemaWorkflowGuide() {
         {STEPS.map(step => {
           const Icon = step.icon;
           return (
-            <div key={step.number} className={`rounded-xl border p-4 ${step.bg}`}>
+            <div key={step.number} className={`border p-5 ${step.bg}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-start gap-3">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-900/60 flex-shrink-0 ${step.color}`}>
                   <Icon className="w-4 h-4" />
@@ -167,7 +167,7 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* What happens automatically */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
+      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-teal-400" />
           <h3 className="text-sm font-medium text-zinc-200">What Happens Automatically</h3>
@@ -189,7 +189,7 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* Content Pipeline integration */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
+      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-amber-400" />
           <h3 className="text-sm font-medium text-zinc-200">Content Pipeline Integration</h3>
@@ -218,7 +218,7 @@ export function SchemaWorkflowGuide() {
       </div>
 
       {/* Typical engagement */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
+      <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-purple-400" />
           <h3 className="text-sm font-medium text-zinc-200">Typical Client Engagement</h3>

@@ -79,7 +79,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Brand & AI Context"
         subtitle="Everything that feeds into AI content generation — voice, knowledge, and audience"
@@ -87,7 +87,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       />
 
       {/* ═══ BRAND VOICE ═══ */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <section className="overflow-hidden bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
             <MessageSquare className="w-4 h-4 text-violet-400" />
@@ -142,7 +142,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       </section>
 
       {/* ═══ KNOWLEDGE BASE ═══ */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <section className="overflow-hidden bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
             <BookOpen className="w-4 h-4 text-teal-400" />
@@ -200,7 +200,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       </section>
 
       {/* ═══ AUDIENCE PERSONAS ═══ */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+      <section className="overflow-hidden bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <Users className="w-4 h-4 text-blue-400" />

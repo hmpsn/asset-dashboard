@@ -109,7 +109,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-8">
       {/* Header with editable name */}
       <div>
         {editingName ? (
@@ -250,7 +250,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             { key: 'activity', label: 'Activity Log', desc: 'Recent workspace activity (up to 500 entries)' },
             { key: 'payments', label: 'Payments', desc: 'Payment records with amounts, status, and dates' },
           ].map(item => (
-            <div key={item.key} className="bg-zinc-900 rounded-xl border border-zinc-800 px-4 py-3 flex items-center justify-between">
+            <div key={item.key} className="bg-zinc-900 border border-zinc-800 px-4 py-3 flex items-center justify-between" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div>
                 <div className="text-xs font-medium text-zinc-200">{item.label}</div>
                 <div className="text-[11px] text-zinc-500 mt-0.5">{item.desc}</div>

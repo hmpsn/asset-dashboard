@@ -119,7 +119,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <PageHeader
         title="LLMs.txt Generator"
         subtitle={
@@ -178,7 +178,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
       )}
 
       {error && (
-        <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-500/5 border border-red-500/15">
+        <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <span className="text-xs text-red-400">{error}</span>
         </div>
       )}

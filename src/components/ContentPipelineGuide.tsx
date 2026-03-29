@@ -169,7 +169,7 @@ export function ContentPipelineGuide() {
   };
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-8 max-w-3xl">
       <div className="space-y-1.5 mb-6">
         <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-teal-400" />
@@ -181,7 +181,7 @@ export function ContentPipelineGuide() {
       </div>
 
       {/* Workflow overview */}
-      <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-teal-500/5 border border-teal-500/15 overflow-x-auto">
+      <div className="flex items-center gap-2 px-4 py-3 bg-teal-500/5 border border-teal-500/15 overflow-x-auto" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {[
           { icon: Layers, label: 'Template' },
           { icon: Grid3X3, label: 'Matrix' },

@@ -30,7 +30,7 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
     diff.newGaps.length + diff.resolvedGaps.length + diff.keywordChanges.length;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-amber-500/20 overflow-hidden">
+    <div className="bg-zinc-900 border border-amber-500/20 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"

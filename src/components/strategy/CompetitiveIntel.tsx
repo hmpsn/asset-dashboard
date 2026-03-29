@@ -181,7 +181,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -210,7 +210,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
         const compOv = comp.overview;
 
         return (
-          <div key={comp.domain} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div key={comp.domain} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <button
               onClick={() => toggleExpand(comp.domain)}
               className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800/50 transition-colors"
@@ -266,7 +266,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
 
       {/* Keyword Gaps */}
       {data.keywordGaps.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleExpand('gaps')}
             className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800/50 transition-colors"

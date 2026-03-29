@@ -205,7 +205,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
   const publishedCells = matrices.reduce((sum, m) => sum + m.cells.filter(c => c.status === 'published').length, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <PageHeader
         title="Content Planner"
         subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
@@ -233,7 +233,7 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
       />
 
       {error && (
-        <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-500/5 border border-red-500/15">
+        <div className="flex items-start gap-2 px-4 py-3 bg-red-500/5 border border-red-500/15" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
           <span className="text-xs text-red-400">{error}</span>
         </div>

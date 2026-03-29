@@ -39,7 +39,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
     <div className="space-y-8">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Latest Score</div>
           <div className="flex items-end gap-2">
             <span className={`text-3xl font-bold ${scoreColorClass(latest.siteScore)}`}>{latest.siteScore}</span>
@@ -54,11 +54,11 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
             )}
           </div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Total Audits</div>
           <div className="text-3xl font-bold text-zinc-200">{history.length}</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Error Trend</div>
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold text-red-400">{latest.errors}</span>
@@ -73,7 +73,7 @@ export function AuditHistory({ siteId, history, onRefresh }: { siteId: string; h
 
       {/* Score trend chart */}
       {history.length >= 2 && (
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="text-sm font-medium text-zinc-300 mb-3">Score Trend</div>
           <ScoreTrendChart history={history} />
         </div>
