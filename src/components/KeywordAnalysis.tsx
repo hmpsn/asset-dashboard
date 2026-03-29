@@ -4,7 +4,7 @@ import {
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
-import { scoreColorClass, scoreBgBarClass } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 
@@ -467,10 +467,15 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                               <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Words</div>
                             </div>
                             <div>
-                              <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
-                                {cs.readabilityScore}
+                              <div className="flex items-center gap-3">
+                                <MetricRing score={cs.readabilityScore} size={64} noAnimation />
+                                <div>
+                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                                    {cs.readabilityScore}
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
+                                </div>
                               </div>
-                              <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-zinc-200">{cs.headings.total}</div>
