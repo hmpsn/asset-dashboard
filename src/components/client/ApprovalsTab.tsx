@@ -83,7 +83,7 @@ export function ApprovalsTab({
         <ClipboardCheck className="w-5 h-5 text-teal-400" />
         <div>
           <h2 className="text-xl font-semibold text-zinc-100">SEO Change Approvals</h2>
-          <p className="text-sm text-zinc-500 mt-1">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
+          <p className="text-sm text-zinc-500 mt-1 leading-relaxed">Review proposed SEO changes, make edits if needed, then approve to push live.</p>
         </div>
         {pendingApprovals > 0 && (
           <span className="ml-auto px-2 py-0.5 text-[11px] font-medium rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300">

@@ -155,7 +155,7 @@ export function AnalyticsTab({
     <div className="space-y-6">
     <div>
       <h2 className="text-xl font-semibold text-zinc-100">Analytics</h2>
-      <p className="text-sm text-zinc-500 mt-1">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
+      <p className="text-sm text-zinc-500 mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
     </div>
 
     {/* GA4 Overview Cards */}

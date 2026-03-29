@@ -104,7 +104,7 @@ export function OverviewTab({
     {/* Welcome header */}
     <div className="mb-2">
       <h2 className="text-xl font-semibold text-zinc-100">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
-      <p className="text-sm text-zinc-500 mt-1">{dynamicSubtitle}</p>
+      <p className="text-sm text-zinc-500 mt-1 leading-relaxed">{dynamicSubtitle}</p>
     </div>
 
     {/* Key metrics — full-span StatCards */}
@@ -296,7 +296,7 @@ export function OverviewTab({
           <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 border border-zinc-800 p-8" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
             <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
-            <p className="text-sm text-zinc-400 mb-6">We're getting everything set up for you. Here's what we need:</p>
+            <p className="text-sm text-zinc-400 mb-6 leading-relaxed">We're getting everything set up for you. Here's what we need:</p>
             
             <div className="space-y-3 max-w-md mx-auto">
               <div className="flex items-center gap-3 text-sm">
