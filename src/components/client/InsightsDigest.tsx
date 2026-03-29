@@ -487,7 +487,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
   const hasMore = all.length > INITIAL_COUNT;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex items-center gap-2">
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
           <Sparkles className="w-3 h-3 text-teal-400" />

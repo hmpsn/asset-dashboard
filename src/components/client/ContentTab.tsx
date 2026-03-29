@@ -524,7 +524,7 @@ export function ContentTab({
                         <span className="text-[11px] text-blue-300 font-medium tracking-wider">Content Performance</span>
                         {perf.daysSincePublish > 0 && <span className="text-[11px] text-zinc-500 ml-auto">{perf.daysSincePublish}d since publish</span>}
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {gsc && <>
                           <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
                             <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-0.5"><MousePointerClick className="w-3 h-3" /> Clicks</div>
