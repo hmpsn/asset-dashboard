@@ -114,7 +114,7 @@ Phase 3: Full Copy Pipeline
 
 ```
 Sequential foundation:
-  Task 1 (Migration 026) → Task 2 (Shared Types)
+  Task 1 (Migration 041) → Task 2 (Shared Types)
 
 Parallel services (after Task 2):
   Task 3 (Brandscript Service) ∥ Task 4 (Discovery Ingestion) ∥ Task 5 (Voice Calibration) ∥ Task 6 (Brand Identity)
@@ -136,7 +136,7 @@ Sequential shared frontend (after parallel batch):
 
 | Task | Model | Reason |
 |------|-------|--------|
-| Task 1 (Migration 026) | `haiku` | Mechanical SQL from plan |
+| Task 1 (Migration 041) | `haiku` | Mechanical SQL from plan |
 | Task 2 (Shared Types) | `haiku` | Transcribing types + constants from spec |
 | Task 3 (Brandscript Service) | `sonnet` | CRUD patterns with edge-case judgment |
 | Task 4 (Discovery Ingestion) | `sonnet` | CRUD patterns with edge-case judgment |
@@ -156,7 +156,7 @@ Sequential shared frontend (after parallel batch):
 
 | File | Owner | Phase |
 |------|-------|-------|
-| `server/db/migrations/026-brandscript-engine.sql` | Task 1 | Sequential |
+| `server/db/migrations/041-brandscript-engine.sql` | Task 1 | Sequential |
 | `shared/types/brand-engine.ts` | Task 2 | Sequential |
 | `server/brandscript.ts` | Task 3 | Parallel batch 1 |
 | `server/routes/brandscript.ts` | Task 3 | Parallel batch 1 |
@@ -184,7 +184,7 @@ Sequential shared frontend (after parallel batch):
 
 ```
 Sequential foundation:
-  Task 1 (Migration 027) → Task 2 (Shared Types + content.ts extension)
+  Task 1 (Migration 042) → Task 2 (Shared Types + content.ts extension)
 
 Parallel services (after Task 2):
   Task 3 (Blueprint CRUD) ∥ Task 4 (Blueprint Generator)
@@ -205,7 +205,7 @@ Sequential shared frontend (after parallel batch):
 
 | Task | Model | Reason |
 |------|-------|--------|
-| Task 1 (Migration 027) | `haiku` | Mechanical SQL from plan |
+| Task 1 (Migration 042) | `haiku` | Mechanical SQL from plan |
 | Task 2 (Shared Types + content.ts) | `haiku` | Transcribing types from spec; re-export pattern is trivial |
 | Task 3 (Blueprint CRUD) | `sonnet` | CRUD with ID-stability logic requires judgment |
 | Task 4 (Blueprint Generator) | `opus` | AI prompt design, brand context integration |
@@ -221,7 +221,7 @@ Sequential shared frontend (after parallel batch):
 
 | File | Owner | Phase |
 |------|-------|-------|
-| `server/db/migrations/027-page-strategy-engine.sql` | Task 1 | Sequential |
+| `server/db/migrations/042-page-strategy-engine.sql` | Task 1 | Sequential |
 | `shared/types/page-strategy.ts` | Task 2 | Sequential |
 | `shared/types/content.ts` | Task 2 | Sequential (extend ContentPageType + TemplateSection) |
 | `server/page-strategy.ts` | Task 3 | Parallel batch 1 |
@@ -242,7 +242,7 @@ Sequential shared frontend (after parallel batch):
 
 ```
 Sequential foundation:
-  Task 1 (Migration 028) → Task 2 (Shared Types) → Task 3 (Export existing constants)
+  Task 1 (Migration 043) → Task 2 (Shared Types) → Task 3 (Export existing constants)
 
 Parallel services (after Task 3):
   Task 4 (Copy Review Service) ∥ Task 5 (Copy Generation Engine) ∥ Task 6 (Copy Intelligence Service) ∥ Task 7 (Copy Export Service)
@@ -264,7 +264,7 @@ Sequential integration:
 
 | Task | Model | Reason |
 |------|-------|--------|
-| Task 1 (Migration 028) | `haiku` | Mechanical SQL from plan |
+| Task 1 (Migration 043) | `haiku` | Mechanical SQL from plan |
 | Task 2 (Shared Types) | `haiku` | Transcribing types from spec |
 | Task 3 (Export constants) | `haiku` | Re-exporting existing symbols only |
 | Task 4 (Copy Review Service) | `sonnet` | Review logic with quality-flag patterns |
@@ -285,7 +285,7 @@ Sequential integration:
 
 | File | Owner | Phase |
 |------|-------|-------|
-| `server/db/migrations/028-copy-pipeline.sql` | Task 1 | Sequential |
+| `server/db/migrations/043-copy-pipeline.sql` | Task 1 | Sequential |
 | `shared/types/copy-pipeline.ts` | Task 2 | Sequential |
 | `server/content-posts-ai.ts` | Task 3 | Sequential (export only) |
 | `server/content-brief.ts` | Task 3 | Sequential (export only) |
@@ -401,10 +401,10 @@ Run this before dispatching any task batch. Takes 2 minutes; prevents 2-hour rol
 
 ### After PARALLEL batch completes (before next batch)
 
-- [ ] `git diff` reviewed — no file modified by two agents
-- [ ] `grep` for duplicate import statements in files touched by multiple agents
 - [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
 - [ ] `npx vitest run` — full test suite passing (not just new tests)
+- [ ] **Invoke `scaled-code-review` skill** — multi-agent review of the batch output. This catches cross-module issues, compliance violations, and logic bugs that single-file review misses. The skill auto-scales agent count based on change size.
+- [ ] Fix all Critical and Important issues before dispatching next batch
 
 ### Agent BLOCKED / NEEDS_CONTEXT recovery
 
@@ -424,7 +424,7 @@ When dispatching subagents for any phase, include these codebase-specific warnin
 2. **Prepared statements** — use the `stmts()` lazy cache pattern (see `server/approvals.ts`). Never store prepared statements in local variables.
 3. **JSON column parsing** — use `parseJsonSafe` / `parseJsonSafeArray` from `server/db/json-validation.ts`. Never bare `JSON.parse` on DB columns.
 4. **Import placement** — imports go at the top of the file with existing imports. Never mid-file.
-5. **ID generation** — Phase 1 uses `genId(prefix)` pattern, Phase 2+ uses `randomUUID()`. Follow whichever is established in the module you're working in.
+5. **ID generation** — All phases use `randomUUID()` from Node `crypto`. Pattern: `prefix_${randomUUID().slice(0, 8)}` (e.g., `bs_a1b2c3d4`). See plan Amendments §2.
 6. **Three-state booleans** — SQLite uses 0/1/NULL for boolean columns. Map correctly in `rowToX()` converters.
 7. **Zod field names** — when writing Zod schemas for existing TypeScript interfaces, cross-reference field names against the source interface. Zod won't flag name mismatches at compile time.
 
@@ -436,3 +436,4 @@ When dispatching subagents for any phase, include these codebase-specific warnin
 |------|--------|
 | 2026-03-28 | Initial creation — audit of 3 specs + 3 plans |
 | 2026-03-28 | Added model assignments per task (all 3 phases), pre-dispatch checklist, BLOCKED recovery guide |
+| 2026-03-28 | Migration numbers updated: 026→041, 027→042, 028→043. ID generation updated to `randomUUID()` convention. See plan Amendments section for full list of 9 pattern alignment corrections. |
