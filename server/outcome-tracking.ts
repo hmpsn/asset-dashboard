@@ -75,10 +75,6 @@ const stmts = createStmtCache(() => ({
     FROM action_outcomes
     WHERE action_id IN (SELECT id FROM tracked_actions_archive)
   `),
-  deleteArchivedOutcomes: db.prepare(`
-    DELETE FROM action_outcomes
-    WHERE action_id NOT IN (SELECT id FROM tracked_actions)
-  `),
 }));
 
 // --- Public API ---
@@ -235,8 +231,7 @@ export function archiveOldActions(): { archived: number } {
   const archiveResult = stmts().archiveOld.run();
   if (archiveResult.changes > 0) {
     stmts().archiveOldOutcomes.run();
-    stmts().deleteArchivedOutcomes.run();
-    stmts().deleteArchived.run();
+    stmts().deleteArchived.run(); // CASCADE removes action_outcomes rows
     log.info({ archived: archiveResult.changes }, 'Archived old tracked actions');
   }
   return { archived: archiveResult.changes };

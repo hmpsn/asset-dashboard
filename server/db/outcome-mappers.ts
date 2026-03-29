@@ -85,17 +85,17 @@ export interface WorkspaceLearningsRow {
 // --- Fallbacks ---
 
 const freshBaseline = (): BaselineSnapshot => ({ captured_at: new Date().toISOString() });
-const EMPTY_HISTORY: TrailingHistory = { metric: '', dataPoints: [] };
-const EMPTY_CONTEXT: ActionContext = {};
-const EMPTY_DELTA: DeltaSummary = {
+const EMPTY_HISTORY: TrailingHistory = Object.freeze({ metric: '', dataPoints: [] }) as TrailingHistory;
+const EMPTY_CONTEXT: ActionContext = Object.freeze({}) as ActionContext;
+const EMPTY_DELTA: DeltaSummary = Object.freeze({
   primary_metric: '',
   baseline_value: 0,
   current_value: 0,
   delta_absolute: 0,
   delta_percent: 0,
   direction: 'stable',
-};
-const EMPTY_PLAYBOOK_OUTCOME: PlaybookOutcome = { metric: '', avgImprovement: 0, avgDaysToResult: 0 };
+}) as DeltaSummary;
+const EMPTY_PLAYBOOK_OUTCOME: PlaybookOutcome = Object.freeze({ metric: '', avgImprovement: 0, avgDaysToResult: 0 }) as PlaybookOutcome;
 
 // --- Mappers ---
 
