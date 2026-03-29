@@ -308,7 +308,7 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
   // 11. Content plan progress
   if (props.contentPlanSummary && props.contentPlanSummary.totalCells > 0) {
     const cp = props.contentPlanSummary;
-    const pct = Math.round((cp.publishedCells / cp.totalCells) * 100);
+    const completionPct = Math.round((cp.publishedCells / cp.totalCells) * 100);
     if (cp.reviewCells > 0) {
       cards.push({
         id: 'content-plan-review',
@@ -320,16 +320,16 @@ function generateInsights(props: InsightsDigestProps): DigestInsight[] {
         priority: 1,
         sentiment: 'opportunity',
       });
-    } else if (pct < 100) {
+    } else if (completionPct < 100) {
       cards.push({
         id: 'content-plan-progress',
         icon: Layers,
-        color: pct >= 80 ? 'green' : pct >= 40 ? 'teal' : 'blue',
-        headline: `Content plan is ${pct}% complete`,
+        color: completionPct >= 80 ? 'green' : completionPct >= 40 ? 'teal' : 'blue',
+        headline: `Content plan is ${completionPct}% complete`,
         body: `${cp.publishedCells} of ${cp.totalCells} pages published across ${cp.matrixCount} plan${cp.matrixCount !== 1 ? 's' : ''}.${cp.inProgressCells > 0 ? ` ${cp.inProgressCells} currently in progress.` : ''}${cp.approvedCells > 0 ? ` ${cp.approvedCells} approved and queued.` : ''}`,
         action: { label: 'View content plan', tab: 'content-plan' },
         priority: 3,
-        sentiment: pct >= 80 ? 'positive' : 'neutral',
+        sentiment: completionPct >= 80 ? 'positive' : 'neutral',
       });
     } else {
       cards.push({
@@ -410,6 +410,7 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   conversion_attribution: { label: 'View analytics', tab: 'performance' },
   serp_opportunity: { label: 'View site health', tab: 'health' },
   anomaly_digest: { label: 'View analytics', tab: 'performance' },
+  strategy_alignment: { label: 'View strategy', tab: 'strategy' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {

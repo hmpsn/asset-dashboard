@@ -140,10 +140,11 @@ async function computeDigest(
 }
 
 function isPositiveMove(insight: AnalyticsInsight): boolean {
-  const data = insight.data as Record<string, unknown>;
-  const prev = (data.previousPosition as number) ?? 0;
-  const curr = (data.currentPosition as number) ?? 0;
-  return curr < prev && curr > 0 && (prev - curr) > 3;
+  if (insight.insightType !== 'ranking_mover') return false;
+  const data = insight.data as import('../shared/types/analytics.js').RankingMoverData;
+  return data.currentPosition < data.previousPosition
+    && data.currentPosition > 0
+    && (data.previousPosition - data.currentPosition) > 3;
 }
 
 function insightToDigestItem(insight: AnalyticsInsight): DigestItem {

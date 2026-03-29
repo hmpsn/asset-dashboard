@@ -1,4 +1,5 @@
 export { MetricRing, MetricRingSvg } from './MetricRing';
+export { MetricToggleCard } from './MetricToggleCard';
 export { StatCard, CompactStatBar } from './StatCard';
 export { PageHeader } from './PageHeader';
 export { SectionCard } from './SectionCard';

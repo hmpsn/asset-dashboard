@@ -1,14 +1,13 @@
 // src/components/AnalyticsOverview.tsx
 import { useState } from 'react';
-import { BarChart3, MousePointer, Eye, ArrowUpDown, Users, Activity, TrendingDown, Loader2, Target } from 'lucide-react';
-import { StatCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH, TabBar } from './ui';
+import { BarChart3, Loader2 } from 'lucide-react';
+import { MetricToggleCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH } from './ui';
 import { AnnotatedTrendChart, type TrendLine } from './charts/AnnotatedTrendChart';
-import { AnalyticsAnnotations } from './AnalyticsAnnotations';
-import { InsightCards } from './client/InsightCards';
 import { InsightFeed } from './insights';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
-import { useClientInsights } from '../hooks/client/useClientQueries';
+import { useToggleSet } from '../hooks/useToggleSet';
+import { fmtNum } from '../utils/formatNumbers';
 
 interface Props {
   workspaceId: string;
@@ -17,23 +16,96 @@ interface Props {
   ga4PropertyId?: string;
 }
 
-type SubTab = 'insights' | 'metrics';
-
 const ALL_OVERVIEW_LINES: TrendLine[] = [
   { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
-  { key: 'impressions', color: '#8b5cf6', yAxisId: 'left', label: 'Impressions' },
-  { key: 'users', color: '#14b8a6', yAxisId: 'right', label: 'Users' },
-  { key: 'sessions', color: '#3b82f6', yAxisId: 'right', label: 'Sessions' },
+  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' },
+  { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'Avg CTR' },
+  { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
+  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' },
+  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' },
 ];
+
+type CardKey = 'clicks' | 'impressions' | 'ctr' | 'position' | 'users' | 'sessions';
+
+interface CardConfig {
+  key: CardKey;
+  label: string;
+  color: string;
+  invertDelta?: boolean;
+  deltaSuffix?: string;  // default '%', position uses '' (raw spots)
+  formatValue: (overview: ReturnType<typeof useAnalyticsOverview>) => string;
+  getDelta: (overview: ReturnType<typeof useAnalyticsOverview>) => number | null;
+}
+
+const GSC_CARDS: CardConfig[] = [
+  {
+    key: 'clicks',
+    label: 'Clicks',
+    color: '#60a5fa',
+    formatValue: (o) => fmtNum(o.gscClicks),
+    getDelta: (o) => o.gscClicksDelta,
+  },
+  {
+    key: 'impressions',
+    label: 'Impressions',
+    color: '#22d3ee',
+    formatValue: (o) => fmtNum(o.gscImpressions),
+    getDelta: (o) => o.gscImpressionsDelta,
+  },
+  {
+    key: 'ctr',
+    label: 'Avg CTR',
+    color: '#f59e0b',
+    formatValue: (o) => o.gscImpressions > 0
+      ? `${((o.gscClicks / o.gscImpressions) * 100).toFixed(1)}%`
+      : '0.0%',
+    getDelta: (_o) => null, // CTR delta not exposed by hook; omit rather than show wrong value
+  },
+  {
+    key: 'position',
+    label: 'Avg Position',
+    color: '#ef4444',
+    invertDelta: true,
+    deltaSuffix: '',  // raw spots, not percentage
+    formatValue: (o) => o.gscPosition.toFixed(1),
+    getDelta: (o) => o.gscPositionDelta,
+  },
+];
+
+const ALL_CARDS: CardConfig[] = [
+  ...GSC_CARDS,
+  {
+    key: 'users',
+    label: 'Users',
+    color: '#14b8a6',
+    formatValue: (o) => fmtNum(o.ga4Users),
+    getDelta: (o) => o.ga4UsersDelta,
+  },
+  {
+    key: 'sessions',
+    label: 'Sessions',
+    color: '#3b82f6',
+    formatValue: (o) => fmtNum(o.ga4Sessions),
+    getDelta: (o) => o.ga4SessionsDelta,
+  },
+];
+
+function formatDeltaLabel(delta: number | null, suffix = '%'): string {
+  if (delta === null) return '—';
+  const sign = delta > 0 ? '+' : '';
+  return `${sign}${delta.toFixed(1)}${suffix}`;
+}
+
+function isDeltaPositive(delta: number | null): boolean {
+  return delta !== null && delta > 0;
+}
 
 export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [subTab, setSubTab] = useState<SubTab>('insights');
-  const [activeLines, setActiveLines] = useState<Set<string>>(new Set(['clicks', 'users']));
+  const [activeLines, handleToggleLine] = useToggleSet(['clicks', 'users']);
   const [showAllInsights, setShowAllInsights] = useState(false);
 
   const overview = useAnalyticsOverview(workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days);
-  const { data: insights = [], isLoading: insightsLoading } = useClientInsights(workspaceId, true);
   const { feed, summary, isLoading: feedLoading } = useInsightFeed(workspaceId);
 
   if (overview.isLoading) {
@@ -59,22 +131,22 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
     overview.createAnnotation.mutate({ date, label, category });
   };
 
-  const handleToggleLine = (key: string) => {
-    setActiveLines(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key); // keep at least 1 active
-      } else if (next.size < 3) {
-        next.add(key);
-      }
-      return next;
-    });
-  };
+  // Visible card/line keys based on connected integrations
+  const visibleKeys = new Set(
+    ALL_CARDS
+      .filter(card => {
+        if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;
+        return overview.hasGa4;
+      })
+      .map(card => card.key),
+  );
+
+  // Prune phantom entries (e.g., 'users' when only GSC connected)
+  const effectiveActive = new Set([...activeLines].filter(k => visibleKeys.has(k)));
 
   const chartLines = ALL_OVERVIEW_LINES
-    .filter(l => overview.hasGsc || l.yAxisId !== 'left')
-    .filter(l => overview.hasGa4 || l.yAxisId !== 'right')
-    .map(l => ({ ...l, active: activeLines.has(l.key) }));
+    .filter(l => visibleKeys.has(l.key))
+    .map(l => ({ ...l, active: effectiveActive.has(l.key) }));
 
   return (
     <div className="space-y-6">
@@ -83,134 +155,58 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
         <DateRangeSelector options={DATE_PRESETS_SEARCH} selected={days} onChange={setDays} />
       </div>
 
-      {/* Sub-tab navigation */}
-      <TabBar
-        tabs={[
-          { id: 'insights', label: 'Insights', icon: Target },
-          { id: 'metrics', label: 'Metrics', icon: BarChart3 },
-        ]}
-        active={subTab}
-        onChange={id => setSubTab(id as SubTab)}
-      />
-
-      {/* Insights sub-tab (default) */}
-      {subTab === 'insights' && (
-        <div className="space-y-6">
-          {/* Priority insight feed */}
-          <SectionCard title="Priority Insights">
-            <InsightFeed
-              feed={feed}
-              summary={summary}
-              loading={feedLoading}
-              showPills
-              limit={showAllInsights ? undefined : 5}
-              onViewAll={() => setShowAllInsights(true)}
-            />
-          </SectionCard>
-
-          {/* Unified trend chart with annotations */}
-          {overview.trendData.length > 0 && (
-            <SectionCard
-              title="Performance Trend"
-              titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
-            >
-              <AnnotatedTrendChart
-                data={overview.trendData}
-                lines={chartLines}
-                annotations={overview.annotations}
-                onCreateAnnotation={handleCreateAnnotation}
-                onToggleLine={handleToggleLine}
-                maxActiveLines={3}
-                height={260}
+      {/* Metric cards — single row of up to 6 */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {ALL_CARDS
+          .filter(card => visibleKeys.has(card.key))
+          .map(card => {
+            const delta = card.getDelta(overview);
+            return (
+              <MetricToggleCard
+                key={card.key}
+                label={card.label}
+                value={card.formatValue(overview)}
+                delta={formatDeltaLabel(delta, card.deltaSuffix ?? '%')}
+                deltaPositive={isDeltaPositive(delta)}
+                color={card.color}
+                active={effectiveActive.has(card.key)}
+                onClick={() => handleToggleLine(card.key)}
+                invertDelta={card.invertDelta}
               />
-            </SectionCard>
-          )}
+            );
+          })}
+      </div>
 
-          {/* Annotations CRUD */}
-          <AnalyticsAnnotations workspaceId={workspaceId} />
-        </div>
-      )}
-
-      {/* Metrics sub-tab */}
-      {subTab === 'metrics' && (
-        <div className="space-y-6">
-          {/* Headline metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {overview.hasGsc && (
-              <>
-                <StatCard
-                  label="Clicks"
-                  value={overview.gscClicks.toLocaleString()}
-                  delta={overview.gscClicksDelta ?? undefined}
-                  deltaLabel="%"
-                  icon={MousePointer}
-                  iconColor="#60a5fa"
-                  sub="GSC"
-                />
-                <StatCard
-                  label="Impressions"
-                  value={overview.gscImpressions.toLocaleString()}
-                  delta={overview.gscImpressionsDelta ?? undefined}
-                  deltaLabel="%"
-                  icon={Eye}
-                  iconColor="#22d3ee"
-                  sub="GSC"
-                />
-                <StatCard
-                  label="Avg Position"
-                  value={overview.gscPosition.toFixed(1)}
-                  delta={overview.gscPositionDelta ?? undefined}
-                  deltaLabel="%"
-                  invertDelta
-                  icon={ArrowUpDown}
-                  iconColor="#fbbf24"
-                  sub="GSC"
-                />
-              </>
-            )}
-            {overview.hasGa4 && (
-              <>
-                <StatCard
-                  label="Users"
-                  value={overview.ga4Users.toLocaleString()}
-                  delta={overview.ga4UsersDelta ?? undefined}
-                  deltaLabel="%"
-                  icon={Users}
-                  iconColor="#14b8a6"
-                  sub="GA4"
-                />
-                <StatCard
-                  label="Sessions"
-                  value={overview.ga4Sessions.toLocaleString()}
-                  delta={overview.ga4SessionsDelta ?? undefined}
-                  deltaLabel="%"
-                  icon={Activity}
-                  iconColor="#3b82f6"
-                  sub="GA4"
-                />
-                <StatCard
-                  label="Bounce Rate"
-                  value={`${overview.ga4BounceRate.toFixed(1)}%`}
-                  delta={overview.ga4BounceRateDelta ?? undefined}
-                  deltaLabel="%"
-                  invertDelta
-                  icon={TrendingDown}
-                  iconColor="#ef4444"
-                  sub="GA4"
-                />
-              </>
-            )}
-          </div>
-
-          {/* Intelligence InsightCards */}
-          <InsightCards
-            workspaceId={workspaceId}
-            insights={insights}
-            tier="growth"
-            loading={insightsLoading}
+      {/* Unified trend chart with toggle cards above */}
+      {overview.trendData.length > 0 && (
+        <SectionCard
+          title="Performance Trend"
+          titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
+        >
+          <AnnotatedTrendChart
+            data={overview.trendData}
+            lines={chartLines}
+            annotations={overview.annotations}
+            onCreateAnnotation={handleCreateAnnotation}
+            onToggleLine={handleToggleLine}
+            maxActiveLines={3}
+            height={260}
           />
-        </div>
+        </SectionCard>
       )}
+
+      {/* Priority insight feed */}
+      <SectionCard title="Priority Insights">
+        <InsightFeed
+          feed={feed}
+          summary={summary}
+          loading={feedLoading}
+          showPills
+          limit={showAllInsights ? undefined : 5}
+          onViewAll={() => setShowAllInsights(true)}
+        />
+      </SectionCard>
+
     </div>
   );
 }

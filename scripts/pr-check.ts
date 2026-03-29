@@ -17,7 +17,7 @@
  *   - Raw fetch() in components (use typed API client)
  */
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import path from 'path';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -31,9 +31,10 @@ function getChangedFiles(): string[] {
     const ghBase = process.env.GITHUB_BASE_REF;
     if (ghBase) {
       try {
-        const out = execSync(`git diff --name-only origin/${ghBase}...HEAD 2>/dev/null`, {
+        const out = execFileSync('git', ['diff', '--name-only', `origin/${ghBase}...HEAD`], {
           cwd: ROOT,
           encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
         }).trim();
         if (out) return out.split('\n').filter(Boolean);
       } catch {
@@ -82,6 +83,7 @@ type Check = {
   pattern: string;
   fileGlobs: string[];
   exclude?: string;
+  pathFilter?: string;  // only scan files under this path prefix
   message: string;
   severity: 'error' | 'warn';
 };
@@ -91,6 +93,7 @@ const CHECKS: Check[] = [
     name: 'Purple in client components',
     pattern: 'purple-',
     fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/components/client/',
     message: 'Purple is admin-only (Three Laws of Color). Use teal for actions, blue for data.',
     severity: 'error',
   },
@@ -183,6 +186,7 @@ for (const check of CHECKS) {
     const relevant = changedFiles.filter(f =>
       exts.some(ext => f.endsWith(ext)) &&
       (!check.exclude || !f.includes(check.exclude)) &&
+      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
       !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) &&
       !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
     );
@@ -190,8 +194,8 @@ for (const check of CHECKS) {
       matches.push(...checkFile(file, check));
     }
   } else {
-    // Full scan
-    matches = checkDirectory('.', check);
+    // Full scan — scope to pathFilter if set
+    matches = checkDirectory(check.pathFilter ?? '.', check);
   }
 
   if (matches.length === 0) {

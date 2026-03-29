@@ -109,7 +109,7 @@ export function useAnalyticsOverview(
     gscPosition: gsc.overview?.avgPosition ?? 0,
     gscClicksDelta: gsc.comparison?.changePercent.clicks ?? null,
     gscImpressionsDelta: gsc.comparison?.changePercent.impressions ?? null,
-    gscPositionDelta: gsc.comparison?.changePercent.position ?? null,
+    gscPositionDelta: gsc.comparison?.change.position ?? null,
     ga4Users: ga4.overview?.totalUsers ?? 0,
     ga4Sessions: ga4.overview?.totalSessions ?? 0,
     ga4BounceRate: ga4.overview?.bounceRate ?? 0,
