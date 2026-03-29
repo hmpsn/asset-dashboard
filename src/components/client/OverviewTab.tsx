@@ -323,9 +323,9 @@ export function OverviewTab({
       </div>
 
       {/* Right sidebar (2/5) */}
-      <div className="lg:col-span-2 space-y-4">
+      <div className="lg:col-span-2 space-y-6">
         {/* Ask the Insights Engine */}
-        <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 border border-teal-500/15 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 border border-teal-500/15 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-teal-400" />
@@ -345,7 +345,7 @@ export function OverviewTab({
             ))}
           </div>
           <div className="mt-3 pt-3 border-t border-zinc-800/50">
-            <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium mb-2">New to SEO? Ask the AI</p>
+            <p className="text-[10px] text-zinc-600 tracking-wider font-medium mb-2">New to SEO? Ask the AI</p>
             <div className="space-y-1">
               {LEARN_SEO_QUESTIONS.slice(0, 3).map((q, i) => (
                 <button
@@ -366,7 +366,7 @@ export function OverviewTab({
           const gaps = strategyData?.contentGaps?.slice(0, 2);
           if (!gaps || gaps.length === 0) return null;
           return (
-            <div className="bg-gradient-to-br from-teal-950/30 via-zinc-900 to-zinc-900 border border-teal-500/15 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div className="bg-gradient-to-br from-teal-950/30 via-zinc-900 to-zinc-900 border border-teal-500/15 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
                   <FileText className="w-3.5 h-3.5 text-teal-400" />
@@ -406,7 +406,7 @@ export function OverviewTab({
             content_updated: { color: '#2dd4bf', label: 'Content' },
           };
           return (
-            <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+            <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center gap-2 mb-3">
                 <Activity className="w-4 h-4 text-teal-400" />
                 <span className="text-xs font-medium text-zinc-300">Recent Work</span>
