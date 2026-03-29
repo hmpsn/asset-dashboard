@@ -5,7 +5,7 @@ import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
 import { createLogger } from '../logger.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
   generateRecommendations,
   loadRecommendations,
@@ -94,9 +94,9 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
         recommendationId: rec.id,
       });
     }
-    // Record for outcome tracking
+    // Record for outcome tracking — idempotent
     try {
-      recordAction({
+      if (!getActionBySource('recommendation', req.params.recId)) recordAction({
         workspaceId: req.params.workspaceId,
         actionType: 'audit_fix_applied',
         sourceType: 'recommendation',
