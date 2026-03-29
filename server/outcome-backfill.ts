@@ -4,6 +4,8 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonSafe } from './db/json-validation.js';
+import { z } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { recordAction, getActionBySource } from './outcome-tracking.js';
 
@@ -155,16 +157,12 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
   const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
   if (!row) return 0;
 
-  let recommendations: Recommendation[] = [];
-  try {
-    const parsed = JSON.parse(row.recommendations);
-    if (Array.isArray(parsed)) {
-      recommendations = parsed;
-    }
-  } catch (err) {
-    log.warn({ err, workspaceId }, 'Failed to parse recommendation_sets.recommendations — skipping workspace');
-    return 0;
-  }
+  const recommendations = parseJsonSafe(
+    row.recommendations,
+    z.array(z.unknown()),
+    [] as Recommendation[],
+    { field: 'recommendations', table: 'recommendation_sets' },
+  ) as Recommendation[];
 
   const completed = recommendations.filter(r => r.status === 'completed');
   let count = 0;

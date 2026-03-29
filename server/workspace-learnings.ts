@@ -394,15 +394,12 @@ export function computeWorkspaceLearnings(workspaceId: string): WorkspaceLearnin
   for (const action of actions) {
     if (!action.measurementComplete) continue;
     const outcomes = getOutcomesForAction(action.id);
-    for (const outcome of outcomes) {
-      if (
-        outcome.score != null &&
-        outcome.score !== 'insufficient_data' &&
-        outcome.score !== 'inconclusive'
-      ) {
-        scored.push({ action, outcome });
-        break; // Use most recent valid outcome per action (outcomes ordered by checkpoint_days ASC)
-      }
+    // outcomes ordered ASC by checkpoint_days — last valid = most recent checkpoint
+    const validOutcomes = outcomes.filter(o =>
+      o.score != null && o.score !== 'insufficient_data' && o.score !== 'inconclusive'
+    );
+    if (validOutcomes.length > 0) {
+      scored.push({ action, outcome: validOutcomes[validOutcomes.length - 1] });
     }
   }
 

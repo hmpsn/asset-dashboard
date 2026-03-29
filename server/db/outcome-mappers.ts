@@ -10,6 +10,7 @@ import {
   competitorContextSchema,
   playbookSequenceSchema,
   playbookOutcomeSchema,
+  workspaceLearningsDataSchema,
 } from '../schemas/outcome-schemas.js';
 import type {
   TrackedAction,
@@ -153,6 +154,10 @@ export function rowToActionPlaybook(row: ActionPlaybookRow): ActionPlaybook {
   };
 }
 
+// Schema for the subset of fields actually stored in the learnings JSON column
+// (workspaceId and computedAt are stored as row columns, not inside the JSON blob)
+const learningsStoredSchema = workspaceLearningsDataSchema.omit({ workspaceId: true, computedAt: true });
+
 /**
  * Maps workspace_learnings row to WorkspaceLearnings.
  * The `learnings` JSON column contains the full computed learnings object
@@ -160,24 +165,26 @@ export function rowToActionPlaybook(row: ActionPlaybookRow): ActionPlaybook {
  * with the row-level fields (workspaceId, computedAt).
  */
 export function rowToWorkspaceLearnings(row: WorkspaceLearningsRow): WorkspaceLearnings | null {
-  try {
-    const parsed = JSON.parse(row.learnings);
-    return {
-      workspaceId: row.workspace_id,
-      computedAt: row.computed_at,
-      confidence: parsed.confidence ?? 'low',
-      totalScoredActions: parsed.totalScoredActions ?? 0,
-      content: parsed.content ?? null,
-      strategy: parsed.strategy ?? null,
-      technical: parsed.technical ?? null,
-      overall: parsed.overall ?? {
-        totalWinRate: 0,
-        strongWinRate: 0,
-        topActionTypes: [],
-        recentTrend: 'stable',
-      },
-    };
-  } catch {
-    return null;
-  }
+  const parsed = parseJsonSafe(
+    row.learnings,
+    learningsStoredSchema.partial(),
+    null,
+    { field: 'learnings', table: 'workspace_learnings' },
+  );
+  if (!parsed) return null;
+  return {
+    workspaceId: row.workspace_id,
+    computedAt: row.computed_at,
+    confidence: parsed.confidence ?? 'low',
+    totalScoredActions: parsed.totalScoredActions ?? 0,
+    content: parsed.content ?? null,
+    strategy: parsed.strategy ?? null,
+    technical: parsed.technical ?? null,
+    overall: parsed.overall ?? {
+      totalWinRate: 0,
+      strongWinRate: 0,
+      topActionTypes: [],
+      recentTrend: 'stable',
+    },
+  };
 }

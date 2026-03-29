@@ -295,16 +295,17 @@ router.get('/api/outcomes/:workspaceId/actions/:actionId', requireWorkspaceAcces
 router.post(
   '/api/outcomes/:workspaceId/actions/:actionId/note',
   requireWorkspaceAccess('workspaceId'),
-  validate(z.object({ note: z.string().max(1000) })),
+  validate(z.object({ note: z.string().min(1).max(1000) })),
   (req, res) => {
     try {
       const action = getAction(req.params.actionId);
       if (!action || action.workspaceId !== req.params.workspaceId) {
         return res.status(404).json({ error: 'Action not found' });
       }
+      const existingNotes = action.context.notes ?? '';
       const updatedContext = {
         ...action.context,
-        notes: req.body.note,
+        notes: existingNotes ? `${existingNotes}\n${req.body.note}` : req.body.note,
       };
       updateActionContext(req.params.actionId, updatedContext);
       res.json({ success: true });

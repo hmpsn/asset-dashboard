@@ -47,6 +47,12 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import type { Workspace } from '../workspaces.js';
+import type { ScrapedPage } from '../web-scraper.js';
+import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
+
+const log = createLogger('workspaces');
 
 // Workspaces
 router.get('/api/workspaces', (_req, res) => {
@@ -217,13 +223,6 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
 });
 
 // --- Shared: scrape website pages for AI analysis ---
-import type { Workspace } from '../workspaces.js';
-import type { ScrapedPage } from '../web-scraper.js';
-import { createLogger } from '../logger.js';
-import { recordAction } from '../outcome-tracking.js';
-
-const log = createLogger('workspaces');
-
 async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPage[]; pagesSummary: string }> {
   const { scrapeUrls } = await import('../web-scraper.js');
 
