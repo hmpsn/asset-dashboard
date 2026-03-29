@@ -245,24 +245,26 @@ router.get('/api/webflow/internal-links/:siteId', requireWorkspaceAccessFromQuer
     const result = await analyzeInternalLinks(req.params.siteId, workspaceId, token);
     saveInternalLinks(req.params.siteId, result);
 
-    try {
-      for (const suggestion of result.suggestions.slice(0, 5)) {
-        const sourceId = suggestion.toPage ?? null;
-        if (!sourceId) continue;
-        if (getActionBySource('internal_link', sourceId)) continue;
-        recordAction({
-          workspaceId: workspaceId ?? req.params.siteId,
-          actionType: 'internal_link_added',
-          sourceType: 'internal_link',
-          sourceId,
-          pageUrl: sourceId,
-          targetKeyword: null,
-          baselineSnapshot: { captured_at: new Date().toISOString() },
-          attribution: 'not_acted_on',
-        });
+    if (workspaceId) {
+      try {
+        for (const suggestion of result.suggestions.slice(0, 5)) {
+          const sourceId = suggestion.toPage ?? null;
+          if (!sourceId) continue;
+          if (getActionBySource('internal_link', sourceId)) continue;
+          recordAction({
+            workspaceId,
+            actionType: 'internal_link_added',
+            sourceType: 'internal_link',
+            sourceId,
+            pageUrl: sourceId,
+            targetKeyword: null,
+            baselineSnapshot: { captured_at: new Date().toISOString() },
+            attribution: 'not_acted_on',
+          });
+        }
+      } catch (err) {
+        log.warn({ err }, 'Failed to record outcome actions for internal link suggestions');
       }
-    } catch (err) {
-      log.warn({ err }, 'Failed to record outcome actions for internal link suggestions');
     }
 
     res.json(result);
