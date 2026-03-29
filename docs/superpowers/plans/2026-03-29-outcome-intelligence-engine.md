@@ -68,6 +68,345 @@ npx tsc --noEmit --skipLibCheck && npx vite build
 
 Both must pass before committing. If `tsc` fails, fix the type error before moving on.
 
+### Bug Prevention Measures
+
+These are mandatory practices to reduce implementation bugs. Past projects suffered from significant bug chasing — these measures exist to prevent that.
+
+#### 1. Pre-Flight Validation Script
+
+Before starting any task batch, run this verification script to confirm assumptions about the codebase:
+
+```bash
+# Run before Task 4 (core store)
+echo "=== Pre-Flight: Verifying codebase assumptions ==="
+
+# Verify parseJsonSafe signature accepts object context
+grep -n "function parseJsonSafe" server/db/json-validation.ts
+
+# Verify db is a default export
+grep -n "export default" server/db/index.ts
+
+# Verify createStmtCache exists and its import path
+grep -rn "export.*createStmtCache" server/db/
+
+# Verify getSafe signature (no params arg)
+grep -n "export.*function getSafe" src/api/client.ts
+
+# Verify post signature
+grep -n "export.*function post" src/api/client.ts
+
+# Verify broadcastToWorkspace import path
+grep -rn "export.*broadcastToWorkspace" server/
+
+# Verify WS_EVENTS location
+grep -rn "export const WS_EVENTS" server/ws-events.ts
+
+# Verify FeatureFlag component exists
+ls src/components/ui/FeatureFlag.tsx
+
+# Verify isFeatureEnabled or feature flag env var pattern
+grep -rn "isFeatureEnabled\|FEATURE_.*=true" server/
+
+echo "=== Pre-Flight Complete ==="
+```
+
+**When to run:** Before Tasks 4, 7a, 12, 14a, 15, 16, 18. Each task should verify assumptions about modules it imports.
+
+#### 2. Round-Trip Test for Every Mapper
+
+Every `rowToX()` mapper in Task 4 must have a round-trip test that:
+1. Constructs a valid row object
+2. Passes it through the mapper
+3. Asserts every field is correctly transformed (camelCase, parsed JSON, boolean conversion)
+4. Tests with minimal/empty JSON columns to verify fallbacks work
+
+Add these in Task 5. Pattern:
+
+```typescript
+it('round-trips TrackedActionRow through rowToTrackedAction', () => {
+  const row: TrackedActionRow = {
+    id: 'test-1', workspace_id: 'ws-1', action_type: 'content_published',
+    source_type: 'content-post', source_id: 'p-1', page_url: '/blog/test',
+    target_keyword: 'test kw', baseline_snapshot: '{"captured_at":"2026-01-01"}',
+    trailing_history: '{"metric":"clicks","dataPoints":[]}',
+    attribution: 'platform_executed', measurement_window: 90,
+    measurement_complete: 0, source_flag: 'live', baseline_confidence: 'exact',
+    context: '{}', created_at: '2026-01-01', updated_at: '2026-01-01',
+  };
+  const result = rowToTrackedAction(row);
+  expect(result.workspaceId).toBe('ws-1');
+  expect(result.actionType).toBe('content_published');
+  expect(result.measurementComplete).toBe(false);
+  expect(result.baselineSnapshot.captured_at).toBe('2026-01-01');
+});
+
+it('handles empty JSON columns gracefully', () => {
+  const row: TrackedActionRow = {
+    ...minimalRow, baseline_snapshot: '{}', trailing_history: '{}', context: '{}',
+  };
+  const result = rowToTrackedAction(row);
+  expect(result.baselineSnapshot).toBeDefined();
+  expect(result.context).toEqual({});
+});
+```
+
+#### 3. Golden Path Integration Test
+
+After Task 8 (all hooks wired), add an integration test that exercises the full happy path:
+
+```typescript
+// tests/integration/outcome-tracking-golden-path.test.ts
+it('records action → measures outcome → updates learnings', () => {
+  // 1. Record an action
+  const action = recordAction({ workspaceId: 'ws-test', actionType: 'content_published', ... });
+  expect(action.id).toBeDefined();
+  expect(action.measurementComplete).toBe(false);
+
+  // 2. Score the action
+  const outcome = recordOutcome({ actionId: action.id, checkpointDays: 7, ... });
+  expect(outcome.score).toBeDefined();
+
+  // 3. Verify action still queryable
+  const fetched = getAction(action.id);
+  expect(fetched).not.toBeNull();
+
+  // 4. Verify learnings can compute without error
+  const learnings = computeWorkspaceLearnings('ws-test');
+  expect(learnings).toBeDefined();
+});
+```
+
+Add as a new step in Task 10 (measurement tests).
+
+#### 4. Integration Checkpoint After Every Parallel Batch
+
+After every parallel batch completes, the orchestrator MUST run:
+
+```bash
+# Full compilation check
+npx tsc --noEmit --skipLibCheck
+
+# Full build check
+npx vite build
+
+# Full test suite (not just new tests)
+npx vitest run
+
+# Duplicate import check
+grep -r "import.*outcome-tracking" server/routes/ | sort | uniq -d
+
+# Verify no mid-file imports
+for f in $(git diff --name-only HEAD~3 -- 'server/routes/*.ts'); do
+  awk '/^import/{last_import=NR} NR>last_import && /^import/{print FILENAME":"NR": mid-file import!"; exit 1}' "$f"
+done
+```
+
+**This is not optional.** Do not start the next batch until all checks pass.
+
+#### 5. Runtime Import Verification
+
+Each task's first step should verify that all imports resolve before writing logic:
+
+```typescript
+// At the top of any new module, after all imports:
+// Verify critical imports are defined at module load time
+if (typeof recordAction !== 'function') throw new Error('recordAction not imported');
+```
+
+This catches missing exports and wrong paths at startup, not at first request. Remove these guards after Task 26 (integration testing confirms everything works).
+
+#### 6. Negative Test Cases
+
+For every major function, include at least one negative/edge case test:
+
+- `recordAction` with missing required fields → should throw or return error
+- `recordOutcome` for non-existent action → should throw
+- `scoreAction` with null baseline → should return `insufficient_data`
+- `computeWorkspaceLearnings` with zero outcomes → should return low confidence
+- `getAction` with invalid ID → should return null
+- `formatLearningsForPrompt` with null learnings → should return empty string
+- Recording hook in route handler when `recordAction` throws → should NOT block the route response
+
+Add these to the relevant test tasks (5, 10, 13).
+
+#### 7. Split Task 4 Read/Write Verification
+
+Task 4 is the most critical task. After implementing it, verify read-write consistency:
+
+```typescript
+// Add to Task 5 tests
+it('write-then-read consistency for recordAction', () => {
+  const params = { workspaceId: 'ws-1', actionType: 'content_published' as const, ... };
+  const written = recordAction(params);
+  const read = getAction(written.id);
+  expect(read).not.toBeNull();
+  // Verify every field matches
+  expect(read!.workspaceId).toBe(written.workspaceId);
+  expect(read!.actionType).toBe(written.actionType);
+  expect(read!.attribution).toBe(written.attribution);
+  expect(read!.measurementComplete).toBe(written.measurementComplete);
+});
+```
+
+#### 8. Explicit Response Shapes in API Routes
+
+Every endpoint in Task 15 must have an explicit TypeScript return type annotation, not rely on inference:
+
+```typescript
+// GOOD: explicit shape
+router.get('/:workspaceId/scorecard', async (req, res): Promise<void> => {
+  const scorecard: OutcomeScorecard = computeScorecard(req.params.workspaceId);
+  res.json(scorecard);
+});
+
+// BAD: implicit shape — frontend/backend can drift
+router.get('/:workspaceId/scorecard', async (req, res) => {
+  res.json(computeScorecard(req.params.workspaceId));
+});
+```
+
+#### 9. Bug Prevention Checklist (Run Before Each Commit)
+
+Each task's commit step should include this mini-checklist:
+
+```bash
+# Before committing, verify:
+# 1. All imports are at top of file (not mid-file)
+grep -n "^import" <file> | tail -1  # should be before first non-import line
+
+# 2. No bare JSON.parse on DB columns
+grep -n "JSON.parse" <file>  # should be zero for DB-facing code
+
+# 3. No `import { db }` (must be default import)
+grep -n "import { db }" <file>  # should be zero
+
+# 4. No .js extensions in src/ imports
+grep -n "from '.*\.js'" src/<file>  # should be zero for frontend files
+
+# 5. Zod field names match TypeScript interface
+# Manual check: compare schema field names against shared/types/outcome-tracking.ts
+```
+
+#### 10. Fire-and-Forget Hook Safety
+
+All recording hooks in route handlers (Tasks 7a-8) MUST:
+1. Use `setImmediate()` to avoid blocking the route response
+2. Wrap in try/catch that logs but never throws
+3. Never `await` the recording — it's fire-and-forget
+
+Pattern:
+```typescript
+// CORRECT: fire-and-forget, non-blocking
+setImmediate(() => {
+  try {
+    recordAction({ workspaceId, actionType: 'content_published', ... });
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'Failed to record outcome action');
+  }
+});
+
+// WRONG: blocks route response
+await recordAction({ workspaceId, actionType: 'content_published', ... });
+```
+
+#### 11. Feature Flag Regression Test
+
+After Task 6 (feature flags), add a test verifying all 8 flags are registered:
+
+```typescript
+it('all outcome feature flags are defined', () => {
+  const requiredFlags = [
+    'outcome-tracking', 'outcome-dashboard', 'outcome-ai-injection',
+    'outcome-client-reporting', 'outcome-external-detection',
+    'outcome-adaptive-pipeline', 'outcome-playbooks', 'outcome-predictive',
+  ];
+  // Verify flags exist in the shared type (compile-time check)
+  // and in the runtime configuration
+  for (const flag of requiredFlags) {
+    expect(typeof flag).toBe('string'); // compile-time: TS will error if not in FeatureFlag type
+  }
+});
+```
+
+#### 12. Backfill Idempotency
+
+Task 11 (backfill) MUST be idempotent — running it twice should not create duplicate tracked actions. The backfill function must:
+
+1. Check for existing tracked actions with the same `sourceType + sourceId` before inserting
+2. Use `INSERT OR IGNORE` or explicit existence checks
+3. Include a test that runs backfill twice and asserts count doesn't change
+
+```typescript
+it('backfill is idempotent', () => {
+  const count1 = backfillWorkspace('ws-test').backfilledCount;
+  const count2 = backfillWorkspace('ws-test').backfilledCount;
+  expect(count2).toBe(0); // second run should find nothing new
+});
+```
+
+#### 13. Assumption Verification Script
+
+Create a verification script that can be run at any point to validate plan assumptions still hold:
+
+```bash
+#!/bin/bash
+# scripts/verify-outcome-assumptions.sh
+# Run this before starting implementation and after each major batch
+
+echo "Verifying outcome tracking implementation assumptions..."
+ERRORS=0
+
+# 1. Migration number 041 is not taken
+if [ -f "server/db/migrations/041-*.sql" ]; then
+  echo "WARNING: Migration 041 already exists — pick a different number"
+  ERRORS=$((ERRORS+1))
+fi
+
+# 2. shared/types/outcome-tracking.ts doesn't exist yet
+if [ -f "shared/types/outcome-tracking.ts" ]; then
+  echo "INFO: outcome-tracking.ts already exists — Task 1 may be done"
+fi
+
+# 3. No existing 'tracked_actions' table references
+if grep -rq "tracked_actions" server/db/migrations/*.sql 2>/dev/null; then
+  echo "WARNING: tracked_actions already referenced in migrations"
+  ERRORS=$((ERRORS+1))
+fi
+
+# 4. Verify scoring_config column not already on workspaces
+if grep -q "scoring_config" server/db/migrations/*.sql 2>/dev/null; then
+  echo "WARNING: scoring_config column may already exist"
+  ERRORS=$((ERRORS+1))
+fi
+
+# 5. Verify WS_EVENTS doesn't already have OUTCOME_ events
+if grep -q "OUTCOME_" server/ws-events.ts 2>/dev/null; then
+  echo "INFO: OUTCOME events already in ws-events.ts — Task 6 may be done"
+fi
+
+echo "Verification complete. Errors: $ERRORS"
+exit $ERRORS
+```
+
+**Run before Task 1.** If migration 041 is taken, increment to 042.
+
+#### 14. API Response Shape Contracts
+
+Every endpoint in Task 15 must match the types defined in `shared/types/outcome-tracking.ts` and consumed by `src/api/outcomes.ts`. After Task 15, verify contract alignment:
+
+```bash
+# Extract endpoint response types from routes file
+grep -n "res.json" server/routes/outcomes.ts
+
+# Extract API client expected types
+grep -n "getSafe\|post" src/api/outcomes.ts
+
+# Manual verification: each endpoint's res.json() call returns data
+# matching the type the frontend expects
+```
+
+If a frontend API method expects `OutcomeScorecard` but the endpoint returns `{ scorecard: OutcomeScorecard }`, that's a bug. The shapes must match exactly.
+
 ---
 
 ## File Structure
@@ -78,7 +417,7 @@ Both must pass before committing. If `tsc` fails, fix the type error before movi
 shared/types/outcome-tracking.ts          — All shared types (TrackedAction, ActionOutcome, etc.)
 server/schemas/outcome-schemas.ts         — Zod schemas for all JSON columns
 server/db/migrations/041-outcome-tracking.sql — All tables + indexes + archive tables
-server/db/outcome-mappers.ts              — rowToTrackedAction, rowToActionOutcome, rowToActionPlaybook
+server/db/outcome-mappers.ts              — rowToTrackedAction, rowToActionOutcome, rowToActionPlaybook, rowToWorkspaceLearnings
 server/outcome-tracking.ts                — Core: recordAction(), getActions(), baseline snapshot assembly
 server/outcome-measurement.ts             — Scoring engine: measureOutcome(), scoreAction()
 server/outcome-backfill.ts                — One-time backfill script
@@ -674,6 +1013,11 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     primary_metric: 'ctr',
     thresholds: { strong_win: 15, win: 5, neutral_band: 5 },
   },
+  brief_created: {
+    primary_metric: 'content_produced',
+    thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
+    // Binary: did the brief lead to published content? 1 = yes
+  },
   voice_calibrated: {
     primary_metric: 'voice_score',
     thresholds: { strong_win: 85, win: 70, neutral_band: 10 },
@@ -883,6 +1227,7 @@ import type {
   TrackedAction,
   ActionOutcome,
   ActionPlaybook,
+  WorkspaceLearnings,
   BaselineSnapshot,
   TrailingHistory,
   ActionContext,
@@ -940,6 +1285,13 @@ export interface ActionPlaybookRow {
   enabled: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface WorkspaceLearningsRow {
+  id: string;
+  workspace_id: string;
+  learnings: string;
+  computed_at: string;
 }
 
 // --- Fallbacks ---
@@ -1012,6 +1364,30 @@ export function rowToActionPlaybook(row: ActionPlaybookRow): ActionPlaybook {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * Maps workspace_learnings row to WorkspaceLearnings.
+ * The `learnings` JSON column contains the full computed learnings object
+ * (content, strategy, technical, overall fields). We parse it and merge
+ * with the row-level fields (workspaceId, computedAt).
+ */
+export function rowToWorkspaceLearnings(row: WorkspaceLearningsRow): WorkspaceLearnings | null {
+  try {
+    const parsed = JSON.parse(row.learnings);
+    return {
+      workspaceId: row.workspace_id,
+      computedAt: row.computed_at,
+      confidence: parsed.confidence ?? 'low',
+      totalScoredActions: parsed.totalScoredActions ?? 0,
+      content: parsed.content ?? null,
+      strategy: parsed.strategy ?? null,
+      technical: parsed.technical ?? null,
+      overall: parsed.overall ?? { winRate: 0, strongWinRate: 0, avgDaysToResult: 0 },
+    };
+  } catch {
+    return null;
+  }
 }
 ```
 
@@ -2083,6 +2459,12 @@ const learningsBlock = learnings ? formatLearningsForPrompt(learnings, 'strategy
 **Model:** sonnet
 **Files you OWN:** `server/monthly-digest.ts`
 
+**IMPORTANT:** Before modifying this file, add these imports at the top:
+```typescript
+import { getWorkspaceLearnings } from './workspace-learnings.js';
+import { getRecentActions } from './outcome-tracking.js';
+```
+
 - [ ] **Step 1:** Import and add outcomes section to digest generation.
 
 In `generateMonthlyDigest`, fetch learnings and scored outcomes for the month:
@@ -2160,10 +2542,20 @@ git commit -m "feat(outcome-tracking): add REST API endpoints for outcomes"
 
 Follow the pattern from existing API modules (e.g., `src/api/analytics.ts`). **IMPORTANT:** There is no `postSafe` — use `post` from `src/api/client.ts`. And `getSafe` does NOT accept query params — build URL strings manually.
 
+**IMPORTANT:** Frontend files in `src/` do NOT use `.js` extensions on imports. Only server files do.
+
 ```typescript
 // src/api/outcomes.ts
-import { getSafe, post } from './client.js';
-import type { TrackedAction, OutcomeScorecard, TopWin, WorkspaceLearnings, WorkspaceOutcomeOverview, WeCalledItEntry } from '../../shared/types/outcome-tracking.js';
+import { getSafe, post } from './client';
+import type {
+  TrackedAction, ActionOutcome, OutcomeScorecard, TopWin,
+  WorkspaceLearnings, WorkspaceOutcomeOverview, WeCalledItEntry,
+} from '../../shared/types/outcome-tracking';
+
+/** Action with its outcomes — returned by the single-action endpoint */
+export interface ActionWithOutcomes extends TrackedAction {
+  outcomes: ActionOutcome[];
+}
 
 export const outcomesApi = {
   getActions: (wsId: string, type?: string, score?: string) => {
@@ -2176,11 +2568,13 @@ export const outcomesApi = {
     return getSafe<TrackedAction[]>(url, []);
   },
   getAction: (wsId: string, actionId: string) =>
-    getSafe<TrackedAction | null>(`/api/outcomes/${wsId}/actions/${actionId}`, null),
+    getSafe<ActionWithOutcomes | null>(`/api/outcomes/${wsId}/actions/${actionId}`, null),
   getScorecard: (wsId: string) =>
     getSafe<OutcomeScorecard | null>(`/api/outcomes/${wsId}/scorecard`, null),
   getTopWins: (wsId: string) =>
     getSafe<TopWin[]>(`/api/outcomes/${wsId}/top-wins`, []),
+  getTimeline: (wsId: string) =>
+    getSafe<TrackedAction[]>(`/api/outcomes/${wsId}/timeline`, []),
   getLearnings: (wsId: string) =>
     getSafe<WorkspaceLearnings | null>(`/api/outcomes/${wsId}/learnings`, null),
   getOverview: () =>
@@ -2428,7 +2822,7 @@ This task wires the measurement, learnings, external detection, and archival cro
 
 import { createLogger } from './logger.js';
 import { measurePendingOutcomes } from './outcome-measurement.js';
-import { computeWorkspaceLearnings } from './workspace-learnings.js';
+import { recomputeAllWorkspaceLearnings } from './workspace-learnings.js';
 import { detectExternalExecutions } from './external-detection.js';
 import { archiveOldActions } from './outcome-tracking.js';
 
@@ -2452,10 +2846,9 @@ export function startOutcomeCrons() {
     );
   }, DAILY_MS);
 
-  // Recompute workspace learnings — daily
+  // Recompute workspace learnings — daily (null = all workspaces)
   learningsInterval = setInterval(() => {
-    // computeWorkspaceLearnings runs for all workspaces
-    computeWorkspaceLearnings().catch(err =>
+    recomputeAllWorkspaceLearnings().catch(err =>
       log.error({ err }, 'Failed to compute workspace learnings')
     );
   }, DAILY_MS);
