@@ -24,6 +24,7 @@ import { runSalesAudit } from '../sales-audit.js';
 import { getAllGscPages } from '../search-console.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
 
 const log = createLogger('webflow-analysis');
 
@@ -243,6 +244,24 @@ router.get('/api/webflow/internal-links/:siteId', requireWorkspaceAccessFromQuer
     const workspaceId = req.query.workspaceId as string | undefined;
     const result = await analyzeInternalLinks(req.params.siteId, workspaceId, token);
     saveInternalLinks(req.params.siteId, result);
+
+    try {
+      for (const suggestion of result.suggestions.slice(0, 5)) {
+        recordAction({
+          workspaceId: workspaceId ?? req.params.siteId,
+          actionType: 'internal_link_added',
+          sourceType: 'internal_link',
+          sourceId: null,
+          pageUrl: suggestion.toPage ?? null,
+          targetKeyword: null,
+          baselineSnapshot: { captured_at: new Date().toISOString() },
+          attribution: 'not_acted_on',
+        });
+      }
+    } catch (err) {
+      log.warn({ err }, 'Failed to record outcome actions for internal link suggestions');
+    }
+
     res.json(result);
   } catch (err) {
     log.error({ err: err }, 'Internal links error');

@@ -44,6 +44,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
+import { recordAction } from '../outcome-tracking.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -1754,6 +1755,21 @@ Rules:
     updateWorkspace(ws.id, { keywordStrategy });
     clearSeoContextCache(ws.id);
     incrementUsage(ws.id, 'strategy_generations');
+
+    try {
+      recordAction({
+        workspaceId: ws.id,
+        actionType: 'strategy_keyword_added',
+        sourceType: 'strategy',
+        sourceId: ws.id,
+        pageUrl: null,
+        targetKeyword: null,
+        baselineSnapshot: { captured_at: new Date().toISOString() },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err }, 'Failed to record outcome action for strategy generation');
+    }
 
     // Auto-seed rank tracking with strategy keywords (deduplicates internally)
     try {

@@ -4,9 +4,12 @@
 import { Router } from 'express';
 import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } from '../content-decay.js';
 import { getWorkspace } from '../workspaces.js';
-
 import { requireWorkspaceAccess } from '../auth.js';
+import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
+
 const router = Router();
+const log = createLogger('content-decay');
 
 // Run decay analysis for a workspace
 router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('workspaceId'), async (req, res) => {
@@ -37,6 +40,24 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
     if (!existing) return res.status(404).json({ error: 'Run decay analysis first' });
     const maxPages = req.body.maxPages || 5;
     const updated = await generateBatchRecommendations(ws, existing, maxPages);
+
+    try {
+      for (const rec of updated.decayingPages?.slice(0, 3) ?? []) {
+        recordAction({
+          workspaceId: req.params.workspaceId,
+          actionType: 'content_refreshed',
+          sourceType: 'content_decay',
+          sourceId: null,
+          pageUrl: rec.page ?? null,
+          targetKeyword: null,
+          baselineSnapshot: { captured_at: new Date().toISOString() },
+          attribution: 'not_acted_on',
+        });
+      }
+    } catch (err) {
+      log.warn({ err }, 'Failed to record outcome actions for decay recommendations');
+    }
+
     res.json(updated);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

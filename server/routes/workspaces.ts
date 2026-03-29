@@ -220,6 +220,7 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
 
 const log = createLogger('workspaces');
 
@@ -435,6 +436,21 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
       workspaceId: ws.id,
       timeoutMs: 90_000,
     });
+
+    try {
+      recordAction({
+        workspaceId: req.params.id,
+        actionType: 'voice_calibrated',
+        sourceType: 'brand_voice',
+        sourceId: req.params.id,
+        pageUrl: null,
+        targetKeyword: null,
+        baselineSnapshot: { captured_at: new Date().toISOString() },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err }, 'Failed to record outcome action for brand voice update');
+    }
 
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {
