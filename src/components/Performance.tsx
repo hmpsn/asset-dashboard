@@ -10,7 +10,7 @@ export function Performance({ siteId }: { siteId: string }) {
   const [tab, setTab] = useState<PerfTab>('weight');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <TabBar
         tabs={[
           { id: 'weight', label: 'Page Weight', icon: BarChart3 },

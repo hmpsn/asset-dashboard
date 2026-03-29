@@ -98,7 +98,7 @@ export function RevenueDashboard() {
     : data.currentMonthRevenue > 0 ? 100 : 0;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-200">Revenue Analytics</h2>
         {!confirmPurge ? (

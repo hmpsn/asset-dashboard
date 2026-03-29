@@ -136,7 +136,7 @@ export function SalesReport() {
   // Input / history view
   if (view === 'input' || !report) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-8 p-6">
         {/* URL Input */}
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
@@ -233,7 +233,7 @@ export function SalesReport() {
   const r = report;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-8 p-6">
       {/* Back + Actions bar */}
       <div className="flex items-center justify-between">
         <button
