@@ -1112,3 +1112,616 @@ CREATE INDEX idx_action_playbooks_workspace ON action_playbooks(workspace_id);
 - Don't test SQLite internals or migration SQL directly
 - Don't test React Query caching behavior (trust the library)
 - Don't test WebSocket delivery (covered by existing ws tests)
+
+---
+
+## Addendum H: Zod Schemas for JSON Columns
+
+All JSON columns must be validated with Zod schemas via `parseJsonSafe`/`parseJsonSafeArray` from `server/db/json-validation.ts`. Never bare `JSON.parse`.
+
+New file: `server/schemas/outcome-schemas.ts`
+
+```typescript
+import { z } from '../middleware/validate.js';
+
+// --- Baseline Snapshot ---
+
+export const baselineSnapshotSchema = z.object({
+  captured_at: z.string(),
+
+  // GSC metrics (present when page_url exists)
+  position: z.number().optional(),
+  clicks: z.number().optional(),
+  impressions: z.number().optional(),
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
+  ctr: z.number().optional(),
+
+  // GA4 metrics (present when GA4 connected)
+  sessions: z.number().optional(),
+  /** Already a percentage. */
+  bounce_rate: z.number().optional(),
+  /** Already a percentage. */
+  engagement_rate: z.number().optional(),
+  conversions: z.number().optional(),
+
+  // Audit metrics
+  page_health_score: z.number().min(0).max(100).optional(),
+
+  // Schema metrics
+  rich_result_eligible: z.boolean().optional(),
+  rich_result_appearing: z.boolean().optional(),
+
+  // Voice metrics
+  voice_score: z.number().min(0).max(100).optional(),
+});
+
+export type BaselineSnapshot = z.infer<typeof baselineSnapshotSchema>;
+
+// --- Trailing History ---
+
+export const trailingDataPointSchema = z.object({
+  date: z.string(),
+  value: z.number(),
+});
+
+export const trailingHistorySchema = z.object({
+  metric: z.string(),
+  dataPoints: z.array(trailingDataPointSchema),
+});
+
+export type TrailingHistory = z.infer<typeof trailingHistorySchema>;
+
+// --- Delta Summary ---
+
+export const deltaSummarySchema = z.object({
+  primary_metric: z.string(),
+  baseline_value: z.number(),
+  current_value: z.number(),
+  delta_absolute: z.number(),
+  delta_percent: z.number(),
+  direction: z.enum(['improved', 'declined', 'stable']),
+});
+
+export type DeltaSummary = z.infer<typeof deltaSummarySchema>;
+
+// --- Action Context ---
+
+export const competitorMovementSchema = z.object({
+  domain: z.string(),
+  keyword: z.string(),
+  positionChange: z.number(),
+  newContent: z.boolean().optional(),
+});
+
+export const competitorContextSchema = z.object({
+  competitorMovement: z.array(competitorMovementSchema).optional(),
+});
+
+export const actionContextSchema = z.object({
+  competitorActivity: competitorContextSchema.optional(),
+  seasonalTag: z.object({
+    month: z.number().min(1).max(12),
+    quarter: z.number().min(1).max(4),
+  }).optional(),
+  relatedActions: z.array(z.string()).optional(),
+  notes: z.string().optional(),
+});
+
+export type ActionContext = z.infer<typeof actionContextSchema>;
+
+// --- Playbook Action Sequence ---
+
+export const playbookStepSchema = z.object({
+  actionType: z.enum([
+    'insight_acted_on', 'content_published', 'brief_created',
+    'strategy_keyword_added', 'schema_deployed', 'audit_fix_applied',
+    'content_refreshed', 'internal_link_added', 'meta_updated',
+    'voice_calibrated',
+  ]),
+  timing: z.string(),
+  detail: z.string(),
+});
+
+export const playbookSequenceSchema = z.array(playbookStepSchema);
+
+// --- Playbook Average Outcome ---
+
+export const playbookOutcomeSchema = z.object({
+  metric: z.string(),
+  avgImprovement: z.number(),
+  avgDaysToResult: z.number(),
+});
+
+// --- Workspace Learnings (cached JSON) ---
+
+export const contentLearningsSchema = z.object({
+  winRateByFormat: z.record(z.string(), z.number()),
+  avgDaysToPage1: z.number().nullable(),
+  bestPerformingTopics: z.array(z.string()),
+  optimalWordCount: z.object({ min: z.number(), max: z.number() }).nullable(),
+  refreshRecoveryRate: z.number(),
+  voiceScoreCorrelation: z.number().nullable(),
+});
+
+export const strategyLearningsSchema = z.object({
+  winRateByDifficultyRange: z.record(z.string(), z.number()),
+  avgTimeToRank: z.record(z.string(), z.number()),
+  bestIntentTypes: z.array(z.string()),
+  keywordVolumeSweetSpot: z.object({ min: z.number(), max: z.number() }).nullable(),
+});
+
+export const technicalLearningsSchema = z.object({
+  winRateByFixType: z.record(z.string(), z.number()),
+  schemaTypesWithRichResults: z.array(z.string()),
+  avgHealthScoreImprovement: z.number(),
+  internalLinkEffectiveness: z.number(),
+});
+
+export const overallLearningsSchema = z.object({
+  totalWinRate: z.number(),
+  strongWinRate: z.number(),
+  topActionTypes: z.array(z.object({
+    type: z.string(),
+    winRate: z.number(),
+    count: z.number(),
+  })),
+  recentTrend: z.enum(['improving', 'stable', 'declining']),
+});
+
+export const workspaceLearningsSchema = z.object({
+  workspaceId: z.string(),
+  computedAt: z.string(),
+  confidence: z.enum(['high', 'medium', 'low']),
+  totalScoredActions: z.number(),
+  content: contentLearningsSchema.nullable(),
+  strategy: strategyLearningsSchema.nullable(),
+  technical: technicalLearningsSchema.nullable(),
+  overall: overallLearningsSchema,
+});
+
+export type WorkspaceLearnings = z.infer<typeof workspaceLearningsSchema>;
+
+// --- Scoring Thresholds (configurable per workspace) ---
+
+export const scoringThresholdSchema = z.object({
+  strong_win: z.number(),
+  win: z.number(),
+  neutral_band: z.number(),  // +/- this value = neutral
+  // Anything outside neutral that isn't a win = loss
+});
+
+export const scoringConfigSchema = z.object({
+  content_published: z.object({
+    primary_metric: z.literal('position'),
+    thresholds: scoringThresholdSchema,
+  }),
+  insight_acted_on: z.object({
+    primary_metric: z.literal('varies'),
+    thresholds: scoringThresholdSchema,
+  }),
+  strategy_keyword_added: z.object({
+    primary_metric: z.literal('position'),
+    thresholds: scoringThresholdSchema,
+  }),
+  schema_deployed: z.object({
+    primary_metric: z.literal('ctr'),
+    thresholds: scoringThresholdSchema,
+  }),
+  audit_fix_applied: z.object({
+    primary_metric: z.literal('page_health_score'),
+    thresholds: scoringThresholdSchema,
+  }),
+  content_refreshed: z.object({
+    primary_metric: z.literal('click_recovery'),
+    thresholds: scoringThresholdSchema,
+  }),
+  internal_link_added: z.object({
+    primary_metric: z.literal('target_improvement'),
+    thresholds: scoringThresholdSchema,
+  }),
+  meta_updated: z.object({
+    primary_metric: z.literal('ctr'),
+    thresholds: scoringThresholdSchema,
+  }),
+  voice_calibrated: z.object({
+    primary_metric: z.literal('voice_score'),
+    thresholds: scoringThresholdSchema,
+  }),
+});
+
+export type ScoringConfig = z.infer<typeof scoringConfigSchema>;
+```
+
+### Default Scoring Thresholds
+
+Stored as a constant, overridable per workspace:
+
+```typescript
+// server/outcome-scoring-defaults.ts
+
+export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
+  content_published: {
+    primary_metric: 'position',
+    thresholds: { strong_win: 10, win: 3, neutral_band: 1 },
+    // strong_win: reached top 10; win: improved 3+; neutral: within +/- 1
+  },
+  insight_acted_on: {
+    primary_metric: 'varies',
+    thresholds: { strong_win: 30, win: 15, neutral_band: 10 },
+    // Percentage improvement thresholds
+  },
+  strategy_keyword_added: {
+    primary_metric: 'position',
+    thresholds: { strong_win: 10, win: 5, neutral_band: 3 },
+    // strong_win: reached top 10; win: improved 5+; neutral: within +/- 3
+  },
+  schema_deployed: {
+    primary_metric: 'ctr',
+    thresholds: { strong_win: 20, win: 10, neutral_band: 5 },
+    // Percentage CTR change thresholds
+  },
+  audit_fix_applied: {
+    primary_metric: 'page_health_score',
+    thresholds: { strong_win: 15, win: 5, neutral_band: 3 },
+    // Absolute health score change
+  },
+  content_refreshed: {
+    primary_metric: 'click_recovery',
+    thresholds: { strong_win: 80, win: 40, neutral_band: 20 },
+    // Percentage of peak traffic recovered
+  },
+  internal_link_added: {
+    primary_metric: 'target_improvement',
+    thresholds: { strong_win: 20, win: 10, neutral_band: 5 },
+    // Percentage improvement in target page metrics
+  },
+  meta_updated: {
+    primary_metric: 'ctr',
+    thresholds: { strong_win: 15, win: 5, neutral_band: 5 },
+    // Percentage CTR change
+  },
+  voice_calibrated: {
+    primary_metric: 'voice_score',
+    thresholds: { strong_win: 85, win: 70, neutral_band: 10 },
+    // Absolute voice score (strong_win/win are minimums, not deltas)
+  },
+};
+```
+
+---
+
+## Addendum I: Row Mappers
+
+Per CLAUDE.md: every table requires a `rowToX()` mapper. DB rows use snake_case; TypeScript uses camelCase.
+
+New file: `server/db/outcome-mappers.ts`
+
+```typescript
+import { parseJsonSafe } from './json-validation.js';
+import {
+  baselineSnapshotSchema,
+  trailingHistorySchema,
+  actionContextSchema,
+  deltaSummarySchema,
+  competitorContextSchema,
+  playbookSequenceSchema,
+  playbookOutcomeSchema,
+  scoringConfigSchema,
+} from '../schemas/outcome-schemas.js';
+import type {
+  TrackedAction,
+  ActionOutcome,
+  ActionPlaybook,
+} from '../../shared/types/outcome-tracking.js';
+
+interface TrackedActionRow {
+  id: string;
+  workspace_id: string;
+  action_type: string;
+  source_type: string;
+  source_id: string | null;
+  page_url: string | null;
+  target_keyword: string | null;
+  baseline_snapshot: string;
+  trailing_history: string;
+  attribution: string;
+  measurement_window: number;
+  measurement_complete: number;
+  source_flag: string;
+  baseline_confidence: string;
+  context: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ActionOutcomeRow {
+  id: string;
+  action_id: string;
+  checkpoint_days: number;
+  metrics_snapshot: string;
+  score: string | null;
+  delta_summary: string;
+  competitor_context: string;
+  measured_at: string;
+}
+
+interface ActionPlaybookRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  trigger_condition: string;
+  action_sequence: string;
+  historical_win_rate: number;
+  sample_size: number;
+  confidence: string;
+  average_outcome: string;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+const EMPTY_BASELINE = { captured_at: new Date().toISOString() };
+const EMPTY_HISTORY = { metric: '', dataPoints: [] };
+const EMPTY_CONTEXT = {};
+const EMPTY_DELTA = {
+  primary_metric: '',
+  baseline_value: 0,
+  current_value: 0,
+  delta_absolute: 0,
+  delta_percent: 0,
+  direction: 'stable' as const,
+};
+
+export function rowToTrackedAction(row: TrackedActionRow): TrackedAction {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    actionType: row.action_type as TrackedAction['actionType'],
+    sourceType: row.source_type,
+    sourceId: row.source_id,
+    pageUrl: row.page_url,
+    targetKeyword: row.target_keyword,
+    baselineSnapshot: parseJsonSafe(row.baseline_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, 'tracked_actions.baseline_snapshot'),
+    trailingHistory: parseJsonSafe(row.trailing_history, trailingHistorySchema, EMPTY_HISTORY, 'tracked_actions.trailing_history'),
+    attribution: row.attribution as TrackedAction['attribution'],
+    measurementWindow: row.measurement_window,
+    measurementComplete: row.measurement_complete === 1,
+    sourceFlag: row.source_flag as TrackedAction['sourceFlag'],
+    baselineConfidence: row.baseline_confidence as TrackedAction['baselineConfidence'],
+    context: parseJsonSafe(row.context, actionContextSchema, EMPTY_CONTEXT, 'tracked_actions.context'),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
+  return {
+    id: row.id,
+    actionId: row.action_id,
+    checkpointDays: row.checkpoint_days as ActionOutcome['checkpointDays'],
+    metricsSnapshot: parseJsonSafe(row.metrics_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, 'action_outcomes.metrics_snapshot'),
+    score: row.score as ActionOutcome['score'],
+    deltaSummary: parseJsonSafe(row.delta_summary, deltaSummarySchema, EMPTY_DELTA, 'action_outcomes.delta_summary'),
+    competitorContext: parseJsonSafe(row.competitor_context, competitorContextSchema, null, 'action_outcomes.competitor_context'),
+    measuredAt: row.measured_at,
+  };
+}
+
+export function rowToActionPlaybook(row: ActionPlaybookRow): ActionPlaybook {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    triggerCondition: row.trigger_condition,
+    actionSequence: parseJsonSafe(row.action_sequence, playbookSequenceSchema, [], 'action_playbooks.action_sequence'),
+    historicalWinRate: row.historical_win_rate,
+    sampleSize: row.sample_size,
+    confidence: row.confidence as ActionPlaybook['confidence'],
+    averageOutcome: parseJsonSafe(row.average_outcome, playbookOutcomeSchema, { metric: '', avgImprovement: 0, avgDaysToResult: 0 }, 'action_playbooks.average_outcome'),
+    enabled: row.enabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+```
+
+---
+
+## Addendum J: Data Retention Policy
+
+### Retention Rules
+
+| Data | Retention | Rationale |
+|---|---|---|
+| `tracked_actions` (active) | Indefinite while measurement window is open | Needed for scoring |
+| `tracked_actions` (measurement_complete) | **24 months** after final checkpoint | Long enough for seasonal analysis and trend detection |
+| `action_outcomes` | Same as parent `tracked_actions` | Tied to action lifecycle |
+| `workspace_learnings` | Always current (single row per workspace, overwritten daily) | Cache, not historical |
+| `action_playbooks` | Indefinite (admin-managed) | Playbooks are curated artifacts |
+| Backfilled actions (`source_flag = 'backfill'`) | Same 24-month rule from final checkpoint | No special treatment |
+
+### Archival Process
+
+- **Monthly cron job:** `archive-old-outcomes`
+  - Moves `tracked_actions` + `action_outcomes` older than 24 months to `tracked_actions_archive` / `action_outcomes_archive` tables (same schema)
+  - Archive tables are read-only — queryable for historical analysis but not included in learnings computation
+  - Admin can export archived data as CSV from the Outcomes dashboard
+
+### Archive Migration SQL
+
+```sql
+-- Added to migration file alongside main tables
+
+CREATE TABLE IF NOT EXISTS tracked_actions_archive (
+  -- Identical schema to tracked_actions
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT,
+  page_url TEXT,
+  target_keyword TEXT,
+  baseline_snapshot TEXT NOT NULL DEFAULT '{}',
+  trailing_history TEXT NOT NULL DEFAULT '{}',
+  attribution TEXT NOT NULL DEFAULT 'not_acted_on',
+  measurement_window INTEGER NOT NULL DEFAULT 90,
+  measurement_complete INTEGER NOT NULL DEFAULT 0,
+  source_flag TEXT NOT NULL DEFAULT 'live',
+  baseline_confidence TEXT NOT NULL DEFAULT 'exact',
+  context TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  archived_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS action_outcomes_archive (
+  -- Identical schema to action_outcomes
+  id TEXT PRIMARY KEY,
+  action_id TEXT NOT NULL,
+  checkpoint_days INTEGER NOT NULL,
+  metrics_snapshot TEXT NOT NULL DEFAULT '{}',
+  score TEXT,
+  delta_summary TEXT NOT NULL DEFAULT '{}',
+  competitor_context TEXT NOT NULL DEFAULT '{}',
+  measured_at TEXT NOT NULL,
+  archived_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_tracked_actions_archive_workspace ON tracked_actions_archive(workspace_id);
+CREATE INDEX idx_action_outcomes_archive_action ON action_outcomes_archive(action_id);
+```
+
+### Why 24 Months
+
+- Covers two full seasonal cycles (needed for seasonal normalization in Section 7c)
+- Long enough for playbook pattern detection across multiple occurrences
+- Short enough to prevent stale data from skewing learnings
+- At ~800 outcome rows/workspace/month, 24 months = ~19,200 rows per workspace. SQLite handles this easily.
+
+---
+
+## Addendum K: Multi-Workspace Admin Overview
+
+### Purpose
+
+Joshua manages multiple client workspaces. A global admin view shows outcome health across all clients without switching workspaces.
+
+### Location
+
+**New global tab:** `'outcomes-overview'` added to `GLOBAL_TABS` in `src/routes.ts`
+
+**Sidebar placement:** Under global admin section (alongside Settings, Roadmap, AI Usage):
+```
+Settings
+Roadmap
+AI Usage
+Revenue
+→ Outcomes Overview    ← NEW
+```
+
+### Overview Dashboard
+
+**Workspace Scorecard Table:**
+
+| Column | Description |
+|---|---|
+| Workspace name | Client name with link to workspace outcomes tab |
+| Win rate | Overall win rate (color-coded: green >70%, amber 40-70%, red <40%) |
+| Trend | Arrow: improving / stable / declining over last 3 months |
+| Active actions | Count of actions currently being measured |
+| Scored (30d) | Actions that reached a checkpoint in the last 30 days |
+| Top win | Best outcome this month (one-liner) |
+| Attention needed | Flag if: win rate declining, no actions in 30 days, or "We Called It" opportunity |
+
+**Aggregate Stats (top of page):**
+- Total win rate across all workspaces
+- Total actions tracked / scored this month
+- "We Called It" detections this month
+- Best-performing workspace this month
+
+**Insights Panel:**
+- "Client X hasn't had any new actions in 45 days — consider reaching out"
+- "Client Y's win rate jumped from 52% to 78% — good candidate for case study"
+- "Schema deployments have 85% win rate across all clients — consider making this a standard offering"
+
+### API Endpoint
+
+```
+GET /api/outcomes/overview    # Admin-only, returns all workspace scorecards
+```
+
+Uses existing `authenticateToken` (admin JWT). Queries `tracked_actions` + `action_outcomes` grouped by `workspace_id`. Cached for 1 hour.
+
+### Components
+
+| Component | Primitives |
+|---|---|
+| `OutcomesOverview.tsx` in `src/components/admin/outcomes/` | `PageHeader`, `SectionCard`, `DataList` |
+| `WorkspaceOutcomeRow.tsx` | `StatusBadge`, `Badge`, inline sparkline for trend |
+
+---
+
+## Addendum L: Scoring Calibration
+
+### Purpose
+
+Different workspaces operate in different competitive environments. A local dentist and a SaaS company have very different expectations for what "winning" looks like. Scoring thresholds should be tunable.
+
+### Default vs Custom Thresholds
+
+Every workspace starts with `DEFAULT_SCORING_CONFIG` (defined in Addendum H). Admins can override per workspace.
+
+### Storage
+
+New column on `workspaces` table:
+
+```sql
+-- Migration addition
+ALTER TABLE workspaces ADD COLUMN scoring_config TEXT DEFAULT NULL;
+```
+
+- `NULL` = use defaults
+- When set, validated against `scoringConfigSchema` (partial overrides allowed — only override the action types you want to change, inherit defaults for the rest)
+
+### Partial Override Schema
+
+```typescript
+// Partial override — only specify what you want to change
+export const scoringConfigOverrideSchema = scoringConfigSchema.partial();
+
+// Resolution: merge default + override
+export function resolveScoringConfig(
+  override: Partial<ScoringConfig> | null
+): ScoringConfig {
+  if (!override) return DEFAULT_SCORING_CONFIG;
+  return {
+    ...DEFAULT_SCORING_CONFIG,
+    ...override,
+  };
+}
+```
+
+### UI
+
+- Located in workspace settings (not the outcomes dashboard)
+- Simple form: for each action type, show current thresholds with edit capability
+- "Reset to defaults" button
+- Preview: "With these thresholds, X of your past outcomes would be reclassified"
+- Changes are prospective only — existing scores are not retroactively changed (but admin can trigger a one-time rescore)
+
+### API
+
+```
+GET    /api/workspaces/:id/scoring-config     # Returns resolved config (defaults + overrides)
+PATCH  /api/workspaces/:id/scoring-config     # Update overrides
+DELETE /api/workspaces/:id/scoring-config     # Reset to defaults
+POST   /api/workspaces/:id/scoring-config/rescore  # One-time rescore of all outcomes
+```
+
+### Auto-Calibration (Phase 3 Enhancement)
+
+Once the system has enough data (50+ scored outcomes), it could suggest threshold adjustments:
+
+> "Based on your outcome data, the current 'win' threshold of 3 positions for content_published catches 80% of meaningful improvements. Consider lowering to 2 to capture more incremental wins."
+
+This is a suggestion only — never auto-changes thresholds without admin approval.
