@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
@@ -195,20 +195,29 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Metric Cards ── */}
       <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
         {audit ? (
-          <StatCard
-            label="Site Health"
-            value={audit.siteScore}
-            icon={Shield}
-            iconColor={audit.siteScore >= 80 ? '#4ade80' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171'}
-            delta={scoreDelta ?? undefined}
-            deltaLabel=" pts"
-            sub={`${audit.errors} errors · ${audit.warnings} warnings`}
+          <div
+            className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col items-center justify-center cursor-pointer hover:border-zinc-700 transition-colors"
+            style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-            size="hero"
-            staggerIndex={0}
-          />
+          >
+            <MetricRing score={audit.siteScore} size={80} />
+            <p className="text-xs text-zinc-400 font-medium mt-2">Site Health</p>
+            {scoreDelta != null && (
+              <p className={`text-[11px] mt-0.5 ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
+              </p>
+            )}
+            <p className="text-[11px] text-zinc-600 mt-0.5">{audit.errors} errors · {audit.warnings} warnings</p>
+          </div>
         ) : (
-          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} size="hero" staggerIndex={0} />
+          <div
+            className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col items-center justify-center"
+            style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
+          >
+            <MetricRing score={0} size={80} noAnimation />
+            <p className="text-xs text-zinc-500 mt-2">Site Health</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5">No audit yet</p>
+          </div>
         )}
 
         {searchData ? (
