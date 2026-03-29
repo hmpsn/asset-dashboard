@@ -14,17 +14,35 @@ interface StatCardProps {
   invertDelta?: boolean;
   onClick?: () => void;
   className?: string;
+  /** Display size: 'default' for standard, 'hero' for top-of-page impact metrics */
+  size?: 'default' | 'hero';
+  /** Stagger animation index (0-based). Each index adds 60ms delay. */
+  staggerIndex?: number;
 }
 
 export function StatCard({
   label, value, icon: Icon, iconColor, valueColor, sub,
   delta, deltaLabel, invertDelta, onClick, className,
+  size = 'default', staggerIndex,
 }: StatCardProps) {
   const Tag = onClick ? 'button' : 'div';
+  const isHero = size === 'hero';
+
+  const staggerStyle = staggerIndex !== undefined
+    ? { animationDelay: `${staggerIndex * 60}ms` }
+    : undefined;
+
+  const baseStyle = {
+    borderRadius: '6px 12px 6px 12px',
+    animation: staggerIndex !== undefined ? 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both' : undefined,
+    ...staggerStyle,
+  };
+
   return (
     <Tag
       onClick={onClick}
-      className={`bg-zinc-900 rounded-xl p-4 border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
+      className={`bg-zinc-900 ${isHero ? 'p-4' : 'p-3'} border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
+      style={baseStyle}
     >
       <div className="flex items-center gap-1.5 mb-2">
         {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}
@@ -32,13 +50,13 @@ export function StatCard({
       </div>
       <div className="flex items-baseline gap-1.5">
         <div
-          className={`text-2xl font-bold leading-none ${valueColor ?? 'text-zinc-100'}`}
+          className={`${isHero ? 'text-4xl' : 'text-2xl'} font-bold leading-none ${valueColor ?? 'text-zinc-100'}`}
           style={valueColor?.startsWith('#') ? { color: valueColor } : undefined}
         >
           {value}
         </div>
         {delta !== undefined && delta !== 0 && (
-          <span className={`text-[11px] font-medium ${(invertDelta ? delta < 0 : delta > 0) ? 'text-green-400' : 'text-red-400'}`}>
+          <span className={`text-[11px] font-medium ${(invertDelta ? delta < 0 : delta > 0) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
             {delta > 0 ? '+' : ''}{delta}{deltaLabel ?? ''}
           </span>
         )}
@@ -59,7 +77,10 @@ interface CompactStatProps {
 
 export function CompactStatBar({ items, className }: { items: CompactStatProps[]; className?: string }) {
   return (
-    <div className={`bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}>
+    <div
+      className={`bg-zinc-900 border border-zinc-800 px-5 py-3 flex items-center justify-between flex-wrap gap-3 ${className ?? ''}`}
+      style={{ borderRadius: '6px 12px 6px 12px' }}
+    >
       {items.map(m => (
         <div key={m.label} className="flex items-center gap-2">
           <span className="text-xs text-zinc-500 uppercase tracking-wider">{m.label}</span>
