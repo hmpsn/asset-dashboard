@@ -127,7 +127,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <MetricToggleCard
           label="Users"
           value={formatNumber(overview.totalUsers)}
-          delta={comparison ? `${comparison.changePercent.users > 0 ? '+' : ''}${comparison.changePercent.users}%` : '—'}
+          delta={comparison ? `${comparison.changePercent.users > 0 ? '+' : ''}${comparison.changePercent.users.toFixed(1)}%` : '—'}
           deltaPositive={(comparison?.changePercent.users ?? 0) >= 0}
           color="#14b8a6"
           active={activeTrafficLines.has('users')}
@@ -140,7 +140,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <MetricToggleCard
           label="Sessions"
           value={formatNumber(overview.totalSessions)}
-          delta={comparison ? `${comparison.changePercent.sessions > 0 ? '+' : ''}${comparison.changePercent.sessions}%` : '—'}
+          delta={comparison ? `${comparison.changePercent.sessions > 0 ? '+' : ''}${comparison.changePercent.sessions.toFixed(1)}%` : '—'}
           deltaPositive={(comparison?.changePercent.sessions ?? 0) >= 0}
           color="#3b82f6"
           active={activeTrafficLines.has('sessions')}
@@ -153,7 +153,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <MetricToggleCard
           label="Bounce Rate"
           value={`${overview.bounceRate}%`}
-          delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate}%` : '—'}
+          delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate.toFixed(1)}pt` : '—'}
           deltaPositive={(comparison?.change.bounceRate ?? 0) >= 0}
           invertDelta
           color="#f97316"

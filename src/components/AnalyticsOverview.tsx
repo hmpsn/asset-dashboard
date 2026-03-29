@@ -32,6 +32,7 @@ interface CardConfig {
   label: string;
   color: string;
   invertDelta?: boolean;
+  deltaSuffix?: string;  // default '%', position uses '' (raw spots)
   formatValue: (overview: ReturnType<typeof useAnalyticsOverview>) => string;
   getDelta: (overview: ReturnType<typeof useAnalyticsOverview>) => number | null;
 }
@@ -65,6 +66,7 @@ const GSC_CARDS: CardConfig[] = [
     label: 'Avg Position',
     color: '#ef4444',
     invertDelta: true,
+    deltaSuffix: '',  // raw spots, not percentage
     formatValue: (o) => o.gscPosition.toFixed(1),
     getDelta: (o) => o.gscPositionDelta,
   },
@@ -88,10 +90,10 @@ const ALL_CARDS: CardConfig[] = [
   },
 ];
 
-function formatDeltaLabel(delta: number | null): string {
+function formatDeltaLabel(delta: number | null, suffix = '%'): string {
   if (delta === null) return '—';
   const sign = delta > 0 ? '+' : '';
-  return `${sign}${delta.toFixed(1)}%`;
+  return `${sign}${delta.toFixed(1)}${suffix}`;
 }
 
 function isDeltaPositive(delta: number | null): boolean {
@@ -169,7 +171,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
                 key={card.key}
                 label={card.label}
                 value={card.formatValue(overview)}
-                delta={formatDeltaLabel(delta)}
+                delta={formatDeltaLabel(delta, card.deltaSuffix ?? '%')}
                 deltaPositive={isDeltaPositive(delta)}
                 color={card.color}
                 active={activeLines.has(card.key)}
