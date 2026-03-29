@@ -20,6 +20,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
+import { ScannerReveal } from './components/ui/ScannerReveal';
 import { Clipboard, Globe } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -378,30 +379,32 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           </div>
         )}
         <main className="flex-1 overflow-auto p-6">
-          {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
-          <div className="max-w-5xl mx-auto">
-            {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
-              <button
-                onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
-                className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
-                style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
-              >
-                <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                  <Clipboard className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <div className="text-left flex-1">
-                  <span className="text-xs font-medium text-amber-300">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
-                  <span className="text-[11px] text-zinc-500 ml-2">from client portal</span>
-                </div>
-                <span className="text-[11px] text-zinc-500">View →</span>
-              </button>
-            )}
-            <ErrorBoundary label={tab}>
-              <Suspense fallback={<ChunkFallback />}>
-                {renderContent()}
-              </Suspense>
-            </ErrorBoundary>
-          </div>
+          <ScannerReveal>
+            {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
+            <div className="max-w-5xl mx-auto">
+              {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
+                <button
+                  onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
+                  className="w-full mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-amber-400/40"
+                  style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.2)' }}
+                >
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                    <Clipboard className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <span className="text-xs font-medium text-amber-300">{pendingContentRequests} new content {pendingContentRequests === 1 ? 'request' : 'requests'}</span>
+                    <span className="text-[11px] text-zinc-500 ml-2">from client portal</span>
+                  </div>
+                  <span className="text-[11px] text-zinc-500">View →</span>
+                </button>
+              )}
+              <ErrorBoundary label={tab}>
+                <Suspense fallback={<ChunkFallback />}>
+                  {renderContent()}
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+          </ScannerReveal>
         </main>
         <StatusBar
           hasOpenAIKey={health.hasOpenAIKey}
