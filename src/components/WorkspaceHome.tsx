@@ -157,7 +157,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
@@ -205,9 +205,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             sub={`${audit.errors} errors · ${audit.warnings} warnings`}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
             size="hero"
+            staggerIndex={0}
           />
         ) : (
-          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} size="hero" />
+          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} size="hero" staggerIndex={0} />
         )}
 
         {searchData ? (
@@ -219,9 +220,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
             size="hero"
+            staggerIndex={1}
           />
         ) : (
-          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" />
+          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" staggerIndex={1} />
         )}
 
         {ga4Data ? (
@@ -235,9 +237,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
             size="hero"
+            staggerIndex={2}
           />
         ) : (
-          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" />
+          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" staggerIndex={2} />
         )}
 
         <StatCard
@@ -248,6 +251,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
           size="hero"
+          staggerIndex={3}
         />
 
         {roiData && (
@@ -259,6 +263,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
             onClick={() => navigate(`/client/${workspaceId}/roi`)}
             size="hero"
+            staggerIndex={4}
           />
         )}
 
@@ -271,6 +276,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk` : `${contentDecayData.warning} pages declining`}
             onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
             size="hero"
+            staggerIndex={5}
           />
         )}
 
@@ -285,6 +291,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
               onClick={() => navigate(adminPath(workspaceId, 'content'))}
               size="hero"
+              staggerIndex={6}
             />
           );
         })()}
