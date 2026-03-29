@@ -9,7 +9,6 @@ import { StatCard } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
-import { InsightNarrative } from './InsightNarrative';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
@@ -266,12 +265,7 @@ export function OverviewTab({
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       {/* Left column (3/5) — Insights feed */}
       <div className="lg:col-span-3 space-y-8">
-        {/* Server-computed insight narratives */}
-        <ErrorBoundary label="Insight Narrative">
-          <InsightNarrative workspaceId={workspaceId} />
-        </ErrorBoundary>
-
-        {/* AI-generated insights digest */}
+        {/* Unified insights feed (server-computed + locally-generated) */}
         <ErrorBoundary label="Insights Digest">
           <InsightsDigest
             overview={overview}

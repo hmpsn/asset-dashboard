@@ -191,16 +191,23 @@ async function generateDigestSummary(
   ].filter(Boolean).join('\n');
 
   try {
-    const prompt = `Write a 2-3 sentence monthly performance summary for a website client.
-Month: ${month}
-Wins: ${wins.length} improvements identified
-Issues addressed: ${issues.length} optimizations completed
-Pages optimized: ${metrics.pagesOptimized}
-ROI highlights: ${roi.length} measurable improvements
+    const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
+
+Data for ${month}:
+- ${wins.length} performance win${wins.length === 1 ? '' : 's'} identified
+- ${issues.length} optimization${issues.length === 1 ? '' : 's'} completed
+- ${metrics.pagesOptimized} page${metrics.pagesOptimized === 1 ? '' : 's'} optimized
+- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}
 ${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
 
-Tone: Professional, outcome-focused, reassuring. No jargon. Use "we" language.
-Only mention specific numbers if they are notable (>10% change). Keep it concise.`;
+Voice rules (follow exactly):
+- Lead with the most interesting metric or outcome — never start with "In [Month]" or "This month"
+- Positive and energetic, like a teammate sharing good news. Not corporate or templated.
+- Use "your site" or "your pages", not "the site" or "the website"
+- Mention ONE specific number if it's notable (>10% change). Don't list multiple stats.
+- If metrics are flat or slightly negative, frame around what's being learned or where attention is focused — without making promises or commitments about future work.
+- Never say "we're on it", "we're working on", "we will", or "rest assured" — the scope of work depends on the client's retainer.
+- 2-3 sentences max. Warm but concise.`;
 
     const result = await callOpenAI({
       model: 'gpt-4.1',
@@ -216,8 +223,17 @@ Only mention specific numbers if they are notable (>10% change). Keep it concise
   }
 }
 
-function fallbackSummary(month: string, wins: number, issues: number): string {
-  return `In ${month}, we continued optimizing your site's search performance. ${wins} improvement${wins === 1 ? '' : 's'} were identified and ${issues} issue${issues === 1 ? '' : 's'} were addressed.`;
+function fallbackSummary(_month: string, wins: number, issues: number): string {
+  if (wins > 0 && issues > 0) {
+    return `Your site picked up ${wins} performance win${wins === 1 ? '' : 's'} this period, and ${issues} optimization${issues === 1 ? ' was' : 's were'} completed. Plenty of momentum to build on.`;
+  }
+  if (wins > 0) {
+    return `${wins} performance win${wins === 1 ? '' : 's'} spotted on your site this period — good signals across the board.`;
+  }
+  if (issues > 0) {
+    return `${issues} optimization${issues === 1 ? ' was' : 's were'} completed this period, keeping your site on track.`;
+  }
+  return `Your site's search performance held steady this period. A solid baseline to build from.`;
 }
 
 /**
