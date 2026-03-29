@@ -98,7 +98,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
   const maxValue = Math.max(...data.pageBreakdown.map(p => p.trafficValue), 1);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Hero metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Organic Traffic Value */}
