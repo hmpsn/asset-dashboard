@@ -504,7 +504,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
             <button
               key={insight.id}
               onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab, betaMode))}
-              className="w-full bg-zinc-900 border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
+              className="w-full bg-zinc-900 border border-zinc-800 p-5 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
               style={{ borderRadius: '10px 24px 10px 24px' }}
             >
               {/* Header */}

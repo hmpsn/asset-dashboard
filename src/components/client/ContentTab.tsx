@@ -499,7 +499,7 @@ export function ContentTab({
 
                 {/* Delivery link */}
                 {req.status === 'delivered' && req.deliveryUrl && (
-                  <div className="bg-green-500/5 border border-green-500/20 p-4 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                  <div className="bg-green-500/5 border border-green-500/20 p-5 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
                     <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
                       <ExternalLink className="w-4 h-4 text-green-400" />
                     </div>
@@ -518,7 +518,7 @@ export function ContentTab({
                   const gsc = perf.gsc;
                   const ga4 = perf.ga4;
                   return (
-                    <div className="bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15 p-4 space-y-2" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                    <div className="bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15 p-5 space-y-2" style={{ borderRadius: '6px 12px 6px 12px' }}>
                       <div className="flex items-center gap-2 mb-1">
                         <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
                         <span className="text-[11px] text-blue-300 font-medium tracking-wider">Content Performance</span>

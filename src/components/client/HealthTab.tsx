@@ -225,7 +225,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
         return (
-          <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-4">
               <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
@@ -320,7 +320,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           );
         };
         return (
-          <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-200">Page Speed &amp; Core Web Vitals</span>
