@@ -240,8 +240,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
             <div className="flex items-center gap-4 mt-3 pt-3 border-t border-zinc-800/50 text-xs">
               <span className="text-zinc-500">{auditDetail.audit.totalPages} pages scanned</span>
-              <span className="text-red-400">{auditDetail.audit.errors} errors</span>
-              <span className="text-amber-400">{auditDetail.audit.warnings} warnings</span>
+              <button
+                onClick={() => { setSeverityFilter(severityFilter === 'error' ? 'all' : 'error'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+                className={`transition-colors ${severityFilter === 'error' ? 'text-red-300 font-medium' : 'text-red-400 hover:text-red-300'}`}
+              >{auditDetail.audit.errors} errors</button>
+              <button
+                onClick={() => { setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+                className={`transition-colors ${severityFilter === 'warning' ? 'text-amber-300 font-medium' : 'text-amber-400 hover:text-amber-300'}`}
+              >{auditDetail.audit.warnings} warnings</button>
             </div>
           </div>
         );
@@ -390,7 +396,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     prioritized.map((item, i) => {
                       const sc = SEV[item.issue.severity];
                       return (
-                        <div key={`${item.pageId}-${i}`} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors">
+                        <div key={`${item.pageId}-${i}`} className="px-4 py-3">
                           <div className="flex items-start gap-3">
                             <span className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 text-[11px] text-zinc-400 font-medium">{i + 1}</span>
                             <div className="flex-1 min-w-0">

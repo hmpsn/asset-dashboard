@@ -726,9 +726,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           </div>
         </div>
         <StatCard label="Pages Scanned" value={effectiveData!.totalPages} size="hero" staggerIndex={0} />
-        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} className={severityFilter === 'error' ? 'border-red-500/50' : ''} size="hero" staggerIndex={1} />
-        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} className={severityFilter === 'warning' ? 'border-amber-500/50' : ''} size="hero" staggerIndex={2} />
-        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} className={severityFilter === 'info' ? 'border-blue-500/50' : ''} size="hero" staggerIndex={3} />
+        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} sub={severityFilter === 'error' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'error' ? '!border-red-500/60 !bg-red-500/5' : ''} size="hero" staggerIndex={1} />
+        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} sub={severityFilter === 'warning' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'warning' ? '!border-amber-500/60 !bg-amber-500/5' : ''} size="hero" staggerIndex={2} />
+        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} sub={severityFilter === 'info' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'info' ? '!border-blue-500/60 !bg-blue-500/5' : ''} size="hero" staggerIndex={3} />
         {effectiveData!.deadLinkSummary && (
           <StatCard
             label="Broken Links"
