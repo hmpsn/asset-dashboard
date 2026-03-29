@@ -140,7 +140,7 @@ export function Sidebar({
         className="px-4 pt-4 pb-3 block hover:opacity-80 transition-opacity"
         title="Command Center"
       >
-        <img src="/logo.svg" alt="hmpsn.studio" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+        <img src="/logo.svg" alt="Studio logo" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
       </button>
 
       {/* Workspace selector */}

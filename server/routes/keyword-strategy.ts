@@ -40,6 +40,7 @@ import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
@@ -1851,8 +1852,8 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
   const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
   if (!prev) return res.json(null);
 
-  const prevStrategy = JSON.parse(prev.strategy_json);
-  const prevPageMap = JSON.parse(prev.page_map_json);
+  const prevStrategy = parseJsonFallback(prev.strategy_json, {});
+  const prevPageMap = parseJsonFallback(prev.page_map_json, {});
   const currentPageMap = listPageKeywords(ws.id);
 
   // Compute diffs

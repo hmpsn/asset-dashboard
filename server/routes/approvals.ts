@@ -35,6 +35,7 @@ import {
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction } from '../outcome-tracking.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
@@ -257,7 +258,8 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       const value = item.clientValue || item.proposedValue;
       if (item.field === 'schema') {
         // Schema item — publish JSON-LD to page via schema publisher
-        const schema = JSON.parse(value);
+        const schema = parseJsonFallback(value, null);
+        if (!schema) throw new Error('Invalid schema JSON');
         const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {

@@ -143,7 +143,8 @@ export function scoreOutcome(
     score = 'strong_win';
   } else if (effectivePercent >= thresholds.win) {
     score = 'win';
-  } else if (Math.abs(effectivePercent) <= thresholds.neutral_band) {
+  } else if (effectivePercent >= -thresholds.neutral_band) {
+    // Any improvement below win threshold, or small decline within neutral band → neutral
     score = 'neutral';
   } else {
     score = 'loss';

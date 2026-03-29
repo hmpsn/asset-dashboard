@@ -82,7 +82,7 @@ type Check = {
   name: string;
   pattern: string;
   fileGlobs: string[];
-  exclude?: string;
+  exclude?: string | string[];
   pathFilter?: string;  // only scan files under this path prefix
   message: string;
   severity: 'error' | 'warn';
@@ -108,7 +108,8 @@ const CHECKS: Check[] = [
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],
-    exclude: 'server/db/json-validation.ts',
+    // json-validation.ts is the implementation; content-posts-ai.ts and keyword-strategy.ts parse AI API response strings (not DB columns)
+    exclude: ['server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts'],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
   },
@@ -138,8 +139,14 @@ const CHECKS: Check[] = [
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
 
+function isExcluded(file: string, exclude: string | string[] | undefined): boolean {
+  if (!exclude) return false;
+  const list = Array.isArray(exclude) ? exclude : [exclude];
+  return list.some(e => file.includes(e.replace('/', path.sep)));
+}
+
 function checkFile(file: string, check: Check): string[] {
-  if (check.exclude && file.includes(check.exclude.replace('/', path.sep))) return [];
+  if (isExcluded(file, check.exclude)) return [];
   try {
     const out = execSync(
       `grep -n -E "${check.pattern}" "${file}" 2>/dev/null || true`,
@@ -160,7 +167,8 @@ function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
-  const excludeFlag = check.exclude ? `--exclude="${path.basename(check.exclude)}"` : '';
+  const excludeList = check.exclude ? (Array.isArray(check.exclude) ? check.exclude : [check.exclude]) : [];
+  const excludeFlag = excludeList.map(e => `--exclude="${path.basename(e)}"`).join(' ');
   try {
     const out = execSync(
       `grep -rn ${globs} ${excludeDirs} ${excludeFiles} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
@@ -185,7 +193,7 @@ for (const check of CHECKS) {
     const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
     const relevant = changedFiles.filter(f =>
       exts.some(ext => f.endsWith(ext)) &&
-      (!check.exclude || !f.includes(check.exclude)) &&
+      !isExcluded(f, check.exclude) &&
       (!check.pathFilter || f.startsWith(check.pathFilter)) &&
       !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) &&
       !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))

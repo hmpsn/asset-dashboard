@@ -130,8 +130,8 @@ export interface ActionOutcome {
 
 export interface PlaybookStep {
   actionType: ActionType;
-  timing: string;
-  detail: string;
+  timing?: string;
+  detail?: string;
 }
 
 export interface PlaybookOutcome {

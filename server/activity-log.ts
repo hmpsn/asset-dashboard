@@ -5,6 +5,7 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
@@ -94,7 +95,7 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
     type: row.type as ActivityType,
     title: row.title,
     description: row.description ?? undefined,
-    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    metadata: row.metadata ? parseJsonFallback(row.metadata, undefined) : undefined,
     actorId: row.actor_id ?? undefined,
     actorName: row.actor_name ?? undefined,
     createdAt: row.created_at,

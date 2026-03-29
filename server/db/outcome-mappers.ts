@@ -84,7 +84,7 @@ export interface WorkspaceLearningsRow {
 
 // --- Fallbacks ---
 
-const EMPTY_BASELINE: BaselineSnapshot = { captured_at: new Date().toISOString() };
+const freshBaseline = (): BaselineSnapshot => ({ captured_at: new Date().toISOString() });
 const EMPTY_HISTORY: TrailingHistory = { metric: '', dataPoints: [] };
 const EMPTY_CONTEXT: ActionContext = {};
 const EMPTY_DELTA: DeltaSummary = {
@@ -108,7 +108,7 @@ export function rowToTrackedAction(row: TrackedActionRow): TrackedAction {
     sourceId: row.source_id,
     pageUrl: row.page_url,
     targetKeyword: row.target_keyword,
-    baselineSnapshot: parseJsonSafe(row.baseline_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, { field: 'baseline_snapshot', table: 'tracked_actions' }),
+    baselineSnapshot: parseJsonSafe(row.baseline_snapshot, baselineSnapshotSchema, freshBaseline(), { field: 'baseline_snapshot', table: 'tracked_actions' }),
     trailingHistory: parseJsonSafe(row.trailing_history, trailingHistorySchema, EMPTY_HISTORY, { field: 'trailing_history', table: 'tracked_actions' }),
     attribution: row.attribution as TrackedAction['attribution'],
     measurementWindow: row.measurement_window,
@@ -126,7 +126,7 @@ export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
     id: row.id,
     actionId: row.action_id,
     checkpointDays: row.checkpoint_days as ActionOutcome['checkpointDays'],
-    metricsSnapshot: parseJsonSafe(row.metrics_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, { field: 'metrics_snapshot', table: 'action_outcomes' }),
+    metricsSnapshot: parseJsonSafe(row.metrics_snapshot, baselineSnapshotSchema, freshBaseline(), { field: 'metrics_snapshot', table: 'action_outcomes' }),
     score: (row.score as ActionOutcome['score']) ?? null,
     earlySignal: (row.early_signal as EarlySignal) ?? undefined,
     deltaSummary: parseJsonSafe(row.delta_summary, deltaSummarySchema, EMPTY_DELTA, { field: 'delta_summary', table: 'action_outcomes' }),
