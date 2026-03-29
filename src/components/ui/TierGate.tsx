@@ -50,7 +50,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
 
   if (compact) {
     return (
-      <div className={`relative rounded-xl border ${colors.border} ${colors.bg} p-3 ${className ?? ''}`}>
+      <div className={`relative border ${colors.border} ${colors.bg} p-3 ${className ?? ''}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <Lock className={`w-3.5 h-3.5 ${colors.text} flex-shrink-0`} />
           <span className="text-xs text-zinc-400">
@@ -74,7 +74,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
 
       {/* Overlay */}
       <div className="absolute inset-0 flex items-center justify-center z-10">
-        <div className={`flex flex-col items-center gap-3 max-w-xs text-center px-6 py-5 rounded-2xl border backdrop-blur-sm ${colors.bg} ${colors.border}`}>
+        <div className={`flex flex-col items-center gap-3 max-w-xs text-center px-6 py-5 border backdrop-blur-sm ${colors.bg} ${colors.border}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
           {/* Icon */}
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors.bg} ring-1 ${colors.border}`}>
             <Sparkles className={`w-5 h-5 ${colors.text}`} />
