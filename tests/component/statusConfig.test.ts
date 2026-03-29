@@ -33,7 +33,8 @@ describe('statusConfig', () => {
     expect(statusConfig['issue-detected']!.text).toContain('amber');
     expect(statusConfig['fix-proposed']!.text).toContain('blue');
     expect(statusConfig['in-review']!.text).toContain('purple');
-    expect(statusConfig.approved!.text).toContain('green');
+    // approved uses emerald (refined from green) per visual polish spec
+    expect(statusConfig.approved!.text).toContain('emerald');
     expect(statusConfig.rejected!.text).toContain('red');
     expect(statusConfig.live!.text).toContain('teal');
   });
@@ -55,7 +56,8 @@ describe('statusBorderClass', () => {
   it('returns border class for non-clean statuses', () => {
     const result = statusBorderClass('approved');
     expect(result).toContain('border-l-2');
-    expect(result).toContain('border-green-500');
+    // approved uses emerald border per visual polish spec
+    expect(result).toContain('border-emerald-500');
   });
 
   it('adjusts opacity from /30 to /40', () => {
@@ -78,7 +80,9 @@ describe('statusDotClass', () => {
   });
 
   it('returns dot class for non-clean statuses', () => {
-    expect(statusDotClass('approved')).toContain('bg-green-400');
+    // approved uses emerald/80 per visual polish spec
+    expect(statusDotClass('approved')).toContain('bg-emerald-400');
+    // rejected and red are muted with /80 opacity
     expect(statusDotClass('rejected')).toContain('bg-red-400');
     expect(statusDotClass('live')).toContain('bg-teal-400');
   });
