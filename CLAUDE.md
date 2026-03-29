@@ -251,6 +251,18 @@ Check for: duplicate imports, conflicting function definitions, missed exports, 
 
 ---
 
+## Implementation Planning Standards
+
+When writing implementation plans (via `writing-plans` skill):
+
+1. **Exhaustive audit first** — for refactoring, migration, or audit work, invoke the `pre-plan-audit` skill before writing the plan. This launches parallel agents to grep the entire codebase and categorize every finding. Never write a plan from memory or spot-checks.
+2. **Parallelization strategy required** — every plan must include a dependency graph showing which tasks can run concurrently and which are sequential.
+3. **Model assignments required** — specify Haiku (mechanical replacements), Sonnet (component logic), or Opus (orchestration/judgment) per task.
+4. **Systemic improvements section required** — every plan must include: shared utilities to extract (if 3+ files do the same fix), pr-check rules to prevent recurrence, and test coverage additions.
+5. **Verification strategy required** — specify how to verify the work (preview screenshots, specific test commands, contrast checks) rather than "manual verification."
+
+---
+
 ## Quality Gates
 
 Work is not done until ALL pass:
