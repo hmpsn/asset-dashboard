@@ -129,11 +129,11 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
     if (totalAlerts === 0 && positive.length === 0) return null;
 
     return (
-      <div className={`rounded-lg border px-3 py-2 ${
+      <div className={`border px-3 py-2 ${
         critical.length > 0 ? 'border-red-500/30 bg-red-500/5' :
         warnings.length > 0 ? 'border-amber-500/30 bg-amber-500/5' :
         'border-green-500/30 bg-green-500/5'
-      }`}>
+      }`} style={{ borderRadius: '6px 12px 6px 12px' }}>
         <div className="flex items-center gap-2">
           <Activity className={`w-3.5 h-3.5 ${
             critical.length > 0 ? 'text-red-400/80' :
@@ -151,7 +151,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-zinc-300 hover:text-zinc-100 transition-colors">
@@ -181,14 +181,14 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
           )}
 
           {/* Anomaly cards */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {anomalies.map(anomaly => {
               const style = SEVERITY_STYLES[anomaly.severity];
               const isExpanded = expanded === anomaly.id;
 
               return (
-                <div key={anomaly.id} className={`rounded-lg border ${style.border} ${style.bg} overflow-hidden transition-all`}>
-                  <div className="flex items-start gap-2 px-3 py-2 cursor-pointer" onClick={() => setExpanded(isExpanded ? null : anomaly.id)}>
+                <div key={anomaly.id} className={`border ${style.border} ${style.bg} overflow-hidden transition-all`} style={{ borderRadius: '6px 12px 6px 12px' }}>
+                  <div className="flex items-start gap-2 px-3 py-3 cursor-pointer" onClick={() => setExpanded(isExpanded ? null : anomaly.id)}>
                     <SeverityIcon severity={anomaly.severity} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -211,9 +211,9 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                   </div>
 
                   {isExpanded && (
-                    <div className="px-3 pb-2.5 pt-0 border-t border-zinc-800/50">
-                      <p className="text-[11px] text-zinc-400 leading-relaxed mt-2">{anomaly.description}</p>
-                      <div className="flex items-center gap-3 mt-2">
+                    <div className="px-3 pb-3 pt-0 border-t border-zinc-800/50">
+                      <p className="text-[11px] text-zinc-400 leading-relaxed mt-3">{anomaly.description}</p>
+                      <div className="flex items-center gap-3 mt-3">
                         <div className="text-[10px]">
                           <span className="text-zinc-500">Previous: </span>
                           <span className="text-zinc-300 font-medium">{anomaly.previousValue.toLocaleString()}</span>

@@ -304,7 +304,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
 
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <PageHeader
         title="Site Architecture"
         subtitle={`${data.totalPages} pages · Analyzed ${new Date(data.analyzedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
@@ -323,10 +323,10 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard label="Total Pages" value={data.totalPages} icon={Layers} iconColor="#2dd4bf" size="hero" />
-        <StatCard label="Live Pages" value={data.existingPages} icon={Globe} iconColor="#4ade80" sub={`${Math.round((data.existingPages / (data.totalPages || 1)) * 100)}% of total`} size="hero" />
-        <StatCard label="Planned" value={data.plannedPages} icon={FileText} iconColor="#60a5fa" sub="From content matrices" size="hero" />
-        <StatCard label="Strategy" value={data.strategyPages} icon={Target} iconColor="#a78bfa" sub="From keyword map" size="hero" />
+        <StatCard label="Total Pages" value={data.totalPages} icon={Layers} iconColor="#2dd4bf" size="hero" staggerIndex={0} />
+        <StatCard label="Live Pages" value={data.existingPages} icon={Globe} iconColor="#4ade80" sub={`${Math.round((data.existingPages / (data.totalPages || 1)) * 100)}% of total`} size="hero" staggerIndex={1} />
+        <StatCard label="Planned" value={data.plannedPages} icon={FileText} iconColor="#60a5fa" sub="From content matrices" size="hero" staggerIndex={2} />
+        <StatCard label="Strategy" value={data.strategyPages} icon={Target} iconColor="#a78bfa" sub="From keyword map" size="hero" staggerIndex={3} />
         <StatCard
           label="Gaps Found"
           value={data.gaps.length}
@@ -334,6 +334,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           iconColor={data.gaps.length > 0 ? '#fbbf24' : '#71717a'}
           sub={data.orphanPaths.length > 0 ? `${data.orphanPaths.length} orphan${data.orphanPaths.length !== 1 ? 's' : ''}` : 'No orphans'}
           size="hero"
+          staggerIndex={4}
         />
         {coverage && (
           <StatCard
@@ -343,6 +344,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
             iconColor={coverage.coveragePct >= 80 ? '#4ade80' : coverage.coveragePct >= 50 ? '#fbbf24' : '#ef4444'}
             sub={`${coverage.withSchema}/${coverage.totalExisting} pages`}
             size="hero"
+            staggerIndex={5}
           />
         )}
       </div>
@@ -388,7 +390,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         </SectionCard>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
         {/* URL Tree */}
         <SectionCard
           title="URL Tree"
@@ -441,7 +443,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
         </SectionCard>
 
         {/* Sidebar: Coverage + Depth */}
-        <div className="space-y-4">
+        <div className="space-y-6">
         {coverage && coverage.priorityQueue.length > 0 && (
           <SectionCard
             title="Schema Priority Queue"
