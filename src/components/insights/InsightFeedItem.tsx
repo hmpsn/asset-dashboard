@@ -3,8 +3,8 @@ import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown } from 'lu
 import type { FeedInsight } from '../../../shared/types/insights.js';
 
 const SEVERITY_CONFIG = {
-  critical: { icon: TrendingDown, bg: 'bg-red-500/10', text: 'text-red-400', badge: 'Critical' },
-  warning: { icon: AlertTriangle, bg: 'bg-amber-500/10', text: 'text-amber-400', badge: 'Warning' },
+  critical: { icon: TrendingDown, bg: 'bg-red-500/8', text: 'text-red-400/80', badge: 'Critical' },
+  warning: { icon: AlertTriangle, bg: 'bg-amber-500/8', text: 'text-amber-400/80', badge: 'Warning' },
   opportunity: { icon: Target, bg: 'bg-blue-500/10', text: 'text-blue-400', badge: 'Opportunity' },
   positive: { icon: TrendingUp, bg: 'bg-emerald-500/10', text: 'text-emerald-400', badge: 'Win' },
 } as const;

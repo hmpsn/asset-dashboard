@@ -155,7 +155,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Date range selector */}
       <div className="flex items-center justify-end">
         <DateRangeSelector
@@ -179,7 +179,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
       {overview && !isLoading && (
         <>
           {/* Step 1: MetricToggleCards */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-3">
             <MetricToggleCard
               label="Clicks"
               value={fmtNum(overview.totalClicks)}
@@ -250,8 +250,8 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
           <div className="flex flex-col lg:flex-row lg:items-start gap-3">
             {/* Left: Data table — height matches sidebar via ref measurement */}
             <div
-              className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
-              style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+              className="bg-zinc-900 border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
+              style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined, borderRadius: '10px 24px 10px 24px' }}
             >
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800 shrink-0">
@@ -287,14 +287,20 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                 </thead>
                 <tbody>
                   {tableView === 'queries' && sortByKey(overview.topQueries).map((q, i) => {
+                    const badge = badgeMap.get(q.query);
                     return (
-                      <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                      <tr key={i} className={`border-b border-zinc-800/50 hover:bg-zinc-800/30 ${rowTint(badge)}`}>
                         <td className="py-2.5 px-4 text-zinc-300 font-medium">
                           {q.query}
+                          {badge && (
+                            <span className={`text-[7px] font-semibold px-1 py-0.5 rounded ${badge.color} ${badge.bgColor} ml-1 whitespace-nowrap`}>
+                              {badge.label}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{q.clicks}</td>
                         <td className="py-2.5 px-3 text-right text-zinc-400">{q.impressions.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 text-right text-blue-400">{q.ctr}%</td>
+                        <td className="py-2.5 px-3 text-right text-emerald-400">{q.ctr}%</td>
                         <td className="py-2.5 px-3 text-right">
                           <span className={q.position <= 10 ? 'text-green-400' : q.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
                             {q.position}
@@ -322,7 +328,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                         </td>
                         <td className="py-2.5 px-3 text-right text-blue-400 font-semibold">{p.clicks}</td>
                         <td className="py-2.5 px-3 text-right text-zinc-400">{p.impressions.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 text-right text-blue-400">{p.ctr}%</td>
+                        <td className="py-2.5 px-3 text-right text-emerald-400">{p.ctr}%</td>
                         <td className="py-2.5 px-3 text-right">
                           <span className={p.position <= 10 ? 'text-green-400' : p.position <= 20 ? 'text-amber-400' : 'text-red-400'}>
                             {p.position}

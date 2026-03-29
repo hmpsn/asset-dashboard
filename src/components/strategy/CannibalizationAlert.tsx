@@ -35,7 +35,7 @@ export function CannibalizationAlert({ items }: CannibalizationAlertProps) {
   const highCount = items.filter(i => i.severity === 'high').length;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-red-500/20 p-4">
+    <div className="bg-zinc-900 border border-red-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
       <h4 className="text-xs font-semibold text-red-300 mb-1 flex items-center gap-1.5">
         <Copy className="w-3.5 h-3.5" /> Keyword Cannibalization
         {highCount > 0 && (

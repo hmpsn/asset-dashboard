@@ -24,7 +24,7 @@ function JobRow({ job, onDismiss, onCancel }: { job: BackgroundJob; onDismiss: (
       <div className="flex items-center gap-2">
         {isActive && <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400 flex-shrink-0" />}
         {job.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
-        {job.status === 'error' && <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+        {job.status === 'error' && <AlertTriangle className="w-3.5 h-3.5 text-red-400/80 flex-shrink-0" />}
         {job.status === 'cancelled' && <Ban className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
         <div className="flex-1 min-w-0">
           <div className="text-xs font-medium text-zinc-200 truncate">{label}</div>

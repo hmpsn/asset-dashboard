@@ -20,7 +20,7 @@ const CATEGORIES: { id: Category; label: string }[] = [
 
 const BADGE: Record<Category, string> = {
   site_change: 'bg-blue-500/20 text-blue-400',
-  algorithm_update: 'bg-amber-500/20 text-amber-400',
+  algorithm_update: 'bg-amber-500/20 text-amber-400/80',
   campaign: 'bg-purple-500/20 text-purple-400',
   other: 'bg-zinc-700/50 text-zinc-400',
 };
@@ -80,7 +80,7 @@ export function AnalyticsAnnotations({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Flag className="w-5 h-5 text-amber-400" />
+        <Flag className="w-5 h-5 text-amber-400/80" />
         <h2 className="text-sm font-semibold text-zinc-200">Annotations</h2>
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
       </div>

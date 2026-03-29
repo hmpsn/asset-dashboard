@@ -169,7 +169,7 @@ export function ContentPipelineGuide() {
   };
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-8 max-w-3xl">
       <div className="space-y-1.5 mb-6">
         <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-teal-400" />
@@ -181,7 +181,7 @@ export function ContentPipelineGuide() {
       </div>
 
       {/* Workflow overview */}
-      <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-teal-500/5 border border-teal-500/15 overflow-x-auto">
+      <div className="flex items-center gap-2 px-4 py-3 bg-teal-500/5 border border-teal-500/15 overflow-x-auto" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {[
           { icon: Layers, label: 'Template' },
           { icon: Grid3X3, label: 'Matrix' },
@@ -248,7 +248,7 @@ export function ContentPipelineGuide() {
                 {/* Tip */}
                 {section.tip && (
                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
-                    <Flag className="w-3 h-3 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <Flag className="w-3 h-3 text-amber-400/80 flex-shrink-0 mt-0.5" />
                     <span className="text-[11px] text-amber-300/80 leading-relaxed">{section.tip}</span>
                   </div>
                 )}

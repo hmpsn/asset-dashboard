@@ -258,14 +258,15 @@ function AssetAudit({ siteId }: Props) {
   const scoreColor = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
         <button
           onClick={() => setActiveFilter(null)}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+          className={`bg-zinc-900 p-5 border text-left transition-colors ${
             activeFilter === null ? 'border-zinc-600' : 'border-zinc-800 hover:border-zinc-700'
           }`}
+          style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className={`text-3xl font-bold ${scoreColor}`}>{score}</div>
           <div className="text-xs text-zinc-500 mt-1">Health Score</div>
@@ -274,9 +275,10 @@ function AssetAudit({ siteId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'missing-alt' ? null : 'missing-alt')}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+          className={`bg-zinc-900 p-5 border text-left transition-colors ${
             activeFilter === 'missing-alt' ? 'border-amber-500/50' : 'border-zinc-800 hover:border-zinc-700'
           }`}
+          style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className="text-3xl font-bold text-amber-400">{audit.missingAlt}</div>
           <div className="text-xs text-zinc-500 mt-1">Missing Alt Text</div>
@@ -287,9 +289,10 @@ function AssetAudit({ siteId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'oversized' ? null : 'oversized')}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+          className={`bg-zinc-900 p-5 border text-left transition-colors ${
             activeFilter === 'oversized' ? 'border-orange-500/50' : 'border-zinc-800 hover:border-zinc-700'
           }`}
+          style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className="text-3xl font-bold text-orange-400">{audit.oversized}</div>
           <div className="text-xs text-zinc-500 mt-1">Oversized</div>
@@ -300,9 +303,10 @@ function AssetAudit({ siteId }: Props) {
 
         <button
           onClick={() => setActiveFilter(activeFilter === 'unused' ? null : 'unused')}
-          className={`bg-zinc-900 rounded-xl p-4 border text-left transition-colors ${
+          className={`bg-zinc-900 p-5 border text-left transition-colors ${
             activeFilter === 'unused' ? 'border-zinc-500/50' : 'border-zinc-800 hover:border-zinc-700'
           }`}
+          style={{ borderRadius: '6px 12px 6px 12px' }}
         >
           <div className="text-3xl font-bold text-zinc-400">{audit.unused}</div>
           <div className="text-xs text-zinc-500 mt-1">Unused</div>
@@ -499,7 +503,7 @@ function AssetAudit({ siteId }: Props) {
           </div>
         ) : (
           filteredIssues.map(issue => (
-            <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800/50 border border-zinc-800 transition-colors group">
+            <div key={issue.assetId} className="flex items-center gap-3 px-4 py-3 bg-zinc-900 hover:bg-zinc-800/50 border border-zinc-800 transition-colors group" style={{ borderRadius: '6px 12px 6px 12px' }}>
               {/* Thumbnail — click for lightbox */}
               <button
                 className="w-10 h-10 rounded bg-zinc-800 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-zinc-600 transition-all"
@@ -600,7 +604,7 @@ function AssetAudit({ siteId }: Props) {
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-700 overflow-hidden">
+            <div className="bg-zinc-900 border border-zinc-700 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center justify-center bg-zinc-950 p-6 min-h-[300px] max-h-[60vh]">
                 <img
                   src={lightboxIssue.url}

@@ -654,19 +654,19 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const missingDescs = pages.filter(p => !p.seo?.description).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Stats bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-sm text-zinc-400">
           <span className="font-medium text-zinc-200">{pages.length}</span> pages
         </div>
         {missingTitles > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
+          <span className="text-xs px-2 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">
             {missingTitles} missing SEO titles
           </span>
         )}
         {missingDescs > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">
+          <span className="text-xs px-2 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
             {missingDescs} missing meta descriptions
           </span>
         )}
@@ -720,7 +720,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         />
       )}
       {bulkResults && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-lg text-sm text-green-300">
+        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/8 border border-emerald-500/30 rounded-lg text-sm text-emerald-300">
           <Check className="w-4 h-4" /> {bulkResults}
         </div>
       )}
@@ -744,11 +744,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           {summary.inReview > 0 && <StatusBadge status="in-review" />}
           {summary.inReview > 0 && <span className="text-purple-400">{summary.inReview}</span>}
           {summary.approved > 0 && <StatusBadge status="approved" />}
-          {summary.approved > 0 && <span className="text-green-400">{summary.approved}</span>}
+          {summary.approved > 0 && <span className="text-emerald-400/80">{summary.approved}</span>}
           {summary.rejected > 0 && <StatusBadge status="rejected" />}
-          {summary.rejected > 0 && <span className="text-red-400">{summary.rejected}</span>}
+          {summary.rejected > 0 && <span className="text-red-400/80">{summary.rejected}</span>}
           {summary.issueDetected > 0 && <StatusBadge status="issue-detected" />}
-          {summary.issueDetected > 0 && <span className="text-amber-400">{summary.issueDetected}</span>}
+          {summary.issueDetected > 0 && <span className="text-amber-400/80">{summary.issueDetected}</span>}
           {summary.fixProposed > 0 && <StatusBadge status="fix-proposed" />}
           {summary.fixProposed > 0 && <span className="text-blue-400">{summary.fixProposed}</span>}
           {workspaceId && (
@@ -782,8 +782,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {workspaceId && (
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
               <span className="text-xs text-zinc-300">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
               <button onClick={() => { cancelBulkAnalyzeRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
             </div>
@@ -791,7 +791,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             <button
               onClick={analyzeAllPages}
               disabled={analyzing.size > 0 || analyzedPages.size === pages.length}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
             >
               <Sparkles className="w-3.5 h-3.5" />
               {analyzedPages.size === pages.length && pages.length > 0
@@ -802,7 +802,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             </button>
           )}
           {analyzedPages.size > 0 && !bulkAnalyzeProgress && (
-            <span className="text-[11px] text-green-400">{analyzedPages.size}/{pages.length} pages have analysis on file</span>
+            <span className="text-[11px] text-emerald-400/80">{analyzedPages.size}/{pages.length} pages have analysis on file</span>
           )}
         </div>
       )}
@@ -817,7 +817,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       />
 
       {hasUnsaved && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/8 border border-amber-500/30 rounded-lg text-xs text-amber-400/80">
           <AlertCircle className="w-3.5 h-3.5" /> You have unsaved changes. Save individual pages then publish to go live.
         </div>
       )}

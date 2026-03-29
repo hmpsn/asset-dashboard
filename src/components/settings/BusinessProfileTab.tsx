@@ -118,7 +118,7 @@ export function BusinessProfileTab({ workspaceId, businessProfile, toast, onSave
   const labelClass = 'block text-[11px] font-medium text-zinc-400 mb-1';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Header */}
       <div className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">

@@ -69,7 +69,7 @@ function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
   };
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+    <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-medium text-zinc-400">Shipping Velocity</span>
         <span className="text-[11px] text-zinc-500">{data[data.length - 1].cumulative} features shipped</span>
@@ -183,7 +183,7 @@ export function Roadmap() {
   const currentSprint = roadmap.find(s => s.items.some(i => i.status !== 'done'));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Roadmap"
         subtitle={`${total} items · ${done} done · ${inProgress} active · ${pending} pending`}
@@ -206,17 +206,17 @@ export function Roadmap() {
 
       {/* Progress overview */}
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="Total Items" value={total} icon={Map} iconColor="#2dd4bf" />
-        <StatCard label="Completed" value={done} icon={CheckCircle2} iconColor="#4ade80" />
-        <StatCard label="In Progress" value={inProgress} icon={Clock} iconColor="#fbbf24" />
-        <StatCard label="Completion" value={total > 0 ? `${Math.round((done / total) * 100)}%` : '0%'} icon={Rocket} iconColor="#60a5fa" />
+        <StatCard label="Total Items" value={total} icon={Map} iconColor="#2dd4bf" size="hero" staggerIndex={0} />
+        <StatCard label="Completed" value={done} icon={CheckCircle2} iconColor="#4ade80" size="hero" staggerIndex={1} />
+        <StatCard label="In Progress" value={inProgress} icon={Clock} iconColor="#fbbf24" size="hero" staggerIndex={2} />
+        <StatCard label="Completion" value={total > 0 ? `${Math.round((done / total) * 100)}%` : '0%'} icon={Rocket} iconColor="#60a5fa" size="hero" staggerIndex={3} />
       </div>
 
       {/* Shipping velocity chart */}
       <ShippingVelocityChart items={allItems} />
 
       {/* Overall progress bar */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-4 py-3">
+      <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-zinc-400">Overall Progress</span>
           {currentSprint && <span className="text-[11px] text-teal-400">Current: {currentSprint.name}</span>}

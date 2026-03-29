@@ -31,7 +31,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
   return (
     <TierGate tier={tier} required="growth" feature="Monthly Performance Digest" teaser="See a monthly summary of your SEO wins, issues addressed, and ROI highlights">
       <SectionCard title={`${digest.month} Performance`} titleIcon={<Calendar className="w-4 h-4 text-zinc-400" />}>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* AI summary */}
           {digest.summary && (
             <p className="text-sm text-zinc-300 leading-relaxed">{digest.summary}</p>
@@ -47,7 +47,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
           {/* Wins */}
           {digest.wins.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <h4 className="text-xs font-medium text-zinc-400 tracking-wider mb-2 flex items-center gap-1.5">
                 <TrendingUp className="w-3 h-3 text-emerald-400" />
                 Wins this month
               </h4>
@@ -68,7 +68,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
           {/* Issues addressed */}
           {digest.issuesAddressed.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
+              <h4 className="text-xs font-medium text-zinc-400 tracking-wider mb-2">
                 Issues addressed
               </h4>
               <ul className="space-y-1.5">
@@ -85,7 +85,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
           {/* ROI highlights */}
           {digest.roiHighlights.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <h4 className="text-xs font-medium text-zinc-400 tracking-wider mb-2 flex items-center gap-1.5">
                 <Award className="w-3 h-3 text-blue-400" />
                 Measurable results
               </h4>

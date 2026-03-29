@@ -25,7 +25,7 @@ export function SeoWorkStatus({ seoStatus, workspaceId, embedded }: SeoWorkStatu
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-zinc-800/50">
       {seoStatus.issueDetected > 0 && (
         <button onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-          <span className="text-lg font-bold text-amber-400">{seoStatus.issueDetected}</span>
+          <span className="text-lg font-bold text-amber-400/80">{seoStatus.issueDetected}</span>
           <span className="text-[10px] text-zinc-500">issues found</span>
         </button>
       )}
@@ -37,13 +37,13 @@ export function SeoWorkStatus({ seoStatus, workspaceId, embedded }: SeoWorkStatu
       )}
       {seoStatus.approved > 0 && (
         <button onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-          <span className="text-lg font-bold text-green-400">{seoStatus.approved}</span>
+          <span className="text-lg font-bold text-emerald-400/80">{seoStatus.approved}</span>
           <span className="text-[10px] text-zinc-500">approved</span>
         </button>
       )}
       {seoStatus.rejected > 0 && (
         <button onClick={() => navigate(adminPath(workspaceId, 'seo-editor'))} className="flex flex-col items-center py-3 hover:bg-zinc-800/30 transition-colors bg-zinc-900">
-          <span className="text-lg font-bold text-red-400">{seoStatus.rejected}</span>
+          <span className="text-lg font-bold text-red-400/80">{seoStatus.rejected}</span>
           <span className="text-[10px] text-zinc-500">rejected</span>
         </button>
       )}

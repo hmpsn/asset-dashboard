@@ -13,7 +13,7 @@ export function StatusBar({ hasOpenAIKey, hasWebflowToken, connected, workspaceC
       <div className="flex items-center gap-1.5">
         {connected
           ? <Wifi className="w-3 h-3 text-emerald-400" />
-          : <WifiOff className="w-3 h-3 text-red-400" />
+          : <WifiOff className="w-3 h-3 text-red-400/80" />
         }
         <span>{connected ? 'Connected' : 'Reconnecting...'}</span>
       </div>
@@ -21,7 +21,7 @@ export function StatusBar({ hasOpenAIKey, hasWebflowToken, connected, workspaceC
       <div className="flex items-center gap-1.5">
         {hasOpenAIKey
           ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-          : <AlertTriangle className="w-3 h-3 text-amber-400" />
+          : <AlertTriangle className="w-3 h-3 text-amber-400/80" />
         }
         <span>Alt Text {hasOpenAIKey ? 'Active' : 'No API Key'}</span>
       </div>
@@ -29,7 +29,7 @@ export function StatusBar({ hasOpenAIKey, hasWebflowToken, connected, workspaceC
       <div className="flex items-center gap-1.5">
         {hasWebflowToken
           ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-          : <AlertTriangle className="w-3 h-3 text-amber-400" />
+          : <AlertTriangle className="w-3 h-3 text-amber-400/80" />
         }
         <span>Webflow {hasWebflowToken ? 'Active' : 'No Token'}</span>
       </div>

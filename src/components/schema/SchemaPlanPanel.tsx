@@ -32,7 +32,7 @@ const ROLE_COLORS: Record<SchemaPageRole, string> = {
   contact: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
   location: 'bg-green-500/15 text-green-300 border-green-500/30',
   product: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  partnership: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+  partnership: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   faq: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   'case-study': 'bg-pink-500/15 text-pink-300 border-pink-500/30',
   comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
@@ -162,7 +162,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   // No plan yet — show generate button
   if (!plan) {
     return (
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 space-y-3">
+      <div className="bg-zinc-900/50 border border-zinc-800 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-teal-400" />
           <span className="text-sm font-medium text-zinc-200">Schema Site Plan</span>
@@ -171,7 +171,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           Generate a site-wide schema plan that analyzes all pages and your keyword strategy to assign roles and identify canonical entities. This ensures consistent, coordinated schema across your entire site.
         </p>
         {error && (
-          <div className="flex items-center gap-1.5 text-xs text-red-400">
+          <div className="flex items-center gap-1.5 text-xs text-red-400/80">
             <AlertCircle className="w-3 h-3" /> {error}
           </div>
         )}
@@ -194,7 +194,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
   }, {} as Record<string, number>);
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="bg-zinc-900/50 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -209,7 +209,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {dirty && <span className="text-[10px] text-amber-400">Unsaved changes</span>}
+          {dirty && <span className="text-[10px] text-amber-400/80">Unsaved changes</span>}
           {expanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
         </div>
       </button>
@@ -218,12 +218,12 @@ export function SchemaPlanPanel({ siteId }: Props) {
         <div className="border-t border-zinc-800 px-4 py-3 space-y-4">
           {/* Status messages */}
           {error && (
-            <div className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs text-red-400/80 bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2">
               <AlertCircle className="w-3 h-3 shrink-0" /> {error}
             </div>
           )}
           {success && (
-            <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
               <CheckCircle className="w-3 h-3 shrink-0" /> {success}
             </div>
           )}
@@ -271,7 +271,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             )}
             {confirmRetract ? (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-red-400">Delete this plan?</span>
+                <span className="text-[11px] text-red-400/80">Delete this plan?</span>
                 <button
                   onClick={async () => {
                     setRetracting(true);
@@ -303,7 +303,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             ) : (
               <button
                 onClick={() => setConfirmRetract(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30 transition-colors"
               >
                 <Trash2 className="w-3 h-3" /> Retract Plan
               </button>

@@ -488,7 +488,7 @@ export function InsightsDigest(props: InsightsDigestProps) {
   const hasMore = all.length > INITIAL_COUNT;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex items-center gap-2">
         <div className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center">
           <Sparkles className="w-3 h-3 text-teal-400" />
@@ -505,7 +505,8 @@ export function InsightsDigest(props: InsightsDigestProps) {
             <button
               key={insight.id}
               onClick={() => insight.action && navigate(clientPath(props.workspaceId, insight.action.tab, betaMode))}
-              className="w-full bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
+              className="w-full bg-zinc-900 border border-zinc-800 p-5 text-left hover:border-zinc-700 transition-colors cursor-pointer group"
+              style={{ borderRadius: '10px 24px 10px 24px' }}
             >
               {/* Header */}
               <div className="flex items-center gap-1.5 mb-2">

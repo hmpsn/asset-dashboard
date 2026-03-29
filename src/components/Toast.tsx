@@ -55,7 +55,7 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
 
   const icons = {
     success: <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />,
-    error: <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />,
+    error: <AlertTriangle className="w-4 h-4 text-red-400/80 shrink-0" />,
     info: <Info className="w-4 h-4 text-blue-400 shrink-0" />,
   };
 

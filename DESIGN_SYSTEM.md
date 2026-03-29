@@ -111,34 +111,33 @@ The primary data display component. Three variants based on context.
 │ optional sub-text           │  ← 12px text-zinc-500
 └─────────────────────────────┘
 ```
-- Container: `bg-zinc-900 rounded-xl border border-zinc-800 p-4`
+- Container: `bg-zinc-900 border border-zinc-800 p-3` with `style={{ borderRadius: '6px 12px 6px 12px' }}`
 - Icon: `w-4 h-4` in accent color, left of label
-- Optional: sparkline right-aligned in header row
-- Optional: delta indicator next to value
+- Optional: delta indicator next to value (emerald-400/80 positive, red-400/80 negative)
+- Stagger entrance: `staggerIndex` prop (0-based, adds 60ms delay per index)
 
-#### Variant: `hero` (score rings, main KPIs)
+#### Variant: `size="hero"` (top-of-page impact stats)
 ```
 ┌─────────────────────────────┐
-│        [ScoreRing]          │
-│           81                │  ← 34px+ DIN Pro 700
-│      119 pages scanned      │  ← 12px text-zinc-500
-│       ↑ 3 from previous     │  ← 12px colored delta
+│ [Icon] Label                │  ← 12px uppercase text-zinc-500
+│                             │
+│ 12,400                      │  ← 36px (text-4xl) DIN Pro 700
+│ optional sub-text           │
 └─────────────────────────────┘
 ```
-- Container: `bg-zinc-900 rounded-xl border border-zinc-800 p-6`
-- Number: DIN Pro 700, size proportional to ring (0.38 × ring size)
-- Centered layout
+- Container: `p-4` (vs `p-3` default) with same asymmetric radius
+- Number: `text-4xl` (36px) for impact. Use `size="hero"` on the first StatCard row of each page.
 
-#### Variant: `compact` (inline metrics bars)
+#### Variant: `compact` (`CompactStatBar`)
 ```
 ┌──────────────────────────────────────────────────────┐
 │  CLICKS  1,234  │  IMPRESSIONS  45,678  │  CTR  3.2% │
 └──────────────────────────────────────────────────────┘
 ```
-- Container: `bg-zinc-900 rounded-xl border border-zinc-800 px-5 py-3`
+- Container: `bg-zinc-900 border border-zinc-800 px-5 py-3` with `style={{ borderRadius: '6px 12px 6px 12px' }}`
 - Horizontal flex layout
 - Label: 12px uppercase tracking-wider text-zinc-500
-- Value: 14px (text-sm) DIN Pro 700, colored
+- Value: DIN Pro 700, colored
 
 ### 2. MetricRing (unified — replaces 3 implementations)
 
@@ -149,10 +148,13 @@ Single component for all score ring displays.
 ```
 
 - SVG circle with stroke animation
-- Score number: DIN Pro 700, `size * 0.38` fontSize, `-0.03em` tracking
-- Color: auto from score (≥80 green, ≥60 amber, <60 red)
+- Score number: DIN Pro 700, `size * 0.38` fontSize (40px at default 120px), `-0.03em` tracking. Number fades in at 0.8s.
+- Color: auto from `scoreColor()` (≥80 emerald, ≥60 amber, <60 red)
 - Stroke width: 8px for large (≥100), 6px for medium, 4px for small (≤48)
-- Background track: `#27272a`
+- Background track: `#303036`
+- Outward glow: `box-shadow` on pseudo-element behind SVG (emerald inner → teal outer). Bloom fades in at 2s.
+- Edge ring: 1px teal border at 15% opacity, fades in with glow.
+- `noAnimation` prop: disables all animations for compact/inline usage (size < 80 also auto-disables)
 
 ### 3. PageHeader
 
@@ -182,11 +184,13 @@ Standard card container for content sections.
 └──────────────────────────────────────────────────────┘
 ```
 
-- Container: `bg-zinc-900 rounded-xl border border-zinc-800`
-- With header: `px-4 py-3 border-b border-zinc-800` top row, content in `p-4`
+- Container: `bg-zinc-900 border border-zinc-800` with `style={{ borderRadius: '10px 24px 10px 24px' }}`
+- With header: `px-4 py-3 border-b border-zinc-800` top row (radius: `10px 24px 0 0`), content in `p-4`
 - Without header: `p-4`
-- Section title: `text-sm font-medium text-zinc-300` (consistent everywhere)
+- Section title: `text-sm font-semibold text-zinc-200` (NOT uppercase)
 - Action buttons: `text-xs font-medium text-teal-400`
+- `interactive` prop: adds teal left-border accent on hover (`hover:border-l-teal-500/40`) for clickable cards
+- `staggerIndex` prop: entrance animation delay (0-based, 60ms per index)
 
 ### 5. DateRangeSelector
 

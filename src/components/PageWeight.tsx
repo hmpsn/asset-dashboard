@@ -161,22 +161,22 @@ function PageWeight({ siteId }: Props) {
   const heavyPages = data.pages.filter(p => p.totalSize > 2 * 1024 * 1024).length;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-zinc-200">{data.totalPages}</div>
           <div className="text-xs text-zinc-500 mt-1">Pages with Assets</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-zinc-200">{formatSize(data.totalAssetSize)}</div>
           <div className="text-xs text-zinc-500 mt-1">Total Asset Size</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className={`text-3xl font-bold ${heavyPages > 0 ? 'text-orange-400' : 'text-green-400'}`}>{heavyPages}</div>
           <div className="text-xs text-zinc-500 mt-1">Heavy Pages (&gt;2MB)</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-5 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-zinc-200">
             {data.pages.length > 0 ? formatSize(Math.round(data.pages.reduce((s, p) => s + p.totalSize, 0) / data.pages.length)) : '0'}
           </div>
@@ -222,7 +222,7 @@ function PageWeight({ siteId }: Props) {
       {/* Page list */}
       <div className="space-y-2">
         {filteredPages.map(page => (
-          <div key={page.page} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div key={page.page} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <button
               onClick={() => toggleExpand(page.page)}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"

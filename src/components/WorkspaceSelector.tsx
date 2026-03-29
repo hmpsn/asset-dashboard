@@ -205,7 +205,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
                           {loadingSites ? '...' : 'Go'}
                         </button>
                       </div>
-                      {tokenError && <p className="text-xs text-red-400 mb-1">{tokenError}</p>}
+                      {tokenError && <p className="text-xs text-red-400/80 mb-1">{tokenError}</p>}
                       {loadingSites && (
                         <div className="flex items-center gap-2 text-xs text-zinc-500 py-1">
                           <div className="w-3 h-3 border border-zinc-600 border-t-zinc-400 rounded-full animate-spin" />
@@ -274,8 +274,8 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={() => setConfirmDelete(null)}>
           <div className="w-80 rounded-xl p-5 shadow-2xl bg-zinc-900 border border-zinc-700" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
+              <div className="w-9 h-9 rounded-lg bg-red-500/8 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-red-400/80" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-zinc-200">Delete workspace?</h3>

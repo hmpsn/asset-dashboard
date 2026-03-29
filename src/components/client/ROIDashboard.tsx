@@ -67,7 +67,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
   // Gate for premium tier
   if (tier !== 'premium' && tier !== 'growth') {
     return (
-      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-8 text-center">
+      <div className="bg-zinc-900/60 border border-zinc-800 p-8 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center mx-auto mb-4">
           <Lock className="w-6 h-6 text-zinc-600" />
         </div>
@@ -82,7 +82,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
   if (loading) {
     return (
-      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-8">
+      <div className="bg-zinc-900/60 border border-zinc-800 p-8" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <LoadingState message="Calculating your traffic value..." size="md" />
       </div>
     );
@@ -98,11 +98,11 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
   const maxValue = Math.max(...data.pageBreakdown.map(p => p.trafficValue), 1);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Hero metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Organic Traffic Value */}
-        <div className="bg-gradient-to-br from-emerald-500/10 via-zinc-900 to-zinc-900 rounded-xl border border-emerald-500/20 p-5">
+        <div className="bg-gradient-to-br from-emerald-500/10 via-zinc-900 to-zinc-900 border border-emerald-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
               <DollarSign className="w-4 h-4 text-emerald-400" />
@@ -116,7 +116,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         </div>
 
         {/* Ad Spend Equivalent */}
-        <div className="bg-gradient-to-br from-blue-500/10 via-zinc-900 to-zinc-900 rounded-xl border border-blue-500/20 p-5">
+        <div className="bg-gradient-to-br from-blue-500/10 via-zinc-900 to-zinc-900 border border-blue-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-blue-400" />
@@ -130,7 +130,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
         </div>
 
         {/* MoM Growth or Pages Tracked */}
-        <div className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10' : 'from-amber-500/10') : 'from-teal-500/10'} via-zinc-900 to-zinc-900 rounded-xl border ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'border-teal-500/20' : 'border-amber-500/20') : 'border-teal-500/20'} p-5`}>
+        <div className={`bg-gradient-to-br ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'from-teal-500/10' : 'from-amber-500/10') : 'from-teal-500/10'} via-zinc-900 to-zinc-900 border ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'border-teal-500/20' : 'border-amber-500/20') : 'border-teal-500/20'} p-5`} style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className={`w-8 h-8 rounded-lg ${data.growthPercent != null ? (data.growthPercent >= 0 ? 'bg-teal-500/15' : 'bg-amber-500/15') : 'bg-teal-500/15'} flex items-center justify-center`}>
               {data.growthPercent != null
@@ -163,7 +163,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
       {/* Page breakdown table */}
       {data.pageBreakdown.length > 0 && (
-        <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900/60 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-5 py-3.5 border-b border-zinc-800/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-teal-400" />
@@ -221,7 +221,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
 
       {/* Content ROI Attribution */}
       {data.contentItems && data.contentItems.length > 0 && (
-        <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900/60 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-5 py-3.5 border-b border-zinc-800/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-emerald-400" />

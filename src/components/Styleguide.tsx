@@ -200,8 +200,8 @@ export function Styleguide() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Users" value="8,901" icon={Users} iconColor="#60a5fa" delta={12} deltaLabel="%" />
             <StatCard label="Bounce Rate" value="42%" icon={TrendingUp} iconColor="#34d399" delta={-3} deltaLabel="%" />
-            <StatCard label="Errors" value="5" icon={AlertTriangle} iconColor="#f87171" valueColor="text-red-400" />
-            <StatCard label="Warnings" value="12" icon={Info} iconColor="#fbbf24" valueColor="text-amber-400" onClick={() => {}} />
+            <StatCard label="Errors" value="5" icon={AlertTriangle} iconColor="#f87171" valueColor="text-red-400/80" />
+            <StatCard label="Warnings" value="12" icon={Info} iconColor="#fbbf24" valueColor="text-amber-400/80" onClick={() => {}} />
           </div>
 
           {/* Compact variant */}
@@ -634,7 +634,7 @@ export function Styleguide() {
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Static Previews</div>
               {([
                 { type: 'success' as const, icon: <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />, border: 'border-emerald-500/20', msg: 'Audit completed successfully — 119 pages scanned.' },
-                { type: 'error' as const, icon: <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />, border: 'border-red-500/20', msg: 'Failed to connect to Search Console. Please try again.' },
+                { type: 'error' as const, icon: <AlertTriangle className="w-4 h-4 text-red-400/80 shrink-0" />, border: 'border-red-500/20', msg: 'Failed to connect to Search Console. Please try again.' },
                 { type: 'info' as const, icon: <Info className="w-4 h-4 text-blue-400 shrink-0" />, border: 'border-blue-500/20', msg: 'Schema changes pushed to 12 pages.' },
               ]).map(t => (
                 <div key={t.type} className={`flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border ${t.border} shadow-2xl shadow-black/40 text-sm text-zinc-200`}>
@@ -661,7 +661,7 @@ export function Styleguide() {
             <div className="fixed bottom-4 right-4 z-[200] pointer-events-auto">
               <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl bg-zinc-900 border shadow-2xl shadow-black/40 text-sm text-zinc-200 ${showToast === 'success' ? 'border-emerald-500/20' : showToast === 'error' ? 'border-red-500/20' : 'border-blue-500/20'}`}>
                 {showToast === 'success' && <CheckCircle className="w-4 h-4 text-emerald-400" />}
-                {showToast === 'error' && <AlertTriangle className="w-4 h-4 text-red-400" />}
+                {showToast === 'error' && <AlertTriangle className="w-4 h-4 text-red-400/80" />}
                 {showToast === 'info' && <Info className="w-4 h-4 text-blue-400" />}
                 <span className="text-xs">This is a {showToast} toast notification.</span>
                 <button onClick={() => setShowToast(null)} className="ml-1 text-zinc-500 hover:text-zinc-400"><X className="w-3 h-3" /></button>

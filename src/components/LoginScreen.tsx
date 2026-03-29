@@ -43,7 +43,7 @@ export function LoginScreen({ onLogin }: Props) {
             />
           </div>
           {error && (
-            <p className="text-xs text-red-400">Incorrect password</p>
+            <p className="text-xs text-red-400/80">Incorrect password</p>
           )}
           <button
             type="submit"

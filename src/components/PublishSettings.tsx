@@ -154,7 +154,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
   if (!webflowSiteId) {
     return (
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 text-center">
-        <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto mb-2" />
+        <AlertTriangle className="w-5 h-5 text-amber-400/80 mx-auto mb-2" />
         <p className="text-sm text-zinc-400">Link a Webflow site in Connections to enable publishing.</p>
       </div>
     );
@@ -173,7 +173,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
           </p>
         </div>
         {publishTarget && (
-          <span className="flex items-center gap-1 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-1 rounded-md">
+          <span className="flex items-center gap-1 text-[11px] text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 px-2 py-1 rounded-md">
             <Check className="w-3 h-3" /> Configured
           </span>
         )}
@@ -228,7 +228,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
               <div key={key} className="flex items-center gap-3">
                 <div className="w-36 flex-shrink-0">
                   <span className="text-[11px] text-zinc-300">
-                    {label} {required && <span className="text-red-400">*</span>}
+                    {label} {required && <span className="text-red-400/80">*</span>}
                   </span>
                   <span className="block text-[10px] text-zinc-600">{hint}</span>
                 </div>

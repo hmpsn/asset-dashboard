@@ -102,6 +102,7 @@ function assignAxes(
         0,
       );
 
+
       const sorted = [...leftLines].sort(
         (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
       );

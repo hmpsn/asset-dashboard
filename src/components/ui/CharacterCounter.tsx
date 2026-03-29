@@ -18,11 +18,11 @@ export function CharacterCounter({
   const percentage = (current / max) * 100;
   
   // Determine color based on percentage
-  let colorClass = 'text-green-400';
+  let colorClass = 'text-emerald-400/80';
   if (percentage >= 95) {
-    colorClass = 'text-red-400';
+    colorClass = 'text-red-400/80';
   } else if (percentage >= 80) {
-    colorClass = 'text-amber-400';
+    colorClass = 'text-amber-400/80';
   }
   
   const sizeClasses = {

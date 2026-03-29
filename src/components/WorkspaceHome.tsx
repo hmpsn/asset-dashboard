@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing } from './ui';
 import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
@@ -157,7 +157,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
@@ -195,18 +195,47 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Metric Cards ── */}
       <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
         {audit ? (
-          <StatCard
-            label="Site Health"
-            value={audit.siteScore}
-            icon={Shield}
-            iconColor={audit.siteScore >= 80 ? '#4ade80' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171'}
-            delta={scoreDelta ?? undefined}
-            deltaLabel=" pts"
-            sub={`${audit.errors} errors · ${audit.warnings} warnings`}
+          <div
+            className="bg-zinc-900 border border-zinc-800 p-3 text-left cursor-pointer hover:border-zinc-700 transition-colors"
+            style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-          />
+          >
+            <div className="flex items-center gap-1.5 mb-2">
+              <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
+              <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold leading-none text-zinc-100">{audit.siteScore}</span>
+                  {scoreDelta != null && (
+                    <span className={`text-[11px] font-medium ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                      {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-zinc-500 mt-1">{audit.errors} err · {audit.warnings} warn</div>
+              </div>
+              <MetricRing score={audit.siteScore} size={44} />
+            </div>
+          </div>
         ) : (
-          <StatCard label="Site Health" value="—" icon={Shield} iconColor="#71717a" sub="No audit yet" onClick={webflowSiteId ? () => navigate(adminPath(workspaceId, 'seo-audit')) : undefined} />
+          <div
+            className="bg-zinc-900 border border-zinc-800 p-3 text-left"
+            style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
+          >
+            <div className="flex items-center gap-1.5 mb-2">
+              <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
+              <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-2xl font-bold leading-none text-zinc-600">—</div>
+                <div className="text-[11px] text-zinc-600 mt-1">No audit yet</div>
+              </div>
+              <MetricRing score={0} size={44} noAnimation />
+            </div>
+          </div>
         )}
 
         {searchData ? (
@@ -217,9 +246,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             iconColor="#22d3ee"
             sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+            size="hero"
+            staggerIndex={1}
           />
         ) : (
-          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} />
+          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" staggerIndex={1} />
         )}
 
         {ga4Data ? (
@@ -232,9 +263,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             deltaLabel="%"
             sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+            size="hero"
+            staggerIndex={2}
           />
         ) : (
-          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} />
+          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" staggerIndex={2} />
         )}
 
         <StatCard
@@ -244,6 +277,8 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : '#71717a'}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
+          size="hero"
+          staggerIndex={3}
         />
 
         {roiData && (
@@ -254,6 +289,8 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             iconColor="#22c55e"
             sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
             onClick={() => navigate(`/client/${workspaceId}/roi`)}
+            size="hero"
+            staggerIndex={4}
           />
         )}
 
@@ -265,6 +302,8 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             iconColor={contentDecayData.critical > 0 ? '#f87171' : '#fbbf24'}
             sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk` : `${contentDecayData.warning} pages declining`}
             onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+            size="hero"
+            staggerIndex={5}
           />
         )}
 
@@ -278,6 +317,8 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               iconColor="#71717a"
               sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
               onClick={() => navigate(adminPath(workspaceId, 'content'))}
+              size="hero"
+              staggerIndex={6}
             />
           );
         })()}

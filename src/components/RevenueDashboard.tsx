@@ -98,7 +98,7 @@ export function RevenueDashboard() {
     : data.currentMonthRevenue > 0 ? 100 : 0;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-200">Revenue Analytics</h2>
         {!confirmPurge ? (
@@ -110,7 +110,7 @@ export function RevenueDashboard() {
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-red-400 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Delete all {data.totalTransactions} records?</span>
+            <span className="text-[11px] text-red-400/80 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Delete all {data.totalTransactions} records?</span>
             <button onClick={handlePurgeAll} className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-300 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 transition-all">Yes, purge</button>
             <button onClick={() => setConfirmPurge(false)} className="px-2.5 py-1 rounded-lg text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 transition-all">Cancel</button>
           </div>
@@ -130,7 +130,7 @@ export function RevenueDashboard() {
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mb-1"><BarChart3 className="w-3 h-3" /> This Month</div>
             <div className="text-xl font-bold text-zinc-200">{fmtCents(data.currentMonthRevenue)}</div>
-            <div className={`flex items-center gap-0.5 text-[11px] mt-0.5 ${monthDelta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={`flex items-center gap-0.5 text-[11px] mt-0.5 ${monthDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
               {monthDelta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {monthDelta >= 0 ? '+' : ''}{monthDelta.toFixed(0)}% vs last month
             </div>

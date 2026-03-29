@@ -117,8 +117,8 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
   if (!data && !loading) {
     return (
-      <div className="space-y-4">
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-6 py-12 text-center">
+      <div className="space-y-8">
+        <div className="bg-zinc-900 border border-zinc-800 px-6 py-12 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <Link className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
           <p className="text-sm text-zinc-400 mb-1">Internal Linking Suggestions</p>
           <p className="text-[11px] text-zinc-500 max-w-md mx-auto mb-4">
@@ -154,7 +154,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   if (!data) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header */}
       <PageHeader
         title="Internal Linking Suggestions"
@@ -168,16 +168,16 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-5 gap-3">
-        <StatCard label="High Priority" value={counts.high} valueColor="text-red-400" />
-        <StatCard label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
-        <StatCard label="Low Priority" value={counts.low} valueColor="text-blue-400" />
-        <StatCard label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-zinc-400'} />
-        <StatCard label="Avg Link Score" value={data.pageHealth?.length ? Math.round(data.pageHealth.reduce((s, p) => s + p.score, 0) / data.pageHealth.length) : '—'} sub="/100" />
+        <StatCard staggerIndex={0} size="hero" label="High Priority" value={counts.high} valueColor="text-red-400" />
+        <StatCard staggerIndex={1} size="hero" label="Medium Priority" value={counts.medium} valueColor="text-amber-400" />
+        <StatCard staggerIndex={2} size="hero" label="Low Priority" value={counts.low} valueColor="text-blue-400" />
+        <StatCard staggerIndex={3} size="hero" label="Orphan Pages" value={data.orphanCount || 0} valueColor={data.orphanCount ? 'text-orange-400' : 'text-zinc-400'} />
+        <StatCard staggerIndex={4} size="hero" label="Avg Link Score" value={data.pageHealth?.length ? Math.round(data.pageHealth.reduce((s, p) => s + p.score, 0) / data.pageHealth.length) : '—'} sub="/100" />
       </div>
 
       {/* Orphan Pages Warning */}
       {data.orphanCount && data.orphanCount > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-orange-500/20 overflow-hidden">
+        <div className="bg-zinc-900 border border-orange-500/20 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => setShowOrphans(!showOrphans)}
             className="w-full px-4 py-3 flex items-center gap-2 hover:bg-zinc-800/30 transition-colors"
@@ -247,7 +247,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
       </div>
 
       {/* Suggestions list */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-xs text-zinc-500">
             No suggestions match your filter

@@ -113,7 +113,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   if (!overview) return null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Date range + loading indicator */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-zinc-500">{overview.dateRange.start} — {overview.dateRange.end}</p>
@@ -124,7 +124,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       </div>
 
       {/* ── 1. MetricToggleCards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricToggleCard
           label="Users"
           value={formatNumber(overview.totalUsers)}
@@ -300,8 +300,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       <div className="flex flex-col lg:flex-row lg:items-start gap-3">
         {/* Left: Top Pages — height matches sidebar via ref measurement */}
         <div
-          className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden min-w-0 lg:flex-[2]"
-          style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+          className="bg-zinc-900 border border-zinc-800 flex flex-col overflow-hidden min-w-0 lg:flex-[2]"
+          style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined, borderRadius: '10px 24px 10px 24px' }}
         >
           <div className="flex items-center px-4 py-3 border-b border-zinc-800 rounded-t-xl shrink-0">
             <span className="text-sm font-semibold text-zinc-200">Top Pages</span>
@@ -427,7 +427,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {conversions.map((c, i) => (
-                    <div key={i} className="bg-zinc-800/30 rounded-lg border border-zinc-800 p-3">
+                    <div key={i} className="bg-zinc-800/30 border border-zinc-800 p-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
                       <div className="text-[11px] text-zinc-400 truncate mb-1">{c.eventName.replace(/_/g, ' ')}</div>
                       <div className="text-xl font-bold text-zinc-200">{c.conversions.toLocaleString()}</div>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -451,7 +451,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 <div className="text-xs text-zinc-500 font-medium mb-2 flex items-center gap-1.5">
                   <ArrowRight className="w-3.5 h-3.5 text-teal-400" /> Top Landing Pages
                 </div>
-                <div className="rounded-lg border border-zinc-800 overflow-hidden">
+                <div className="border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-zinc-800 bg-zinc-900/50">

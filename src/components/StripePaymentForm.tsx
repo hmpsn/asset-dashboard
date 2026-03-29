@@ -90,8 +90,8 @@ function PaymentFormInner({ amount, productName, onSuccess, onCancel }: PaymentF
 
       {/* Error message */}
       {error && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/8 border border-red-500/20">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-400/80 mt-0.5 flex-shrink-0" />
           <span className="text-[11px] text-red-300 leading-relaxed">{error}</span>
         </div>
       )}

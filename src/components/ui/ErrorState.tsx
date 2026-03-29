@@ -20,14 +20,14 @@ export function ErrorState({
 }: ErrorStateProps) {
   const getIconConfig = () => {
     switch (type) {
-      case 'network': 
-        return { Icon: Wifi, color: 'text-amber-400', bg: 'bg-amber-500/10' };
-      case 'data': 
-        return { Icon: Database, color: 'text-red-400', bg: 'bg-red-500/10' };
-      case 'permission': 
+      case 'network':
+        return { Icon: Wifi, color: 'text-amber-400/80', bg: 'bg-amber-500/8' };
+      case 'data':
+        return { Icon: Database, color: 'text-red-400/80', bg: 'bg-red-500/8' };
+      case 'permission':
         return { Icon: AlertTriangle, color: 'text-orange-400', bg: 'bg-orange-500/10' };
-      default: 
-        return { Icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10' };
+      default:
+        return { Icon: AlertTriangle, color: 'text-red-400/80', bg: 'bg-red-500/8' };
     }
   };
 

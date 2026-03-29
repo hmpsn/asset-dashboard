@@ -59,9 +59,9 @@
 |------|------|-------|----------|---------------|
 | **Blue** | `#60a5fa` | `#2563eb` | `blue-400`/`blue-600` | Clicks, sessions, links, info badges, "Needs Review", progress bars, commercial intent |
 | **Emerald** | `#34d399` | `#047857` | `emerald-400` | Success, good scores (80+), score ring fill |
-| **Green** | `#4ade80` | `#15803d` | `green-400` | Positive deltas, delivery confirmations, approved states |
-| **Amber** | `#fbbf24` | `#b45309` | `amber-400` | Warnings, medium scores (60–79), trial badges, premium tier gate (TierGate only) |
-| **Red** | `#f87171` | `#dc2626` | `red-400` | Errors, bad scores (<60), high-priority items, destructive actions |
+| **Green / Emerald** | `#34d399` | `#047857` | `emerald-400/80` | Positive deltas, approved states, success indicators. Use `emerald-400/80` (not `green-400`) to match muted palette |
+| **Amber** | `#fbbf24` | `#b45309` | `amber-400/80` | Warnings, medium scores (60–79), trial badges, premium tier gate (TierGate only). Use `/80` opacity for status indicators |
+| **Red** | `#f87171` | `#dc2626` | `red-400/80` | Errors, bad scores (<60), high-priority items, destructive actions. Use `/80` opacity for status indicators |
 | **Orange** | `#fb923c` | `#c2410c` | `orange-400` | "Changes requested" status, urgent attention |
 | **Cyan** | `#22d3ee` | `#0e7490` | `cyan-400` | Navigational intent badges, social data |
 | **Purple** | `#a78bfa` | `#7c3aed` | `purple-400`/`purple-600` | **Admin AI chat only** — FAB, messages, input focus, send button. Also admin "Flag for Client" in SeoAudit |
@@ -211,12 +211,26 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 
 | Context | Value |
 |---------|-------|
-| Page-level section gap | `space-y-5` (20px) |
-| Card padding | `p-4` standard, `p-3` compact |
+| Page-level section gap | `space-y-8` (32px) between major sections |
+| Related items within a section | `gap-3` (12px) |
+| Between cards within a section | `gap-4` (16px) |
+| Card padding | `p-4` standard (`size="hero"`), `p-3` default |
 | Card header | `px-4 py-3` |
-| Grid gap | `gap-3` stat cards, `gap-4`/`gap-5` content sections |
 | Stat card grid | `grid-cols-2 sm:grid-cols-4` |
 | Content opportunity grid | `grid-cols-1 md:grid-cols-2` |
+
+### Card Border Radius — Asymmetric Signature Shape
+
+The platform's signature shape is an asymmetric diagonal radius — tight top-left/bottom-right, rounded top-right/bottom-left:
+
+| Component | Radius | Implementation |
+|-----------|--------|----------------|
+| `SectionCard` (page-level) | `10px 24px 10px 24px` | `style={{ borderRadius: '10px 24px 10px 24px' }}` |
+| `StatCard` | `6px 12px 6px 12px` | `style={{ borderRadius: '6px 12px 6px 12px' }}` |
+| Insight cards (standalone) | `8px 16px 8px 16px` | inline style |
+| Nested cards (inside SectionCard) | `8px` uniform | `rounded-lg` |
+| Badges, pills | `4px` uniform | `rounded` |
+| Buttons | unchanged | `rounded-lg` (8px) |
 
 ---
 
@@ -224,7 +238,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 
 | Pattern | Spec |
 |---------|------|
-| Card hover | `border-zinc-700` + `box-shadow: 0 4px 24px -4px rgba(0,0,0,0.3)` |
+| Card hover (data-only) | `border-zinc-700` + `box-shadow: 0 4px 24px -4px rgba(0,0,0,0.3)` |
+| Card hover (interactive/clickable) | Left border `rgba(45,212,191,0.4)` teal accent. Use `interactive` prop on `SectionCard` |
 | Button transition | `transition-colors` (150ms) or `transition-all` for complex states |
 | Active tab (segmented) | `bg-zinc-700 text-zinc-200` |
 | Active tab (underline) | `border-teal-500 text-teal-300` |
@@ -233,6 +248,10 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | Modal enter | `animate-[scaleIn_0.2s_ease-out]` |
 | Modal overlay | `bg-black/70 backdrop-blur-md` |
 | Modal container | `bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl max-w-md` |
+| Page transition | `ScannerReveal` — muted teal beam sweeps top-to-bottom on navigation (850ms, ease-out) |
+| Card entrance | Stagger-fade: `staggerFadeIn` 0.4s + 60ms delay per sibling. Use `staggerIndex` prop on `SectionCard`/`StatCard` |
+| MetricRing entrance | Charge-up: ring sweep → number fade at 0.8s → glow bloom at 2s. Disabled with `noAnimation` prop |
+| Noise texture | `body::after` SVG feTurbulence at 2% opacity — reduces digital perfection, adds tactile depth |
 
 ---
 
@@ -357,6 +376,7 @@ When shipping UI changes that affect color or design patterns:
 | 2025-03-07 | **v2 rewrite**: Full codebase audit (43 components + 12 primitives). Fixed StripePaymentForm, WorkspaceOverview, WorkspaceSettings. Added per-component color map, primitive inventory, admin vs client rules, AI prompting section |
 | 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` with dual Y-axes, annotation markers, click-to-annotate. Merged SearchConsole + GoogleAnalytics into `AnalyticsHub`. |
 | 2026-03-27 | **Connected Intelligence Phase 1**: New `InsightFeed` priority feed component (severity icons: red=critical TrendingDown, amber=warning AlertTriangle, blue=opportunity Target, green=win TrendingUp). `SummaryPills` with colored dots (red/amber/green/blue/purple) and toggle-filter interaction. `InsightSkeleton` shimmer loading. `AnnotatedTrendChart` gains toggleable line chips (solid=active, outline=inactive, grayed=at-max). All three hub tabs now insight-first with sub-tabs. |
+| 2026-03-28 | **Visual Polish** (10 refinements): Asymmetric card radius (SectionCard `10px 24px`, StatCard `6px 12px`), MetricRing outward glow + charge-up animation, noise overlay on body, ScannerReveal page transitions, spacing variation (`space-y-8` between sections), removed uppercase from section headings, StatCard `size="hero"` prop, stagger-fade entrance animations, interactive card hover (teal left-border accent), status color muting (`emerald-400/80`, `amber-400/80`, `red-400/80`, bg at `/8` opacity). Updated: SectionCard, StatCard, MetricRing, Skeleton, TierGate, Badge, statusConfig, ~60 consumer files. |
 
 ---
 

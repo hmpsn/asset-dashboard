@@ -4,7 +4,7 @@ import {
   BarChart3, Sparkles, Search as SearchIcon, TrendingUp,
   CheckCircle, Tag, Zap, BookOpen,
 } from 'lucide-react';
-import { scoreColorClass, scoreBgBarClass } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
 import { get, post } from '../api/client';
 import { keywords } from '../api/seo';
 
@@ -202,7 +202,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
   const analyzedCount = Object.keys(analyses).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Stats + Analyze All */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-sm text-zinc-400">
@@ -248,7 +248,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
       </div>
 
       {/* Page list */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);
@@ -256,7 +256,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           const cs = contentScores[page.id];
 
           return (
-            <div key={page.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div key={page.id} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <button
                 onClick={() => toggleExpand(page.id, page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"
@@ -302,7 +302,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                     <div className="space-y-4 pt-2">
                       {/* Top row: Score + Intent + Difficulty */}
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Optimization</div>
                           <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}
@@ -312,7 +312,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                             <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
@@ -324,7 +324,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                             </div>
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
                           <div className={`text-lg font-bold capitalize ${difficultyColor(kw.estimatedDifficulty)}`}>
                             {kw.estimatedDifficulty}
@@ -334,7 +334,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                       </div>
 
                       {/* Primary keyword */}
-                      <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                      <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                         <div className="flex items-center gap-2 mb-2">
                           <Target className="w-3.5 h-3.5 text-teal-400" />
                           <span className="text-xs font-medium text-zinc-300">Primary Keyword</span>
@@ -362,7 +362,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
                       {/* Keywords grid */}
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <Tag className="w-3.5 h-3.5 text-blue-400" />
                             <span className="text-xs font-medium text-zinc-300">Secondary Keywords</span>
@@ -375,7 +375,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                             ))}
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <TrendingUp className="w-3.5 h-3.5 text-green-400" />
                             <span className="text-xs font-medium text-zinc-300">Long-Tail Keywords</span>
@@ -392,7 +392,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
                       {/* Competitor keywords */}
                       {kw.competitorKeywords.length > 0 && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-3.5 h-3.5 text-amber-400" />
                             <span className="text-xs font-medium text-zinc-300">Competitor Keywords</span>
@@ -409,7 +409,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
                       {/* Content gaps */}
                       {kw.contentGaps.length > 0 && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
                             <span className="text-xs font-medium text-zinc-300">Content Gaps</span>
@@ -456,7 +456,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
 
                       {/* Content metrics */}
                       {cs && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-3">
                             <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
                             <span className="text-xs font-medium text-zinc-300">Content Metrics</span>
@@ -467,10 +467,15 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                               <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Words</div>
                             </div>
                             <div>
-                              <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
-                                {cs.readabilityScore}
+                              <div className="flex items-center gap-3">
+                                <MetricRing score={cs.readabilityScore} size={64} noAnimation />
+                                <div>
+                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                                    {cs.readabilityScore}
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
+                                </div>
                               </div>
-                              <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-zinc-200">{cs.headings.total}</div>

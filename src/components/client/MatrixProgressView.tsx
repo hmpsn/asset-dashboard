@@ -136,7 +136,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <PageHeader
@@ -161,7 +161,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
       </div>
 
       {/* Progress bar */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+      <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-zinc-300">Overall Progress</span>
           <span className="text-xs text-zinc-400">{progressPercent}%</span>
@@ -183,7 +183,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
 
       {/* Review alert */}
       {reviewCount > 0 && (
-        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 px-5 py-3 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
             <Eye className="w-4 h-4 text-teal-400" />
           </div>

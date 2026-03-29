@@ -173,7 +173,7 @@ export function StripeSettings() {
       {/* Toast */}
       {toast && (
         <div className={`mb-3 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${
-          toast.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+          toast.type === 'success' ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-red-500/8 text-red-400/80 border border-red-500/20'
         }`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
           {toast.message}
@@ -184,19 +184,19 @@ export function StripeSettings() {
         {/* Status summary */}
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5">
-            {config?.hasSecretKey ? <CheckCircle2 className="w-3 h-3 text-green-400" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
+            {config?.hasSecretKey ? <CheckCircle2 className="w-3 h-3 text-emerald-400/80" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
             <span className={config?.hasSecretKey ? 'text-zinc-300' : 'text-zinc-500'}>Secret Key</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {config?.hasWebhookSecret ? <CheckCircle2 className="w-3 h-3 text-green-400" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
+            {config?.hasWebhookSecret ? <CheckCircle2 className="w-3 h-3 text-emerald-400/80" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
             <span className={config?.hasWebhookSecret ? 'text-zinc-300' : 'text-zinc-500'}>Webhook Secret</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {config?.hasPublishableKey ? <CheckCircle2 className="w-3 h-3 text-green-400" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
+            {config?.hasPublishableKey ? <CheckCircle2 className="w-3 h-3 text-emerald-400/80" /> : <AlertTriangle className="w-3 h-3 text-zinc-600" />}
             <span className={config?.hasPublishableKey ? 'text-zinc-300' : 'text-zinc-500'}>Publishable Key</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <DollarSign className={`w-3 h-3 ${configuredCount > 0 ? 'text-green-400' : 'text-zinc-600'}`} />
+            <DollarSign className={`w-3 h-3 ${configuredCount > 0 ? 'text-emerald-400/80' : 'text-zinc-600'}`} />
             <span className={configuredCount > 0 ? 'text-zinc-300' : 'text-zinc-500'}>{configuredCount}/{products.length} products</span>
           </div>
         </div>
@@ -206,7 +206,7 @@ export function StripeSettings() {
           <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mb-2">API Keys</div>
           <div className="space-y-2">
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Secret Key {config?.hasSecretKey && <span className="text-green-400">(saved)</span>}</label>
+              <label className="text-[11px] text-zinc-400 block mb-1">Secret Key {config?.hasSecretKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
                   <input
@@ -226,7 +226,7 @@ export function StripeSettings() {
               </div>
             </div>
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Webhook Secret {config?.hasWebhookSecret && <span className="text-green-400">(saved)</span>}</label>
+              <label className="text-[11px] text-zinc-400 block mb-1">Webhook Secret {config?.hasWebhookSecret && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
                   <input
@@ -246,7 +246,7 @@ export function StripeSettings() {
               </div>
             </div>
             <div>
-              <label className="text-[11px] text-zinc-400 block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-green-400">(saved)</span>}</label>
+              <label className="text-[11px] text-zinc-400 block mb-1">Publishable Key {config?.hasPublishableKey && <span className="text-emerald-400/80">(saved)</span>}</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
                   <input

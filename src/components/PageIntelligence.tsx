@@ -7,7 +7,7 @@ import {
   Shield, DollarSign, ArrowUp, ArrowDown, ArrowUpRight, Code2, Plus,
 } from 'lucide-react';
 import { adminPath } from '../routes';
-import { scoreColorClass, scoreBgBarClass } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
@@ -582,22 +582,22 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-zinc-200">Page Intelligence</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {unifiedPages.length} pages
-            {cmsCount > 0 && <span className="text-violet-400"> · {cmsCount} CMS</span>}
+            {cmsCount > 0 && <span className="text-purple-400"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
             {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
         {/* Analyze All */}
         {bulkProgress ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+          <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
             <span className="text-xs text-zinc-300">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
             <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
           </div>
@@ -607,7 +607,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               <button
                 onClick={() => analyzeAllPages(false)}
                 disabled={analyzing.size > 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Analyze Remaining ({unifiedPages.length - analyzedCount})
@@ -619,7 +619,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 ${
                 analyzedCount > 0
                   ? 'bg-zinc-700 hover:bg-zinc-600 text-zinc-200'
-                  : 'bg-violet-600/80 hover:bg-violet-500/80 text-white'
+                  : 'bg-purple-600/80 hover:bg-purple-500/80 text-white'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -692,7 +692,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       </div>
 
       {/* Page List */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {filtered.map(page => {
           const isExpanded = expanded === page.id;
           const isAnalyzing = analyzing.has(page.id);
@@ -722,7 +722,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-zinc-300 truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/20 shrink-0">CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20 shrink-0">CMS</span>
                       )}
                     </div>
                     <span className="text-[11px] text-zinc-500 font-mono">{page.path}</span>
@@ -915,7 +915,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Score + Intent + Difficulty */}
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Optimization</div>
                           <div className={`text-2xl font-bold ${scoreColorClass(kw.optimizationScore)}`}>
                             {kw.optimizationScore}<span className="text-xs font-normal text-zinc-500">/100</span>
@@ -924,7 +924,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             <div className={`h-full rounded-full ${scoreBgBarClass(kw.optimizationScore)}`} style={{ width: `${kw.optimizationScore}%` }} />
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Search Intent</div>
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">{intentIcon(kw.searchIntent)}</span>
@@ -934,7 +934,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             </div>
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
                           <div className={`text-lg font-bold capitalize ${difficultyTextColor(kw.estimatedDifficulty)}`}>{kw.estimatedDifficulty}</div>
                           <div className="text-[11px] text-zinc-500 mt-0.5">Cluster: {kw.topicCluster}</div>
@@ -942,7 +942,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       </div>
 
                       {/* Primary keyword presence */}
-                      <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                      <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                         <div className="flex items-center gap-2 mb-2">
                           <Target className="w-3.5 h-3.5 text-teal-400" />
                           <span className="text-xs font-medium text-zinc-300">Primary Keyword: <span className="text-white">{kw.primaryKeyword}</span></span>
@@ -970,7 +970,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Keywords grid */}
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <Tag className="w-3.5 h-3.5 text-blue-400" />
                             <span className="text-xs font-medium text-zinc-300">Secondary Keywords</span>
@@ -981,7 +981,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                             ))}
                           </div>
                         </div>
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <TrendingUp className="w-3.5 h-3.5 text-green-400" />
                             <span className="text-xs font-medium text-zinc-300">Long-Tail Keywords</span>
@@ -996,7 +996,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Competitor keywords */}
                       {kw.competitorKeywords.length > 0 && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-3.5 h-3.5 text-amber-400" />
                             <span className="text-xs font-medium text-zinc-300">Competitor Keywords</span>
@@ -1015,7 +1015,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                           <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Issues & Recommendations</span>
 
                           {kw.contentGaps.length > 0 && (
-                            <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                            <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                               <div className="flex items-center gap-2 mb-2">
                                 <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
                                 <span className="text-xs font-medium text-zinc-300">Content Gaps</span>
@@ -1032,7 +1032,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                           <div className="grid grid-cols-2 gap-3">
                             {kw.optimizationIssues.length > 0 && (
-                              <div className="bg-zinc-900 rounded-lg p-3 border border-red-500/20">
+                              <div className="bg-zinc-900 p-3 border border-red-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <AlertCircle className="w-3.5 h-3.5 text-red-400" />
                                   <span className="text-xs font-medium text-zinc-300">Issues</span>
@@ -1045,7 +1045,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               </div>
                             )}
                             {kw.recommendations.length > 0 && (
-                              <div className="bg-zinc-900 rounded-lg p-3 border border-green-500/20">
+                              <div className="bg-zinc-900 p-3 border border-green-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
                                 <div className="flex items-center gap-2 mb-2">
                                   <Sparkles className="w-3.5 h-3.5 text-green-400" />
                                   <span className="text-xs font-medium text-zinc-300">Recommendations</span>
@@ -1063,7 +1063,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
                       {/* Content metrics */}
                       {cs && (
-                        <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+                        <div className="bg-zinc-900 p-3 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
                           <div className="flex items-center gap-2 mb-3">
                             <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
                             <span className="text-xs font-medium text-zinc-300">Content Metrics</span>
@@ -1074,10 +1074,15 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                               <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Words</div>
                             </div>
                             <div>
-                              <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
-                                {cs.readabilityScore}
+                              <div className="flex items-center gap-3">
+                                <MetricRing score={cs.readabilityScore} size={64} noAnimation />
+                                <div>
+                                  <div className={`text-lg font-bold ${cs.readabilityScore >= 60 ? 'text-green-400' : cs.readabilityScore >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                                    {cs.readabilityScore}
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
+                                </div>
                               </div>
-                              <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Readability</div>
                             </div>
                             <div>
                               <div className="text-lg font-bold text-zinc-200">{cs.headings.total}</div>

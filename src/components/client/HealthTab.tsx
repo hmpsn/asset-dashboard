@@ -163,7 +163,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   };
 
   if (auditDetail) return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
@@ -225,7 +225,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-4">
               <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
@@ -240,8 +240,14 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             </div>
             <div className="flex items-center gap-4 mt-3 pt-3 border-t border-zinc-800/50 text-xs">
               <span className="text-zinc-500">{auditDetail.audit.totalPages} pages scanned</span>
-              <span className="text-red-400">{auditDetail.audit.errors} errors</span>
-              <span className="text-amber-400">{auditDetail.audit.warnings} warnings</span>
+              <button
+                onClick={() => { setSeverityFilter(severityFilter === 'error' ? 'all' : 'error'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+                className={`transition-colors ${severityFilter === 'error' ? 'text-red-300 font-medium' : 'text-red-400 hover:text-red-300'}`}
+              >{auditDetail.audit.errors} errors</button>
+              <button
+                onClick={() => { setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning'); setTimeout(() => allPagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+                className={`transition-colors ${severityFilter === 'warning' ? 'text-amber-300 font-medium' : 'text-amber-400 hover:text-amber-300'}`}
+              >{auditDetail.audit.warnings} warnings</button>
             </div>
           </div>
         );
@@ -287,7 +293,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           return (
             <div key={label} className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{label}</span>
+                <span className="text-xs font-medium text-zinc-400 tracking-wider">{label}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="space-y-1.5">
@@ -320,7 +326,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           );
         };
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-200">Page Speed &amp; Core Web Vitals</span>
@@ -375,7 +381,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Fix These First */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+              <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400" />
                   <span className="text-sm font-medium text-zinc-200">Fix these first</span>
@@ -390,7 +396,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
                     prioritized.map((item, i) => {
                       const sc = SEV[item.issue.severity];
                       return (
-                        <div key={`${item.pageId}-${i}`} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors">
+                        <div key={`${item.pageId}-${i}`} className="px-4 py-3">
                           <div className="flex items-start gap-3">
                             <span className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0 text-[11px] text-zinc-400 font-medium">{i + 1}</span>
                             <div className="flex-1 min-w-0">
@@ -421,7 +427,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
 
               {/* Page Cards */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-zinc-400" />
@@ -519,7 +525,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 5. SITE-WIDE ISSUES ── */}
       {auditDetail.audit.siteWideIssues.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
@@ -571,7 +577,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
@@ -776,7 +782,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-zinc-400" />
@@ -820,7 +826,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   );
 
   if (audit) return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+    <div className="bg-zinc-900 border border-zinc-800 p-6" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>

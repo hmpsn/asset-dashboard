@@ -190,8 +190,8 @@ export function RedirectManager({ siteId }: Props) {
 
   if (!data && !loading) {
     return (
-      <div className="space-y-4">
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 px-6 py-12 text-center">
+      <div className="space-y-8">
+        <div className="bg-zinc-900 border border-zinc-800 px-6 py-12 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <CornerDownRight className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
           <p className="text-sm text-zinc-400 mb-1">Redirect Scanner</p>
           <p className="text-[11px] text-zinc-500 max-w-md mx-auto mb-4">
@@ -229,7 +229,7 @@ export function RedirectManager({ siteId }: Props) {
   const { summary } = data;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header */}
       <PageHeader
         title="Redirect Manager"
@@ -243,15 +243,15 @@ export function RedirectManager({ siteId }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Healthy" value={summary.healthy} icon={CheckCircle} iconColor="#34d399" valueColor="text-emerald-400" />
-        <StatCard label="Redirecting" value={summary.redirecting} icon={ArrowRight} iconColor="#fbbf24" valueColor="text-amber-400" />
-        <StatCard label="404s" value={summary.notFound} icon={Ban} iconColor="#f87171" valueColor="text-red-400" />
-        <StatCard label="Chains" value={summary.chainsDetected} icon={Link2} iconColor="#2dd4bf" valueColor="text-teal-400" sub={summary.longestChain > 1 ? `longest: ${summary.longestChain} hops` : undefined} />
+        <StatCard label="Healthy" value={summary.healthy} icon={CheckCircle} iconColor="#34d399" valueColor="text-emerald-400" size="hero" staggerIndex={0} />
+        <StatCard label="Redirecting" value={summary.redirecting} icon={ArrowRight} iconColor="#fbbf24" valueColor="text-amber-400" size="hero" staggerIndex={1} />
+        <StatCard label="404s" value={summary.notFound} icon={Ban} iconColor="#f87171" valueColor="text-red-400" size="hero" staggerIndex={2} />
+        <StatCard label="Chains" value={summary.chainsDetected} icon={Link2} iconColor="#2dd4bf" valueColor="text-teal-400" sub={summary.longestChain > 1 ? `longest: ${summary.longestChain} hops` : undefined} size="hero" staggerIndex={3} />
       </div>
 
       {/* Redirect Chains */}
       {data.chains.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800">
             <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Redirect Chains
@@ -311,7 +311,7 @@ export function RedirectManager({ siteId }: Props) {
 
       {/* Redirect Recommendations */}
       {rules.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
             <div>
               <h4 className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
@@ -425,7 +425,7 @@ export function RedirectManager({ siteId }: Props) {
       </div>
 
       {/* Page status table */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="grid grid-cols-[auto_1fr_80px_1fr] gap-0 text-[11px] text-zinc-500 uppercase tracking-wider font-medium px-4 py-2 border-b border-zinc-800">
           <span className="pr-3">Status</span>
           <span>Path</span>
@@ -481,7 +481,7 @@ export function RedirectManager({ siteId }: Props) {
 
       {/* Tips */}
       {(summary.chainsDetected > 0 || summary.notFound > 0) && (
-        <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
+        <div className="bg-zinc-800/30 border border-zinc-800 px-4 py-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="text-[11px] text-zinc-500 space-y-1">

@@ -529,7 +529,7 @@ function AssetBrowser({ siteId }: Props) {
       <div className="flex items-center gap-4 text-sm">
         <span className="text-zinc-400">{assets.length} assets</span>
         {missingAltCount > 0 && (
-          <span className="text-amber-400 flex items-center gap-1">
+          <span className="text-amber-400/80 flex items-center gap-1">
             <AlertTriangle className="w-3.5 h-3.5" /> {missingAltCount} missing alt
           </span>
         )}
@@ -539,7 +539,7 @@ function AssetBrowser({ siteId }: Props) {
           </span>
         )}
         {unusedCount > 0 && (
-          <span className="text-red-400 flex items-center gap-1">
+          <span className="text-red-400/80 flex items-center gap-1">
             <Trash2 className="w-3.5 h-3.5" /> {unusedCount} unused
           </span>
         )}
@@ -565,9 +565,9 @@ function AssetBrowser({ siteId }: Props) {
       {/* Alt text error banner */}
       {altError && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 border border-red-800/50 rounded-lg text-sm text-red-300">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+          <AlertTriangle className="w-3.5 h-3.5 text-red-400/80 shrink-0" />
           <span className="flex-1">{altError}</span>
-          <button onClick={() => setAltError(null)} className="text-red-400 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setAltError(null)} className="text-red-400/80 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 

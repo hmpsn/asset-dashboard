@@ -79,7 +79,7 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
   };
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <ListChecks className="w-4 h-4 text-teal-400" />

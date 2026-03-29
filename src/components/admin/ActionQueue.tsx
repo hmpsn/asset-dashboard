@@ -15,8 +15,8 @@ interface Props {
 
 // Severity badge colors following Three Laws of Color
 const severityBadge = {
-  critical: 'bg-red-500/10 text-red-400 border-red-500/20',
-  warning: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  critical: 'bg-red-500/8 text-red-400/80 border-red-500/20',
+  warning: 'bg-amber-500/8 text-amber-400/80 border-amber-500/20',
   opportunity: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   positive: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
 } as const;

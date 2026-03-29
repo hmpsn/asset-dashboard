@@ -62,7 +62,7 @@ export function SearchSnapshot({ overview, trend, comparison, devices, onViewMor
   const totalDevClicks = devices.reduce((s, d) => s + d.clicks, 0) || 1;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-4">
+    <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -174,7 +174,7 @@ export function AnalyticsSnapshot({ overview, trend, topPages, comparison, newVs
   const retSeg = newVsReturning.find(s => s.segment === 'returning');
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-4">
+    <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

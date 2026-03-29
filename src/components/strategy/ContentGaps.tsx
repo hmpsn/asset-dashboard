@@ -42,7 +42,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
   if (sorted.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4">
+    <div className="bg-zinc-900 border border-blue-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
       <h4 className="text-xs font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
         <FileText className="w-3.5 h-3.5" /> Content Gaps
       </h4>

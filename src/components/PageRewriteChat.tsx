@@ -138,8 +138,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
   };
 
   const sevColor = (sev: string) => {
-    if (sev === 'error') return 'text-red-400';
-    if (sev === 'warning') return 'text-amber-400';
+    if (sev === 'error') return 'text-red-400/80';
+    if (sev === 'warning') return 'text-amber-400/80';
     return 'text-blue-400';
   };
 
@@ -305,7 +305,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
 
           {pageError && (
             <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
-              <AlertTriangle className="w-6 h-6 text-amber-400" />
+              <AlertTriangle className="w-6 h-6 text-amber-400/80" />
               <p className="text-xs text-zinc-400 text-center">{pageError}</p>
             </div>
           )}
@@ -336,7 +336,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
                     onClick={() => setShowIssues(!showIssues)}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-zinc-800/50 transition-colors"
                   >
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
                     <span className="text-xs font-medium text-zinc-200 flex-1">
                       Audit Issues ({pageData.issues.length})
                     </span>

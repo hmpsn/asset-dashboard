@@ -225,7 +225,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 rounded-xl p-6 border border-zinc-800">
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 p-6 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={result.score} size={100} />
           <div className="text-xs text-zinc-500">{strategy === 'mobile' ? 'Mobile' : 'Desktop'}</div>
@@ -406,7 +406,7 @@ export function PageSpeedPanel({ siteId }: Props) {
   const v = data.averageVitals;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Strategy toggle + re-run */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
@@ -433,7 +433,7 @@ export function PageSpeedPanel({ siteId }: Props) {
       </div>
 
       {/* Average score + vitals */}
-      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 rounded-xl p-6 border border-zinc-800">
+      <div className="grid grid-cols-[auto_1fr] gap-6 bg-zinc-900 p-6 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex flex-col items-center gap-2">
           <MetricRing score={data.averageScore} size={100} />
           <div className="text-xs text-zinc-500">Avg Score</div>
@@ -453,7 +453,7 @@ export function PageSpeedPanel({ siteId }: Props) {
         {data.pages.map(page => {
           const isOpen = expandedPage === page.url;
           return (
-            <div key={page.url} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div key={page.url} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <button
                 onClick={() => setExpandedPage(isOpen ? null : page.url)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-900/50 transition-colors text-left"

@@ -44,7 +44,7 @@ export function CmsTemplatePanel({
     <>
       {/* CMS Template Panel */}
       {showCmsPanel && (
-        <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
+        <div className="w-full max-w-lg bg-zinc-900 border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
             <span className="text-xs font-medium text-amber-300">CMS Collection Templates</span>
             <button onClick={onClose} className="text-[11px] text-zinc-500 hover:text-zinc-400">Close</button>
@@ -62,7 +62,7 @@ export function CmsTemplatePanel({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-zinc-300">{p.collectionName}</span>
-                    {generatingCmsTemplate === p.collectionId && <Loader2 className="w-3 h-3 animate-spin text-amber-400" />}
+                    {generatingCmsTemplate === p.collectionId && <Loader2 className="w-3 h-3 animate-spin text-amber-400/80" />}
                   </div>
                   <span className="text-[11px] text-zinc-500">/{p.collectionSlug}/{'{'} slug {'}'} · Template: {p.pageTitle}</span>
                 </button>
@@ -74,14 +74,14 @@ export function CmsTemplatePanel({
 
       {/* CMS Template Result */}
       {cmsTemplateResult && (
-        <div className="w-full max-w-2xl bg-zinc-900 border border-amber-500/20 rounded-xl overflow-hidden mt-2">
+        <div className="w-full max-w-2xl bg-zinc-900 border border-amber-500/20 overflow-hidden mt-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-2.5 border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-xs font-medium text-amber-300">Template: {cmsTemplateResult.collectionName}</span>
                 <div className="flex gap-1.5 mt-1">
                   {cmsTemplateResult.schemaTypes.map((t, i) => (
-                    <span key={i} className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20">{t}</span>
+                    <span key={i} className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-amber-500/8 text-amber-300 border border-amber-500/20">{t}</span>
                   ))}
                 </div>
               </div>
@@ -98,13 +98,13 @@ export function CmsTemplatePanel({
                   onClick={onCopyCmsTemplate}
                   className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
                 >
-                  {cmsCopied ? <><CheckCircle className="w-3 h-3 text-green-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                  {cmsCopied ? <><CheckCircle className="w-3 h-3 text-emerald-400/80" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
                 </button>
               </div>
             </div>
             <div className="mt-3 flex items-center gap-2">
               {cmsPublished ? (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
                   <CheckCircle className="w-3.5 h-3.5" /> Published to Webflow
                 </span>
               ) : (
@@ -116,7 +116,7 @@ export function CmsTemplatePanel({
                   {publishingCmsTemplate ? <><Loader2 className="w-3 h-3 animate-spin" /> Publishing...</> : <><Upload className="w-3.5 h-3.5" /> Publish to Template Page</>}
                 </button>
               )}
-              {cmsError && <span className="text-xs text-red-400">{cmsError}</span>}
+              {cmsError && <span className="text-xs text-red-400/80">{cmsError}</span>}
             </div>
             <p className="text-[11px] text-zinc-500 mt-2">This template uses {'{{wf}}'} tags — each CMS item page gets unique schema with its own field values.</p>
           </div>

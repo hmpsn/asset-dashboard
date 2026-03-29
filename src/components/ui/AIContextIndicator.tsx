@@ -91,14 +91,14 @@ export function AIContextIndicator({ workspaceId, feature = 'all', compact = fal
   const colorClass = allConnected
     ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5'
     : score >= 60
-      ? 'text-amber-400 border-amber-500/30 bg-amber-500/5'
-      : 'text-red-400 border-red-500/30 bg-red-500/5';
+      ? 'text-amber-400/80 border-amber-500/30 bg-amber-500/5'
+      : 'text-red-400/80 border-red-500/30 bg-red-500/5';
 
   const pillColor = allConnected
     ? 'bg-emerald-500/15 text-emerald-400'
     : score >= 60
-      ? 'bg-amber-500/15 text-amber-400'
-      : 'bg-red-500/15 text-red-400';
+      ? 'bg-amber-500/15 text-amber-400/80'
+      : 'bg-red-500/15 text-red-400/80';
 
   if (compact) {
     return (

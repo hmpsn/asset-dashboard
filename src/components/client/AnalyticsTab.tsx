@@ -152,26 +152,27 @@ export function AnalyticsTab({
   }
 
   return (<>
-    <div className="mb-2">
+    <div className="space-y-6">
+    <div>
       <h2 className="text-xl font-semibold text-zinc-100">Analytics</h2>
-      <p className="text-sm text-zinc-500 mt-1">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
+      <p className="text-sm text-zinc-500 mt-1 leading-relaxed">{ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : 'Google Analytics overview'}</p>
     </div>
 
     {/* GA4 Overview Cards */}
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-      <StatCard icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
-      <StatCard icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-blue-400" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
-      <StatCard label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
-      <StatCard icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-amber-400" staggerIndex={3} />
-      <StatCard icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate ? -ga4Comparison.change.bounceRate : undefined} deltaLabel="pp" staggerIndex={4} />
-      <StatCard icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-teal-400" staggerIndex={5} />
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <StatCard size="hero" icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
+      <StatCard size="hero" icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-blue-400" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
+      <StatCard size="hero" label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
+      <StatCard size="hero" icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-amber-400" staggerIndex={3} />
+      <StatCard size="hero" icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate ? -ga4Comparison.change.bounceRate : undefined} deltaLabel="pp" staggerIndex={4} />
+      <StatCard size="hero" icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-teal-400" staggerIndex={5} />
     </div>
 
     {/* Traffic Trend + Devices row */}
     {ga4Trend.length > 0 && (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Traffic Trend (2/3) */}
-        <div className="lg:col-span-2 bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <h3 className="text-sm font-semibold text-zinc-200 mb-4">Traffic Trend</h3>
           <ResponsiveContainer width="100%" height={192}>
             <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -214,7 +215,7 @@ export function AnalyticsTab({
 
         {/* Devices Pie Chart (1/3) */}
         {ga4Devices.length > 0 && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 flex flex-col">
+          <div className="bg-zinc-900 border border-zinc-800 p-5 flex flex-col" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <h3 className="text-sm font-semibold text-zinc-200 mb-4">Devices</h3>
             <div className="flex-1 flex flex-col items-center justify-center">
               {(() => {
@@ -246,9 +247,9 @@ export function AnalyticsTab({
       </div>
     )}
 
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Top Pages */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+      <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <h3 className="text-sm font-semibold text-zinc-200 mb-3">Top Pages</h3>
         <div className="space-y-1 max-h-[350px] overflow-y-auto">
           {ga4Pages.slice(0, 15).map((p, i) => (
@@ -263,7 +264,7 @@ export function AnalyticsTab({
       </div>
 
       {/* Traffic Sources */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+      <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <h3 className="text-sm font-semibold text-zinc-200 mb-3">Traffic Sources</h3>
         <div className="space-y-2">
           {ga4Sources.slice(0, 10).map((s, i) => {
@@ -286,9 +287,7 @@ export function AnalyticsTab({
 
     {/* Organic Search + New vs Returning + Landing Pages */}
     {ga4Organic && (
-      <div className="mb-6">
-        <OrganicInsight organic={ga4Organic} landingPages={ga4LandingPages} newVsReturning={ga4NewVsReturning || []} />
-      </div>
+      <OrganicInsight organic={ga4Organic} landingPages={ga4LandingPages} newVsReturning={ga4NewVsReturning || []} />
     )}
 
     {/* ── Event Modules (Grouped) ── */}
@@ -312,7 +311,8 @@ export function AnalyticsTab({
         const pinned = isEventPinned(c.eventName);
         return (
           <button key={i} onClick={() => loadEventTrend(c.eventName)}
-            className={`text-left rounded-xl border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}>
+            className={`text-left border p-4 transition-colors ${isSelected ? 'bg-teal-500/10 border-teal-500/30' : pinned ? 'bg-teal-500/5 border-teal-500/15 hover:border-teal-500/30' : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700'}`}
+            style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] text-zinc-400 truncate max-w-[140px]">{eventDisplayName(c.eventName)}</span>
               <div className="flex items-center gap-1.5">
@@ -350,13 +350,13 @@ export function AnalyticsTab({
       };
       const ungroupedEvents = getEventsForModule('__ungrouped__');
       return (
-        <div className="space-y-6 mt-6">
+        <div className="space-y-6">
           {/* Render each group as a module */}
           {groups.map(group => {
             const groupEvents = getEventsForModule(group.id);
             const noResults = modulePageFilters[group.id] && groupEvents.length === 0 && !modulePageLoading[group.id];
             return (
-              <div key={group.id} className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+              <div key={group.id} className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
                   <h3 className="text-sm font-semibold text-zinc-300">{group.name}</h3>
@@ -375,7 +375,7 @@ export function AnalyticsTab({
           })}
           {/* Ungrouped events */}
           {(ungroupedEvents.length > 0 || modulePageFilters['__ungrouped__']) && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+            <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <h3 className="text-sm font-semibold text-zinc-300 mb-1">{groups.length > 0 ? 'Other Events' : 'Key Events'}</h3>
               <p className="text-[11px] text-zinc-500 mb-2">{groups.length > 0 ? 'Events not assigned to a group' : 'Custom and conversion events tracked on your site'}</p>
               {renderPageFilter('__ungrouped__')}
@@ -391,7 +391,7 @@ export function AnalyticsTab({
 
           {/* Event Trend (shown when an event is selected) */}
           {ga4SelectedEvent && ga4EventTrend.length > 2 && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+            <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-zinc-300">{eventDisplayName(ga4SelectedEvent)}</h3>
@@ -437,7 +437,7 @@ export function AnalyticsTab({
     })()}
 
     {/* ── Collapsible Event Explorer ── */}
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden mt-6">
+    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <button onClick={() => setShowExplorer(!showExplorer)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-zinc-800/30 transition-colors">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-teal-400" />
@@ -520,6 +520,7 @@ export function AnalyticsTab({
           )}
         </div>
       )}
+    </div>
     </div>
   </>);
 }

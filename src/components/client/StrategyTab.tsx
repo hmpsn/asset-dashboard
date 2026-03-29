@@ -231,7 +231,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   ].filter(Boolean).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header + Strategy Health Score */}
       <div className="flex items-center justify-between">
         <div>
@@ -242,7 +242,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
       {/* Unvalidated strategy note */}
       {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 flex items-start gap-2.5">
+        <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-start gap-2.5" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-amber-300/90 leading-relaxed">
             Keyword volume and difficulty metrics are currently unavailable for this strategy. The recommendations are based on AI analysis and site content.
@@ -251,7 +251,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       )}
 
       {/* Strategy Health Score Card */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+      <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center gap-4">
           <div className={`text-3xl font-bold ${healthScore >= 80 ? 'text-emerald-400' : healthScore >= 60 ? 'text-amber-400' : 'text-teal-400'}`}>
             {healthScore}/100
@@ -274,7 +274,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         </div>
         {/* Progress bars */}
-        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-zinc-800/50">
+        <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-zinc-800/50">
           <div>
             <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1">
               <span>Content Gaps</span>
@@ -309,7 +309,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Optimize Existing Pages */}
         {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex items-center gap-3">
+          <div className="bg-zinc-900 border border-zinc-800 p-4 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
               <Zap className="w-5 h-5 text-amber-400" />
             </div>
@@ -327,7 +327,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         )}
 
         {/* New Content to Create */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex items-center gap-3">
+        <div className="bg-zinc-900 border border-zinc-800 p-4 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
             <FileText className="w-5 h-5 text-teal-400" />
           </div>
@@ -344,7 +344,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
 
         {/* Your Keyword Map */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex items-center gap-3">
+        <div className="bg-zinc-900 border border-zinc-800 p-4 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
             <Layers className="w-5 h-5 text-blue-400" />
           </div>
@@ -363,14 +363,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
       {/* ── BUSINESS PRIORITIES (client driver's seat) ── */}
       {workspaceId && prioritiesLoaded && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleSection('business-priorities')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+              <div className="w-6 h-6 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                <Briefcase className="w-3.5 h-3.5 text-teal-400" />
               </div>
               <div className="text-left">
                 <div className="text-sm font-medium text-zinc-200">Your Business Priorities</div>
@@ -397,7 +397,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50 group">
                       <span className={`text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${
                         p.category === 'growth' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        p.category === 'brand' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' :
+                        p.category === 'brand' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' :
                         p.category === 'product' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                         p.category === 'audience' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                         p.category === 'competitive' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
@@ -424,7 +424,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <select
                   value={newPriorityCategory}
                   onChange={e => setNewPriorityCategory(e.target.value)}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-zinc-300 focus:outline-none focus:border-violet-500"
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-zinc-300 focus:outline-none focus:border-teal-500"
                 >
                   <option value="growth">Growth</option>
                   <option value="brand">Brand</option>
@@ -443,7 +443,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                   placeholder="e.g., We're launching a new product line in Q3..."
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-violet-500"
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-teal-500"
                 />
                 <button
                   onClick={() => {
@@ -453,7 +453,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     }
                   }}
                   disabled={!newPriority.trim() || savingPriorities || priorities.length >= 10}
-                  className="px-3 py-1.5 rounded-lg bg-violet-600/20 border border-violet-500/30 text-[11px] text-violet-300 font-medium hover:bg-violet-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/30 transition-colors flex items-center gap-1 disabled:opacity-40"
                 >
                   <Plus className="w-3 h-3" /> Add
                 </button>
@@ -468,7 +468,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
       {/* ── SUGGEST A KEYWORD ── */}
       {workspaceId && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleSection('suggest-keyword')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
@@ -512,7 +512,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
               {requestedKeywords.length > 0 && (
                 <div className="mt-3 space-y-1">
-                  <div className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Your Suggestions</div>
+                  <div className="text-[10px] text-zinc-600 tracking-wider font-medium">Your Suggestions</div>
                   {requestedKeywords.map(kw => (
                     <div key={kw} className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
                       <span className="text-[11px] text-zinc-300">{kw}</span>
@@ -529,7 +529,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── NEW CONTENT TO CREATE (Content Gaps + Keyword Opps + Competitor Gaps) ── */}
       <div ref={newContentRef}>
         <TierGate tier={effectiveTier} required="growth" feature="New Content to Create" teaser={`${(strategyData.contentGaps?.length || 0) + (strategyData.keywordGaps?.length || 0)} content topics identified — upgrade to unlock recommendations`}>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleSection('new-content')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
@@ -591,7 +591,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Data-validated</span>
                             : <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700/50 font-medium">AI suggestion</span>
                           }
-                          <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
+                          <span className="text-[10px] text-zinc-600 tracking-wider">{gap.intent}</span>
                         </div>
                       </div>
                       {((gap.volume != null && gap.volume > 0) || (gap.difficulty != null && gap.difficulty > 0) || (gap.impressions != null && gap.impressions > 0)) && (
@@ -676,7 +676,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         ) : planStatus ? (
                           <button
                             onClick={() => onTabChange?.('content-plan')}
-                            className="flex items-center gap-1 text-[11px] text-violet-400 bg-violet-500/10 px-2.5 py-1.5 rounded-lg border border-violet-500/20 flex-shrink-0 hover:bg-violet-500/20 transition-colors"
+                            className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0 hover:bg-teal-500/20 transition-colors"
                             title="View in Content Plan"
                           >
                             <Layers className="w-3.5 h-3.5" />
@@ -727,7 +727,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <span className="text-[10px] text-zinc-600">({strategyData.keywordGaps.length})</span>
                   </div>
                   <p className="text-[11px] text-zinc-500 mb-2">Keywords your competitors rank for that you don't.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {strategyData.keywordGaps.slice(0, expandedSections.has('competitor-gaps-all') ? undefined : 6).map((gap, i) => (
                       <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
                         <span className="text-[11px] text-zinc-300 font-medium truncate mr-2">{gap.keyword}</span>
@@ -781,7 +781,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── OPTIMIZE EXISTING PAGES (Quick Wins + Growth Opportunities merged) ── */}
       {(quickWinsAvailable > 0 || pagesWithGrowthOpps > 0) && (
       <div ref={optimizeExistingRef}>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleSection('optimize-existing')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
@@ -944,7 +944,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* ── YOUR KEYWORD MAP (Page Map + Target Keywords + Tracked Keywords) ── */}
       <div ref={keywordMapRef}>
       <TierGate tier={effectiveTier} required="growth" feature="Your Keyword Map" teaser={`${strategyData.pageMap.length} pages tracked`}>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleSection('page-keyword-map')}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
@@ -986,7 +986,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 const clientAdded = trackedKeywords.filter(tk => !strategySet.has(tk.query.toLowerCase().trim()));
                 return clientAdded.length > 0 ? (
                   <div className="mb-3">
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Your keywords</div>
+                    <div className="text-[10px] text-zinc-500 tracking-wider mb-1.5">Your keywords</div>
                     <div className="flex flex-wrap gap-2">
                       {clientAdded.map(tk => (
                         <span key={tk.query} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-400">
@@ -1073,7 +1073,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         const declined = [...keywordFeedback.entries()].filter(([, s]) => s === 'declined');
         if (declined.length === 0) return null;
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <button
               onClick={() => toggleSection('declined-keywords')}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"

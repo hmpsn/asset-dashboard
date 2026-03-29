@@ -18,12 +18,17 @@ describe('Badge', () => {
   it('applies specified color classes', () => {
     const { container } = render(<Badge label="Hot" color="red" />);
     const span = container.querySelector('span')!;
-    expect(span.className).toContain('bg-red-500/10');
-    expect(span.className).toContain('text-red-400');
+    expect(span.className).toContain('bg-red-500/8');
+    expect(span.className).toContain('text-red-400/80');
   });
 
   it('applies each supported color correctly', () => {
-    const colors = ['teal', 'blue', 'emerald', 'green', 'amber', 'red', 'orange', 'purple', 'zinc'] as const;
+    // 'green' is aliased to emerald in the refined status color palette
+    const { container: greenContainer, unmount: greenUnmount } = render(<Badge label="green" color="green" />);
+    expect(greenContainer.querySelector('span')!.className).toContain('text-emerald-');
+    greenUnmount();
+
+    const colors = ['teal', 'blue', 'emerald', 'amber', 'red', 'orange', 'purple', 'zinc'] as const;
     for (const color of colors) {
       const { container, unmount } = render(<Badge label={color} color={color} />);
       const span = container.querySelector('span')!;

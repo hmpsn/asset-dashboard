@@ -12,7 +12,7 @@ import {
   Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
 } from 'lucide-react';
 const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
-import { type Tier, Skeleton, OverviewSkeleton } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
 import { RenderMarkdown } from './client/helpers';
 import { STUDIO_NAME } from '../constants';
 import { HealthTab } from './client/HealthTab';
@@ -375,7 +375,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   if (error || !ws) return (
     <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="text-center">
-        <p className="text-red-400 text-sm mb-3">{error || 'Dashboard not found'}</p>
+        <p className="text-red-400/80 text-sm mb-3">{error || 'Dashboard not found'}</p>
         <button onClick={() => window.location.reload()} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition-colors">Try Again</button>
       </div>
     </div>
@@ -389,7 +389,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   if ((ws.requiresPassword || showsUserLogin) && !authenticated) return (
     <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex flex-col items-center mb-6">
             <img src="/logo.svg" alt="hmpsn studio" className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
@@ -416,7 +416,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               <div className="space-y-3">
                 {forgotSent ? (
                   <>
-                    <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4 text-center">
+                    <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: '6px 12px 6px 12px' }}>
                       <p className="text-sm text-teal-400 font-medium">Check your email</p>
                       <p className="text-xs text-zinc-400 mt-1">If an account exists with that email, we've sent a password reset link.</p>
                     </div>
@@ -441,7 +441,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                       placeholder="Email address" autoFocus
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
                     <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
-                    {authError && <p className="text-xs text-red-400">{authError}</p>}
+                    {authError && <p className="text-xs text-red-400/80">{authError}</p>}
                     <button type="submit" disabled={authLoading || !forgotEmail.trim()}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
                       {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reset Link'}
@@ -458,7 +458,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               <div className="space-y-3">
                 {resetDone ? (
                   <>
-                    <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4 text-center">
+                    <div className="bg-teal-500/10 border border-teal-500/20 p-4 text-center" style={{ borderRadius: '6px 12px 6px 12px' }}>
                       <p className="text-sm text-teal-400 font-medium">Password updated!</p>
                       <p className="text-xs text-zinc-400 mt-1">You can now sign in with your new password.</p>
                     </div>
@@ -486,7 +486,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     <input type="password" value={resetConfirm} onChange={e => { setResetConfirm(e.target.value); setAuthError(''); }}
                       placeholder="Confirm new password"
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
-                    {authError && <p className="text-xs text-red-400">{authError}</p>}
+                    {authError && <p className="text-xs text-red-400/80">{authError}</p>}
                     <button type="submit" disabled={authLoading || !resetPassword || !resetConfirm}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
                       {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Set New Password'}
@@ -517,7 +517,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 />
               </div>
               <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
-              {authError && <p className="text-xs text-red-400">{authError}</p>}
+              {authError && <p className="text-xs text-red-400/80">{authError}</p>}
               <button
                 type="submit"
                 disabled={authLoading || !loginEmail.trim() || !loginPassword.trim()}
@@ -549,7 +549,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                   autoFocus={loginTab === 'password' || showsPasswordLogin}
                 />
-                {authError && <p className="text-xs text-red-400 mt-2">{authError}</p>}
+                {authError && <p className="text-xs text-red-400/80 mt-2">{authError}</p>}
               </div>
               <button
                 type="submit"
@@ -571,7 +571,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   if (emailGateOpen && authenticated && !clientUser) return (
     <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 shadow-2xl shadow-black/40">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex flex-col items-center mb-6">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
               <Mail className="w-6 h-6 text-teal-400" />
@@ -656,7 +656,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold">{ws.name}</h1>
                 {!betaMode && ws.isTrial && (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20">
                     Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                   </span>
                 )}
@@ -789,12 +789,14 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6 space-y-5">
+      <main className="max-w-6xl mx-auto px-6 py-6">
+        <ScannerReveal>
+        <div className="space-y-8">
 
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <Clock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
             <p className="text-sm text-amber-300">
               <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
               {' '}Upgrade to keep access to all features.
@@ -802,8 +804,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           </div>
         )}
         {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
-            <Clock className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <Clock className="w-4 h-4 text-red-400/80 flex-shrink-0" />
             <p className="text-sm text-red-300">
               Your Growth trial has ended. Some features are now limited.
               {' '}Upgrade to restore full access.
@@ -813,8 +815,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* Section loading errors */}
         {Object.keys(sectionErrors).length > 0 && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15">
-            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 px-4 py-3 bg-red-500/8 border border-red-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
+            <AlertTriangle className="w-4 h-4 text-red-400/80 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-red-300 space-y-0.5">
               {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
             </div>
@@ -871,7 +873,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span>
                 {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chatUsage.remaining > 0 ? 'text-zinc-400 bg-zinc-800' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chatUsage.remaining > 0 ? 'text-zinc-400 bg-zinc-800' : 'text-amber-400/80 bg-amber-500/8 border border-amber-500/20'}`}>
                     {chatUsage.remaining}/{chatUsage.limit} left
                   </span>
                 ) : (
@@ -969,7 +971,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             {!betaMode && chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
             <div className="px-4 py-3 border-t border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
                 <p className="text-[11px] text-amber-300/80 flex-1">
                   {roiValue && roiValue > 0
                     ? <>Your organic traffic is worth <span className="font-semibold text-emerald-400">${Math.round(roiValue).toLocaleString()}/mo</span> — unlock unlimited insights with Growth.</>
@@ -1015,12 +1017,14 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           </ErrorBoundary>
         )}
 
+        </div>
+        </ScannerReveal>
       </main>
 
       {/* ── SEO Upgrade Modal ── */}
       {!betaMode && showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-zinc-900 border border-zinc-700 p-8 max-w-md w-full mx-4 text-center shadow-2xl" style={{ borderRadius: '10px 24px 10px 24px' }} onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-7 h-7 text-teal-400" />
             </div>
@@ -1065,7 +1069,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         const fmt = fmtPrice;
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4" onClick={() => !pricingConfirming && setPricingModal(null)}>
-            <div className="relative bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="relative bg-zinc-900 border border-zinc-700/50 shadow-2xl shadow-black/50 w-full max-w-md overflow-hidden animate-[scaleIn_0.2s_ease-out]" style={{ borderRadius: '10px 24px 10px 24px' }} onClick={e => e.stopPropagation()}>
               {/* Close button */}
               <button
                 onClick={() => !pricingConfirming && setPricingModal(null)}
@@ -1096,7 +1100,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 </div>
 
                 {/* Topic card */}
-                <div className="rounded-xl px-3.5 py-3 border bg-teal-950/30 border-teal-500/10">
+                <div className="px-3.5 py-3 border bg-teal-950/30 border-teal-500/10" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <div className="flex items-center gap-2 mb-1">
                     <Target className="w-3 h-3 text-teal-400/70" />
                     <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Topic</span>
@@ -1108,7 +1112,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
               {/* Price banner */}
               {displayPrice != null && (
-                <div className="mx-6 flex items-center justify-between px-4 py-3 rounded-xl border bg-teal-500/5 border-teal-500/15">
+                <div className="mx-6 flex items-center justify-between px-4 py-3 border bg-teal-500/5 border-teal-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <div>
                     <div className="text-2xl font-bold tracking-tight text-teal-300">{fmt(displayPrice)}</div>
                     <div className="text-[10px] text-zinc-500 mt-0.5">{isUpgrade ? 'Upgrade difference' : 'One-time payment'}</div>
@@ -1119,7 +1123,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 </div>
               )}
               {displayPrice == null && (
-                <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 rounded-xl px-4 py-3 border border-zinc-700/30">
+                <div className="mx-6 mt-0 mb-0 text-[11px] text-zinc-500 bg-zinc-800/40 px-4 py-3 border border-zinc-700/30" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <Lock className="w-3 h-3 inline mr-1.5 -mt-0.5" />
                   Pricing will be confirmed by {STUDIO_NAME} after submission.
                 </div>

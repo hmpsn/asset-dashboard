@@ -22,7 +22,7 @@ export function SchemaEditor({ pageId, schemaJson, parseError, hasEdits, onChang
         spellCheck={false}
       />
       {parseError && (
-        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400">
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-red-400/80">
           <AlertCircle className="w-3 h-3" />
           {parseError}
         </div>

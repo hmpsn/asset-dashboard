@@ -86,7 +86,7 @@ export function ContentTab({
       const reviewCount = contentRequests.filter(r => r.status === 'client_review').length;
       const newComments = contentRequests.filter(r => r.comments && r.comments.length > 0 && r.comments[r.comments.length - 1].author === 'team' && r.status !== 'declined').length;
       if (reviewCount > 0 || newComments > 0) return (
-        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+        <div className="bg-gradient-to-r from-teal-600/15 to-teal-600/5 border border-teal-500/30 px-5 py-3 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
             <FileText className="w-4 h-4 text-teal-400" />
           </div>
@@ -117,7 +117,7 @@ export function ContentTab({
         { label: 'Published', value: published, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
       ];
       return (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-3">
           {stats.map(s => (
             <div key={s.label} className={`${s.bg} border ${s.border} rounded-lg px-3 py-2 text-center`}>
               <div className={`text-lg font-bold ${s.color} tabular-nums`}>{s.value}</div>
@@ -140,7 +140,7 @@ export function ContentTab({
 
     {/* Topic submission form */}
     {showTopicForm && (
-      <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-3">
+      <div className="bg-zinc-900 border border-teal-500/20 p-5 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="text-xs font-medium text-zinc-300">Suggest a Content Topic</div>
         <input type="text" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Topic name (e.g. 'Benefits of sedation dentistry')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
         <input type="text" value={newTopicKeyword} onChange={e => setNewTopicKeyword(e.target.value)} placeholder="Target keyword (e.g. 'sedation dentistry benefits')" className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 placeholder-zinc-600" />
@@ -203,7 +203,7 @@ export function ContentTab({
         const canUpgrade = isBriefOnly && ['approved', 'delivered', 'published'].includes(req.status);
 
         return (
-          <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div key={req.id} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <button onClick={() => {
               const next = isExpanded ? null : req.id;
               setExpandedContentReq(next);
@@ -263,7 +263,7 @@ export function ContentTab({
                     {/* — Strategic Overview — */}
                     {brief.executiveSummary && (
                       <div className="bg-teal-500/5 border border-teal-500/20 rounded-lg px-4 py-3">
-                        <div className="text-[11px] text-teal-400 font-medium uppercase tracking-wider mb-1.5">Strategic Overview</div>
+                        <div className="text-[11px] text-teal-400 font-medium tracking-wider mb-1.5">Strategic Overview</div>
                         <div className="text-xs text-zinc-300 leading-relaxed">{brief.executiveSummary}</div>
                       </div>
                     )}
@@ -302,7 +302,7 @@ export function ContentTab({
 
                     {/* — Content Direction — */}
                     <div className="space-y-3">
-                      <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Direction</div>
+                      <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Direction</div>
                       <div className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
                         <div className="text-[11px] text-zinc-500 mb-1">Suggested Title</div>
                         <div className="text-sm text-teal-400 font-medium">{brief.suggestedTitle}</div>
@@ -340,7 +340,7 @@ export function ContentTab({
                     {/* — Detailed Outline — */}
                     {brief.outline?.length > 0 && (
                       <div className="space-y-3">
-                        <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Outline</div>
+                        <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Outline</div>
                         <div className="space-y-2">
                           {brief.outline.map((s: { heading: string; notes: string; wordCount?: number; keywords?: string[] }, i: number) => (
                             <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
@@ -360,7 +360,7 @@ export function ContentTab({
 
                     {/* — SEO Intelligence — */}
                     <div className="space-y-3">
-                      <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">SEO Intelligence</div>
+                      <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">SEO Intelligence</div>
                       {brief.secondaryKeywords && brief.secondaryKeywords.length > 0 && (
                         <div>
                           <div className="text-[11px] text-zinc-500 mb-1.5">Keywords to Include</div>
@@ -420,8 +420,8 @@ export function ContentTab({
                     {/* — E-E-A-T Guidance — */}
                     {brief.eeatGuidance && (
                       <div className="space-y-3">
-                        <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">E-E-A-T Signals</div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">E-E-A-T Signals</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {[
                             { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
                             { label: 'Expertise', value: brief.eeatGuidance.expertise, color: 'text-teal-400' },
@@ -440,7 +440,7 @@ export function ContentTab({
                     {/* — Content Checklist — */}
                     {brief.contentChecklist && brief.contentChecklist.length > 0 && (
                       <div className="space-y-3">
-                        <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Checklist</div>
+                        <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Content Checklist</div>
                         <div className="bg-zinc-950 rounded-lg border border-zinc-800 divide-y divide-zinc-800/50">
                           {brief.contentChecklist.map((item: string, i: number) => (
                             <div key={i} className="flex items-start gap-2.5 px-4 py-2.5">
@@ -455,7 +455,7 @@ export function ContentTab({
                     {/* — Schema Markup — */}
                     {brief.schemaRecommendations && brief.schemaRecommendations.length > 0 && (
                       <div className="space-y-3">
-                        <div className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Schema Markup</div>
+                        <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">Schema Markup</div>
                         <div className="space-y-2">
                           {brief.schemaRecommendations.map((schema: { type: string; notes: string }, i: number) => (
                             <div key={i} className="bg-zinc-950 rounded-lg px-4 py-3 border border-zinc-800">
@@ -499,7 +499,7 @@ export function ContentTab({
 
                 {/* Delivery link */}
                 {req.status === 'delivered' && req.deliveryUrl && (
-                  <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
+                  <div className="bg-green-500/5 border border-green-500/20 p-5 flex items-center gap-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
                     <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
                       <ExternalLink className="w-4 h-4 text-green-400" />
                     </div>
@@ -518,13 +518,13 @@ export function ContentTab({
                   const gsc = perf.gsc;
                   const ga4 = perf.ga4;
                   return (
-                    <div className="bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15 rounded-xl p-4 space-y-2">
+                    <div className="bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15 p-5 space-y-2" style={{ borderRadius: '6px 12px 6px 12px' }}>
                       <div className="flex items-center gap-2 mb-1">
                         <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
-                        <span className="text-[11px] text-blue-300 font-medium uppercase tracking-wider">Content Performance</span>
+                        <span className="text-[11px] text-blue-300 font-medium tracking-wider">Content Performance</span>
                         {perf.daysSincePublish > 0 && <span className="text-[11px] text-zinc-500 ml-auto">{perf.daysSincePublish}d since publish</span>}
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {gsc && <>
                           <div className="bg-zinc-950/60 rounded-lg px-3 py-2 border border-zinc-800/50">
                             <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-0.5"><MousePointerClick className="w-3 h-3" /> Clicks</div>
@@ -566,7 +566,7 @@ export function ContentTab({
 
                 {/* Upgrade CTA for brief_only items after approval */}
                 {canUpgrade && (
-                  <div className="bg-gradient-to-r from-teal-600/10 via-emerald-600/10 to-teal-600/10 border border-teal-500/20 rounded-xl p-4 flex items-center gap-4">
+                  <div className="bg-gradient-to-r from-teal-600/10 via-emerald-600/10 to-teal-600/10 border border-teal-500/20 p-5 flex items-center gap-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 flex items-center justify-center flex-shrink-0">
                       <Sparkles className="w-5 h-5 text-teal-400" />
                     </div>
@@ -617,7 +617,7 @@ export function ContentTab({
                 {/* Comments thread */}
                 {req.comments && req.comments.length > 0 && (
                   <div>
-                    <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Comments</div>
+                    <div className="text-[11px] text-zinc-500 tracking-wider mb-2">Comments</div>
                     <div className="space-y-1.5">
                       {req.comments.map(c => (
                         <div key={c.id} className={`text-xs px-3 py-2 rounded-lg ${c.author === 'client' ? 'bg-blue-500/10 border border-blue-500/15 text-blue-300 ml-6' : 'bg-zinc-800/60 border border-zinc-800 text-zinc-400 mr-6'}`}>
@@ -656,7 +656,7 @@ export function ContentTab({
         </summary>
         <div className="mt-2 space-y-2">
           {contentRequests.filter(r => r.status === 'declined').map(req => (
-            <div key={req.id} className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 px-4 py-3 opacity-60">
+            <div key={req.id} className="bg-zinc-900/50 border border-zinc-800/50 px-4 py-3 opacity-60" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="text-xs text-zinc-400">{req.topic}</div>
               <div className="text-[11px] text-zinc-500 mt-0.5">&ldquo;{req.targetKeyword}&rdquo;</div>
             </div>

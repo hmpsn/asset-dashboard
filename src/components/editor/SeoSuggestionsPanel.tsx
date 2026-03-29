@@ -182,7 +182,7 @@ function SuggestionRow({ suggestion: s, isSelecting, onSelect }: {
                 {isSelected ? <Check className="w-3 h-3" /> : i + 1}
               </span>
               <span className="flex-1 leading-relaxed">{v}</span>
-              <span className={`shrink-0 text-[10px] mt-0.5 ${isOver ? 'text-red-400' : 'text-zinc-600'}`}>
+              <span className={`shrink-0 text-[10px] mt-0.5 ${isOver ? 'text-red-400/80' : 'text-zinc-600'}`}>
                 {charCount}
               </span>
             </button>

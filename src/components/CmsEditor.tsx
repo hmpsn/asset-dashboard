@@ -458,7 +458,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {dirtyCount > 0 && (
-            <span className="text-[11px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+            <span className="text-[11px] text-amber-400/80 bg-amber-500/8 px-2 py-0.5 rounded">
               {dirtyCount} unsaved
             </span>
           )}
@@ -529,9 +529,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
           <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
           {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-green-400">{summary.approved}</span></>}
-          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
-          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400/80">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400/80">{summary.issueDetected}</span></>}
           {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
         </div>
       )}
@@ -596,17 +596,17 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                   </span>
                 )}
                 {missingNames > 0 && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
                     {missingNames} missing names
                   </span>
                 )}
                 {missingTitles > 0 && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">
                     {missingTitles} missing SEO titles
                   </span>
                 )}
                 {missingDescs > 0 && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">
                     {missingDescs} missing meta desc
                   </span>
                 )}
@@ -664,16 +664,16 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             />
                           )}
                           {isItemExpanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
-                          <span className={`text-xs truncate ${hasName ? 'text-zinc-300' : 'text-red-400 italic'}`}>{itemName || '(untitled)'}</span>
+                          <span className={`text-xs truncate ${hasName ? 'text-zinc-300' : 'text-red-400/80 italic'}`}>{itemName || '(untitled)'}</span>
                           <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">/{coll.collectionSlug}/{itemSlug}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <StatusBadge status={getState(item.id)?.status} />
-                          {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">No title</span>}
-                          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400">No desc</span>}
+                          {!hasSeoTitle && <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/8 border border-amber-500/30 text-amber-400/80">No title</span>}
+                          {!hasSeoDesc && <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/30 text-red-400/80">No desc</span>}
                           {isDirty && <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400">Unsaved</span>}
                           {isSaved && !isDirty && <Check className="w-3 h-3 text-emerald-400" />}
-                          {error && <AlertCircle className="w-3 h-3 text-red-400" />}
+                          {error && <AlertCircle className="w-3 h-3 text-red-400/80" />}
                           <button
                             onClick={(e) => { e.stopPropagation(); togglePreview(item.id); }}
                             className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
@@ -813,7 +813,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                           {/* Save button + error */}
                           <div className="flex items-center justify-between pt-1">
                             <div>
-                              {error && <span className="text-[11px] text-red-400">{error}</span>}
+                              {error && <span className="text-[11px] text-red-400/80">{error}</span>}
                               {isSaved && !isDirty && <span className="text-[11px] text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> Saved as draft</span>}
                             </div>
                             <button
@@ -832,9 +832,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                             if (!itemApprovals || itemApprovals.length === 0) return null;
                             const latest = itemApprovals[0]; // most recent first
                             const statusColors: Record<string, string> = {
-                              pending: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-                              approved: 'text-green-400 bg-green-500/10 border-green-500/20',
-                              rejected: 'text-red-400 bg-red-500/10 border-red-500/20',
+                              pending: 'text-amber-400/80 bg-amber-500/8 border-amber-500/20',
+                              approved: 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20',
+                              rejected: 'text-red-400/80 bg-red-500/8 border-red-500/20',
                               applied: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
                             };
                             return (

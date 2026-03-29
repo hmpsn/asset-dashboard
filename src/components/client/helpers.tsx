@@ -299,7 +299,7 @@ export function InsightCard({ icon: Icon, color, title, count, desc, items }: {
   };
   const c = colorMap[color] || colorMap.amber;
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+    <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-1.5 mb-3">
         <Icon className={`w-4 h-4 ${c.text}`} />
         <span className={`text-xs font-medium ${c.text}`}>{title}</span>
