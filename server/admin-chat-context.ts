@@ -9,6 +9,8 @@
 
 import type { Workspace } from './workspaces.js';
 import { getWorkspace, getBrandName } from './workspaces.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { getLatestSnapshot } from './reports.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
@@ -797,6 +799,18 @@ export async function assembleAdminContext(
     if (pageContext.keywordContext) {
       sections.push(`PAGE KEYWORD TARGET:\n${pageContext.keywordContext}`);
       dataSources.push('Page-Specific Keyword Assignments');
+    }
+  }
+
+  // ── Inject workspace learnings if available ──
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    const learnings = getWorkspaceLearnings(workspaceId);
+    if (learnings) {
+      const learningsBlock = formatLearningsForPrompt(learnings, 'all');
+      if (learningsBlock) {
+        sections.push(learningsBlock);
+        dataSources.push('Workspace Outcome Learnings');
+      }
     }
   }
 

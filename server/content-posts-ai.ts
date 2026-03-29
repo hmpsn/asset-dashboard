@@ -6,6 +6,8 @@
 import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import type { ContentBrief } from './content-brief.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -71,7 +73,17 @@ export async function callCreativeAI(opts: {
 export function buildVoiceContext(workspaceId: string): string {
   const { fullContext } = buildSeoContext(workspaceId);
   const kwMapBlock = buildKeywordMapContext(workspaceId);
-  return `${fullContext}${kwMapBlock}`;
+
+  // Inject workspace learnings for content domain if feature is enabled
+  let learningsBlock = '';
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    const learnings = getWorkspaceLearnings(workspaceId);
+    if (learnings) {
+      learningsBlock = formatLearningsForPrompt(learnings, 'content');
+    }
+  }
+
+  return `${fullContext}${kwMapBlock}${learningsBlock ? `\n\n${learningsBlock}` : ''}`;
 }
 
 // --- Page-type-specific writing instructions ---
