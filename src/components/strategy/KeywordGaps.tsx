@@ -17,7 +17,7 @@ export function KeywordGaps({ keywordGaps, difficultyColor }: KeywordGapsProps) 
   if (keywordGaps.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-orange-500/20 p-4">
+    <div className="bg-zinc-900 border border-orange-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
       <h4 className="text-xs font-semibold text-orange-300 mb-2 flex items-center gap-1.5">
         <Users className="w-3.5 h-3.5" /> Competitor Keyword Gaps
       </h4>

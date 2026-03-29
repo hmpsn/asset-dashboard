@@ -93,7 +93,7 @@ export function BacklinkProfile({ workspaceId }: Props) {
     : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-2 mb-1">
         <Link2 className="w-4 h-4 text-teal-400" />
         <h3 className="text-sm font-semibold text-zinc-200">Backlink Profile</h3>
