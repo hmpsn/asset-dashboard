@@ -34,7 +34,7 @@ export function RankingsSnapshot({ ranks, gscPropertyUrl, workspaceId, className
               <span className="text-[11px] text-zinc-400 truncate flex-1">{r.query}</span>
               <span className="text-[11px] font-medium text-zinc-200 tabular-nums w-6 text-right">{Math.round(r.position)}</span>
               {r.change != null && r.change !== 0 && (
-                <span className={`flex items-center text-[11px] font-medium w-8 justify-end ${r.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`flex items-center text-[11px] font-medium w-8 justify-end ${r.change > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                   {r.change > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                   {Math.abs(Math.round(r.change))}
                 </span>

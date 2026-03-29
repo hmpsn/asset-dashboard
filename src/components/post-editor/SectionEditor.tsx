@@ -19,9 +19,9 @@ interface PostSection {
 
 function WordBadge({ actual, target }: { actual: number; target: number }) {
   const pct = target > 0 ? actual / target : 1;
-  const color = pct >= 0.85 && pct <= 1.15 ? 'text-green-400 bg-green-500/10 border-green-500/20' :
-    pct >= 0.6 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-    'text-red-400 bg-red-500/10 border-red-500/20';
+  const color = pct >= 0.85 && pct <= 1.15 ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20' :
+    pct >= 0.6 ? 'text-amber-400/80 bg-amber-500/8 border-amber-500/20' :
+    'text-red-400/80 bg-red-500/8 border-red-500/20';
   return <span className={`text-[11px] px-1.5 py-0.5 rounded border ${color}`}>{actual}/{target}w</span>;
 }
 
@@ -48,9 +48,9 @@ export function SectionEditor({
     <div className={`bg-zinc-900 rounded-xl border overflow-hidden ${section.status === 'error' ? 'border-red-500/30' : section.status === 'generating' ? 'border-amber-500/20' : 'border-zinc-800'}`}>
       <button onClick={() => onToggleExpand(section.index)} className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
         <div className="flex items-center gap-2">
-          {section.status === 'generating' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> :
-           section.status === 'error' ? <AlertTriangle className="w-3.5 h-3.5 text-red-400" /> :
-           section.status === 'done' ? <Check className="w-3.5 h-3.5 text-green-400" /> :
+          {section.status === 'generating' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400/80" /> :
+           section.status === 'error' ? <AlertTriangle className="w-3.5 h-3.5 text-red-400/80" /> :
+           section.status === 'done' ? <Check className="w-3.5 h-3.5 text-emerald-400/80" /> :
            <Clock className="w-3.5 h-3.5 text-zinc-500" />}
           <span className="text-xs font-medium text-zinc-200">{section.heading}</span>
           {section.status === 'done' && <WordBadge actual={section.wordCount} target={section.targetWordCount} />}
@@ -71,10 +71,10 @@ export function SectionEditor({
           {section.status === 'pending' && isGenerating ? (
             <div className="text-xs text-zinc-500 italic">Waiting to be generated...</div>
           ) : section.status === 'generating' ? (
-            <div className="flex items-center gap-2 text-xs text-amber-400"><Loader2 className="w-3 h-3 animate-spin" /> Writing this section...</div>
+            <div className="flex items-center gap-2 text-xs text-amber-400/80"><Loader2 className="w-3 h-3 animate-spin" /> Writing this section...</div>
           ) : section.status === 'error' ? (
             <div className="space-y-2">
-              <div className="text-xs text-red-400">{section.error || 'Generation failed'}</div>
+              <div className="text-xs text-red-400/80">{section.error || 'Generation failed'}</div>
               <button onClick={() => onRegenerate(section.index)} disabled={regenerating} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
                 {regenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Retry
               </button>

@@ -375,7 +375,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   if (error || !ws) return (
     <div className="min-h-screen bg-[#0f1219] flex items-center justify-center">
       <div className="text-center">
-        <p className="text-red-400 text-sm mb-3">{error || 'Dashboard not found'}</p>
+        <p className="text-red-400/80 text-sm mb-3">{error || 'Dashboard not found'}</p>
         <button onClick={() => window.location.reload()} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-600 transition-colors">Try Again</button>
       </div>
     </div>
@@ -441,7 +441,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                       placeholder="Email address" autoFocus
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
                     <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
-                    {authError && <p className="text-xs text-red-400">{authError}</p>}
+                    {authError && <p className="text-xs text-red-400/80">{authError}</p>}
                     <button type="submit" disabled={authLoading || !forgotEmail.trim()}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
                       {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reset Link'}
@@ -486,7 +486,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     <input type="password" value={resetConfirm} onChange={e => { setResetConfirm(e.target.value); setAuthError(''); }}
                       placeholder="Confirm new password"
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors" />
-                    {authError && <p className="text-xs text-red-400">{authError}</p>}
+                    {authError && <p className="text-xs text-red-400/80">{authError}</p>}
                     <button type="submit" disabled={authLoading || !resetPassword || !resetConfirm}
                       className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-all flex items-center justify-center gap-2">
                       {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Set New Password'}
@@ -517,7 +517,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 />
               </div>
               <TurnstileWidget onToken={(t) => { turnstileTokenRef.current = t; }} resetTrigger={turnstileReset} />
-              {authError && <p className="text-xs text-red-400">{authError}</p>}
+              {authError && <p className="text-xs text-red-400/80">{authError}</p>}
               <button
                 type="submit"
                 disabled={authLoading || !loginEmail.trim() || !loginPassword.trim()}
@@ -549,7 +549,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
                   autoFocus={loginTab === 'password' || showsPasswordLogin}
                 />
-                {authError && <p className="text-xs text-red-400 mt-2">{authError}</p>}
+                {authError && <p className="text-xs text-red-400/80 mt-2">{authError}</p>}
               </div>
               <button
                 type="submit"
@@ -656,7 +656,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-semibold">{ws.name}</h1>
                 {!betaMode && ws.isTrial && (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20">
                     Growth Trial{ws.trialDaysRemaining ? ` · ${ws.trialDaysRemaining}d` : ''}
                   </span>
                 )}
@@ -793,8 +793,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* Trial countdown banner — shows at day 10 and under */}
         {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) <= 10 && (ws.trialDaysRemaining ?? 0) > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+            <Clock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
             <p className="text-sm text-amber-300">
               <strong>{ws.trialDaysRemaining} day{ws.trialDaysRemaining === 1 ? '' : 's'}</strong> left on your Growth trial.
               {' '}Upgrade to keep access to all features.
@@ -802,8 +802,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           </div>
         )}
         {!betaMode && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
-            <Clock className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/20">
+            <Clock className="w-4 h-4 text-red-400/80 flex-shrink-0" />
             <p className="text-sm text-red-300">
               Your Growth trial has ended. Some features are now limited.
               {' '}Upgrade to restore full access.
@@ -814,7 +814,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {/* Section loading errors */}
         {Object.keys(sectionErrors).length > 0 && (
           <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15">
-            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-4 h-4 text-red-400/80 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-red-300 space-y-0.5">
               {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
             </div>
@@ -871,7 +871,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-teal-400" /><span className="text-sm font-medium text-zinc-200">Insights Engine</span>
                 {!betaMode && chatUsage && chatUsage.tier === 'free' ? (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chatUsage.remaining > 0 ? 'text-zinc-400 bg-zinc-800' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${chatUsage.remaining > 0 ? 'text-zinc-400 bg-zinc-800' : 'text-amber-400/80 bg-amber-500/8 border border-amber-500/20'}`}>
                     {chatUsage.remaining}/{chatUsage.limit} left
                   </span>
                 ) : (
@@ -969,7 +969,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             {!betaMode && chatUsage && chatUsage.tier === 'free' && !chatUsage.allowed ? (
             <div className="px-4 py-3 border-t border-zinc-800 flex-shrink-0">
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
                 <p className="text-[11px] text-amber-300/80 flex-1">
                   {roiValue && roiValue > 0
                     ? <>Your organic traffic is worth <span className="font-semibold text-emerald-400">${Math.round(roiValue).toLocaleString()}/mo</span> — unlock unlimited insights with Growth.</>

@@ -110,8 +110,8 @@ export function getFixTab(issue: SeoIssue): string | null {
 }
 
 export const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string; icon: typeof AlertTriangle }> = {
-  error: { label: 'Error', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30', icon: AlertCircle },
-  warning: { label: 'Warning', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30', icon: AlertTriangle },
+  error: { label: 'Error', color: 'text-red-400/80', bg: 'bg-red-500/8 border-red-500/30', icon: AlertCircle },
+  warning: { label: 'Warning', color: 'text-amber-400/80', bg: 'bg-amber-500/8 border-amber-500/30', icon: AlertTriangle },
   info: { label: 'Info', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30', icon: Info },
 };
 

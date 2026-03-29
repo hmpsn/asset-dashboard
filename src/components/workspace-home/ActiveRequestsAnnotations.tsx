@@ -44,7 +44,7 @@ export function ActiveRequestsAnnotations({ requests, annotations, workspaceId }
       {requests.length > 0 && (
         <SectionCard
           title="Active Requests"
-          titleIcon={<Clipboard className="w-4 h-4 text-amber-400" />}
+          titleIcon={<Clipboard className="w-4 h-4 text-amber-400/80" />}
           action={<button onClick={() => navigate(adminPath(workspaceId, 'requests'))} className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors">View All →</button>}
           noPadding
         >

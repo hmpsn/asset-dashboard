@@ -54,7 +54,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Flag className="w-5 h-5 text-amber-400" />
+        <Flag className="w-5 h-5 text-amber-400/80" />
         <h2 className="text-sm font-semibold text-zinc-200">Timeline Annotations</h2>
         <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{annotations.length}</span>
       </div>

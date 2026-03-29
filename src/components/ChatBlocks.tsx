@@ -30,7 +30,7 @@ export function MetricBlock({ data }: { data: MetricBlockData | MetricBlockData[
           <div className="flex items-baseline gap-1.5 mt-0.5">
             <span className="text-sm font-semibold text-zinc-200">{fmtValue(m.value, m.format)}{m.unit || ''}</span>
             {m.change != null && (
-              <span className={`flex items-center gap-0.5 text-[10px] font-medium ${m.change > 0 ? 'text-green-400' : m.change < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+              <span className={`flex items-center gap-0.5 text-[10px] font-medium ${m.change > 0 ? 'text-emerald-400/80' : m.change < 0 ? 'text-red-400/80' : 'text-zinc-500'}`}>
                 {m.change > 0 ? <TrendingUp className="w-2.5 h-2.5" /> : m.change < 0 ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
                 {m.change > 0 ? '+' : ''}{typeof m.change === 'number' ? m.change.toFixed(1) : m.change}%
               </span>
@@ -124,7 +124,7 @@ export function DataTableBlock({ data }: { data: DataTableBlockData }) {
         <div className="flex items-center gap-1 ml-auto">
             <button onClick={handleCopy} title="Copy as CSV"
               className="p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition-colors">
-              {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+              {copied ? <Check className="w-3 h-3 text-emerald-400/80" /> : <Copy className="w-3 h-3" />}
             </button>
             <button onClick={handleDownload} title="Download CSV"
               className="p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition-colors">

@@ -84,7 +84,7 @@ export function AuditBatchActions({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onBatchCreateTasks('errors')}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
+                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-red-500/8 border border-red-500/20 text-red-400/80 hover:bg-red-500/15 transition-colors"
                 title="Add all errors to tasks"
               >
                 <ClipboardList className="w-3 h-3" /> Add Errors to Tasks ({effectiveData.errors})

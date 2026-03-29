@@ -83,7 +83,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
           id: `anomaly-critical-${wsId}`,
           label: `${data.count} critical anomal${data.count > 1 ? 'ies' : 'y'}`,
           sub: data.name,
-          color: 'text-red-400',
+          color: 'text-red-400/80',
           icon: TrendingDown,
           workspaceId: wsId,
           workspaceName: data.name,
@@ -96,7 +96,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
           id: `anomaly-warning-${wsId}`,
           label: `${data.count} warning anomal${data.count > 1 ? 'ies' : 'y'}`,
           sub: data.name,
-          color: 'text-amber-400',
+          color: 'text-amber-400/80',
           icon: TrendingDown,
           workspaceId: wsId,
           workspaceName: data.name,
@@ -111,7 +111,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             id: `requests-${ws.id}`,
             label: `${ws.requests.new} new request${ws.requests.new > 1 ? 's' : ''}`,
             sub: ws.name,
-            color: 'text-red-400',
+            color: 'text-red-400/80',
             icon: MessageSquare,
             workspaceId: ws.id,
             workspaceName: ws.name,
@@ -135,7 +135,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             id: `content-${ws.id}`,
             label: `${ws.contentRequests!.pending} content brief${ws.contentRequests!.pending > 1 ? 's' : ''} awaiting review`,
             sub: ws.name,
-            color: 'text-amber-400',
+            color: 'text-amber-400/80',
             icon: Clipboard,
             workspaceId: ws.id,
             workspaceName: ws.name,
@@ -184,7 +184,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
               id: `churn-${signal.workspaceId}-${signal.title}`,
               label: signal.title,
               sub: signal.workspaceName,
-              color: signal.severity === 'critical' ? 'text-red-400' : 'text-amber-400',
+              color: signal.severity === 'critical' ? 'text-red-400/80' : 'text-amber-400/80',
               icon: Flag,
               workspaceId: signal.workspaceId,
               workspaceName: signal.workspaceName,
@@ -240,7 +240,7 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
             <span className="text-xs font-semibold text-zinc-200">Notifications</span>
             <div className="flex items-center gap-2">
               {hasItems && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 tabular-nums">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400/80 tabular-nums">
                   {items.length}
                 </span>
               )}

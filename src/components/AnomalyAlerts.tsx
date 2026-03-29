@@ -34,20 +34,20 @@ const SEVERITY_STYLES = {
   critical: {
     border: 'border-red-500/30',
     bg: 'bg-red-500/5',
-    badge: 'bg-red-500/20 text-red-400',
-    icon: 'text-red-400',
+    badge: 'bg-red-500/20 text-red-400/80',
+    icon: 'text-red-400/80',
   },
   warning: {
     border: 'border-amber-500/30',
     bg: 'bg-amber-500/5',
-    badge: 'bg-amber-500/20 text-amber-400',
-    icon: 'text-amber-400',
+    badge: 'bg-amber-500/20 text-amber-400/80',
+    icon: 'text-amber-400/80',
   },
   positive: {
     border: 'border-green-500/30',
     bg: 'bg-green-500/5',
-    badge: 'bg-green-500/20 text-green-400',
-    icon: 'text-green-400',
+    badge: 'bg-green-500/20 text-emerald-400/80',
+    icon: 'text-emerald-400/80',
   },
 };
 
@@ -136,14 +136,14 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
       }`}>
         <div className="flex items-center gap-2">
           <Activity className={`w-3.5 h-3.5 ${
-            critical.length > 0 ? 'text-red-400' :
-            warnings.length > 0 ? 'text-amber-400' :
-            'text-green-400'
+            critical.length > 0 ? 'text-red-400/80' :
+            warnings.length > 0 ? 'text-amber-400/80' :
+            'text-emerald-400/80'
           }`} />
           <span className="text-[11px] text-zinc-300">
             {totalAlerts > 0 && <span className="font-medium">{totalAlerts} alert{totalAlerts !== 1 ? 's' : ''}</span>}
             {totalAlerts > 0 && positive.length > 0 && ' · '}
-            {positive.length > 0 && <span className="text-green-400">{positive.length} positive</span>}
+            {positive.length > 0 && <span className="text-emerald-400/80">{positive.length} positive</span>}
           </span>
         </div>
       </div>
@@ -157,9 +157,9 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
         <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-xs font-medium text-zinc-300 hover:text-zinc-100 transition-colors">
           <Activity className="w-3.5 h-3.5 text-zinc-400" />
           Anomaly Alerts
-          {critical.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400">{critical.length}</span>}
-          {warnings.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400">{warnings.length}</span>}
-          {positive.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-green-400">{positive.length}</span>}
+          {critical.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400/80">{critical.length}</span>}
+          {warnings.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400/80">{warnings.length}</span>}
+          {positive.length > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-emerald-400/80">{positive.length}</span>}
           {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         </button>
         {isAdmin && (
@@ -222,7 +222,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
                           <span className="text-zinc-500">Current: </span>
                           <span className="text-zinc-300 font-medium">{anomaly.currentValue.toLocaleString()}</span>
                         </div>
-                        <div className={`text-[10px] font-medium ${anomaly.changePct > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        <div className={`text-[10px] font-medium ${anomaly.changePct > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                           {anomaly.changePct > 0 ? '+' : ''}{anomaly.changePct}%
                         </div>
                       </div>

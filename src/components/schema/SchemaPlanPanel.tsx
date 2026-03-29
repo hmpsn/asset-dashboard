@@ -171,7 +171,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           Generate a site-wide schema plan that analyzes all pages and your keyword strategy to assign roles and identify canonical entities. This ensures consistent, coordinated schema across your entire site.
         </p>
         {error && (
-          <div className="flex items-center gap-1.5 text-xs text-red-400">
+          <div className="flex items-center gap-1.5 text-xs text-red-400/80">
             <AlertCircle className="w-3 h-3" /> {error}
           </div>
         )}
@@ -209,7 +209,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {dirty && <span className="text-[10px] text-amber-400">Unsaved changes</span>}
+          {dirty && <span className="text-[10px] text-amber-400/80">Unsaved changes</span>}
           {expanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
         </div>
       </button>
@@ -218,12 +218,12 @@ export function SchemaPlanPanel({ siteId }: Props) {
         <div className="border-t border-zinc-800 px-4 py-3 space-y-4">
           {/* Status messages */}
           {error && (
-            <div className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs text-red-400/80 bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2">
               <AlertCircle className="w-3 h-3 shrink-0" /> {error}
             </div>
           )}
           {success && (
-            <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
               <CheckCircle className="w-3 h-3 shrink-0" /> {success}
             </div>
           )}
@@ -271,7 +271,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             )}
             {confirmRetract ? (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-red-400">Delete this plan?</span>
+                <span className="text-[11px] text-red-400/80">Delete this plan?</span>
                 <button
                   onClick={async () => {
                     setRetracting(true);
@@ -303,7 +303,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             ) : (
               <button
                 onClick={() => setConfirmRetract(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-500/8 hover:bg-red-500/15 text-red-400/80 border border-red-500/30 transition-colors"
               >
                 <Trash2 className="w-3 h-3" /> Retract Plan
               </button>

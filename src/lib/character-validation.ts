@@ -48,7 +48,7 @@ export function truncateSmart(text: string, max: number): string {
 }
 
 export function getColorClass(percentage: number): string {
-  if (percentage >= 95) return 'text-red-400';
-  if (percentage >= 80) return 'text-amber-400';
-  return 'text-green-400';
+  if (percentage >= 95) return 'text-red-400/80';
+  if (percentage >= 80) return 'text-amber-400/80';
+  return 'text-emerald-400/80';
 }

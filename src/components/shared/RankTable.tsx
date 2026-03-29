@@ -2,10 +2,10 @@ import { TrendingUp } from 'lucide-react';
 
 // ── Shared position color helper ──
 export function positionColor(pos: number): string {
-  if (pos <= 3) return 'text-green-400 font-semibold';
-  if (pos <= 10) return 'text-green-400';
-  if (pos <= 20) return 'text-amber-400';
-  return 'text-red-400';
+  if (pos <= 3) return 'text-emerald-400/80 font-semibold';
+  if (pos <= 10) return 'text-emerald-400/80';
+  if (pos <= 20) return 'text-amber-400/80';
+  return 'text-red-400/80';
 }
 
 // ── Rank History Chart ──
@@ -116,7 +116,7 @@ export function RankChange({ change }: { change?: number }) {
   if (change === undefined) return <span className="text-zinc-500">—</span>;
   if (change === 0) return <span className="text-zinc-500">—</span>;
   return (
-    <span className={change > 0 ? 'text-green-400' : 'text-red-400'}>
+    <span className={change > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}>
       {change > 0 ? '↑' : '↓'}{Math.abs(change)}
     </span>
   );

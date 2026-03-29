@@ -88,9 +88,9 @@ export function ReviewChecklist({
             className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-zinc-800/50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <ClipboardCheck className={`w-3.5 h-3.5 ${allChecked ? 'text-green-400' : 'text-zinc-500'}`} />
+              <ClipboardCheck className={`w-3.5 h-3.5 ${allChecked ? 'text-emerald-400/80' : 'text-zinc-500'}`} />
               <span className="text-xs font-medium text-zinc-300">Review Checklist</span>
-              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${allChecked ? 'text-green-400 bg-green-500/10 border-green-500/20' : 'text-zinc-500 bg-zinc-800 border-zinc-700'}`}>
+              <span className={`text-[11px] px-1.5 py-0.5 rounded border ${allChecked ? 'text-emerald-400/80 bg-emerald-500/8 border-emerald-500/20' : 'text-zinc-500 bg-zinc-800 border-zinc-700'}`}>
                 {checkedCount}/{CHECKLIST_ITEMS.length}
               </span>
             </div>
@@ -115,13 +115,13 @@ export function ReviewChecklist({
                     className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-zinc-800/50 transition-colors group"
                   >
                     {checklist[item.key]
-                      ? <CheckSquare className="w-4 h-4 text-green-400 flex-shrink-0" />
+                      ? <CheckSquare className="w-4 h-4 text-emerald-400/80 flex-shrink-0" />
                       : <Square className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 flex-shrink-0" />}
                     <span className={`text-[11px] ${checklist[item.key] ? 'text-zinc-300 line-through decoration-zinc-600' : 'text-zinc-400'}`}>
                       {item.label}
                     </span>
                     {aiResults?.[item.key] && (
-                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${aiResults[item.key].pass ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${aiResults[item.key].pass ? 'bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20' : 'bg-amber-500/8 text-amber-400/80 border border-amber-500/20'}`}>
                         {aiResults[item.key].pass ? 'AI: Pass' : 'AI: Review'}
                       </span>
                     )}

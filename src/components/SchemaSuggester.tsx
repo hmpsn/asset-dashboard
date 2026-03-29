@@ -731,8 +731,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <AlertCircle className="w-8 h-8 text-red-400" />
-        <p className="text-red-400 text-sm font-medium">Schema generation failed</p>
+        <AlertCircle className="w-8 h-8 text-red-400/80" />
+        <p className="text-red-400/80 text-sm font-medium">Schema generation failed</p>
         <p className="text-zinc-500 text-xs max-w-md text-center">{scanError}</p>
         <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
           <RefreshCw className="w-3 h-3" /> Retry
@@ -745,7 +745,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         {schemaTabBar}
-        <CheckCircle className="w-8 h-8 text-green-400" />
+        <CheckCircle className="w-8 h-8 text-emerald-400/80" />
         <p className="text-zinc-400 text-sm">No schema suggestions needed</p>
         <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
           <RefreshCw className="w-3 h-3" /> Re-scan
@@ -852,12 +852,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
         </div>
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
           <div className="text-xs text-zinc-500 mb-1">Validated</div>
-          <div className={`text-2xl font-bold ${pagesWithErrors > 0 ? 'text-amber-400' : 'text-green-400'}`}>{data.length - pagesWithErrors}/{data.length}</div>
+          <div className={`text-2xl font-bold ${pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80'}`}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="text-xs text-zinc-500">{pagesWithErrors > 0 ? `${pagesWithErrors} with warnings` : 'all passing'}</div>
         </div>
         <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
           <div className="text-xs text-zinc-500 mb-1">Existing Schemas</div>
-          <div className="text-2xl font-bold text-green-400">{pagesWithExisting}</div>
+          <div className="text-2xl font-bold text-emerald-400/80">{pagesWithExisting}</div>
           <div className="text-xs text-zinc-500">pages already have JSON-LD</div>
         </div>
       </div>
@@ -876,12 +876,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             </div>
             <div className="flex items-center gap-3">
               {impactData.avgClicksDelta !== null && (
-                <span className={`text-xs font-medium ${impactData.avgClicksDelta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`text-xs font-medium ${impactData.avgClicksDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                   {impactData.avgClicksDelta >= 0 ? '+' : ''}{impactData.avgClicksDelta} clicks
                 </span>
               )}
               {impactData.avgPositionDelta !== null && (
-                <span className={`text-xs font-medium ${impactData.avgPositionDelta <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`text-xs font-medium ${impactData.avgPositionDelta <= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                   {impactData.avgPositionDelta <= 0 ? '' : '+'}{impactData.avgPositionDelta} pos
                 </span>
               )}
@@ -905,7 +905,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                   <div key={stat.label} className="bg-zinc-900 px-3 py-2.5">
                     <div className="text-[10px] text-zinc-500">{stat.label}</div>
                     {stat.value !== null ? (
-                      <div className={`text-sm font-bold ${stat.positive(stat.value) ? 'text-green-400' : 'text-red-400'}`}>
+                      <div className={`text-sm font-bold ${stat.positive(stat.value) ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
                         {stat.value >= 0 && stat.label !== 'Avg Position' ? '+' : ''}{stat.value}{stat.suffix}
                       </div>
                     ) : (
@@ -929,11 +929,11 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                       <span className="flex items-center gap-1 text-[10px] text-zinc-500"><Clock className="w-3 h-3" /> Too recent</span>
                     ) : d.before && d.after ? (
                       <div className="flex items-center gap-3 text-[11px]">
-                        <span className={d.after.clicks >= d.before.clicks ? 'text-green-400' : 'text-red-400'}>
+                        <span className={d.after.clicks >= d.before.clicks ? 'text-emerald-400/80' : 'text-red-400/80'}>
                           {d.after.clicks >= d.before.clicks ? <TrendingUp className="w-3 h-3 inline" /> : <TrendingDown className="w-3 h-3 inline" />}
                           {' '}{d.after.clicks - d.before.clicks >= 0 ? '+' : ''}{d.after.clicks - d.before.clicks} clicks
                         </span>
-                        <span className={d.after.position <= d.before.position ? 'text-green-400' : 'text-red-400'}>
+                        <span className={d.after.position <= d.before.position ? 'text-emerald-400/80' : 'text-red-400/80'}>
                           pos {d.after.position.toFixed(1)}
                         </span>
                       </div>
@@ -957,9 +957,9 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           <span className="text-zinc-400 font-medium">{summary.total} tracked</span>
           {summary.live > 0 && <><StatusBadge status="live" /><span className="text-teal-400">{summary.live}</span></>}
           {summary.inReview > 0 && <><StatusBadge status="in-review" /><span className="text-purple-400">{summary.inReview}</span></>}
-          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-green-400">{summary.approved}</span></>}
-          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400">{summary.rejected}</span></>}
-          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400">{summary.issueDetected}</span></>}
+          {summary.approved > 0 && <><StatusBadge status="approved" /><span className="text-emerald-400/80">{summary.approved}</span></>}
+          {summary.rejected > 0 && <><StatusBadge status="rejected" /><span className="text-red-400/80">{summary.rejected}</span></>}
+          {summary.issueDetected > 0 && <><StatusBadge status="issue-detected" /><span className="text-amber-400/80">{summary.issueDetected}</span></>}
           {summary.fixProposed > 0 && <><StatusBadge status="fix-proposed" /><span className="text-blue-400">{summary.fixProposed}</span></>}
         </div>
       )}

@@ -94,7 +94,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                   {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {isLatest && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
                     current
                   </span>
                 )}
@@ -103,7 +103,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                 <button
                   onClick={() => handleRollback(entry)}
                   disabled={rollingBack !== null}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors disabled:opacity-50 bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20"
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors disabled:opacity-50 bg-amber-500/8 text-amber-400/80 border border-amber-500/20 hover:bg-amber-500/15"
                   title="Restore this version"
                 >
                   {rollingBack === entry.id
@@ -113,7 +113,7 @@ export function SchemaVersionHistory({ siteId, pageId, workspaceId, onRestore }:
                 </button>
               )}
               {isRestored && (
-                <span className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                <span className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/20">
                   <CheckCircle className="w-3 h-3" /> Restored
                 </span>
               )}

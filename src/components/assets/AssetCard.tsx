@@ -104,7 +104,7 @@ export function AssetCard({
               className="flex-1 min-w-0 px-2 py-1 bg-zinc-800 border border-cyan-600 rounded text-xs focus:outline-none"
               autoFocus
             />
-            <button onClick={() => onSaveRename(asset.id)} className="text-green-400 hover:text-green-300 shrink-0">
+            <button onClick={() => onSaveRename(asset.id)} className="text-emerald-400/80 hover:text-emerald-300 shrink-0">
               <Check className="w-3.5 h-3.5" />
             </button>
             <button onClick={onCancelRename} className="text-zinc-500 hover:text-zinc-300 shrink-0">
@@ -117,13 +117,13 @@ export function AssetCard({
               {asset.displayName || asset.originalFileName}
             </span>
             {(!asset.altText || asset.altText.trim() === '') && (
-              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-amber-900/40 text-amber-400 leading-none">No Alt</span>
+              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-amber-900/40 text-amber-400/80 leading-none">No Alt</span>
             )}
             {asset.size > 500 * 1024 && (
               <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-orange-900/40 text-orange-400 leading-none">Oversized</span>
             )}
             {unusedFlag && (
-              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-red-900/40 text-red-400 leading-none">Unused</span>
+              <span className="shrink-0 px-1 py-0.5 rounded text-[11px] font-semibold bg-red-900/40 text-red-400/80 leading-none">Unused</span>
             )}
             {cmsLabel && (
               <span
@@ -162,7 +162,7 @@ export function AssetCard({
               className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-xs focus:outline-none"
               autoFocus
             />
-            <button onClick={() => onSaveAlt(asset.id)} className="text-green-400 hover:text-green-300">
+            <button onClick={() => onSaveAlt(asset.id)} className="text-emerald-400/80 hover:text-emerald-300">
               <Check className="w-3.5 h-3.5" />
             </button>
             <button onClick={onCancelEditAlt} className="text-zinc-500 hover:text-zinc-300">

@@ -62,7 +62,7 @@ function DeltaBadge({ before, after, label, invert }: { before: number; after: n
           <Minus className="w-2.5 h-2.5" /> 0%
         </span>
       ) : (
-        <span className={`flex items-center gap-0.5 text-[10px] font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+        <span className={`flex items-center gap-0.5 text-[10px] font-medium ${isPositive ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
           {isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
           {pct > 0 ? '+' : ''}{pct.toFixed(0)}%
         </span>
