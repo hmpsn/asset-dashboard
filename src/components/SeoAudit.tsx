@@ -705,9 +705,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       {auditTabBar}
       {/* Summary cards */}
       <div className={`grid gap-3 ${effectiveData!.deadLinkSummary ? 'grid-cols-6' : 'grid-cols-5'}`}>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 col-span-1">
+        <div className="bg-zinc-900 p-5 border border-zinc-800 col-span-1" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Site Score</span>
+            <span className="text-[11px] text-zinc-500 tracking-wider font-medium">Site Score</span>
           </div>
           <div className="flex items-end gap-2">
             <div className={`text-3xl font-bold ${scoreColorClass(effectiveData!.siteScore)}`}>{effectiveData!.siteScore}</div>
@@ -725,10 +725,10 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             <div className={`h-full rounded-full ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
           </div>
         </div>
-        <StatCard label="Pages Scanned" value={effectiveData!.totalPages} size="hero" />
-        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} className={severityFilter === 'error' ? 'border-red-500/50' : ''} size="hero" />
-        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} className={severityFilter === 'warning' ? 'border-amber-500/50' : ''} size="hero" />
-        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} className={severityFilter === 'info' ? 'border-blue-500/50' : ''} size="hero" />
+        <StatCard label="Pages Scanned" value={effectiveData!.totalPages} size="hero" staggerIndex={0} />
+        <StatCard label="Errors" value={effectiveData!.errors} valueColor="text-red-400" onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')} sub={severityFilter === 'error' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'error' ? '!border-red-500/60 !bg-red-500/5' : ''} size="hero" staggerIndex={1} />
+        <StatCard label="Warnings" value={effectiveData!.warnings} valueColor="text-amber-400" onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')} sub={severityFilter === 'warning' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'warning' ? '!border-amber-500/60 !bg-amber-500/5' : ''} size="hero" staggerIndex={2} />
+        <StatCard label="Info" value={effectiveData!.infos} valueColor="text-blue-400" onClick={() => setSeverityFilter(severityFilter === 'info' ? 'all' : 'info')} sub={severityFilter === 'info' ? '↑ Filtering' : 'Click to filter'} className={severityFilter === 'info' ? '!border-blue-500/60 !bg-blue-500/5' : ''} size="hero" staggerIndex={3} />
         {effectiveData!.deadLinkSummary && (
           <StatCard
             label="Broken Links"
@@ -738,6 +738,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             sub={effectiveData!.deadLinkSummary.total === 0 ? 'All links healthy' : `${effectiveData!.deadLinkSummary.internal} internal · ${effectiveData!.deadLinkSummary.external} external`}
             onClick={() => setAuditSubTab('links')}
             size="hero"
+            staggerIndex={4}
           />
         )}
       </div>
@@ -757,7 +758,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         if (tips.length === 0) return null;
         return (
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 flex-wrap">
-            <span className="text-[11px] text-zinc-500 font-medium uppercase tracking-wider mr-1">Quick fixes →</span>
+            <span className="text-[11px] text-zinc-500 font-medium tracking-wider mr-1">Quick fixes →</span>
             {tips.map(tip => (
               <span key={tip.tool} className="flex items-center gap-1 text-[11px] text-teal-400/80 bg-teal-500/5 px-2 py-1 rounded border border-teal-500/10">
                 <tip.icon className="w-3 h-3" /> {tip.label}
@@ -769,7 +770,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Scheduled Audit Settings */}
       {workspaceId && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+        <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-zinc-400" />
@@ -850,7 +851,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           return (
             <div key={label} className="flex-1 min-w-[260px]">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{label}</span>
+                <span className="text-xs font-medium text-zinc-400 tracking-wider">{label}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               {/* CWV Metrics */}
@@ -891,7 +892,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         };
 
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-2 mb-4">
               <Globe className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-300">Core Web Vitals</span>
@@ -907,7 +908,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Site-wide issues */}
       {data.siteWideIssues.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-2">
+        <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="text-sm font-medium text-zinc-300 mb-2">Site-Wide Issues</div>
           {data.siteWideIssues.map((issue, idx) => {
             const cfg = SEVERITY_CONFIG[issue.severity];
@@ -937,7 +938,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
       {/* Dead Link Details Panel */}
       {effectiveData!.deadLinkDetails && effectiveData!.deadLinkDetails.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+        <div className="bg-zinc-900 border border-zinc-800 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Link2Off className="w-4 h-4 text-red-400" />
@@ -1142,7 +1143,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           const trackBorder = statusBorderClass(pageState?.status);
 
           return (
-            <div key={page.slug || page.page} className={`bg-zinc-900 rounded-xl border ${trackBorder || 'border-zinc-800'}`}>
+            <div key={page.slug || page.page} className={`bg-zinc-900 border ${trackBorder || 'border-zinc-800'}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <button
                 onClick={() => toggleExpand(page.page)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"

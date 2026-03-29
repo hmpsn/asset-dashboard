@@ -9,32 +9,34 @@ export function ScannerReveal({ children }: ScannerRevealProps) {
   const location = useLocation();
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden' }}>
+    <div>
       {children}
 
-      {/* Overlay: dark cover that clips away top-to-bottom */}
+      {/* Overlay: viewport-fixed dark cover that clips away top-to-bottom.
+          Fixed positioning makes percentages relative to the viewport,
+          so the sweep takes the same wall-clock time on every page. */}
       <div
         key={`overlay-${location.key}`}
         style={{
-          position: 'absolute',
+          position: 'fixed',
           inset: 0,
-          zIndex: 10,
+          zIndex: 9998,
           backgroundColor: '#0f1219',
           animation: 'scanReveal 0.85s cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
           pointerEvents: 'none',
         }}
       />
 
-      {/* Beam: teal line that sweeps top-to-bottom */}
+      {/* Beam: teal line that sweeps top-to-bottom at consistent viewport speed */}
       <div
         key={`beam-${location.key}`}
         style={{
-          position: 'absolute',
+          position: 'fixed',
           left: 0,
           right: 0,
           top: '-1px',
           height: '1px',
-          zIndex: 11,
+          zIndex: 9999,
           background: `linear-gradient(90deg,
             transparent 8%,
             rgba(45, 212, 191, 0.15) 25%,

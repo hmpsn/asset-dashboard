@@ -117,7 +117,7 @@ export function ContentTab({
         { label: 'Published', value: published, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
       ];
       return (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-3">
           {stats.map(s => (
             <div key={s.label} className={`${s.bg} border ${s.border} rounded-lg px-3 py-2 text-center`}>
               <div className={`text-lg font-bold ${s.color} tabular-nums`}>{s.value}</div>
@@ -421,7 +421,7 @@ export function ContentTab({
                     {brief.eeatGuidance && (
                       <div className="space-y-3">
                         <div className="text-[11px] text-zinc-500 font-medium tracking-wider flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-zinc-800">E-E-A-T Signals</div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {[
                             { label: 'Experience', value: brief.eeatGuidance.experience, color: 'text-blue-400' },
                             { label: 'Expertise', value: brief.eeatGuidance.expertise, color: 'text-teal-400' },
@@ -566,7 +566,7 @@ export function ContentTab({
 
                 {/* Upgrade CTA for brief_only items after approval */}
                 {canUpgrade && (
-                  <div className="bg-gradient-to-r from-teal-600/10 via-emerald-600/10 to-teal-600/10 border border-teal-500/20 p-4 flex items-center gap-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
+                  <div className="bg-gradient-to-r from-teal-600/10 via-emerald-600/10 to-teal-600/10 border border-teal-500/20 p-5 flex items-center gap-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 flex items-center justify-center flex-shrink-0">
                       <Sparkles className="w-5 h-5 text-teal-400" />
                     </div>

@@ -225,26 +225,26 @@ export function AeoReview({ workspaceId }: Props) {
     <div className="space-y-8">
       {/* Summary bar */}
       <div className="grid grid-cols-5 gap-3">
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Avg AEO Score</div>
           <div className={`text-3xl font-bold ${aeoScoreColorClass(avgScore)}`}>{avgScore}</div>
           <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${aeoScoreBgBarClass(avgScore)}`} style={{ width: `${avgScore}%` }} />
           </div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Pages Reviewed</div>
           <div className="text-2xl font-bold text-zinc-200">{review.pages.length}</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Total Changes</div>
           <div className="text-2xl font-bold text-purple-400">{review.totalChanges}</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Quick Wins</div>
           <div className="text-2xl font-bold text-green-400">{review.quickWins}</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-1">Est. Time</div>
           <div className="text-2xl font-bold text-zinc-200">
             {(() => {
@@ -256,7 +256,7 @@ export function AeoReview({ workspaceId }: Props) {
       </div>
 
       {/* Site summary */}
-      <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl px-4 py-3">
+      <div className="bg-purple-500/5 border border-purple-500/20 px-4 py-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="text-xs text-purple-300">{review.sitewideSummary}</div>
         <div className="text-[11px] text-zinc-500 mt-1">
           Last reviewed: {new Date(review.generatedAt).toLocaleString()}
@@ -316,7 +316,7 @@ export function AeoReview({ workspaceId }: Props) {
       )}
 
       {/* Page list */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filteredPages.map(page => {
           const isExpanded = expanded.has(page.pageUrl);
           const highCount = page.changes.filter(c => c.priority === 'high').length;
@@ -324,7 +324,7 @@ export function AeoReview({ workspaceId }: Props) {
           const isRefreshing = loadingPage === page.pageUrl;
 
           return (
-            <div key={page.pageUrl} className="bg-zinc-900 rounded-xl border border-zinc-800">
+            <div key={page.pageUrl} className="bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <button
                 onClick={() => togglePage(page.pageUrl)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-colors text-left"

@@ -115,7 +115,7 @@ export default function ContentDecay({ workspaceId }: Props) {
       </div>
 
       {!analysis && !analyzing && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800">
+        <div className="bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <EmptyState icon={TrendingDown} title="No decay analysis yet" description="Run an analysis to detect content losing search traffic" className="py-12" />
         </div>
       )}
@@ -124,7 +124,7 @@ export default function ContentDecay({ workspaceId }: Props) {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 text-center">
+            <div className="bg-zinc-900 border border-zinc-800 p-4 text-center" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="text-2xl font-bold text-zinc-100">{analysis.summary.totalDecaying}</div>
               <div className="text-[11px] text-zinc-500 mt-1">Declining Pages</div>
             </div>
@@ -133,7 +133,7 @@ export default function ContentDecay({ workspaceId }: Props) {
               const count = analysis.summary[sev];
               return (
                 <button key={sev} onClick={() => setSeverityFilter(severityFilter === sev ? 'all' : sev)}
-                  className={`rounded-xl border p-4 text-center transition-colors ${severityFilter === sev ? `${cfg.bg} ${cfg.border}` : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}>
+                  className={`border p-4 text-center transition-colors ${severityFilter === sev ? `${cfg.bg} ${cfg.border}` : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`} style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <div className={`text-2xl font-bold ${cfg.text}`}>{count}</div>
                   <div className="text-[11px] text-zinc-500 mt-1">{cfg.label}</div>
                 </button>
@@ -152,7 +152,7 @@ export default function ContentDecay({ workspaceId }: Props) {
 
           {/* Decaying pages list */}
           {filtered.length > 0 && (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-300">
                   {severityFilter === 'all' ? 'All Declining Pages' : `${SEV_CONFIG[severityFilter].label} Pages`}
@@ -228,7 +228,7 @@ export default function ContentDecay({ workspaceId }: Props) {
           )}
 
           {filtered.length === 0 && analysis.summary.totalDecaying === 0 && (
-            <div className="text-center py-8 bg-zinc-900 rounded-xl border border-zinc-800">
+            <div className="text-center py-8 bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="text-green-400 text-sm font-medium">All content performing well</div>
               <p className="text-xs text-zinc-500 mt-1">No pages showing significant traffic decline</p>
             </div>

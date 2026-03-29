@@ -131,9 +131,18 @@ export function OverviewTab({
       return (
         <div className={`grid gap-3 ${totalItems <= 3 ? 'grid-cols-' + totalItems : totalItems === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
           {audit && (
-            <div className="flex flex-col items-center justify-center p-3 bg-zinc-900 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
-              <MetricRing score={audit.siteScore} size={96} />
-              <p className="text-xs text-zinc-500 mt-1 text-center">Site Health</p>
+            <div className="bg-zinc-900 border border-zinc-800 p-3 text-left" style={{ borderRadius: '6px 12px 6px 12px' }}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
+                <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-2xl font-bold leading-none text-zinc-100">{audit.siteScore}</div>
+                  <div className="text-[11px] text-zinc-500 mt-1">of 100</div>
+                </div>
+                <MetricRing score={audit.siteScore} size={44} />
+              </div>
             </div>
           )}
           {cards.map((card, i) => (
