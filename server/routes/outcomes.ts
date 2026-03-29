@@ -50,18 +50,20 @@ const WIN_SCORES: OutcomeScore[] = ['strong_win', 'win'];
 
 function computeScorecard(workspaceId: string): OutcomeScorecard {
   const actions = getActionsByWorkspace(workspaceId);
-  const counts = getWorkspaceCounts(workspaceId);
 
   // Group by action type
   const byType = new Map<ActionType, { wins: number; strongWins: number; scored: number; total: number }>();
   let totalWins = 0;
   let totalStrongWins = 0;
   let totalScored = 0;
+  let pendingCount = 0;
 
   for (const action of actions) {
     const outcomes = getOutcomesForAction(action.id);
     const latestScored = outcomes.filter(o => o.score && o.score !== 'insufficient_data' && o.score !== 'inconclusive');
     const latestOutcome = latestScored.length > 0 ? latestScored[latestScored.length - 1] : null;
+
+    if (!action.measurementComplete) pendingCount++;
 
     const entry = byType.get(action.actionType) ?? { wins: 0, strongWins: 0, scored: 0, total: 0 };
     entry.total++;
@@ -114,9 +116,9 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
   return {
     overallWinRate,
     strongWinRate: totalScored > 0 ? totalStrongWins / totalScored : 0,
-    totalTracked: counts.total,
+    totalTracked: actions.length,
     totalScored,
-    pendingMeasurement: counts.pending,
+    pendingMeasurement: pendingCount,
     byCategory,
     trend,
   };
