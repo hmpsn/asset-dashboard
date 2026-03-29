@@ -14,17 +14,24 @@ interface StatCardProps {
   invertDelta?: boolean;
   onClick?: () => void;
   className?: string;
+  /** Stagger index for entrance animation. Cards appear sequentially with 60ms delays. */
+  staggerIndex?: number;
 }
 
 export function StatCard({
   label, value, icon: Icon, iconColor, valueColor, sub,
-  delta, deltaLabel, invertDelta, onClick, className,
+  delta, deltaLabel, invertDelta, onClick, className, staggerIndex,
 }: StatCardProps) {
   const Tag = onClick ? 'button' : 'div';
+  const animationStyle = staggerIndex !== undefined ? {
+    animation: `fadeInUp 0.4s ease-out forwards`,
+    animationDelay: `${staggerIndex * 60}ms`,
+  } : undefined;
   return (
     <Tag
       onClick={onClick}
       className={`bg-zinc-900 rounded-xl p-4 border border-zinc-800 text-left ${onClick ? 'hover:border-zinc-700 transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
+      style={animationStyle}
     >
       <div className="flex items-center gap-1.5 mb-2">
         {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" style={iconColor ? { color: iconColor } : undefined} />}

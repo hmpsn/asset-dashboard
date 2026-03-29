@@ -159,12 +159,12 @@ export function AnalyticsTab({
 
     {/* GA4 Overview Cards */}
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-      <StatCard icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.users} deltaLabel="%" />
-      <StatCard icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-blue-400" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" />
-      <StatCard label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" />
-      <StatCard icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-amber-400" />
-      <StatCard icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate ? -ga4Comparison.change.bounceRate : undefined} deltaLabel="pp" />
-      <StatCard icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-teal-400" />
+      <StatCard icon={Users} label="Users" value={ga4Overview.totalUsers.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.users} deltaLabel="%" staggerIndex={0} />
+      <StatCard icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-blue-400" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
+      <StatCard label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
+      <StatCard icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-amber-400" staggerIndex={3} />
+      <StatCard icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate ? -ga4Comparison.change.bounceRate : undefined} deltaLabel="pp" staggerIndex={4} />
+      <StatCard icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-teal-400" staggerIndex={5} />
     </div>
 
     {/* Traffic Trend + Devices row */}
