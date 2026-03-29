@@ -31,7 +31,7 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
   return (
     <TierGate tier={tier} required="growth" feature="Monthly Performance Digest" teaser="See a monthly summary of your SEO wins, issues addressed, and ROI highlights">
       <SectionCard title={`${digest.month} Performance`} titleIcon={<Calendar className="w-4 h-4 text-zinc-400" />}>
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* AI summary */}
           {digest.summary && (
             <p className="text-sm text-zinc-300 leading-relaxed">{digest.summary}</p>

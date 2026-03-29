@@ -149,7 +149,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
     .map(l => ({ ...l, active: activeLines.has(l.key) }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Date range selector */}
       <div className="flex justify-end">
         <DateRangeSelector options={DATE_PRESETS_SEARCH} selected={days} onChange={setDays} />

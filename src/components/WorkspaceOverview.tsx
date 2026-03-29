@@ -103,7 +103,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   attentionItems.sort((a, b) => a.priority - b.priority);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Command Center"
         subtitle={`${data.length} workspace${data.length !== 1 ? 's' : ''} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
@@ -212,7 +212,8 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
               <button
                 key={ws.id}
                 onClick={() => onSelectWorkspace(ws.id)}
-                className={`w-full text-left rounded-xl p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30' : hasAlerts || isAtRisk ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                className={`w-full text-left p-5 transition-all hover:scale-[1.005] hover:shadow-lg group relative bg-zinc-900 border ${onlineUsers.length > 0 ? 'border-green-500/40' : isAtRisk && (ws.churnSignals?.critical || 0) > 0 ? 'border-red-500/30' : hasAlerts || isAtRisk ? 'border-amber-500/30' : 'border-zinc-800'}`}
+                style={{ borderRadius: '10px 24px 10px 24px' }}
               >
                 {/* New request badge */}
                 {ws.requests.new > 0 && (

@@ -336,7 +336,7 @@ export function OverviewTab({
       </div>
 
       {/* Right sidebar (2/5) */}
-      <div className="lg:col-span-2 space-y-6">
+      <div className="lg:col-span-2 space-y-8">
         {/* Ask the Insights Engine */}
         <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 border border-teal-500/15 p-5" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center gap-2 mb-3">

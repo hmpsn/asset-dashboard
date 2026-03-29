@@ -174,7 +174,7 @@ export function ContentPerformance({ workspaceId }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Content Performance"
         subtitle={`${items.length} published post${items.length !== 1 ? 's' : ''} tracked`}
@@ -195,28 +195,28 @@ export function ContentPerformance({ workspaceId }: Props) {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-center gap-2 mb-1">
                 <MousePointer className="w-3.5 h-3.5 text-blue-400" />
                 <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Total Clicks</span>
               </div>
               <p className="text-xl font-semibold text-zinc-100">{totalClicks.toLocaleString()}</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-center gap-2 mb-1">
                 <Eye className="w-3.5 h-3.5 text-cyan-400" />
                 <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Impressions</span>
               </div>
               <p className="text-xl font-semibold text-zinc-100">{totalImpressions.toLocaleString()}</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-center gap-2 mb-1">
                 <Users className="w-3.5 h-3.5 text-teal-400" />
                 <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Sessions</span>
               </div>
               <p className="text-xl font-semibold text-zinc-100">{totalSessions.toLocaleString()}</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+            <div className="bg-zinc-900 border border-zinc-800 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="flex items-center gap-2 mb-1">
                 <Target className="w-3.5 h-3.5 text-amber-400" />
                 <span className="text-[11px] text-zinc-500 uppercase tracking-wider">Avg Position</span>

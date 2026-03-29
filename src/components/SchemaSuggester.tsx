@@ -587,7 +587,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   if (!started) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-8">
         {schemaTabBar}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
@@ -640,7 +640,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
             <Loader2 className="w-4 h-4 animate-spin" /> Loading pages...
           </div>
         ) : availablePages.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-500">{availablePages.length} pages — set page types for better AI prompts</span>
@@ -680,7 +680,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
                 })}
               </div>
             )}
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden max-h-[400px] overflow-y-auto">
+            <div className="bg-zinc-900 border border-zinc-800 overflow-hidden max-h-[400px] overflow-y-auto" style={{ borderRadius: '10px 24px 10px 24px' }}>
               {filteredInitialPages.map(p => (
                 <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-800/30 transition-colors">
                   <div className="flex-1 min-w-0">
@@ -763,7 +763,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   }, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {schemaTabBar}
       {/* Schema site plan */}
       <SchemaPlanPanel siteId={siteId} />
@@ -845,17 +845,17 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Pages</div>
           <div className="text-2xl font-bold text-zinc-200">{data.length}</div>
           <div className="text-xs text-zinc-500">{totalTypes} @graph types total</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Validated</div>
           <div className={`text-2xl font-bold ${pagesWithErrors > 0 ? 'text-amber-400/80' : 'text-emerald-400/80'}`}>{data.length - pagesWithErrors}/{data.length}</div>
           <div className="text-xs text-zinc-500">{pagesWithErrors > 0 ? `${pagesWithErrors} with warnings` : 'all passing'}</div>
         </div>
-        <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Existing Schemas</div>
           <div className="text-2xl font-bold text-emerald-400/80">{pagesWithExisting}</div>
           <div className="text-xs text-zinc-500">pages already have JSON-LD</div>
@@ -864,7 +864,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
       {/* Schema Impact Panel (C6) */}
       {impactData && impactData.totalDeployments > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => setShowImpactDetail(v => !v)}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
@@ -965,7 +965,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       )}
 
       {/* Page list */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {data.map(page => {
           const schemaRecs = recsLoaded ? recsForPage(page.slug).filter(r => r.type === 'schema') : [];
           return (

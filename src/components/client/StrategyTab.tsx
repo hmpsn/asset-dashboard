@@ -274,7 +274,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </div>
         </div>
         {/* Progress bars */}
-        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-zinc-800/50">
+        <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-zinc-800/50">
           <div>
             <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1">
               <span>Content Gaps</span>
@@ -727,7 +727,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                     <span className="text-[10px] text-zinc-600">({strategyData.keywordGaps.length})</span>
                   </div>
                   <p className="text-[11px] text-zinc-500 mb-2">Keywords your competitors rank for that you don't.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {strategyData.keywordGaps.slice(0, expandedSections.has('competitor-gaps-all') ? undefined : 6).map((gap, i) => (
                       <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800/50">
                         <span className="text-[11px] text-zinc-300 font-medium truncate mr-2">{gap.keyword}</span>

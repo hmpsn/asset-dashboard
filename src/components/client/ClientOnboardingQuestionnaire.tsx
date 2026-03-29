@@ -186,7 +186,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                   { icon: Palette, label: 'Brand Voice', desc: 'How you want to sound' },
                   { icon: Target, label: 'Competitors', desc: 'Who you compete with' },
                 ].map((item, i) => (
-                  <div key={i} className="px-3 py-3 rounded-xl bg-zinc-800/50 border border-zinc-800 text-left">
+                  <div key={i} className="px-3 py-3 bg-zinc-800/50 border border-zinc-800 text-left" style={{ borderRadius: '6px 12px 6px 12px' }}>
                     <item.icon className="w-4 h-4 text-teal-400 mb-1.5" />
                     <div className="text-[11px] font-semibold text-zinc-200">{item.label}</div>
                     <div className="text-[10px] text-zinc-500">{item.desc}</div>
@@ -287,7 +287,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
 
               <div>
                 <label className={labelCls}>Where are most customers in their buying journey?</label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
+                <div className="grid grid-cols-2 gap-3 mt-1">
                   {BUYING_STAGE_OPTIONS.map(opt => (
                     <button key={opt.value} onClick={() => setAudience({ ...audience, buyingStage: opt.value })}
                       className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
@@ -446,7 +446,7 @@ export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSki
                 </SummaryCard>
               </div>
 
-              <div className="bg-teal-500/5 border border-teal-500/15 rounded-xl px-4 py-3 mt-4">
+              <div className="bg-teal-500/5 border border-teal-500/15 px-4 py-3 mt-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
                 <p className="text-[11px] text-teal-400/80 leading-relaxed">
                   <strong className="text-teal-300">What happens next:</strong> Your answers will be used to create audience personas, enrich your brand voice, and build a knowledge base — making every piece of content we generate more accurate and on-brand.
                 </p>
@@ -499,7 +499,7 @@ function SummaryCard({ icon: Icon, title, filled, onClick, children }: {
   icon: typeof Building2; title: string; filled: boolean; onClick: () => void; children: React.ReactNode;
 }) {
   return (
-    <button onClick={onClick} className="w-full text-left px-4 py-3 rounded-xl bg-zinc-800/40 border border-zinc-800 hover:border-zinc-700 transition-all group">
+    <button onClick={onClick} className="w-full text-left px-4 py-3 bg-zinc-800/40 border border-zinc-800 hover:border-zinc-700 transition-all group" style={{ borderRadius: '6px 12px 6px 12px' }}>
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <Icon className={`w-3.5 h-3.5 ${filled ? 'text-teal-400' : 'text-zinc-600'}`} />
