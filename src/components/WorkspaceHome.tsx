@@ -196,27 +196,45 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
         {audit ? (
           <div
-            className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col items-center justify-center cursor-pointer hover:border-zinc-700 transition-colors"
+            className="bg-zinc-900 border border-zinc-800 p-3 text-left cursor-pointer hover:border-zinc-700 transition-colors"
             style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
           >
-            <MetricRing score={audit.siteScore} size={80} />
-            <p className="text-xs text-zinc-400 font-medium mt-2">Site Health</p>
-            {scoreDelta != null && (
-              <p className={`text-[11px] mt-0.5 ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
-                {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
-              </p>
-            )}
-            <p className="text-[11px] text-zinc-600 mt-0.5">{audit.errors} errors · {audit.warnings} warnings</p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
+              <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold leading-none text-zinc-100">{audit.siteScore}</span>
+                  {scoreDelta != null && (
+                    <span className={`text-[11px] font-medium ${scoreDelta >= 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                      {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-zinc-500 mt-1">{audit.errors} err · {audit.warnings} warn</div>
+              </div>
+              <MetricRing score={audit.siteScore} size={44} />
+            </div>
           </div>
         ) : (
           <div
-            className="bg-zinc-900 border border-zinc-800 p-4 flex flex-col items-center justify-center"
+            className="bg-zinc-900 border border-zinc-800 p-3 text-left"
             style={{ borderRadius: '6px 12px 6px 12px', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
           >
-            <MetricRing score={0} size={80} noAnimation />
-            <p className="text-xs text-zinc-500 mt-2">Site Health</p>
-            <p className="text-[11px] text-zinc-600 mt-0.5">No audit yet</p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Shield className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
+              <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium leading-none">Site Health</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-2xl font-bold leading-none text-zinc-600">—</div>
+                <div className="text-[11px] text-zinc-600 mt-1">No audit yet</div>
+              </div>
+              <MetricRing score={0} size={44} noAnimation />
+            </div>
           </div>
         )}
 
