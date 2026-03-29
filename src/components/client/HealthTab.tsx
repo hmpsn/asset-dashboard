@@ -225,7 +225,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           ? 'Several issues are holding back your search performance — prioritize the fixes below.'
           : 'Critical issues need immediate attention to establish search visibility.';
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-4">
               <div className={`text-4xl font-bold ${scoreColorClass(score)}`}>{score}</div>
               <div className="flex-1">
@@ -320,7 +320,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           );
         };
         return (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-200">Page Speed &amp; Core Web Vitals</span>
@@ -375,7 +375,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               {/* Fix These First */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+              <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400" />
                   <span className="text-sm font-medium text-zinc-200">Fix these first</span>
@@ -421,7 +421,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               </div>
 
               {/* Page Cards */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+              <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-zinc-400" />
@@ -519,7 +519,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 5. SITE-WIDE ISSUES ── */}
       {auditDetail.audit.siteWideIssues.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
@@ -571,7 +571,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
 
       {/* ── 6. ALL PAGES LIST ── */}
       <div ref={allPagesRef}>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap bg-zinc-950/30">
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
@@ -776,7 +776,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
       </div>
 
       {/* ── 7. HISTORY (Collapsed by default - at the bottom) ── */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <button onClick={() => toggleSection('history')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-zinc-400" />
@@ -820,7 +820,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
   );
 
   if (audit) return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+    <div className="bg-zinc-900 border border-zinc-800 p-6" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="flex items-center gap-4">
         <ScoreRing score={audit.siteScore} size={100} />
         <div>

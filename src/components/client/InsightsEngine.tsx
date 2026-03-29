@@ -187,7 +187,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   if (loading) {
     return (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
+      <div className="bg-zinc-900 border border-zinc-800 p-8 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <Loader2 className="w-6 h-6 text-teal-400 animate-spin mx-auto mb-2" />
         <p className="text-xs text-zinc-500">Analyzing your site for recommendations...</p>
       </div>
@@ -196,7 +196,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   if (error && !data) {
     return (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 text-center">
+      <div className="bg-zinc-900 border border-zinc-800 p-6 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <XCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
         <p className="text-xs text-zinc-400">{error}</p>
         <button onClick={handleRegenerate} className="mt-2 text-xs text-teal-400 hover:text-teal-300">
@@ -208,7 +208,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   if (!data || data.recommendations.length === 0) {
     return (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center">
+      <div className="bg-zinc-900 border border-zinc-800 p-8 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <Shield className="w-8 h-8 text-teal-400 mx-auto mb-3" />
         <p className="text-sm font-medium text-zinc-300">No recommendations yet</p>
         <p className="text-xs text-zinc-500 mt-1">Run a site audit to generate prioritized recommendations.</p>
@@ -223,7 +223,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
     const topRecs = [...fixNowRecs, ...fixSoonRecs].slice(0, 4);
 
     return (
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <Lightbulb className="w-4 h-4 text-amber-400" />
@@ -315,7 +315,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
   // ── Full Mode ──────────────────────────────────────────────────
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       {/* Header */}
       <div className="px-5 py-4 border-b border-zinc-800">
         <div className="flex items-center gap-2">

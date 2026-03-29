@@ -86,7 +86,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
 
       {/* New request form */}
       {showNewRequest && (
-        <div className="bg-zinc-900 rounded-xl border border-teal-500/20 p-5 space-y-4">
+        <div className="bg-zinc-900 border border-teal-500/20 p-5 space-y-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <h3 className="text-xs font-semibold text-zinc-200">Submit a Request</h3>
           <div>
             <label className="text-[11px] text-zinc-500 mb-1.5 block">Quick Templates</label>
@@ -219,7 +219,7 @@ export function RequestsTab({ workspaceId, requests, requestsLoading, clientUser
             };
             const teamNotes = req.notes.filter(n => n.author === 'team').length;
             return (
-              <div key={req.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+              <div key={req.id} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <button onClick={() => { setExpandedRequest(isExpanded ? null : req.id); setReqNoteInput(''); }}
                   className="w-full px-5 py-4 text-left hover:bg-zinc-800/30 transition-colors">
                   <div className="flex items-start justify-between gap-3">

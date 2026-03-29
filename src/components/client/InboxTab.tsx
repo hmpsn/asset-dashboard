@@ -202,7 +202,7 @@ export function InboxTab({
               const isFlagging = flaggingCell === cell.cellId;
               const isFlagged = cell.status === 'flagged';
               return (
-                <div key={cell.cellId} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                <div key={cell.cellId} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
                   <div className="px-5 py-4">
                     <div className="flex items-center justify-between">
                       <div className="min-w-0 flex-1">

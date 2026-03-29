@@ -108,7 +108,7 @@ export function ApprovalsTab({
         const isApplying = applyingBatch === batch.id;
 
         return (
-          <div key={batch.id} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div key={batch.id} className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
             {/* Batch header */}
             <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
               <div>

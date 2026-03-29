@@ -161,7 +161,7 @@ export function OverviewTab({
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
       return (
-        <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 rounded-xl px-4 py-3">
+        <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-teal-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-400" /></div>
             <span className="text-xs font-medium text-zinc-200">{total} item{total > 1 ? 's' : ''} need{total === 1 ? 's' : ''} your attention</span>
@@ -183,7 +183,7 @@ export function OverviewTab({
       // Determine the most valuable next action
       if (strategyData && contentRequests.filter(r => r.status === 'client_review').length === 0) {
         return (
-          <div className="bg-gradient-to-r from-teal-600/10 via-zinc-900 to-emerald-600/10 border border-teal-500/20 rounded-xl px-4 py-3">
+          <div className="bg-gradient-to-r from-teal-600/10 via-zinc-900 to-emerald-600/10 border border-teal-500/20 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center">
@@ -207,7 +207,7 @@ export function OverviewTab({
       
       if (audit && audit.siteScore < 80) {
         return (
-          <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-orange-600/10 border border-amber-500/20 rounded-xl px-4 py-3">
+          <div className="bg-gradient-to-r from-amber-600/10 via-zinc-900 to-orange-600/10 border border-amber-500/20 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
@@ -231,7 +231,7 @@ export function OverviewTab({
       
       if (overview && overview.totalClicks < 100) {
         return (
-          <div className="bg-gradient-to-r from-blue-600/10 via-zinc-900 to-cyan-600/10 border border-blue-500/20 rounded-xl px-4 py-3">
+          <div className="bg-gradient-to-r from-blue-600/10 via-zinc-900 to-cyan-600/10 border border-blue-500/20 px-4 py-3" style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
@@ -288,7 +288,7 @@ export function OverviewTab({
 
         {/* Empty state with setup guidance */}
         {!overview && !audit && !ga4Overview && (
-          <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 rounded-xl border border-zinc-800 p-8">
+          <div className="bg-gradient-to-br from-teal-500/10 via-zinc-900 to-emerald-500/10 border border-zinc-800 p-8" style={{ borderRadius: '10px 24px 10px 24px' }}>
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mx-auto mb-4"><BarChart3 className="w-6 h-6 text-teal-400" /></div>
             <h2 className="text-lg font-semibold text-zinc-200 mb-2">{ws.name}</h2>
             <p className="text-sm text-zinc-400 mb-6">We're getting everything set up for you. Here's what we need:</p>
@@ -324,7 +324,7 @@ export function OverviewTab({
       {/* Right sidebar (2/5) */}
       <div className="lg:col-span-2 space-y-4">
         {/* Ask the Insights Engine */}
-        <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/15 p-4">
+        <div className="bg-gradient-to-br from-teal-500/5 via-zinc-900 to-zinc-900 border border-teal-500/15 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-teal-400" />
@@ -365,7 +365,7 @@ export function OverviewTab({
           const gaps = strategyData?.contentGaps?.slice(0, 2);
           if (!gaps || gaps.length === 0) return null;
           return (
-            <div className="bg-gradient-to-br from-teal-950/30 via-zinc-900 to-zinc-900 rounded-xl border border-teal-500/15 p-4">
+            <div className="bg-gradient-to-br from-teal-950/30 via-zinc-900 to-zinc-900 border border-teal-500/15 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-lg bg-teal-500/15 flex items-center justify-center">
                   <FileText className="w-3.5 h-3.5 text-teal-400" />
@@ -405,7 +405,7 @@ export function OverviewTab({
             content_updated: { color: '#2dd4bf', label: 'Content' },
           };
           return (
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+            <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center gap-2 mb-3">
                 <Activity className="w-4 h-4 text-teal-400" />
                 <span className="text-xs font-medium text-zinc-300">Recent Work</span>
