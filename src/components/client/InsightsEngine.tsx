@@ -467,7 +467,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
                             {/* Affected pages */}
                             {rec.affectedPages.length > 0 && (
                               <div className="mb-3">
-                                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Affected Pages</div>
+                                <div className="text-[10px] text-zinc-500 tracking-wider mb-1.5">Affected Pages</div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {rec.affectedPages.slice(0, 8).map((slug, i) => (
                                     <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">

@@ -287,7 +287,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
           return (
             <div key={label} className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">{label}</span>
+                <span className="text-xs font-medium text-zinc-400 tracking-wider">{label}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="space-y-1.5">

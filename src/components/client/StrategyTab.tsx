@@ -512,7 +512,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
               </div>
               {requestedKeywords.length > 0 && (
                 <div className="mt-3 space-y-1">
-                  <div className="text-[10px] text-zinc-600 uppercase tracking-wider font-medium">Your Suggestions</div>
+                  <div className="text-[10px] text-zinc-600 tracking-wider font-medium">Your Suggestions</div>
                   {requestedKeywords.map(kw => (
                     <div key={kw} className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/40 rounded-lg border border-zinc-800">
                       <span className="text-[11px] text-zinc-300">{kw}</span>
@@ -591,7 +591,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Data-validated</span>
                             : <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700/50 font-medium">AI suggestion</span>
                           }
-                          <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{gap.intent}</span>
+                          <span className="text-[10px] text-zinc-600 tracking-wider">{gap.intent}</span>
                         </div>
                       </div>
                       {((gap.volume != null && gap.volume > 0) || (gap.difficulty != null && gap.difficulty > 0) || (gap.impressions != null && gap.impressions > 0)) && (
@@ -986,7 +986,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 const clientAdded = trackedKeywords.filter(tk => !strategySet.has(tk.query.toLowerCase().trim()));
                 return clientAdded.length > 0 ? (
                   <div className="mb-3">
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Your keywords</div>
+                    <div className="text-[10px] text-zinc-500 tracking-wider mb-1.5">Your keywords</div>
                     <div className="flex flex-wrap gap-2">
                       {clientAdded.map(tk => (
                         <span key={tk.query} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-400">
