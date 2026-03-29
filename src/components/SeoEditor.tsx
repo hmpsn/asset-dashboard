@@ -654,7 +654,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const missingDescs = pages.filter(p => !p.seo?.description).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Stats bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-sm text-zinc-400">
