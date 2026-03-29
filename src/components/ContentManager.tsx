@@ -126,14 +126,14 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   // If viewing a post, render the PostEditor
   if (activePostId) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-8">
         <button
           onClick={() => { setActivePostId(null); invalidatePosts(); }}
           className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           ← Back to Content
         </button>
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+        <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
@@ -154,7 +154,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {(['draft', 'review', 'approved', 'generating'] as const).map(status => {
@@ -164,7 +164,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
             <button
               key={status}
               onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
-              className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+              style={{ borderRadius: '6px 12px 6px 12px' }}
+              className={`border px-4 py-3 text-left transition-colors ${
                 statusFilter === status ? `${cfg.bg} border-opacity-100` : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
               }`}
             >
@@ -223,7 +224,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
       )}
 
       {/* Post list */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filtered.map(post => {
           const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.draft;
           const Icon = cfg.icon;
@@ -234,7 +235,8 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
           return (
             <div
               key={post.id}
-              className="bg-zinc-900 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-colors"
+              className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors"
+              style={{ borderRadius: '10px 24px 10px 24px' }}
             >
               <div className="px-4 py-3">
                 <div className="flex items-start justify-between gap-3">

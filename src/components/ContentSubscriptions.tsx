@@ -117,7 +117,8 @@ export function ContentSubscriptions({ workspaceId }: Props) {
                 <button
                   key={plan.plan}
                   onClick={() => setNewPlan(plan.plan)}
-                  className={`p-4 rounded-lg border text-left transition-colors ${
+                  style={{ borderRadius: '6px 12px 6px 12px' }}
+                  className={`p-4 border text-left transition-colors ${
                     newPlan === plan.plan
                       ? 'border-teal-500 bg-teal-500/10'
                       : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'
