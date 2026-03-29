@@ -10,10 +10,19 @@ interface MetricToggleCardProps {
   displayOnly?: boolean;   // true = non-interactive, renders as div instead of button
 }
 
+// Returns true when the delta string represents no change — regardless of suffix format.
+// Strips leading sign and any non-numeric suffix, then checks if the numeric part is zero.
+function isDeltaNeutral(delta: string): boolean {
+  if (delta === '—') return true;
+  const numeric = parseFloat(delta.replace(/^[+-]/, ''));
+  return !isNaN(numeric) && numeric === 0;
+}
+
 export function MetricToggleCard({
   label, value, delta, deltaPositive, color, active, onClick, invertDelta, displayOnly,
 }: MetricToggleCardProps) {
   const isPositive = invertDelta ? !deltaPositive : deltaPositive;
+  const isNeutral = isDeltaNeutral(delta);
 
   const content = (
     <>
@@ -23,7 +32,7 @@ export function MetricToggleCard({
       <div className="text-lg font-bold text-zinc-200 leading-tight mt-0.5">
         {value}
       </div>
-      <div className={`text-[9px] mt-0.5 ${delta === '—' || delta === '+0.0%' || delta === '0.0%' || delta === '0' ? 'text-zinc-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+      <div className={`text-[9px] mt-0.5 ${isNeutral ? 'text-zinc-500' : isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
         {delta}
       </div>
     </>
