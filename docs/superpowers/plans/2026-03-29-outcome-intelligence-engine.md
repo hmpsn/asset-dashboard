@@ -20,7 +20,7 @@
 
 2. **Prepared statement caching.** Always use `createStmtCache(() => ({ ... }))` / `stmts()` pattern. Never use local `let` variables for statement caching — the guard is useless on locals re-initialized every call.
 
-3. **JSON column validation.** Never bare `JSON.parse` on DB columns. Always use `parseJsonSafe(raw, schema, fallback, context)` from `server/db/json-validation.ts`. For arrays, use `parseJsonSafeArray`.
+3. **JSON column validation.** Never bare `JSON.parse` on DB columns. Always use `parseJsonSafe(raw, schema, fallback, context)` from `server/db/json-validation.ts`. For arrays, use `parseJsonSafeArray`. **CRITICAL: The `context` parameter is an object `{ workspaceId?, field?, table? }`, NOT a string.** Example: `parseJsonSafe(raw, schema, fallback, { field: 'baseline_snapshot', table: 'tracked_actions' })`.
 
 4. **Zod schema field names.** Cross-reference field names against the TypeScript interface in `shared/types/outcome-tracking.ts`. Zod won't catch name mismatches at compile time — a wrong name silently fails `safeParse`.
 
@@ -32,7 +32,7 @@
 
 8. **React Query key sync.** Every new query key factory must be added to `src/lib/queryKeys.ts` before any hook uses it.
 
-9. **Feature flag gating.** All new UI components must be wrapped in `<FeatureFlag flag="outcome-tracking">` or the relevant flag. All new route handlers must check the flag before executing.
+9. **Feature flag gating.** All new UI components must be wrapped in `<FeatureFlag flag="outcome-tracking">` or the relevant flag using the existing `<FeatureFlag>` component from `src/components/ui/FeatureFlag.tsx`. Server-side: check via `isFeatureEnabled(workspaceId, 'outcome-tracking')` from `server/feature-flags.ts` — if the function doesn't exist yet, check the env var pattern `FEATURE_OUTCOME_TRACKING=true`.
 
 10. **Color rules.** Teal for actions/CTAs. Blue for data metrics. Green/amber/red for status. Never purple in client components. Use `scoreColor()` for score displays.
 
@@ -41,6 +41,20 @@
 12. **Test assertions on collections.** Never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`.
 
 13. **Percentage fields.** CTR and rates are stored as percentages (6.3 for 6.3%), not decimals. Add JSDoc: `/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */`
+
+14. **`db` is a default export.** Import as `import db from './db/index.js'`, NOT `import { db } from './db/index.js'`.
+
+15. **`getSafe` signature.** `getSafe<T>(url: string, fallback: T, signal?: AbortSignal)` — there is no params argument and no `postSafe`. For query params, build the URL string: `` `${baseUrl}?type=${type}` ``. For POST, use `post<T>(url, body?, signal?)` from `src/api/client.ts`.
+
+16. **Logger in route hooks.** Before adding `log.warn(...)` to any route file, CHECK if that file already has a logger imported. Many route files do NOT. If missing, add: `import { createLogger } from '../logger.js'; const log = createLogger('route-name');`
+
+17. **WebSocket invalidation is TWO steps.** Adding a WS event constant is not enough. You MUST also add a handler in `src/hooks/useWsInvalidation.ts` that calls `qc.invalidateQueries()` for the relevant query keys. Without this, the frontend never auto-refreshes.
+
+18. **Cron job registration.** Creating a cron module is not enough. You MUST also import and call the `start*` function in `server/startup.ts` inside `startSchedulers()`. Without this, the cron never runs.
+
+19. **UI completeness.** Every new component MUST include: (a) `<ErrorBoundary>` wrapping, (b) loading states using `<Skeleton>` with contextual messages ("Analyzing outcomes..." not "Loading..."), (c) empty states using `<EmptyState>` with action-oriented CTAs, (d) proper ARIA labels on interactive elements.
+
+20. **`broadcastToWorkspace` import.** Always import as `import { broadcastToWorkspace } from '../broadcast.js'` and events as `import { WS_EVENTS } from '../ws-events.js'` (from route files).
 
 ### File Ownership Protocol
 
@@ -125,36 +139,33 @@ server/app.ts                             — Mount outcomes routes
 ## Dependency Graph
 
 ```
-Task 1 (types) ──┐
-Task 2 (schemas) ─┤── Task 3 (migration) ── Task 4 (mappers + store) ── Task 5 (tests)
-                  │
-                  ├── PARALLEL BATCH A (Tasks 6a-6f: recording hooks, 6 agents) ── Task 7 (remaining hooks, sequential)
-                  │
-                  ├── Task 8 (measurement engine) ── Task 9 (measurement tests)
-                  │
-                  ├── Task 10 (backfill) ── Task 11 (backfill tests)
-                  │
-                  ├── Task 12 (learnings module) ── Task 13 (learnings tests) ── PARALLEL BATCH B (Tasks 14a-14d: AI injection)
-                  │
-                  ├── Task 15 (feature flags + ws events + query keys + routes) — MUST COME BEFORE any frontend work
-                  │
-                  ├── Task 16 (API endpoints) ── Task 17 (frontend API client + hooks)
-                  │
-                  ├── PARALLEL BATCH C (Tasks 18a-18e: UI components)
-                  │
-                  ├── Task 19 (external detection) ── Task 20 (external detection tests)
-                  │
-                  ├── Task 21 (client components + digest integration)
-                  │
-                  ├── Task 22 (scoring calibration)
-                  │
-                  ├── Task 23 (multi-workspace overview)
-                  │
-                  ├── Task 24 (adaptive pipeline integration — Phase 3)
-                  │
-                  ├── Task 25 (playbooks — Phase 3)
-                  │
-                  └── Task 26 (final integration test + quality gates)
+Task 1 (types) → Task 2 (schemas) → Task 3 (migration) → Task 4 (mappers + store) → Task 5 (tests)
+                                                                    │
+                    Task 6 (flags/events/keys/routes) ──────────────┤ ← GATE: must complete before hooks or frontend
+                                                                    │
+                    PARALLEL BATCH A (Tasks 7a-7f: recording hooks) ─┤── Task 8 (remaining hooks)
+                                                                    │
+                    Task 9 (measurement) → Task 10 (measurement tests)
+                    Task 11 (backfill) → backfill tests              │ ← These 3 streams are semi-parallel
+                    Task 12 (learnings) → Task 13 (learnings tests) ─┤
+                                                                    │
+                    PARALLEL BATCH B (Tasks 14a-14d: AI injection) ──┤
+                                                                    │
+                    Task 15 (API endpoints) → Task 16 (frontend API + hooks)
+                                                                    │
+                    PARALLEL BATCH C (Tasks 17a-17e: UI components) ─┤
+                                                                    │
+                    Task 18 (external detection)  ┐                  │
+                    Task 19 (client components)   ├── semi-parallel  │
+                    Task 20 (multi-ws overview)   │                  │
+                    Task 21 (scoring calibration) ┘                  │
+                                                                    │
+                    Task 22 (adaptive pipeline) ── Task 23 (playbooks)
+                                                                    │
+                    Task 24 (cron registration) ┐── parallel         │
+                    Task 25 (WS invalidation)  ┘                     │
+                                                                    │
+                    Task 26 (final integration + quality gates) ─────┘
 ```
 
 ---
@@ -957,14 +968,14 @@ export function rowToTrackedAction(row: TrackedActionRow): TrackedAction {
     sourceId: row.source_id,
     pageUrl: row.page_url,
     targetKeyword: row.target_keyword,
-    baselineSnapshot: parseJsonSafe(row.baseline_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, 'tracked_actions.baseline_snapshot'),
-    trailingHistory: parseJsonSafe(row.trailing_history, trailingHistorySchema, EMPTY_HISTORY, 'tracked_actions.trailing_history'),
+    baselineSnapshot: parseJsonSafe(row.baseline_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, { field: 'baseline_snapshot', table: 'tracked_actions' }),
+    trailingHistory: parseJsonSafe(row.trailing_history, trailingHistorySchema, EMPTY_HISTORY, { field: 'trailing_history', table: 'tracked_actions' }),
     attribution: row.attribution as TrackedAction['attribution'],
     measurementWindow: row.measurement_window,
     measurementComplete: row.measurement_complete === 1,
     sourceFlag: row.source_flag as TrackedAction['sourceFlag'],
     baselineConfidence: row.baseline_confidence as TrackedAction['baselineConfidence'],
-    context: parseJsonSafe(row.context, actionContextSchema, EMPTY_CONTEXT, 'tracked_actions.context'),
+    context: parseJsonSafe(row.context, actionContextSchema, EMPTY_CONTEXT, { field: 'context', table: 'tracked_actions' }),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -975,12 +986,12 @@ export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
     id: row.id,
     actionId: row.action_id,
     checkpointDays: row.checkpoint_days as ActionOutcome['checkpointDays'],
-    metricsSnapshot: parseJsonSafe(row.metrics_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, 'action_outcomes.metrics_snapshot'),
+    metricsSnapshot: parseJsonSafe(row.metrics_snapshot, baselineSnapshotSchema, EMPTY_BASELINE, { field: 'metrics_snapshot', table: 'action_outcomes' }),
     score: (row.score as ActionOutcome['score']) ?? null,
     earlySignal: (row.early_signal as EarlySignal) ?? undefined,
-    deltaSummary: parseJsonSafe(row.delta_summary, deltaSummarySchema, EMPTY_DELTA, 'action_outcomes.delta_summary'),
+    deltaSummary: parseJsonSafe(row.delta_summary, deltaSummarySchema, EMPTY_DELTA, { field: 'delta_summary', table: 'action_outcomes' }),
     competitorContext: row.competitor_context && row.competitor_context !== '{}'
-      ? parseJsonSafe(row.competitor_context, competitorContextSchema, null, 'action_outcomes.competitor_context')
+      ? parseJsonSafe(row.competitor_context, competitorContextSchema, null, { field: 'competitor_context', table: 'action_outcomes' })
       : null,
     measuredAt: row.measured_at,
   };
@@ -992,11 +1003,11 @@ export function rowToActionPlaybook(row: ActionPlaybookRow): ActionPlaybook {
     workspaceId: row.workspace_id,
     name: row.name,
     triggerCondition: row.trigger_condition,
-    actionSequence: parseJsonSafe(row.action_sequence, playbookSequenceSchema, [] as PlaybookStep[], 'action_playbooks.action_sequence'),
+    actionSequence: parseJsonSafe(row.action_sequence, playbookSequenceSchema, [] as PlaybookStep[], { field: 'action_sequence', table: 'action_playbooks' }),
     historicalWinRate: row.historical_win_rate,
     sampleSize: row.sample_size,
     confidence: row.confidence as ActionPlaybook['confidence'],
-    averageOutcome: parseJsonSafe(row.average_outcome, playbookOutcomeSchema, EMPTY_PLAYBOOK_OUTCOME, 'action_playbooks.average_outcome'),
+    averageOutcome: parseJsonSafe(row.average_outcome, playbookOutcomeSchema, EMPTY_PLAYBOOK_OUTCOME, { field: 'average_outcome', table: 'action_playbooks' }),
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1012,7 +1023,7 @@ This module handles recording actions, querying them, and baseline snapshot asse
 // server/outcome-tracking.ts
 
 import crypto from 'node:crypto';
-import { db } from './db/index.js';
+import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { rowToTrackedAction, rowToActionOutcome } from './db/outcome-mappers.js';
@@ -1424,8 +1435,10 @@ git commit -m "feat(outcome-tracking): add feature flags, WS events, query keys,
 
 Each hook task follows the same pattern:
 1. Import `recordAction` from `../outcome-tracking.js`
-2. After the mutation succeeds (where `addActivity` is called), add a `recordAction()` call
-3. Build a `BaselineSnapshot` from data available at that point in the handler
+2. **Check if the file already has a logger** — run `grep -n 'createLogger\|const log' <file>`. If NOT present, add: `import { createLogger } from '../logger.js'; const log = createLogger('<route-name>');`
+3. After the mutation succeeds (where `addActivity` is called), add a `recordAction()` call
+4. Build a `BaselineSnapshot` from data available at that point in the handler
+5. Wrap the `recordAction` call in `try/catch` with `log.warn(...)` — recording failures must NEVER break the main operation
 
 **CRITICAL:** Each task must ONLY modify the files listed in "Files you OWN". Do NOT touch any other route file.
 
@@ -2145,20 +2158,27 @@ git commit -m "feat(outcome-tracking): add REST API endpoints for outcomes"
 
 - [ ] **Step 1: Create API client**
 
-Follow the pattern from existing API modules (e.g., `src/api/analytics.ts`). Use typed `getSafe`/`postSafe` wrappers.
+Follow the pattern from existing API modules (e.g., `src/api/analytics.ts`). **IMPORTANT:** There is no `postSafe` — use `post` from `src/api/client.ts`. And `getSafe` does NOT accept query params — build URL strings manually.
 
 ```typescript
 // src/api/outcomes.ts
-import { getSafe, postSafe } from './base.js';
+import { getSafe, post } from './client.js';
 import type { TrackedAction, OutcomeScorecard, TopWin, WorkspaceLearnings, WorkspaceOutcomeOverview, WeCalledItEntry } from '../../shared/types/outcome-tracking.js';
 
 export const outcomesApi = {
-  getActions: (wsId: string, params?: { type?: string; score?: string }) =>
-    getSafe<TrackedAction[]>(`/api/outcomes/${wsId}/actions`, [], params),
+  getActions: (wsId: string, type?: string, score?: string) => {
+    let url = `/api/outcomes/${wsId}/actions`;
+    const params = new URLSearchParams();
+    if (type) params.set('type', type);
+    if (score) params.set('score', score);
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+    return getSafe<TrackedAction[]>(url, []);
+  },
   getAction: (wsId: string, actionId: string) =>
     getSafe<TrackedAction | null>(`/api/outcomes/${wsId}/actions/${actionId}`, null),
   getScorecard: (wsId: string) =>
-    getSafe<OutcomeScorecard>(`/api/outcomes/${wsId}/scorecard`, null),
+    getSafe<OutcomeScorecard | null>(`/api/outcomes/${wsId}/scorecard`, null),
   getTopWins: (wsId: string) =>
     getSafe<TopWin[]>(`/api/outcomes/${wsId}/top-wins`, []),
   getLearnings: (wsId: string) =>
@@ -2166,7 +2186,7 @@ export const outcomesApi = {
   getOverview: () =>
     getSafe<WorkspaceOutcomeOverview[]>(`/api/outcomes/overview`, []),
   addNote: (wsId: string, actionId: string, note: string) =>
-    postSafe(`/api/outcomes/${wsId}/actions/${actionId}/note`, { note }),
+    post<{ ok: boolean }>(`/api/outcomes/${wsId}/actions/${actionId}/note`, { note }),
 };
 
 export const clientOutcomesApi = {
@@ -2391,7 +2411,155 @@ Functions:
 
 ---
 
-### Task 24: Final Integration + Quality Gates
+### Task 24: Cron Job Registration
+
+**Model:** sonnet
+**Depends on:** Tasks 9, 12, 18
+**Files:**
+- Create: `server/outcome-crons.ts`
+- Modify: `server/startup.ts`
+
+This task wires the measurement, learnings, external detection, and archival crons into the server's startup scheduler. Without this, none of the background processing runs.
+
+- [ ] **Step 1: Create the cron orchestrator**
+
+```typescript
+// server/outcome-crons.ts
+
+import { createLogger } from './logger.js';
+import { measurePendingOutcomes } from './outcome-measurement.js';
+import { computeWorkspaceLearnings } from './workspace-learnings.js';
+import { detectExternalExecutions } from './external-detection.js';
+import { archiveOldActions } from './outcome-tracking.js';
+
+const log = createLogger('outcome-crons');
+
+const DAILY_MS = 24 * 60 * 60 * 1000;
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+
+let measureInterval: ReturnType<typeof setInterval> | null = null;
+let learningsInterval: ReturnType<typeof setInterval> | null = null;
+let detectionInterval: ReturnType<typeof setInterval> | null = null;
+let archiveInterval: ReturnType<typeof setInterval> | null = null;
+
+export function startOutcomeCrons() {
+  if (measureInterval) return; // Already started
+
+  // Measure pending outcomes — daily
+  measureInterval = setInterval(() => {
+    measurePendingOutcomes().catch(err =>
+      log.error({ err }, 'Failed to measure pending outcomes')
+    );
+  }, DAILY_MS);
+
+  // Recompute workspace learnings — daily
+  learningsInterval = setInterval(() => {
+    // computeWorkspaceLearnings runs for all workspaces
+    computeWorkspaceLearnings().catch(err =>
+      log.error({ err }, 'Failed to compute workspace learnings')
+    );
+  }, DAILY_MS);
+
+  // Detect external executions — every 12 hours
+  detectionInterval = setInterval(() => {
+    detectExternalExecutions().catch(err =>
+      log.error({ err }, 'Failed to detect external executions')
+    );
+  }, TWELVE_HOURS_MS);
+
+  // Archive old actions — monthly (run daily, only acts if 24 months passed)
+  archiveInterval = setInterval(() => {
+    archiveOldActions();
+  }, DAILY_MS);
+
+  log.info('Outcome crons started');
+}
+
+export function stopOutcomeCrons() {
+  if (measureInterval) clearInterval(measureInterval);
+  if (learningsInterval) clearInterval(learningsInterval);
+  if (detectionInterval) clearInterval(detectionInterval);
+  if (archiveInterval) clearInterval(archiveInterval);
+  measureInterval = null;
+  learningsInterval = null;
+  detectionInterval = null;
+  archiveInterval = null;
+}
+```
+
+- [ ] **Step 2: Register in startup.ts**
+
+In `server/startup.ts`, add import and call:
+
+```typescript
+import { startOutcomeCrons } from './outcome-crons.js';
+
+// Inside startSchedulers():
+startOutcomeCrons();
+```
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+npx tsc --noEmit --skipLibCheck
+git add server/outcome-crons.ts server/startup.ts
+git commit -m "feat(outcome-tracking): register outcome cron jobs in server startup"
+```
+
+---
+
+### Task 25: WebSocket Invalidation Handlers
+
+**Model:** sonnet
+**Depends on:** Tasks 6, 16
+**Files:**
+- Modify: `src/hooks/useWsInvalidation.ts`
+
+Without this task, the frontend never auto-refreshes when outcomes are scored, external actions are detected, or learnings are updated.
+
+- [ ] **Step 1: Read the current useWsInvalidation file**
+
+Read `src/hooks/useWsInvalidation.ts` to see the existing handler pattern.
+
+- [ ] **Step 2: Add outcome event handlers**
+
+Add inside the `useWorkspaceEvents` call, following the exact existing pattern:
+
+```typescript
+    [WS_EVENTS.OUTCOME_SCORED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(workspaceId) });
+    },
+    [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(workspaceId) });
+    },
+    [WS_EVENTS.OUTCOME_LEARNINGS_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeLearnings(workspaceId) });
+    },
+    [WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomePlaybooks(workspaceId) });
+    },
+```
+
+- [ ] **Step 3: Verify and commit**
+
+```bash
+npx tsc --noEmit --skipLibCheck
+git add src/hooks/useWsInvalidation.ts
+git commit -m "feat(outcome-tracking): add WS invalidation handlers for outcome events"
+```
+
+---
+
+### Task 26: Final Integration + Quality Gates
 
 **Model:** opus
 **Depends on:** All previous tasks
@@ -2462,19 +2630,22 @@ git commit -m "docs: update feature audit, brand guide, and roadmap for outcome 
 
 | Model | Tasks | Rationale |
 |---|---|---|
-| **opus** | 4 (core store), 9 (measurement), 11 (backfill), 12 (learnings), 15 (API routes), 18 (external detection), 22 (adaptive pipeline), 23 (playbooks), 24 (integration) | Complex logic, scoring algorithms, multi-system coordination |
-| **sonnet** | 1 (types), 2 (schemas), 3 (migration), 5 (tests), 6 (flags/events/keys), 7a-7f (recording hooks), 8 (remaining hooks), 10 (measurement tests), 13 (learnings tests), 14a-14d (AI injection), 16 (frontend hooks), 17a-17e (UI components), 19 (client components), 20 (overview), 21 (calibration) | Pattern-following, repetitive but precise, UI components |
+| **opus** | 4 (core store), 9 (measurement), 11 (backfill), 12 (learnings), 15 (API routes), 18 (external detection), 22 (adaptive pipeline), 23 (playbooks), 26 (integration) | Complex logic, scoring algorithms, multi-system coordination |
+| **sonnet** | 1 (types), 2 (schemas), 3 (migration), 5 (tests), 6 (flags/events/keys), 7a-7f (recording hooks), 8 (remaining hooks), 10 (measurement tests), 13 (learnings tests), 14a-14d (AI injection), 16 (frontend hooks), 17a-17e (UI components), 19 (client components), 20 (overview), 21 (calibration), 24 (crons), 25 (WS invalidation) | Pattern-following, repetitive but precise, UI components |
 
 ## Parallelization Summary
 
 | Batch | Tasks | Max Parallel Agents | Estimated Combined Time |
 |---|---|---|---|
 | **Sequential Foundation** | 1 → 2 → 3 → 4 → 5 | 1 | Foundation must be serial |
+| **Sequential Gate** | 6 | 1 | Shared contracts — must complete before hooks |
 | **Parallel Batch A** | 7a, 7b, 7c, 7d, 7e, 7f | 6 | Recording hooks (all independent route files) |
-| **Sequential** | 6, 8 | 1 | Shared files + remaining hooks |
+| **Sequential** | 8 | 1 | Remaining hooks (multi-file) |
 | **Semi-parallel** | 9+10, 11, 12+13 | 3 | Measurement, backfill, learnings (independent modules) |
 | **Parallel Batch B** | 14a, 14b, 14c, 14d | 4 | AI injection (each modifies one file) |
 | **Sequential** | 15 → 16 | 1 | API routes → frontend client (dependent) |
 | **Parallel Batch C** | 17a, 17b, 17c, 17d, 17e | 5 | UI components (independent files) |
 | **Semi-parallel** | 18, 19, 20, 21 | 3-4 | Phase 2+3 features |
-| **Sequential** | 22, 23, 24 | 1 | Adaptive, playbooks, final integration |
+| **Sequential** | 22, 23 | 1 | Adaptive, playbooks |
+| **Parallel** | 24, 25 | 2 | Cron registration + WS invalidation (independent files) |
+| **Sequential** | 26 | 1 | Final integration + quality gates |
