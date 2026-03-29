@@ -469,7 +469,7 @@ git commit -m "style: MetricRing — outward glow, charge-up animation, refined 
 
 ---
 
-### Task 5: Skeleton, TierGate, ErrorState — match new radius
+### Task 5: Skeleton, TierGate, ErrorState — match new radius `[model: haiku]` `[parallel with Task 6]`
 
 **Files:**
 - Modify: `src/components/ui/Skeleton.tsx`
@@ -536,7 +536,7 @@ git commit -m "style: Skeleton + TierGate — match asymmetric card radius"
 
 ---
 
-### Task 6: Badge and statusConfig — muted status colors
+### Task 6: Badge and statusConfig — muted status colors `[model: haiku]` `[parallel with Task 5]`
 
 **Files:**
 - Modify: `src/components/ui/Badge.tsx`
@@ -592,7 +592,7 @@ git commit -m "style: Badge + statusConfig — muted status colors (emerald/80, 
 
 ---
 
-### Task 7: Diff review checkpoint — Phase 2
+### Task 7: Diff review checkpoint — Phase 2 `[model: sonnet]` `[sequential — after Tasks 5+6]`
 
 - [ ] **Step 1: Review all primitive changes**
 
@@ -625,7 +625,7 @@ npx vitest run
 
 ## Phase 3: Scanner Sweep Component
 
-### Task 8: Create ScannerReveal component
+### Task 8: Create ScannerReveal component `[model: sonnet]` `[sequential — after Task 7]`
 
 **Files:**
 - Create: `src/components/ui/ScannerReveal.tsx`
@@ -700,7 +700,7 @@ git commit -m "feat: add ScannerReveal page transition component"
 
 ---
 
-### Task 9: Integrate ScannerReveal into App.tsx layout
+### Task 9: Integrate ScannerReveal into App.tsx layout `[model: sonnet]` `[sequential — after Task 8]`
 
 **Files:**
 - Modify: `src/App.tsx`
@@ -758,7 +758,7 @@ git commit -m "feat: integrate ScannerReveal into admin layout for page transiti
 
 > **Agentic workers:** Phase 4 tasks can be parallelized across agents. Each task lists its **owned files** — no two tasks share a file. Before starting Phase 4, ensure all Phase 1-3 commits are pushed and available.
 
-### Task 10: Spacing + uppercase sweep — Admin pages (A-K)
+### Task 10: Spacing + uppercase sweep — Admin pages (A-K) `[model: sonnet]` `[parallel with Tasks 11–14]`
 
 **Files owned by this task (modify):**
 - `src/components/AnalyticsOverview.tsx`
@@ -818,7 +818,7 @@ git commit -m "style: spacing + uppercase + hero stats sweep — admin pages A-K
 
 ---
 
-### Task 11: Spacing + uppercase sweep — Admin pages (L-Z)
+### Task 11: Spacing + uppercase sweep — Admin pages (L-Z) `[model: sonnet]` `[parallel with Tasks 10, 12–14]`
 
 **Files owned by this task (modify):**
 - `src/components/LlmsTxtGenerator.tsx`
@@ -864,7 +864,7 @@ git commit -m "style: spacing + uppercase + hero stats sweep — admin pages L-Z
 
 ---
 
-### Task 12: Spacing + uppercase sweep — Client pages
+### Task 12: Spacing + uppercase sweep — Client pages `[model: sonnet]` `[parallel with Tasks 10–11, 13–14]`
 
 **Files owned by this task (modify):**
 - `src/components/client/OverviewTab.tsx`
@@ -911,7 +911,7 @@ git commit -m "style: spacing + uppercase + hero stats sweep — client pages"
 
 ---
 
-### Task 13: Spacing + uppercase sweep — Settings, strategy, schema, editor, audit, briefs, matrix
+### Task 13: Spacing + uppercase sweep — Settings, strategy, schema, editor, audit, briefs, matrix `[model: sonnet]` `[parallel with Tasks 10–12, 14]`
 
 **Files owned by this task (modify):**
 - `src/components/settings/BusinessProfileTab.tsx`
@@ -1168,23 +1168,67 @@ The noise texture should be barely visible at 2% opacity. If it looks "dusty" or
 
 ---
 
-## Dependency Graph
+## Dependency Graph & Parallel Execution
 
 ```
-Phase 1 (Task 1: CSS keyframes/noise)
+✅ Task 1 (CSS keyframes/noise) — DONE
   ↓
-Phase 2 (Tasks 2-6: primitives — sequential, each builds on committed CSS)
+✅ Task 2 (SectionCard) — DONE
+✅ Task 3 (StatCard) — DONE
+✅ Task 4 (MetricRing) — DONE
   ↓
-Task 7: Diff review checkpoint
+══ PARALLEL BATCH A (dispatch simultaneously) ════════════════
+  Task 5: Skeleton + TierGate    [model: haiku]
+  Task 6: Badge + statusConfig   [model: haiku]
+═════════════════════════════════════════════════════════════
+  ↓ (both complete)
+Task 7: Diff review checkpoint   [model: sonnet]
   ↓
-Phase 3 (Tasks 8-9: ScannerReveal — sequential)
+Task 8: ScannerReveal component  [model: sonnet]
   ↓
-Phase 4 (Tasks 10-15: consumer sweep — PARALLELIZABLE across agents)
+Task 9: App.tsx integration      [model: sonnet]
   ↓
-Phase 5 (Tasks 16-18: verification + docs — sequential)
+══ PARALLEL BATCH B (dispatch simultaneously) ════════════════
+  Task 10: Admin pages A-K       [model: sonnet]
+  Task 11: Admin pages L-Z       [model: sonnet]
+  Task 12: Client pages          [model: sonnet]
+  Task 13: Settings/strategy/etc [model: sonnet]
+  Task 14: Status color sweep    [model: sonnet]
+═════════════════════════════════════════════════════════════
+  ↓ (all five complete)
+Task 15: Hand-rolled radius audit [model: sonnet]
+  ↓
+Task 16: Full diff review         [model: sonnet]
+  ↓
+Task 17: Design docs update       [model: sonnet]
+  ↓
+Task 18: Visual verification      [model: sonnet]
 ```
 
-**Parallel batch in Phase 4:**
-- Tasks 10, 11, 12, 13 can run in parallel (different file sets, no overlap)
-- Task 14 (status colors) can run in parallel with Tasks 10-13 IF it skips files owned by other tasks
-- Task 15 (hand-rolled radius) must run AFTER Tasks 10-13 complete (needs their committed changes to avoid conflicts)
+### Model Selection Rationale
+
+| Task | Model | Reason |
+|------|-------|--------|
+| 5, 6 | `haiku` | Mechanical: exact replacements in 2 files each, no judgment required |
+| 7 | `sonnet` | Diff review requires reading and evaluating changed code |
+| 8 | `sonnet` | New component with React state logic |
+| 9 | `sonnet` | Modifying shared layout file (App.tsx), needs surgical precision |
+| 10–14 | `sonnet` | Judgment calls: which `uppercase` to remove, which colors to swap, which stats get `hero` |
+| 15 | `sonnet` | Judgment required: card vs non-card `rounded-xl` distinction |
+| 16–18 | `sonnet` | Review, writing, and visual verification |
+
+### File Ownership (Parallel Batch A)
+
+**Task 5 owns:**
+- `src/components/ui/Skeleton.tsx`
+- `src/components/ui/TierGate.tsx`
+
+**Task 6 owns:**
+- `src/components/ui/Badge.tsx`
+- `src/components/ui/statusConfig.ts`
+
+**No overlaps. Neither task touches the other's files.**
+
+### File Ownership (Parallel Batch B)
+
+See individual task ownership tables. Tasks 10–14 have zero file overlap — each owns a disjoint set of consumer pages. Task 14 (status colors) must skip any file being modified by Tasks 10–13 in that batch.

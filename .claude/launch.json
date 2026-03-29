@@ -13,5 +13,12 @@
       "runtimeArgs": ["run", "dev:server"],
       "port": 3002
     }
+    ,
+    {
+      "name": "brainstorm",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "64038", "-d", "/Users/joshuahampson/CascadeProjects/asset-dashboard/.claude/worktrees/inspiring-agnesi/.superpowers/brainstorm/47841-1774753263/content"],
+      "port": 64038
+    }
   ]
 }
