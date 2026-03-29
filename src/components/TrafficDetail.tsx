@@ -11,6 +11,7 @@ import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import { useAdminGA4 } from '../hooks/admin';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { useToggleSet } from '../hooks/useToggleSet';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine } from './charts/AnnotatedTrendChart';
 import { InsightFeed } from './insights';
@@ -43,7 +44,7 @@ const TRAFFIC_LINES: TrendLine[] = [
 
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
+  const [activeTrafficLines, handleToggleTrafficLine] = useToggleSet(['users', 'sessions']);
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarHeight, setSidebarHeight] = useState(0);
@@ -131,11 +132,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           deltaPositive={(comparison?.changePercent.users ?? 0) >= 0}
           color="#14b8a6"
           active={activeTrafficLines.has('users')}
-          onClick={() => setActiveTrafficLines(prev => {
-            const next = new Set(prev);
-            if (next.has('users')) { if (next.size > 1) next.delete('users'); } else if (next.size < 3) { next.add('users'); }
-            return next;
-          })}
+          onClick={() => handleToggleTrafficLine('users')}
         />
         <MetricToggleCard
           label="Sessions"
@@ -144,11 +141,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
           deltaPositive={(comparison?.changePercent.sessions ?? 0) >= 0}
           color="#3b82f6"
           active={activeTrafficLines.has('sessions')}
-          onClick={() => setActiveTrafficLines(prev => {
-            const next = new Set(prev);
-            if (next.has('sessions')) { if (next.size > 1) next.delete('sessions'); } else if (next.size < 3) { next.add('sessions'); }
-            return next;
-          })}
+          onClick={() => handleToggleTrafficLine('sessions')}
         />
         <MetricToggleCard
           label="Bounce Rate"
@@ -185,17 +178,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
                 : undefined
             }
-            onToggleLine={(key) => {
-              setActiveTrafficLines(prev => {
-                const next = new Set(prev);
-                if (next.has(key)) {
-                  if (next.size > 1) next.delete(key);
-                } else if (next.size < 3) {
-                  next.add(key);
-                }
-                return next;
-              });
-            }}
+            onToggleLine={handleToggleTrafficLine}
             maxActiveLines={3}
           />
         </SectionCard>
@@ -232,7 +215,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
                   <span className="text-zinc-400">Bounce rate change</span>
                   <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}%
+                    {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}pt
                   </span>
                 </div>
               )}
@@ -340,20 +323,22 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <div ref={sidebarRef} className="lg:flex-1 space-y-3">
           <SectionCard title="Traffic Sources">
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {sources.slice(0, 10).map((s, i) => {
+              {(() => {
                 const totalSessions = sources.reduce((sum, x) => sum + x.sessions, 0);
-                const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
-                return (
-                  <div key={i} className="relative">
-                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
-                      <span className="text-xs text-zinc-300 flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
-                      <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
-                      <span className="text-[11px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                return sources.slice(0, 10).map((s, i) => {
+                  const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
+                  return (
+                    <div key={i} className="relative">
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
+                        <span className="text-xs text-zinc-300 flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                        <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                        <span className="text-[11px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
               {sources.length === 0 && <EmptyState icon={Globe} title="No traffic sources data" description="No source data available for the selected time period." className="py-4" />}
             </div>
           </SectionCard>

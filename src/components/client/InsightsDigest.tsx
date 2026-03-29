@@ -410,6 +410,7 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   conversion_attribution: { label: 'View analytics', tab: 'performance' },
   serp_opportunity: { label: 'View site health', tab: 'health' },
   anomaly_digest: { label: 'View analytics', tab: 'performance' },
+  strategy_alignment: { label: 'View strategy', tab: 'strategy' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {

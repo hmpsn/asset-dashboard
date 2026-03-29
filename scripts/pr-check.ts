@@ -17,7 +17,7 @@
  *   - Raw fetch() in components (use typed API client)
  */
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import path from 'path';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -31,9 +31,10 @@ function getChangedFiles(): string[] {
     const ghBase = process.env.GITHUB_BASE_REF;
     if (ghBase) {
       try {
-        const out = execSync(`git diff --name-only origin/${ghBase}...HEAD 2>/dev/null`, {
+        const out = execFileSync('git', ['diff', '--name-only', `origin/${ghBase}...HEAD`], {
           cwd: ROOT,
           encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
         }).trim();
         if (out) return out.split('\n').filter(Boolean);
       } catch {

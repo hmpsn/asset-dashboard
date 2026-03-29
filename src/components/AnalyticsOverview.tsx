@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { BarChart3, Loader2 } from 'lucide-react';
 import { MetricToggleCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH } from './ui';
 import { AnnotatedTrendChart, type TrendLine } from './charts/AnnotatedTrendChart';
-
 import { InsightFeed } from './insights';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { useToggleSet } from '../hooks/useToggleSet';
 import { fmtNum } from '../utils/formatNumbers';
 
 interface Props {
@@ -18,11 +18,11 @@ interface Props {
 
 const ALL_OVERVIEW_LINES: TrendLine[] = [
   { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
-  { key: 'impressions', color: '#8b5cf6', yAxisId: 'left', label: 'Impressions' },
+  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' },
   { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'Avg CTR' },
   { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
-  { key: 'users', color: '#14b8a6', yAxisId: 'right', label: 'Users' },
-  { key: 'sessions', color: '#3b82f6', yAxisId: 'right', label: 'Sessions' },
+  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' },
+  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' },
 ];
 
 type CardKey = 'clicks' | 'impressions' | 'ctr' | 'position' | 'users' | 'sessions';
@@ -48,7 +48,7 @@ const GSC_CARDS: CardConfig[] = [
   {
     key: 'impressions',
     label: 'Impressions',
-    color: '#8b5cf6',
+    color: '#22d3ee',
     formatValue: (o) => fmtNum(o.gscImpressions),
     getDelta: (o) => o.gscImpressionsDelta,
   },
@@ -102,7 +102,7 @@ function isDeltaPositive(delta: number | null): boolean {
 
 export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [activeLines, setActiveLines] = useState<Set<string>>(new Set(['clicks', 'users']));
+  const [activeLines, handleToggleLine] = useToggleSet(['clicks', 'users']);
   const [showAllInsights, setShowAllInsights] = useState(false);
 
   const overview = useAnalyticsOverview(workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days);
@@ -143,18 +143,6 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
 
   // Prune phantom entries (e.g., 'users' when only GSC connected)
   const effectiveActive = new Set([...activeLines].filter(k => visibleKeys.has(k)));
-
-  const handleToggleLine = (key: string) => {
-    setActiveLines(prev => {
-      const next = new Set([...prev].filter(k => visibleKeys.has(k)));
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key); // keep at least 1 active
-      } else if (next.size < 3) {
-        next.add(key);
-      }
-      return next;
-    });
-  };
 
   const chartLines = ALL_OVERVIEW_LINES
     .filter(l => visibleKeys.has(l.key))
