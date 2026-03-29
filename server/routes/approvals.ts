@@ -306,9 +306,9 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   broadcastToWorkspace(req.params.workspaceId, 'approval:applied', { batchId: req.params.batchId, applied: appliedIds.length });
 
-  // Record for outcome tracking — meta updates
+  // Record for outcome tracking — only successfully applied meta updates
   try {
-    for (const item of approved) {
+    for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
         recordAction({
           workspaceId: req.params.workspaceId,

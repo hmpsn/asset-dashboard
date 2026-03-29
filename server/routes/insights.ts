@@ -6,7 +6,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { resolveInsight, getUnresolvedInsights } from '../analytics-insights-store.js';
 import { createLogger } from '../logger.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 
 const log = createLogger('insights');
 
@@ -37,8 +37,9 @@ router.put(
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
     addActivity(workspaceId, 'insight_resolved', `Insight ${status}${note ? ': ' + note : ''}`);
     broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });
-    // Record for outcome tracking
+    // Record for outcome tracking — only on resolved, not in_progress; idempotent
     try {
+      if (status === 'resolved' && !getActionBySource('insight', req.params.insightId)) {
       const insightData = updated.data as Record<string, unknown> | undefined;
       recordAction({
         workspaceId,
@@ -57,6 +58,7 @@ router.put(
         },
         attribution: 'platform_executed',
       });
+      }
     } catch (err) {
       log.warn({ err, insightId: req.params.insightId }, 'Failed to record outcome action for insight');
     }
