@@ -344,7 +344,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -373,7 +373,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
       {/* Active Post Editor */}
       {activePostId && (
-        <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4">
+        <div className="bg-zinc-900 border border-blue-500/20 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <PostEditor
             workspaceId={workspaceId}
             postId={activePostId}
@@ -385,7 +385,7 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
 
       {/* Generated Posts list */}
       {posts.length > 0 && !activePostId && (
-        <div className="bg-zinc-900 rounded-xl border border-blue-500/20 p-4 space-y-3">
+        <div className="bg-zinc-900 border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex items-center gap-2 mb-1">
             <PenLine className="w-4 h-4 text-blue-400" />
             <span className="text-xs font-medium text-zinc-300">Generated Posts</span>

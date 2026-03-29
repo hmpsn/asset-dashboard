@@ -176,7 +176,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -210,7 +210,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
           { label: 'Published', value: stats.published, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(s => (
-          <div key={s.label} className={`rounded-xl border ${s.border} ${s.bg} px-4 py-3`}>
+          <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: '6px 12px 6px 12px' }}>
             <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
             <div className="text-[11px] text-zinc-500 mt-0.5">{s.label}</div>
           </div>
@@ -218,7 +218,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between bg-zinc-900 rounded-xl border border-zinc-800 px-4 py-2.5">
+      <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 px-4 py-2.5" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <button
           onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
           className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -245,7 +245,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Calendar grid */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-zinc-800">
           {DAYS.map(d => (
@@ -303,7 +303,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
 
       {/* Selected day detail panel */}
       {selectedDay && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
             <span className="text-xs font-medium text-zinc-300">
               {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}

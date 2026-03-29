@@ -99,10 +99,10 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 rounded-xl border border-zinc-800 text-[11px] text-zinc-400">
+        <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400" style={{ borderRadius: '10px 24px 10px 24px' }}>
           {summary.briefs > 0 && <span className="flex items-center gap-1"><Clipboard className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
           {summary.posts > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><FileText className="w-3 h-3 text-amber-400" /><span className="font-medium text-zinc-300">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
           {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-violet-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
@@ -112,11 +112,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
 
       {/* Content decay alert */}
       {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-xs ${
+        <div className={`flex items-center gap-3 px-4 py-2.5 border text-xs ${
           decay.critical > 0
             ? 'bg-red-500/5 border-red-500/20'
             : 'bg-amber-500/5 border-amber-500/20'
-        }`}>
+        }`} style={{ borderRadius: '10px 24px 10px 24px' }}>
           <TrendingDown className={`w-4 h-4 flex-shrink-0 ${decay.critical > 0 ? 'text-red-400' : 'text-amber-400'}`} />
           <div className="flex-1">
             <span className="font-medium text-zinc-200">

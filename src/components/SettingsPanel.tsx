@@ -122,14 +122,14 @@ export function SettingsPanel() {
   const unlinked = workspaces.filter(w => !w.webflowSiteId);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-8">
       <div>
         <h2 className="text-lg font-semibold text-zinc-200">Settings</h2>
         <p className="text-xs mt-0.5 text-zinc-500">Account-level connections and configuration</p>
       </div>
 
       {/* Google Account Connection */}
-      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <Search className="w-4 h-4 text-blue-400" />
@@ -174,7 +174,7 @@ export function SettingsPanel() {
       </section>
 
       {/* Webflow Connections Overview */}
-      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-teal-400" />
@@ -211,7 +211,7 @@ export function SettingsPanel() {
       </section>
 
       {/* API Keys */}
-      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 border-b border-zinc-800">
           <h3 className="text-sm font-semibold text-zinc-200">API Keys</h3>
         </div>
@@ -225,7 +225,7 @@ export function SettingsPanel() {
       </section>
 
       {/* Platform Health */}
-      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-teal-400" />
@@ -275,7 +275,7 @@ export function SettingsPanel() {
       </section>
 
       {/* Storage Monitor */}
-      <section className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
+      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-500/8 flex items-center justify-center">
             <HardDrive className="w-4 h-4 text-amber-400/80" />

@@ -84,7 +84,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   };
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
       <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2">
         <Send className="w-3.5 h-3.5 text-teal-400" />
         <span className="text-xs font-medium text-zinc-300">Sent to Client{!loading && ` (${batches.length})`}</span>
