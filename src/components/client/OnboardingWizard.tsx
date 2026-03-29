@@ -100,7 +100,7 @@ export function OnboardingWizard({
             </div>
 
             {!betaMode && isTrial && (
-              <div className="mx-6 mb-4 px-3.5 py-3 rounded-xl bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15">
+              <div className="mx-6 mb-4 px-3.5 py-3 bg-gradient-to-r from-blue-500/5 to-teal-500/5 border border-blue-500/15" style={{ borderRadius: '6px 12px 6px 12px' }}>
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div>
@@ -125,7 +125,7 @@ export function OnboardingWizard({
             </div>
 
             <div className="px-6 py-4">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {features.map((f, i) => (
                   <div key={i} className={`px-3 py-2.5 rounded-lg border transition-colors ${f.available ? 'bg-zinc-800/50 border-zinc-800 hover:border-zinc-700' : 'bg-zinc-900/50 border-zinc-800/50 opacity-50'}`}>
                     <div className="flex items-center gap-2 mb-1">

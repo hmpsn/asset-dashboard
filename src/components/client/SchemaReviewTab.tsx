@@ -162,7 +162,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
       </div>
 
       {/* What is schema — education blurb */}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl px-5 py-4">
+      <div className="bg-zinc-900/50 border border-zinc-800 px-5 py-4" style={{ borderRadius: '6px 12px 6px 12px' }}>
         <div className="flex items-start gap-3">
           <Sparkles className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" />
           <div className="text-xs text-zinc-400 leading-relaxed">
@@ -175,7 +175,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
       {/* Plan status + actions */}
       {plan && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Globe className="w-4 h-4 text-teal-400" />
@@ -337,7 +337,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
 
       {/* Schema snapshot summary (if no plan but snapshot exists) */}
       {!plan && snapshot && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Globe className="w-4 h-4 text-teal-400" />
