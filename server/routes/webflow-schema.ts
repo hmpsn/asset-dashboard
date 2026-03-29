@@ -195,10 +195,11 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
 
     res.json({ success: true, published });
 
-    // Record for outcome tracking
+    // Record for outcome tracking (only when workspace is known)
     try {
+      if (!pubWs) throw new Error('no workspace');
       recordAction({
-        workspaceId: pubWs?.id || '',
+        workspaceId: pubWs.id,
         actionType: 'schema_deployed',
         sourceType: 'schema',
         sourceId: pageId,

@@ -198,7 +198,7 @@ router.get('/api/outcomes/overview', requireAuth, async (_req, res) => {
       });
     }
 
-    res.json({ workspaces: overviews });
+    res.json(overviews);
   } catch (err) {
     log.error({ err }, 'Failed to get outcomes overview');
     res.status(500).json({ error: 'Failed to get outcomes overview' });
@@ -220,7 +220,7 @@ router.get('/api/outcomes/:workspaceId/scorecard', requireWorkspaceAccess('works
 router.get('/api/outcomes/:workspaceId/top-wins', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const wins = getTopWinsForWorkspace(req.params.workspaceId);
-    res.json({ wins });
+    res.json(wins);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get top wins');
     res.status(500).json({ error: 'Failed to get top wins' });
@@ -231,7 +231,7 @@ router.get('/api/outcomes/:workspaceId/top-wins', requireWorkspaceAccess('worksp
 router.get('/api/outcomes/:workspaceId/timeline', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
     const actions = getRecentActions(req.params.workspaceId, 50);
-    res.json({ actions });
+    res.json(actions);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get timeline');
     res.status(500).json({ error: 'Failed to get action timeline' });
@@ -269,7 +269,7 @@ router.get('/api/outcomes/:workspaceId/actions', requireWorkspaceAccess('workspa
       });
     }
 
-    res.json({ actions });
+    res.json(actions);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get actions');
     res.status(500).json({ error: 'Failed to get tracked actions' });
@@ -284,7 +284,7 @@ router.get('/api/outcomes/:workspaceId/actions/:actionId', requireWorkspaceAcces
       return res.status(404).json({ error: 'Action not found' });
     }
     const outcomes = getOutcomesForAction(req.params.actionId);
-    res.json({ action, outcomes });
+    res.json({ ...action, outcomes });
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId, actionId: req.params.actionId }, 'Failed to get action');
     res.status(500).json({ error: 'Failed to get action details' });
@@ -352,7 +352,7 @@ router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), 
       delta: w.delta,
       detectedAt: w.scoredAt,
     }));
-    res.json({ entries });
+    res.json(entries);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client wins');
     res.status(500).json({ error: 'Failed to get outcome wins' });

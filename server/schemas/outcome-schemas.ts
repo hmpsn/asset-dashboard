@@ -90,8 +90,8 @@ export const actionContextSchema = z.object({
 // --- Playbook Schemas ---
 export const playbookStepSchema = z.object({
   actionType: actionTypeEnum,
-  timing: z.string(),
-  detail: z.string(),
+  timing: z.string().optional(),
+  detail: z.string().optional(),
 });
 
 export const playbookSequenceSchema = z.array(playbookStepSchema);
