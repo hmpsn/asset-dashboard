@@ -5,7 +5,7 @@ import {
 import { MonthlyDigest } from './MonthlyDigest';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard } from '../ui';
+import { StatCard, MetricRing } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -119,9 +119,6 @@ export function OverviewTab({
       } else if (ga4Overview) {
         cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: '#60a5fa', sub: 'last period', delta: ga4Comparison?.changePercent.sessions });
       }
-      if (audit) {
-        cards.push({ label: <><span>Site Health</span><Explainer term="site-health" /></>, value: `${audit.siteScore}/100`, icon: Shield, color: audit.siteScore >= 80 ? '#34d399' : audit.siteScore >= 60 ? '#fbbf24' : '#f87171', sub: `${audit.totalPages} pages`, delta: audit.previousScore != null ? audit.siteScore - audit.previousScore : undefined });
-      }
       if (strategyData) {
         const ranked = strategyData.pageMap.filter(p => p.currentPosition);
         if (ranked.length > 0) {
@@ -129,9 +126,16 @@ export function OverviewTab({
           cards.push({ label: <><span>Avg Position</span><Explainer term="position" /></>, value: `#${avgP.toFixed(1)}`, icon: Target, color: avgP <= 10 ? '#34d399' : avgP <= 20 ? '#fbbf24' : '#60a5fa', sub: `${ranked.length} pages ranking` });
         }
       }
-      if (cards.length === 0) return null;
+      const totalItems = cards.length + (audit ? 1 : 0);
+      if (totalItems === 0) return null;
       return (
-        <div className={`grid gap-3 ${cards.length <= 3 ? 'grid-cols-' + cards.length : cards.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
+        <div className={`grid gap-3 ${totalItems <= 3 ? 'grid-cols-' + totalItems : totalItems === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
+          {audit && (
+            <div className="flex flex-col items-center justify-center p-3 bg-zinc-900 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
+              <MetricRing score={audit.siteScore} size={96} />
+              <p className="text-xs text-zinc-500 mt-1 text-center">Site Health</p>
+            </div>
+          )}
           {cards.map((card, i) => (
             <StatCard
               key={i}
