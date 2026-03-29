@@ -106,7 +106,7 @@ export function InboxTab({
   const hasContent = contentRequests.length > 0 || effectiveTier !== 'free';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Header + filters */}
       <div>
         <div className="flex items-center gap-3 mb-4">

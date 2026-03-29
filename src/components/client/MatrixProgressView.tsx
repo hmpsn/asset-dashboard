@@ -136,7 +136,7 @@ export function MatrixProgressView({ matrix, onCellPreview, onFlagCell, onDownlo
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <PageHeader

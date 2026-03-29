@@ -136,6 +136,7 @@ export function OverviewTab({
           {cards.map((card, i) => (
             <StatCard
               key={i}
+              size="hero"
               label={card.label}
               value={card.value}
               icon={card.icon}
@@ -262,9 +263,9 @@ export function OverviewTab({
     </ErrorBoundary>
 
     {/* Main content: insights + sidebar */}
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       {/* Left column (3/5) — Insights feed */}
-      <div className="lg:col-span-3 space-y-5">
+      <div className="lg:col-span-3 space-y-8">
         {/* Server-computed insight narratives */}
         <ErrorBoundary label="Insight Narrative">
           <InsightNarrative workspaceId={workspaceId} />
