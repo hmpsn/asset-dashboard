@@ -3695,6 +3695,17 @@
           "notes": "Shipped — 5 sub-tasks: (1) Strategy enrichment — buildStrategyIntelligenceBlock() injects keyword clusters, competitor gaps, performance deltas, conversion data into master prompt. (2) 2 new insight cards — Schema Opportunities + Content Health with tier-gating. (3) Analytics annotations — SQLite table + CRUD + admin/public routes (4 categories). (4) Content calendar intelligence — suggestPublishDates() from decay + quick wins. (5) GSC pagination — paginateGscQuery() helper, getQueryPageData upgraded to 2000 rows. 35 new TDD tests.",
           "status": "done",
           "shippedAt": "2026-03-26"
+        },
+        {
+          "id": "outcome-intelligence-engine",
+          "title": "Outcome Intelligence Engine",
+          "source": "Outcome Intelligence Engine spec (docs/specs/outcome-intelligence-engine.md)",
+          "est": "20-28h",
+          "priority": "P1",
+          "sprint": "E",
+          "notes": "Full implementation: action tracking (10+ source systems), outcome measurement at 7/30/60/90d checkpoints (GSC + GA4 delta), win/loss/neutral scoring, workspace learnings with confidence thresholds (high 25+, medium 10-24, low <10), AI prompt injection, admin Outcomes Dashboard (4-tab: Overview/Actions/Wins/Learnings), client tiered reporting (Free top-3-wins, Growth scorecard, Premium detailed), We Called It external detection (2-cycle confirmation), multi-workspace overview with aggregate stats, action playbooks (pattern detection from multi-action pages), backfill engine (idempotent retroactive action creation from generated_posts/analytics_insights/recommendation_sets), cron scheduler for measurement and external detection. Feature flags: outcome-tracking, outcome-ai-injection, outcome-dashboard, outcome-client-reporting, outcome-external-detection, outcome-playbooks.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
         }
       ]
     }

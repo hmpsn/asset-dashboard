@@ -2924,6 +2924,96 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+## Outcome Intelligence
+
+### 189. Outcome Intelligence Engine
+**What it does:** Platform-wide action tracking and outcome measurement system. Records actions from 10+ systems (content publishing, SEO fixes, schema changes, strategy updates, brief generation, keyword mapping, redirects, performance work, approvals, annotation events), then measures results at 7/30/60/90-day checkpoints using GSC clicks/impressions and GA4 sessions/conversions. Each action is scored as `strong_win`, `win`, `neutral`, `loss`, or `inconclusive` based on traffic delta thresholds. Feature flagged: `outcome-tracking`.
+
+**Agency value:** Closes the loop on every recommendation and execution — the platform answers "did that work?" with real data, not gut feel. Demonstrates ROI on every action taken inside the dashboard.
+
+**Client value:** Proof that the agency's work is moving the needle. Win/loss history for every optimization surfaces in client-facing views.
+
+**Mutual:** Transforms the platform from a tool that records work into one that measures outcomes. Every action becomes a data point in a continuous improvement loop.
+
+---
+
+### 190. Workspace Learnings
+**What it does:** AI feedback loop that aggregates outcome data into structured learnings injected into all AI prompts. After measuring outcomes, the system identifies patterns — what works, what doesn't, which pages respond to which action types — and surfaces them as structured `WorkspaceLearning` objects. Confidence thresholds: high (25+ scored outcomes), medium (10–24), low (<10). Learnings are injected into schema generation, content brief, strategy, and chat advisor prompts. Feature flagged: `outcome-ai-injection`.
+
+**Agency value:** The AI gets smarter about each client over time. Recommendations are grounded in what has actually worked for that specific workspace — not generic best practices.
+
+**Client value:** Strategies tailored to the history of their site. Wins get replicated; losing patterns get avoided.
+
+**Mutual:** Self-improving intelligence that compounds over time. The longer the platform is used, the more accurate its recommendations become.
+
+---
+
+### 191. Outcomes Dashboard (Admin)
+**What it does:** Admin dashboard with a win-rate scorecard, chronological action feed, top wins panel, and learnings summary panel. 4-tab layout (Overview, Actions, Wins, Learnings) with filterable views by action type and time range. Win rate ring uses `scoreColor()` scale (green ≥70, amber 40–69, red <40). Score badges: green = strong_win/win, amber = neutral, red = loss, zinc = insufficient_data/inconclusive. Feature flagged: `outcome-dashboard`.
+
+**Agency value:** One screen answers "what are we winning at, what's not working, and what has the AI learned?" Filterable action feed makes account reviews faster. Win rate ring provides instant portfolio health signal.
+
+**Client value:** N/A — admin-only.
+
+**Mutual:** Admin has a single source of truth for outcome performance across all workspaces.
+
+---
+
+### 192. Client Outcome Reporting
+**What it does:** Tiered client views showing outcome results with tone and depth matched to plan tier. Free tier: top 3 wins only. Growth tier: full scorecard with win rate ring and action summary. Premium tier: detailed breakdown with action-by-action results, delta indicators, and trend charts. Includes the "We Called It" feature for wins on externally detected recommendations — surfaces in the client dashboard when GSC/GA4 improvement is detected on a page that had an unimplemented recommendation. Feature flagged: `outcome-client-reporting`.
+
+**Agency value:** Outcome reporting becomes a retention and upsell tool. Free-tier clients see the value; Growth/Premium clients get full transparency.
+
+**Client value:** Concrete proof of ROI — not just "we did work" but "here's what changed." Premium clients see exactly which actions drove results.
+
+**Mutual:** Outcome visibility builds trust and justifies pricing at every tier.
+
+---
+
+### 193. External Execution Detection
+**What it does:** Detects when recommendations are implemented outside the platform (e.g., client or developer acts on a recommendation without using the dashboard). Compares GSC/GA4 performance against pages with open recommendations. Triggers a confirmation window requiring 2 consecutive detection cycles before marking as externally executed — prevents false positives from normal ranking volatility. Creates a `platform_action` record with source `external_detection` when confirmed. Feature flagged: `outcome-external-detection`.
+
+**Agency value:** Captures credit for recommendations that were acted on outside the tool. Win rate stays accurate even when clients implement changes manually.
+
+**Client value:** The platform notices when their site improves and attributes it correctly — no manual logging required.
+
+**Mutual:** Complete outcome picture regardless of execution path.
+
+---
+
+### 194. Multi-Workspace Outcomes Overview
+**What it does:** Cross-workspace table in the admin Command Center showing win rates, recent trends, outcome counts, and attention flags for every workspace. Aggregate stats bar shows platform-wide totals (total actions, total wins, average win rate). Sortable by win rate, trend direction, and total actions. Workspaces with declining win rates or low outcome counts are flagged for attention. Part of `outcome-dashboard` feature flag.
+
+**Agency value:** Portfolio-level outcome visibility in one screen. Quickly identifies which clients are seeing wins and which need strategy adjustments. Outcome trends surface account health proactively.
+
+**Client value:** N/A — admin-only.
+
+**Mutual:** Admin can prioritize client attention based on outcome data, not just instinct.
+
+---
+
+### 195. Action Playbooks
+**What it does:** Pattern detection from multi-action pages. Analyzes pages where 3+ actions were executed and discovers reusable action sequences with historical win rates. A playbook captures the ordered sequence of action types, the average traffic delta achieved, and the number of times that sequence has been executed. Playbooks are surfaced in the admin Outcomes Dashboard and can be referenced by the AI advisor when making recommendations for similar page types. Feature flagged: `outcome-playbooks`.
+
+**Agency value:** Converts tacit knowledge ("what we usually do for service pages") into explicit, measurable playbooks. Replicates winning sequences across the portfolio.
+
+**Client value:** Recommendations grounded in proven patterns, not experimentation.
+
+**Mutual:** Institutional knowledge capture — the platform gets smarter as the agency does more work.
+
+---
+
+### 196. Backfill Engine
+**What it does:** Retroactive action creation from historical platform data. On first run, scans `generated_posts`, `analytics_insights`, and `recommendation_sets` tables and creates `platform_action` records for past activity — so the outcome measurement system has historical data to measure from day one. Designed to run once and be idempotent (safe to re-run without creating duplicates). Uses a `backfill_completed` flag to skip on subsequent runs. Part of `outcome-tracking` feature flag.
+
+**Agency value:** New workspaces don't start from zero. Historical content, insights, and recommendations are immediately enrolled in outcome measurement — giving the system data to learn from on day one.
+
+**Client value:** N/A — infrastructure only.
+
+**Mutual:** Outcome intelligence is useful immediately after setup, not only after months of new activity.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -2932,12 +3022,13 @@ When the user asks to update this document with recent features, follow this pro
 | Content & Strategy | 45+ | Strategy → brief → AI post → review → publish pipeline, content matrices, templates, keyword intelligence, competitive analysis |
 | Analytics & Tracking | 15+ | Connected Intelligence Engine, insights computation, rank tracking, revenue analytics, AI usage tracking |
 | AI & Intelligence | 15+ | Full-spectrum AI advisors, knowledge base, brand voice, recommendations engine, unified context architecture, AEO page review |
+| Outcome Intelligence | 8+ | Action tracking, outcome measurement (7/30/60/90d), workspace learnings, client reporting, external detection, playbooks, backfill |
 | Client Portal | 30+ | 24/7 data access, approvals, onboarding, plans, feedback, strategy participation, content plan review, email capture |
 | Monetization | 8+ | Stripe Checkout + Subscriptions, self-service cart, billing portal, recurring content subscriptions, ROI-backed upgrade prompts |
 | Auth & Security | 7+ | Internal users, workspace ACL, client users, Helmet/HTTPS, rate limiting, CAPTCHA, credential stuffing protection |
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**253 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**261 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 Current feature count: **252**. Last updated: March 2026.
