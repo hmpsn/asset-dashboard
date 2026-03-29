@@ -157,7 +157,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
           ) : (
             <div className="p-4 space-y-3">
               {/* Type selector */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 {(Object.entries(TYPE_CONFIG) as [FeedbackType, typeof TYPE_CONFIG['bug']][]).map(([key, cfg]) => {
                   const Icon = cfg.icon;
                   return (
@@ -236,7 +236,7 @@ export function FeedbackWidget({ workspaceId, currentTab, submittedBy, chatExpan
               const hasTeamReply = item.replies.some(r => r.author === 'team');
 
               return (
-                <div key={item.id} className="bg-zinc-800/50 rounded-xl border border-zinc-800 overflow-hidden">
+                <div key={item.id} className="bg-zinc-800/50 border border-zinc-800 overflow-hidden" style={{ borderRadius: '6px 12px 6px 12px' }}>
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                     className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-zinc-800/80 transition-colors"
