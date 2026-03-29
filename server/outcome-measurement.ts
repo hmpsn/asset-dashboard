@@ -82,12 +82,15 @@ export function computeDelta(
   const cv = typeof currentValue === 'number' ? currentValue : 0;
 
   const deltaAbsolute = cv - bv;
-  const deltaPercent = bv !== 0 ? (deltaAbsolute / Math.abs(bv)) * 100 : 0;
+  // When baseline is 0: any positive change → 100%, any negative → -100%, no change → 0%
+  const deltaPercent = bv !== 0
+    ? (deltaAbsolute / Math.abs(bv)) * 100
+    : cv > 0 ? 100 : cv < 0 ? -100 : 0;
 
   let direction: DeltaSummary['direction'];
   const lowerIsBetter = LOWER_IS_BETTER_METRICS.has(primaryMetric);
 
-  if (Math.abs(deltaPercent) < 0.01) {
+  if (Math.abs(deltaAbsolute) < 0.001) {
     direction = 'stable';
   } else if (lowerIsBetter) {
     // For position: a decrease (negative delta) is an improvement

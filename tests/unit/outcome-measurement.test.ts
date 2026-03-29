@@ -180,12 +180,13 @@ describe('computeDelta', () => {
     expect(delta.delta_absolute).toBe(50);
   });
 
-  it('handles zero baseline — avoids division by zero, returns 0 for delta_percent', () => {
+  it('handles zero baseline — returns 100% delta and improved direction when current > 0', () => {
     const baseline = makeSnapshot({ clicks: 0 });
     const current = makeSnapshot({ clicks: 80 });
     const delta = computeDelta(baseline, current, 'clicks');
-    expect(delta.delta_percent).toBe(0); // bv === 0 → percent is 0
+    expect(delta.delta_percent).toBe(100);
     expect(delta.delta_absolute).toBe(80);
+    expect(delta.direction).toBe('improved');
   });
 
   it('returns correct delta_absolute and delta_percent for normal case', () => {
