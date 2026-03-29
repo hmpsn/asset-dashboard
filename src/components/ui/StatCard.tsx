@@ -28,14 +28,12 @@ export function StatCard({
   const Tag = onClick ? 'button' : 'div';
   const isHero = size === 'hero';
 
-  const staggerStyle = staggerIndex !== undefined
-    ? { animationDelay: `${staggerIndex * 60}ms` }
-    : undefined;
-
   const baseStyle = {
     borderRadius: '6px 12px 6px 12px',
-    animation: staggerIndex !== undefined ? 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both' : undefined,
-    ...staggerStyle,
+    ...(staggerIndex !== undefined && {
+      animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both',
+      animationDelay: `${staggerIndex * 60}ms`,
+    }),
   };
 
   return (
