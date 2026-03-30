@@ -74,7 +74,7 @@ router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess
 // Generate a new content brief
 router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
-    const { targetKeyword, businessContext, pageType, referenceUrls } = req.body;
+    const { targetKeyword, businessContext, pageType, referenceUrls, pageAnalysisContext } = req.body;
     if (!targetKeyword) return res.status(400).json({ error: 'targetKeyword required' });
 
     const ws = getWorkspace(req.params.workspaceId);
@@ -180,6 +180,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,
       ga4PagePerformance: ga4Performance.length > 0 ? ga4Performance : undefined,
       styleExamples: stylePages.length > 0 ? stylePages : undefined,
+      pageAnalysisContext: pageAnalysisContext || undefined,
     });
 
     // Record for outcome tracking

@@ -99,15 +99,26 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
 
-  // Auto-fill keyword from audit Fix→
+  // Auto-fill keyword from Page Intelligence context and optionally auto-generate
   const fixConsumed = useRef(false);
   useEffect(() => {
     if (fixContext && !fixConsumed.current) {
       fixConsumed.current = true;
-      const prefill = fixContext.pageName || fixContext.pageSlug || '';
+      // Prefer the actual primary keyword over page name
+      const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';
       if (prefill) setKeyword(prefill.replace(/-/g, ' '));
     }
   }, [fixContext]);
+
+  // Auto-generate when arriving from Page Intelligence with autoGenerate flag
+  const autoGenTriggered = useRef(false);
+  useEffect(() => {
+    if (fixContext?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {
+      autoGenTriggered.current = true;
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, fixContext?.autoGenerate]);
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
@@ -299,6 +310,15 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
         targetPageSlug: fixContext?.pageSlug,
         pageType: pageType || undefined,
         referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
+        pageAnalysisContext: fixContext?.optimizationIssues || fixContext?.recommendations || fixContext?.contentGaps
+          ? {
+              optimizationScore: fixContext.optimizationScore,
+              optimizationIssues: fixContext.optimizationIssues,
+              recommendations: fixContext.recommendations,
+              contentGaps: fixContext.contentGaps,
+              searchIntent: fixContext.searchIntent,
+            }
+          : undefined,
       });
       queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [brief, ...(old ?? [])]);
       setKeyword('');
