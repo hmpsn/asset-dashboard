@@ -70,6 +70,7 @@ export function startOutcomeCrons() {
   setTimeout(() => void runLearnings(), 20_000);
   setTimeout(() => void runDetection(), 25_000);
   setTimeout(() => void runPlaybooks(), 30_000);
+  setTimeout(runArchive, 35_000);
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
   learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
