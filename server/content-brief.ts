@@ -19,7 +19,7 @@ import { z } from 'zod';
 
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
 function parseAiJson<T = Record<string, unknown>>(raw: string, context: string): T {
-  const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
   try {
     return JSON.parse(cleaned) as T;
   } catch {

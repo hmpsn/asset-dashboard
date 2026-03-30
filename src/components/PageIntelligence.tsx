@@ -1164,18 +1164,17 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </button>
                     <button
                       onClick={() => {
-                        const analysis = sp || kw;
                         navigate(adminPath(workspaceId, 'seo-briefs'), {
                           state: {
                             fixContext: {
                               pageSlug: page.slug,
                               pageName: page.title,
-                              primaryKeyword: analysis?.primaryKeyword || undefined,
-                              searchIntent: analysis?.searchIntent || undefined,
-                              optimizationScore: analysis?.optimizationScore ?? undefined,
-                              optimizationIssues: analysis?.optimizationIssues?.length ? analysis.optimizationIssues : undefined,
-                              recommendations: analysis?.recommendations?.length ? analysis.recommendations : undefined,
-                              contentGaps: analysis?.contentGaps?.length ? analysis.contentGaps : undefined,
+                              primaryKeyword: sp?.primaryKeyword || kw?.primaryKeyword || undefined,
+                              searchIntent: sp?.searchIntent || kw?.searchIntent || undefined,
+                              optimizationScore: sp?.optimizationScore ?? kw?.optimizationScore ?? undefined,
+                              optimizationIssues: (sp?.optimizationIssues?.length ? sp.optimizationIssues : undefined) || (kw?.optimizationIssues?.length ? kw.optimizationIssues : undefined),
+                              recommendations: (sp?.recommendations?.length ? sp.recommendations : undefined) || (kw?.recommendations?.length ? kw.recommendations : undefined),
+                              contentGaps: (sp?.contentGaps?.length ? sp.contentGaps : undefined) || (kw?.contentGaps?.length ? kw.contentGaps : undefined),
                               autoGenerate: true,
                             },
                           },
