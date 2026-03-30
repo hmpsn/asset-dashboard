@@ -47,13 +47,14 @@ export function clearSeoContextCache(workspaceId?: string): void {
 
 /**
  * Build SEO context from a workspace's keyword strategy.
- * Results are cached for 5 minutes per workspace+pagePath combination.
+ * Results are cached for 5 minutes per workspace+pagePath+learningsDomain combination.
  * @param workspaceId - workspace to look up
  * @param pagePath - optional page path to find page-specific keywords
+ * @param learningsDomain - which learning domain to inject (default 'strategy'); pass 'content' from content generation callers
  */
-export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoContext {
+export function buildSeoContext(workspaceId?: string, pagePath?: string, learningsDomain: 'content' | 'strategy' | 'technical' | 'all' = 'strategy'): SeoContext {
   if (workspaceId) {
-    const cacheKey = `${workspaceId}:${pagePath || ''}`;
+    const cacheKey = `${workspaceId}:${pagePath || ''}:${learningsDomain}`;
     const cached = seoContextCache.get(cacheKey);
     if (cached && Date.now() < cached.expiry) return cached.value;
   }
@@ -82,17 +83,17 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
 
   if (!strategy) {
     const baseParts = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
-    // Inject workspace learnings for strategy domain if feature is enabled
+    // Inject workspace learnings if feature is enabled
     if (isFeatureEnabled('outcome-ai-injection')) {
       const learnings = getWorkspaceLearnings(workspaceId);
       if (learnings) {
-        const learningsBlock = formatLearningsForPrompt(learnings, 'strategy');
+        const learningsBlock = formatLearningsForPrompt(learnings, learningsDomain);
         if (learningsBlock) baseParts.push(learningsBlock);
       }
     }
     const fullContext = baseParts.join('');
     const result: SeoContext = { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
     return result;
   }
 
@@ -129,11 +130,11 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
   }
 
   const contextParts = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
-  // Inject workspace learnings for strategy domain if feature is enabled
+  // Inject workspace learnings if feature is enabled
   if (isFeatureEnabled('outcome-ai-injection')) {
     const learnings = getWorkspaceLearnings(workspaceId);
     if (learnings) {
-      const learningsBlock = formatLearningsForPrompt(learnings, 'strategy');
+      const learningsBlock = formatLearningsForPrompt(learnings, learningsDomain);
       if (learningsBlock) contextParts.push(learningsBlock);
     }
   }
@@ -142,7 +143,7 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
 
   // Cache result
   if (workspaceId) {
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
   }
 
   return result;
