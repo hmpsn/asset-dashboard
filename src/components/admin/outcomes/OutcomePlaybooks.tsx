@@ -7,7 +7,7 @@ interface Props {
   workspaceId: string;
 }
 
-function confidenceVariant(confidence: PlaybookConfidence): 'green' | 'amber' | 'red' {
+function confidenceColor(confidence: PlaybookConfidence): 'green' | 'amber' | 'red' {
   if (confidence === 'high') return 'green';
   if (confidence === 'medium') return 'amber';
   return 'red';
@@ -24,9 +24,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-medium text-zinc-100 capitalize">{playbook.name}</h3>
-        <Badge variant={confidenceVariant(playbook.confidence)} size="sm">
-          {playbook.confidence} confidence
-        </Badge>
+        <Badge label={`${playbook.confidence} confidence`} color={confidenceColor(playbook.confidence)} />
       </div>
 
       {/* Action sequence */}
