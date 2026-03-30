@@ -148,19 +148,19 @@ export function LinkChecker({ siteId }: Props) {
     <div className="space-y-8">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-zinc-200">{data.totalLinks}</div>
           <div className="text-xs text-zinc-500 mt-1">Total Links</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-green-400">{data.healthy}</div>
           <div className="text-xs text-zinc-500 mt-1">Healthy</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-red-500/30" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-zinc-900 p-4 border border-red-500/30" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-red-400">{data.deadLinks.length}</div>
           <div className="text-xs text-zinc-500 mt-1">Dead Links</div>
         </div>
-        <div className="bg-zinc-900 p-4 border border-amber-500/30" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="bg-zinc-900 p-4 border border-amber-500/30" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-3xl font-bold text-amber-400">{data.redirects.length}</div>
           <div className="text-xs text-zinc-500 mt-1">Redirects</div>
         </div>
@@ -226,7 +226,7 @@ export function LinkChecker({ siteId }: Props) {
           </div>
         ) : (
           filtered.map((link, idx) => (
-            <div key={idx} className="flex items-start gap-3 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800/50 border border-zinc-800 transition-colors">
+            <div key={idx} className="flex items-start gap-3 px-4 py-3 bg-zinc-900 hover:bg-zinc-800/50 border border-zinc-800 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
               {tab === 'dead' ? (
                 <AlertCircle className="w-4 h-4 mt-0.5 text-red-400 shrink-0" />
               ) : (

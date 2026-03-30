@@ -61,7 +61,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
       <p className="text-xs text-zinc-500">Add markers to track key events. Annotations appear on timeline charts in both the admin and client dashboards.</p>
 
       {/* Add annotation form */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-3">
+      <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-[11px] text-zinc-500 block mb-1">Date *</label>
@@ -99,7 +99,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
       {annotations.length > 0 ? (
         <div className="space-y-2">
           {annotations.sort((a, b) => b.date.localeCompare(a.date)).map(ann => (
-            <div key={ann.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 group hover:border-zinc-700 transition-colors">
+            <div key={ann.id} className="flex items-center gap-3 px-4 py-3 bg-zinc-900 border border-zinc-800 group hover:border-zinc-700 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
               <span className="text-xs text-zinc-500 flex-shrink-0 font-mono">{ann.date}</span>
               <div className="flex-1 min-w-0">

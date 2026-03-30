@@ -229,7 +229,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Stats + Progress */}
-      <div className="rounded-xl p-4 bg-zinc-900 border border-zinc-800">
+      <div className="p-4 bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-6">
             {[

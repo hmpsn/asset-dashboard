@@ -29,7 +29,7 @@ const IMPACT_DOT: Record<string, string> = {
 
 function FeatureCard({ feature }: { feature: Feature }) {
   return (
-    <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4 hover:border-zinc-700 transition-colors">
+    <div className="bg-zinc-900 border border-zinc-800 p-4 hover:border-zinc-700 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <h3 className="text-sm font-semibold text-zinc-100 leading-tight">{feature.title}</h3>
         <div className="flex items-center gap-1.5 flex-shrink-0">
