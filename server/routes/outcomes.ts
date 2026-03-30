@@ -7,6 +7,8 @@ import { requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { createLogger } from '../logger.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { listWorkspaces } from '../workspaces.js';
 import {
   getAction,
@@ -33,7 +35,7 @@ import type {
   ActionOutcome,
   OutcomeScore,
 } from '../../shared/types/outcome-tracking.js';
-import { actionTypeEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
+import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
 
 const log = createLogger('outcomes');
 
@@ -273,15 +275,15 @@ router.post(
       ctr: z.number().optional(),
       sessions: z.number().optional(),
     }),
-    attribution: z.enum(['platform_executed', 'user_reported', 'external_detected', 'not_acted_on']).optional(),
+    attribution: attributionEnum.optional(),
     measurementWindow: z.number().int().min(7).max(365).optional(),
   })),
   (req, res) => {
     try {
-      // Idempotency: if sourceId is provided, check for existing action
+      // Idempotency: if sourceId is provided, check for existing action in THIS workspace
       if (req.body.sourceId) {
         const existing = getActionBySource(req.body.sourceType, req.body.sourceId);
-        if (existing) {
+        if (existing && existing.workspaceId === req.params.workspaceId) {
           return res.json({ success: true, action: existing, deduplicated: true });
         }
       }
@@ -298,6 +300,7 @@ router.post(
         measurementWindow: req.body.measurementWindow,
       });
 
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
       res.json({ success: true, action });
     } catch (err) {
       log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to record action');

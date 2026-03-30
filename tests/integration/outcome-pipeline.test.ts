@@ -138,6 +138,69 @@ describe('Outcome actions — idempotency guard', () => {
     );
     expect(matching.length).toBeGreaterThan(0);
   });
+
+  it('idempotency guard does not leak actions across workspaces', async () => {
+    // Create a second workspace
+    const ws2 = createWorkspace('Cross-WS Test');
+    const ws2Id = ws2.id;
+
+    try {
+      // Record an action in ws2 with a known sourceType+sourceId
+      const src = `cross-ws-${RUN_ID}`;
+      const res1 = await postJson(`/api/outcomes/${ws2Id}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'cross-test',
+        sourceId: src,
+        baselineSnapshot: { position: 1.0 },
+      });
+      expect(res1.status).toBe(200);
+      const ws2Action = (await res1.json()).action;
+      expect(ws2Action.workspaceId).toBe(ws2Id);
+
+      // Try to record same sourceType+sourceId in testWsId — should create NEW action, not return ws2's
+      const res2 = await postJson(`/api/outcomes/${testWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'cross-test',
+        sourceId: src,
+        baselineSnapshot: { position: 2.0 },
+      });
+      expect(res2.status).toBe(200);
+      const body2 = await res2.json();
+      // Must NOT return the ws2 action
+      expect(body2.action.workspaceId).toBe(testWsId);
+      expect(body2.action.id).not.toBe(ws2Action.id);
+    } finally {
+      deleteWorkspace(ws2Id);
+    }
+  });
+});
+
+// ── Attribution validation ──
+
+describe('Outcome actions — attribution validation', () => {
+  it('rejects invalid attribution values', async () => {
+    const res = await postJson(`/api/outcomes/${testWsId}/actions`, {
+      actionType: 'meta_updated',
+      sourceType: 'attr-test',
+      sourceId: `attr-invalid-${RUN_ID}`,
+      baselineSnapshot: { position: 3.0 },
+      attribution: 'user_reported',  // invalid — not in Attribution type
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts valid attribution value externally_executed', async () => {
+    const res = await postJson(`/api/outcomes/${testWsId}/actions`, {
+      actionType: 'meta_updated',
+      sourceType: 'attr-test',
+      sourceId: `attr-valid-${RUN_ID}`,
+      baselineSnapshot: { position: 3.0 },
+      attribution: 'externally_executed',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.action.attribution).toBe('externally_executed');
+  });
 });
 
 // ── Notes ──
