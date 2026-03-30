@@ -47,6 +47,12 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import type { Workspace } from '../workspaces.js';
+import type { ScrapedPage } from '../web-scraper.js';
+import { createLogger } from '../logger.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
+
+const log = createLogger('workspaces');
 
 // Workspaces
 router.get('/api/workspaces', (_req, res) => {
@@ -217,12 +223,6 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
 });
 
 // --- Shared: scrape website pages for AI analysis ---
-import type { Workspace } from '../workspaces.js';
-import type { ScrapedPage } from '../web-scraper.js';
-import { createLogger } from '../logger.js';
-
-const log = createLogger('workspaces');
-
 async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPage[]; pagesSummary: string }> {
   const { scrapeUrls } = await import('../web-scraper.js');
 
@@ -435,6 +435,21 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
       workspaceId: ws.id,
       timeoutMs: 90_000,
     });
+
+    try {
+      if (!getActionBySource('brand_voice', req.params.id)) recordAction({
+        workspaceId: req.params.id,
+        actionType: 'voice_calibrated',
+        sourceType: 'brand_voice',
+        sourceId: req.params.id,
+        pageUrl: null,
+        targetKeyword: null,
+        baselineSnapshot: { captured_at: new Date().toISOString() },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err }, 'Failed to record outcome action for brand voice update');
+    }
 
     res.json({ brandVoice: aiResult.text, pagesScraped: scraped.length });
   } catch (err) {

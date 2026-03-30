@@ -159,6 +159,133 @@ Use the established typography scale consistently:
 - Body text: `text-sm text-zinc-400`
 - Small text: `text-[11px] text-zinc-500`
 
+## Rule 11: Two-Column Table + Sidebar Layouts
+
+When a data table and a sidebar of cards need to sit side-by-side with the table matching the sidebar's height:
+
+**CSS cannot solve this alone.** CSS grid `stretch` and flex `stretch` make the shorter element match the taller one — but when the table has hundreds of rows, IT becomes the taller element and the sidebar stretches to match (useless). `max-height` with fixed values doesn't adapt to different sidebar content heights.
+
+**Solution: measure the sidebar via `useRef` + `useEffect`, set the table's `maxHeight` to match.**
+
+```tsx
+const sidebarRef = useRef<HTMLDivElement>(null);
+const [sidebarHeight, setSidebarHeight] = useState(0);
+
+useEffect(() => {
+  if (sidebarRef.current) {
+    const h = sidebarRef.current.offsetHeight;
+    if (h > 0 && h !== sidebarHeight) setSidebarHeight(h);
+  }
+});
+
+// Layout:
+<div className="flex flex-col lg:flex-row lg:items-start gap-3">
+  {/* Table — height matches sidebar */}
+  <div
+    className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden min-w-0 lg:flex-[2]"
+    style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined }}
+  >
+    <div className="... shrink-0">{/* header */}</div>
+    <div className="overflow-y-auto flex-1 min-h-0">{/* scrollable content */}</div>
+  </div>
+
+  {/* Sidebar — ref measured, natural height */}
+  <div ref={sidebarRef} className="lg:flex-1 space-y-3">
+    <SectionCard>...</SectionCard>
+    <SectionCard>...</SectionCard>
+  </div>
+</div>
+```
+
+**Key details:**
+- Use `lg:items-start` on the flex container so the sidebar renders at its natural height (not stretched to match the table)
+- The table container must be `flex flex-col overflow-hidden` — SectionCard's nested div structure breaks height propagation, so build the table container as a direct div
+- The scroll area inside needs `flex-1 min-h-0 overflow-y-auto`
+- Add `min-w-0` on the table container and row items to prevent long text from overflowing the grid width
+- The `useEffect` runs on every render to catch sidebar height changes from data loading
+
+**Anti-patterns:**
+- ❌ `max-h-[500px]` — doesn't adapt to sidebar content
+- ❌ CSS grid `row-span` with `auto` rows — table content determines row height, not sidebar
+- ❌ SectionCard with `className="flex flex-col"` — the inner content div doesn't get `flex-1`
+- ❌ `flex stretch` without `items-start` — sidebar stretches to match table, ref measures stretched height (circular)
+
+## Rule 12: SectionCard Cannot Be a Flex Container
+
+`SectionCard` wraps children in a nested `<div className={noPadding ? '' : 'p-4'}>` that does NOT participate in flex layout. Adding `className="flex flex-col"` to SectionCard puts flex on the outer div, but the inner content div is still a plain block element — `flex-1`, `min-h-0`, and `overflow-hidden` on children have no effect.
+
+**When you need controlled overflow or flex height propagation, build the container as a direct `<div>` instead of using SectionCard.**
+
+```tsx
+// ❌ WRONG — SectionCard breaks the flex chain
+<SectionCard noPadding className="flex flex-col max-h-[80vh]">
+  <div className="overflow-y-auto flex-1 min-h-0">
+    {/* This will NOT scroll — the inner wrapper div breaks propagation */}
+  </div>
+</SectionCard>
+
+// ✅ RIGHT — Direct div with full flex control
+<div className="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden">
+  <div className="px-4 py-3 border-b border-zinc-800 shrink-0">Header</div>
+  <div className="overflow-y-auto flex-1 min-h-0">{/* Scrollable content */}</div>
+</div>
+```
+
+SectionCard is still correct for non-scrolling content sections — just not for containers that need height-constrained overflow.
+
+## Rule 13: Chart Axis Assignment — Volume vs Rate Metrics
+
+Recharts supports max 2 Y-axes. When mixing volume metrics (clicks, impressions, users, sessions) with rate metrics (CTR, position, bounce rate, duration), ALWAYS separate them:
+
+- **Volume metrics → left axis**
+- **Rate metrics → right axis**
+- **When 2 volume metrics differ by >10x** (e.g., clicks 4K vs impressions 300K), move the smaller to the right axis
+
+Use the `TrendLine.yAxisId` hint as the primary grouping signal. Only fall back to scale-based assignment when all active lines share the same hint.
+
+**Known rate metric keys:** `ctr`, `position`, `bounceRate`, `avgSessionDuration`
+
+**Anti-pattern:** Dynamic scale-only assignment that groups CTR (1.3%) with Impressions (300K) on the same axis because 300000/1.3 > 10 "should" put them on different axes — but the code grouped them first before checking.
+
+## Rule 14: Comparison Object Fields — `change` vs `changePercent`
+
+GSC and GA4 comparison objects return both:
+- `.change.clicks` — raw number change (e.g., +92 clicks)
+- `.changePercent.clicks` — percentage change (e.g., +2.2%)
+
+**For MetricToggleCard deltas, always use `changePercent` with a `%` suffix** for volume metrics. For rate metrics (CTR, position), use `.change` with appropriate suffixes (`pt` for percentage points, raw for positions).
+
+```tsx
+// ❌ WRONG — shows "+92.0" instead of "+2.2%"
+delta={comparison.change.clicks}
+
+// ✅ RIGHT — percentage change
+delta={`${comparison.changePercent.clicks > 0 ? '+' : ''}${comparison.changePercent.clicks.toFixed(1)}%`}
+
+// ✅ RIGHT — CTR is percentage points, not percent
+delta={`${comparison.change.ctr > 0 ? '+' : ''}${comparison.change.ctr.toFixed(1)}pt`}
+```
+
+## Rule 15: Overflow Scroll Requires Unbroken Height Chain
+
+`overflow-y-auto` only works when EVERY ancestor from the scroll container up to the height-constraining element participates in height propagation. One plain `<div>` without `flex-1 min-h-0` breaks the chain and content overflows visually instead of scrolling.
+
+**The chain must be:**
+```
+constraining element (max-height or height set)
+  └─ flex flex-col
+       └─ header (shrink-0)
+       └─ scroll area (flex-1 min-h-0 overflow-y-auto)
+```
+
+**Every intermediate wrapper must have `flex-1 min-h-0`** or it breaks propagation. This is why SectionCard breaks scroll (Rule 12) — its inner wrapper div is a plain block element.
+
+## Rule 16: Use Local Dev Server for Layout Iteration
+
+CSS layout changes (grid, flex, overflow, height constraints) require visual verification. **Do not push to staging for each iteration** — the deploy cycle is 2-3 minutes per attempt.
+
+Use `preview_start` (local dev server) for layout work. Push to staging only after the layout is confirmed working locally. This prevents the "push → wait → screenshot → fix → push → wait" loop that burns 20+ minutes on what should be a 5-minute fix.
+
 ---
 
 **Enforcement**: These rules are checked during code review. Violations must be fixed before merge.

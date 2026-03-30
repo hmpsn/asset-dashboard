@@ -203,7 +203,10 @@ export function useClientContentPlan(wsId: string, enabled: boolean) {
 
 
 // ── Analytics Insights ────────────────────────────────────────────
-export function useClientInsights(wsId: string, enabled: boolean) {
+// NOTE: Named useClientRawInsights to avoid collision with useClientInsights in
+// ./useClientInsights.ts (which fetches from the /narrative endpoint and returns ClientInsight[]).
+// This hook fetches raw AnalyticsInsight[] from /api/public/insights/{wsId}.
+export function useClientRawInsights(wsId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.client.insights(wsId),
     queryFn: () => getSafe<AnalyticsInsight[]>(`/api/public/insights/${wsId}`, []),

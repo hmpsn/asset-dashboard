@@ -16,7 +16,7 @@ interface StatCardProps {
   className?: string;
   /** Display size: 'default' for standard, 'hero' for top-of-page impact metrics */
   size?: 'default' | 'hero';
-  /** Stagger animation index (0-based). Each index adds 60ms delay. */
+  /** Stagger index for entrance animation. Cards appear sequentially with 60ms delays. */
   staggerIndex?: number;
 }
 

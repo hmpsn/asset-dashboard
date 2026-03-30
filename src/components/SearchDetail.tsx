@@ -7,6 +7,7 @@ import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
 import { useAnalyticsAnnotations, useCreateAnnotation } from '../hooks/admin/useAnalyticsAnnotations';
+import { useToggleSet } from '../hooks/useToggleSet';
 import { InsightFeed } from './insights';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine, ChartCallout } from './charts/AnnotatedTrendChart';
@@ -22,7 +23,7 @@ type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
 
 const SEARCH_LINES: TrendLine[] = [
   { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
-  { key: 'impressions', color: '#8b5cf6', yAxisId: 'left', label: 'Impressions' },
+  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' },
   { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'CTR %' },
   { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
 ];
@@ -72,7 +73,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   const [days, setDays] = useState(28);
   const [sortKey, setSortKey] = useState<SortKey>('clicks');
   const [sortAsc, setSortAsc] = useState(false);
-  const [activeSearchLines, setActiveSearchLines] = useState<Set<string>>(new Set(['clicks', 'impressions']));
+  const [activeSearchLines, handleToggleLine] = useToggleSet(['clicks', 'impressions']);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarHeight, setSidebarHeight] = useState(0);
 
@@ -92,18 +93,6 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
   const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);
   const createAnnotation = useCreateAnnotation(workspaceId);
 
-  const handleToggleLine = (key: string) => {
-    setActiveSearchLines(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key);
-      } else if (next.size < 3) {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
   const chartLines = SEARCH_LINES.map(l => ({ ...l, active: activeSearchLines.has(l.key) }));
 
   // Map PerformanceTrend to chart-compatible format
@@ -116,13 +105,14 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
     position: Math.round(t.position * 10) / 10,
   }));
 
-  // Build callout bubbles from ranking drop insights
+  // Build callout bubbles from ranking drop insights — pin to insight's detected date or last chart date
   const searchFeed = feed.filter(f => f.domain === 'search' || f.domain === 'cross');
+  const lastChartDate = chartData.length > 0 ? chartData[chartData.length - 1].date : '';
   const callouts: ChartCallout[] = searchFeed
     .filter(f => f.type === 'ranking_mover' && (f.severity === 'critical' || f.severity === 'warning'))
     .slice(0, 2)
     .map(f => ({
-      date: chartData.length > 0 ? chartData[chartData.length - 1].date : '',
+      date: f.detectedAt?.slice(0, 10) ?? lastChartDate,
       label: f.headline,
       detail: f.title,
       color: '#ef4444',
@@ -147,19 +137,12 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
     else { setSortKey(key); setSortAsc(false); }
   };
 
-  const sortQueries = (items: SearchQuery[]): SearchQuery[] => {
+  function sortByKey<T extends Record<SortKey, number>>(items: T[]): T[] {
     return [...items].sort((a, b) => {
       const av = a[sortKey]; const bv = b[sortKey];
-      return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
+      return sortAsc ? av - bv : bv - av;
     });
-  };
-
-  const sortPages = (items: SearchPage[]): SearchPage[] => {
-    return [...items].sort((a, b) => {
-      const av = a[sortKey]; const bv = b[sortKey];
-      return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
-    });
-  };
+  }
 
   if (!gscPropertyUrl) {
     return (
@@ -211,7 +194,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
               value={fmtNum(overview.totalImpressions)}
               delta={hasDelta ? fmtDelta(comparison!.changePercent.impressions, '%') : '\u2014'}
               deltaPositive={hasDelta ? isDeltaPositive(comparison!.changePercent.impressions) : true}
-              color="#8b5cf6"
+              color="#22d3ee"
               active={activeSearchLines.has('impressions')}
               onClick={() => handleToggleLine('impressions')}
             />
@@ -268,7 +251,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
             {/* Left: Data table — height matches sidebar via ref measurement */}
             <div
               className="bg-zinc-900 border border-zinc-800 flex flex-col min-w-0 lg:flex-[2] overflow-hidden"
-            style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined, borderRadius: '10px 24px 10px 24px' }}
+              style={{ maxHeight: sidebarHeight > 0 ? `${sidebarHeight}px` : undefined, borderRadius: '10px 24px 10px 24px' }}
             >
               {/* Inline toggle header */}
               <div className="flex items-center gap-4 px-4 py-2.5 border-b border-zinc-800 shrink-0">
@@ -303,7 +286,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableView === 'queries' && sortQueries(overview.topQueries).map((q, i) => {
+                  {tableView === 'queries' && sortByKey(overview.topQueries).map((q, i) => {
                     const badge = badgeMap.get(q.query);
                     return (
                       <tr key={i} className={`border-b border-zinc-800/50 hover:bg-zinc-800/30 ${rowTint(badge)}`}>
@@ -326,7 +309,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                       </tr>
                     );
                   })}
-                  {tableView === 'pages' && sortPages(overview.topPages).map((p, i) => {
+                  {tableView === 'pages' && sortByKey(overview.topPages).map((p, i) => {
                     let pagePath: string;
                     try { pagePath = new URL(p.page).pathname; } catch { pagePath = p.page; }
                     const badge = badgeMap.get(p.page);
@@ -354,6 +337,12 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
                       </tr>
                     );
                   })}
+                  {tableView === 'queries' && overview.topQueries.length === 0 && (
+                    <tr><td colSpan={5} className="py-8"><EmptyState icon={Search} title="No queries data" description="No search query data available for this period." /></td></tr>
+                  )}
+                  {tableView === 'pages' && overview.topPages.length === 0 && (
+                    <tr><td colSpan={5} className="py-8"><EmptyState icon={Search} title="No pages data" description="No page data available for this period." /></td></tr>
+                  )}
                 </tbody>
               </table>
               </div>

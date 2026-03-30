@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { BarChart3, Loader2 } from 'lucide-react';
 import { MetricToggleCard, SectionCard, DateRangeSelector, EmptyState, DATE_PRESETS_SEARCH } from './ui';
 import { AnnotatedTrendChart, type TrendLine } from './charts/AnnotatedTrendChart';
-
 import { InsightFeed } from './insights';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { useToggleSet } from '../hooks/useToggleSet';
 import { fmtNum } from '../utils/formatNumbers';
 
 interface Props {
@@ -18,11 +18,11 @@ interface Props {
 
 const ALL_OVERVIEW_LINES: TrendLine[] = [
   { key: 'clicks', color: '#60a5fa', yAxisId: 'left', label: 'Clicks' },
-  { key: 'impressions', color: '#8b5cf6', yAxisId: 'left', label: 'Impressions' },
-  { key: 'ctr', color: '#f59e0b', yAxisId: 'left', label: 'Avg CTR' },
+  { key: 'impressions', color: '#22d3ee', yAxisId: 'left', label: 'Impressions' },
+  { key: 'ctr', color: '#f59e0b', yAxisId: 'right', label: 'Avg CTR' },
   { key: 'position', color: '#ef4444', yAxisId: 'right', label: 'Avg Position' },
-  { key: 'users', color: '#14b8a6', yAxisId: 'right', label: 'Users' },
-  { key: 'sessions', color: '#3b82f6', yAxisId: 'right', label: 'Sessions' },
+  { key: 'users', color: '#14b8a6', yAxisId: 'left', label: 'Users' },
+  { key: 'sessions', color: '#3b82f6', yAxisId: 'left', label: 'Sessions' },
 ];
 
 type CardKey = 'clicks' | 'impressions' | 'ctr' | 'position' | 'users' | 'sessions';
@@ -32,6 +32,7 @@ interface CardConfig {
   label: string;
   color: string;
   invertDelta?: boolean;
+  deltaSuffix?: string;  // default '%', position uses '' (raw spots)
   formatValue: (overview: ReturnType<typeof useAnalyticsOverview>) => string;
   getDelta: (overview: ReturnType<typeof useAnalyticsOverview>) => number | null;
 }
@@ -47,7 +48,7 @@ const GSC_CARDS: CardConfig[] = [
   {
     key: 'impressions',
     label: 'Impressions',
-    color: '#8b5cf6',
+    color: '#22d3ee',
     formatValue: (o) => fmtNum(o.gscImpressions),
     getDelta: (o) => o.gscImpressionsDelta,
   },
@@ -65,6 +66,7 @@ const GSC_CARDS: CardConfig[] = [
     label: 'Avg Position',
     color: '#ef4444',
     invertDelta: true,
+    deltaSuffix: '',  // raw spots, not percentage
     formatValue: (o) => o.gscPosition.toFixed(1),
     getDelta: (o) => o.gscPositionDelta,
   },
@@ -88,10 +90,11 @@ const ALL_CARDS: CardConfig[] = [
   },
 ];
 
-function formatDeltaLabel(delta: number | null): string {
+function formatDeltaLabel(delta: number | null, suffix = '%'): string {
   if (delta === null) return '—';
   const sign = delta > 0 ? '+' : '';
-  return `${sign}${delta.toFixed(1)}%`;
+  return `${sign}${delta.toFixed(1)}${suffix}`;
+
 }
 
 function isDeltaPositive(delta: number | null): boolean {
@@ -100,7 +103,7 @@ function isDeltaPositive(delta: number | null): boolean {
 
 export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [activeLines, setActiveLines] = useState<Set<string>>(new Set(['clicks', 'users']));
+  const [activeLines, handleToggleLine] = useToggleSet(['clicks', 'users']);
   const [showAllInsights, setShowAllInsights] = useState(false);
 
   const overview = useAnalyticsOverview(workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days);
@@ -129,24 +132,22 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
     overview.createAnnotation.mutate({ date, label, category });
   };
 
-  const handleToggleLine = (key: string) => {
-    setActiveLines(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key); // keep at least 1 active
-      } else if (next.size < 3) {
-        next.add(key);
-      }
-      return next;
-    });
-  };
+  // Visible card/line keys based on connected integrations
+  const visibleKeys = new Set(
+    ALL_CARDS
+      .filter(card => {
+        if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;
+        return overview.hasGa4;
+      })
+      .map(card => card.key),
+  );
+
+  // Prune phantom entries (e.g., 'users' when only GSC connected)
+  const effectiveActive = new Set([...activeLines].filter(k => visibleKeys.has(k)));
 
   const chartLines = ALL_OVERVIEW_LINES
-    .filter(l => {
-      if (['clicks', 'impressions', 'ctr', 'position'].includes(l.key)) return overview.hasGsc;
-      return overview.hasGa4;
-    })
-    .map(l => ({ ...l, active: activeLines.has(l.key) }));
+    .filter(l => visibleKeys.has(l.key))
+    .map(l => ({ ...l, active: effectiveActive.has(l.key) }));
 
   return (
     <div className="space-y-8">
@@ -158,10 +159,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
       {/* Metric cards — single row of up to 6 */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {ALL_CARDS
-          .filter(card => {
-            if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;
-            return overview.hasGa4;
-          })
+          .filter(card => visibleKeys.has(card.key))
           .map(card => {
             const delta = card.getDelta(overview);
             return (
@@ -169,10 +167,10 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
                 key={card.key}
                 label={card.label}
                 value={card.formatValue(overview)}
-                delta={formatDeltaLabel(delta)}
+                delta={formatDeltaLabel(delta, card.deltaSuffix ?? '%')}
                 deltaPositive={isDeltaPositive(delta)}
                 color={card.color}
-                active={activeLines.has(card.key)}
+                active={effectiveActive.has(card.key)}
                 onClick={() => handleToggleLine(card.key)}
                 invertDelta={card.invertDelta}
               />
@@ -181,20 +179,22 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
       </div>
 
       {/* Unified trend chart with toggle cards above */}
-      <SectionCard
-        title="Performance Trend"
-        titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
-      >
-        <AnnotatedTrendChart
-          data={overview.trendData}
-          lines={chartLines}
-          annotations={overview.annotations}
-          onCreateAnnotation={handleCreateAnnotation}
-          onToggleLine={handleToggleLine}
-          maxActiveLines={3}
-          height={260}
-        />
-      </SectionCard>
+      {overview.trendData.length > 0 && (
+        <SectionCard
+          title="Performance Trend"
+          titleExtra={<span className="text-[11px] text-zinc-500">{days}d</span>}
+        >
+          <AnnotatedTrendChart
+            data={overview.trendData}
+            lines={chartLines}
+            annotations={overview.annotations}
+            onCreateAnnotation={handleCreateAnnotation}
+            onToggleLine={handleToggleLine}
+            maxActiveLines={3}
+            height={260}
+          />
+        </SectionCard>
+      )}
 
       {/* Priority insight feed */}
       <SectionCard title="Priority Insights">

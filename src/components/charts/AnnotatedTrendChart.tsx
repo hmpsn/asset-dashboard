@@ -46,7 +46,8 @@ interface AnnotatedTrendChartProps {
   height?: number;
   onCreateAnnotation?: (date: string, label: string, category: string) => void;
   onToggleLine?: (key: string) => void;  // callback when a line chip is clicked
-  maxActiveLines?: number;                // default 3
+  /** @deprecated Toggle limit is now enforced by the parent via useToggleSet. Accepted for backward compat but not used. */
+  maxActiveLines?: number;
   callouts?: ChartCallout[];              // optional chart callout bubbles
 }
 
@@ -78,10 +79,14 @@ function assignAxes(
     for (const l of activeLines) assignments.set(l.key, l.yAxisId);
 
     // Check if left-hinted metrics have divergent scales — if so, move smaller to right
+    // BUT only if that move won't create a scale conflict with existing right-hinted metrics.
+    // Rule 13: rate metrics (ctr, position) must stay on right. When a volume metric is
+    // moved right due to left-divergence, it must be scale-compatible with right occupants.
     const leftLines = activeLines.filter(l => l.yAxisId === 'left');
     if (leftLines.length >= 2) {
+      // Compute max values for ALL active lines so we can cross-check right-axis scale
       const maxValues = new Map<string, number>();
-      for (const line of leftLines) {
+      for (const line of activeLines) {
         let max = 0;
         for (const row of data) {
           const v = Number(row[line.key]) || 0;
@@ -89,12 +94,33 @@ function assignAxes(
         }
         maxValues.set(line.key, max || 1);
       }
+
+      // Current right-axis peak (from right-hinted metrics, before any moves)
+      const rightLines = activeLines.filter(l => l.yAxisId === 'right');
+      const rightPeak = rightLines.reduce(
+        (peak, rl) => Math.max(peak, maxValues.get(rl.key) ?? 0),
+        0,
+      );
+
+
       const sorted = [...leftLines].sort(
         (a, b) => (maxValues.get(b.key) ?? 0) - (maxValues.get(a.key) ?? 0),
       );
       for (let i = 1; i < sorted.length; i++) {
         const ratio = (maxValues.get(sorted[0].key) ?? 1) / (maxValues.get(sorted[i].key) ?? 1);
-        if (ratio >= 10) assignments.set(sorted[i].key, 'right');
+        if (ratio >= 10) {
+          // Only move if the candidate is scale-compatible with existing right-axis metrics.
+          // If right has rate metrics (e.g., ctr ~0.05, position ~10-50) and the candidate
+          // is a volume metric (e.g., clicks ~1000), the right axis would be unreadable.
+          const candidatePeak = maxValues.get(sorted[i].key) ?? 1;
+          const rightConflict = rightPeak > 0 && (
+            candidatePeak / rightPeak >= 10 || rightPeak / candidatePeak >= 10
+          );
+          if (!rightConflict) {
+            assignments.set(sorted[i].key, 'right');
+          }
+          // else: leave on left — compression is preferable to breaking the right axis
+        }
       }
     }
 
@@ -245,7 +271,7 @@ export function AnnotatedTrendChart({
   height = 220,
   onCreateAnnotation,
   onToggleLine,
-  maxActiveLines = 3,
+  maxActiveLines: _maxActiveLines,
   callouts,
 }: AnnotatedTrendChartProps) {
   const [popover, setPopover] = useState<PopoverState | null>(null);
@@ -272,7 +298,12 @@ export function AnnotatedTrendChart({
     [onCreateAnnotation, annotations],
   );
 
-  const activeLines = lines.filter(l => l.active !== false);
+  const activeLines = useMemo(
+    () => lines.filter(l => l.active !== false),
+    // Stable dependency: serialize active keys instead of comparing array reference
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines.map(l => `${l.key}:${l.active}`).join(',')],
+  );
 
   // Dynamic Y-axis assignment based on data scale
   const axisAssignments = useMemo(

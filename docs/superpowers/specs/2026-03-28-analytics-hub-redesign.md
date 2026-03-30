@@ -167,7 +167,7 @@ Compact panels stacked vertically:
 - Users — `#14b8a6` (teal)
 - Sessions — `#3b82f6` (blue)
 - Bounce Rate — `#f97316` (orange), inverted delta (lower = better)
-- Avg Duration — `#a78bfa` (purple)
+- Avg Duration — `#22d3ee` (cyan) — spec originally said purple but Three Laws of Color forbid purple outside admin AI; cyan used instead
 
 Same card anatomy and toggle behavior.
 

@@ -11,6 +11,7 @@ import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import { useAdminGA4 } from '../hooks/admin';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { useToggleSet } from '../hooks/useToggleSet';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine } from './charts/AnnotatedTrendChart';
 import { InsightFeed } from './insights';
@@ -43,8 +44,8 @@ const TRAFFIC_LINES: TrendLine[] = [
 
 function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
   const [days, setDays] = useState(28);
-  const [activeTrafficLines, setActiveTrafficLines] = useState<Set<string>>(new Set(['users', 'sessions']));
-  const [eventsExpanded, setEventsExpanded] = useState(true);
+  const [activeTrafficLines, handleToggleTrafficLine] = useToggleSet(['users', 'sessions']);
+  const [eventsExpanded, setEventsExpanded] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarHeight, setSidebarHeight] = useState(0);
 
@@ -127,47 +128,39 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <MetricToggleCard
           label="Users"
           value={formatNumber(overview.totalUsers)}
-          delta={comparison ? `${comparison.changePercent.users > 0 ? '+' : ''}${comparison.changePercent.users}%` : '—'}
+          delta={comparison ? `${comparison.changePercent.users > 0 ? '+' : ''}${comparison.changePercent.users.toFixed(1)}%` : '—'}
           deltaPositive={(comparison?.changePercent.users ?? 0) >= 0}
           color="#14b8a6"
           active={activeTrafficLines.has('users')}
-          onClick={() => setActiveTrafficLines(prev => {
-            const next = new Set(prev);
-            if (next.has('users')) { if (next.size > 1) next.delete('users'); } else if (next.size < 3) { next.add('users'); }
-            return next;
-          })}
+          onClick={() => handleToggleTrafficLine('users')}
         />
         <MetricToggleCard
           label="Sessions"
           value={formatNumber(overview.totalSessions)}
-          delta={comparison ? `${comparison.changePercent.sessions > 0 ? '+' : ''}${comparison.changePercent.sessions}%` : '—'}
+          delta={comparison ? `${comparison.changePercent.sessions > 0 ? '+' : ''}${comparison.changePercent.sessions.toFixed(1)}%` : '—'}
           deltaPositive={(comparison?.changePercent.sessions ?? 0) >= 0}
           color="#3b82f6"
           active={activeTrafficLines.has('sessions')}
-          onClick={() => setActiveTrafficLines(prev => {
-            const next = new Set(prev);
-            if (next.has('sessions')) { if (next.size > 1) next.delete('sessions'); } else if (next.size < 3) { next.add('sessions'); }
-            return next;
-          })}
+          onClick={() => handleToggleTrafficLine('sessions')}
         />
         <MetricToggleCard
           label="Bounce Rate"
           value={`${overview.bounceRate}%`}
-          delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate}%` : '—'}
-          deltaPositive={(comparison?.change.bounceRate ?? 0) >= 0}
+          delta={comparison ? `${comparison.change.bounceRate > 0 ? '+' : ''}${comparison.change.bounceRate.toFixed(1)}pt` : '—'}
+          deltaPositive={(comparison?.change.bounceRate ?? 0) > 0}
           invertDelta
           color="#f97316"
           active
-          onClick={() => {}}
+          displayOnly
         />
         <MetricToggleCard
           label="Avg Duration"
           value={formatDuration(overview.avgSessionDuration)}
-          delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
-          deltaPositive={(comparison?.change.avgSessionDuration ?? 0) >= 0}
-          color="#a78bfa"
+          delta={comparison ? `${comparison.change.avgSessionDuration > 0 ? '+' : comparison.change.avgSessionDuration < 0 ? '-' : ''}${formatDuration(Math.abs(comparison.change.avgSessionDuration))}` : '—'}
+          deltaPositive={(comparison?.change.avgSessionDuration ?? 0) > 0}
+          color="#22d3ee"
           active
-          onClick={() => {}}
+          displayOnly
         />
       </div>
 
@@ -185,17 +178,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 ? (date, label, category) => overviewData.createAnnotation.mutate({ date, label, category })
                 : undefined
             }
-            onToggleLine={(key) => {
-              setActiveTrafficLines(prev => {
-                const next = new Set(prev);
-                if (next.has(key)) {
-                  if (next.size > 1) next.delete(key);
-                } else if (next.size < 3) {
-                  next.add(key);
-                }
-                return next;
-              });
-            }}
+            onToggleLine={handleToggleTrafficLine}
             maxActiveLines={3}
           />
         </SectionCard>
@@ -211,7 +194,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
       />
 
       {/* ── 4. Growth Signals + Engagement Analysis (side by side) ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${comparison ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {/* Growth Signals */}
         {comparison && (
           <SectionCard title="Growth Signals" titleIcon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
@@ -232,7 +215,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-zinc-800/30">
                   <span className="text-zinc-400">Bounce rate change</span>
                   <span className={`font-medium ${comparison.change.bounceRate < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}%
+                    {comparison.change.bounceRate > 0 ? '+' : ''}{comparison.change.bounceRate}pt
                   </span>
                 </div>
               )}
@@ -328,7 +311,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
               <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50 min-w-0">
                 <span className="text-[11px] text-zinc-500 w-5 text-right shrink-0">{i + 1}</span>
                 <span className="text-xs text-zinc-300 flex-1 truncate font-mono min-w-0">{p.path}</span>
-                <span className="text-xs text-teal-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
+                <span className="text-xs text-blue-400 font-medium tabular-nums">{p.pageviews.toLocaleString()}</span>
                 <span className="text-[11px] text-zinc-500 w-14 text-right">{formatNumber(p.users)} u</span>
               </div>
             ))}
@@ -340,20 +323,22 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         <div ref={sidebarRef} className="lg:flex-1 space-y-3">
           <SectionCard title="Traffic Sources">
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {sources.slice(0, 10).map((s, i) => {
+              {(() => {
                 const totalSessions = sources.reduce((sum, x) => sum + x.sessions, 0);
-                const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
-                return (
-                  <div key={i} className="relative">
-                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
-                      <span className="text-xs text-zinc-300 flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
-                      <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
-                      <span className="text-[11px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                return sources.slice(0, 10).map((s, i) => {
+                  const pct = totalSessions > 0 ? (s.sessions / totalSessions) * 100 : 0;
+                  return (
+                    <div key={i} className="relative">
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg relative z-10">
+                        <span className="text-xs text-zinc-300 flex-1 truncate">{s.source || '(direct)'}{s.medium !== '(none)' ? ` / ${s.medium}` : ''}</span>
+                        <span className="text-xs text-blue-400 font-medium tabular-nums">{s.sessions.toLocaleString()}</span>
+                        <span className="text-[11px] text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="absolute inset-0 rounded-lg bg-blue-500/5" style={{ width: `${pct}%` }} />
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
               {sources.length === 0 && <EmptyState icon={Globe} title="No traffic sources data" description="No source data available for the selected time period." className="py-4" />}
             </div>
           </SectionCard>
@@ -369,7 +354,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                       <span className="text-zinc-500">{d.percentage}%</span>
                     </div>
                     <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${d.percentage}%` }} />
+                      <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${d.percentage}%` }} />
                     </div>
                   </div>
                   <span className="text-xs text-zinc-500 tabular-nums w-10 text-right">{formatNumber(d.users)}</span>

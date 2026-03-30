@@ -76,7 +76,7 @@ export function TierGate({ tier, required, feature, teaser, children, className,
       <div className="absolute inset-0 flex items-center justify-center z-10">
         <div className={`flex flex-col items-center gap-3 max-w-xs text-center px-6 py-5 border backdrop-blur-sm ${colors.bg} ${colors.border}`} style={{ borderRadius: '10px 24px 10px 24px' }}>
           {/* Icon */}
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors.bg} ring-1 ${colors.border}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colors.bg} ring-1 ${colors.border}`}>
             <Sparkles className={`w-5 h-5 ${colors.text}`} />
           </div>
 

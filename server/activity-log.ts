@@ -5,6 +5,7 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
@@ -53,6 +54,11 @@ export type ActivityType =
   | 'invoice_failed'
   | 'page_analysis'
   | 'insight_resolved'
+  | 'outcome_scored'
+  | 'external_action_detected'
+  | 'playbook_suggested'
+  | 'learnings_updated'
+  | 'schema_plan_deleted'
   | 'note';
 
 export interface ActivityEntry {
@@ -90,12 +96,20 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
     type: row.type as ActivityType,
     title: row.title,
     description: row.description ?? undefined,
-    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    metadata: row.metadata ? parseJsonFallback(row.metadata, undefined) : undefined,
     actorId: row.actor_id ?? undefined,
     actorName: row.actor_name ?? undefined,
     createdAt: row.created_at,
   };
 }
+
+/** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
+const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
+  'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
+  'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
+  'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
+  'content_published',
+]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
@@ -172,14 +186,6 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   }
   return rows.map(rowToEntry);
 }
-
-/** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
-const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
-  'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
-  'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
-  'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
-  'content_published',
-]);
 
 export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
   const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit) as ActivityRow[];
