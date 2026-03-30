@@ -154,6 +154,24 @@ const CHECKS: Check[] = [
     message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',
     severity: 'warn',
   },
+  {
+    name: 'Hardcoded dark hex in inline styles',
+    pattern: 'style=\\{[^}]*(#0f1219|#18181b|#27272a|#303036)',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: 'Styleguide.tsx',
+    message: 'Use CSS variables or chartColor helpers from ui/constants.ts. Hardcoded dark hex breaks light mode.',
+    severity: 'warn',
+  },
+  {
+    name: 'SVG with hardcoded dark fill/stroke',
+    pattern: '(fill|stroke)="(#0f1219|#18181b|#27272a|#303036|#52525b)"',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: 'Styleguide.tsx',
+    message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
