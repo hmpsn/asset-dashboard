@@ -32,6 +32,20 @@ const log = createLogger('outcome-measurement');
 // Position-based metrics where lower is better (improvement = decrease)
 const LOWER_IS_BETTER_METRICS = new Set(['position']);
 
+/**
+ * Resolve a potentially relative pageUrl (e.g. `/blog-post`) to a full URL
+ * (e.g. `https://example.com/blog-post`) using the workspace's liveDomain.
+ * GSC Search Analytics API requires full URLs for the `page` dimension filter.
+ */
+function resolveFullPageUrl(pageUrl: string, ws: { liveDomain?: string; gscPropertyUrl?: string }): string {
+  if (pageUrl.startsWith('http')) return pageUrl;
+  const base = ws.liveDomain
+    ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)
+    : ws.gscPropertyUrl?.replace(/\/$/, '') ?? '';
+  if (!base) return pageUrl;
+  return `${base}${pageUrl.startsWith('/') ? '' : '/'}${pageUrl}`;
+}
+
 // Minimum impressions required to avoid an insufficient_data outcome
 const MIN_IMPRESSIONS_FOR_DATA = 50;
 
@@ -60,7 +74,8 @@ function averageGscRows(
   return {
     clicks: Math.round(sum.clicks / n),
     impressions: Math.round(sum.impressions / n),
-    ctr: +(sum.ctr / n).toFixed(1),
+    // Compute aggregate CTR from totals (clicks/impressions), not by averaging daily percentages
+    ctr: sum.impressions > 0 ? +((sum.clicks / sum.impressions) * 100).toFixed(1) : 0,
     position: +(sum.position / n).toFixed(1),
   };
 }
@@ -75,7 +90,8 @@ async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnaps
   }
   try {
     // Use the last 14 days to smooth weekly variation and get a current-state reading
-    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, action.pageUrl, 14);
+    const fullUrl = resolveFullPageUrl(action.pageUrl, ws);
+    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, 14);
     if (!rows.length) return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
     return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
   } catch {
@@ -96,7 +112,8 @@ export async function fetchGscSnapshot(
   const ws = getWorkspace(workspaceId);
   if (!ws?.webflowSiteId || !ws?.gscPropertyUrl) return null;
   try {
-    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, days);
+    const fullUrl = resolveFullPageUrl(pageUrl, ws);
+    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, days);
     if (!rows.length) return null;
     return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
   } catch {
@@ -117,7 +134,8 @@ export async function captureBaselineFromGsc(
   if (!ws?.webflowSiteId || !ws?.gscPropertyUrl) return;
   try {
     // Use 28 days to get a stable baseline reading at action creation time
-    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 28);
+    const fullUrl = resolveFullPageUrl(pageUrl, ws);
+    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, 28);
     if (!rows.length) return;
     updateBaselineSnapshot(actionId, {
       ...averageGscRows(rows),

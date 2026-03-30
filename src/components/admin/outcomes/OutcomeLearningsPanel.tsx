@@ -183,7 +183,7 @@ function StrategySection({ data }: StrategySectionProps) {
             <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Best Intent Types</p>
             <div className="flex flex-wrap gap-1.5">
               {data.bestIntentTypes.slice(0, 5).map((intent) => (
-                <Badge key={intent} label={intent} color="teal" />
+                <Badge key={intent} label={intent} color="blue" />
               ))}
             </div>
           </div>

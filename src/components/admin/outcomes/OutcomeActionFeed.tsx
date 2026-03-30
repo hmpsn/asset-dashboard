@@ -82,7 +82,7 @@ function ActionRow({ action }: ActionRowProps) {
         {/* Type badge */}
         <Badge
           label={ACTION_TYPE_LABELS[action.actionType] ?? action.actionType}
-          color="teal"
+          color="blue"
         />
 
         {/* Page + keyword */}

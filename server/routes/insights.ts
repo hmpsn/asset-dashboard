@@ -40,24 +40,24 @@ router.put(
     // Record for outcome tracking — only on resolved, not in_progress; idempotent
     try {
       if (status === 'resolved' && !getActionBySource('insight', req.params.insightId)) {
-      const insightData = updated.data as Record<string, unknown> | undefined;
-      recordAction({
-        workspaceId,
-        actionType: 'insight_acted_on',
-        sourceType: 'insight',
-        sourceId: req.params.insightId,
-        pageUrl: updated.pageId ?? null,
-        targetKeyword: (insightData?.query as string) ?? (insightData?.keyword as string) ?? null,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-          position: insightData?.currentPosition as number | undefined,
-          clicks: insightData?.clicks as number | undefined,
-          impressions: insightData?.impressions as number | undefined,
-          ctr: insightData?.ctr as number | undefined,
-          page_health_score: insightData?.score as number | undefined,
-        },
-        attribution: 'platform_executed',
-      });
+        const insightData = updated.data as Record<string, unknown> | undefined;
+        recordAction({
+          workspaceId,
+          actionType: 'insight_acted_on',
+          sourceType: 'insight',
+          sourceId: req.params.insightId,
+          pageUrl: updated.pageId ?? null,
+          targetKeyword: (insightData?.query as string) ?? (insightData?.keyword as string) ?? null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+            position: insightData?.currentPosition as number | undefined,
+            clicks: insightData?.clicks as number | undefined,
+            impressions: insightData?.impressions as number | undefined,
+            ctr: insightData?.ctr as number | undefined,
+            page_health_score: insightData?.score as number | undefined,
+          },
+          attribution: 'platform_executed',
+        });
       }
     } catch (err) {
       log.warn({ err, insightId: req.params.insightId }, 'Failed to record outcome action for insight');
