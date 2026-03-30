@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Loader2, Lock, CheckCircle2, AlertTriangle, X, Shield, ArrowLeft } from 'lucide-react';
+import { themeColor } from './ui/constants';
 
 // --- Stripe singleton (loaded once per publishable key) ---
 
@@ -187,10 +188,10 @@ export function StripePaymentForm({
             colorPrimary: accentColor === 'blue' ? '#3b82f6' : '#14b8a6',
             colorBackground: '#09090b',
             colorText: '#e4e4e7',
-            colorTextSecondary: '#a1a1aa',
-            colorTextPlaceholder: '#52525b',
+            colorTextSecondary: themeColor('#a1a1aa', '#334155'),
+            colorTextPlaceholder: themeColor('#52525b', '#94a3b8'),
             colorDanger: '#ef4444',
-            colorIcon: '#71717a',
+            colorIcon: themeColor('#71717a', '#64748b'),
             colorIconTabSelected: accentColor === 'blue' ? '#3b82f6' : '#14b8a6',
             fontFamily: 'Inter, system-ui, sans-serif',
             fontSizeBase: '13px',
@@ -203,8 +204,8 @@ export function StripePaymentForm({
           },
           rules: {
             '.Input': {
-              backgroundColor: 'rgba(24, 24, 27, 0.8)',
-              border: '1px solid rgba(63, 63, 70, 0.6)',
+              backgroundColor: themeColor('rgba(24, 24, 27, 0.8)', 'rgba(241, 245, 249, 0.7)'),
+              border: `1px solid ${themeColor('rgba(63, 63, 70, 0.6)', 'rgba(203, 213, 225, 0.5)')}`,
               boxShadow: 'none',
               padding: '10px 12px',
               transition: 'border-color 0.15s ease',
@@ -214,7 +215,7 @@ export function StripePaymentForm({
               boxShadow: `0 0 0 1px ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(20, 184, 166, 0.1)'}`,
             },
             '.Label': {
-              color: '#71717a',
+              color: themeColor('#71717a', '#64748b'),
               fontSize: '10px',
               fontWeight: '600',
               textTransform: 'uppercase',
@@ -223,14 +224,14 @@ export function StripePaymentForm({
             },
             '.Tab': {
               backgroundColor: 'transparent',
-              border: '1px solid rgba(63, 63, 70, 0.4)',
+              border: `1px solid ${themeColor('rgba(63, 63, 70, 0.4)', 'rgba(203, 213, 225, 0.5)')}`,
               borderRadius: '8px',
               boxShadow: 'none',
               transition: 'all 0.15s ease',
             },
             '.Tab:hover': {
-              backgroundColor: 'rgba(39, 39, 42, 0.5)',
-              border: '1px solid rgba(63, 63, 70, 0.7)',
+              backgroundColor: themeColor('rgba(39, 39, 42, 0.5)', 'rgba(241, 245, 249, 0.7)'),
+              border: `1px solid ${themeColor('rgba(63, 63, 70, 0.7)', 'rgba(203, 213, 225, 0.7)')}`,
               color: '#e4e4e7',
             },
             '.Tab--selected': {
@@ -253,15 +254,15 @@ export function StripePaymentForm({
             },
             '.Block': {
               backgroundColor: 'transparent',
-              borderColor: 'rgba(63, 63, 70, 0.4)',
+              borderColor: themeColor('rgba(63, 63, 70, 0.4)', 'rgba(203, 213, 225, 0.5)'),
             },
             '.CheckboxInput': {
-              backgroundColor: 'rgba(24, 24, 27, 0.8)',
-              borderColor: 'rgba(63, 63, 70, 0.6)',
+              backgroundColor: themeColor('rgba(24, 24, 27, 0.8)', 'rgba(241, 245, 249, 0.7)'),
+              borderColor: themeColor('rgba(63, 63, 70, 0.6)', 'rgba(203, 213, 225, 0.5)'),
             },
             '.PickerItem': {
-              backgroundColor: 'rgba(24, 24, 27, 0.8)',
-              borderColor: 'rgba(63, 63, 70, 0.4)',
+              backgroundColor: themeColor('rgba(24, 24, 27, 0.8)', 'rgba(241, 245, 249, 0.7)'),
+              borderColor: themeColor('rgba(63, 63, 70, 0.4)', 'rgba(203, 213, 225, 0.5)'),
               padding: '10px 12px',
             },
             '.PickerItem--selected': {
