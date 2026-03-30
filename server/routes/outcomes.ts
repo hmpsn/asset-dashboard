@@ -31,6 +31,7 @@ import type {
   ActionOutcome,
   OutcomeScore,
 } from '../../shared/types/outcome-tracking.js';
+import { actionTypeEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
 
 const log = createLogger('outcomes');
 
@@ -256,20 +257,21 @@ router.get('/api/outcomes/:workspaceId/learnings', requireWorkspaceAccess('works
 // GET /api/outcomes/:workspaceId/actions — List tracked actions
 router.get('/api/outcomes/:workspaceId/actions', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, score } = req.query;
     let actions: TrackedAction[];
-    if (type && typeof type === 'string') {
-      actions = getActionsByWorkspaceAndType(req.params.workspaceId, type as ActionType);
+    const parsedType = typeof type === 'string' ? actionTypeEnum.safeParse(type) : null;
+    if (parsedType?.success) {
+      actions = getActionsByWorkspaceAndType(req.params.workspaceId, parsedType.data as ActionType);
     } else {
       actions = getActionsByWorkspace(req.params.workspaceId);
     }
 
     // Optional score filter
-    const { score } = req.query;
-    if (score && typeof score === 'string') {
+    const parsedScore = typeof score === 'string' ? outcomeScoreEnum.safeParse(score) : null;
+    if (parsedScore?.success) {
       actions = actions.filter(a => {
         const outcomes = getOutcomesForAction(a.id);
-        return outcomes.some(o => o.score === score);
+        return outcomes.some(o => o.score === parsedScore.data);
       });
     }
 

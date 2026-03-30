@@ -1,6 +1,7 @@
 import { Brain, FileText, Target, Wrench, TrendingUp } from 'lucide-react';
 import { SectionCard, Badge, EmptyState, Skeleton, SectionCardSkeleton } from '../../ui';
 import { useOutcomeLearnings } from '../../../hooks/admin/useOutcomes';
+import { pct } from './outcomeConstants';
 import type {
   ContentLearnings,
   StrategyLearnings,
@@ -24,9 +25,7 @@ function confidenceLabel(confidence: LearningsConfidence): string {
   return 'Low Confidence';
 }
 
-function pct(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
+
 
 function formatWinRateRecord(record: Record<string, number>): Array<{ label: string; value: string }> {
   return Object.entries(record)

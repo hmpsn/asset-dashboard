@@ -66,10 +66,9 @@ function averageGscRows(
     (acc, r) => ({
       clicks: acc.clicks + r.clicks,
       impressions: acc.impressions + r.impressions,
-      ctr: acc.ctr + r.ctr,
       position: acc.position + r.position,
     }),
-    { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+    { clicks: 0, impressions: 0, position: 0 },
   );
   return {
     clicks: Math.round(sum.clicks / n),
@@ -274,7 +273,8 @@ async function scoreActionAtCheckpoint(
   // Only apply the insufficient_data gate when impressions was explicitly captured
   // (undefined means the baseline was recorded without GSC data — don't block scoring)
   const baselineImpressions = action.baselineSnapshot.impressions;
-  if (SEARCH_METRICS.has(primaryMetric) && baselineImpressions !== undefined && baselineImpressions < MIN_IMPRESSIONS_FOR_DATA) {
+  const maxImpressions = Math.max(baselineImpressions ?? 0, currentSnapshot.impressions ?? 0);
+  if (SEARCH_METRICS.has(primaryMetric) && baselineImpressions !== undefined && maxImpressions < MIN_IMPRESSIONS_FOR_DATA) {
     const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
     const outcome = recordOutcome({
       actionId: action.id,

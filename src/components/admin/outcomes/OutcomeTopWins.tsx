@@ -1,14 +1,11 @@
 import { Trophy } from 'lucide-react';
 import { SectionCard, EmptyState, Badge, Skeleton } from '../../ui';
 import { useOutcomeTopWins } from '../../../hooks/admin/useOutcomes';
+import { formatOutcomeDate } from './outcomeConstants';
 import type { TopWin } from '../../../../shared/types/outcome-tracking';
 
 interface Props {
   workspaceId: string;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function winLabel(win: TopWin): string {
@@ -63,11 +60,11 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
               <p className="text-[11px] text-blue-400 mt-0.5">
                 {win.delta.delta_percent >= 0 ? '+' : ''}{win.delta.delta_percent.toFixed(1)}% {win.delta.primary_metric}
               </p>
-              <p className="text-[11px] text-zinc-600 mt-0.5">{formatDate(win.createdAt)}</p>
+              <p className="text-[11px] text-zinc-600 mt-0.5">{formatOutcomeDate(win.createdAt)}</p>
             </div>
             <Badge
               label={win.score === 'strong_win' ? 'Strong Win' : 'Win'}
-              color={win.score === 'strong_win' ? 'green' : 'teal'}
+              color={win.score === 'strong_win' ? 'green' : 'blue'}
             />
           </div>
         ))}

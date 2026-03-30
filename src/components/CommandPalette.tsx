@@ -48,7 +48,7 @@ const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: st
   { id: 'roadmap', label: 'Roadmap', icon: Shield, group: '' },
   { id: 'features', label: 'Feature Library', icon: Layers, group: '' },
   { id: 'outcomes', label: 'Outcomes', icon: Trophy, group: 'Analytics' },
-  { id: 'outcomes-overview', label: 'Outcomes Overview', icon: Trophy, group: 'Analytics' },
+  { id: 'outcomes-overview', label: 'Outcomes Overview', icon: BarChart3, group: 'Analytics' },
 ];
 
 const RECENT_KEY = 'admin-palette-recent';
