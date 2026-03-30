@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { PageHeader, StatCard } from './ui';
 import { webflow } from '../api/seo';
+import { themeColor } from './ui/constants';
 
 interface LinkSuggestion {
   fromPage: string;
@@ -219,7 +220,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
                 backgroundColor: 'rgba(45,212,191,0.1)',
                 color: '#2dd4bf',
               } : {
-                color: '#71717a',
+                color: themeColor('#71717a', '#94a3b8'),
               }}
             >
               {f.label}

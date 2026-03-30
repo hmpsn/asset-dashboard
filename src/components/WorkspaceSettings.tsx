@@ -7,6 +7,7 @@ import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
 import { PublishSettings } from './PublishSettings';
 import { get, patch, post } from '../api/client';
+import { themeColor } from './ui/constants';
 
 interface GscSite { siteUrl: string; permissionLevel: string; }
 interface GA4Property { name: string; displayName: string; propertyId: string; }
@@ -173,7 +174,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
         {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
-            style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: '#71717a' }}>
+            style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: themeColor('#71717a', '#94a3b8') }}>
             {label}
           </button>
         ))}
