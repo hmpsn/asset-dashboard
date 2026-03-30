@@ -86,6 +86,7 @@ type Check = {
   fileGlobs: string[];
   exclude?: string | string[];
   pathFilter?: string;  // only scan files under this path prefix
+  excludeLines?: string[];  // grep -v patterns — lines matching any of these are filtered out
   message: string;
   severity: 'error' | 'warn';
 };
@@ -154,6 +155,28 @@ const CHECKS: Check[] = [
     message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',
     severity: 'warn',
   },
+  {
+    name: 'Hardcoded dark hex in inline styles',
+    pattern: 'style=\\{[^}]*(#0f1219|#18181b|#27272a|#303036|#52525b)',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: 'Styleguide.tsx',
+    // Exclude correct usages: themeColor/chart helpers already handle light mode
+    excludeLines: ['themeColor(', 'chartGridColor(', 'chartAxisColor(', 'chartDotStroke(', 'chartDotFill('],
+    message: 'Use CSS variables or chartColor helpers from ui/constants.ts. Hardcoded dark hex breaks light mode.',
+    severity: 'warn',
+  },
+  {
+    name: 'SVG with hardcoded dark fill/stroke',
+    pattern: '(fill|stroke)=\\"(#0f1219|#18181b|#27272a|#303036|#52525b)\\"',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    exclude: 'Styleguide.tsx',
+    // Exclude correct usages: chart helpers already handle light mode
+    excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
+    message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -164,6 +187,11 @@ function isExcluded(file: string, exclude: string | string[] | undefined): boole
   return list.some(e => file.includes(e.replace('/', path.sep)));
 }
 
+function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
+  if (!excludeLines || excludeLines.length === 0) return lines;
+  return lines.filter(line => !excludeLines.some(ex => line.includes(ex)));
+}
+
 function checkFile(file: string, check: Check): string[] {
   if (isExcluded(file, check.exclude)) return [];
   try {
@@ -171,7 +199,8 @@ function checkFile(file: string, check: Check): string[] {
       `grep -n -E "${check.pattern}" "${file}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
-    return out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
+    const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
+    return applyExcludeLines(lines, check.excludeLines);
   } catch {
     return [];
   }
@@ -193,7 +222,8 @@ function checkDirectory(dir: string, check: Check): string[] {
       `grep -rn ${globs} ${excludeDirs} ${excludeFiles} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
-    return out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    const lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    return applyExcludeLines(lines, check.excludeLines);
   } catch {
     return [];
   }

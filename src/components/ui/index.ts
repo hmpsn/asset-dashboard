@@ -28,4 +28,11 @@ export {
   DATE_PRESETS_SHORT,
   DATE_PRESETS_FULL,
   DATE_PRESETS_SEARCH,
+  themeColor,
+  chartGridColor,
+  chartAxisColor,
+  chartDotStroke,
+  chartDotFill,
+  chartTooltipStyle,
+  chartTooltipLabelStyle,
 } from './constants';

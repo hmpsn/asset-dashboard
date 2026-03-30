@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { AlertTriangle, Info, CheckCircle2, ChevronDown, Shield, FileEdit, Share2, Link2, ExternalLink, FileText, BarChart3, Check, Globe, TrendingUp, Minus, LayoutList, Layers } from 'lucide-react';
 import { MetricRing } from '../ui';
-import { scoreColorClass } from '../ui/constants';
+import { scoreColorClass, themeColor } from '../ui/constants';
 import { ScoreHistoryChart } from './helpers';
 import { toLiveUrl } from './utils';
 import { SEV, CAT_LABELS } from './types';
@@ -804,7 +804,7 @@ export function HealthTab({ audit, auditDetail, liveDomain, initialSeverity, wor
               <div className="text-xs font-medium text-zinc-400 mb-2">Issues by Category</div>
               <div className="space-y-2">
                 {Object.entries(categoryStats).map(([cat, counts]) => {
-                  const info = CAT_LABELS[cat] || { label: cat, color: '#71717a' };
+                  const info = CAT_LABELS[cat] || { label: cat, color: themeColor('#71717a', '#94a3b8') };
                   return (
                     <div key={cat} className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />

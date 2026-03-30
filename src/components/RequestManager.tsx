@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, patch, post, del, getSafe, postForm } from '../api/client';
+import { themeColor } from './ui/constants';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
@@ -232,7 +233,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-6">
             {[
-              { label: 'Total', value: counts.total, color: '#e4e4e7' },
+              { label: 'Total', value: counts.total, color: themeColor('#e4e4e7', '#1e293b') },
               { label: 'New', value: counts.new, color: '#60a5fa' },
               { label: 'Active', value: counts.in_progress, color: '#2dd4bf' },
               { label: 'Resolved', value: counts.completed, color: '#4ade80' },
@@ -253,7 +254,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           )}
         </div>
         {counts.total > 0 && (
-          <div className="h-2 rounded-full overflow-hidden bg-[#0f1219]">
+          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: themeColor('#0f1219', '#e2e8f0') }}>
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(counts.completed / counts.total) * 100}%`, backgroundColor: '#4ade80' }} />
           </div>
         )}
@@ -339,7 +340,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                 style={selected.size === filtered.length && filtered.length > 0
                   ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                  : { borderColor: '#27272a' }}>
+                  : { borderColor: themeColor('#27272a', '#e2e8f0') }}>
                 {selected.size === filtered.length && filtered.length > 0 && <CheckCheck className="w-3 h-3 text-black" />}
               </div>
               {selected.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
@@ -357,7 +358,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
             return (
               <div key={req.id} className={`rounded-xl overflow-hidden transition-all ${isSelected ? 'ring-1' : ''}`}
-                style={{ backgroundColor: '#18181b', border: '1px solid #27272a', ...(isSelected ? { ringColor: '#2dd4bf' } : {}) }}>
+                style={{ backgroundColor: themeColor('#18181b', '#ffffff'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}`, ...(isSelected ? { ringColor: '#2dd4bf' } : {}) }}>
                 {/* Row header */}
                 <div className="flex items-center">
                   {/* Checkbox */}
@@ -366,7 +367,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                       style={isSelected
                         ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                        : { borderColor: '#27272a' }}>
+                        : { borderColor: themeColor('#27272a', '#e2e8f0') }}>
                       {isSelected && <CheckCheck className="w-3 h-3 text-black" />}
                     </div>
                   </button>
@@ -385,10 +386,10 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                          <span className="px-1.5 py-0.5 rounded bg-[#0f1219] text-zinc-500">
+                          <span className="px-1.5 py-0.5 rounded text-zinc-500" style={{ backgroundColor: themeColor('#0f1219', '#f4f4f5') }}>
                             {wsName(req.workspaceId)}
                           </span>
-                          <span className="px-1.5 py-0.5 rounded bg-[#0f1219]">
+                          <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: themeColor('#0f1219', '#f4f4f5') }}>
                             {CAT_LABELS[req.category] || req.category}
                           </span>
                           {req.submittedBy && <span className="text-zinc-200">by {req.submittedBy}</span>}
@@ -433,21 +434,24 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                       <div>
                         <label className="text-[11px] uppercase tracking-wider block mb-1 text-zinc-500">Status</label>
                         <select value={req.status} onChange={e => updateRequest(req.id, { status: e.target.value })}
-                          className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
+                          className="px-2 py-1 rounded text-[11px] border border-zinc-800 text-zinc-200"
+                          style={{ backgroundColor: themeColor('#0f1219', '#ffffff') }}>
                           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="text-[11px] uppercase tracking-wider block mb-1 text-zinc-500">Priority</label>
                         <select value={req.priority} onChange={e => updateRequest(req.id, { priority: e.target.value })}
-                          className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
+                          className="px-2 py-1 rounded text-[11px] border border-zinc-800 text-zinc-200"
+                          style={{ backgroundColor: themeColor('#0f1219', '#ffffff') }}>
                           {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="text-[11px] uppercase tracking-wider block mb-1 text-zinc-500">Category</label>
                         <select value={req.category} onChange={e => updateRequest(req.id, { category: e.target.value })}
-                          className="px-2 py-1 rounded text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200">
+                          className="px-2 py-1 rounded text-[11px] border border-zinc-800 text-zinc-200"
+                          style={{ backgroundColor: themeColor('#0f1219', '#ffffff') }}>
                           {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
                       </div>
@@ -484,7 +488,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                               }`} style={
                                 note.author === 'team'
                                   ? { backgroundColor: 'rgba(45, 212, 191, 0.08)', borderColor: 'rgba(45, 212, 191, 0.15)' }
-                                  : { backgroundColor: '#0f1219', border: '1px solid #27272a' }
+                                  : { backgroundColor: themeColor('#0f1219', '#f8fafc'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}` }
                               }>
                                 <div className="flex items-center gap-1.5 mb-0.5">
                                   <span className={`text-[11px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-500'}`}>
@@ -523,7 +527,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                       {noteFiles.length > 0 && expandedId === req.id && (
                         <div className="flex flex-wrap gap-1.5">
                           {noteFiles.map((f, i) => (
-                            <span key={i} className="flex items-center gap-1 text-[11px] rounded px-2 py-1 bg-[#0f1219] border border-zinc-800 text-zinc-400">
+                            <span key={i} className="flex items-center gap-1 text-[11px] rounded px-2 py-1 border border-zinc-800 text-zinc-400" style={{ backgroundColor: themeColor('#0f1219', '#f4f4f5') }}>
                               <Paperclip className="w-2.5 h-2.5" />{f.name}
                               <button onClick={() => setNoteFiles(prev => prev.filter((_, j) => j !== i))} className="hover:opacity-70"><X className="w-2.5 h-2.5" /></button>
                             </span>
@@ -534,11 +538,12 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                         <input value={expandedId === req.id ? noteInput : ''} onChange={e => setNoteInput(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendNote(req.id)}
                           placeholder="Send a note to the client..."
-                          className="flex-1 px-3 py-2 rounded-lg text-[11px] bg-[#0f1219] border border-zinc-800 text-zinc-200"
+                          className="flex-1 px-3 py-2 rounded-lg text-[11px] border border-zinc-800 text-zinc-200"
+                          style={{ backgroundColor: themeColor('#0f1219', '#ffffff') }}
                           disabled={sendingNote} />
                         <input type="file" ref={noteFileRef} className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                           onChange={e => { if (e.target.files) setNoteFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; }} />
-                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-lg transition-colors bg-[#0f1219] border border-zinc-800" title="Attach file">
+                        <button onClick={() => noteFileRef.current?.click()} className="px-2 py-2 rounded-lg transition-colors border border-zinc-800" style={{ backgroundColor: themeColor('#0f1219', '#f4f4f5') }} title="Attach file">
                           <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
                         </button>
                         <button onClick={() => sendNote(req.id)} disabled={sendingNote || (!noteInput.trim() && noteFiles.length === 0)}

@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { Plus, X } from 'lucide-react';
 import type { Annotation } from '../../hooks/admin/useAnalyticsAnnotations';
+import { chartGridColor, chartAxisColor, chartDotStroke, chartTooltipStyle, chartTooltipLabelStyle } from '../ui/constants';
 
 // ── Category colors (matches AnalyticsAnnotations badges) ──
 const ANNOTATION_COLORS: Record<string, string> = {
@@ -164,7 +165,7 @@ function AnnotationDot({ x, annotation }: { x: number; annotation: Annotation })
 
   return (
     <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <circle cx={x} cy={12} r={5} fill={color} stroke="#18181b" strokeWidth={2} style={{ cursor: 'pointer' }} />
+      <circle cx={x} cy={12} r={5} fill={color} stroke={chartDotStroke()} strokeWidth={2} style={{ cursor: 'pointer' }} />
       {hovered && (
         <foreignObject x={x - 100} y={20} width={200} height={80}>
           <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 shadow-lg text-center">
@@ -315,19 +316,19 @@ export function AnnotatedTrendChart({
   const hasRightAxis = [...axisAssignments.values()].includes('right');
 
   // Color-code Y-axis labels: use the color of the first active line on that axis
-  const leftAxisColor = activeLines.find(l => axisAssignments.get(l.key) === 'left')?.color ?? '#71717a';
-  const rightAxisColor = activeLines.find(l => axisAssignments.get(l.key) === 'right')?.color ?? '#71717a';
+  const leftAxisColor = activeLines.find(l => axisAssignments.get(l.key) === 'left')?.color ?? chartAxisColor();
+  const rightAxisColor = activeLines.find(l => axisAssignments.get(l.key) === 'right')?.color ?? chartAxisColor();
 
   return (
     <div ref={containerRef} className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={data} onClick={handleChartClick as unknown as (state: unknown) => void}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor()} />
           <XAxis
             dataKey={dateKey}
-            tick={{ fill: '#71717a', fontSize: 10 }}
+            tick={{ fill: chartAxisColor(), fontSize: 10 }}
             tickLine={false}
-            axisLine={{ stroke: '#3f3f46' }}
+            axisLine={{ stroke: chartGridColor() }}
             tickFormatter={v => {
               const [, m, d] = String(v).split('-');
               return m && d ? `${Number(m)}/${Number(d)}` : v;
@@ -357,13 +358,8 @@ export function AnnotatedTrendChart({
             />
           )}
           <Tooltip
-            contentStyle={{
-              backgroundColor: '#18181b',
-              border: '1px solid #3f3f46',
-              borderRadius: '0.5rem',
-              fontSize: '11px',
-            }}
-            labelStyle={{ color: '#a1a1aa', fontFamily: 'monospace' }}
+            contentStyle={chartTooltipStyle()}
+            labelStyle={chartTooltipLabelStyle()}
           />
           {activeLines.map(line => (
             <Area

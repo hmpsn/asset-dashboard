@@ -181,6 +181,8 @@ export function StripePaymentForm({
       stripe={stripePromise}
       options={{
         clientSecret,
+        // Stripe Elements appearance is always dark — the payment modal container (bg-zinc-900)
+        // is dark regardless of page theme. Do not use themeColor() here.
         appearance: {
           theme: 'night',
           variables: {
