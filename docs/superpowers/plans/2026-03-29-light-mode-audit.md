@@ -319,7 +319,43 @@ with:
 backgroundColor: 'var(--brand-bg, #0f1219)',
 ```
 
-- [ ] **Step 2: Fix MetricRing track color (main component)**
+- [ ] **Step 2: Fix MetricRing glow color to match score**
+
+The glow (line 27) is hardcoded teal (`rgba(52, 211, 153, 0.15)` + `rgba(45, 212, 191, 0.1)`) regardless of score. A red ring (score < 60) still shows a teal glow — visually misleading.
+
+In `src/components/ui/MetricRing.tsx`, add a `scoreGlowColor` helper inside the component (after `const color = scoreColor(score);` on line 17):
+
+```typescript
+  // Glow should match ring color — teal for good, amber for warning, red for poor
+  const glowRgb = score >= 80 ? '52, 211, 153' : score >= 60 ? '251, 191, 36' : '248, 113, 113';
+  const edgeRgba = score >= 80 ? 'rgba(45, 212, 191, 0.15)' : score >= 60 ? 'rgba(251, 191, 36, 0.15)' : 'rgba(248, 113, 113, 0.15)';
+```
+
+Then on line 27, replace the hardcoded glow:
+
+```typescript
+boxShadow: `0 0 20px 8px rgba(52, 211, 153, 0.15), 0 0 40px 16px rgba(45, 212, 191, 0.1)`,
+```
+
+with:
+
+```typescript
+boxShadow: `0 0 20px 8px rgba(${glowRgb}, 0.15), 0 0 40px 16px rgba(${glowRgb}, 0.1)`,
+```
+
+And on line 37, replace the hardcoded edge ring border:
+
+```typescript
+border: '1px solid rgba(45, 212, 191, 0.15)',
+```
+
+with:
+
+```typescript
+border: `1px solid ${edgeRgba}`,
+```
+
+- [ ] **Step 3: Fix MetricRing track color (main component)**
 
 In `src/components/ui/MetricRing.tsx`, line 43, replace:
 
@@ -333,7 +369,7 @@ with:
 stroke="var(--metric-ring-track, #303036)"
 ```
 
-- [ ] **Step 3: Fix MetricRingSvg track color**
+- [ ] **Step 4: Fix MetricRingSvg track color**
 
 In `src/components/ui/MetricRing.tsx`, line 79, replace:
 
@@ -347,16 +383,16 @@ with:
 stroke="var(--metric-ring-track, #303036)"
 ```
 
-- [ ] **Step 4: Verify build**
+- [ ] **Step 5: Verify build**
 
 Run: `npx tsc --noEmit --skipLibCheck`
 Expected: zero errors
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/components/ui/ScannerReveal.tsx src/components/ui/MetricRing.tsx
-git commit -m "fix: make ScannerReveal overlay and MetricRing track theme-aware via CSS vars"
+git commit -m "fix: make ScannerReveal overlay and MetricRing track/glow theme-aware"
 ```
 
 ---
