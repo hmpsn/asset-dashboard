@@ -17,6 +17,16 @@ import {
 } from './schemas/content-schemas.js';
 import { z } from 'zod';
 
+/** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
+function parseAiJson<T = Record<string, unknown>>(raw: string, context: string): T {
+  const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    throw new Error(`Failed to parse AI response as JSON (${context})`);
+  }
+}
+
 // ── Analytics Intelligence for brief enrichment ──
 
 interface BriefIntelligenceInput {
@@ -550,13 +560,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  let parsed: Record<string, unknown>;
-  try {
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
-    parsed = JSON.parse(cleaned);
-  } catch {
-    throw new Error('Failed to parse AI response as JSON');
-  }
+  const parsed = parseAiJson(raw, 'brief-regenerate');
 
   // Create a new brief ID — preserves the old one for history
   const newBrief: ContentBrief = {
@@ -695,17 +699,13 @@ Rules:
   });
 
   // Parse the outline from the response
-  let newOutline: ContentBrief['outline'];
-  try {
-    const raw = aiResult.text || '[]';
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
-    const parsed = JSON.parse(cleaned);
-    // Handle both { outline: [...] } and direct array
-    newOutline = Array.isArray(parsed) ? parsed : (parsed.outline || parsed.sections || []);
-    if (!Array.isArray(newOutline) || newOutline.length === 0) {
-      throw new Error('Empty outline returned');
-    }
-  } catch {
+  const outlineRaw = aiResult.text || '[]';
+  const outlineParsed = parseAiJson<Record<string, unknown> | unknown[]>(outlineRaw, 'outline-regen');
+  // Handle both { outline: [...] } and direct array
+  const newOutline: ContentBrief['outline'] = Array.isArray(outlineParsed)
+    ? outlineParsed as ContentBrief['outline']
+    : ((outlineParsed as Record<string, unknown>).outline || (outlineParsed as Record<string, unknown>).sections || []) as ContentBrief['outline'];
+  if (!Array.isArray(newOutline) || newOutline.length === 0) {
     throw new Error('Failed to parse regenerated outline');
   }
 
@@ -991,14 +991,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-
-  let parsed: Record<string, unknown>;
-  try {
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
-    parsed = JSON.parse(cleaned);
-  } catch {
-    throw new Error('Failed to parse AI response as JSON');
-  }
+  const parsed = parseAiJson(raw, 'content-brief');
 
   const brief: ContentBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
