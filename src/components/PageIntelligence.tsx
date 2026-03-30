@@ -1163,7 +1163,24 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                       <Pencil className="w-3 h-3" /> Fix in SEO Editor
                     </button>
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      onClick={() => {
+                        const analysis = sp || kw;
+                        navigate(adminPath(workspaceId, 'seo-briefs'), {
+                          state: {
+                            fixContext: {
+                              pageSlug: page.slug,
+                              pageName: page.title,
+                              primaryKeyword: analysis?.primaryKeyword || undefined,
+                              searchIntent: analysis?.searchIntent || undefined,
+                              optimizationScore: analysis?.optimizationScore ?? undefined,
+                              optimizationIssues: analysis?.optimizationIssues?.length ? analysis.optimizationIssues : undefined,
+                              recommendations: analysis?.recommendations?.length ? analysis.recommendations : undefined,
+                              contentGaps: analysis?.contentGaps?.length ? analysis.contentGaps : undefined,
+                              autoGenerate: true,
+                            },
+                          },
+                        });
+                      }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <BookOpen className="w-3 h-3" /> Create Brief
