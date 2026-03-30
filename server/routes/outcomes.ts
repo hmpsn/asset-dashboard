@@ -10,11 +10,13 @@ import { createLogger } from '../logger.js';
 import { listWorkspaces } from '../workspaces.js';
 import {
   getAction,
+  getActionBySource,
   getActionsByWorkspace,
   getActionsByWorkspaceAndType,
   getOutcomesForAction,
   getRecentActions,
   getWorkspaceCounts,
+  recordAction,
   updateActionContext,
 } from '../outcome-tracking.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
@@ -254,6 +256,56 @@ router.get('/api/outcomes/:workspaceId/learnings', requireWorkspaceAccess('works
   }
 });
 
+// POST /api/outcomes/:workspaceId/actions — Record a new tracked action (admin only)
+router.post(
+  '/api/outcomes/:workspaceId/actions',
+  requireWorkspaceAccess('workspaceId'),
+  validate(z.object({
+    actionType: actionTypeEnum,
+    sourceType: z.string().min(1).max(100),
+    sourceId: z.string().max(200).optional(),
+    pageUrl: z.string().max(2048).optional(),
+    targetKeyword: z.string().max(500).optional(),
+    baselineSnapshot: z.object({
+      position: z.number().optional(),
+      clicks: z.number().optional(),
+      impressions: z.number().optional(),
+      ctr: z.number().optional(),
+      sessions: z.number().optional(),
+    }),
+    attribution: z.enum(['platform_executed', 'user_reported', 'external_detected', 'not_acted_on']).optional(),
+    measurementWindow: z.number().int().min(7).max(365).optional(),
+  })),
+  (req, res) => {
+    try {
+      // Idempotency: if sourceId is provided, check for existing action
+      if (req.body.sourceId) {
+        const existing = getActionBySource(req.body.sourceType, req.body.sourceId);
+        if (existing) {
+          return res.json({ success: true, action: existing, deduplicated: true });
+        }
+      }
+
+      const action = recordAction({
+        workspaceId: req.params.workspaceId,
+        actionType: req.body.actionType as ActionType,
+        sourceType: req.body.sourceType,
+        sourceId: req.body.sourceId,
+        pageUrl: req.body.pageUrl,
+        targetKeyword: req.body.targetKeyword,
+        baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
+        attribution: req.body.attribution,
+        measurementWindow: req.body.measurementWindow,
+      });
+
+      res.json({ success: true, action });
+    } catch (err) {
+      log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to record action');
+      res.status(500).json({ error: 'Failed to record action' });
+    }
+  },
+);
+
 // GET /api/outcomes/:workspaceId/actions — List tracked actions
 router.get('/api/outcomes/:workspaceId/actions', requireWorkspaceAccess('workspaceId'), (req, res) => {
   try {
@@ -373,6 +425,92 @@ router.get('/api/outcomes/:workspaceId/playbooks', requireWorkspaceAccess('works
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get playbooks');
     res.status(500).json({ error: 'Failed to get playbooks' });
+  }
+});
+
+// GET /api/outcomes/:workspaceId/diagnostics — Pipeline health diagnostics (admin only)
+router.get('/api/outcomes/:workspaceId/diagnostics', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const wsId = req.params.workspaceId;
+    const actions = getActionsByWorkspace(wsId);
+    const counts = getWorkspaceCounts(wsId);
+    const playbooks = getPlaybooks(wsId);
+    const learnings = getWorkspaceLearnings(wsId);
+
+    // Anomaly detection
+    const emptyBaselines: string[] = [];
+    const relativeUrls: string[] = [];
+    const overdueScoring: string[] = [];
+    const orphanedOutcomes: string[] = [];
+    const now = Date.now();
+
+    for (const action of actions) {
+      // Actions with empty baselines (no position, clicks, or impressions)
+      const b = action.baselineSnapshot;
+      if (b.position === undefined && b.clicks === undefined && b.impressions === undefined) {
+        emptyBaselines.push(action.id);
+      }
+
+      // Relative URLs (missing protocol)
+      if (action.pageUrl && !action.pageUrl.startsWith('http')) {
+        relativeUrls.push(action.id);
+      }
+
+      // Overdue for scoring: pending + created > measurementWindow days ago
+      if (!action.measurementComplete) {
+        const ageMs = now - new Date(action.createdAt).getTime();
+        const windowMs = action.measurementWindow * 24 * 60 * 60 * 1000;
+        if (ageMs > windowMs) {
+          overdueScoring.push(action.id);
+        }
+      }
+
+      // Orphaned outcomes: outcomes referencing actions that are complete but have no win/loss score
+      const outcomes = getOutcomesForAction(action.id);
+      for (const o of outcomes) {
+        if (o.score === null) {
+          orphanedOutcomes.push(`${action.id}:${o.checkpointDays}d`);
+        }
+      }
+    }
+
+    // Outcome counts per score
+    const scoreCounts: Record<string, number> = {};
+    for (const action of actions) {
+      const outcomes = getOutcomesForAction(action.id);
+      for (const o of outcomes) {
+        const key = o.score ?? 'null';
+        scoreCounts[key] = (scoreCounts[key] ?? 0) + 1;
+      }
+    }
+
+    res.json({
+      workspaceId: wsId,
+      featureEnabled: isFeatureEnabled('outcome-tracking'),
+      tableCounts: {
+        trackedActions: counts.total,
+        scored: counts.scored,
+        pending: counts.pending,
+        playbooks: playbooks.length,
+        learnings: learnings ? 1 : 0,
+      },
+      scoreCounts,
+      anomalies: {
+        emptyBaselines,
+        relativeUrls,
+        overdueScoring,
+        orphanedOutcomes,
+      },
+      anomalySummary: {
+        emptyBaselines: emptyBaselines.length,
+        relativeUrls: relativeUrls.length,
+        overdueScoring: overdueScoring.length,
+        orphanedOutcomes: orphanedOutcomes.length,
+      },
+    });
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get diagnostics');
+    res.status(500).json({ error: 'Failed to get diagnostics' });
   }
 });
 
