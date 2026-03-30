@@ -72,6 +72,14 @@ export interface FixContext {
   pageName?: string;
   issueCheck?: string;
   issueMessage?: string;
+  // Brief generation context from Page Intelligence
+  primaryKeyword?: string;
+  searchIntent?: string;
+  optimizationScore?: number;
+  optimizationIssues?: string[];
+  recommendations?: string[];
+  contentGaps?: string[];
+  autoGenerate?: boolean;
 }
 
 /** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */
