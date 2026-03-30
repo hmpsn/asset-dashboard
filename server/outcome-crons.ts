@@ -16,6 +16,10 @@ let detectionInterval: ReturnType<typeof setInterval> | null = null;
 let archiveInterval: ReturnType<typeof setInterval> | null = null;
 let playbooksInterval: ReturnType<typeof setInterval> | null = null;
 
+// Startup timeout handles — stored so stopOutcomeCrons() can cancel them
+// if shutdown is called within the first 35s of startup.
+let startupTimeouts: ReturnType<typeof setTimeout>[] = [];
+
 export function startOutcomeCrons() {
   if (!isFeatureEnabled('outcome-tracking')) {
     log.info('Outcome tracking disabled — skipping cron registration');
@@ -65,12 +69,15 @@ export function startOutcomeCrons() {
     });
   };
 
-  // Run each job once after a short startup delay, then on their normal interval
-  setTimeout(() => void runMeasure(), 15_000);
-  setTimeout(() => void runLearnings(), 20_000);
-  setTimeout(() => void runDetection(), 25_000);
-  setTimeout(() => void runPlaybooks(), 30_000);
-  setTimeout(runArchive, 35_000);
+  // Run each job once after a short startup delay, then on their normal interval.
+  // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
+  startupTimeouts = [
+    setTimeout(() => void runMeasure(), 15_000),
+    setTimeout(() => void runLearnings(), 20_000),
+    setTimeout(() => void runDetection(), 25_000),
+    setTimeout(() => void runPlaybooks(), 30_000),
+    setTimeout(runArchive, 35_000),
+  ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
   learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
@@ -83,6 +90,8 @@ export function startOutcomeCrons() {
 }
 
 export function stopOutcomeCrons() {
+  for (const t of startupTimeouts) clearTimeout(t);
+  startupTimeouts = [];
   if (measureInterval) clearInterval(measureInterval);
   if (learningsInterval) clearInterval(learningsInterval);
   if (detectionInterval) clearInterval(detectionInterval);
