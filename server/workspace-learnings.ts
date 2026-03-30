@@ -444,8 +444,14 @@ export function getWorkspaceLearnings(
 
   if (learnings.totalScoredActions === 0) {
     // No current data — return stale cache rather than nothing, so AI prompts
-    // don't lose historical context due to a transient data gap
-    return row ? rowToWorkspaceLearnings(row) : null;
+    // don't lose historical context due to a transient data gap.
+    // Touch the row's computed_at so we don't recompute on every subsequent call
+    // until the next 24h window.
+    if (row) {
+      stmts().upsert.run({ id: row.id, workspace_id: workspaceId, learnings: row.learnings, computed_at: new Date().toISOString() });
+      return rowToWorkspaceLearnings(row);
+    }
+    return null;
   }
 
   const id = crypto.randomUUID();
