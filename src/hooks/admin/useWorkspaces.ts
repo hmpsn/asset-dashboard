@@ -9,7 +9,10 @@ export const WORKSPACES_KEY = queryKeys.admin.workspaces();
 export function useWorkspaces() {
   return useQuery<Workspace[]>({
     queryKey: WORKSPACES_KEY,
-    queryFn: () => get<Workspace[]>('/api/workspaces'),
+    queryFn: async () => {
+      const data = await get<Workspace[]>('/api/workspaces');
+      return data.sort((a, b) => a.name.localeCompare(b.name));
+    },
     staleTime: STALE_TIMES.STABLE,
   });
 }
