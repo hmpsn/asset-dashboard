@@ -24,6 +24,7 @@ export const WS_EVENTS = {
   CONTENT_PUBLISHED: 'content:published',
   INSIGHT_RESOLVED: 'insight:resolved',
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
+  SCHEMA_PLAN_SENT: 'schema:plan_sent',
   OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',
   OUTCOME_SCORED: 'outcome:scored',
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',

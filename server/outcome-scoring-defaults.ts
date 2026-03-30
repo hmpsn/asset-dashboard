@@ -50,5 +50,14 @@ export function resolveScoringConfig(
   override: Partial<ScoringConfig> | null | undefined,
 ): ScoringConfig {
   if (!override) return DEFAULT_SCORING_CONFIG;
-  return { ...DEFAULT_SCORING_CONFIG, ...override };
+  // Deep-merge: shallow spread would replace entire per-action-type entries, losing
+  // default thresholds when the workspace override only specifies a partial entry
+  // (e.g. just primary_metric). Merge each action type individually instead.
+  const result = { ...DEFAULT_SCORING_CONFIG };
+  for (const key of Object.keys(override) as Array<keyof ScoringConfig>) {
+    if (override[key]) {
+      result[key] = { ...DEFAULT_SCORING_CONFIG[key], ...override[key] };
+    }
+  }
+  return result;
 }
