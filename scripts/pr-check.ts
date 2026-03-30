@@ -147,8 +147,8 @@ const CHECKS: Check[] = [
   },
   {
     name: 'Bare SUM() without COALESCE in db.prepare',
-    // Match SUM( not immediately preceded by ( or whitespace after ( — excludes COALESCE(SUM( and COALESCE( SUM(
-    pattern: '(^|[^( \\t])SUM\\(',
+    // Match SUM( not immediately preceded by ( — excludes COALESCE(SUM( while catching bare SUM(col)
+    pattern: '(^|[^(])SUM\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',

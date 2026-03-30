@@ -31,6 +31,9 @@ export async function detectExternalExecutions(): Promise<{ detected: number; ch
           };
           updateActionContext(action.id, ctx);
         }
+      } else if ((action.context.detectionChecks ?? 0) > 0) {
+        // Reset counter — checks must be consecutive
+        updateActionContext(action.id, { ...action.context, detectionChecks: 0 });
       }
     } catch (err) {
       log.warn({ err, actionId: action.id }, 'Error checking external execution');
