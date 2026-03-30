@@ -476,7 +476,7 @@ router.delete('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuer
 
   const ws = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
   if (ws) {
-    addActivity(ws.id, 'schema_plan_generated', 'Schema site plan retracted', 'Plan deleted by admin');
+    addActivity(ws.id, 'schema_plan_deleted', 'Schema site plan retracted', 'Plan deleted by admin');
   }
   res.json({ success: true });
 });

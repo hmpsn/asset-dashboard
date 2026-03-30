@@ -58,6 +58,8 @@ export type ActivityType =
   | 'external_action_detected'
   | 'playbook_suggested'
   | 'learnings_updated'
+  | 'schema_plan_deleted'
+  | 'workspace_deleted'
   | 'note';
 
 export interface ActivityEntry {
@@ -101,6 +103,14 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
     createdAt: row.created_at,
   };
 }
+
+/** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
+const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
+  'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
+  'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
+  'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
+  'content_published',
+]);
 
 // --- Prepared statements (lazily initialized after migrations run) ---
 
@@ -177,14 +187,6 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   }
   return rows.map(rowToEntry);
 }
-
-/** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
-const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
-  'audit_completed', 'request_resolved', 'approval_applied', 'seo_updated',
-  'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
-  'brief_generated', 'brief_approved', 'content_upgraded', 'fix_completed',
-  'content_published',
-]);
 
 export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
   const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit) as ActivityRow[];
