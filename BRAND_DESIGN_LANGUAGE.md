@@ -125,6 +125,22 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | `DATE_PRESETS_FULL` | `[7d, 14d, 28d, 90d, 6mo, 1y]` | Full date selectors |
 | `DATE_PRESETS_SEARCH` | `[7d, 28d, 90d, 6mo, 16mo]` | Search Console selectors |
 
+### Chart Theme Helpers (`constants.ts`)
+
+For inline styles and Recharts props that can't be overridden by CSS class rules, always use these helpers — never hardcode dark hex values:
+
+| Helper | Dark mode | Light mode | Usage |
+|--------|-----------|------------|-------|
+| `chartGridColor()` | `#27272a` | `#e2e8f0` | `<CartesianGrid stroke={chartGridColor()} />` |
+| `chartAxisColor()` | `#71717a` | `#64748b` | `<XAxis tick={{ fill: chartAxisColor() }} />` |
+| `chartDotStroke()` | `#18181b` | `#f1f5f9` | `activeDot={{ stroke: chartDotStroke() }}` |
+| `chartDotFill()` | `#0f1219` | `#ffffff` | `dot={{ fill: chartDotFill() }}` |
+| `chartTooltipStyle()` | dark bg/border | white bg/border | `<Tooltip contentStyle={chartTooltipStyle()} />` |
+| `chartTooltipLabelStyle()` | zinc label | slate label | `<Tooltip labelStyle={chartTooltipLabelStyle()} />` |
+| `themeColor(dark, light)` | returns `dark` | returns `light` | Any two-value theme switch |
+
+**Rule:** Never use hardcoded dark hex (`#0f1219`, `#18181b`, `#27272a`, `#303036`) in inline `style={{}}` props or SVG `fill`/`stroke` attributes. Use these helpers or CSS variables (`var(--brand-bg)`, `var(--brand-bg-card)`, `var(--brand-border)`). Violations are caught by `npx tsx scripts/pr-check.ts`.
+
 ---
 
 ## 4. Per-Component Color Map
@@ -397,6 +413,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-03-27 | **Connected Intelligence Phase 1**: New `InsightFeed` priority feed component (severity icons: red=critical TrendingDown, amber=warning AlertTriangle, blue=opportunity Target, green=win TrendingUp). `SummaryPills` with colored dots (red/amber/green/blue/purple) and toggle-filter interaction. `InsightSkeleton` shimmer loading. `AnnotatedTrendChart` gains toggleable line chips (solid=active, outline=inactive, grayed=at-max). All three hub tabs now insight-first with sub-tabs. |
 | 2026-03-28 | **Visual Polish** (10 refinements): Asymmetric card radius (SectionCard `10px 24px`, StatCard `6px 12px`), MetricRing outward glow + charge-up animation, noise overlay on body, ScannerReveal page transitions, spacing variation (`space-y-8` between sections), removed uppercase from section headings, StatCard `size="hero"` prop, stagger-fade entrance animations, interactive card hover (teal left-border accent), status color muting (`emerald-400/80`, `amber-400/80`, `red-400/80`, bg at `/8` opacity). Updated: SectionCard, StatCard, MetricRing, Skeleton, TierGate, Badge, statusConfig, ~60 consumer files. |
 | 2026-03-29 | **Outcome Intelligence Engine**: Added Outcome Tracking color map — win rate rings use `scoreColor()`, score badges (strong_win/win=green, neutral=amber, loss=red, insufficient_data/inconclusive=zinc), action type badges (blue), delta indicators (green/red/zinc), confidence badges (green/amber/red). Client "We Called It" uses soft teal. All outcome CTAs use standard teal gradient. |
+| 2026-03-30 | **Light Mode Audit + Visual Polish**: Fixed 148 dark-color instances across 42 files. Added 7 chart theme helpers to `constants.ts` (`themeColor`, `chartGridColor`, `chartAxisColor`, `chartDotStroke`, `chartDotFill`, `chartTooltipStyle`, `chartTooltipLabelStyle`). Fixed MetricRing glow to match score color (not always teal). Fixed ScannerReveal overlay, MetricRing track, Skeleton shimmer, Stripe Elements theming, all Recharts chart axes/grids/dots/tooltips. Added 17 missing `.dashboard-light` CSS overrides. Added 2 pr-check rules for dark hex enforcement. Standardized `space-y-8` on 10 page wrappers, asymmetric border radius on 11 cards. |
 
 ---
 
