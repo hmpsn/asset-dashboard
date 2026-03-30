@@ -52,7 +52,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div className="flex items-center gap-2">
         <Flag className="w-5 h-5 text-amber-400/80" />
         <h2 className="text-sm font-semibold text-zinc-200">Timeline Annotations</h2>

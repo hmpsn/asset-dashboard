@@ -19,7 +19,7 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
   const [activeTab, setActiveTab] = useState<LinksTab>('redirects');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 border-b border-zinc-800 pb-0">
         {TABS.map(t => {

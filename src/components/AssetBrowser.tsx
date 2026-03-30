@@ -524,7 +524,7 @@ function AssetBrowser({ siteId }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Stats bar */}
       <div className="flex items-center gap-4 text-sm">
         <span className="text-zinc-400">{assets.length} assets</span>
