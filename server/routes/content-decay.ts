@@ -7,7 +7,7 @@ import { getWorkspace } from '../workspaces.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
-import { recordAction, getActionBySource } from '../outcome-tracking.js';
+import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 
 const router = Router();
 const log = createLogger('content-decay');
@@ -46,7 +46,7 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
       for (const rec of updated.decayingPages?.slice(0, 3) ?? []) {
         const sourceId = rec.page ?? null;
         if (!sourceId) continue;
-        if (getActionBySource('content_decay', sourceId)) continue;
+        if (getActionByWorkspaceAndSource(req.params.workspaceId, 'content_decay', sourceId)) continue;
         recordAction({
           workspaceId: req.params.workspaceId,
           actionType: 'content_refreshed',

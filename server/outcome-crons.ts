@@ -8,13 +8,17 @@ import { isFeatureEnabled } from './feature-flags.js';
 const log = createLogger('outcome-crons');
 
 const DAILY_MS = 24 * 60 * 60 * 1000;
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+const WEEKLY_MS = 7 * DAILY_MS;
 
 let measureInterval: ReturnType<typeof setInterval> | null = null;
 let learningsInterval: ReturnType<typeof setInterval> | null = null;
 let detectionInterval: ReturnType<typeof setInterval> | null = null;
 let archiveInterval: ReturnType<typeof setInterval> | null = null;
 let playbooksInterval: ReturnType<typeof setInterval> | null = null;
+
+// Startup timeout handles — stored so stopOutcomeCrons() can cancel them
+// if shutdown is called within the first 35s of startup.
+let startupTimeouts: ReturnType<typeof setTimeout>[] = [];
 
 export function startOutcomeCrons() {
   if (!isFeatureEnabled('outcome-tracking')) {
@@ -42,6 +46,7 @@ export function startOutcomeCrons() {
   };
 
   const runDetection = async () => {
+    if (!isFeatureEnabled('outcome-external-detection')) return;
     try {
       const { detectExternalExecutions } = await import('./external-detection.js');
       await detectExternalExecutions();
@@ -51,6 +56,7 @@ export function startOutcomeCrons() {
   };
 
   const runPlaybooks = async () => {
+    if (!isFeatureEnabled('outcome-playbooks')) return;
     try {
       const { detectAllWorkspacePlaybooks } = await import('./outcome-playbooks.js');
       await detectAllWorkspacePlaybooks();
@@ -65,15 +71,19 @@ export function startOutcomeCrons() {
     });
   };
 
-  // Run each job once after a short startup delay, then on their normal interval
-  setTimeout(() => void runMeasure(), 15_000);
-  setTimeout(() => void runLearnings(), 20_000);
-  setTimeout(() => void runDetection(), 25_000);
-  setTimeout(() => void runPlaybooks(), 30_000);
+  // Run each job once after a short startup delay, then on their normal interval.
+  // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
+  startupTimeouts = [
+    setTimeout(() => void runMeasure(), 15_000),
+    setTimeout(() => void runLearnings(), 20_000),
+    setTimeout(() => void runDetection(), 25_000),
+    setTimeout(() => void runPlaybooks(), 30_000),
+    setTimeout(runArchive, 35_000),
+  ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
   learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
-  detectionInterval = setInterval(() => void runDetection(), TWELVE_HOURS_MS);
+  detectionInterval = setInterval(() => void runDetection(), WEEKLY_MS);
   archiveInterval = setInterval(runArchive, DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
@@ -82,6 +92,8 @@ export function startOutcomeCrons() {
 }
 
 export function stopOutcomeCrons() {
+  for (const t of startupTimeouts) clearTimeout(t);
+  startupTimeouts = [];
   if (measureInterval) clearInterval(measureInterval);
   if (learningsInterval) clearInterval(learningsInterval);
   if (detectionInterval) clearInterval(detectionInterval);

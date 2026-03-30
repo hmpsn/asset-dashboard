@@ -152,6 +152,25 @@ When dispatching parallel subagents or working on multi-phase features:
 
 ---
 
+## Auth Conventions
+
+This project uses **two separate auth systems** that must never be mixed up:
+
+| System | Used for | Token location | Server check |
+|--------|----------|---------------|-------------|
+| HMAC password auth | Admin panel login | `localStorage` → `x-auth-token` header | `APP_PASSWORD` gate in `app.ts` |
+| JWT user auth | Multi-user accounts (`users.ts`) | `Authorization: Bearer` or `token` cookie | `requireAuth` middleware |
+
+**Rule: Never add `requireAuth` to admin API routes.** The admin panel authenticates via HMAC token (`x-auth-token`), which the global `APP_PASSWORD` gate in `app.ts` already validates for all `/api/` requests. Adding `requireAuth` to a route the admin frontend calls will silently return 401 — the token won't be recognized because `requireAuth` only accepts JWTs.
+
+**`requireAuth` is only correct in two contexts:**
+1. `server/routes/users.ts` — JWT-based multi-user account management
+2. `server/routes/auth.ts` — `/api/auth/me` JWT session check
+
+**`requireWorkspaceAccess` is safe for all routes** — it explicitly passes through when no JWT user is present (HMAC auth users are covered by the global gate).
+
+---
+
 ## Code Conventions
 
 - **TypeScript strict** — no `any` unless unavoidable
@@ -252,6 +271,18 @@ After parallel agents finish, run:
 git diff HEAD -- <list of shared files touched>
 ```
 Check for: duplicate imports, conflicting function definitions, missed exports, mismatched type names. Fix before starting the next batch.
+
+---
+
+## Implementation Planning Standards
+
+When writing implementation plans (via `writing-plans` skill):
+
+1. **Exhaustive audit first** — for refactoring, migration, or audit work, invoke the `pre-plan-audit` skill before writing the plan. This launches parallel agents to grep the entire codebase and categorize every finding. Never write a plan from memory or spot-checks.
+2. **Parallelization strategy required** — every plan must include a dependency graph showing which tasks can run concurrently and which are sequential.
+3. **Model assignments required** — specify Haiku (mechanical replacements), Sonnet (component logic), or Opus (orchestration/judgment) per task.
+4. **Systemic improvements section required** — every plan must include: shared utilities to extract (if 3+ files do the same fix), pr-check rules to prevent recurrence, and test coverage additions.
+5. **Verification strategy required** — specify how to verify the work (preview screenshots, specific test commands, contrast checks) rather than "manual verification."
 
 ---
 

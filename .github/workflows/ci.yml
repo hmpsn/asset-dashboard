@@ -6,13 +6,23 @@ on:
   pull_request:
     branches: [main, staging]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for pr-check.ts diff detection
+          fetch-depth: 2  # HEAD + HEAD~1 so pr-check.ts can diff on push events
+
+      # On PRs, also fetch the base branch so pr-check.ts can use `git diff origin/<base>...HEAD`.
+      # `|| true` prevents a transient git failure from killing CI —
+      # pr-check.ts falls back to a full codebase scan gracefully.
+      - name: Fetch base branch for diff
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} --depth=1 || true
 
       - uses: actions/setup-node@v4
         with:
@@ -30,10 +40,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Fetch base branch for PR diff
-        if: github.event_name == 'pull_request'
-        run: git fetch origin ${{ github.base_ref }}
 
       - name: PR checks
         run: npx tsx scripts/pr-check.ts
