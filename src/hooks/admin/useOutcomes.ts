@@ -78,6 +78,16 @@ export function useOutcomeOverview() {
   });
 }
 
+// ── Playbooks ──────────────────────────────────────────────────────────────
+
+export function useOutcomePlaybooks(wsId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.outcomePlaybooks(wsId),
+    queryFn: ({ signal }) => outcomesApi.getPlaybooks(wsId, signal),
+    enabled: !!wsId,
+  });
+}
+
 // ── Add note mutation ──────────────────────────────────────────────────────
 
 export function useAddOutcomeNote(wsId: string) {

@@ -84,6 +84,27 @@ async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnaps
 }
 
 /**
+ * Fetch a GSC snapshot (averaged over `days`) for a page.
+ * Returns null if the workspace has no GSC connection or GSC returns no data.
+ * Used by both fetchCurrentMetrics and external detection.
+ */
+export async function fetchGscSnapshot(
+  workspaceId: string,
+  pageUrl: string,
+  days: number,
+): Promise<BaselineSnapshot | null> {
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.webflowSiteId || !ws?.gscPropertyUrl) return null;
+  try {
+    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, days);
+    if (!rows.length) return null;
+    return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Capture and store a GSC baseline for a newly recorded action.
  * Call fire-and-forget (void) from route handlers — does not block the response.
  */
@@ -368,15 +389,26 @@ async function scoreActionAtCheckpoint(
 export async function measurePendingOutcomes(
   scoringConfigOverride?: Partial<ScoringConfig>,
 ): Promise<{ measured: number; errors: number }> {
-  const config = resolveScoringConfig(scoringConfigOverride ?? null);
   const pendingActions = getPendingActions();
 
   log.info({ count: pendingActions.length }, 'Starting outcome measurement run');
+
+  // Cache per-workspace configs to avoid repeated DB lookups
+  const wsConfigCache = new Map<string, ScoringConfig>();
+  const getConfig = (workspaceId: string): ScoringConfig => {
+    if (wsConfigCache.has(workspaceId)) return wsConfigCache.get(workspaceId)!;
+    const ws = getWorkspace(workspaceId);
+    const override = scoringConfigOverride ?? (ws?.scoringConfig as Partial<ScoringConfig> | undefined) ?? null;
+    const config = resolveScoringConfig(override);
+    wsConfigCache.set(workspaceId, config);
+    return config;
+  };
 
   let measured = 0;
   let errors = 0;
 
   for (const action of pendingActions) {
+    const config = getConfig(action.workspaceId);
     for (const checkpoint of CHECKPOINTS) {
       try {
         if (isDueForCheckpoint(action, checkpoint)) {

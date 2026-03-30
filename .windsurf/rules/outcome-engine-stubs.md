@@ -15,48 +15,38 @@
 
 ---
 
-### 2. `checkExternalExecution` is a stub
-**File:** `server/external-detection.ts` (the `checkExternalExecution` function)
-**What it does now:** Always returns `false` — external detection never confirms any action.
-**Effect:** Actions recorded with `attribution: 'not_acted_on'` (content decay, internal links) never flip to `externally_executed`. External win detection is completely disabled.
-**What needs to happen:** Implement GSC-based detection — compare current GSC snapshot to `action.baselineSnapshot`. If position/clicks improved by threshold, return `true`.
-**Roadmap item:** #231
+### 2. ~~`checkExternalExecution` is a stub~~ — SHIPPED 2026-03-29
+**File:** `server/external-detection.ts`
+**Wired:** Calls `fetchGscSnapshot(workspaceId, pageUrl, 14)` and returns `true` when position improved ≥3 places OR clicks improved ≥20% (with ≥5 absolute clicks). Guard: only runs when action has a real GSC baseline (`position` or `clicks` captured). Falls back to `false` for unconnected workspaces.
+**Roadmap item:** #231 ✓
 
 ---
 
-### 3. `detectPlaybookPatterns` is never called from any route or cron
-**File:** `server/outcome-playbooks.ts`
-**What it does now:** Function exists, computes patterns, writes to `action_playbooks` table — but is never invoked.
-**Effect:** Playbooks are never generated. The frontend `queryKeys.admin.outcomePlaybooks` key is wired but there are no API routes to serve it.
-**What needs to happen:** (a) Add a cron job call in `outcome-crons.ts`; (b) Add `GET /api/outcomes/:workspaceId/playbooks` route; (c) Add API client function; (d) Add React Query hook.
-**Roadmap item:** #232
+### 3. ~~`detectPlaybookPatterns` is never called~~ — SHIPPED 2026-03-29
+**Files:** `server/outcome-playbooks.ts`, `server/routes/outcomes.ts`, `src/api/outcomes.ts`, `src/hooks/admin/useOutcomes.ts`, `src/components/admin/outcomes/OutcomePlaybooks.tsx`
+**Wired:** `detectAllWorkspacePlaybooks()` added; called on startup (30s delay) and weekly. `GET /api/outcomes/:workspaceId/playbooks` route serves results. `useOutcomePlaybooks` hook + `OutcomePlaybooks` component wired into Outcomes dashboard as a new "Playbooks" tab.
+**Roadmap item:** #232 ✓
 
 ---
 
-### 4. `insight_acted_on` action type always scores neutral
-**File:** `server/outcome-scoring-defaults.ts:12`
-**What it does now:** `primary_metric: 'varies'` — `computeDelta` looks up `baseline['varies']` which is always `undefined`, producing a 0% delta.
-**Effect:** Every "act on insight" action will score `neutral` regardless of real-world metric changes.
-**What needs to happen:** At insight record time, capture which metric was affected (e.g., if it was a title change, track `clicks`; if a position fix, track `position`). Store the relevant metric in `action.context` and use it in scoring config lookup.
-**Roadmap item:** #233
+### 4. ~~`insight_acted_on` primary metric~~ — Already `clicks`, resolved
+**File:** `server/outcome-scoring-defaults.ts`
+**Status:** `primary_metric` is `clicks`, not `varies`. The stubs doc described a prior state. `insights.ts` already captures baseline clicks/position/impressions/ctr from the insight data at action time. Scoring is functional.
+**Roadmap item:** #233 ✓ (no further work needed)
 
 ---
 
 ## MEDIUM — Feature works but with gaps
 
-### 5. `scoring_config` DB column exists but is never read
-**File:** `server/db/migrations/041-outcome-tracking.sql:114` | `server/outcome-scoring-defaults.ts:49-53`
-**What it does now:** Column added to `workspaces` table for per-workspace scoring thresholds. `resolveScoringConfig` only accepts an explicit parameter — no code reads the column.
-**Effect:** Per-workspace scoring customization (e.g., setting a higher win threshold for a competitive client) is completely non-functional.
-**What needs to happen:** In `measurePendingOutcomes()`, call `getWorkspace(workspaceId)`, parse `workspace.scoring_config`, and pass it as `scoringConfigOverride`.
-**Roadmap item:** #234
+### 5. ~~`scoring_config` never read~~ — SHIPPED 2026-03-29
+**File:** `server/workspaces.ts`, `server/outcome-measurement.ts`
+**Wired:** `scoring_config` added to `WorkspaceRow` + `rowToWorkspace` mapper. `Workspace.scoringConfig` field added. `measurePendingOutcomes` now caches per-workspace config, reads `ws.scoringConfig` as `Partial<ScoringConfig>` override (explicit param still wins for tests).
+**Roadmap item:** #234 ✓
 
-### 6. Cron jobs don't run on first startup
-**File:** `server/outcome-crons.ts:26-60`
-**What it does now:** All four intervals (`measure`, `learnings`, `detection`, `archive`) use `setInterval` with no immediate invocation.
-**Effect:** After a fresh deploy or server restart with backfilled data, outcomes won't be scored for up to 24 hours, learnings won't compute for 24h, external detection won't run for 12h.
-**What needs to happen:** Either add initial `setTimeout(() => fn(), 5_000)` calls, or document that the admin should manually trigger via `/api/outcomes/admin/trigger` (if that route exists) after deploy.
-**Roadmap item:** #235
+### 6. ~~Cron jobs don't run on first startup~~ — SHIPPED 2026-03-29
+**File:** `server/outcome-crons.ts`
+**Wired:** All cron functions extracted as named `runX()` functions. Each fires once at startup with staggered `setTimeout` delays (15-30s to let migrations complete). Playbooks added as a new weekly cron.
+**Roadmap item:** #235 ✓
 
 ### 7. Overview endpoint is N+1 SQLite queries
 **File:** `server/routes/outcomes.ts:158-206`

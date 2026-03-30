@@ -3,6 +3,7 @@ import { getSafe, post } from './client';
 import type {
   TrackedAction,
   ActionOutcome,
+  ActionPlaybook,
   OutcomeScorecard,
   TopWin,
   WorkspaceLearnings,
@@ -51,6 +52,9 @@ export const outcomesApi = {
 
   addNote: (wsId: string, actionId: string, note: string) =>
     post<{ ok: boolean }>(`/api/outcomes/${wsId}/actions/${actionId}/note`, { note }),
+
+  getPlaybooks: (wsId: string, signal?: AbortSignal) =>
+    getSafe<ActionPlaybook[]>(`/api/outcomes/${wsId}/playbooks`, [], signal),
 };
 
 // ── Client-facing endpoints (public, token-gated by workspace) ──────────────

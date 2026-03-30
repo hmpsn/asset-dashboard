@@ -242,6 +242,8 @@ export interface Workspace {
     foundedDate?: string;         // ISO date or year
     numberOfEmployees?: string;   // e.g. "10-50"
   };
+  // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
+  scoringConfig?: Record<string, unknown>;
   folder: string;
   createdAt: string;
 }

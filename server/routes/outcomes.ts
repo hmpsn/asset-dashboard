@@ -17,9 +17,11 @@ import {
   getWorkspaceCounts,
   updateActionContext,
 } from '../outcome-tracking.js';
+import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
 import type {
   ActionType,
+  ActionPlaybook,
   OutcomeScorecard,
   TopWin,
   WorkspaceOutcomeOverview,
@@ -358,6 +360,17 @@ router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), 
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client wins');
     res.status(500).json({ error: 'Failed to get outcome wins' });
+  }
+});
+
+// GET /api/outcomes/:workspaceId/playbooks — Action playbook patterns
+router.get('/api/outcomes/:workspaceId/playbooks', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const playbooks: ActionPlaybook[] = getPlaybooks(req.params.workspaceId);
+    res.json(playbooks);
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get playbooks');
+    res.status(500).json({ error: 'Failed to get playbooks' });
   }
 });
 

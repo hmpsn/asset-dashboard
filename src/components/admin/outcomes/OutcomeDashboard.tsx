@@ -8,8 +8,9 @@ const OutcomeScorecard = lazy(() => import('./OutcomeScorecard'));
 const OutcomeActionFeed = lazy(() => import('./OutcomeActionFeed'));
 const OutcomeTopWins = lazy(() => import('./OutcomeTopWins'));
 const OutcomeLearningsPanel = lazy(() => import('./OutcomeLearningsPanel'));
+const OutcomePlaybooks = lazy(() => import('./OutcomePlaybooks'));
 
-type OutcomeTab = 'scorecard' | 'actions' | 'wins' | 'learnings';
+type OutcomeTab = 'scorecard' | 'actions' | 'wins' | 'learnings' | 'playbooks';
 
 interface OutcomeDashboardProps {
   workspaceId: string;
@@ -23,6 +24,7 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
     { id: 'actions', label: 'Actions' },
     { id: 'wins', label: 'Top Wins' },
     { id: 'learnings', label: 'Learnings' },
+    { id: 'playbooks', label: 'Playbooks' },
   ];
 
   return (
@@ -39,6 +41,7 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
             {activeTab === 'actions' && <OutcomeActionFeed workspaceId={workspaceId} />}
             {activeTab === 'wins' && <OutcomeTopWins workspaceId={workspaceId} />}
             {activeTab === 'learnings' && <OutcomeLearningsPanel workspaceId={workspaceId} />}
+            {activeTab === 'playbooks' && <OutcomePlaybooks workspaceId={workspaceId} />}
           </Suspense>
         </ErrorBoundary>
       </div>

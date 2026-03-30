@@ -63,69 +63,6 @@
       ]
     },
     {
-      "id": "sprint-outcome-engine-wiring",
-      "name": "Outcome Engine — Live Data Wiring",
-      "hours": "12-18",
-      "rationale": "The Outcome Intelligence Engine ships with stubs for the measurement layer. These tasks wire real GSC/GA4 data and unlock the feature's core value proposition. Nothing in the engine produces meaningful results until #230 (fetchCurrentMetrics) is done. See .windsurf/rules/outcome-engine-stubs.md for full diagnostic guide.",
-      "items": [
-        {
-          "id": 230,
-          "title": "Wire fetchCurrentMetrics to real GSC/GA4 data",
-          "source": "outcome-engine-stubs.md #1",
-          "est": "4-6h",
-          "priority": "P0",
-          "notes": "SHIPPED 2026-03-29. fetchCurrentMetrics wired to getPageTrend (14-day average). captureBaselineFromGsc added (28-day baseline, fire-and-forget from approvals/schema/content-posts routes). Baseline-unavailable guard added in scoreActionAtCheckpoint — search-metric actions without GSC baseline score inconclusive instead of wrong delta from 0. updateBaselineSnapshot added to outcome-tracking.ts.",
-          "status": "done",
-          "shippedAt": "2026-03-29"
-        },
-        {
-          "id": 231,
-          "title": "Wire checkExternalExecution to GSC delta detection",
-          "source": "outcome-engine-stubs.md #2",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "External detection (We Called It) always returns false — stub in server/external-detection.ts. Implement: fetch current GSC snapshot for action.pageUrl, compare to action.baselineSnapshot. If position improved by >3 or clicks up >20%, return true. Requires #230 first (GSC fetch infra). Actions with attribution 'not_acted_on' will never become wins without this.",
-          "status": "pending"
-        },
-        {
-          "id": 232,
-          "title": "Wire outcome playbooks — cron + API routes + frontend hook",
-          "source": "outcome-engine-stubs.md #3",
-          "est": "2-3h",
-          "priority": "P2",
-          "notes": "detectPlaybookPatterns() exists in server/outcome-playbooks.ts but is never called. 4 tasks: (1) Call it from outcome-crons.ts on the learnings interval. (2) Add GET /api/outcomes/:workspaceId/playbooks route. (3) Add outcomePlaybooks() API client function. (4) Add useOutcomePlaybooks hook + OutcomePlaybooks component in admin Outcomes tab.",
-          "status": "pending"
-        },
-        {
-          "id": 233,
-          "title": "Fix insight_acted_on metric resolution (primary_metric: 'varies')",
-          "source": "outcome-engine-stubs.md #4",
-          "est": "2-3h",
-          "priority": "P1",
-          "notes": "server/outcome-scoring-defaults.ts uses primary_metric: 'varies' for insight_acted_on — computeDelta looks up baseline['varies'] which is always undefined → 0% delta → always neutral. Fix: at insight resolution time (routes/insights.ts), determine which metric was affected by the insight type (CTR insight → clicks, position insight → position, etc.) and store it in action.context.primaryMetric. Update computeDelta to check context.primaryMetric before falling back to scoring config default.",
-          "status": "pending"
-        },
-        {
-          "id": 234,
-          "title": "Read scoring_config workspace column in outcome measurement",
-          "source": "outcome-engine-stubs.md #5",
-          "est": "1h",
-          "priority": "P2",
-          "notes": "Per-workspace scoring threshold overrides are stored in workspaces.scoring_config (migration 041) but never read. In measurePendingOutcomes(), call getWorkspace(workspaceId), parse workspace.scoring_config JSON, pass as scoringConfigOverride to resolveScoringConfig(). Also add UI in workspace settings to configure thresholds.",
-          "status": "pending"
-        },
-        {
-          "id": 235,
-          "title": "Run outcome crons on startup (not just after first interval)",
-          "source": "outcome-engine-stubs.md #6",
-          "est": "0.5h",
-          "priority": "P2",
-          "notes": "server/outcome-crons.ts uses setInterval with no initial invocation. After deploy with backfilled data, scoring won't run for 24h, detection for 12h. Add setTimeout(() => measureFn(), 10_000) initial calls, or document a /api/outcomes/admin/trigger endpoint. Low effort, prevents confusion on first deploy.",
-          "status": "pending"
-        }
-      ]
-    },
-    {
       "id": "sprint-team",
       "name": "Team & Collaboration",
       "hours": "20-26",
@@ -1086,6 +1023,75 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "id": "sprint-outcome-engine-wiring",
+      "name": "✅ SHIPPED — Outcome Engine — Live Data Wiring",
+      "hours": "12-18",
+      "rationale": "The Outcome Intelligence Engine ships with stubs for the measurement layer. These tasks wire real GSC/GA4 data and unlock the feature's core value proposition. Nothing in the engine produces meaningful results until #230 (fetchCurrentMetrics) is done. See .windsurf/rules/outcome-engine-stubs.md for full diagnostic guide.",
+      "items": [
+        {
+          "id": 230,
+          "title": "Wire fetchCurrentMetrics to real GSC/GA4 data",
+          "source": "outcome-engine-stubs.md #1",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "SHIPPED 2026-03-29. fetchCurrentMetrics wired to getPageTrend (14-day average). captureBaselineFromGsc added (28-day baseline, fire-and-forget from approvals/schema/content-posts routes). Baseline-unavailable guard added in scoreActionAtCheckpoint — search-metric actions without GSC baseline score inconclusive instead of wrong delta from 0. updateBaselineSnapshot added to outcome-tracking.ts.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 231,
+          "title": "Wire checkExternalExecution to GSC delta detection",
+          "source": "outcome-engine-stubs.md #2",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "SHIPPED 2026-03-29. checkExternalExecution now calls fetchGscSnapshot (14-day window) and returns true when position improved >=3 places OR clicks up >=20% with >=5 absolute. Guard: only fires when action has a real GSC baseline (position or clicks captured). Falls back to false for unconnected workspaces.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 232,
+          "title": "Wire outcome playbooks — cron + API routes + frontend hook",
+          "source": "outcome-engine-stubs.md #3",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "SHIPPED 2026-03-29. (1) detectAllWorkspacePlaybooks() added to outcome-playbooks.ts, called on startup + weekly. (2) GET /api/outcomes/:workspaceId/playbooks route added. (3) getPlaybooks() added to API client. (4) useOutcomePlaybooks hook added. (5) OutcomePlaybooks.tsx component created. (6) Playbooks tab wired into OutcomeDashboard.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 233,
+          "title": "Fix insight_acted_on metric resolution (primary_metric: 'varies')",
+          "source": "outcome-engine-stubs.md #4",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "RESOLVED 2026-03-29. primary_metric was already 'clicks' in the shipped code — the stubs doc described a prior state. insights.ts already captures baseline clicks/position/impressions/ctr from insight data. No code change needed.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 234,
+          "title": "Read scoring_config workspace column in outcome measurement",
+          "source": "outcome-engine-stubs.md #5",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "SHIPPED 2026-03-29. scoring_config added to WorkspaceRow + rowToWorkspace mapper + Workspace.scoringConfig field. measurePendingOutcomes now caches per-workspace config, reads ws.scoringConfig as Partial<ScoringConfig> override. Explicit override param still works for tests.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 235,
+          "title": "Run outcome crons on startup (not just after first interval)",
+          "source": "outcome-engine-stubs.md #6",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "SHIPPED 2026-03-29. All cron jobs refactored into named functions (runMeasure, runLearnings, runDetection, runPlaybooks, runArchive). Each fires once via setTimeout on startup (15-30s staggered delay). Playbooks added as weekly interval.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        }
+      ],
+      "shippedAt": "2026-03-29"
     },
     {
       "id": "sprint-platform-intelligence",

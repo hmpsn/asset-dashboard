@@ -79,6 +79,7 @@ interface WorkspaceRow {
   publish_target: string | null;
   business_profile: string | null;
   seo_data_provider: string | null;
+  scoring_config: string | null;
   created_at: string;
 }
 
@@ -147,6 +148,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
     if (bp) ws.businessProfile = bp;
   }
+  if (row.scoring_config) ws.scoringConfig = parseJsonFallback(row.scoring_config, {});
   return ws;
 }
 

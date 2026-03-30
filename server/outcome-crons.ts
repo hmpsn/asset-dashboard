@@ -22,42 +22,61 @@ export function startOutcomeCrons() {
   }
   if (measureInterval) return; // already started
 
-  // Measure pending outcomes daily
-  measureInterval = setInterval(async () => {
+  const runMeasure = async () => {
     try {
       const { measurePendingOutcomes } = await import('./outcome-measurement.js');
       await measurePendingOutcomes();
     } catch (err) {
       log.error({ err }, 'Failed to measure pending outcomes');
     }
-  }, DAILY_MS);
+  };
 
-  // Recompute workspace learnings daily
-  learningsInterval = setInterval(async () => {
+  const runLearnings = async () => {
     try {
       const { recomputeAllWorkspaceLearnings } = await import('./workspace-learnings.js');
       await recomputeAllWorkspaceLearnings();
     } catch (err) {
       log.error({ err }, 'Failed to compute workspace learnings');
     }
-  }, DAILY_MS);
+  };
 
-  // Detect external executions every 12 hours
-  detectionInterval = setInterval(async () => {
+  const runDetection = async () => {
     try {
       const { detectExternalExecutions } = await import('./external-detection.js');
       await detectExternalExecutions();
     } catch (err) {
       log.error({ err }, 'Failed to detect external executions');
     }
-  }, TWELVE_HOURS_MS);
+  };
 
-  // Archive old actions daily
-  archiveInterval = setInterval(() => {
+  const runPlaybooks = async () => {
+    try {
+      const { detectAllWorkspacePlaybooks } = await import('./outcome-playbooks.js');
+      await detectAllWorkspacePlaybooks();
+    } catch (err) {
+      log.error({ err }, 'Failed to detect playbook patterns');
+    }
+  };
+
+  const runArchive = () => {
     import('./outcome-tracking.js').then(m => m.archiveOldActions()).catch(err => {
       log.error({ err }, 'Failed to archive old actions');
     });
-  }, DAILY_MS);
+  };
+
+  // Run each job once after a short startup delay, then on their normal interval
+  setTimeout(() => void runMeasure(), 15_000);
+  setTimeout(() => void runLearnings(), 20_000);
+  setTimeout(() => void runDetection(), 25_000);
+  setTimeout(() => void runPlaybooks(), 30_000);
+
+  measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
+  learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
+  detectionInterval = setInterval(() => void runDetection(), TWELVE_HOURS_MS);
+  archiveInterval = setInterval(runArchive, DAILY_MS);
+
+  // Playbook pattern detection runs weekly (no separate interval var needed — piggybacks on learnings cadence)
+  setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
   log.info('Outcome crons started');
 }

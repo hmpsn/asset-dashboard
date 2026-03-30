@@ -3,6 +3,7 @@
 
 import { createLogger } from './logger.js';
 import { getNotActedOnActions, updateAttribution, updateActionContext } from './outcome-tracking.js';
+import { fetchGscSnapshot } from './outcome-measurement.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { TrackedAction, ActionContext } from '../shared/types/outcome-tracking.js';
@@ -44,12 +45,37 @@ export async function detectExternalExecutions(): Promise<{ detected: number; ch
 }
 
 /**
- * Stub detection — checks based on action type.
+ * Detect external execution by comparing current GSC metrics to the stored baseline.
+ * Returns true if the action's primary metric improved beyond a detection threshold,
+ * suggesting the recommendation was implemented outside the platform.
  *
- * TODO: Wire to actual page content checks (fetch page, compare schema, meta tags, etc.)
- * For now returns false — detection will be wired when page fetching is available.
+ * Only fires for actions with a pageUrl and a real GSC baseline (impressions captured).
+ * Actions with no GSC connection or no baseline fall back to false.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function checkExternalExecution(_action: TrackedAction): Promise<boolean> {
+async function checkExternalExecution(action: TrackedAction): Promise<boolean> {
+  if (!action.pageUrl) return false;
+
+  // Only check actions that have a real GSC baseline — ones with only captured_at
+  // have no comparison point and would produce false positives
+  const hasBaseline = (
+    action.baselineSnapshot.position !== undefined ||
+    action.baselineSnapshot.clicks !== undefined
+  );
+  if (!hasBaseline) return false;
+
+  const current = await fetchGscSnapshot(action.workspaceId, action.pageUrl, 14);
+  if (!current) return false;
+
+  const basePos = action.baselineSnapshot.position;
+  const curPos = current.position;
+  const baseClicks = action.baselineSnapshot.clicks ?? 0;
+  const curClicks = current.clicks ?? 0;
+
+  // Position improved by 3+ places (lower is better)
+  if (basePos !== undefined && curPos !== undefined && (basePos - curPos) >= 3) return true;
+
+  // Clicks improved by 20%+ with at least 5 absolute clicks
+  if (baseClicks > 0 && curClicks >= baseClicks * 1.2 && (curClicks - baseClicks) >= 5) return true;
+
   return false;
 }

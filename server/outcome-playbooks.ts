@@ -6,6 +6,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
+import { listWorkspaces } from './workspaces.js';
 import { rowToActionPlaybook } from './db/outcome-mappers.js';
 import type { ActionPlaybookRow } from './db/outcome-mappers.js';
 import type { ActionPlaybook } from '../shared/types/outcome-tracking.js';
@@ -120,4 +121,15 @@ export function detectPlaybookPatterns(workspaceId: string): { discovered: numbe
 export function suggestPlaybook(workspaceId: string, trigger: string): ActionPlaybook | null {
   const playbooks = getPlaybooks(workspaceId);
   return playbooks.find(p => p.enabled && p.triggerCondition === trigger) ?? null;
+}
+
+/** Run playbook pattern detection across all workspaces. Called by the weekly cron. */
+export async function detectAllWorkspacePlaybooks(): Promise<void> {
+  const workspaces = listWorkspaces();
+  let totalDiscovered = 0;
+  for (const ws of workspaces) {
+    const { discovered } = detectPlaybookPatterns(ws.id);
+    totalDiscovered += discovered;
+  }
+  log.info({ workspaceCount: workspaces.length, totalDiscovered }, 'Playbook detection ran across all workspaces');
 }
