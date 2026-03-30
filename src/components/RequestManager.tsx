@@ -215,7 +215,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const wsName = (id: string) => workspaces.find(w => w.id === id)?.name || id;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

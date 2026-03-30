@@ -253,7 +253,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const progress = isGenerating ? Math.round(((completedSections + (post.introduction ? 1 : 0)) / (totalSections + 2)) * 100) : 100;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
