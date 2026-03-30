@@ -68,7 +68,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
       <div className="flex flex-col items-center justify-center h-full gap-6">
         <img src="/logo.svg" alt={STUDIO_NAME} className="h-10 opacity-40" />
         <div className="text-center max-w-sm">
-          <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to hmpsn studio</p>
+          <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to {STUDIO_NAME}</p>
           <p className="text-xs leading-relaxed text-zinc-500">Create a workspace to get started.</p>
         </div>
       </div>
