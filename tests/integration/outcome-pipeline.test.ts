@@ -130,13 +130,11 @@ describe('Outcome actions — idempotency guard', () => {
     // Should return the same action, not create a new one
     expect(body2.action.id).toBe(firstId);
 
-    // Verify only one exists
+    // Verify exactly one action with firstId exists (no duplicate)
     const listRes = await api(`/api/outcomes/${testWsId}/actions?type=content_published`);
     const actions = await listRes.json();
-    const matching = actions.filter((a: { sourceFlag: string }) =>
-      actions.filter((x: { id: string }) => x.id === firstId).length === 1
-    );
-    expect(matching.length).toBeGreaterThan(0);
+    const matching = actions.filter((a: { id: string }) => a.id === firstId);
+    expect(matching.length).toBe(1);
   });
 
   it('idempotency guard does not leak actions across workspaces', async () => {

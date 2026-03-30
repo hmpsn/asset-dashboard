@@ -12,7 +12,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { listWorkspaces } from '../workspaces.js';
 import {
   getAction,
-  getActionBySource,
+  getActionByWorkspaceAndSource,
   getActionsByWorkspace,
   getActionsByWorkspaceAndType,
   getOutcomesForAction,
@@ -282,8 +282,8 @@ router.post(
     try {
       // Idempotency: if sourceId is provided, check for existing action in THIS workspace
       if (req.body.sourceId) {
-        const existing = getActionBySource(req.body.sourceType, req.body.sourceId);
-        if (existing && existing.workspaceId === req.params.workspaceId) {
+        const existing = getActionByWorkspaceAndSource(req.params.workspaceId, req.body.sourceType, req.body.sourceId);
+        if (existing) {
           return res.json({ success: true, action: existing, deduplicated: true });
         }
       }
