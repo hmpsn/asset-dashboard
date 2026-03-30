@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { STUDIO_NAME } from '../constants';
 import {
   Search, BarChart3, Target, TrendingUp, Zap,
   CheckCircle2, ChevronDown, ArrowRight, Sparkles,
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
-   hmpsn.studio Landing Page
+   Landing Page
    GTM-driven lead gen page for Webflow SEO platform
    ═══════════════════════════════════════════════════════════ */
 
@@ -514,7 +515,7 @@ function Footer() {
     <footer className="border-t border-zinc-800/50 py-10">
       <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <img src="/hmpsn-studio-logo-wordmark-white.svg" alt="hmpsn studio" className="h-5 opacity-60" />
-        <p className="text-xs text-zinc-600">&copy; {new Date().getFullYear()} hmpsn.studio. All rights reserved.</p>
+        <p className="text-xs text-zinc-600">&copy; {new Date().getFullYear()} {STUDIO_NAME}. All rights reserved.</p>
       </div>
     </footer>
   );

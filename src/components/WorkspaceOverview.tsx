@@ -15,6 +15,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
 import { chartAxisColor, themeColor } from './ui/constants';
+import { STUDIO_NAME } from '../constants';
 
 // Types imported from useWorkspaceOverview hook
 
@@ -65,7 +66,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   if (data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6">
-        <img src="/logo.svg" alt="hmpsn.studio" className="h-10 opacity-40" />
+        <img src="/logo.svg" alt={STUDIO_NAME} className="h-10 opacity-40" />
         <div className="text-center max-w-sm">
           <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to hmpsn studio</p>
           <p className="text-xs leading-relaxed text-zinc-500">Create a workspace to get started.</p>
