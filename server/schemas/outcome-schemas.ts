@@ -115,7 +115,7 @@ export const contentLearningsSchema = z.object({
 
 export const strategyLearningsSchema = z.object({
   winRateByDifficultyRange: z.record(z.string(), z.number()),
-  avgTimeToRank: z.record(z.string(), z.number()),
+  winRateByCheckpoint: z.record(z.string(), z.number()),
   bestIntentTypes: z.array(z.string()),
   keywordVolumeSweetSpot: z.object({ min: z.number(), max: z.number() }).nullable(),
 });

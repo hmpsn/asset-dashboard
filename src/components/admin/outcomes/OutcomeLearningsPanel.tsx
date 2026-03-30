@@ -122,8 +122,8 @@ interface StrategySectionProps {
 
 function StrategySection({ data }: StrategySectionProps) {
   const difficultyWins = formatWinRateRecord(data.winRateByDifficultyRange);
-  const timeToRankEntries = Object.entries(data.avgTimeToRank)
-    .sort(([, a], [, b]) => a - b)
+  const checkpointWinRates = Object.entries(data.winRateByCheckpoint)
+    .sort(([a], [b]) => parseInt(a) - parseInt(b))
     .slice(0, 4);
 
   return (
@@ -150,15 +150,15 @@ function StrategySection({ data }: StrategySectionProps) {
           <NoDataMessage message="No difficulty win-rate data yet" />
         )}
 
-        {/* Avg time to rank */}
-        {timeToRankEntries.length > 0 && (
+        {/* Win rate by checkpoint */}
+        {checkpointWinRates.length > 0 && (
           <div>
-            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Avg Time to Rank (days)</p>
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Win Rate by Checkpoint</p>
             <div className="space-y-1.5">
-              {timeToRankEntries.map(([range, days]) => (
-                <div key={range} className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-400 capitalize">{range.replace(/_/g, ' ')}</span>
-                  <span className="text-xs font-semibold text-blue-400">{Math.round(days)}d</span>
+              {checkpointWinRates.map(([checkpoint, rate]) => (
+                <div key={checkpoint} className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-400 capitalize">{checkpoint}</span>
+                  <span className="text-xs font-semibold text-emerald-400">{Math.round(rate * 100)}%</span>
                 </div>
               ))}
             </div>

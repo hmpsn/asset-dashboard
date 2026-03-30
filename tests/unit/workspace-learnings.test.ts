@@ -75,7 +75,7 @@ function makeContentLearnings(overrides: Partial<ContentLearnings> = {}): Conten
 function makeStrategyLearnings(overrides: Partial<StrategyLearnings> = {}): StrategyLearnings {
   return {
     winRateByDifficultyRange: { '0-20': 0.8, '21-40': 0.6, '41-60': 0.45 },
-    avgTimeToRank: { '30d': 0.7, '60d': 0.8 },
+    winRateByCheckpoint: { '30d': 0.7, '60d': 0.8 },
     bestIntentTypes: ['informational', 'transactional'],
     keywordVolumeSweetSpot: { min: 500, max: 8000 },
     ...overrides,

@@ -234,10 +234,10 @@ function computeStrategyLearnings(items: ScoredActionWithOutcome[]): StrategyLea
     checkpointGroups[key].push(item);
   }
 
-  const avgTimeToRank: Record<string, number> = {};
+  const winRateByCheckpoint: Record<string, number> = {};
   for (const [days, group] of Object.entries(checkpointGroups)) {
     if (group.length >= 3) {
-      avgTimeToRank[`${days}d`] = computeWinRate(group);
+      winRateByCheckpoint[`${days}d`] = computeWinRate(group);
     }
   }
 
@@ -271,7 +271,7 @@ function computeStrategyLearnings(items: ScoredActionWithOutcome[]): StrategyLea
 
   return {
     winRateByDifficultyRange,
-    avgTimeToRank,
+    winRateByCheckpoint,
     bestIntentTypes,
     keywordVolumeSweetSpot,
   };

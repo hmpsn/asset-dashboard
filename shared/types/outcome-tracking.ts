@@ -181,7 +181,7 @@ export interface ContentLearnings {
 
 export interface StrategyLearnings {
   winRateByDifficultyRange: Record<string, number>;
-  avgTimeToRank: Record<string, number>;
+  winRateByCheckpoint: Record<string, number>;
   bestIntentTypes: string[];
   keywordVolumeSweetSpot: { min: number; max: number } | null;
 }

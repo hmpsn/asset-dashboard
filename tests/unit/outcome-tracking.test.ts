@@ -332,7 +332,7 @@ describe('rowToWorkspaceLearnings', () => {
     },
     strategy: {
       winRateByDifficultyRange: { '0-30': 0.8, '31-60': 0.6 },
-      avgTimeToRank: { '0-30': 28, '31-60': 55 },
+      winRateByCheckpoint: { '30d': 0.65, '60d': 0.78 },
       bestIntentTypes: ['informational', 'transactional'],
       keywordVolumeSweetSpot: { min: 500, max: 5000 },
     },
