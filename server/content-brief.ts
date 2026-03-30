@@ -739,6 +739,14 @@ export async function generateBrief(
     keywordLocked?: boolean;
     keywordSource?: ContentBrief['keywordSource'];
     keywordValidation?: ContentBrief['keywordValidation'];
+    // Pre-computed page analysis from Page Intelligence (avoids re-lookup)
+    pageAnalysisContext?: {
+      optimizationScore?: number;
+      optimizationIssues?: string[];
+      recommendations?: string[];
+      contentGaps?: string[];
+      searchIntent?: string;
+    };
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -760,9 +768,23 @@ export async function generateBrief(
     p.primaryKeyword?.toLowerCase() === targetKeyword.toLowerCase()
     || p.secondaryKeywords?.some(sk => sk.toLowerCase() === targetKeyword.toLowerCase())
   );
-  const pageAnalysisBlock = matchedPage
+  let pageAnalysisBlock = matchedPage
     ? buildPageAnalysisContext(workspaceId, matchedPage.pagePath)
     : '';
+
+  // If no match found via keyword lookup, use pre-computed analysis from Page Intelligence
+  if (!pageAnalysisBlock && context.pageAnalysisContext) {
+    const pac = context.pageAnalysisContext;
+    const parts: string[] = [];
+    if (pac.optimizationScore !== undefined) parts.push(`Optimization score: ${pac.optimizationScore}/100`);
+    if (pac.searchIntent) parts.push(`Search intent: ${pac.searchIntent}`);
+    if (pac.optimizationIssues?.length) parts.push(`Issues to address:\n${pac.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
+    if (pac.contentGaps?.length) parts.push(`Content gaps to fill:\n${pac.contentGaps.map(g => `- ${g}`).join('\n')}`);
+    if (pac.recommendations?.length) parts.push(`Recommendations from page analysis:\n${pac.recommendations.map(r => `- ${r}`).join('\n')}`);
+    if (parts.length > 0) {
+      pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
+    }
+  }
 
   // Reference URL context (competitor/inspiration pages)
   const referenceBlock = context.scrapedReferences?.length
