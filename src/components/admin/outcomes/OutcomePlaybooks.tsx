@@ -73,7 +73,7 @@ export default function OutcomePlaybooks({ workspaceId }: Props) {
     return (
       <SectionCard title="Action Playbooks">
         <EmptyState
-          icon={<Zap className="h-5 w-5" />}
+          icon={Zap}
           title="No playbooks discovered yet"
           description="Playbooks emerge automatically once enough pages have multiple tracked actions with scored outcomes. Keep applying recommendations."
         />
