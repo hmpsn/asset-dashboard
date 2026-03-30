@@ -243,7 +243,7 @@ export interface Workspace {
     numberOfEmployees?: string;   // e.g. "10-50"
   };
   // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
-  scoringConfig?: Partial<Record<string, { primary_metric: string; measurement_window_days: number; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
+  scoringConfig?: Partial<Record<string, { primary_metric: string; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
   folder: string;
   createdAt: string;
 }

@@ -226,8 +226,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
         <EmptyState
           icon={Activity}
           title="No actions tracked yet"
-          description="Actions are logged automatically when you act on insights, publish content, or apply SEO fixes."
-          action="Check back after applying your next insight or SEO fix"
+          description="Actions are logged automatically when you act on insights, publish content, or apply SEO fixes. Check back after applying your next insight or SEO fix."
         />
       ) : (
         <SectionCard
