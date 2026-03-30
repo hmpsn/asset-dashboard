@@ -141,17 +141,20 @@ function PremiumWins({ wins }: { wins: WeCalledItEntry[] }) {
 
   return (
     <div className="space-y-6">
-      {Array.from(byMonth.entries()).map(([month, entries]) => (
-        <div key={month} className="space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">{month}</p>
-          {entries
-            .filter(e => e.delta.direction === 'improved')
-            .sort((a, b) => b.delta.delta_percent - a.delta.delta_percent)
-            .map(entry => (
+      {Array.from(byMonth.entries()).map(([month, entries]) => {
+        const improvedEntries = entries
+          .filter(e => e.delta.direction === 'improved')
+          .sort((a, b) => b.delta.delta_percent - a.delta.delta_percent);
+        if (improvedEntries.length === 0) return null;
+        return (
+          <div key={month} className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">{month}</p>
+            {improvedEntries.map(entry => (
               <WinCard key={entry.actionId} entry={entry} />
             ))}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

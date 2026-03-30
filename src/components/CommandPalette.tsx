@@ -123,7 +123,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: nav.group || undefined,
         icon: nav.icon,
         type: 'nav',
-        action: () => { const GLOBAL = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'features']); if (GLOBAL.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
+        action: () => { const GLOBAL = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'features', 'outcomes-overview']); if (GLOBAL.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
       });
     }
 
