@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from 'react';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Loader2, Lock, CheckCircle2, AlertTriangle, X, Shield, ArrowLeft } from 'lucide-react';
-import { themeColor } from './ui/constants';
 
 // --- Stripe singleton (loaded once per publishable key) ---
 
