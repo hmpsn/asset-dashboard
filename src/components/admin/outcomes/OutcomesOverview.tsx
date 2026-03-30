@@ -1,6 +1,7 @@
 // src/components/admin/outcomes/OutcomesOverview.tsx
 // Cross-workspace outcomes summary — admin only.
 
+import { useMemo } from 'react';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, BarChart3, Activity } from 'lucide-react';
 import { PageHeader, SectionCard, StatCard, EmptyState, Skeleton, Badge } from '../../ui';
 import { FeatureFlag } from '../../ui/FeatureFlag';
@@ -168,6 +169,14 @@ function TableSkeleton() {
 export default function OutcomesOverview() {
   const { data: workspaces = [], isLoading } = useOutcomeOverview();
 
+  const sortedWorkspaces = useMemo(
+    () => [...workspaces].sort((a, b) => {
+      if (a.attentionNeeded !== b.attentionNeeded) return a.attentionNeeded ? -1 : 1;
+      return b.winRate - a.winRate;
+    }),
+    [workspaces],
+  );
+
   return (
     <FeatureFlag flag="outcome-dashboard">
       <ErrorBoundary>
@@ -208,7 +217,7 @@ export default function OutcomesOverview() {
               {/* Workspace table */}
               <SectionCard>
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="w-4 h-4 text-teal-400" />
+                  <Activity className="w-4 h-4 text-blue-400" />
                   <h3 className="text-sm font-semibold text-zinc-100">All workspaces</h3>
                   <span className="text-xs text-zinc-500 ml-auto">
                     {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}
@@ -219,25 +228,17 @@ export default function OutcomesOverview() {
                   <table className="w-full text-left min-w-[640px]">
                     <thead>
                       <tr className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                        <th className="pb-2 px-4">Workspace</th>
-                        <th className="pb-2 px-4">Win rate</th>
-                        <th className="pb-2 px-4">Trend</th>
-                        <th className="pb-2 px-4">Active</th>
-                        <th className="pb-2 px-4">Scored (30d)</th>
-                        <th className="pb-2 px-4">Top win</th>
-                        <th className="pb-2 px-4">Status</th>
+                        <th scope="col" className="pb-2 px-4">Workspace</th>
+                        <th scope="col" className="pb-2 px-4">Win rate</th>
+                        <th scope="col" className="pb-2 px-4">Trend</th>
+                        <th scope="col" className="pb-2 px-4">Active</th>
+                        <th scope="col" className="pb-2 px-4">Scored (30d)</th>
+                        <th scope="col" className="pb-2 px-4">Top win</th>
+                        <th scope="col" className="pb-2 px-4">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {workspaces
-                        .sort((a, b) => {
-                          // Attention-needed first, then by win rate descending
-                          if (a.attentionNeeded !== b.attentionNeeded) {
-                            return a.attentionNeeded ? -1 : 1;
-                          }
-                          return b.winRate - a.winRate;
-                        })
-                        .map(ws => (
+                      {sortedWorkspaces.map(ws => (
                           <WorkspaceRow key={ws.workspaceId} ws={ws} />
                         ))}
                     </tbody>

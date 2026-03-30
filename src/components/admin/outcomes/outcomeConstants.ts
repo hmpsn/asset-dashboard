@@ -3,6 +3,16 @@
 
 import type { ActionType } from '../../../../shared/types/outcome-tracking';
 
+/** Format ISO date to "Mar 29, 2026" */
+export function formatOutcomeDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Format a 0-1 decimal as a percentage string, e.g. 0.73 → "73%" */
+export function pct(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
 export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   insight_acted_on: 'Insight',
   content_published: 'Content Published',

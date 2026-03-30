@@ -34,7 +34,7 @@ import {
   clearPageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { createLogger } from '../logger.js';
@@ -311,11 +311,12 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
   try {
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
+        if (getActionBySource('approval', item.id)) continue;
         const action = recordAction({
           workspaceId: req.params.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'approval',
-          sourceId: req.params.batchId,
+          sourceId: item.id,
           pageUrl: item.pageSlug ? `/${item.pageSlug}` : null,
           targetKeyword: null,
           baselineSnapshot: {

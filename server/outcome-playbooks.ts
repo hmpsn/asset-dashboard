@@ -7,6 +7,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
 import { listWorkspaces } from './workspaces.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 import { rowToActionPlaybook } from './db/outcome-mappers.js';
 import type { ActionPlaybookRow } from './db/outcome-mappers.js';
 import type { ActionPlaybook } from '../shared/types/outcome-tracking.js';
@@ -130,6 +132,9 @@ export async function detectAllWorkspacePlaybooks(): Promise<void> {
   for (const ws of workspaces) {
     const { discovered } = detectPlaybookPatterns(ws.id);
     totalDiscovered += discovered;
+    if (discovered > 0) {
+      broadcastToWorkspace(ws.id, WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, { discovered });
+    }
   }
   log.info({ workspaceCount: workspaces.length, totalDiscovered }, 'Playbook detection ran across all workspaces');
 }

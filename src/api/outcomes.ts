@@ -51,7 +51,7 @@ export const outcomesApi = {
     getSafe<WorkspaceOutcomeOverview[]>(`/api/outcomes/overview`, [], signal),
 
   addNote: (wsId: string, actionId: string, note: string) =>
-    post<{ ok: boolean }>(`/api/outcomes/${wsId}/actions/${actionId}/note`, { note }),
+    post<{ success: boolean }>(`/api/outcomes/${wsId}/actions/${actionId}/note`, { note }),
 
   getPlaybooks: (wsId: string, signal?: AbortSignal) =>
     getSafe<ActionPlaybook[]>(`/api/outcomes/${wsId}/playbooks`, [], signal),

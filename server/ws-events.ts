@@ -52,6 +52,7 @@ export const WS_EVENTS = {
   SCHEMA_PLAN_SENT: 'schema:plan_sent',
 
   // Outcome tracking
+  OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',
   OUTCOME_SCORED: 'outcome:scored',
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',

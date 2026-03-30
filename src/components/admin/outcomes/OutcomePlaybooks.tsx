@@ -1,6 +1,7 @@
 import { ArrowRight, Zap } from 'lucide-react';
 import { SectionCard, Badge, EmptyState, Skeleton } from '../../ui';
 import { useOutcomePlaybooks } from '../../../hooks/admin/useOutcomes';
+import { pct } from './outcomeConstants';
 import type { ActionPlaybook, PlaybookConfidence } from '../../../../shared/types/outcome-tracking';
 
 interface Props {
@@ -11,10 +12,6 @@ function confidenceColor(confidence: PlaybookConfidence): 'green' | 'amber' | 'r
   if (confidence === 'high') return 'green';
   if (confidence === 'medium') return 'amber';
   return 'red';
-}
-
-function pct(value: number): string {
-  return `${Math.round(value * 100)}%`;
 }
 
 function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
@@ -44,7 +41,7 @@ function PlaybookCard({ playbook }: { playbook: ActionPlaybook }) {
       {/* Stats */}
       <div className="flex items-center gap-4 text-xs text-zinc-400">
         <span>
-          <span className="font-medium text-teal-400">{pct(playbook.historicalWinRate)}</span>{' '}
+          <span className="font-medium text-blue-400">{pct(playbook.historicalWinRate)}</span>{' '}
           win rate
         </span>
         <span>

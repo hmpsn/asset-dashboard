@@ -3,7 +3,7 @@ import { Activity, ChevronDown, ChevronUp, ExternalLink, Filter } from 'lucide-r
 import { SectionCard, Badge, EmptyState, Skeleton } from '../../ui';
 import { useOutcomeActions } from '../../../hooks/admin/useOutcomes';
 import type { ActionType, TrackedAction } from '../../../../shared/types/outcome-tracking';
-import { ACTION_TYPE_LABELS } from './outcomeConstants';
+import { ACTION_TYPE_LABELS, formatOutcomeDate } from './outcomeConstants';
 
 interface Props {
   workspaceId: string;
@@ -32,10 +32,6 @@ const SCORE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'insufficient_data', label: 'Insufficient Data' },
   { value: 'inconclusive', label: 'Inconclusive' },
 ];
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function truncateUrl(url: string): string {
   try {
@@ -98,7 +94,7 @@ function ActionRow({ action }: ActionRowProps) {
         </div>
 
         {/* Date */}
-        <span className="text-[11px] text-zinc-500 shrink-0">{formatDate(action.createdAt)}</span>
+        <span className="text-[11px] text-zinc-500 shrink-0">{formatOutcomeDate(action.createdAt)}</span>
 
         {/* Delta */}
         {hasDelta && (
@@ -230,7 +226,7 @@ export default function OutcomeActionFeed({ workspaceId }: Props) {
         <EmptyState
           icon={Activity}
           title="No actions tracked yet"
-          description="Actions are logged automatically when you act on insights, publish content, or apply SEO fixes."
+          description="Actions are logged automatically when you act on insights, publish content, or apply SEO fixes. Check back after applying your next insight or SEO fix."
         />
       ) : (
         <SectionCard

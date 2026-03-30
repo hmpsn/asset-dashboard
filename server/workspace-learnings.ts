@@ -8,6 +8,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
 import { rowToWorkspaceLearnings } from './db/outcome-mappers.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 import type { WorkspaceLearningsRow } from './db/outcome-mappers.js';
 import type {
   WorkspaceLearnings,
@@ -638,6 +640,10 @@ export async function recomputeAllWorkspaceLearnings(): Promise<void> {
         computed_at: learnings.computedAt,
       });
 
+      broadcastToWorkspace(workspaceId, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
+        totalScoredActions: learnings.totalScoredActions,
+        confidence: learnings.confidence,
+      });
       log.info(
         { workspaceId, totalScoredActions: learnings.totalScoredActions, confidence: learnings.confidence },
         'Workspace learnings recomputed'

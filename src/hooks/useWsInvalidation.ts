@@ -89,6 +89,11 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceSignals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
     },
+    [WS_EVENTS.OUTCOME_ACTION_RECORDED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeScorecard(workspaceId) });
+    },
     [WS_EVENTS.OUTCOME_SCORED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(workspaceId) });
