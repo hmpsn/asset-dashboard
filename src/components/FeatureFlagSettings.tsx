@@ -10,6 +10,11 @@ interface FlagMeta {
   default: boolean;
 }
 
+// FLAG_GROUPS and FLAG_LABELS are intentionally maintained alongside FEATURE_FLAGS
+// in shared/types/feature-flags.ts. When adding a new flag:
+//   1. Add the key to FEATURE_FLAGS (source of truth)
+//   2. Add it to the appropriate FLAG_GROUPS entry (or it falls into the "Other" bucket)
+//   3. Add a human-readable label to FLAG_LABELS (or the raw key is displayed as fallback)
 const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
   {
     label: 'Outcome Intelligence Engine',
