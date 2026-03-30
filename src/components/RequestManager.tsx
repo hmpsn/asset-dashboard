@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { get, patch, post, del, getSafe, postForm } from '../api/client';
+import { themeColor } from './ui/constants';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
@@ -339,7 +340,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
               <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                 style={selected.size === filtered.length && filtered.length > 0
                   ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                  : { borderColor: '#27272a' }}>
+                  : { borderColor: themeColor('#27272a', '#e2e8f0') }}>
                 {selected.size === filtered.length && filtered.length > 0 && <CheckCheck className="w-3 h-3 text-black" />}
               </div>
               {selected.size === filtered.length && filtered.length > 0 ? 'Deselect all' : 'Select all'}
@@ -357,7 +358,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
 
             return (
               <div key={req.id} className={`rounded-xl overflow-hidden transition-all ${isSelected ? 'ring-1' : ''}`}
-                style={{ backgroundColor: '#18181b', border: '1px solid #27272a', ...(isSelected ? { ringColor: '#2dd4bf' } : {}) }}>
+                style={{ backgroundColor: themeColor('#18181b', '#ffffff'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}`, ...(isSelected ? { ringColor: '#2dd4bf' } : {}) }}>
                 {/* Row header */}
                 <div className="flex items-center">
                   {/* Checkbox */}
@@ -366,7 +367,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                     <div className="w-4 h-4 rounded border flex items-center justify-center transition-colors"
                       style={isSelected
                         ? { backgroundColor: '#2dd4bf', borderColor: '#2dd4bf' }
-                        : { borderColor: '#27272a' }}>
+                        : { borderColor: themeColor('#27272a', '#e2e8f0') }}>
                       {isSelected && <CheckCheck className="w-3 h-3 text-black" />}
                     </div>
                   </button>
@@ -484,7 +485,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
                               }`} style={
                                 note.author === 'team'
                                   ? { backgroundColor: 'rgba(45, 212, 191, 0.08)', borderColor: 'rgba(45, 212, 191, 0.15)' }
-                                  : { backgroundColor: '#0f1219', border: '1px solid #27272a' }
+                                  : { backgroundColor: themeColor('#0f1219', '#f8fafc'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}` }
                               }>
                                 <div className="flex items-center gap-1.5 mb-0.5">
                                   <span className={`text-[11px] font-medium ${note.author === 'team' ? 'text-teal-400' : 'text-zinc-500'}`}>
