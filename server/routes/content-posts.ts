@@ -34,6 +34,8 @@ import {
 import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
+import { recordAction } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { buildSeoContext } from '../seo-context.js';
 
@@ -176,6 +178,26 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
               `Auto-published "${updated.title}" to Webflow CMS on approval`,
               `Collection: ${ws.publishTarget!.collectionName} · Slug: ${slug}`,
               { postId: req.params.postId, itemId: result.itemId, collectionId, slug });
+            // Record for outcome tracking
+            try {
+              const postAction = recordAction({
+                workspaceId: req.params.workspaceId,
+                actionType: 'content_published',
+                sourceType: 'post',
+                sourceId: req.params.postId,
+                pageUrl: slug ? `/${slug}` : null,
+                targetKeyword: updated.targetKeyword ?? null,
+                baselineSnapshot: {
+                  captured_at: new Date().toISOString(),
+                },
+                attribution: 'platform_executed',
+              });
+              if (slug) {
+                void captureBaselineFromGsc(postAction.id, req.params.workspaceId, `/${slug}`);
+              }
+            } catch (err) {
+              log.warn({ err, postId: req.params.postId }, 'Failed to record outcome action for content publish');
+            }
             broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_PUBLISHED, {
               postId: req.params.postId, itemId: result.itemId, slug, title: updated.title });
           } else {

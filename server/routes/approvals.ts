@@ -34,6 +34,9 @@ import {
   clearPageState,
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 
@@ -256,7 +259,8 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
       const value = item.clientValue || item.proposedValue;
       if (item.field === 'schema') {
         // Schema item — publish JSON-LD to page via schema publisher
-        const schema = JSON.parse(value);
+        const schema = parseJsonFallback(value, null);
+        if (!schema) throw new Error('Invalid schema JSON');
         const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {
@@ -302,6 +306,33 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
   }
 
   broadcastToWorkspace(req.params.workspaceId, 'approval:applied', { batchId: req.params.batchId, applied: appliedIds.length });
+
+  // Record for outcome tracking — only successfully applied meta updates
+  try {
+    for (const item of approved.filter(i => appliedIds.includes(i.id))) {
+      if (item.field === 'seoTitle' || item.field === 'seoDescription') {
+        if (getActionBySource('approval', item.id)) continue;
+        const action = recordAction({
+          workspaceId: req.params.workspaceId,
+          actionType: 'meta_updated',
+          sourceType: 'approval',
+          sourceId: item.id,
+          pageUrl: item.pageSlug ? `/${item.pageSlug}` : null,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          attribution: 'platform_executed',
+        });
+        if (item.pageSlug) {
+          void captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`);
+        }
+      }
+    }
+  } catch (err) {
+    log.warn({ err, batchId: req.params.batchId }, 'Failed to record outcome action for approval apply');
+  }
+
   res.json({ results, applied: appliedIds.length, failed: results.length - appliedIds.length });
 });
 

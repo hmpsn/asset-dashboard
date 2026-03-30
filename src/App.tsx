@@ -59,6 +59,8 @@ const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline
 const BrandHub = lazyWithRetry(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
 const RevenueDashboard = lazyWithRetry(() => import('./components/RevenueDashboard').then(m => ({ default: m.RevenueDashboard })));
 const FeatureLibrary = lazyWithRetry(() => import('./components/FeatureLibrary'));
+const OutcomeDashboard = lazyWithRetry(() => import('./components/admin/outcomes/OutcomeDashboard'));
+const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes/OutcomesOverview'));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
@@ -135,7 +137,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const { data: queue = [] } = useQueue();
 
   // Derive tab and workspace ID from URL path
-  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features']), []);
+  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']), []);
   const { tab, urlWorkspaceId } = useMemo(() => {
     const p = location.pathname;
     const wsTabMatch = p.match(/^\/ws\/([^/]+)\/(.+)$/);
@@ -305,6 +307,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'ai-usage') return <AIUsagePage />;
     if (tab === 'revenue') return <RevenueDashboard />;
     if (tab === 'features') return <FeatureLibrary />;
+    if (tab === 'outcomes-overview') return <OutcomesOverview />;
 
     if (!selected) {
       return <WorkspaceOverview onSelectWorkspace={(id) => {
@@ -344,6 +347,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
+    if (tab === 'outcomes') return <OutcomeDashboard key={`outcomes-${selected.id}`} workspaceId={selected.id} />;
 
     return null;
   };

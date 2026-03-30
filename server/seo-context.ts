@@ -3,6 +3,8 @@ import path from 'path';
 import { getWorkspace, type KeywordStrategy } from './workspaces';
 import { getPageKeyword, listPageKeywords } from './page-keywords.js';
 import { getUploadRoot } from './data-dir.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 
 /**
  * Shared SEO context builder for all AI-powered endpoints.
@@ -45,13 +47,14 @@ export function clearSeoContextCache(workspaceId?: string): void {
 
 /**
  * Build SEO context from a workspace's keyword strategy.
- * Results are cached for 5 minutes per workspace+pagePath combination.
+ * Results are cached for 5 minutes per workspace+pagePath+learningsDomain combination.
  * @param workspaceId - workspace to look up
  * @param pagePath - optional page path to find page-specific keywords
+ * @param learningsDomain - which learning domain to inject (default 'strategy'); pass 'content' from content generation callers
  */
-export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoContext {
+export function buildSeoContext(workspaceId?: string, pagePath?: string, learningsDomain: 'content' | 'strategy' | 'technical' | 'all' = 'strategy'): SeoContext {
   if (workspaceId) {
-    const cacheKey = `${workspaceId}:${pagePath || ''}`;
+    const cacheKey = `${workspaceId}:${pagePath || ''}:${learningsDomain}`;
     const cached = seoContextCache.get(cacheKey);
     if (cached && Date.now() < cached.expiry) return cached.value;
   }
@@ -79,9 +82,18 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
   const knowledgeBlock = buildKnowledgeBase(workspaceId);
 
   if (!strategy) {
-    const fullContext = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
+    const baseParts = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
+    // Inject workspace learnings if feature is enabled
+    if (isFeatureEnabled('outcome-ai-injection')) {
+      const learnings = getWorkspaceLearnings(workspaceId);
+      if (learnings) {
+        const learningsBlock = formatLearningsForPrompt(learnings, learningsDomain);
+        if (learningsBlock) baseParts.push(learningsBlock);
+      }
+    }
+    const fullContext = baseParts.join('');
     const result: SeoContext = { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
     return result;
   }
 
@@ -117,12 +129,21 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string): SeoCon
     keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
   }
 
-  const fullContext = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean).join('');
+  const contextParts = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
+  // Inject workspace learnings if feature is enabled
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    const learnings = getWorkspaceLearnings(workspaceId);
+    if (learnings) {
+      const learningsBlock = formatLearningsForPrompt(learnings, learningsDomain);
+      if (learningsBlock) contextParts.push(learningsBlock);
+    }
+  }
+  const fullContext = contextParts.join('');
   const result: SeoContext = { keywordBlock, brandVoiceBlock, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
 
   // Cache result
   if (workspaceId) {
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
   }
 
   return result;

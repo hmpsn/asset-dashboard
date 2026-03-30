@@ -1025,6 +1025,75 @@
       ]
     },
     {
+      "id": "sprint-outcome-engine-wiring",
+      "name": "✅ SHIPPED — Outcome Engine — Live Data Wiring",
+      "hours": "12-18",
+      "rationale": "The Outcome Intelligence Engine ships with stubs for the measurement layer. These tasks wire real GSC/GA4 data and unlock the feature's core value proposition. Nothing in the engine produces meaningful results until #230 (fetchCurrentMetrics) is done. See .windsurf/rules/outcome-engine-stubs.md for full diagnostic guide.",
+      "items": [
+        {
+          "id": 230,
+          "title": "Wire fetchCurrentMetrics to real GSC/GA4 data",
+          "source": "outcome-engine-stubs.md #1",
+          "est": "4-6h",
+          "priority": "P0",
+          "notes": "SHIPPED 2026-03-29. fetchCurrentMetrics wired to getPageTrend (14-day average). captureBaselineFromGsc added (28-day baseline, fire-and-forget from approvals/schema/content-posts routes). Baseline-unavailable guard added in scoreActionAtCheckpoint — search-metric actions without GSC baseline score inconclusive instead of wrong delta from 0. updateBaselineSnapshot added to outcome-tracking.ts.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 231,
+          "title": "Wire checkExternalExecution to GSC delta detection",
+          "source": "outcome-engine-stubs.md #2",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "SHIPPED 2026-03-29. checkExternalExecution now calls fetchGscSnapshot (14-day window) and returns true when position improved >=3 places OR clicks up >=20% with >=5 absolute. Guard: only fires when action has a real GSC baseline (position or clicks captured). Falls back to false for unconnected workspaces.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 232,
+          "title": "Wire outcome playbooks — cron + API routes + frontend hook",
+          "source": "outcome-engine-stubs.md #3",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "SHIPPED 2026-03-29. (1) detectAllWorkspacePlaybooks() added to outcome-playbooks.ts, called on startup + weekly. (2) GET /api/outcomes/:workspaceId/playbooks route added. (3) getPlaybooks() added to API client. (4) useOutcomePlaybooks hook added. (5) OutcomePlaybooks.tsx component created. (6) Playbooks tab wired into OutcomeDashboard.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 233,
+          "title": "Fix insight_acted_on metric resolution (primary_metric: 'varies')",
+          "source": "outcome-engine-stubs.md #4",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "RESOLVED 2026-03-29. primary_metric was already 'clicks' in the shipped code — the stubs doc described a prior state. insights.ts already captures baseline clicks/position/impressions/ctr from insight data. No code change needed.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 234,
+          "title": "Read scoring_config workspace column in outcome measurement",
+          "source": "outcome-engine-stubs.md #5",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "SHIPPED 2026-03-29. scoring_config added to WorkspaceRow + rowToWorkspace mapper + Workspace.scoringConfig field. measurePendingOutcomes now caches per-workspace config, reads ws.scoringConfig as Partial<ScoringConfig> override. Explicit override param still works for tests.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        },
+        {
+          "id": 235,
+          "title": "Run outcome crons on startup (not just after first interval)",
+          "source": "outcome-engine-stubs.md #6",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "SHIPPED 2026-03-29. All cron jobs refactored into named functions (runMeasure, runLearnings, runDetection, runPlaybooks, runArchive). Each fires once via setTimeout on startup (15-30s staggered delay). Playbooks added as weekly interval.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
+        }
+      ],
+      "shippedAt": "2026-03-29"
+    },
+    {
       "id": "sprint-platform-intelligence",
       "name": "✅ SHIPPED — Platform Intelligence Upgrade",
       "items": [
@@ -3695,6 +3764,17 @@
           "notes": "Shipped — 5 sub-tasks: (1) Strategy enrichment — buildStrategyIntelligenceBlock() injects keyword clusters, competitor gaps, performance deltas, conversion data into master prompt. (2) 2 new insight cards — Schema Opportunities + Content Health with tier-gating. (3) Analytics annotations — SQLite table + CRUD + admin/public routes (4 categories). (4) Content calendar intelligence — suggestPublishDates() from decay + quick wins. (5) GSC pagination — paginateGscQuery() helper, getQueryPageData upgraded to 2000 rows. 35 new TDD tests.",
           "status": "done",
           "shippedAt": "2026-03-26"
+        },
+        {
+          "id": "outcome-intelligence-engine",
+          "title": "Outcome Intelligence Engine",
+          "source": "Outcome Intelligence Engine spec (docs/specs/outcome-intelligence-engine.md)",
+          "est": "20-28h",
+          "priority": "P1",
+          "sprint": "E",
+          "notes": "Full implementation: action tracking (10+ source systems), outcome measurement at 7/30/60/90d checkpoints (GSC + GA4 delta), win/loss/neutral scoring, workspace learnings with confidence thresholds (high 25+, medium 10-24, low <10), AI prompt injection, admin Outcomes Dashboard (4-tab: Overview/Actions/Wins/Learnings), client tiered reporting (Free top-3-wins, Growth scorecard, Premium detailed), We Called It external detection (2-cycle confirmation), multi-workspace overview with aggregate stats, action playbooks (pattern detection from multi-action pages), backfill engine (idempotent retroactive action creation from generated_posts/analytics_insights/recommendation_sets), cron scheduler for measurement and external detection. Feature flags: outcome-tracking, outcome-ai-injection, outcome-dashboard, outcome-client-reporting, outcome-external-detection, outcome-playbooks.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
         }
       ]
     }

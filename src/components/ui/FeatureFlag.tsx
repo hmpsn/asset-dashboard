@@ -1,6 +1,6 @@
 import React from 'react';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { FeatureFlagKey } from '../../../shared/types/feature-flags';
+import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 
 interface Props {
   flag: FeatureFlagKey;

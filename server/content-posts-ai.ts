@@ -69,7 +69,8 @@ export async function callCreativeAI(opts: {
 }
 
 export function buildVoiceContext(workspaceId: string): string {
-  const { fullContext } = buildSeoContext(workspaceId);
+  // Pass 'content' domain so buildSeoContext injects content-domain learnings (not strategy-domain)
+  const { fullContext } = buildSeoContext(workspaceId, undefined, 'content');
   const kwMapBlock = buildKeywordMapContext(workspaceId);
   return `${fullContext}${kwMapBlock}`;
 }
