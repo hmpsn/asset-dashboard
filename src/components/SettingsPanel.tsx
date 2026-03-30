@@ -5,6 +5,7 @@ import {
   Shield, Key, Mail, CreditCard, Wifi, WifiOff, HardDrive, Trash2, RefreshCw,
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
+import { FeatureFlagSettings } from './FeatureFlagSettings';
 import { get, post, getOptional, getSafe } from '../api/client';
 
 interface Workspace {
@@ -405,6 +406,9 @@ export function SettingsPanel() {
           <div className="px-5 py-4 text-xs text-zinc-500">Unable to load storage stats</div>
         )}
       </section>
+
+      {/* Feature Flags */}
+      <FeatureFlagSettings />
 
       {/* Stripe / Payments */}
       <StripeSettings />

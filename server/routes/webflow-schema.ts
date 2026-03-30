@@ -28,7 +28,7 @@ import {
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
@@ -197,9 +197,14 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
 
     res.json({ success: true, published });
 
-    // Record for outcome tracking (only when workspace is known)
+    // Record for outcome tracking (only when workspace is known).
+    // Idempotency guard: skip if this page already has a tracked schema action in this workspace.
+    // Prevents duplicate entries when the same page is re-published in quick succession (retries,
+    // double-clicks). Intentional re-deployments with schema changes are tracked via external
+    // detection when GSC metrics change rather than as new tracked_actions entries.
     try {
       if (!pubWs) throw new Error('no workspace');
+      if (getActionByWorkspaceAndSource(pubWs.id, 'schema', pageId)) throw new Error('already tracked');
       const schemaAction = recordAction({
         workspaceId: pubWs.id,
         actionType: 'schema_deployed',
