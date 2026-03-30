@@ -7,6 +7,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { PageHeader, SectionCard, Badge, StatCard } from './ui';
 import { roadmap as roadmapApi } from '../api/misc';
+import { chartGridColor, chartDotFill } from './ui/constants';
 
 /* ── Roadmap data types (from shared types) ── */
 import type { RoadmapItem, SprintData } from '../../shared/types/roadmap.ts';
@@ -86,7 +87,7 @@ function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
           const y = PAD_T + chartH - f * chartH;
           return (
             <g key={f}>
-              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#27272a" strokeWidth="1" />
+              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke={chartGridColor()} strokeWidth="1" />
               <text x={PAD_L - 6} y={y + 3} textAnchor="end" className="fill-zinc-600" fontSize="10">
                 {Math.round(f * maxY)}
               </text>
@@ -99,7 +100,7 @@ function ShippingVelocityChart({ items }: { items: RoadmapItem[] }) {
         {/* Data points + labels */}
         {points.map((p, i) => (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r="3.5" fill="#0f0f0f" stroke="#2dd4bf" strokeWidth="2" />
+            <circle cx={p.x} cy={p.y} r="3.5" fill={chartDotFill()} stroke="#2dd4bf" strokeWidth="2" />
             <text x={p.x} y={p.y - 8} textAnchor="middle" className="fill-teal-400" fontSize="10" fontWeight="600">
               +{p.count}
             </text>
