@@ -591,3 +591,32 @@ body::after {
 .dashboard-light .border-green-500\/30 { border-color: rgba(21,128,61,0.22) !important; }
 .dashboard-light .border-zinc-800\/50 { border-color: rgba(226,232,240,0.6) !important; }
 .dashboard-light .bg-zinc-800\/50 { background-color: rgba(241,245,249,0.7) !important; }
+
+/* ── Missing opacity variant backgrounds ── */
+.dashboard-light .bg-zinc-800\/40 { background-color: rgba(241,245,249,0.6) !important; }
+.dashboard-light .bg-zinc-800\/20 { background-color: rgba(241,245,249,0.3) !important; }
+.dashboard-light .bg-zinc-700\/50 { background-color: rgba(226,232,240,0.7) !important; }
+.dashboard-light .bg-zinc-500\/10 { background-color: rgba(148,163,184,0.1) !important; }
+.dashboard-light .bg-zinc-500\/15 { background-color: rgba(148,163,184,0.15) !important; }
+
+/* ── Missing opacity variant borders ── */
+.dashboard-light .border-zinc-800\/30 { border-color: rgba(226,232,240,0.4) !important; }
+.dashboard-light .border-zinc-800\/60 { border-color: rgba(226,232,240,0.7) !important; }
+.dashboard-light .border-zinc-500\/20 { border-color: rgba(148,163,184,0.2) !important; }
+.dashboard-light .border-zinc-500\/30 { border-color: rgba(148,163,184,0.3) !important; }
+
+/* ── Missing dividers ── */
+.dashboard-light .divide-zinc-800\/30 > * + * { border-color: rgba(226,232,240,0.4) !important; }
+
+/* ── Missing ring ── */
+.dashboard-light .ring-zinc-900 { --tw-ring-color: #e2e8f0 !important; }
+
+/* ── Arbitrary hex text ── */
+.dashboard-light .text-\[\#0f1219\] { color: #0f172a !important; }
+
+/* ── Missing gradient stops ── */
+.dashboard-light .from-zinc-900 { --tw-gradient-from: #ffffff !important; }
+.dashboard-light .to-zinc-900\/50 { --tw-gradient-to: rgba(255,255,255,0.8) !important; }
+
+/* ── MetricRing track color ── */
+.dashboard-light { --metric-ring-track: #e2e8f0; }
