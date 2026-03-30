@@ -22,7 +22,7 @@ import { runSalesAudit } from '../sales-audit.js';
 import { getAllGscPages } from '../search-console.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
-import { recordAction, getActionBySource } from '../outcome-tracking.js';
+import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 
 const router = Router();
 const log = createLogger('webflow-analysis');
@@ -249,7 +249,7 @@ router.get('/api/webflow/internal-links/:siteId', requireWorkspaceAccessFromQuer
         for (const suggestion of result.suggestions.slice(0, 5)) {
           const sourceId = suggestion.toPage ?? null;
           if (!sourceId) continue;
-          if (getActionBySource('internal_link', sourceId)) continue;
+          if (getActionByWorkspaceAndSource(workspaceId, 'internal_link', sourceId)) continue;
           recordAction({
             workspaceId,
             actionType: 'internal_link_added',
