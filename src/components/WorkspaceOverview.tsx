@@ -155,7 +155,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? '#f59e0b' : totalInProgressContent > 0 ? '#60a5fa' : themeColor('#71717a', '#94a3b8')} />
         <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? '#2dd4bf' : themeColor('#71717a', '#94a3b8')} />
         <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : themeColor('#71717a', '#94a3b8')} />
-        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? '#a78bfa' : themeColor('#71717a', '#94a3b8')} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
+        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? '#60a5fa' : themeColor('#71717a', '#94a3b8')} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
       </div>
 
       {/* ── Online Now ── */}

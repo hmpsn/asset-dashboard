@@ -182,6 +182,9 @@ export function StripePaymentForm({
       stripe={stripePromise}
       options={{
         clientSecret,
+        // Note: themeColor() calls below are evaluated at render time. Stripe Elements bakes
+        // appearance at mount — a live theme toggle won't re-skin the form until it remounts.
+        // Acceptable trade-off: users don't toggle themes mid-payment.
         appearance: {
           theme: 'night',
           variables: {

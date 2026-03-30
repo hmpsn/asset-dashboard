@@ -208,7 +208,7 @@ function Solution() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pillars.map((p, i) => (
-            <div key={i} className={`rounded-xl border ${p.border} bg-gradient-to-br ${p.gradient} to-zinc-900/50 p-6 relative overflow-hidden`}>
+            <div key={i} className={`border ${p.border} bg-gradient-to-br ${p.gradient} to-zinc-900/50 p-6 relative overflow-hidden`} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br from-white/[0.02] to-transparent -translate-y-1/2 translate-x-1/2" />
               <div className="relative">
                 <div className={`w-10 h-10 rounded-xl ${p.iconBg} flex items-center justify-center mb-4`}>

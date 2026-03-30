@@ -233,7 +233,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-6">
             {[
-              { label: 'Total', value: counts.total, color: '#e4e4e7' },
+              { label: 'Total', value: counts.total, color: themeColor('#e4e4e7', '#1e293b') },
               { label: 'New', value: counts.new, color: '#60a5fa' },
               { label: 'Active', value: counts.in_progress, color: '#2dd4bf' },
               { label: 'Resolved', value: counts.completed, color: '#4ade80' },
@@ -254,7 +254,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
           )}
         </div>
         {counts.total > 0 && (
-          <div className="h-2 rounded-full overflow-hidden bg-[#0f1219]">
+          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: themeColor('#0f1219', '#e2e8f0') }}>
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(counts.completed / counts.total) * 100}%`, backgroundColor: '#4ade80' }} />
           </div>
         )}
