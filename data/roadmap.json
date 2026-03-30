@@ -74,8 +74,9 @@
           "source": "outcome-engine-stubs.md #1",
           "est": "4-6h",
           "priority": "P0",
-          "notes": "BLOCKING — entire scoring pipeline is inert until this is done. server/outcome-measurement.ts:44-49 stub returns baseline as current. Replace with GSC API call for position/clicks/impressions/ctr for action.pageUrl + action.targetKeyword over a date window ending at the checkpoint date. GA4 for sessions on non-search action types. All scores are 'neutral' until this ships.",
-          "status": "pending"
+          "notes": "SHIPPED 2026-03-29. fetchCurrentMetrics wired to getPageTrend (14-day average). captureBaselineFromGsc added (28-day baseline, fire-and-forget from approvals/schema/content-posts routes). Baseline-unavailable guard added in scoreActionAtCheckpoint — search-metric actions without GSC baseline score inconclusive instead of wrong delta from 0. updateBaselineSnapshot added to outcome-tracking.ts.",
+          "status": "done",
+          "shippedAt": "2026-03-29"
         },
         {
           "id": 231,

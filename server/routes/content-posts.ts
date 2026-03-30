@@ -35,6 +35,7 @@ import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import { recordAction } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { buildSeoContext } from '../seo-context.js';
 
@@ -179,7 +180,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
               { postId: req.params.postId, itemId: result.itemId, collectionId, slug });
             // Record for outcome tracking
             try {
-              recordAction({
+              const postAction = recordAction({
                 workspaceId: req.params.workspaceId,
                 actionType: 'content_published',
                 sourceType: 'post',
@@ -191,6 +192,9 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
                 },
                 attribution: 'platform_executed',
               });
+              if (slug) {
+                void captureBaselineFromGsc(postAction.id, req.params.workspaceId, `/${slug}`);
+              }
             } catch (err) {
               log.warn({ err, postId: req.params.postId }, 'Failed to record outcome action for content publish');
             }

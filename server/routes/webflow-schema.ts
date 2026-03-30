@@ -29,6 +29,7 @@ import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClie
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { listPendingSchemas } from '../schema-queue.js';
 import { createLogger } from '../logger.js';
 import {
@@ -199,7 +200,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     // Record for outcome tracking (only when workspace is known)
     try {
       if (!pubWs) throw new Error('no workspace');
-      recordAction({
+      const schemaAction = recordAction({
         workspaceId: pubWs.id,
         actionType: 'schema_deployed',
         sourceType: 'schema',
@@ -213,6 +214,9 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
         },
         attribution: 'platform_executed',
       });
+      if (req.body.pageSlug) {
+        void captureBaselineFromGsc(schemaAction.id, pubWs.id, `/${req.body.pageSlug}`);
+      }
     } catch (err) {
       log.warn({ err, pageId }, 'Failed to record outcome action for schema deployment');
     }

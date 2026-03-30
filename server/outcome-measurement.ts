@@ -9,8 +9,11 @@ import {
   getOutcomesForAction,
   getActionsByPage,
   updateActionContext,
+  updateBaselineSnapshot,
 } from './outcome-tracking.js';
 import { resolveScoringConfig } from './outcome-scoring-defaults.js';
+import { getWorkspace } from './workspaces.js';
+import { getPageTrend } from './search-console.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import type {
@@ -37,16 +40,72 @@ const CHECKPOINTS = [7, 30, 60, 90] as const;
 type CheckpointDays = 7 | 30 | 60 | 90;
 
 // ---------------------------------------------------------------------------
-// Stub: fetch current metrics
-// TODO: wire to GSC/GA4 fetch
+// GSC helpers
 // ---------------------------------------------------------------------------
 
-async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnapshot> {
-  // Identity stub — returns the baseline until real fetching is wired
+function averageGscRows(
+  rows: Array<{ clicks: number; impressions: number; ctr: number; position: number }>,
+): Partial<BaselineSnapshot> {
+  if (!rows.length) return {};
+  const n = rows.length;
+  const sum = rows.reduce(
+    (acc, r) => ({
+      clicks: acc.clicks + r.clicks,
+      impressions: acc.impressions + r.impressions,
+      ctr: acc.ctr + r.ctr,
+      position: acc.position + r.position,
+    }),
+    { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+  );
   return {
-    ...action.baselineSnapshot,
-    captured_at: new Date().toISOString(),
+    clicks: Math.round(sum.clicks / n),
+    impressions: Math.round(sum.impressions / n),
+    ctr: +(sum.ctr / n).toFixed(1),
+    position: +(sum.position / n).toFixed(1),
   };
+}
+
+async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnapshot> {
+  if (!action.pageUrl) {
+    return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+  }
+  const ws = getWorkspace(action.workspaceId);
+  if (!ws?.webflowSiteId || !ws?.gscPropertyUrl) {
+    return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+  }
+  try {
+    // Use the last 14 days to smooth weekly variation and get a current-state reading
+    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, action.pageUrl, 14);
+    if (!rows.length) return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+    return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
+  } catch {
+    return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
+  }
+}
+
+/**
+ * Capture and store a GSC baseline for a newly recorded action.
+ * Call fire-and-forget (void) from route handlers — does not block the response.
+ */
+export async function captureBaselineFromGsc(
+  actionId: string,
+  workspaceId: string,
+  pageUrl: string,
+): Promise<void> {
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.webflowSiteId || !ws?.gscPropertyUrl) return;
+  try {
+    // Use 28 days to get a stable baseline reading at action creation time
+    const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 28);
+    if (!rows.length) return;
+    updateBaselineSnapshot(actionId, {
+      ...averageGscRows(rows),
+      captured_at: new Date().toISOString(),
+    });
+    log.info({ actionId, pageUrl }, 'GSC baseline captured');
+  } catch (err) {
+    log.warn({ err, actionId, pageUrl }, 'Failed to capture GSC baseline');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +256,36 @@ async function scoreActionAtCheckpoint(
       deltaSummary: outcome.deltaSummary,
     });
     return;
+  }
+
+  // Edge case: baseline has no GSC data for a search-metric action.
+  // Without a real baseline we cannot compute a meaningful delta — score inconclusive.
+  // (insights.ts already captures position/clicks/etc from insight data, so this only
+  // fires for action types whose call sites didn't capture a GSC baseline.)
+  if (SEARCH_METRICS.has(primaryMetric)) {
+    const searchFields: Array<keyof BaselineSnapshot> = ['position', 'clicks', 'impressions', 'ctr'];
+    const baselineLacksData = searchFields.every(
+      k => action.baselineSnapshot[k] === undefined || action.baselineSnapshot[k] === null,
+    );
+    if (baselineLacksData) {
+      const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
+      const outcome = recordOutcome({
+        actionId: action.id,
+        checkpointDays,
+        metricsSnapshot: currentSnapshot,
+        score: 'inconclusive',
+        deltaSummary: delta,
+      });
+      log.info({ actionId: action.id, checkpointDays }, 'No GSC baseline — cannot measure delta');
+      broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_SCORED, {
+        actionId: action.id,
+        checkpointDays,
+        score: outcome.score,
+        earlySignal: outcome.earlySignal,
+        deltaSummary: outcome.deltaSummary,
+      });
+      return;
+    }
   }
 
   // Edge case: inconclusive — current metrics are all undefined (page deleted/redirected).

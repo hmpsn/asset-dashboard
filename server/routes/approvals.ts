@@ -35,6 +35,7 @@ import {
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction } from '../outcome-tracking.js';
+import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
@@ -310,7 +311,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
   try {
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
-        recordAction({
+        const action = recordAction({
           workspaceId: req.params.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'approval',
@@ -322,6 +323,9 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
           },
           attribution: 'platform_executed',
         });
+        if (item.pageSlug) {
+          void captureBaselineFromGsc(action.id, req.params.workspaceId, `/${item.pageSlug}`);
+        }
       }
     }
   } catch (err) {

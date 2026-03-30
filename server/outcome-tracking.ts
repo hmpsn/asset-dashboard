@@ -39,6 +39,7 @@ const stmts = createStmtCache(() => ({
   updateAttribution: db.prepare(`UPDATE tracked_actions SET attribution = ?, updated_at = datetime('now') WHERE id = ?`),
   markComplete: db.prepare(`UPDATE tracked_actions SET measurement_complete = 1, updated_at = datetime('now') WHERE id = ?`),
   updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ?`),
+  updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ?`),
   insertOutcome: db.prepare(`
     INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at)
     VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at)
@@ -177,6 +178,10 @@ export function markActionComplete(actionId: string): void {
 
 export function updateActionContext(actionId: string, context: ActionContext): void {
   stmts().updateContext.run(JSON.stringify(context), actionId);
+}
+
+export function updateBaselineSnapshot(actionId: string, snapshot: BaselineSnapshot): void {
+  stmts().updateBaseline.run(JSON.stringify(snapshot), actionId);
 }
 
 export function recordOutcome(params: {

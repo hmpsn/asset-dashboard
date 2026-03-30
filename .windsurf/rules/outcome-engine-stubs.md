@@ -8,12 +8,10 @@
 
 ## CRITICAL — Feature is non-functional until these are wired
 
-### 1. `fetchCurrentMetrics` is a stub
-**File:** `server/outcome-measurement.ts:44-49`
-**What it does now:** Returns `{ ...action.baselineSnapshot, captured_at: now }` — the current snapshot IS the baseline.
-**Effect:** Every 30/60/90-day checkpoint produces `delta_absolute: 0`, `delta_percent: 0`, `direction: stable`, score: `neutral`. The entire scoring pipeline is inert.
-**What needs to happen:** Replace stub with real GSC/GA4 data fetch. Pattern: call GSC API for `position`, `clicks`, `impressions`, `ctr` for the action's `pageUrl` + `targetKeyword` over a date range ending at the checkpoint date.
-**Roadmap item:** #230
+### 1. ~~`fetchCurrentMetrics` is a stub~~ — SHIPPED 2026-03-29
+**File:** `server/outcome-measurement.ts`
+**Wired:** Calls `getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, action.pageUrl, 14)` and averages the last 14 days. Falls back gracefully when workspace has no GSC connection or no page URL. Three call sites (approvals, webflow-schema, content-posts) fire-and-forget `captureBaselineFromGsc` after `recordAction`. Baseline-unavailable guard added: if a search-metric action has no GSC baseline data, it scores `inconclusive` rather than computing a misleading delta from 0.
+**Roadmap item:** #230 ✓
 
 ---
 
@@ -86,8 +84,8 @@ The fallback `EMPTY_BASELINE` uses `new Date().toISOString()` at module load. On
 
 ## Diagnostic checklist — "Why is outcome tracking not working?"
 
-1. **No outcomes being scored** → Check `fetchCurrentMetrics` stub (#1 above). Scoring IS running (check cron logs) but producing all-neutral results.
-2. **Win rate always 0%** → Same as above — stub returns identical baseline as current.
+1. **No outcomes being scored** → Verify GSC is connected for the workspace (`gscPropertyUrl` + `webflowSiteId` set). Check cron logs for `outcome-measurement`. Confirm the page URL on tracked actions matches the URL format GSC reports.
+2. **Win rate always 0%** → Check if `fetchCurrentMetrics` is returning data (non-empty GSC rows). If workspace has no GSC, all checkpoints will score `inconclusive`.
 3. **External wins never detected** → `checkExternalExecution` stub (#2 above). External detection runs but never returns `true`.
 4. **Playbooks section empty** → No route exists to serve playbooks (#3 above). Also `detectPlaybookPatterns` is never called.
 5. **Learnings not updating** → Check if `totalScoredActions` > 0. Learnings only compute when there are scored actions. With stub active, all actions score `neutral` but still count as "scored".
