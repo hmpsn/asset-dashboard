@@ -152,6 +152,25 @@ When dispatching parallel subagents or working on multi-phase features:
 
 ---
 
+## Auth Conventions
+
+This project uses **two separate auth systems** that must never be mixed up:
+
+| System | Used for | Token location | Server check |
+|--------|----------|---------------|-------------|
+| HMAC password auth | Admin panel login | `localStorage` → `x-auth-token` header | `APP_PASSWORD` gate in `app.ts` |
+| JWT user auth | Multi-user accounts (`users.ts`) | `Authorization: Bearer` or `token` cookie | `requireAuth` middleware |
+
+**Rule: Never add `requireAuth` to admin API routes.** The admin panel authenticates via HMAC token (`x-auth-token`), which the global `APP_PASSWORD` gate in `app.ts` already validates for all `/api/` requests. Adding `requireAuth` to a route the admin frontend calls will silently return 401 — the token won't be recognized because `requireAuth` only accepts JWTs.
+
+**`requireAuth` is only correct in two contexts:**
+1. `server/routes/users.ts` — JWT-based multi-user account management
+2. `server/routes/auth.ts` — `/api/auth/me` JWT session check
+
+**`requireWorkspaceAccess` is safe for all routes** — it explicitly passes through when no JWT user is present (HMAC auth users are covered by the global gate).
+
+---
+
 ## Code Conventions
 
 - **TypeScript strict** — no `any` unless unavoidable

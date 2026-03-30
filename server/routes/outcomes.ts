@@ -2,7 +2,7 @@
  * outcomes routes — Outcome Intelligence Engine REST API
  */
 import { Router } from 'express';
-import { requireAuth, requireWorkspaceAccess } from '../auth.js';
+import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { isFeatureEnabled } from '../feature-flags.js';
@@ -164,7 +164,7 @@ function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
 
 // GET /api/outcomes/overview — Multi-workspace overview
 // LITERAL route — must come BEFORE param routes to avoid shadowing
-router.get('/api/outcomes/overview', requireAuth, async (_req, res) => {
+router.get('/api/outcomes/overview', async (_req, res) => {
   try {
     const workspaces = listWorkspaces();
     const overviews: WorkspaceOutcomeOverview[] = [];
