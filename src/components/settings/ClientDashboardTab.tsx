@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import SearchableSelect from '../SearchableSelect';
 import { get, post, patch, del, getSafe } from '../../api/client';
+import { themeColor } from '../ui/constants';
 
 import type { SafeClientUser as ClientUserSafe } from '../../../shared/types/users.ts';
 import type { EventGroup, EventDisplayConfig } from '../../../shared/types/workspace.ts';
@@ -256,7 +257,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
             <button onClick={copyClientLink}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
               style={copiedLink ? { backgroundColor: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }
-                : { backgroundColor: '#18181b', color: '#a1a1aa', border: '1px solid #27272a' }}>
+                : { backgroundColor: themeColor('#18181b', '#ffffff'), color: themeColor('#a1a1aa', '#64748b'), border: `1px solid ${themeColor('#27272a', '#e2e8f0')}` }}>
               {copiedLink ? <><CheckCircle className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
             </button>
             <a href={`/client/${workspaceId}`} target="_blank" rel="noopener noreferrer"
@@ -502,7 +503,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               setShowPricingConfig(!showPricingConfig);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{ backgroundColor: '#27272a', color: '#a1a1aa' }}>
+            style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}>
             {showPricingConfig ? 'Close' : <><Pencil className="w-3 h-3" /> Configure</>}
           </button>
         </div>
@@ -623,7 +624,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
               )}
               <button onClick={() => showEventConfig ? setShowEventConfig(false) : loadEvents()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                style={{ backgroundColor: '#27272a', color: '#a1a1aa' }}>
+                style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}>
                 {showEventConfig ? 'Close' : <><RefreshCw className="w-3 h-3" /> Configure</>}
               </button>
             </div>

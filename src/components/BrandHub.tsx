@@ -5,6 +5,7 @@ import {
   Plus, Pencil, Trash2, Check,
 } from 'lucide-react';
 import { PageHeader } from './ui';
+import { themeColor } from './ui/constants';
 import { workspaces } from '../api';
 
 interface AudiencePersona {
@@ -216,7 +217,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               setEditingPersonaId(null);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{ backgroundColor: '#27272a', color: '#a1a1aa' }}>
+            style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}>
             {showPersonas ? 'Close' : <><Plus className="w-3 h-3" /> Manage</>}
           </button>
         </div>
