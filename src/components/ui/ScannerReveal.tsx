@@ -66,7 +66,7 @@ export function ScannerReveal({ children }: ScannerRevealProps) {
             right: rect.right,
             bottom: rect.bottom,
             zIndex: 9998,
-            backgroundColor: '#0f1219',
+            backgroundColor: 'var(--brand-bg, #0f1219)',
             animation: 'scanReveal 0.85s cubic-bezier(0.22, 0.61, 0.36, 1) forwards',
             pointerEvents: 'none',
           }}

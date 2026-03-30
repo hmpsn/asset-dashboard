@@ -17,6 +17,10 @@ export function MetricRing({ score, size = 120, strokeWidth, className, noAnimat
   const color = scoreColor(score);
   const showGlow = !noAnimation && size >= 80;
 
+  // Glow should match ring color — teal for good, amber for warning, red for poor
+  const glowRgb = score >= 80 ? '52, 211, 153' : score >= 60 ? '251, 191, 36' : '248, 113, 113';
+  const edgeRgba = score >= 80 ? 'rgba(45, 212, 191, 0.15)' : score >= 60 ? 'rgba(251, 191, 36, 0.15)' : 'rgba(248, 113, 113, 0.15)';
+
   return (
     <div className={`relative ${className ?? ''}`} style={{ width: size, height: size }}>
       {/* Glow layer — outward-only via box-shadow behind the ring */}
@@ -24,7 +28,7 @@ export function MetricRing({ score, size = 120, strokeWidth, className, noAnimat
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            boxShadow: `0 0 20px 8px rgba(52, 211, 153, 0.15), 0 0 40px 16px rgba(45, 212, 191, 0.1)`,
+            boxShadow: `0 0 20px 8px rgba(${glowRgb}, 0.15), 0 0 40px 16px rgba(${glowRgb}, 0.1)`,
             animation: 'ringGlowIn 0.8s ease-out 2s both',
           }}
         />
@@ -34,13 +38,13 @@ export function MetricRing({ score, size = 120, strokeWidth, className, noAnimat
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            border: '1px solid rgba(45, 212, 191, 0.15)',
+            border: `1px solid ${edgeRgba}`,
             animation: 'ringGlowIn 0.8s ease-out 2s both',
           }}
         />
       )}
       <svg width={size} height={size} className="transform -rotate-90 relative z-10">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#303036" strokeWidth={sw} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--metric-ring-track, #303036)" strokeWidth={sw} />
         <circle
           cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
@@ -76,7 +80,7 @@ export function MetricRingSvg({ score, size = 48, strokeWidth }: Omit<MetricRing
 
   return (
     <svg width={size} height={size} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#303036" strokeWidth={sw} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--metric-ring-track, #303036)" strokeWidth={sw} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
         strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
