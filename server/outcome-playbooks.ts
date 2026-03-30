@@ -99,7 +99,7 @@ export function detectPlaybookPatterns(workspaceId: string): { discovered: numbe
       workspace_id: workspaceId,
       name,
       trigger_condition: steps[0],
-      action_sequence: JSON.stringify(steps.map((type, i) => ({ step: i + 1, actionType: type }))),
+      action_sequence: JSON.stringify(steps.map((type) => ({ actionType: type }))),
       historical_win_rate: winRate,
       sample_size: stats.count,
       confidence,

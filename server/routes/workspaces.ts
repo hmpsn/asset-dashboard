@@ -51,7 +51,6 @@ import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
-import { addActivity } from '../activity-log.js';
 
 const log = createLogger('workspaces');
 
@@ -217,10 +216,8 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
 });
 
 router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
-  const ws = getWorkspace(req.params.id);
-  if (!ws) return res.status(404).json({ error: 'Not found' });
-  addActivity(req.params.id, 'workspace_deleted', `Workspace "${ws.name}" deleted`, 'Workspace and all associated data removed');
-  deleteWorkspace(req.params.id);
+  const ok = deleteWorkspace(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Not found' });
   broadcast('workspace:deleted', { id: req.params.id });
   res.json({ ok: true });
 });

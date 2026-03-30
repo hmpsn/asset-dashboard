@@ -59,7 +59,6 @@ export type ActivityType =
   | 'playbook_suggested'
   | 'learnings_updated'
   | 'schema_plan_deleted'
-  | 'workspace_deleted'
   | 'note';
 
 export interface ActivityEntry {
