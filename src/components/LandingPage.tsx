@@ -452,7 +452,7 @@ function FAQ() {
     },
     {
       q: "What are 'strategy & implementation hours' on Premium?",
-      a: "Premium includes 3 hours per month of hands-on SEO work by hmpsn studio — things like updating meta tags, implementing schema markup, setting up redirects, and publishing content. It's scoped to SEO execution, not general web development.",
+      a: `Premium includes 3 hours per month of hands-on SEO work by ${STUDIO_NAME} — things like updating meta tags, implementing schema markup, setting up redirects, and publishing content. It's scoped to SEO execution, not general web development.`,
     },
     {
       q: "Can I cancel anytime?",

@@ -157,7 +157,7 @@ const CHECKS: Check[] = [
   },
   {
     name: 'Hardcoded dark hex in inline styles',
-    pattern: 'style=\\{[^}]*(#0f1219|#18181b|#27272a|#303036)',
+    pattern: 'style=\\{[^}]*(#0f1219|#18181b|#27272a|#303036|#52525b)',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: 'Styleguide.tsx',
