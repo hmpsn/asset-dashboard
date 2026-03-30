@@ -14,6 +14,7 @@ let measureInterval: ReturnType<typeof setInterval> | null = null;
 let learningsInterval: ReturnType<typeof setInterval> | null = null;
 let detectionInterval: ReturnType<typeof setInterval> | null = null;
 let archiveInterval: ReturnType<typeof setInterval> | null = null;
+let playbooksInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startOutcomeCrons() {
   if (!isFeatureEnabled('outcome-tracking')) {
@@ -75,8 +76,7 @@ export function startOutcomeCrons() {
   detectionInterval = setInterval(() => void runDetection(), TWELVE_HOURS_MS);
   archiveInterval = setInterval(runArchive, DAILY_MS);
 
-  // Playbook pattern detection runs weekly (no separate interval var needed — piggybacks on learnings cadence)
-  setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
+  playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
   log.info('Outcome crons started');
 }
@@ -86,9 +86,11 @@ export function stopOutcomeCrons() {
   if (learningsInterval) clearInterval(learningsInterval);
   if (detectionInterval) clearInterval(detectionInterval);
   if (archiveInterval) clearInterval(archiveInterval);
+  if (playbooksInterval) clearInterval(playbooksInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
   archiveInterval = null;
+  playbooksInterval = null;
   log.info('Outcome crons stopped');
 }
