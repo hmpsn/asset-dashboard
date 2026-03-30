@@ -80,7 +80,7 @@ function WinCard({ entry }: { entry: WeCalledItEntry }) {
       {/* Footer */}
       <div className="flex items-center gap-1 text-xs text-zinc-500">
         <ArrowUpRight className="w-3 h-3" />
-        <span>Confirmed {new Date(entry.detectedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        <span>Confirmed {new Date(entry.detectedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</span>
       </div>
     </div>
   );
