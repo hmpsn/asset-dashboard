@@ -182,19 +182,18 @@ export function StripePaymentForm({
       stripe={stripePromise}
       options={{
         clientSecret,
-        // Note: themeColor() calls below are evaluated at render time. Stripe Elements bakes
-        // appearance at mount — a live theme toggle won't re-skin the form until it remounts.
-        // Acceptable trade-off: users don't toggle themes mid-payment.
+        // Stripe Elements appearance is always dark — the payment modal container (bg-zinc-900)
+        // is dark regardless of page theme. Do not use themeColor() here.
         appearance: {
           theme: 'night',
           variables: {
             colorPrimary: accentColor === 'blue' ? '#3b82f6' : '#14b8a6',
             colorBackground: '#09090b',
             colorText: '#e4e4e7',
-            colorTextSecondary: themeColor('#a1a1aa', '#334155'),
-            colorTextPlaceholder: themeColor('#52525b', '#94a3b8'),
+            colorTextSecondary: '#a1a1aa',
+            colorTextPlaceholder: '#52525b',
             colorDanger: '#ef4444',
-            colorIcon: themeColor('#71717a', '#64748b'),
+            colorIcon: '#71717a',
             colorIconTabSelected: accentColor === 'blue' ? '#3b82f6' : '#14b8a6',
             fontFamily: 'Inter, system-ui, sans-serif',
             fontSizeBase: '13px',
@@ -207,8 +206,8 @@ export function StripePaymentForm({
           },
           rules: {
             '.Input': {
-              backgroundColor: themeColor('rgba(24, 24, 27, 0.8)', 'rgba(241, 245, 249, 0.7)'),
-              border: `1px solid ${themeColor('rgba(63, 63, 70, 0.6)', 'rgba(203, 213, 225, 0.5)')}`,
+              backgroundColor: 'rgba(24, 24, 27, 0.8)',
+              border: '1px solid rgba(63, 63, 70, 0.6)',
               boxShadow: 'none',
               padding: '10px 12px',
               transition: 'border-color 0.15s ease',
@@ -218,7 +217,7 @@ export function StripePaymentForm({
               boxShadow: `0 0 0 1px ${accentColor === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(20, 184, 166, 0.1)'}`,
             },
             '.Label': {
-              color: themeColor('#71717a', '#64748b'),
+              color: '#71717a',
               fontSize: '10px',
               fontWeight: '600',
               textTransform: 'uppercase',
@@ -227,14 +226,14 @@ export function StripePaymentForm({
             },
             '.Tab': {
               backgroundColor: 'transparent',
-              border: `1px solid ${themeColor('rgba(63, 63, 70, 0.4)', 'rgba(203, 213, 225, 0.5)')}`,
+              border: '1px solid rgba(63, 63, 70, 0.4)',
               borderRadius: '8px',
               boxShadow: 'none',
               transition: 'all 0.15s ease',
             },
             '.Tab:hover': {
-              backgroundColor: themeColor('rgba(39, 39, 42, 0.5)', 'rgba(241, 245, 249, 0.7)'),
-              border: `1px solid ${themeColor('rgba(63, 63, 70, 0.7)', 'rgba(203, 213, 225, 0.7)')}`,
+              backgroundColor: 'rgba(39, 39, 42, 0.5)',
+              border: '1px solid rgba(63, 63, 70, 0.7)',
               color: '#e4e4e7',
             },
             '.Tab--selected': {
@@ -257,15 +256,15 @@ export function StripePaymentForm({
             },
             '.Block': {
               backgroundColor: 'transparent',
-              borderColor: themeColor('rgba(63, 63, 70, 0.4)', 'rgba(203, 213, 225, 0.5)'),
+              borderColor: 'rgba(63, 63, 70, 0.4)',
             },
             '.CheckboxInput': {
-              backgroundColor: themeColor('rgba(24, 24, 27, 0.8)', 'rgba(241, 245, 249, 0.7)'),
-              borderColor: themeColor('rgba(63, 63, 70, 0.6)', 'rgba(203, 213, 225, 0.5)'),
+              backgroundColor: 'rgba(24, 24, 27, 0.8)',
+              borderColor: 'rgba(63, 63, 70, 0.6)',
             },
             '.PickerItem': {
-              backgroundColor: themeColor('rgba(24, 24, 27, 0.8)', 'rgba(241, 245, 249, 0.7)'),
-              borderColor: themeColor('rgba(63, 63, 70, 0.4)', 'rgba(203, 213, 225, 0.5)'),
+              backgroundColor: 'rgba(24, 24, 27, 0.8)',
+              borderColor: 'rgba(63, 63, 70, 0.4)',
               padding: '10px 12px',
             },
             '.PickerItem--selected': {
