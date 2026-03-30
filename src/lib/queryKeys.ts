@@ -70,6 +70,13 @@ export const queryKeys = {
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     health: () => ['admin-health'] as const,
     queue: () => ['admin-queue'] as const,
+    outcomeActions: (wsId: string) => ['admin-outcome-actions', wsId] as const,
+    outcomeScorecard: (wsId: string) => ['admin-outcome-scorecard', wsId] as const,
+    outcomeTimeline: (wsId: string) => ['admin-outcome-timeline', wsId] as const,
+    outcomeLearnings: (wsId: string) => ['admin-outcome-learnings', wsId] as const,
+    outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,
+    outcomeTopWins: (wsId: string) => ['admin-outcome-top-wins', wsId] as const,
+    outcomeOverview: () => ['admin-outcome-overview'] as const,
   },
 
   // ── Client ────────────────────────────────────────────────────────
@@ -101,6 +108,8 @@ export const queryKeys = {
     insights: (wsId: string) => ['client-insights', wsId] as const,
     clientInsights: (wsId: string) => ['client-narrative-insights', wsId] as const,
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
+    outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
+    outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

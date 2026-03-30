@@ -7,6 +7,8 @@ import { getGA4PeriodComparison } from './google-analytics.js';
 import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 
 const log = createLogger('monthly-digest');
 
@@ -113,7 +115,21 @@ async function computeDigest(
     pagesOptimized: issuesAddressed.length,
   };
 
-  const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics);
+  // Fetch workspace learnings for outcome context
+  let learningsSummary: string | undefined;
+  let recentOutcomesCount: number | undefined;
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    const learnings = getWorkspaceLearnings(ws.id);
+    if (learnings) {
+      const block = formatLearningsForPrompt(learnings, 'all');
+      if (block) {
+        learningsSummary = block;
+        recentOutcomesCount = learnings.totalScoredActions;
+      }
+    }
+  }
+
+  const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics, learningsSummary, recentOutcomesCount);
 
   const result: MonthlyDigestData = {
     month: monthLabel,
@@ -180,6 +196,8 @@ async function generateDigestSummary(
   issues: DigestItem[],
   roi: ROIHighlight[],
   metrics: { clicksChange: number; impressionsChange: number; avgPositionChange: number; pagesOptimized: number },
+  learningsSummary?: string,
+  recentOutcomesCount?: number,
 ): Promise<string> {
   const clicksTrend = metrics.clicksChange > 0 ? `+${metrics.clicksChange.toFixed(1)}%` : metrics.clicksChange < 0 ? `${metrics.clicksChange.toFixed(1)}%` : null;
   const impressionsTrend = metrics.impressionsChange > 0 ? `+${metrics.impressionsChange.toFixed(1)}%` : metrics.impressionsChange < 0 ? `${metrics.impressionsChange.toFixed(1)}%` : null;
@@ -199,7 +217,9 @@ Data for ${month}:
 - ${issues.length} optimization${issues.length === 1 ? '' : 's'} completed
 - ${metrics.pagesOptimized} page${metrics.pagesOptimized === 1 ? '' : 's'} optimized
 - ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}
+${recentOutcomesCount !== undefined ? `- ${recentOutcomesCount} tracked outcome${recentOutcomesCount === 1 ? '' : 's'} in workspace learnings` : ''}
 ${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
+${learningsSummary ? `\nWorkspace outcome learnings:\n${learningsSummary}` : ''}
 
 Voice rules (follow exactly):
 - Lead with the most interesting metric or outcome — never start with "In [Month]" or "This month"

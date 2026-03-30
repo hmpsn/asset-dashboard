@@ -8,7 +8,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Activity, Shield,
-  Zap, BookOpen, CalendarDays, DollarSign,
+  Zap, BookOpen, CalendarDays, DollarSign, Trophy,
 } from 'lucide-react';
 
 interface NavItem {
@@ -60,6 +60,7 @@ function buildNavGroups(hasContentItems: boolean): NavGroup[] {
       items: [
       { id: 'analytics-hub', label: 'Analytics', icon: BarChart3, needsSite: true, desc: 'Unified analytics: search performance, traffic, insights, and annotations' },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
+      { id: 'outcomes', label: 'Outcomes', icon: Trophy, desc: 'Track what\'s working across all your SEO actions' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
       activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
@@ -90,7 +91,7 @@ function buildNavGroups(hasContentItems: boolean): NavGroup[] {
   ];
 }
 
-const GLOBAL_TABS = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue']);
+const GLOBAL_TABS = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'outcomes-overview']);
 
 export function Sidebar({
   workspaces, selected, tab, theme, pendingContentRequests, hasContentItems,
@@ -139,7 +140,7 @@ export function Sidebar({
         className="px-4 pt-4 pb-3 block hover:opacity-80 transition-opacity"
         title="Command Center"
       >
-        <img src="/logo.svg" alt="hmpsn.studio" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+        <img src="/logo.svg" alt="Studio logo" className="h-7" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
       </button>
 
       {/* Workspace selector */}

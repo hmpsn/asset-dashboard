@@ -4,8 +4,9 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
-const router = Router();
-
+import { requireClientPortalAuth } from '../middleware.js';
+import { createLogger } from '../logger.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
   generateRecommendations,
   loadRecommendations,
@@ -14,6 +15,9 @@ import {
 } from '../recommendations.js';
 import { getLatestSnapshot } from '../reports.js';
 import { updatePageState, getPageIdBySlug, getWorkspace } from '../workspaces.js';
+
+const log = createLogger('routes:recommendations');
+const router = Router();
 
 // ─── Recommendation Engine ─────────────────────────────────────────
 // Generate (or re-generate) prioritized recommendations for a workspace
@@ -47,7 +51,7 @@ router.get('/api/public/recommendations/:workspaceId', async (req, res) => {
 });
 
 // Update recommendation status (pending → in_progress → completed)
-router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
+router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const { status } = req.body;
   if (!status || !['pending', 'in_progress', 'completed', 'dismissed'].includes(status)) {
     return res.status(400).json({ error: 'Valid status required: pending, in_progress, completed, dismissed' });
@@ -91,12 +95,29 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
         recommendationId: rec.id,
       });
     }
+    // Record for outcome tracking — idempotent
+    try {
+      if (!getActionBySource('recommendation', req.params.recId)) recordAction({
+        workspaceId: req.params.workspaceId,
+        actionType: 'audit_fix_applied',
+        sourceType: 'recommendation',
+        sourceId: req.params.recId,
+        pageUrl: rec.affectedPages?.[0] ?? null,
+        targetKeyword: null,
+        baselineSnapshot: {
+          captured_at: new Date().toISOString(),
+        },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err, recId: req.params.recId }, 'Failed to record outcome action for recommendation completion');
+    }
   }
   res.json(rec);
 });
 
 // Dismiss a recommendation
-router.delete('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
+router.delete('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const ok = dismissRecommendation(req.params.workspaceId, req.params.recId);
   if (!ok) return res.status(404).json({ error: 'Recommendation not found' });
   res.json({ ok: true });

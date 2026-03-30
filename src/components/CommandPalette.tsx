@@ -5,7 +5,7 @@ import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
-  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers,
+  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath } from '../routes';
@@ -47,6 +47,8 @@ const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: st
   { id: 'prospect', label: 'Prospect', icon: FileSearch, group: '' },
   { id: 'roadmap', label: 'Roadmap', icon: Shield, group: '' },
   { id: 'features', label: 'Feature Library', icon: Layers, group: '' },
+  { id: 'outcomes', label: 'Outcomes', icon: Trophy, group: 'Analytics' },
+  { id: 'outcomes-overview', label: 'Outcomes Overview', icon: BarChart3, group: 'Analytics' },
 ];
 
 const RECENT_KEY = 'admin-palette-recent';
@@ -121,7 +123,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: nav.group || undefined,
         icon: nav.icon,
         type: 'nav',
-        action: () => { const GLOBAL = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'features']); if (GLOBAL.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
+        action: () => { const GLOBAL = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'features', 'outcomes-overview']); if (GLOBAL.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
       });
     }
 

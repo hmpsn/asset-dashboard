@@ -40,10 +40,14 @@ import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -665,6 +669,22 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (requestedKeywords.length > 0) {
       businessSection += `\nCLIENT-REQUESTED KEYWORDS (the client has submitted these keyword ideas — give them HIGH PRIORITY in page assignments and content gap suggestions. If no existing page covers a requested keyword, it MUST appear as a content gap):\n${requestedKeywords.map(k => `- "${k}"`).join('\n')}\n`;
       log.info(`Injecting ${requestedKeywords.length} client-requested keywords into AI prompt`);
+    }
+
+    // Adaptive pipeline: inject workspace learnings for difficulty range guidance
+    if (isFeatureEnabled('outcome-adaptive-pipeline')) {
+      try {
+        const learnings = getWorkspaceLearnings(ws.id);
+        if (learnings) {
+          const block = formatLearningsForPrompt(learnings, 'strategy');
+          if (block) {
+            businessSection += `\n\n${block}\n`;
+            log.info({ workspaceId: ws.id }, 'Injected workspace learnings into strategy prompt');
+          }
+        }
+      } catch (err) {
+        log.warn({ err }, 'Failed to inject workspace learnings into strategy prompt');
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1755,6 +1775,21 @@ Rules:
     clearSeoContextCache(ws.id);
     incrementUsage(ws.id, 'strategy_generations');
 
+    try {
+      if (!getActionBySource('strategy', ws.id)) recordAction({
+        workspaceId: ws.id,
+        actionType: 'strategy_keyword_added',
+        sourceType: 'strategy',
+        sourceId: ws.id,
+        pageUrl: null,
+        targetKeyword: null,
+        baselineSnapshot: { captured_at: new Date().toISOString() },
+        attribution: 'platform_executed',
+      });
+    } catch (err) {
+      log.warn({ err }, 'Failed to record outcome action for strategy generation');
+    }
+
     // Auto-seed rank tracking with strategy keywords (deduplicates internally)
     try {
       const seedKeywords = new Set<string>();
@@ -1817,8 +1852,8 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
   const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
   if (!prev) return res.json(null);
 
-  const prevStrategy = JSON.parse(prev.strategy_json);
-  const prevPageMap = JSON.parse(prev.page_map_json);
+  const prevStrategy = parseJsonFallback(prev.strategy_json, {});
+  const prevPageMap = parseJsonFallback(prev.page_map_json, []);
   const currentPageMap = listPageKeywords(ws.id);
 
   // Compute diffs

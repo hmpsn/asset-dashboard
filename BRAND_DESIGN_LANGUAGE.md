@@ -166,6 +166,25 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **SeoEditor.tsx** | "Unsaved" badge | `blue-500/10 text-blue-400` | State indicator |
 | **RequestManager.tsx** | "New" status | `blue-500/10 text-blue-400` | Info state |
 
+### Outcome Tracking
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Win rate rings | `scoreColor()` scale: green ≥70, amber 40–69, red <40 | Score = data, uses standard score helpers |
+| Score badges: strong_win / win | `bg-emerald-500/10 text-emerald-400` | Positive outcome = green |
+| Score badges: neutral | `bg-amber-500/10 text-amber-400` | No clear signal = amber |
+| Score badges: loss | `bg-red-500/10 text-red-400` | Negative outcome = red |
+| Score badges: insufficient_data / inconclusive | `bg-zinc-500/10 text-zinc-400` | Unknown = zinc |
+| Action type badges | `bg-blue-500/10 text-blue-400` | Data indicator — blue for read-only labels |
+| Delta indicators: improved | `text-emerald-400` + ↑ arrow | Positive direction = green |
+| Delta indicators: declined | `text-red-400` + ↓ arrow | Negative direction = red |
+| Delta indicators: stable | `text-zinc-400` + → arrow | No change = zinc |
+| Confidence badges: high | `bg-emerald-500/10 text-emerald-400` | High confidence = green |
+| Confidence badges: medium | `bg-amber-500/10 text-amber-400` | Medium confidence = amber |
+| Confidence badges: low | `bg-red-500/10 text-red-400` | Low confidence = red |
+| Outcome CTAs (admin) | `from-teal-600 to-emerald-600` | Standard CTA gradient |
+| Client "We Called It" highlight | `bg-teal-600/20 border-teal-500/30 text-teal-300` | Soft teal — client-facing positive signal |
+
 ### Stripe Payment (`StripePaymentForm.tsx`)
 
 | Element | Color |
@@ -377,6 +396,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-03-27 | **Analytics Hub redesign**: Added `AnnotatedTrendChart` with dual Y-axes, annotation markers, click-to-annotate. Merged SearchConsole + GoogleAnalytics into `AnalyticsHub`. |
 | 2026-03-27 | **Connected Intelligence Phase 1**: New `InsightFeed` priority feed component (severity icons: red=critical TrendingDown, amber=warning AlertTriangle, blue=opportunity Target, green=win TrendingUp). `SummaryPills` with colored dots (red/amber/green/blue/purple) and toggle-filter interaction. `InsightSkeleton` shimmer loading. `AnnotatedTrendChart` gains toggleable line chips (solid=active, outline=inactive, grayed=at-max). All three hub tabs now insight-first with sub-tabs. |
 | 2026-03-28 | **Visual Polish** (10 refinements): Asymmetric card radius (SectionCard `10px 24px`, StatCard `6px 12px`), MetricRing outward glow + charge-up animation, noise overlay on body, ScannerReveal page transitions, spacing variation (`space-y-8` between sections), removed uppercase from section headings, StatCard `size="hero"` prop, stagger-fade entrance animations, interactive card hover (teal left-border accent), status color muting (`emerald-400/80`, `amber-400/80`, `red-400/80`, bg at `/8` opacity). Updated: SectionCard, StatCard, MetricRing, Skeleton, TierGate, Badge, statusConfig, ~60 consumer files. |
+| 2026-03-29 | **Outcome Intelligence Engine**: Added Outcome Tracking color map — win rate rings use `scoreColor()`, score badges (strong_win/win=green, neutral=amber, loss=red, insufficient_data/inconclusive=zinc), action type badges (blue), delta indicators (green/red/zinc), confidence badges (green/amber/red). Client "We Called It" uses soft teal. All outcome CTAs use standard teal gradient. |
 
 ---
 

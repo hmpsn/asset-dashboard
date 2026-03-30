@@ -24,6 +24,11 @@ export const WS_EVENTS = {
   CONTENT_PUBLISHED: 'content:published',
   INSIGHT_RESOLVED: 'insight:resolved',
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
+  OUTCOME_ACTION_RECORDED: 'outcome:action_recorded',
+  OUTCOME_SCORED: 'outcome:scored',
+  OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
+  OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
+  OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];
