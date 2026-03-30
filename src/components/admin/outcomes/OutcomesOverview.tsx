@@ -12,7 +12,7 @@ import type { WorkspaceOutcomeOverview, LearningsTrend } from '../../../../share
 // --- Helpers -----------------------------------------------------------
 
 function trendIcon(trend: LearningsTrend) {
-  if (trend === 'improving') return <TrendingUp className="w-3.5 h-3.5 text-green-400" />;
+  if (trend === 'improving') return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
   if (trend === 'declining') return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
   return <Minus className="w-3.5 h-3.5 text-zinc-400" />;
 }
@@ -24,7 +24,7 @@ function trendLabel(trend: LearningsTrend): string {
 }
 
 function trendColor(trend: LearningsTrend): string {
-  if (trend === 'improving') return 'text-teal-400';
+  if (trend === 'improving') return 'text-emerald-400';
   if (trend === 'declining') return 'text-red-400';
   return 'text-zinc-400';
 }

@@ -3,23 +3,11 @@ import { Activity, ChevronDown, ChevronUp, ExternalLink, Filter } from 'lucide-r
 import { SectionCard, Badge, EmptyState, Skeleton } from '../../ui';
 import { useOutcomeActions } from '../../../hooks/admin/useOutcomes';
 import type { ActionType, TrackedAction } from '../../../../shared/types/outcome-tracking';
+import { ACTION_TYPE_LABELS } from './outcomeConstants';
 
 interface Props {
   workspaceId: string;
 }
-
-const ACTION_TYPE_LABELS: Record<ActionType, string> = {
-  insight_acted_on: 'Insight',
-  content_published: 'Content Published',
-  brief_created: 'Brief Created',
-  strategy_keyword_added: 'Strategy Update',
-  schema_deployed: 'Schema Deployed',
-  audit_fix_applied: 'Audit Fix',
-  content_refreshed: 'Content Refresh',
-  internal_link_added: 'Internal Link',
-  meta_updated: 'Meta Update',
-  voice_calibrated: 'Voice Calibration',
-};
 
 const ACTION_TYPE_OPTIONS: Array<{ value: ActionType | ''; label: string }> = [
   { value: '', label: 'All Types' },
@@ -72,7 +60,16 @@ function ActionRow({ action }: ActionRowProps) {
     ? history.dataPoints[history.dataPoints.length - 1]
     : null;
 
-  const delta = lastPoint ? lastPoint.value - (baseline.position ?? baseline.clicks ?? 0) : null;
+  // Match baseline field to the metric actually tracked in trailingHistory
+  const baselineForMetric = history.metric === 'position' ? baseline.position
+    : history.metric === 'clicks' ? baseline.clicks
+    : history.metric === 'impressions' ? baseline.impressions
+    : history.metric === 'ctr' ? baseline.ctr
+    : history.metric === 'sessions' ? baseline.sessions
+    : undefined;
+  const delta = lastPoint != null && baselineForMetric != null
+    ? lastPoint.value - baselineForMetric
+    : null;
   const hasDelta = delta !== null && !Number.isNaN(delta);
 
   return (
