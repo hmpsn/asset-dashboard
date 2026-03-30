@@ -14,8 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # HEAD + HEAD~1 so pr-check.ts can diff on push events
 
-      # Fetch the base branch so pr-check.ts can run `git diff origin/<base>...HEAD`.
+      # On PRs, also fetch the base branch so pr-check.ts can use `git diff origin/<base>...HEAD`.
       # `|| true` prevents a transient git failure from killing CI —
       # pr-check.ts falls back to a full codebase scan gracefully.
       - name: Fetch base branch for diff

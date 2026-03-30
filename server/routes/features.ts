@@ -2,7 +2,6 @@ import { Router } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { requireAuth } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import { getAllFlags, getAllFlagsWithMeta, setFlagOverride } from '../feature-flags.js';
 import { FEATURE_FLAGS } from '../../shared/types/feature-flags.js';
@@ -30,14 +29,13 @@ router.get('/api/feature-flags', (_req, res) => {
 });
 
 /** Returns all flags with source metadata — admin only. */
-router.get('/api/admin/feature-flags', requireAuth, (_req, res) => {
+router.get('/api/admin/feature-flags', (_req, res) => {
   res.json(getAllFlagsWithMeta());
 });
 
 /** Set or clear a DB override for a single flag — admin only. */
 router.put(
   '/api/admin/feature-flags/:key',
-  requireAuth,
   validate(z.object({
     enabled: z.boolean().nullable(),
   })),
