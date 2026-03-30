@@ -64,7 +64,7 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
             </div>
             <Badge
               label={win.score === 'strong_win' ? 'Strong Win' : 'Win'}
-              color={win.score === 'strong_win' ? 'green' : 'blue'}
+              color="green"
             />
           </div>
         ))}
