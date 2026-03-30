@@ -84,7 +84,7 @@ export function FeatureFlagSettings() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const { data: flags, isLoading } = useQuery({
+  const { data: flags, isLoading, isError, error } = useQuery({
     queryKey: ['admin-feature-flags'],
     queryFn: fetchAdminFlags,
   });
@@ -119,6 +119,11 @@ export function FeatureFlagSettings() {
       {isLoading ? (
         <div className="px-5 py-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading flags...
+        </div>
+      ) : isError ? (
+        <div className="px-5 py-6 text-xs text-red-400 space-y-1">
+          <p className="font-medium">Failed to load feature flags</p>
+          <p className="text-zinc-500 font-mono break-all">{error instanceof Error ? error.message : String(error)}</p>
         </div>
       ) : (
         <div className="divide-y divide-zinc-800/60">

@@ -14,14 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # full history for pr-check.ts diff detection
 
-      # Ensure the base-branch remote tracking ref exists so pr-check.ts can run
-      # `git diff origin/<base>...HEAD`. Without this, `actions/checkout` only
-      # fetches the PR head branch; the base ref may not exist as a local tracking
-      # ref even with fetch-depth: 0. `|| true` prevents a transient git failure
-      # from killing CI — pr-check.ts falls back to a full codebase scan gracefully.
+      # Fetch the base branch so pr-check.ts can run `git diff origin/<base>...HEAD`.
+      # `|| true` prevents a transient git failure from killing CI —
+      # pr-check.ts falls back to a full codebase scan gracefully.
       - name: Fetch base branch for diff
         if: github.event_name == 'pull_request'
         run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} --depth=1 || true
