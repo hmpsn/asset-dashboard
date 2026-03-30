@@ -12,6 +12,19 @@ interface FlagMeta {
 
 const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
   {
+    label: 'Outcome Intelligence Engine',
+    keys: [
+      'outcome-tracking',
+      'outcome-dashboard',
+      'outcome-playbooks',
+      'outcome-external-detection',
+      'outcome-ai-injection',
+      'outcome-client-reporting',
+      'outcome-adaptive-pipeline',
+      'outcome-predictive',
+    ],
+  },
+  {
     label: 'Copy & Brand Engine',
     keys: ['copy-engine', 'copy-engine-voice', 'copy-engine-pipeline'],
   },
@@ -30,13 +43,26 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
 ];
 
 const FLAG_LABELS: Record<string, string> = {
-  'copy-engine':              'Copy Engine — core',
-  'copy-engine-voice':        'Copy Engine — voice calibration',
-  'copy-engine-pipeline':     'Copy Engine — pipeline',
-  'self-service-onboarding':  'Self-service Webflow onboarding',
-  'self-service-gsc-ga4':     'Self-service GSC / GA4 connection',
-  'team-collaboration':        'Team management',
-  'white-label':               'White-label domains',
+  // Outcome Intelligence Engine
+  'outcome-tracking':           'Action tracking & measurement',
+  'outcome-dashboard':          'Outcomes admin dashboard',
+  'outcome-playbooks':          'Playbook pattern detection',
+  'outcome-external-detection': 'External change detection (12h)',
+  'outcome-ai-injection':       'Inject outcomes into AI context',
+  'outcome-client-reporting':   'Client-facing outcome reporting',
+  'outcome-adaptive-pipeline':  'Adaptive measurement pipeline',
+  'outcome-predictive':         'Predictive scoring (future)',
+  // Copy & Brand Engine
+  'copy-engine':                'Copy Engine — core',
+  'copy-engine-voice':          'Copy Engine — voice calibration',
+  'copy-engine-pipeline':       'Copy Engine — pipeline',
+  // Self-Service
+  'self-service-onboarding':    'Self-service Webflow onboarding',
+  'self-service-gsc-ga4':       'Self-service GSC / GA4 connection',
+  // Team
+  'team-collaboration':         'Team management',
+  // White-label
+  'white-label':                'White-label domains',
 };
 
 const SOURCE_LABEL: Record<FlagMeta['source'], string> = {
