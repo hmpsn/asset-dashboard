@@ -165,7 +165,7 @@ const CHECKS: Check[] = [
   },
   {
     name: 'SVG with hardcoded dark fill/stroke',
-    pattern: '(fill|stroke)="(#0f1219|#18181b|#27272a|#303036|#52525b)"',
+    pattern: '(fill|stroke)=\\"(#0f1219|#18181b|#27272a|#303036|#52525b)\\"',
     fileGlobs: ['*.tsx'],
     pathFilter: 'src/components/',
     exclude: 'Styleguide.tsx',

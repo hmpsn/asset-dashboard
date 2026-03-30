@@ -40,7 +40,7 @@ export function MetricRing({ score, size = 120, strokeWidth, className, noAnimat
         />
       )}
       <svg width={size} height={size} className="transform -rotate-90 relative z-10">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#303036" strokeWidth={sw} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--metric-ring-track, #303036)" strokeWidth={sw} />
         <circle
           cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
@@ -76,7 +76,7 @@ export function MetricRingSvg({ score, size = 48, strokeWidth }: Omit<MetricRing
 
   return (
     <svg width={size} height={size} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#303036" strokeWidth={sw} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--metric-ring-track, #303036)" strokeWidth={sw} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw}
         strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
