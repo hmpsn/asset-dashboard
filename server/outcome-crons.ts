@@ -8,7 +8,7 @@ import { isFeatureEnabled } from './feature-flags.js';
 const log = createLogger('outcome-crons');
 
 const DAILY_MS = 24 * 60 * 60 * 1000;
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+const WEEKLY_MS = 7 * DAILY_MS;
 
 let measureInterval: ReturnType<typeof setInterval> | null = null;
 let learningsInterval: ReturnType<typeof setInterval> | null = null;
@@ -73,7 +73,7 @@ export function startOutcomeCrons() {
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
   learningsInterval = setInterval(() => void runLearnings(), DAILY_MS);
-  detectionInterval = setInterval(() => void runDetection(), TWELVE_HOURS_MS);
+  detectionInterval = setInterval(() => void runDetection(), WEEKLY_MS);
   archiveInterval = setInterval(runArchive, DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);

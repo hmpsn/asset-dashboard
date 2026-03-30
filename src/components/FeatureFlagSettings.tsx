@@ -52,7 +52,7 @@ const FLAG_LABELS: Record<string, string> = {
   'outcome-tracking':           'Action tracking & measurement',
   'outcome-dashboard':          'Outcomes admin dashboard',
   'outcome-playbooks':          'Playbook pattern detection',
-  'outcome-external-detection': 'External change detection (12h)',
+  'outcome-external-detection': 'External change detection (weekly)',
   'outcome-ai-injection':       'Inject outcomes into AI context',
   'outcome-client-reporting':   'Client-facing outcome reporting',
   'outcome-adaptive-pipeline':  'Adaptive measurement pipeline',
