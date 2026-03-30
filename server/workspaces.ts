@@ -20,6 +20,7 @@ import {
   contentPricingSchema, portalContactSchema, auditSuppressionSchema,
   publishTargetSchema, businessProfileSchema, audiencePersonaSchema,
 } from './schemas/workspace-schemas.js';
+import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { z } from 'zod';
 
 // ── Brand name resolution ──
@@ -148,7 +149,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
     if (bp) ws.businessProfile = bp;
   }
-  if (row.scoring_config) ws.scoringConfig = parseJsonFallback(row.scoring_config, {});
+  if (row.scoring_config) ws.scoringConfig = parseJsonSafe(row.scoring_config, scoringConfigOverrideSchema, {}, { workspaceId: row.id, field: 'scoring_config', table: 'workspaces' });
   return ws;
 }
 

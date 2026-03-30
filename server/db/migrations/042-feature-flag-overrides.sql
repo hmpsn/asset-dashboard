@@ -1,4 +1,4 @@
--- 041-feature-flag-overrides.sql
+-- 042-feature-flag-overrides.sql
 -- Persists admin-controlled feature flag overrides.
 -- Priority: DB override > env var > hardcoded default.
 CREATE TABLE IF NOT EXISTS feature_flag_overrides (

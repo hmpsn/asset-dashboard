@@ -46,6 +46,7 @@ export function startOutcomeCrons() {
   };
 
   const runDetection = async () => {
+    if (!isFeatureEnabled('outcome-external-detection')) return;
     try {
       const { detectExternalExecutions } = await import('./external-detection.js');
       await detectExternalExecutions();
@@ -55,6 +56,7 @@ export function startOutcomeCrons() {
   };
 
   const runPlaybooks = async () => {
+    if (!isFeatureEnabled('outcome-playbooks')) return;
     try {
       const { detectAllWorkspacePlaybooks } = await import('./outcome-playbooks.js');
       await detectAllWorkspacePlaybooks();
