@@ -161,7 +161,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">

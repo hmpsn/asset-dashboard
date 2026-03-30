@@ -111,7 +111,7 @@ export default function FeatureLibrary() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
       <PageHeader
         title="Feature Library"
         subtitle={`${allFeatures.length} curated features — internal sales reference`}

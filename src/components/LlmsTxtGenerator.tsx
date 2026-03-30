@@ -94,7 +94,7 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
 
   if (!data && !loading && !error) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-8">
         <PageHeader
           title="LLMs.txt Generator"
           subtitle="Generate an LLMs.txt file to help AI models understand your site"
