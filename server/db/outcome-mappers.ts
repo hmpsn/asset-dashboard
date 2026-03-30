@@ -8,6 +8,7 @@ import {
   actionContextSchema,
   deltaSummarySchema,
   competitorContextSchema,
+  earlySignalEnum,
   playbookStepSchema,
   playbookOutcomeSchema,
   workspaceLearningsDataSchema,
@@ -128,7 +129,9 @@ export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
     checkpointDays: row.checkpoint_days as ActionOutcome['checkpointDays'],
     metricsSnapshot: parseJsonSafe(row.metrics_snapshot, baselineSnapshotSchema, freshBaseline(), { field: 'metrics_snapshot', table: 'action_outcomes' }),
     score: (row.score as ActionOutcome['score']) ?? null,
-    earlySignal: (row.early_signal as EarlySignal) ?? undefined,
+    earlySignal: row.early_signal != null
+      ? (earlySignalEnum.safeParse(row.early_signal).success ? row.early_signal as EarlySignal : undefined)
+      : undefined,
     deltaSummary: parseJsonSafe(row.delta_summary, deltaSummarySchema, EMPTY_DELTA, { field: 'delta_summary', table: 'action_outcomes' }),
     competitorContext: row.competitor_context && row.competitor_context !== '{}'
       ? parseJsonSafe(row.competitor_context, competitorContextSchema, null, { field: 'competitor_context', table: 'action_outcomes' })

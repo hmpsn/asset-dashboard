@@ -24,7 +24,7 @@ function trendLabel(trend: LearningsTrend): string {
 }
 
 function trendColor(trend: LearningsTrend): string {
-  if (trend === 'improving') return 'text-green-400';
+  if (trend === 'improving') return 'text-teal-400';
   if (trend === 'declining') return 'text-red-400';
   return 'text-zinc-400';
 }
@@ -40,7 +40,7 @@ function winRateClass(rate: number): string {
 // --- Aggregate stats bar ----------------------------------------------
 
 function AggregateStats({ workspaces }: { workspaces: WorkspaceOutcomeOverview[] }) {
-  const totalActions = workspaces.reduce((sum, w) => sum + w.activeActions + w.scoredLast30d, 0);
+  const totalActions = workspaces.reduce((sum, w) => sum + w.activeActions, 0);
   const totalScored = workspaces.reduce((sum, w) => sum + w.scoredLast30d, 0);
   const attentionCount = workspaces.filter(w => w.attentionNeeded).length;
 
@@ -131,7 +131,7 @@ function WorkspaceRow({ ws }: { ws: WorkspaceOutcomeOverview }) {
                 : ws.topWin.pageUrl?.replace(/^https?:\/\/[^/]+/, '') ?? 'Unknown page'}
             </p>
             <p className={`text-xs font-medium ${winRateClass(ws.winRate)}`}>
-              +{ws.topWin.delta.delta_percent.toFixed(1)}% {ws.topWin.delta.primary_metric}
+              {ws.topWin.delta.delta_percent >= 0 ? '+' : ''}{ws.topWin.delta.delta_percent.toFixed(1)}% {ws.topWin.delta.primary_metric}
             </p>
           </div>
         ) : (

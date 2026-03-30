@@ -32,7 +32,7 @@ function formatDelta(delta: DeltaSummary): string {
 
 function formatMonth(isoDate: string): string {
   const d = new Date(isoDate);
-  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 // Groups entries by calendar month of detectedAt

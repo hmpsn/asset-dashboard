@@ -96,6 +96,7 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTimeline(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomeTopWins(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.outcomeSummary(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.outcomeWins(workspaceId) });
     },
     [WS_EVENTS.OUTCOME_EXTERNAL_DETECTED]: () => {
       if (!workspaceId) return;

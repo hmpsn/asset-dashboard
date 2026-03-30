@@ -4,6 +4,7 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import {
@@ -50,7 +51,7 @@ router.get('/api/public/recommendations/:workspaceId', async (req, res) => {
 });
 
 // Update recommendation status (pending → in_progress → completed)
-router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
+router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const { status } = req.body;
   if (!status || !['pending', 'in_progress', 'completed', 'dismissed'].includes(status)) {
     return res.status(400).json({ error: 'Valid status required: pending, in_progress, completed, dismissed' });
@@ -116,7 +117,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
 });
 
 // Dismiss a recommendation
-router.delete('/api/public/recommendations/:workspaceId/:recId', (req, res) => {
+router.delete('/api/public/recommendations/:workspaceId/:recId', requireClientPortalAuth(), (req, res) => {
   const ok = dismissRecommendation(req.params.workspaceId, req.params.recId);
   if (!ok) return res.status(404).json({ error: 'Recommendation not found' });
   res.json({ ok: true });

@@ -226,10 +226,9 @@ function computeStrategyLearnings(items: ScoredActionWithOutcome[]): StrategyLea
     }
   }
 
-  // Average time to rank by checkpoint
+  // Win rate by checkpoint — what fraction of actions scored at each checkpoint are wins
   const checkpointGroups: Record<string, ScoredActionWithOutcome[]> = {};
   for (const item of strategyItems) {
-    if (!isWin(item.outcome.score)) continue;
     const key = String(item.outcome.checkpointDays);
     if (!checkpointGroups[key]) checkpointGroups[key] = [];
     checkpointGroups[key].push(item);
@@ -444,7 +443,9 @@ export function getWorkspaceLearnings(
   const learnings = computeWorkspaceLearnings(workspaceId);
 
   if (learnings.totalScoredActions === 0) {
-    return null;
+    // No current data — return stale cache rather than nothing, so AI prompts
+    // don't lose historical context due to a transient data gap
+    return row ? rowToWorkspaceLearnings(row) : null;
   }
 
   const id = crypto.randomUUID();

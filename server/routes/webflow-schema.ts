@@ -4,8 +4,7 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
-const router = Router();
-
+import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../helpers.js';
@@ -16,6 +15,7 @@ import { generateSchemaPlan } from '../schema-plan.js';
 import { deleteBatch } from '../approvals.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.ts';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { notifyApprovalReady } from '../email.js';
 import {
   listCollections,
@@ -40,6 +40,7 @@ import {
   deleteValidation,
 } from '../schema-validator.js';
 
+const router = Router();
 const log = createLogger('webflow-schema');
 
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
@@ -440,7 +441,7 @@ router.post('/api/webflow/schema-plan/:siteId/send-to-client', requireWorkspaceA
       });
     }
 
-    broadcastToWorkspace(ws.id, 'schema:plan_sent', { siteId: req.params.siteId });
+    broadcastToWorkspace(ws.id, WS_EVENTS.SCHEMA_PLAN_SENT, { siteId: req.params.siteId });
     addActivity(ws.id, 'schema_plan_sent', 'Schema strategy sent to client for review', `${plan.pageRoles.length} pages`);
     res.json({ plan: updated || plan });
   } catch (err) {
@@ -560,7 +561,7 @@ router.post('/api/webflow/schema-rollback/:siteId', requireWorkspaceAccessFromQu
 // ── Public (client-facing) schema endpoints ──
 
 // GET: client-readable schema snapshot (read-only)
-router.get('/api/public/schema-snapshot/:workspaceId', (req, res) => {
+router.get('/api/public/schema-snapshot/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const snapshot = getSchemaSnapshot(ws.webflowSiteId);
@@ -580,7 +581,7 @@ router.get('/api/public/schema-snapshot/:workspaceId', (req, res) => {
 });
 
 // GET: client-readable schema plan (read-only)
-router.get('/api/public/schema-plan/:workspaceId', (req, res) => {
+router.get('/api/public/schema-plan/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws?.webflowSiteId) return res.status(404).json({ error: 'No site linked' });
   const plan = getSchemaPlan(ws.webflowSiteId);
@@ -589,7 +590,7 @@ router.get('/api/public/schema-plan/:workspaceId', (req, res) => {
 });
 
 // POST: client feedback on schema plan (approve / request changes)
-router.post('/api/public/schema-plan/:workspaceId/feedback', (req, res) => {
+router.post('/api/public/schema-plan/:workspaceId/feedback', requireClientPortalAuth(), (req, res) => {
   const { action, note } = req.body;
   if (!action || !['approve', 'request_changes'].includes(action)) {
     return res.status(400).json({ error: 'action must be "approve" or "request_changes"' });

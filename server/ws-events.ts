@@ -48,6 +48,9 @@ export const WS_EVENTS = {
   // Intelligence signals (keyword strategy + content pipeline)
   INTELLIGENCE_SIGNALS_UPDATED: 'intelligence:signals_updated',
 
+  // Schema
+  SCHEMA_PLAN_SENT: 'schema:plan_sent',
+
   // Outcome tracking
   OUTCOME_SCORED: 'outcome:scored',
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',

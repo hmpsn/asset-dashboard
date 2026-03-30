@@ -199,12 +199,15 @@ async function scoreActionAtCheckpoint(
     return;
   }
 
-  // Edge case: inconclusive — current metrics are all undefined (page deleted/redirected)
+  // Edge case: inconclusive — current metrics are all undefined (page deleted/redirected).
+  // Only applicable to search-metric-based action types; non-search actions (voice_calibrated,
+  // brief_created, etc.) legitimately have no metric fields in their snapshot.
   const metricKeys: Array<keyof BaselineSnapshot> = [
     'position', 'clicks', 'impressions', 'ctr', 'sessions',
     'bounce_rate', 'engagement_rate', 'conversions', 'page_health_score', 'voice_score',
   ];
-  const allUndefined = metricKeys.every(k => currentSnapshot[k] === undefined || currentSnapshot[k] === null);
+  const allUndefined = SEARCH_METRICS.has(primaryMetric) &&
+    metricKeys.every(k => currentSnapshot[k] === undefined || currentSnapshot[k] === null);
   if (allUndefined) {
     const delta = computeDelta(action.baselineSnapshot, currentSnapshot, primaryMetric);
     const outcome = recordOutcome({

@@ -18,14 +18,14 @@ export async function detectExternalExecutions(): Promise<{ detected: number; ch
       const isExecuted = await checkExternalExecution(action);
       if (isExecuted) {
         // Require 2 consecutive positive checks before committing attribution
-        const checks = (action.context as ActionContext & { detectionChecks?: number }).detectionChecks ?? 0;
+        const checks = action.context.detectionChecks ?? 0;
         if (checks >= 1) {
           updateAttribution(action.id, 'externally_executed');
           broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_EXTERNAL_DETECTED, { actionId: action.id });
           detected++;
           log.info({ actionId: action.id, actionType: action.actionType }, 'External execution detected');
         } else {
-          const ctx: ActionContext & { detectionChecks: number } = {
+          const ctx: ActionContext = {
             ...action.context,
             detectionChecks: checks + 1,
           };

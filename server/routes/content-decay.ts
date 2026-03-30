@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } from '../content-decay.js';
 import { getWorkspace } from '../workspaces.js';
 import { requireWorkspaceAccess } from '../auth.js';
+import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 
@@ -69,7 +70,7 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
 });
 
 // Public: Get decay analysis (client dashboard)
-router.get('/api/public/content-decay/:workspaceId', (req, res) => {
+router.get('/api/public/content-decay/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const analysis = loadDecayAnalysis(req.params.workspaceId);
   if (!analysis) return res.json(null);
   res.json(analysis);

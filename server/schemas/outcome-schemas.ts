@@ -85,6 +85,7 @@ export const actionContextSchema = z.object({
   seasonalTag: seasonalTagSchema.optional(),
   relatedActions: z.array(z.string()).optional(),
   notes: z.string().optional(),
+  detectionChecks: z.number().optional(),
 });
 
 // --- Playbook Schemas ---

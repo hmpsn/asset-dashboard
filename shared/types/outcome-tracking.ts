@@ -94,6 +94,8 @@ export interface ActionContext {
   seasonalTag?: SeasonalTag;
   relatedActions?: string[];
   notes?: string;
+  /** Tracks consecutive positive checks before committing external-execution attribution */
+  detectionChecks?: number;
 }
 
 export interface TrackedAction {

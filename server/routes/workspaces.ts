@@ -50,7 +50,7 @@ import { clearSeoContextCache } from '../seo-context.js';
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 
 const log = createLogger('workspaces');
 
@@ -437,7 +437,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
     });
 
     try {
-      recordAction({
+      if (!getActionBySource('brand_voice', req.params.id)) recordAction({
         workspaceId: req.params.id,
         actionType: 'voice_calibrated',
         sourceType: 'brand_voice',

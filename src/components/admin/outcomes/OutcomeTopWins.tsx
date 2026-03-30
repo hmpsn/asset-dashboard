@@ -61,7 +61,7 @@ export default function OutcomeTopWins({ workspaceId }: Props) {
                 {winLabel(win)}
               </p>
               <p className="text-[11px] text-blue-400 mt-0.5">
-                +{win.delta.delta_percent.toFixed(1)}% {win.delta.primary_metric}
+                {win.delta.delta_percent >= 0 ? '+' : ''}{win.delta.delta_percent.toFixed(1)}% {win.delta.primary_metric}
               </p>
               <p className="text-[11px] text-zinc-600 mt-0.5">{formatDate(win.createdAt)}</p>
             </div>

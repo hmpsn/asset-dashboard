@@ -189,22 +189,27 @@ export function recordOutcome(params: {
   competitorContext?: object | null;
 }): ActionOutcome {
   const id = crypto.randomUUID();
-  stmts().insertOutcome.run({
-    id,
-    action_id: params.actionId,
-    checkpoint_days: params.checkpointDays,
-    metrics_snapshot: JSON.stringify(params.metricsSnapshot),
-    score: params.score,
-    early_signal: params.earlySignal ?? null,
-    delta_summary: JSON.stringify(params.deltaSummary),
-    competitor_context: JSON.stringify(params.competitorContext ?? {}),
-    measured_at: new Date().toISOString(),
+
+  const doRecord = db.transaction(() => {
+    stmts().insertOutcome.run({
+      id,
+      action_id: params.actionId,
+      checkpoint_days: params.checkpointDays,
+      metrics_snapshot: JSON.stringify(params.metricsSnapshot),
+      score: params.score,
+      early_signal: params.earlySignal ?? null,
+      delta_summary: JSON.stringify(params.deltaSummary),
+      competitor_context: JSON.stringify(params.competitorContext ?? {}),
+      measured_at: new Date().toISOString(),
+    });
+
+    // Mark action complete after 90-day checkpoint
+    if (params.checkpointDays === 90) {
+      stmts().markComplete.run(params.actionId);
+    }
   });
 
-  // Mark action complete after 90-day checkpoint
-  if (params.checkpointDays === 90) {
-    markActionComplete(params.actionId);
-  }
+  doRecord();
 
   const rows = stmts().getOutcomesByAction.all(params.actionId) as ActionOutcomeRow[];
   const outcome = rows.find(r => r.checkpoint_days === params.checkpointDays);

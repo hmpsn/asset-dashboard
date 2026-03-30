@@ -15,8 +15,18 @@ const log = createLogger('outcome-playbooks');
 const stmts = createStmtCache(() => ({
   getByWorkspace: db.prepare('SELECT * FROM action_playbooks WHERE workspace_id = ? ORDER BY historical_win_rate DESC'),
   upsert: db.prepare(`
-    INSERT OR REPLACE INTO action_playbooks (id, workspace_id, name, trigger_condition, action_sequence, historical_win_rate, sample_size, confidence, average_outcome, enabled, created_at, updated_at)
+    INSERT INTO action_playbooks (id, workspace_id, name, trigger_condition, action_sequence, historical_win_rate, sample_size, confidence, average_outcome, enabled, created_at, updated_at)
     VALUES (@id, @workspace_id, @name, @trigger_condition, @action_sequence, @historical_win_rate, @sample_size, @confidence, @average_outcome, @enabled, @created_at, @updated_at)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      trigger_condition = excluded.trigger_condition,
+      action_sequence = excluded.action_sequence,
+      historical_win_rate = excluded.historical_win_rate,
+      sample_size = excluded.sample_size,
+      confidence = excluded.confidence,
+      average_outcome = excluded.average_outcome,
+      enabled = excluded.enabled,
+      updated_at = excluded.updated_at
   `),
 }));
 

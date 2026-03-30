@@ -4,8 +4,6 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
-const router = Router();
-
 import { addActivity } from '../activity-log.js';
 import { analyzeInternalLinks } from '../internal-links.js';
 import { checkSiteLinks, getSiteDomains } from '../link-checker.js';
@@ -26,6 +24,7 @@ import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 
+const router = Router();
 const log = createLogger('webflow-analysis');
 
 // --- Competitor SEO Comparison ---

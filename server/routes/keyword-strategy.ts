@@ -45,7 +45,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
-import { recordAction } from '../outcome-tracking.js';
+import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 
@@ -1776,7 +1776,7 @@ Rules:
     incrementUsage(ws.id, 'strategy_generations');
 
     try {
-      recordAction({
+      if (!getActionBySource('strategy', ws.id)) recordAction({
         workspaceId: ws.id,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
