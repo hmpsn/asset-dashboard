@@ -141,7 +141,7 @@ function Problem() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {problems.map((p, i) => (
-            <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 hover:border-zinc-700 transition-colors">
+            <div key={i} className="border border-zinc-800 bg-zinc-900/50 p-6 hover:border-zinc-700 transition-colors" style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="w-10 h-10 rounded-xl bg-red-500/8 border border-red-500/20 flex items-center justify-center mb-4">
                 <p.icon className="w-5 h-5 text-red-400/80" />
               </div>

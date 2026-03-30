@@ -331,7 +331,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
 
               {/* Audit issues */}
               {pageData.issues.length > 0 && (
-                <div className="rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+                <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
                   <button
                     onClick={() => setShowIssues(!showIssues)}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-zinc-800/50 transition-colors"
@@ -365,7 +365,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
 
               {/* Page headings */}
               {pageData.headings.length > 0 && (
-                <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4 space-y-2">
+                <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
                   <h3 className="text-xs font-semibold text-zinc-300">Heading Structure</h3>
                   <div className="space-y-1">
                     {pageData.headings.map((h, i) => (
@@ -378,7 +378,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
               )}
 
               {/* Page body text */}
-              <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4 space-y-2">
+              <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
                 <h3 className="text-xs font-semibold text-zinc-300">Page Content</h3>
                 <div className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap max-h-[60vh] overflow-y-auto pr-2">
                   {pageData.bodyText.slice(0, 5000)}
