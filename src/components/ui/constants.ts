@@ -1,3 +1,10 @@
+/** Generic theme-aware color helper — returns `dark` in dark mode, `light` in light mode.
+ *  Use for inline styles that need to adapt to .dashboard-light without Tailwind classes. */
+export function themeColor(dark: string, light: string): string {
+  const isLight = typeof document !== 'undefined' && !!document.querySelector('.dashboard-light');
+  return isLight ? light : dark;
+}
+
 /** Score color helper — used by MetricRing and any component showing health scores.
  *  Returns WCAG-compliant darker shades when .dashboard-light is active. */
 export function scoreColor(score: number): string {
