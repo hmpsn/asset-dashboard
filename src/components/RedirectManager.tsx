@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { PageHeader, StatCard } from './ui';
 import { redirects } from '../api/misc';
+import { themeColor } from './ui/constants';
 
 interface RedirectHop {
   url: string;
@@ -405,7 +406,7 @@ export function RedirectManager({ siteId }: Props) {
                 backgroundColor: 'rgba(45,212,191,0.1)',
                 color: '#2dd4bf',
               } : {
-                color: '#71717a',
+                color: themeColor('#71717a', '#94a3b8'),
               }}
             >
               {f.label}
