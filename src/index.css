@@ -620,3 +620,9 @@ body::after {
 
 /* ── MetricRing track color ── */
 .dashboard-light { --metric-ring-track: #e2e8f0; }
+
+/* ── Skeleton shimmer — visible pulse on light backgrounds ── */
+.dashboard-light .animate-pulse.bg-zinc-800 {
+  background-color: #e2e8f0 !important;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
