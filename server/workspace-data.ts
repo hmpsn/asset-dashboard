@@ -88,9 +88,11 @@ async function fetchAndCachePages(
       return entry;
     } catch (err) {
       log.warn({ workspaceId, siteId, err }, 'Failed to fetch Webflow pages');
-      // Return stale cache if available — preserve fallback-on-error behavior
-      const stale = pageCache.get(key);
-      if (stale) return stale.data;
+      // Return stale cache if available — preserve fallback-on-error behavior.
+      // Use peek() instead of get() because get() hard-deletes expired entries,
+      // making the fallback unreachable after TTL expiry.
+      const stale = pageCache.peek(key);
+      if (stale) return stale;
       return { allPages: [], publishedPages: [], fetchedAt: 0 } as PageCacheEntry;
     }
   });

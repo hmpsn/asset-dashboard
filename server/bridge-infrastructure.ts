@@ -222,7 +222,10 @@ const subCacheStmts = createStmtCache(() => ({
 export function readSubCache<T>(workspaceId: string, key: string): T | null {
   const row = subCacheStmts().read.get(workspaceId, key) as { data: string; cached_at: string; ttl_seconds: number } | undefined;
   if (!row) return null;
-  const age = (Date.now() - new Date(row.cached_at).getTime()) / 1000;
+  // SQLite datetime('now') returns 'YYYY-MM-DD HH:MM:SS' (UTC, no Z suffix).
+  // Node.js new Date() parses that as LOCAL time without a Z. Append Z to force UTC.
+  const cachedAtUtc = row.cached_at.endsWith('Z') ? row.cached_at : row.cached_at.replace(' ', 'T') + 'Z';
+  const age = (Date.now() - new Date(cachedAtUtc).getTime()) / 1000;
   if (age > row.ttl_seconds) return null;
   return parseJsonFallback<T>(row.data, null as unknown as T);
 }
