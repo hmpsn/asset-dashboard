@@ -293,7 +293,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
 // ── Cache management ────────────────────────────────────────────────────
 
 function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string {
-  const slices = (opts?.slices ?? ALL_SLICES).sort().join(',');
+  const slices = [...(opts?.slices ?? ALL_SLICES)].sort().join(',');
   const page = opts?.pagePath ?? '';
   const domain = opts?.learningsDomain ?? 'all';
   return `intelligence:${workspaceId}:${slices}:${page}:${domain}`;
