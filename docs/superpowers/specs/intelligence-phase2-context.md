@@ -18,7 +18,7 @@ Before writing Phase 2, confirm these files exist and export what's expected:
 | `server/routes/intelligence.ts` | `GET /api/intelligence/:workspaceId`, `GET /api/intelligence/health` | Created in Phase 1 |
 | `src/hooks/admin/useWorkspaceIntelligence.ts` | `useWorkspaceIntelligence(wsId, slices?, pagePath?, learningsDomain?)` | Created in Phase 1 |
 | `src/api/intelligence.ts` | `intelligenceApi.getIntelligence()`, `intelligenceApi.getHealth()` | Created in Phase 1 |
-| `src/lib/queryKeys.ts` | `queryKeys.admin.intelligence(wsId, slices?, pagePath?)` | Added in Phase 1 |
+| `src/lib/queryKeys.ts` | `queryKeys.admin.intelligence(wsId, slices?, pagePath?, learningsDomain?)` | Added in Phase 1 |
 | `server/ws-events.ts` | `INTELLIGENCE_CACHE_UPDATED` event | Added in Phase 1 |
 | `server/db/migrations/043-intelligence-caching-layer.sql` | `intelligence_sub_cache`, `content_pipeline_cache`, `suggested_briefs` tables; `resolution_source` column on `analytics_insights` | Created in Phase 1 |
 

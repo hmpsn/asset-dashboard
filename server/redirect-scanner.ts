@@ -7,7 +7,7 @@ import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getWorkspace } from './workspaces.js';
 
 const log = createLogger('redirect-scanner');
 
@@ -209,7 +209,8 @@ export interface GscGhostUrl {
 
 export async function scanRedirects(siteId: string, workspaceId?: string, liveDomain?: string, gscGhostUrls?: GscGhostUrl[]): Promise<RedirectScanResult> {
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-  const token = process.env.WEBFLOW_API_TOKEN || '';
+  const ws = wsId ? getWorkspace(wsId) : undefined;
+  const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
   const subdomain = await getSiteSubdomain(siteId, token);
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)

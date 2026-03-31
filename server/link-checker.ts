@@ -2,7 +2,7 @@ import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getWorkspace } from './workspaces.js';
 
 const log = createLogger('link-checker');
 
@@ -149,7 +149,8 @@ async function checkUrl(url: string, timeout = 10000): Promise<{ status: number 
 
 export async function checkSiteLinks(siteId: string, workspaceId?: string, domain?: string): Promise<LinkCheckResult> {
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-  const token = process.env.WEBFLOW_API_TOKEN || '';
+  const ws = wsId ? getWorkspace(wsId) : undefined;
+  const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
   const domains = await getSiteDomains(siteId, token);
   if (!domains) {
     return { totalLinks: 0, deadLinks: [], redirects: [], healthy: 0, checkedAt: new Date().toISOString() };

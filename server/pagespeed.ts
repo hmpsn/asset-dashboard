@@ -2,7 +2,7 @@ import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
-import { listWorkspaces } from './workspaces.js';
+import { listWorkspaces, getWorkspace } from './workspaces.js';
 
 const log = createLogger('pagespeed');
 
@@ -350,7 +350,8 @@ export async function runSiteSpeed(
   workspaceId?: string,
 ): Promise<SiteSpeedResult> {
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-  const token = process.env.WEBFLOW_API_TOKEN || '';
+  const ws = wsId ? getWorkspace(wsId) : undefined;
+  const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
   const subdomain = await getSiteSubdomain(siteId, token);
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
 

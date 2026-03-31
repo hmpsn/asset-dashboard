@@ -22,7 +22,7 @@ export function useWorkspaceIntelligence(
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all',
 ) {
   return useQuery({
-    queryKey: queryKeys.admin.intelligence(workspaceId, slices, pagePath),
+    queryKey: queryKeys.admin.intelligence(workspaceId, slices, pagePath, learningsDomain),
     queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, slices, pagePath, learningsDomain, signal),
     enabled: !!workspaceId,
     staleTime: 5 * 60 * 1000, // 5 min — matches server cache TTL

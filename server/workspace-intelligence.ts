@@ -295,7 +295,8 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
 function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string {
   const slices = (opts?.slices ?? ALL_SLICES).sort().join(',');
   const page = opts?.pagePath ?? '';
-  return `intelligence:${workspaceId}:${slices}:${page}`;
+  const domain = opts?.learningsDomain ?? 'all';
+  return `intelligence:${workspaceId}:${slices}:${page}:${domain}`;
 }
 
 /** Invalidate all cached intelligence for a workspace */
