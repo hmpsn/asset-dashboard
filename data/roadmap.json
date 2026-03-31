@@ -671,6 +671,15 @@
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
         {
+          "id": 531,
+          "title": "Replace hardcoded studio name in User-Agent strings with STUDIO_NAME constant",
+          "source": "pr-check.ts",
+          "est": "0.25h",
+          "priority": "P3",
+          "notes": "2 occurrences: server/internal-links.ts line 23 and server/llms-txt-generator.ts line 224. Both use 'HmpsnStudioBot' or 'hmpsn.studio' directly instead of importing STUDIO_NAME from server/constants.ts. Quick find-and-replace.",
+          "status": "pending"
+        },
+        {
           "id": 400,
           "title": "Content Templates backend (CRUD + migration 014)",
           "source": "CONTENT_PLANNER_PLAN",
