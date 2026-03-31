@@ -12,6 +12,8 @@ import type {
   SeoContextSlice,
   InsightsSlice,
   LearningsSlice,
+  PromptFormatOptions,
+  PromptVerbosity,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
@@ -188,6 +190,96 @@ async function assembleLearnings(
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
   };
+}
+
+// ── Prompt formatter (§3 section 2c) ────────────────────────────────────
+
+export function formatForPrompt(
+  intelligence: WorkspaceIntelligence,
+  opts?: PromptFormatOptions,
+): string {
+  const verbosity = opts?.verbosity ?? 'standard';
+  const sections: string[] = [];
+
+  sections.push('[Workspace Intelligence]');
+
+  // Cold-start detection (§29)
+  const hasData = intelligence.seoContext || intelligence.insights?.all.length || intelligence.learnings?.summary;
+  if (!hasData) {
+    sections.push('This workspace is newly onboarded. Limited data available.');
+    if (intelligence.seoContext?.brandVoice) {
+      sections.push(`Brand voice: ${intelligence.seoContext.brandVoice}`);
+    }
+    sections.push('Recommendation: Focus on establishing baseline data before making optimization decisions.');
+    return sections.join('\n');
+  }
+
+  // SEO Context
+  if (intelligence.seoContext) {
+    sections.push(formatSeoContextSection(intelligence.seoContext, verbosity));
+  }
+
+  // Insights
+  if (intelligence.insights && intelligence.insights.all.length > 0) {
+    sections.push(formatInsightsSection(intelligence.insights, verbosity));
+  }
+
+  // Learnings
+  if (intelligence.learnings) {
+    sections.push(formatLearningsSection(intelligence.learnings, verbosity));
+  }
+
+  return sections.filter(Boolean).join('\n\n');
+}
+
+function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## SEO Context'];
+
+  if (ctx.brandVoice) lines.push(`Brand voice: ${ctx.brandVoice}`);
+  if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
+
+  if (verbosity === 'detailed') {
+    if (ctx.knowledgeBase) lines.push(`Knowledge: ${ctx.knowledgeBase}`);
+    if (ctx.strategy) lines.push(`Strategy: ${ctx.strategy.siteKeywords?.length ?? 0} site keywords`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatInsightsSection(insights: InsightsSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## Active Insights'];
+  const { bySeverity } = insights;
+
+  lines.push(`Summary: ${bySeverity.critical} critical, ${bySeverity.warning} warning, ${bySeverity.opportunity} opportunity, ${bySeverity.positive} positive`);
+
+  const limit = verbosity === 'compact' ? 3 : verbosity === 'standard' ? 5 : 10;
+  const top = insights.topByImpact.length > 0 ? insights.topByImpact : insights.all;
+  for (const insight of top.slice(0, limit)) {
+    lines.push(`- [${insight.severity}] ${insight.insightType}: impact ${insight.impactScore ?? 'n/a'}${insight.pageId ? ` (${insight.pageId})` : ''}`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity): string {
+  if (!learnings.summary && learnings.topActionTypes.length === 0) return '';
+
+  const lines: string[] = ['## Outcome Learnings'];
+
+  if (learnings.recentTrend) lines.push(`Trend: ${learnings.recentTrend}`);
+  if (learnings.confidence) lines.push(`Confidence: ${learnings.confidence}`);
+  if (learnings.overallWinRate > 0) lines.push(`Overall win rate: ${Math.round(learnings.overallWinRate * 100)}%`);
+
+  if (verbosity === 'detailed' || verbosity === 'standard') {
+    if (learnings.topActionTypes.length > 0) {
+      lines.push('Win rates by action type:');
+      for (const { type, winRate, count } of learnings.topActionTypes) {
+        lines.push(`  ${type}: ${Math.round(winRate * 100)}% (${count} actions)`);
+      }
+    }
+  }
+
+  return lines.join('\n');
 }
 
 // ── Cache management ────────────────────────────────────────────────────
