@@ -73,10 +73,11 @@ export async function executeBridge(
   try {
     const result = fn();
     if (result && typeof result.then === 'function') {
-      // Async bridge — race against timeout, clear timer on success to avoid leaks
+      // Async bridge — race against timeout, clear timer on settle to avoid leaks
       let timeoutId: ReturnType<typeof setTimeout>;
+      const cleanup = () => clearTimeout(timeoutId);
       await Promise.race([
-        result.then((v: void) => { clearTimeout(timeoutId); return v; }),
+        result.then((v: void) => { cleanup(); return v; }, (e: unknown) => { cleanup(); throw e; }),
         new Promise<void>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error(`Bridge ${flag} timed out after ${timeoutMs}ms`)), timeoutMs);
         }),
@@ -125,12 +126,13 @@ export function debounceBridge(
 
     timers.set(
       workspaceId,
-      setTimeout(async () => {
+      setTimeout(() => {
         timers.delete(workspaceId);
         const latestFn = pending.get(workspaceId);
         pending.delete(workspaceId);
         if (latestFn) {
-          await executeBridge(flag, workspaceId, latestFn);
+          // executeBridge catches all errors internally — safe to discard promise
+          void executeBridge(flag, workspaceId, latestFn);
         }
       }, delayMs),
     );

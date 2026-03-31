@@ -363,6 +363,8 @@ interface AnalyticsInsight {
 | **Page cache has no bounded eviction** — plain `Map` with no max size | `server/workspace-data.ts` | PR 2A |
 | **`workspace-data.ts` duplicates single-flight** — inline instead of shared utility | `server/workspace-data.ts` | PR 2A |
 | **Shadow-mode compares only 2/5 fields** | `server/seo-context.ts` | PR 2C |
+| **Shadow-mode `brandVoice` comparison always mismatches** — compares `intel.seoContext.brandVoice` (raw workspace voice string) against `result.brandVoiceBlock` (wrapped with `BRAND VOICE & STYLE` header + brand docs content). These will never match, producing false-positive mismatch warnings. Task 21 must compare against the correct source field for each comparison. | `server/seo-context.ts:172` | PR 2C |
+| **Phase 1 page accessor behavioral change** — `getWorkspacePages()`/`getWorkspaceAllPages()` return `[]` when no workspace matches `siteId`, whereas the old `listPages(siteId, token)` would call the Webflow API directly. Route handlers are guarded by `requireWorkspaceAccessFromQuery()` middleware, but utility functions called outside route context (e.g., `scanAssetUsage` in `webflow-assets.ts`) now silently return empty results instead of attempting the API call. | `server/workspace-data.ts` | Monitor / Phase 3 |
 | **`personas` always empty array** — stub in assembler | `server/workspace-intelligence.ts` | PR 2A |
 | **No barrel export for hook** | `src/hooks/admin/index.ts` | PR 2A |
 | **`getContentPipelineSummary()` not implemented** — type exists, function doesn't | `server/workspace-data.ts` | PR 2A |
