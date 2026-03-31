@@ -396,7 +396,6 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
       companyName: ctx.companyName,
       businessContext: ctx.businessContext,
       strategy: ws.keywordStrategy,
-      tokenOverride: getTokenForSite(req.params.siteId) || undefined,
       architectureResult,
       competitorDomains: ws.competitorDomains,
       ourSchemaTypes,

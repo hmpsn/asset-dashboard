@@ -25,7 +25,6 @@ export interface PlanContext {
   companyName?: string;
   businessContext?: string;
   strategy?: KeywordStrategy;
-  tokenOverride?: string;
   architectureResult?: SiteArchitectureResult;
   competitorDomains?: string[];  // Competitor domains for schema gap analysis
   ourSchemaTypes?: string[];     // Current schema types we're already using
@@ -36,7 +35,7 @@ export interface PlanContext {
  * Returns a plan with canonical entities and page role assignments.
  */
 export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePlan> {
-  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult, competitorDomains, ourSchemaTypes } = ctx;
+  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, architectureResult, competitorDomains, ourSchemaTypes } = ctx;
 
   let pageList: PageListItem[];
 
