@@ -5,6 +5,7 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
+import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -301,8 +302,15 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
 
 /** Invalidate all cached intelligence for a workspace */
 export function invalidateIntelligenceCache(workspaceId: string): void {
+  // Invalidate in-memory LRU
   const deleted = intelligenceCache.deleteByPrefix(`intelligence:${workspaceId}:`);
-  log.debug({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated');
+  // Invalidate persistent sub-cache
+  try {
+    invalidateSubCachePrefix(workspaceId, '');
+  } catch {
+    // Table may not exist yet — non-critical
+  }
+  log.info({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated (in-memory + persistent)');
 }
 
 /** Cache stats for health endpoint (§18) */

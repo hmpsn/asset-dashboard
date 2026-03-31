@@ -5,6 +5,7 @@
 import { listPages, filterPublishedPages } from './webflow-pages.js';
 import { getWorkspace } from './workspaces.js';
 import { createLogger } from './logger.js';
+import { LRUCache, singleFlight } from './intelligence-cache.js';
 
 const log = createLogger('workspace-data');
 
@@ -27,8 +28,7 @@ interface PageCacheEntry {
 // ── Page cache ──────────────────────────────────────────────────────────
 
 const PAGE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-const pageCache = new Map<string, PageCacheEntry>();
-const pageInflight = new Map<string, Promise<PageCacheEntry>>();
+const pageCache = new LRUCache<PageCacheEntry>(100);
 
 /**
  * Generation counter per cache key. Incremented on invalidation.
@@ -51,54 +51,42 @@ async function fetchAndCachePages(
 ): Promise<PageCacheEntry> {
   const key = `${workspaceId}:${siteId}`;
 
-  // Check cache
+  // Check cache (LRU handles TTL expiry)
   const cached = pageCache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < PAGE_CACHE_TTL) {
+  if (cached && !cached.stale) {
     log.debug({ workspaceId, siteId, cache_hit: true }, 'Page cache hit');
-    return cached;
+    return cached.data;
   }
-  log.debug({ workspaceId, siteId, cache_hit: false }, 'Page cache miss');
+  log.debug({ workspaceId, siteId, cache_hit: false, stale: cached?.stale }, 'Page cache miss');
 
-  // Single-flight: if another call is already fetching, wait for it
-  const existing = pageInflight.get(key);
-  if (existing) return existing;
+  // Single-flight dedup via shared utility
+  return singleFlight(`page:${key}`, async () => {
+    const token = getWorkspace(workspaceId)?.webflowToken;
+    const gen = getGeneration(key);
 
-  // Resolve workspace token — fall through to listPages() even if null,
-  // because webflowFetch() falls back to process.env.WEBFLOW_API_TOKEN.
-  const token = getWorkspace(workspaceId)?.webflowToken;
-
-  // Capture generation at fetch start — only write to cache if it hasn't
-  // been invalidated while the API call was in flight.
-  const gen = getGeneration(key);
-
-  const promise = listPages(siteId, token || undefined)
-    .then(raw => {
+    try {
+      const raw = await listPages(siteId, token || undefined);
       // "All pages" = live pages (not draft, not archived) — includes CMS templates
       const allPages = raw.filter(p => p.draft !== true && !p.archived);
       const publishedPages = filterPublishedPages(raw);
       const entry: PageCacheEntry = { allPages, publishedPages, fetchedAt: Date.now() };
+
       // Only cache if generation hasn't changed (no invalidation during fetch)
       if (getGeneration(key) === gen) {
-        pageCache.set(key, entry);
+        pageCache.set(key, entry, PAGE_CACHE_TTL);
         log.info({ workspaceId, siteId, rawPages: raw.length, livePages: allPages.length, publishedPages: publishedPages.length }, 'Page cache refreshed');
       } else {
         log.info({ workspaceId, siteId }, 'Page cache invalidated during fetch — discarding stale result');
       }
       return entry;
-    })
-    .catch(err => {
+    } catch (err) {
       log.warn({ workspaceId, siteId, err }, 'Failed to fetch Webflow pages');
-      // Return stale cache if available
+      // Return stale cache if available — preserve fallback-on-error behavior
       const stale = pageCache.get(key);
-      if (stale) return stale;
+      if (stale) return stale.data;
       return { allPages: [], publishedPages: [], fetchedAt: 0 } as PageCacheEntry;
-    })
-    .finally(() => {
-      pageInflight.delete(key);
-    });
-
-  pageInflight.set(key, promise);
-  return promise;
+    }
+  });
 }
 
 /**
@@ -145,26 +133,26 @@ export async function getWorkspaceAllPages(
  */
 export function invalidatePageCache(workspaceId: string): void {
   const prefix = `${workspaceId}:`;
-  for (const key of pageCache.keys()) {
-    if (key.startsWith(prefix)) {
-      pageCache.delete(key);
-      // Bump generation — any in-flight fetch for this key will see a
-      // different generation when it resolves and skip the cache write.
-      cacheGeneration.set(key, getGeneration(key) + 1);
-    }
-  }
-  // Also bump generation for in-flight keys not yet in pageCache
-  for (const key of pageInflight.keys()) {
+  const deleted = pageCache.deleteByPrefix(prefix);
+  // Bump generation for race-safe invalidation
+  for (const key of cacheGeneration.keys()) {
     if (key.startsWith(prefix)) {
       cacheGeneration.set(key, getGeneration(key) + 1);
     }
   }
-  log.debug({ workspaceId }, 'Page cache invalidated');
+  log.info({ workspaceId, entriesDeleted: deleted }, 'Page cache invalidated');
 }
 
 /**
  * Cache stats for health endpoint (§18).
  */
 export function getPageCacheStats(): { entries: number; maxEntries: number } {
-  return { entries: pageCache.size, maxEntries: 100 };
+  return pageCache.stats();
+}
+
+/**
+ * Stub: content pipeline summary for workspace. Full implementation in Phase 2.
+ */
+export function getContentPipelineSummary(_workspaceId: string): null {
+  return null;
 }
