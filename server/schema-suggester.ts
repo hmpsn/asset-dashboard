@@ -1,5 +1,6 @@
 import { discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollections } from './webflow.js';
 import { getWorkspacePages } from './workspace-data.js';
+import { listWorkspaces } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
@@ -2026,7 +2027,8 @@ export async function generateSchemaSuggestions(
     return [];
   }
 
-  const allPublished = ctx.workspaceId ? await getWorkspacePages(ctx.workspaceId, siteId) : [];
+  const wsId = ctx.workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const allPublished = wsId ? await getWorkspacePages(wsId, siteId) : [];
   const pages = allPublished.filter(
     (p: { title: string; slug: string }) => !(p.title || '').toLowerCase().includes('password') && !(p.slug || '').toLowerCase().includes('password')
   );

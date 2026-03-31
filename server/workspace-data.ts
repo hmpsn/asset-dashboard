@@ -31,6 +31,17 @@ const pageCache = new Map<string, PageCacheEntry>();
 const pageInflight = new Map<string, Promise<PageCacheEntry>>();
 
 /**
+ * Generation counter per cache key. Incremented on invalidation.
+ * In-flight fetches check this before writing to cache — if the generation
+ * changed while the fetch was running, the result is stale and discarded.
+ */
+const cacheGeneration = new Map<string, number>();
+
+function getGeneration(key: string): number {
+  return cacheGeneration.get(key) ?? 0;
+}
+
+/**
  * Internal: fetch and cache ALL pages for a workspace+site.
  * Both getWorkspacePages() and getWorkspaceAllPages() share this cache.
  */
@@ -56,14 +67,23 @@ async function fetchAndCachePages(
   // because webflowFetch() falls back to process.env.WEBFLOW_API_TOKEN.
   const token = getWorkspace(workspaceId)?.webflowToken;
 
+  // Capture generation at fetch start — only write to cache if it hasn't
+  // been invalidated while the API call was in flight.
+  const gen = getGeneration(key);
+
   const promise = listPages(siteId, token || undefined)
     .then(raw => {
       // "All pages" = live pages (not draft, not archived) — includes CMS templates
       const allPages = raw.filter(p => p.draft !== true && !p.archived);
       const publishedPages = filterPublishedPages(raw);
       const entry: PageCacheEntry = { allPages, publishedPages, fetchedAt: Date.now() };
-      pageCache.set(key, entry);
-      log.info({ workspaceId, siteId, rawPages: raw.length, livePages: allPages.length, publishedPages: publishedPages.length }, 'Page cache refreshed');
+      // Only cache if generation hasn't changed (no invalidation during fetch)
+      if (getGeneration(key) === gen) {
+        pageCache.set(key, entry);
+        log.info({ workspaceId, siteId, rawPages: raw.length, livePages: allPages.length, publishedPages: publishedPages.length }, 'Page cache refreshed');
+      } else {
+        log.info({ workspaceId, siteId }, 'Page cache invalidated during fetch — discarding stale result');
+      }
       return entry;
     })
     .catch(err => {
@@ -120,11 +140,23 @@ export async function getWorkspaceAllPages(
 
 /**
  * Invalidate page cache for a workspace. Called on workspace settings save.
+ * Uses a generation counter to prevent in-flight fetches from re-populating
+ * the cache with stale data after invalidation.
  */
 export function invalidatePageCache(workspaceId: string): void {
+  const prefix = `${workspaceId}:`;
   for (const key of pageCache.keys()) {
-    if (key.startsWith(`${workspaceId}:`)) {
+    if (key.startsWith(prefix)) {
       pageCache.delete(key);
+      // Bump generation — any in-flight fetch for this key will see a
+      // different generation when it resolves and skip the cache write.
+      cacheGeneration.set(key, getGeneration(key) + 1);
+    }
+  }
+  // Also bump generation for in-flight keys not yet in pageCache
+  for (const key of pageInflight.keys()) {
+    if (key.startsWith(prefix)) {
+      cacheGeneration.set(key, getGeneration(key) + 1);
     }
   }
   log.debug({ workspaceId }, 'Page cache invalidated');
