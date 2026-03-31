@@ -66,6 +66,9 @@ async function fetchAndCachePages(
   // Single-flight dedup via shared utility
   return singleFlight(`page:${key}`, async () => {
     const token = getWorkspace(workspaceId)?.webflowToken;
+    // Register key in generation map BEFORE the async fetch, so that
+    // invalidatePageCache() can find and bump it even on first-ever fetch.
+    if (!cacheGeneration.has(key)) cacheGeneration.set(key, 0);
     const gen = getGeneration(key);
 
     try {
@@ -138,13 +141,17 @@ export async function getWorkspaceAllPages(
 export function invalidatePageCache(workspaceId: string): void {
   const prefix = `${workspaceId}:`;
   const deleted = pageCache.deleteByPrefix(prefix);
-  // Bump generation for race-safe invalidation
+  // Bump generation for race-safe invalidation.
+  // fetchAndCachePages registers its key in cacheGeneration BEFORE the async
+  // fetch, so in-flight first-ever fetches are always found and bumped here.
+  let bumped = 0;
   for (const key of cacheGeneration.keys()) {
     if (key.startsWith(prefix)) {
       cacheGeneration.set(key, getGeneration(key) + 1);
+      bumped++;
     }
   }
-  log.info({ workspaceId, entriesDeleted: deleted }, 'Page cache invalidated');
+  log.info({ workspaceId, entriesDeleted: deleted, generationsBumped: bumped }, 'Page cache invalidated');
 }
 
 /**

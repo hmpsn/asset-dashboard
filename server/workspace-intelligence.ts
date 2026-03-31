@@ -215,7 +215,16 @@ export function formatForPrompt(
   sections.push('[Workspace Intelligence]');
 
   // Cold-start detection (§29)
-  const hasData = intelligence.seoContext || intelligence.insights?.all.length || intelligence.learnings?.summary;
+  // Check for meaningful content, not just object existence — seoContext is always
+  // assembled as an object, so truthy-check on it would always pass.
+  const hasSeoContent = intelligence.seoContext && (
+    intelligence.seoContext.strategy ||
+    intelligence.seoContext.brandVoice ||
+    intelligence.seoContext.businessContext ||
+    intelligence.seoContext.knowledgeBase ||
+    (intelligence.seoContext.personas && intelligence.seoContext.personas.length > 0)
+  );
+  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary;
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
