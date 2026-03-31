@@ -10,6 +10,7 @@ import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type { FeatureFlagKey } from '../shared/types/feature-flags.js';
 
 const log = createLogger('bridge-infrastructure');
@@ -220,7 +221,7 @@ export function readSubCache<T>(workspaceId: string, key: string): T | null {
   if (!row) return null;
   const age = (Date.now() - new Date(row.cached_at).getTime()) / 1000;
   if (age > row.ttl_seconds) return null;
-  try { return JSON.parse(row.data); } catch { return null; }
+  return parseJsonFallback<T>(row.data, null as unknown as T);
 }
 
 /**

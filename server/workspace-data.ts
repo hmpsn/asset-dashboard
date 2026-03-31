@@ -217,11 +217,9 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
   let cellsPlanned = 0;
   let cellsPublished = 0;
   for (const r of matricesCellRows) {
-    try {
-      const cells = JSON.parse(r.cells || '[]') as { status?: string }[];
-      cellsPlanned += cells.length;
-      cellsPublished += cells.filter(c => c.status === 'published').length;
-    } catch { /* skip malformed */ }
+    const cells = parseJsonFallback<{ status?: string }[]>(r.cells || '[]', []);
+    cellsPlanned += cells.length;
+    cellsPublished += cells.filter(c => c.status === 'published').length;
   }
 
   const requestsByStatusRows = pipelineStmts().requestsByStatus.all(workspaceId) as { status: string; cnt: number }[];
