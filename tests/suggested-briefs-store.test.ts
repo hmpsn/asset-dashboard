@@ -1,4 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import db from '../server/db/index.js';
+
+// Clean up test data before and after to ensure idempotent runs
+const cleanupTestData = () => db.prepare("DELETE FROM suggested_briefs WHERE workspace_id LIKE 'test-ws-%'").run();
+beforeAll(cleanupTestData);
+afterAll(cleanupTestData);
 
 describe('suggested-briefs-store', () => {
   let createSuggestedBrief: typeof import('../server/suggested-briefs-store.js').createSuggestedBrief;

@@ -91,6 +91,14 @@ const stmts = createStmtCache(() => ({
 
 // ── CRUD ───────────────────────────────────────────────────────────────
 
+/**
+ * Create a suggested brief for a workspace.
+ *
+ * Deduplication: if the same keyword (case-insensitive, trimmed) was previously dismissed,
+ * returns a **synthetic** (non-persisted) brief with `status: 'dismissed'`. The returned
+ * object has a fresh `id` that does NOT correspond to any DB row — callers should check
+ * `result.status === 'dismissed'` rather than assuming the brief was persisted.
+ */
 export function createSuggestedBrief(params: {
   workspaceId: string;
   keyword: string;

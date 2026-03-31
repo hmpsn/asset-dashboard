@@ -210,6 +210,8 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   if (!ws) return res.status(404).json({ error: 'Not found' });
   clearSeoContextCache(req.params.id); // Invalidate cached AI context
   invalidateIntelligenceCache(req.params.id);
+  // Bridge #11: debounced cascade — re-invalidates intelligence cache 2s later to catch any
+  // cache repopulation that occurred between the immediate clear above and this deferred pass.
   debouncedSettingsCascade(req.params.id, () => {
     invalidateIntelligenceCache(req.params.id);
     invalidatePageCache(req.params.id);
