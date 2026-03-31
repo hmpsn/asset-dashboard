@@ -25,11 +25,10 @@ import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import {
-  listPages,
-  filterPublishedPages,
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
@@ -233,8 +232,7 @@ async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPag
     : subdomain ? `https://${subdomain}.webflow.io` : '';
   if (!baseUrl) throw new Error('Could not determine site URL');
 
-  const allPages = await listPages(ws.webflowSiteId!, token);
-  const published = filterPublishedPages(allPages);
+  const published = await getWorkspacePages(ws.id, ws.webflowSiteId!);
 
   const priorityPatterns = [
     /^\/?$/, /about/i, /who-we-are/i, /our-story/i, /team/i,

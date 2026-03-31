@@ -29,11 +29,10 @@ import { getConfiguredProvider } from '../seo-data-provider.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword } from '../seo-data-provider.js';
 import { checkUsageLimit, incrementUsage } from '../usage-tracking.js';
 import {
-  listPages,
-  filterPublishedPages,
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
@@ -224,8 +223,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Build Webflow API metadata lookup (for enrichment only, not page discovery)
     const wfMetaByPath = new Map<string, { title: string; seoTitle: string; seoDesc: string }>();
     try {
-      const allPages = await listPages(ws.webflowSiteId, token);
-      const published = filterPublishedPages(allPages);
+      const published = await getWorkspacePages(ws.id, ws.webflowSiteId);
       for (const p of published) {
         const pagePath = resolvePagePath(p);
         wfMetaByPath.set(pagePath, {
