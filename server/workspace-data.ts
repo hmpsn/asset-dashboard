@@ -37,8 +37,10 @@ export async function getWorkspacePages(
   // Check cache
   const cached = pageCache.get(key);
   if (cached && Date.now() - cached.fetchedAt < PAGE_CACHE_TTL) {
+    log.debug({ workspaceId, siteId, cache_hit: true }, 'Page cache hit');
     return cached.pages;
   }
+  log.debug({ workspaceId, siteId, cache_hit: false }, 'Page cache miss');
 
   // Single-flight: if another call is already fetching, wait for it
   const existing = pageInflight.get(key);

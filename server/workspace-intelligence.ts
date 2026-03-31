@@ -39,7 +39,13 @@ export async function buildWorkspaceIntelligence(
 
   // Check cache
   const cached = intelligenceCache.get(cacheKey);
-  if (cached && !cached.stale) return cached.data;
+  if (cached && !cached.stale) {
+    log.debug({ workspaceId, cache_hit: true, stale: false }, 'Intelligence cache hit');
+    return cached.data;
+  }
+  if (cached?.stale) {
+    log.debug({ workspaceId, cache_hit: true, stale: true }, 'Intelligence cache hit (stale)');
+  }
 
   // Single-flight dedup (§13)
   return singleFlight(cacheKey, async () => {
