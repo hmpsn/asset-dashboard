@@ -5,6 +5,9 @@ import { getPageKeyword, listPageKeywords } from './page-keywords.js';
 import { getUploadRoot } from './data-dir.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('seo-context');
 
 /**
  * Shared SEO context builder for all AI-powered endpoints.
@@ -144,6 +147,39 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string, learnin
   // Cache result
   if (workspaceId) {
     seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
+  }
+
+  // Shadow-mode intelligence delegation (§14, §16)
+  // Fire-and-forget — don't await, don't block the return.
+  // ALWAYS returns the original result — shadow mode is observation-only.
+  if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId) {
+    void (async () => {
+      try {
+        const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');
+        const intel = await buildWorkspaceIntelligence(workspaceId, {
+          slices: ['seoContext'],
+          pagePath,
+          learningsDomain,
+        });
+
+        if (intel.seoContext) {
+          const mismatches: string[] = [];
+          if (intel.seoContext.brandVoice !== result.brandVoiceBlock) {
+            mismatches.push('brandVoice');
+          }
+          if (intel.seoContext.businessContext !== result.businessContext) {
+            mismatches.push('businessContext');
+          }
+          if (mismatches.length > 0) {
+            log.warn({ workspaceId, mismatches }, 'Intelligence shadow-mode mismatch detected');
+          } else {
+            log.debug({ workspaceId }, 'Intelligence shadow-mode: results match');
+          }
+        }
+      } catch (err) {
+        log.warn({ workspaceId, err }, 'Intelligence shadow-mode comparison failed');
+      }
+    })();
   }
 
   return result;
