@@ -116,5 +116,20 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.outcomePlaybooks(workspaceId) });
     },
+    [WS_EVENTS.SUGGESTED_BRIEF_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    },
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.actionQueue(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.clientInsights(workspaceId) });
+    },
+    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.analyticsAnnotations(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.client.annotations(workspaceId) });
+    },
   });
 }
