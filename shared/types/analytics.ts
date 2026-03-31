@@ -225,6 +225,7 @@ export interface AnalyticsInsight {
   resolutionStatus?: 'in_progress' | 'resolved' | null;
   resolutionNote?: string | null;
   resolvedAt?: string | null;
+  resolutionSource?: string | null;
 }
 
 // ── Insight data shapes (used in data JSON field) ─────────────────
