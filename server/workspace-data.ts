@@ -186,7 +186,10 @@ export function getContentPipelineSummary(workspaceId: string): ContentPipelineS
   // Check persistent cache first
   const cached = pipelineStmts().getCache.get(workspaceId) as { summary_json: string; cached_at: string; invalidated_at: string | null } | undefined;
   if (cached && !cached.invalidated_at) {
-    const age = Date.now() - new Date(cached.cached_at).getTime();
+    // Normalize to ISO 8601 with Z — write path uses new Date().toISOString() which always
+    // includes Z, but normalizing defensively in case a future path uses datetime('now').
+    const cachedAtUtc = cached.cached_at.endsWith('Z') ? cached.cached_at : cached.cached_at.replace(' ', 'T') + 'Z';
+    const age = Date.now() - new Date(cachedAtUtc).getTime();
     if (age < 5 * 60 * 1000) {
       const parsed = parseJsonFallback(cached.summary_json, null as unknown as ContentPipelineSummary);
       if (parsed) return parsed;
