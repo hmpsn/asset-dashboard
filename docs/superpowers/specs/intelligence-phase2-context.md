@@ -1,7 +1,7 @@
 # Unified Workspace Intelligence — Phase 2 Context Brief
 
 > **Purpose:** This document carries forward everything verified during Phase 1 planning and execution so the Phase 2 plan starts from ground truth, not assumptions. Read this BEFORE writing the Phase 2 plan.
-> **Last updated:** 2026-03-31 (post Phase 1 merge to main)
+> **Last updated:** 2026-03-31 (post PR 2A merge to staging)
 
 ---
 
@@ -9,18 +9,21 @@
 
 | File | Key Exports | Status |
 |------|-------------|--------|
-| `shared/types/intelligence.ts` | `WorkspaceIntelligence`, `IntelligenceSlice`, `IntelligenceOptions`, `PromptFormatOptions`, `ContentPipelineSummary`, all 8 slice interfaces | ✅ Created |
-| `shared/types/feature-flags.ts` | `intelligence-shadow-mode` flag | ✅ Added |
-| `server/workspace-intelligence.ts` | `buildWorkspaceIntelligence()`, `formatForPrompt()`, `invalidateIntelligenceCache()`, `getIntelligenceCacheStats()` | ✅ Created |
-| `server/workspace-data.ts` | `getWorkspacePages()`, `getWorkspaceAllPages()`, `invalidatePageCache()`, `getPageCacheStats()` | ✅ Created |
-| `server/intelligence-cache.ts` | `LRUCache` (with `deleteByPrefix()`, `markStale()`), `singleFlight()` | ✅ Created |
-| `server/routes/intelligence.ts` | `GET /api/intelligence/:workspaceId`, `GET /api/intelligence/health` | ✅ Created |
-| `src/hooks/admin/useWorkspaceIntelligence.ts` | `useWorkspaceIntelligence(wsId, slices?, pagePath?, learningsDomain?)` | ✅ Created |
-| `src/api/intelligence.ts` | `intelligenceApi.getIntelligence()`, `intelligenceApi.getHealth()` | ✅ Created |
-| `src/lib/queryKeys.ts` | `queryKeys.admin.intelligence(wsId, slices?, pagePath?, learningsDomain?)` | ✅ Added |
-| `server/ws-events.ts` | `INTELLIGENCE_CACHE_UPDATED` event | ✅ Added |
-| `server/db/migrations/043-intelligence-caching-layer.sql` | `intelligence_sub_cache`, `content_pipeline_cache`, `suggested_briefs` tables; `resolution_source` column on `analytics_insights` | ✅ Created |
-| `server/constants.ts` | `STUDIO_URL`, `STUDIO_BOT_UA` constants | ✅ Added |
+| `shared/types/intelligence.ts` | `WorkspaceIntelligence`, `IntelligenceSlice`, `IntelligenceOptions`, `PromptFormatOptions`, `ContentPipelineSummary`, all 8 slice interfaces | ✅ Phase 1 |
+| `shared/types/feature-flags.ts` | `intelligence-shadow-mode` flag + **15 bridge flags** (all default OFF) | ✅ Phase 1 + 2A |
+| `server/workspace-intelligence.ts` | `buildWorkspaceIntelligence()`, `formatForPrompt()`, `invalidateIntelligenceCache()`, `getIntelligenceCacheStats()` | ✅ Phase 1 |
+| `server/workspace-data.ts` | `getWorkspacePages()`, `getWorkspaceAllPages()`, `invalidatePageCache()`, `getPageCacheStats()`, **`getContentPipelineSummary()`**, **`invalidateContentPipelineCache()`** | ✅ Phase 1 + 2A |
+| `server/intelligence-cache.ts` | `LRUCache` (with `get()`, `set()`, `delete()`, `markStale()`, `deleteByPrefix()`, **`peek()`**, `stats()`), `singleFlight()` | ✅ Phase 1 + 2A |
+| `server/bridge-infrastructure.ts` | `executeBridge()`, `fireBridge()`, `debounceBridge()`, `withWorkspaceLock()`, `getBridgeFlags()`, `readSubCache()`, `writeSubCache()`, `invalidateSubCache()`, `invalidateSubCachePrefix()`, pre-configured debounced instances | ✅ Phase 2A |
+| `server/routes/intelligence.ts` | `GET /api/intelligence/:workspaceId`, `GET /api/intelligence/health` (includes bridge flags) | ✅ Phase 1 + 2A |
+| `src/hooks/admin/useWorkspaceIntelligence.ts` | `useWorkspaceIntelligence(wsId, slices?, pagePath?, learningsDomain?)` | ✅ Phase 1 |
+| `src/api/intelligence.ts` | `intelligenceApi.getIntelligence()`, `intelligenceApi.getHealth()` | ✅ Phase 1 |
+| `src/lib/queryKeys.ts` | `queryKeys.admin.intelligence(wsId, slices?, pagePath?, learningsDomain?)` | ✅ Phase 1 |
+| `server/ws-events.ts` | `INTELLIGENCE_CACHE_UPDATED` event | ✅ Phase 1 |
+| `server/db/migrations/043-intelligence-caching-layer.sql` | `intelligence_sub_cache`, `content_pipeline_cache`, `suggested_briefs` tables; `resolution_source` column on `analytics_insights` | ✅ Phase 1 |
+| `server/constants.ts` | `STUDIO_URL`, `STUDIO_BOT_UA` constants | ✅ Phase 1 |
+| `tests/bridge-infrastructure.test.ts` | 9 tests covering executeBridge, fireBridge, debounceBridge, withWorkspaceLock | ✅ Phase 2A |
+| `tests/bridge-pairing.test.ts` | Structural test: every file calling `clearSeoContextCache` must also call `invalidateIntelligenceCache` | ✅ Phase 2A |
 
 ### Phase 1 Slices Implemented
 
@@ -50,14 +53,15 @@ These are differences between the original spec (`unified-workspace-intelligence
 | `getWorkspacePages()` | Single function returning published pages | Two functions: `getWorkspacePages()` (published, no CMS templates) and `getWorkspaceAllPages()` (all live, no drafts/archived) |
 | Page cache invalidation | Simple `Map.delete()` | Generation counter pattern for race-safe invalidation |
 | Page cache token resolution | `token ∣∣ process.env.WEBFLOW_API_TOKEN` | `token ∣∣ undefined` — lets `webflowFetch()` handle env var fallback internally |
-| `getContentPipelineSummary()` | Spec said Phase 1 | **Deferred** — type exists, function does not |
-| Persona parsing | Spec assumed working | Always returns `[]` — TODO in Phase 2+ |
-| Barrel export for hook | Spec assumed present | **Missing** — `useWorkspaceIntelligence` not in `src/hooks/admin/index.ts` |
+| `getContentPipelineSummary()` | Spec said Phase 1 | ✅ **Shipped in PR 2A** — implemented in `workspace-data.ts` with 5-min persistent cache |
+| Persona parsing | Spec assumed working | Always returns `[]` — TODO in Phase 2+ (unchanged) |
+| Barrel export for hook | Spec assumed present | ✅ **Fixed in PR 2A** — `useWorkspaceIntelligence` now exported from `src/hooks/admin/index.ts` |
 | Shadow-mode soak | Spec required 3-day soak before Phase 2 | **Skipped** — minimal traffic, user opted to proceed |
-| Shadow-mode comparison | Spec implied full comparison | Only compares `brandVoice` + `businessContext` (2 of 5 fields) |
+| Shadow-mode comparison | Spec implied full comparison | Only compares `brandVoice` + `businessContext` (2 of 5 fields); comparison is currently a no-op (both sides from same call chain — documented in code, Task 21 fixes) |
 | Stale-while-revalidate | Spec defined serve-stale behavior | Stale entries logged but never served — falls through to recompute |
-| `workspace-data.ts` single-flight | Spec assumed shared `singleFlight()` | Uses inline `Map<string, Promise>` pattern (has fallback-on-error advantage) |
-| Page cache eviction | Spec said LRU with max 100 | Plain `Map` with no enforcement — `getPageCacheStats()` reports misleading `maxEntries: 100` |
+| `workspace-data.ts` single-flight | Spec assumed shared `singleFlight()` | ✅ **Fixed in PR 2A** — uses shared `singleFlight()` from `intelligence-cache.ts`; stale fallback uses `peek()` |
+| Page cache eviction | Spec said LRU with max 100 | ✅ **Fixed in PR 2A** — now uses `LRUCache<PageCacheEntry>(100)`; `getPageCacheStats()` returns real LRU stats |
+| Bridge flag count | Spec says 16 | **Actually 15** — bridge #6 intentionally skipped (spec numbering goes #5 → #7). Both `BRIDGE_FLAGS` array and `feature-flags.ts` have 15 entries. |
 
 ---
 
@@ -166,20 +170,70 @@ export async function getWorkspacePages(workspaceId: string, siteId: string): Pr
 export async function getWorkspaceAllPages(workspaceId: string, siteId: string): Promise<WebflowPage[]>
 export function invalidatePageCache(workspaceId: string): void
 export function getPageCacheStats(): { entries: number; maxEntries: number }
+export function getContentPipelineSummary(workspaceId: string): ContentPipelineSummary  // PR 2A
+export function invalidateContentPipelineCache(workspaceId: string): void               // PR 2A
 
 // server/intelligence-cache.ts
 export class LRUCache<T> {
   constructor(maxEntries: number)
-  get(key: string): { data: T; stale: boolean } | null
+  get(key: string): { data: T; stale: boolean } | null  // hard-deletes on TTL expiry
   set(key: string, value: T, ttlMs: number): void
   delete(key: string): void
   markStale(key: string): void
   deleteByPrefix(prefix: string): number
+  peek(key: string): T | null  // PR 2A — returns data WITHOUT TTL enforcement; use in error fallback paths
   clear(): void
   get size(): number
   stats(): { entries: number; maxEntries: number }
 }
 export function singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T>
+
+// server/bridge-infrastructure.ts (PR 2A — all new)
+export async function executeBridge(
+  flag: FeatureFlagKey,
+  workspaceId: string,
+  fn: () => Promise<void> | void,
+  opts?: { timeoutMs?: number; dryRun?: boolean },
+): Promise<void>
+// NEVER throws. Feature-flag gated. Times out after timeoutMs (default 5000ms).
+// Use for async callers only. Sync callers must use fireBridge().
+
+export function fireBridge(
+  flag: FeatureFlagKey,
+  workspaceId: string,
+  fn: () => Promise<void> | void,
+  opts?: { timeoutMs?: number; dryRun?: boolean },
+): void
+// Fire-and-forget wrapper for sync callers (recordAction, saveSnapshot).
+// Deliberately discards Promise — safe because executeBridge catches internally.
+
+export function debounceBridge(
+  flag: FeatureFlagKey,
+  delayMs: number,
+): (workspaceId: string, fn: () => Promise<void> | void) => void
+// Factory — returns a debounced executor. Last call within delayMs wins per workspace.
+
+export async function withWorkspaceLock<T>(
+  workspaceId: string,
+  fn: () => Promise<T>,
+): Promise<T>
+// Per-workspace FIFO mutex. Use for bridges modifying shared rows (insight scores, audit snapshots).
+
+export function getBridgeFlags(): Record<string, boolean>
+
+// Pre-configured debounced instances (import directly, don't create new ones):
+export const debouncedStrategyInvalidate    // 'bridge-strategy-invalidate', 2s
+export const debouncedPageAnalysisInvalidate // 'bridge-page-analysis-invalidate', 2s
+export const debouncedSettingsCascade        // 'bridge-settings-cascade', 2s
+export const debouncedOutcomeReweight        // 'bridge-outcome-reweight', 5s
+export const debouncedAnomalyBoost           // 'bridge-anomaly-boost', 5s
+
+// Sub-cache utilities (for surgical per-slice cache invalidation):
+export function readSubCache<T>(workspaceId: string, key: string): T | null
+export function writeSubCache(workspaceId: string, key: string, data: unknown, ttlSeconds: number): void
+export function invalidateSubCache(workspaceId: string, key: string): void
+export function invalidateSubCachePrefix(workspaceId: string, prefix: string): void
+// NOTE: readSubCache handles SQLite datetime('now') UTC normalization internally.
 
 // server/analytics-insights-store.ts (line 153)
 export function getInsights(workspaceId: string, insightType?: InsightType): AnalyticsInsight[]
@@ -330,6 +384,22 @@ interface AnalyticsInsight {
 
 ---
 
+## PR 2A Verified Findings — Critical for 2B Implementers
+
+1. **`fireBridge()` for sync callers, `executeBridge()` for async** — `recordAction()` and `saveSnapshot()` are synchronous. Any bridge post-hook added to these functions MUST use `fireBridge()`, not `executeBridge()` (floating promise). `fireBridge()` internally calls `void executeBridge(...)` to silence the promise.
+
+2. **Bridge-pairing test must stay green** — `tests/bridge-pairing.test.ts` asserts that every file calling `clearSeoContextCache` also calls `invalidateIntelligenceCache`. Bridge #3 (strategy invalidate), Bridge #5 (page analysis), and Bridge #11 (settings cascade) all touch cache invalidation. If any of these tasks adds a `clearSeoContextCache` call, `invalidateIntelligenceCache` must be in the same file. Run `npx vitest run tests/bridge-pairing.test.ts` after each cache-invalidation change.
+
+3. **Use pre-configured debounced instances** — do NOT call `debounceBridge()` to create new instances. Import the pre-configured exports from `bridge-infrastructure.ts` directly: `debouncedStrategyInvalidate`, `debouncedPageAnalysisInvalidate`, `debouncedSettingsCascade`. These maintain state across calls and are what the plan refers to.
+
+4. **`LRUCache.peek()` for error fallback paths** — if any PR 2B/2C code reads from an LRU cache in an error handler and wants to return stale data, use `cache.peek(key)` not `cache.get(key)`. `get()` hard-deletes expired entries before returning null, making fallbacks unreachable after TTL expiry.
+
+5. **SQLite `datetime('now')` timestamps need UTC normalization** — any code reading a `datetime('now')` column and computing age via `new Date(row.cached_at)` must normalize: `row.cached_at.endsWith('Z') ? row.cached_at : row.cached_at.replace(' ', 'T') + 'Z'`. The `readSubCache` function already handles this internally. New code that reads other timestamp columns from SQLite must apply the same pattern.
+
+6. **`resolution_source` on `analytics_insights`** — added by migration 043. When Bridge #7 auto-resolves insights, it must set `resolution_source = 'bridge-action-auto-resolve'`. The `resolveInsight()` function signature may need to be updated to accept this field (Task 6B).
+
+---
+
 ## Discovered Caveats for Phase 2
 
 1. **`annotations.pageUrl` doesn't exist** — the `analytics_annotations` table has no page URL column. Bridge #13 should encode page context in the `label` field instead of requiring a schema migration.
@@ -358,16 +428,16 @@ interface AnalyticsInsight {
 
 ## Phase 1 Deferred Items (must address in Phase 2)
 
-| Item | Where | PR Target |
-|------|-------|-----------|
-| **Page cache has no bounded eviction** — plain `Map` with no max size | `server/workspace-data.ts` | PR 2A |
-| **`workspace-data.ts` duplicates single-flight** — inline instead of shared utility | `server/workspace-data.ts` | PR 2A |
-| **Shadow-mode compares only 2/5 fields** | `server/seo-context.ts` | PR 2C |
-| **Shadow-mode `brandVoice` comparison always mismatches** — compares `intel.seoContext.brandVoice` (raw workspace voice string) against `result.brandVoiceBlock` (wrapped with `BRAND VOICE & STYLE` header + brand docs content). These will never match, producing false-positive mismatch warnings. Task 21 must compare against the correct source field for each comparison. | `server/seo-context.ts:172` | PR 2C |
-| **Phase 1 page accessor behavioral change** — `getWorkspacePages()`/`getWorkspaceAllPages()` return `[]` when no workspace matches `siteId`, whereas the old `listPages(siteId, token)` would call the Webflow API directly. Route handlers are guarded by `requireWorkspaceAccessFromQuery()` middleware, but utility functions called outside route context (e.g., `scanAssetUsage` in `webflow-assets.ts`) now silently return empty results instead of attempting the API call. | `server/workspace-data.ts` | Monitor / Phase 3 |
-| **`personas` always empty array** — stub in assembler | `server/workspace-intelligence.ts` | PR 2A |
-| **No barrel export for hook** | `src/hooks/admin/index.ts` | PR 2A |
-| **`getContentPipelineSummary()` not implemented** — type exists, function doesn't | `server/workspace-data.ts` | PR 2A |
+| Item | Where | Status |
+|------|-------|--------|
+| **Page cache has no bounded eviction** — plain `Map` with no max size | `server/workspace-data.ts` | ✅ PR 2A — LRUCache(100) |
+| **`workspace-data.ts` duplicates single-flight** — inline instead of shared utility | `server/workspace-data.ts` | ✅ PR 2A — uses shared `singleFlight()`; stale fallback uses `peek()` |
+| **`personas` always empty array** — stub in assembler | `server/workspace-intelligence.ts` | ✅ PR 2A — `workspace?.personas ?? []` |
+| **No barrel export for hook** | `src/hooks/admin/index.ts` | ✅ PR 2A |
+| **`getContentPipelineSummary()` not implemented** | `server/workspace-data.ts` | ✅ PR 2A — 5-min persistent cache, invalidation exported |
+| **Shadow-mode compares only 2/5 fields** | `server/seo-context.ts` | ⏳ PR 2C Task 21 |
+| **Shadow-mode comparison is currently a no-op** — both sides from same `buildSeoContext()` call chain; documented in code with Task 21 note. Fires assembler for latency/error telemetry but field comparison never catches divergence. | `server/seo-context.ts:171` | ⏳ PR 2C Task 21 |
+| **Phase 1 page accessor behavioral change** — `getWorkspacePages()`/`getWorkspaceAllPages()` return `[]` when no workspace matches `siteId`. `seo-audit.ts` scanner functions now log `warn` when wsId is null. | `server/workspace-data.ts` | Monitor / Phase 3 |
 
 ---
 
