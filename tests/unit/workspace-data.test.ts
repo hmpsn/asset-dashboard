@@ -44,11 +44,13 @@ describe('getWorkspacePages', () => {
     expect(mockListPages).toHaveBeenCalledOnce();
   });
 
-  it('returns empty array when workspace has no token', async () => {
+  it('falls through to listPages when workspace has no token (env var fallback)', async () => {
     mockGetWorkspace.mockReturnValue({ id: 'ws-1', webflowToken: null } as any);
+    mockListPages.mockResolvedValue([]);
     const pages = await getWorkspacePages('ws-1', 'site-1');
     expect(pages).toEqual([]);
-    expect(mockListPages).not.toHaveBeenCalled();
+    // listPages IS called with undefined — webflowFetch falls back to WEBFLOW_API_TOKEN env var
+    expect(mockListPages).toHaveBeenCalledWith('site-1', undefined);
   });
 
   it('returns fresh data after cache invalidation', async () => {

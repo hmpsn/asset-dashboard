@@ -52,14 +52,11 @@ async function fetchAndCachePages(
   const existing = pageInflight.get(key);
   if (existing) return existing;
 
-  // Resolve workspace token
+  // Resolve workspace token — fall through to listPages() even if null,
+  // because webflowFetch() falls back to process.env.WEBFLOW_API_TOKEN.
   const token = getWorkspace(workspaceId)?.webflowToken;
-  if (!token) {
-    const empty: PageCacheEntry = { allPages: [], publishedPages: [], fetchedAt: Date.now() };
-    return empty;
-  }
 
-  const promise = listPages(siteId, token)
+  const promise = listPages(siteId, token || undefined)
     .then(raw => {
       // "All pages" = live pages (not draft, not archived) — includes CMS templates
       const allPages = raw.filter(p => p.draft !== true && !p.archived);

@@ -672,11 +672,11 @@
       "items": [
         {
           "id": 531,
-          "title": "Replace hardcoded studio name in User-Agent strings with STUDIO_NAME constant",
+          "title": "Replace remaining hardcoded 'hmpsn.studio' strings with STUDIO_URL/STUDIO_BOT_UA constants",
           "source": "pr-check.ts",
           "est": "0.25h",
           "priority": "P3",
-          "notes": "2 occurrences: server/internal-links.ts line 23 and server/llms-txt-generator.ts line 224. Both use 'HmpsnStudioBot' or 'hmpsn.studio' directly instead of importing STUDIO_NAME from server/constants.ts. Quick find-and-replace.",
+          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. 2/8 occurrences fixed (internal-links.ts, llms-txt-generator.ts). Remaining 6: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts. Quick find-and-replace.",
           "status": "pending"
         },
         {

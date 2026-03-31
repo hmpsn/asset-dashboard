@@ -642,7 +642,7 @@ router.post('/api/jobs', async (req, res) => {
             }
             if (baseUrl) {
               try {
-                const staticPaths = buildStaticPathSet(allPages);
+                const staticPaths = buildStaticPathSet(published);
                 const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
                 for (const cms of cmsUrls) {
                   pages.push({

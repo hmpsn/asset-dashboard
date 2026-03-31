@@ -21,6 +21,7 @@ import { listContentRequests } from './content-requests.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { callOpenAI } from './openai-helpers.js';
+import { STUDIO_BOT_UA } from './constants.js';
 import db from './db/index.js';
 import { randomUUID } from 'crypto';
 
@@ -221,7 +222,7 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
             method: 'HEAD',
             signal: controller.signal,
             redirect: 'follow',
-            headers: { 'User-Agent': 'HmpsnStudioBot/1.0 (+https://hmpsn.studio)' },
+            headers: { 'User-Agent': STUDIO_BOT_UA },
           });
           clearTimeout(timeout);
           return res.ok ? url : null;

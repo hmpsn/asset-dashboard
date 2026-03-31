@@ -16,11 +16,12 @@ import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
+import { STUDIO_BOT_UA } from './constants.js';
 
 const log = createLogger('internal-links');
 
 const FETCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0; +https://hmpsn.studio)',
+  'User-Agent': STUDIO_BOT_UA,
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 };
 
