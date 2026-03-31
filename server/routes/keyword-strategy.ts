@@ -34,6 +34,7 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
@@ -1771,6 +1772,7 @@ Rules:
 
     updateWorkspace(ws.id, { keywordStrategy });
     clearSeoContextCache(ws.id);
+    invalidateIntelligenceCache(ws.id);
     incrementUsage(ws.id, 'strategy_generations');
 
     try {
@@ -1914,6 +1916,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   const updated = { ...(ws.keywordStrategy || {}), ...rest, generatedAt: new Date().toISOString() };
   updateWorkspace(ws.id, { keywordStrategy: updated });
   clearSeoContextCache(ws.id);
+  invalidateIntelligenceCache(ws.id);
   // Respond with reassembled strategy
   const responsePageMap = listPageKeywords(ws.id);
   res.json({ ...updated, pageMap: responsePageMap });

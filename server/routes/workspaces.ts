@@ -46,6 +46,7 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
@@ -207,6 +208,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
   clearSeoContextCache(req.params.id); // Invalidate cached AI context
+  invalidateIntelligenceCache(req.params.id);
   // Strip token from response to avoid leaking to frontend
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
   broadcast('workspace:updated', safe);

@@ -87,6 +87,23 @@ export class LRUCache<T> {
     return this.cache.size;
   }
 
+  /**
+   * Peek at an entry without TTL enforcement — returns the stored value
+   * even if expired, as long as it hasn't exceeded MAX_STALENESS_MS.
+   * Does NOT delete expired entries. Use for stale-fallback-on-error paths
+   * where serving old data is better than returning nothing.
+   */
+  peek(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    // Still respect the hard 24-hour max staleness
+    const age = Date.now() - entry.cachedAt;
+    if (age > MAX_STALENESS_MS) return null;
+
+    return entry.value;
+  }
+
   /** Returns current cache stats for health endpoint (§18) */
   stats(): { entries: number; maxEntries: number } {
     return { entries: this.cache.size, maxEntries: this.maxEntries };

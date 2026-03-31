@@ -116,7 +116,7 @@ export interface ContentPipelineSlice {
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
   coverageGaps: string[];
-  seoEdits: { pending: number; applied: number; inReview: number };
+  seoEdits: { pending: number; applied: number; dismissed: number };
 }
 
 export interface SiteHealthSlice {
@@ -166,5 +166,5 @@ export interface ContentPipelineSummary {
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
-  seoEdits: { pending: number; applied: number; inReview: number };
+  seoEdits: { pending: number; applied: number; dismissed: number };
 }

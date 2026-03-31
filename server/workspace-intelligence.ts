@@ -5,6 +5,7 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
+import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -117,15 +118,17 @@ async function assembleSeoContext(
   opts?: IntelligenceOptions,
 ): Promise<SeoContextSlice> {
   const { buildSeoContext } = await import('./seo-context.js');
+  const { getWorkspace } = await import('./workspaces.js');
   // Pass _skipShadow to prevent circular recursion:
   // buildWorkspaceIntelligence → assembleSeoContext → buildSeoContext → shadow mode → buildWorkspaceIntelligence → ∞
   const ctx = buildSeoContext(workspaceId, opts?.pagePath, opts?.learningsDomain ?? 'all', { _skipShadow: true });
+  const workspace = getWorkspace(workspaceId);
 
   return {
     strategy: ctx.strategy,
     brandVoice: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
-    personas: [], // TODO: parse from personasBlock or load directly in Phase 2
+    personas: workspace?.personas ?? [],
     knowledgeBase: ctx.knowledgeBlock,
   };
 }
@@ -212,7 +215,16 @@ export function formatForPrompt(
   sections.push('[Workspace Intelligence]');
 
   // Cold-start detection (§29)
-  const hasData = intelligence.seoContext || intelligence.insights?.all.length || intelligence.learnings?.summary;
+  // Check for meaningful content, not just object existence — seoContext is always
+  // assembled as an object, so truthy-check on it would always pass.
+  const hasSeoContent = intelligence.seoContext && (
+    intelligence.seoContext.strategy ||
+    intelligence.seoContext.brandVoice ||
+    intelligence.seoContext.businessContext ||
+    intelligence.seoContext.knowledgeBase ||
+    (intelligence.seoContext.personas && intelligence.seoContext.personas.length > 0)
+  );
+  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary;
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
@@ -301,8 +313,15 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
 
 /** Invalidate all cached intelligence for a workspace */
 export function invalidateIntelligenceCache(workspaceId: string): void {
+  // Invalidate in-memory LRU
   const deleted = intelligenceCache.deleteByPrefix(`intelligence:${workspaceId}:`);
-  log.debug({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated');
+  // Invalidate persistent sub-cache
+  try {
+    invalidateSubCachePrefix(workspaceId, ''); // empty prefix = all keys for this workspace
+  } catch {
+    // Table may not exist yet — non-critical
+  }
+  log.info({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated (in-memory + persistent)');
 }
 
 /** Cache stats for health endpoint (§18) */

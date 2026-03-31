@@ -20,5 +20,6 @@ export { useKeywordStrategy } from './useKeywordStrategy';
 export { useSeoEditor } from './useSeoEditor';
 export { useAdminROI } from './useAdminROI';
 export { useIntelligenceSignals } from './useIntelligenceSignals';
+export { useWorkspaceIntelligence } from './useWorkspaceIntelligence';
 export { useAiSuggestedBriefs } from './useAiSuggestedBriefs';
 export { useActionQueue } from './useActionQueue';

@@ -1,88 +1,137 @@
 # Unified Workspace Intelligence — Phase 2 Context Brief
 
-> **Purpose:** This document carries forward everything verified during Phase 1 planning so the Phase 2 plan starts from ground truth, not assumptions. Read this BEFORE writing the Phase 2 plan.
+> **Purpose:** This document carries forward everything verified during Phase 1 planning and execution so the Phase 2 plan starts from ground truth, not assumptions. Read this BEFORE writing the Phase 2 plan.
+> **Last updated:** 2026-03-31 (post Phase 1 merge to main)
 
 ---
 
-## What Phase 1 Built (verify these exist before planning Phase 2)
-
-Before writing Phase 2, confirm these files exist and export what's expected:
+## What Phase 1 Built (verified against actual code March 31 2026)
 
 | File | Key Exports | Status |
 |------|-------------|--------|
-| `shared/types/intelligence.ts` | `WorkspaceIntelligence`, `IntelligenceSlice`, `IntelligenceOptions`, `PromptFormatOptions`, `ContentPipelineSummary`, all 8 slice interfaces | Created in Phase 1 |
-| `shared/types/feature-flags.ts` | `intelligence-shadow-mode` flag | Added in Phase 1 |
-| `server/workspace-intelligence.ts` | `buildWorkspaceIntelligence()`, `formatForPrompt()`, `invalidateIntelligenceCache()`, `getIntelligenceCacheStats()` | Created in Phase 1 |
-| `server/workspace-data.ts` | `getWorkspacePages()`, `getWorkspaceAllPages()`, `invalidatePageCache()`, `getPageCacheStats()` | Created in Phase 1 |
-| `server/intelligence-cache.ts` | `LRUCache` (with `deleteByPrefix()`), `singleFlight()` | Created in Phase 1 |
-| `server/routes/intelligence.ts` | `GET /api/intelligence/:workspaceId`, `GET /api/intelligence/health` | Created in Phase 1 |
-| `src/hooks/admin/useWorkspaceIntelligence.ts` | `useWorkspaceIntelligence(wsId, slices?, pagePath?, learningsDomain?)` | Created in Phase 1 |
-| `src/api/intelligence.ts` | `intelligenceApi.getIntelligence()`, `intelligenceApi.getHealth()` | Created in Phase 1 |
-| `src/lib/queryKeys.ts` | `queryKeys.admin.intelligence(wsId, slices?, pagePath?, learningsDomain?)` | Added in Phase 1 |
-| `server/ws-events.ts` | `INTELLIGENCE_CACHE_UPDATED` event | Added in Phase 1 |
-| `server/db/migrations/043-intelligence-caching-layer.sql` | `intelligence_sub_cache`, `content_pipeline_cache`, `suggested_briefs` tables; `resolution_source` column on `analytics_insights` | Created in Phase 1 |
+| `shared/types/intelligence.ts` | `WorkspaceIntelligence`, `IntelligenceSlice`, `IntelligenceOptions`, `PromptFormatOptions`, `ContentPipelineSummary`, all 8 slice interfaces | ✅ Created |
+| `shared/types/feature-flags.ts` | `intelligence-shadow-mode` flag | ✅ Added |
+| `server/workspace-intelligence.ts` | `buildWorkspaceIntelligence()`, `formatForPrompt()`, `invalidateIntelligenceCache()`, `getIntelligenceCacheStats()` | ✅ Created |
+| `server/workspace-data.ts` | `getWorkspacePages()`, `getWorkspaceAllPages()`, `invalidatePageCache()`, `getPageCacheStats()` | ✅ Created |
+| `server/intelligence-cache.ts` | `LRUCache` (with `deleteByPrefix()`, `markStale()`), `singleFlight()` | ✅ Created |
+| `server/routes/intelligence.ts` | `GET /api/intelligence/:workspaceId`, `GET /api/intelligence/health` | ✅ Created |
+| `src/hooks/admin/useWorkspaceIntelligence.ts` | `useWorkspaceIntelligence(wsId, slices?, pagePath?, learningsDomain?)` | ✅ Created |
+| `src/api/intelligence.ts` | `intelligenceApi.getIntelligence()`, `intelligenceApi.getHealth()` | ✅ Created |
+| `src/lib/queryKeys.ts` | `queryKeys.admin.intelligence(wsId, slices?, pagePath?, learningsDomain?)` | ✅ Added |
+| `server/ws-events.ts` | `INTELLIGENCE_CACHE_UPDATED` event | ✅ Added |
+| `server/db/migrations/043-intelligence-caching-layer.sql` | `intelligence_sub_cache`, `content_pipeline_cache`, `suggested_briefs` tables; `resolution_source` column on `analytics_insights` | ✅ Created |
+| `server/constants.ts` | `STUDIO_URL`, `STUDIO_BOT_UA` constants | ✅ Added |
 
 ### Phase 1 Slices Implemented
 
-- `seoContext` — fully assembled from `buildSeoContext()`
+- `seoContext` — fully assembled from `buildSeoContext()` with `_skipShadow` recursion guard
 - `insights` — fully assembled from `getInsights()`, capped at 100, grouped by type/severity
-- `learnings` — assembled from `getWorkspaceLearnings()` + `getPlaybooks()`
+- `learnings` — assembled from `getWorkspaceLearnings()` + `getPlaybooks()`, gated by `outcome-ai-injection` flag
 
 ### Phase 1 Slices STUBBED (return undefined)
 
-- `pageProfile` — Phase 2 or 3
-- `contentPipeline` — Phase 2
-- `siteHealth` — Phase 2 or 3
-- `clientSignals` — Phase 3 or 4
-- `operational` — Phase 3 or 4
+- `pageProfile` — Phase 3
+- `contentPipeline` — Phase 2C
+- `siteHealth` — Phase 2C
+- `clientSignals` — Phase 3+
+- `operational` — Phase 3+
 
 ---
 
-## Phase 2 Scope: Event Bridges
+## Spec vs Reality — Key Deltas (discovered during Phase 1)
 
-Phase 2 implements the **event bridges** — reactive connections that fire when data changes in one subsystem and propagate effects to others.
+These are differences between the original spec (`unified-workspace-intelligence.md`) and what was actually built. **Phase 2 plans must use the "reality" column, not the spec.**
 
-### Spec Reference
-
-Full bridge definitions: `docs/superpowers/specs/unified-workspace-intelligence.md` §4 (bridges 1-16), §24 (per-bridge feature flags), §25 (concurrency/debouncing), §26 (bridge transactions), §27 (cron integration)
-
-### The 16 Bridges
-
-| # | Trigger | Effect | Category |
-|---|---------|--------|----------|
-| 1 | Outcome scored → | Reweight insight impact scores | Write-time |
-| 2 | Content decay detected → | Auto-suggest brief | Write-time |
-| 3 | Strategy updated → | Invalidate intelligence cache | Write-time |
-| 4 | Insight acted on → | Record tracked action | Write-time (already exists in `routes/insights.ts:40-64`) |
-| 5 | Analysis complete → | Cache sub-results | Write-time |
-| 6 | Client feedback → | Adjust keyword priorities | Write-time |
-| 7 | Action completed → | Auto-resolve source insight | Write-time |
-| 8 | Approval batch resolved → | Update strategy alignment | Write-time |
-| 9 | Chat question asked → | Log topic for signals | Write-time |
-| 10 | Anomaly confirmed → | Boost insight priority | Write-time |
-| 11 | Knowledge base updated → | Cascade to brand voice cache | Write-time |
-| 12 | Audit complete → | Generate audit-derived insights | Standalone |
-| 13 | Action recorded → | Create timeline annotation | Write-time |
-| 14 | Learnings recomputed → | Broadcast strategy signals | Standalone |
-| 15 | Audit stored → | Create site health insights | Standalone |
-| 16 | Content published → | Update pipeline cache | Write-time |
-
-### Bridge Infrastructure Needed
-
-1. **Bridge execution wrapper** — standardized try/catch, logging, dry-run mode, feature flag check
-2. **Per-bridge feature flags** — 16 new flags in `shared/types/feature-flags.ts`
-3. **Source tagging** — all bridge-written DB rows tagged with `resolution_source = 'bridge_N_name'` (column added in Phase 1 migration 043)
-4. **Debouncing** — per spec §25:
-   - Cache invalidation bridges: 2s debounce
-   - Score modification bridges: 5s debounce
-   - Per-action bridges: no debounce
-5. **Bridge transactions** — multi-step bridges use `db.transaction()` per spec §26
+| Area | Original Spec | Actual Implementation |
+|------|---------------|----------------------|
+| `buildSeoContext()` signature | 3 params: `(workspaceId?, pagePath?, learningsDomain?)` | 4 params: added `internalOpts?: { _skipShadow?: boolean }` to prevent circular recursion |
+| `useWorkspaceIntelligence()` hook | 2 params: `(workspaceId, slices?)` | 4 params: `(workspaceId, slices?, pagePath?, learningsDomain?)` |
+| Query key factory | `['admin-intelligence', wsId, slices.join(',')]` | `['admin-intelligence', wsId, pagePath, learningsDomain, ...sortedSlices]` |
+| `getWorkspacePages()` | Single function returning published pages | Two functions: `getWorkspacePages()` (published, no CMS templates) and `getWorkspaceAllPages()` (all live, no drafts/archived) |
+| Page cache invalidation | Simple `Map.delete()` | Generation counter pattern for race-safe invalidation |
+| Page cache token resolution | `token ∣∣ process.env.WEBFLOW_API_TOKEN` | `token ∣∣ undefined` — lets `webflowFetch()` handle env var fallback internally |
+| `getContentPipelineSummary()` | Spec said Phase 1 | **Deferred** — type exists, function does not |
+| Persona parsing | Spec assumed working | Always returns `[]` — TODO in Phase 2+ |
+| Barrel export for hook | Spec assumed present | **Missing** — `useWorkspaceIntelligence` not in `src/hooks/admin/index.ts` |
+| Shadow-mode soak | Spec required 3-day soak before Phase 2 | **Skipped** — minimal traffic, user opted to proceed |
+| Shadow-mode comparison | Spec implied full comparison | Only compares `brandVoice` + `businessContext` (2 of 5 fields) |
+| Stale-while-revalidate | Spec defined serve-stale behavior | Stale entries logged but never served — falls through to recompute |
+| `workspace-data.ts` single-flight | Spec assumed shared `singleFlight()` | Uses inline `Map<string, Promise>` pattern (has fallback-on-error advantage) |
+| Page cache eviction | Spec said LRU with max 100 | Plain `Map` with no enforcement — `getPageCacheStats()` reports misleading `maxEntries: 100` |
 
 ---
 
-## Verified Function Signatures (confirmed accurate March 2026)
+## Phase 2 Scope: 3-PR Strategy
 
-These were verified line-by-line during Phase 1 planning. Use these exact signatures — don't guess.
+Phase 2 is split into 3 PRs for incremental verification. Each PR is independently deployable and testable.
+
+### PR 2A — Bridge Infrastructure + Tech Debt
+
+**Goal:** Build the execution framework. No bridges fire. Nothing changes for end users.
+
+**Includes:**
+1. Bridge execution wrapper (`executeBridge()`) with logging, dry-run, feature flag check, timeout
+2. Per-bridge feature flags (16 new flags, all default OFF) in `shared/types/feature-flags.ts`
+3. Debounce utility (`debounceBridge()`) with per-bridge delay policies
+4. Per-workspace mutex (`withWorkspaceLock()`) for bridges that modify shared rows
+5. `getContentPipelineSummary()` data accessor in `workspace-data.ts`
+6. Page cache → LRU migration (replace plain `Map` with `LRUCache`)
+7. `workspace-data.ts` → shared `singleFlight()` (preserve fallback-on-error behavior)
+8. Barrel export for `useWorkspaceIntelligence` hook
+9. Persona parsing stub resolution (make `personas` optional in type, or populate from `personasBlock`)
+
+**Verification:** All existing tests pass. Health endpoint reports correct cache stats. No behavioral changes.
+
+### PR 2B — Low-Risk Write-Time Bridges
+
+**Goal:** Wire the simplest bridges — cache invalidation and single-table mutations. Each bridge flag-gated.
+
+**Includes:**
+- **Bridge #3** — Strategy updated → invalidate intelligence cache (debounce 2s)
+- **Bridge #5** — Page analysis complete → clear SEO context + intelligence cache (debounce 2s)
+- **Bridge #11** — Knowledge/strategy mutation → cascade cache invalidation (debounce 2s)
+- **Bridge #7** — Action recorded → auto-resolve related insights to `in_progress` (no debounce)
+- **Bridge #13** — Action recorded → create annotation on timeline (no debounce)
+- **Bridge #2** — Content decay detected → auto-suggest brief (no debounce)
+  - Requires: CRUD API endpoints for `suggested_briefs` table (table exists from migration 043)
+  - Requires: Admin UI for viewing/accepting/dismissing suggestions (or defer UI to 2C)
+
+**Not included:** Bridge #4 — already exists in `routes/insights.ts:40-64`. Verify test coverage only.
+
+**Verification:** Enable each bridge flag individually on staging. Trigger the source event, verify the effect. Disable and verify no side effects.
+
+### PR 2C — Complex Bridges + Slice Assembly
+
+**Goal:** Wire bridges that modify existing data (need transactions, dedup) and fill in stubbed slices.
+
+**Includes:**
+- **Bridge #1** — Outcome scored → reweight insight impact scores (debounce 5s, workspace mutex)
+- **Bridge #10** — Anomaly confirmed → boost insight severity (debounce 5s, workspace mutex)
+- **Bridge #12** — Audit complete → generate `page_health` insights (transaction, dedup)
+- **Bridge #15** — Audit stored → create site health insights (transaction, dedup)
+- Assemble `contentPipeline` slice (uses `getContentPipelineSummary()` from PR 2A)
+- Assemble `siteHealth` slice (reads latest audit snapshot + schema validation)
+- Expand shadow-mode comparison to all 5 fields (brandVoice, businessContext, strategy, knowledgeBase, personas)
+
+**Verification:** Each bridge with dedicated integration tests. Deduplication verified. Transaction rollback on failure verified.
+
+### Explicitly Deferred to Phase 3+
+
+- Read-time enrichments (bridges #6, #8, #9, #16) — change query behavior, not write behavior
+- `clientSignals` and `operational` slice assembly
+- `pageProfile` slice assembly
+- Client intelligence endpoint (`/api/public/intelligence/:workspaceId`)
+- AI endpoint migration from `buildSeoContext()` to full intelligence
+- Persona parsing from `personasBlock` string
+- Suggested briefs admin UI (if deferred from 2B)
+- `formatForPrompt()` cold-start behavior
+- Onboarding completeness tracking
+
+---
+
+## Verified Function Signatures (confirmed accurate March 31 2026)
+
+These were verified line-by-line during Phase 1. Use these exact signatures — don't guess.
 
 ### Core Functions
 
@@ -97,6 +146,40 @@ export function buildSeoContext(
 // SYNCHRONOUS. Returns SeoContext with: keywordBlock, brandVoiceBlock, businessContext,
 // personasBlock, knowledgeBlock, fullContext, strategy
 // NOTE: _skipShadow prevents circular recursion when called from buildWorkspaceIntelligence
+
+// server/workspace-intelligence.ts
+export async function buildWorkspaceIntelligence(
+  workspaceId: string,
+  opts?: IntelligenceOptions,
+): Promise<WorkspaceIntelligence>
+
+export function formatForPrompt(
+  intelligence: WorkspaceIntelligence,
+  opts?: PromptFormatOptions,
+): string
+
+export function invalidateIntelligenceCache(workspaceId: string): void
+export function getIntelligenceCacheStats(): { entries: number; maxEntries: number }
+
+// server/workspace-data.ts
+export async function getWorkspacePages(workspaceId: string, siteId: string): Promise<WebflowPage[]>
+export async function getWorkspaceAllPages(workspaceId: string, siteId: string): Promise<WebflowPage[]>
+export function invalidatePageCache(workspaceId: string): void
+export function getPageCacheStats(): { entries: number; maxEntries: number }
+
+// server/intelligence-cache.ts
+export class LRUCache<T> {
+  constructor(maxEntries: number)
+  get(key: string): { data: T; stale: boolean } | null
+  set(key: string, value: T, ttlMs: number): void
+  delete(key: string): void
+  markStale(key: string): void
+  deleteByPrefix(prefix: string): number
+  clear(): void
+  get size(): number
+  stats(): { entries: number; maxEntries: number }
+}
+export function singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T>
 
 // server/analytics-insights-store.ts (line 153)
 export function getInsights(workspaceId: string, insightType?: InsightType): AnalyticsInsight[]
@@ -129,13 +212,6 @@ export function getPlaybooks(workspaceId: string): ActionPlaybook[]
 export function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
 // NOTE: Function name is analyzeContentDecay, NOT computeContentDecay.
 
-// server/webflow-pages.ts (line 25)
-export async function listPages(siteId: string, tokenOverride?: string): Promise<WebflowPage[]>
-// NOTE: siteId FIRST, then optional token override.
-
-// server/webflow-pages.ts (line 34)
-export function filterPublishedPages(pages: WebflowPage[]): WebflowPage[]
-
 // server/insight-feedback.ts
 export function buildStrategySignals(insights: AnalyticsInsight[]): StrategySignal[]
 export function buildPipelineSignals(insights: AnalyticsInsight[]): PipelineSignal[]
@@ -149,6 +225,9 @@ export function isFeatureEnabled(flag: FeatureFlagKey): boolean
 export function createAnnotation(opts: {
   workspaceId: string; date: string; label: string; category: string; createdBy?: string
 }): { id: string }
+
+// server/seo-context.ts
+export function clearSeoContextCache(workspaceId?: string): void
 ```
 
 ### WebSocket Events
@@ -167,7 +246,6 @@ export function createAnnotation(opts: {
 export function requireWorkspaceAccess(paramName: string = 'id'): RequestHandler
 // Takes route PARAM NAME, not workspace ID. Returns Express middleware.
 // HMAC auth users pass through (no JWT needed for admin routes).
-// Safe for all routes — explicitly passes through when no JWT user present.
 ```
 
 ---
@@ -186,13 +264,6 @@ interface WorkspaceLearnings {
   strategy: StrategyLearnings | null;     // winRateByDifficultyRange, bestIntentTypes, etc.
   technical: TechnicalLearnings | null;   // winRateByFixType, schemaTypesWithRichResults, etc.
   overall: OverallLearnings;              // totalWinRate, strongWinRate, topActionTypes[], recentTrend
-}
-
-interface OverallLearnings {
-  totalWinRate: number;
-  strongWinRate: number;
-  topActionTypes: Array<{ type: string; winRate: number; count: number }>;
-  recentTrend: LearningsTrend;           // 'improving' | 'stable' | 'declining'
 }
 ```
 
@@ -219,7 +290,7 @@ interface AnalyticsInsight {
   resolutionStatus?: 'in_progress' | 'resolved' | null;
   resolutionNote?: string | null;
   resolvedAt?: string | null;
-  // resolution_source: TEXT — added by migration 043, not yet in TS interface
+  // resolution_source: TEXT — added by migration 043, now in TS interface
 }
 ```
 
@@ -233,15 +304,15 @@ interface AnalyticsInsight {
 |-------|-------------|-------|
 | `analytics_insights` | `id, workspace_id, page_id, insight_type, data, severity, impact_score, resolution_source` | `resolution_source` added in 043. Bridge-written rows must set this. |
 | `tracked_actions` | `id, workspace_id, action_type, source_type, source_id, page_url, ...` | Many optional columns with defaults. |
-| `analytics_annotations` | `id, workspace_id, date, label, category, created_by` | No `pageUrl` column — annotation is workspace-scoped. |
+| `analytics_annotations` | `id, workspace_id, date, label, category, created_by` | **No `pageUrl` column** — annotation is workspace-scoped. Bridge #13 can set `label` to include page context. |
 | `suggested_briefs` | `id, workspace_id, keyword, page_url, source, reason, priority, status, ...` | Created in 043. Empty until Bridge #2 populates it. |
 | `intelligence_sub_cache` | `workspace_id, cache_key, ttl_seconds, cached_at, data` | Created in 043. For surgical cache invalidation. |
 | `content_pipeline_cache` | `workspace_id, summary_json, cached_at` | Created in 043. Pre-computed pipeline counts. |
 
 ### Tables Phase 2 Bridges Will Read From
 
-| Table | Exists | Schema Verified |
-|-------|--------|----------------|
+| Table | Exists | Notes |
+|-------|--------|-------|
 | `content_briefs` | Yes | status column has defaults |
 | `content_posts` | Yes | status column present |
 | `content_matrices` | Yes | cells stored as JSON array |
@@ -259,61 +330,52 @@ interface AnalyticsInsight {
 
 ---
 
-## Discovered Caveats for Phase 2+
+## Discovered Caveats for Phase 2
 
-These are real data gaps or architectural notes discovered during Phase 1 audit:
+1. **`annotations.pageUrl` doesn't exist** — the `analytics_annotations` table has no page URL column. Bridge #13 should encode page context in the `label` field instead of requiring a schema migration.
 
-1. **`annotations.pageUrl` doesn't exist** — the `analytics_annotations` table has no page URL column. Phase 2/3 needs a migration to add it, or derive page context from the triggering event.
-
-2. **Rank history is shallow** — `page_keywords` stores `current_position` + `previous_position` only. No deep historical series. `PageProfileSlice.rankHistory.best` must be derived from current/previous, not a historical scan.
+2. **Rank history is shallow** — `page_keywords` stores `current_position` + `previous_position` only. No deep historical series. `PageProfileSlice.rankHistory.best` must be derived from current/previous, not a historical scan. (Phase 3 concern)
 
 3. **No dedicated hourly GSC sync cron** — GSC data is fetched on-demand, not on a schedule. Any bridge depending on "fresh GSC data" must trigger its own fetch or accept staleness.
 
 4. **Anomaly detection runs every 12 hours** — not 6. Bridge #10 (anomaly → boost) fires at most twice daily.
 
-5. **Only 2 tables are truly unbounded** — `chat_sessions` and `audit_snapshots`. All others have cleanup mechanisms. Phase 2 bridges that write to these tables don't need their own cleanup.
+5. **Only 2 tables are truly unbounded** — `chat_sessions` and `audit_snapshots`. All others have cleanup mechanisms.
 
-6. **`buildSeoContext()` has 26 callers** — not 23. If Phase 2 changes the delegation from shadow-mode to real, all 26 must be regression-tested.
+6. **`buildSeoContext()` has 26 callers** — not 23. If Phase 2 changes the delegation from shadow-mode to real, all 26 must be regression-tested. (Phase 3 concern — Phase 2 does not change delegation)
 
-7. **Bridge #4 already exists** — `routes/insights.ts:40-64` already records a tracked action when an insight is resolved. Phase 2 should verify this, not re-implement it.
+7. **Bridge #4 already exists** — `routes/insights.ts:40-64` already records a tracked action when an insight is resolved. Phase 2 should verify test coverage only, not re-implement.
 
 8. **`broadcastToWorkspace()` requires an active WebSocket connection** — if no admin/client is connected, the broadcast is a no-op. Bridges should not depend on broadcasts for data consistency — they're for UI reactivity only.
 
----
+9. **Shadow-mode always passes in Phase 1** — because the intelligence assembler calls `buildSeoContext()` with `_skipShadow`, and that same function populates the cache that the shadow comparison reads from. Mismatches can only appear once the assembler populates fields from different sources (Phase 3+).
 
-## Deferred Review Items (address in Phase 2)
+10. **Per-workspace Webflow tokens** — `getWorkspacePages()` correctly resolves `ws?.webflowToken` before falling back to env var. Domain/subdomain lookups in link-checker, pagespeed, redirect-scanner also use per-workspace tokens now.
 
-These were flagged during Phase 1 code review and intentionally deferred. Each must be resolved in Phase 2:
-
-| Item | Where | When to address |
-|------|-------|-----------------|
-| **`workspace-data.ts` duplicates single-flight** — uses inline Promise-based dedup instead of shared `singleFlight()` from `intelligence-cache.ts` | `server/workspace-data.ts` lines 47-84 | Phase 2, when adding more data accessors (content pipeline, site health). Refactor to shared utility since multiple accessors will need it. |
-| **Page cache has no bounded eviction** — `pageCache` is a plain `Map` with no max size. `getPageCacheStats()` reports `maxEntries: 100` but nothing enforces it. | `server/workspace-data.ts` | Phase 2, same refactor. Switch to `LRUCache` from `intelligence-cache.ts` for automatic bounded eviction. |
-| **Shadow-mode compares only 2 of 5 fields** — only `brandVoice` and `businessContext` are compared. `strategy`, `knowledgeBase`, and `personas` are not. | `server/seo-context.ts` lines 166-172 | During the 3-day staging soak. Expand comparison incrementally, verify no false positives before adding more fields. |
-| **`personas` always empty array** — `assembleSeoContext` returns `personas: []` as a stub. Type declares it required, not optional. | `server/workspace-intelligence.ts` line 126, `shared/types/intelligence.ts` | Phase 2, when persona parsing is implemented. Either populate or make optional in the type. |
-| **No barrel export for the hook** — `useWorkspaceIntelligence` is not re-exported from `src/hooks/admin/index.ts` | `src/hooks/admin/` | Phase 2, when the hook is first consumed by a component. |
+11. **`workspace-data.ts` fallback-on-error** — the inline single-flight pattern returns stale cached data on API failure instead of propagating errors. When migrating to shared `singleFlight()` in PR 2A, must wrap with fallback behavior to preserve this graceful degradation.
 
 ---
 
-## Shadow Mode Soak Findings (fill in after Phase 1 staging)
+## Phase 1 Deferred Items (must address in Phase 2)
 
-> **After the 3-day soak, record findings here before starting Phase 2 planning.**
-
-- [ ] Total intelligence assemblies on staging: ___
-- [ ] Shadow-mode mismatches found: ___
-- [ ] Mismatch details (if any): ___
-- [ ] Average assembly latency (ms): ___
-- [ ] Cache hit rate: ___
-- [ ] Any subsystem failures observed: ___
-- [ ] Performance concerns: ___
+| Item | Where | PR Target |
+|------|-------|-----------|
+| **Page cache has no bounded eviction** — plain `Map` with no max size | `server/workspace-data.ts` | PR 2A |
+| **`workspace-data.ts` duplicates single-flight** — inline instead of shared utility | `server/workspace-data.ts` | PR 2A |
+| **Shadow-mode compares only 2/5 fields** | `server/seo-context.ts` | PR 2C |
+| **Shadow-mode `brandVoice` comparison always mismatches** — compares `intel.seoContext.brandVoice` (raw workspace voice string) against `result.brandVoiceBlock` (wrapped with `BRAND VOICE & STYLE` header + brand docs content). These will never match, producing false-positive mismatch warnings. Task 21 must compare against the correct source field for each comparison. | `server/seo-context.ts:172` | PR 2C |
+| **Phase 1 page accessor behavioral change** — `getWorkspacePages()`/`getWorkspaceAllPages()` return `[]` when no workspace matches `siteId`, whereas the old `listPages(siteId, token)` would call the Webflow API directly. Route handlers are guarded by `requireWorkspaceAccessFromQuery()` middleware, but utility functions called outside route context (e.g., `scanAssetUsage` in `webflow-assets.ts`) now silently return empty results instead of attempting the API call. | `server/workspace-data.ts` | Monitor / Phase 3 |
+| **`personas` always empty array** — stub in assembler | `server/workspace-intelligence.ts` | PR 2A |
+| **No barrel export for hook** | `src/hooks/admin/index.ts` | PR 2A |
+| **`getContentPipelineSummary()` not implemented** — type exists, function doesn't | `server/workspace-data.ts` | PR 2A |
 
 ---
 
-## Planning Protocol Reminders
+## Planning Protocol
 
 Before writing the Phase 2 plan:
-1. Read `docs/rules/plan-accuracy-protocol.md` — the full audit methodology
-2. Read this document end-to-end — every verified signature and schema
-3. Run `pre-plan-audit` skill to grep all bridge trigger points in the codebase
-4. Fill in the shadow mode soak findings above
-5. Verify Phase 1 files still match the exports table at the top of this document
+1. Read this document end-to-end — every verified signature, delta, and caveat
+2. Run `pre-plan-audit` skill to grep all bridge trigger points in the codebase
+3. Verify Phase 1 files still match the exports table at the top
+4. For each bridge, identify the exact file + line where the trigger hook will be inserted
+5. Map file ownership for parallel agent dispatch — no file touched by two agents
