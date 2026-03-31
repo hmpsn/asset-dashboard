@@ -10,7 +10,6 @@ import {
   listSites,
   updateAsset,
   deleteAsset,
-  listPages,
   getPageDom,
   uploadAsset,
 } from '../webflow.js';
@@ -21,6 +20,7 @@ import {
   getWorkspace,
   getTokenForSite,
 } from '../workspaces.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-alt-text');
@@ -38,7 +38,8 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     if (siteId) {
       try {
         const tkn = getTokenForSite(siteId) || undefined;
-        const pages = await listPages(siteId, tkn);
+        const altWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+        const pages = altWs ? await getWorkspacePages(altWs.id, siteId) : [];
         const assetId = req.params.assetId;
         const contextParts: string[] = [];
 
@@ -151,7 +152,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   const assetContextMap = new Map<string, string>();
   if (siteId) {
     try {
-      const pages = await listPages(siteId, token);
+      const pages = bulkWsId ? await getWorkspacePages(bulkWsId, siteId) : [];
       for (const page of pages.slice(0, 15)) {
         try {
           const dom = await getPageDom(page.id, token);

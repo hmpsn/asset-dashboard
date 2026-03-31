@@ -57,6 +57,11 @@ export const WS_EVENTS = {
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
+
+  // Intelligence layer cache
+  // TODO(Phase 2): Broadcast when bridges write data that invalidates intelligence cache.
+  // Frontend consumer (useWebSocket handler + queryKeys.admin.intelligenceAll invalidation) needed at same time.
+  INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

@@ -9,7 +9,8 @@
  *
  * Returns a tree structure with gap analysis for visualization.
  */
-import { listPages, filterPublishedPages, buildStaticPathSet, discoverCmsUrls, getSiteSubdomain } from './webflow-pages.js';
+import { buildStaticPathSet, discoverCmsUrls, getSiteSubdomain } from './webflow-pages.js';
+import { getWorkspacePages } from './workspace-data.js';
 import { listMatrices } from './content-matrices.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -303,8 +304,7 @@ export async function buildSiteArchitecture(workspaceId: string): Promise<SiteAr
   if (ws.webflowSiteId) {
     try {
       const token = ws.webflowToken || process.env.WEBFLOW_API_TOKEN;
-      const allPages = await listPages(ws.webflowSiteId, token || undefined);
-      const published = filterPublishedPages(allPages);
+      const published = await getWorkspacePages(ws.id, ws.webflowSiteId);
 
       for (const p of published) {
         const pagePath = resolvePagePath(p);

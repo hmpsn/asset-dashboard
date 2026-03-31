@@ -8,7 +8,7 @@ const router = Router();
 
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
 import { savePageSpeed, getPageSpeed, saveSinglePageSpeed } from '../performance-store.js';
-import { getTokenForSite } from '../workspaces.js';
+import { listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-pagespeed');
@@ -16,10 +16,10 @@ const log = createLogger('webflow-pagespeed');
 // --- PageSpeed / Core Web Vitals ---
 router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
     const strategy = (req.query.strategy as 'mobile' | 'desktop') || 'mobile';
     const maxPages = parseInt(req.query.maxPages as string) || 5;
-    const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, token);
+    const psWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, psWs?.id);
     savePageSpeed(req.params.siteId, result);
     res.json(result);
   } catch (err) {

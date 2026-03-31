@@ -10,7 +10,8 @@ import { callOpenAI } from './openai-helpers.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSchemaPlan } from './schema-store.js';
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { getWorkspacePages } from './workspace-data.js';
 import type { SiteArchitectureResult } from './site-architecture.js';
 import { flattenTree } from './site-architecture.js';
 import { crawlCompetitorSchemas, compareSchemas } from './competitor-schema.js';
@@ -24,7 +25,6 @@ export interface PlanContext {
   companyName?: string;
   businessContext?: string;
   strategy?: KeywordStrategy;
-  tokenOverride?: string;
   architectureResult?: SiteArchitectureResult;
   competitorDomains?: string[];  // Competitor domains for schema gap analysis
   ourSchemaTypes?: string[];     // Current schema types we're already using
@@ -35,7 +35,7 @@ export interface PlanContext {
  * Returns a plan with canonical entities and page role assignments.
  */
 export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePlan> {
-  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, tokenOverride, architectureResult, competitorDomains, ourSchemaTypes } = ctx;
+  const { siteId, workspaceId, siteUrl, companyName, businessContext, strategy, architectureResult, competitorDomains, ourSchemaTypes } = ctx;
 
   let pageList: PageListItem[];
 
@@ -66,8 +66,8 @@ export async function generateSchemaPlan(ctx: PlanContext): Promise<SchemaSitePl
     log.info(`Schema plan using architecture tree: ${pageList.length} existing pages (tree has ${nodes.length} total nodes)`);
   } else {
     // ── Fallback: fetch pages directly from Webflow API + sitemap ──
-    const allPages = await listPages(siteId, tokenOverride);
-    const pages = filterPublishedPages(allPages).filter(
+    const allPublished = await getWorkspacePages(workspaceId, siteId);
+    const pages = allPublished.filter(
       (p: { title: string; slug: string }) =>
         !(p.title || '').toLowerCase().includes('password') &&
         !(p.slug || '').toLowerCase().includes('password'),

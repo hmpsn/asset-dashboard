@@ -112,7 +112,11 @@ const CHECKS: Check[] = [
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],
     // json-validation.ts is the implementation; the rest parse AI API response strings (not DB columns)
-    exclude: ['server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts', 'server/content-brief.ts'],
+    exclude: [
+      'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
+      'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
+      'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
+    ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
   },

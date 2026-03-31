@@ -19,13 +19,13 @@ import { WS_EVENTS } from '../ws-events.js';
 import { notifyApprovalReady } from '../email.js';
 import {
   listCollections,
-  listPages,
   publishSite,
   publishSchemaToPage,
   publishRawSchemaToPage,
   retractSchemaFromPage,
 } from '../webflow.js';
 import { listWorkspaces, getTokenForSite, updatePageState, getWorkspace, getClientPortalUrl } from '../workspaces.js';
+import { getWorkspaceAllPages } from '../workspace-data.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
@@ -287,9 +287,11 @@ router.post('/api/webflow/schema-cms-template/:siteId/publish', requireWorkspace
 // --- List CMS template pages (pages with collectionId) ---
 router.get('/api/webflow/cms-template-pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
-    const allPages = await listPages(req.params.siteId, token);
-    const collections = await listCollections(req.params.siteId, token);
+    const siteId = req.params.siteId;
+    const token = getTokenForSite(siteId) || undefined;
+    const cmsWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const allPages = cmsWs ? await getWorkspaceAllPages(cmsWs.id, siteId) : [];
+    const collections = await listCollections(siteId, token);
     const collMap = new Map(collections.map(c => [c.id, c]));
 
     const templatePages = allPages
@@ -394,7 +396,6 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
       companyName: ctx.companyName,
       businessContext: ctx.businessContext,
       strategy: ws.keywordStrategy,
-      tokenOverride: getTokenForSite(req.params.siteId) || undefined,
       architectureResult,
       competitorDomains: ws.competitorDomains,
       ourSchemaTypes,

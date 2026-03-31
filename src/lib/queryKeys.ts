@@ -77,6 +77,11 @@ export const queryKeys = {
     outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,
     outcomeTopWins: (wsId: string) => ['admin-outcome-top-wins', wsId] as const,
     outcomeOverview: () => ['admin-outcome-overview'] as const,
+
+    // Intelligence
+    intelligence: (wsId: string, slices?: string[], pagePath?: string, learningsDomain?: string) =>
+      ['admin-intelligence', wsId, pagePath ?? '', learningsDomain ?? 'all', ...(slices ? [...slices].sort() : [])] as const,
+    intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
   },
 
   // ── Client ────────────────────────────────────────────────────────

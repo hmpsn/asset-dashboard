@@ -3,9 +3,11 @@
  * and provides a comprehensive redirect audit for a Webflow site.
  */
 
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
+import { getWorkspacePages } from './workspace-data.js';
+import { listWorkspaces, getWorkspace } from './workspaces.js';
 
 const log = createLogger('redirect-scanner');
 
@@ -205,8 +207,10 @@ export interface GscGhostUrl {
   impressions: number;
 }
 
-export async function scanRedirects(siteId: string, tokenOverride?: string, liveDomain?: string, gscGhostUrls?: GscGhostUrl[]): Promise<RedirectScanResult> {
-  const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
+export async function scanRedirects(siteId: string, workspaceId?: string, liveDomain?: string, gscGhostUrls?: GscGhostUrl[]): Promise<RedirectScanResult> {
+  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const ws = wsId ? getWorkspace(wsId) : undefined;
+  const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
   const subdomain = await getSiteSubdomain(siteId, token);
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
@@ -222,8 +226,7 @@ export async function scanRedirects(siteId: string, tokenOverride?: string, live
   }
 
   // 1. Gather all known pages
-  const allPages = await listPages(siteId, tokenOverride);
-  const published = filterPublishedPages(allPages);
+  const published = wsId ? await getWorkspacePages(wsId, siteId) : [];
   log.info(`Redirect scanner: checking ${published.length} static pages on ${baseUrl}`);
 
   const pageUrls: Array<{ url: string; path: string; title: string; source: 'static' | 'cms' | 'gsc' }> = published.map(p => {

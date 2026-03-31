@@ -5,14 +5,14 @@ import { Router } from 'express';
 import {
   listAssets,
   scanAssetUsage,
-  listPages,
   listAssetFolders,
   createAssetFolder,
   moveAssetToFolder,
   getSiteSubdomain,
   updateAsset,
 } from '../webflow.js';
-import { getTokenForSite } from '../workspaces.js';
+import { getTokenForSite, listWorkspaces } from '../workspaces.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-organize');
@@ -52,10 +52,11 @@ router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQu
       const subdomain = await getSiteSubdomain(siteId, token);
       if (subdomain) {
         const baseUrl = `https://${subdomain}.webflow.io`;
-        const pages = await listPages(siteId, token);
+        const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+        const pages = ws ? await getWorkspacePages(ws.id, siteId) : [];
         const pageUrls = [
           baseUrl,
-          ...pages.filter(p => p.slug && p.slug !== 'index' && !p.draft && !p.archived).map(p => `${baseUrl}/${p.slug}`),
+          ...pages.filter(p => p.slug && p.slug !== 'index').map(p => `${baseUrl}/${p.slug}`),
         ];
         for (let i = 0; i < pageUrls.length; i += 10) {
           await Promise.allSettled(pageUrls.slice(i, i + 10).map(async (url) => {

@@ -13,13 +13,14 @@ import { getGA4TopPages } from '../google-analytics.js';
 import { upload, moveUploadedFiles } from '../middleware.js';
 import { triggerOptimize } from '../processor.js';
 import { getAllGscPages } from '../search-console.js';
-import { listSites, listPages, getPageDom } from '../webflow.js';
+import { listSites, getPageDom } from '../webflow.js';
 import {
   listWorkspaces,
   getWorkspace,
   getTokenForSite,
   getAllPageStates,
 } from '../workspaces.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('misc');
@@ -136,7 +137,8 @@ router.post('/api/smart-name', async (req, res) => {
 
         // Scan pages to find where this asset is used
         if (assetId || imageUrl) {
-          const pages = await listPages(siteId, tkn);
+          const smartNameWs = listWorkspaces().find(w => w.webflowSiteId === siteId);
+          const pages = smartNameWs ? await getWorkspacePages(smartNameWs.id, siteId) : [];
           const usedOnPages: string[] = [];
           for (const page of pages.slice(0, 15)) {
             try {
