@@ -28,7 +28,8 @@ import {
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
-import { getWorkspacePages } from '../workspace-data.js';
+import { getWorkspacePages, invalidatePageCache } from '../workspace-data.js';
+import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
@@ -209,6 +210,11 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   if (!ws) return res.status(404).json({ error: 'Not found' });
   clearSeoContextCache(req.params.id); // Invalidate cached AI context
   invalidateIntelligenceCache(req.params.id);
+  debouncedSettingsCascade(req.params.id, () => {
+    invalidateIntelligenceCache(req.params.id);
+    invalidatePageCache(req.params.id);
+    invalidateSubCachePrefix(req.params.id, 'slice:'); // Invalidate ALL slice caches on settings change
+  });
   // Strip token from response to avoid leaking to frontend
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
   broadcast('workspace:updated', safe);
