@@ -59,6 +59,8 @@ export const WS_EVENTS = {
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
 
   // Intelligence layer cache
+  // TODO(Phase 2): Broadcast when bridges write data that invalidates intelligence cache.
+  // Frontend consumer (useWebSocket handler + queryKeys.admin.intelligenceAll invalidation) needed at same time.
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
 } as const;
 

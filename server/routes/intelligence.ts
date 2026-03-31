@@ -38,6 +38,7 @@ router.get(
       const { workspaceId } = req.params;
       const slicesParam = req.query.slices as string | undefined;
       const pagePath = req.query.pagePath as string | undefined;
+      const learningsDomain = req.query.learningsDomain as 'content' | 'strategy' | 'technical' | 'all' | undefined;
 
       // Parse slices from comma-separated query param
       let slices: IntelligenceSlice[] | undefined;
@@ -51,6 +52,7 @@ router.get(
       const intelligence = await buildWorkspaceIntelligence(workspaceId, {
         slices,
         pagePath: pagePath || undefined,
+        learningsDomain: learningsDomain || undefined,
       });
 
       res.json(intelligence);
