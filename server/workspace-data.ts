@@ -6,6 +6,10 @@ import { listPages, filterPublishedPages } from './webflow-pages.js';
 import { getWorkspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
+import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import type { ContentPipelineSummary } from '../shared/types/intelligence.js';
 
 const log = createLogger('workspace-data');
 
@@ -150,9 +154,100 @@ export function getPageCacheStats(): { entries: number; maxEntries: number } {
   return pageCache.stats();
 }
 
+// ── Content pipeline summary ─────────────────────────────────────────────
+
+const pipelineStmts = createStmtCache(() => ({
+  briefsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_briefs WHERE workspace_id = ?`),
+  postsTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_posts WHERE workspace_id = ?`),
+  postsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_posts WHERE workspace_id = ? GROUP BY status`),
+  matricesTotal: db.prepare(`SELECT COUNT(*) as cnt FROM content_matrices WHERE workspace_id = ?`),
+  matricesCells: db.prepare(`SELECT cells, stats FROM content_matrices WHERE workspace_id = ?`),
+  requestsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM content_topic_requests WHERE workspace_id = ? GROUP BY status`),
+  workOrdersActive: db.prepare(`SELECT COUNT(*) as cnt FROM work_orders WHERE workspace_id = ? AND status != 'completed'`),
+  seoEditsByStatus: db.prepare(`SELECT status, COUNT(*) as cnt FROM seo_suggestions WHERE workspace_id = ? GROUP BY status`),
+  getCache: db.prepare(`SELECT summary_json, cached_at, invalidated_at FROM content_pipeline_cache WHERE workspace_id = ?`),
+  upsertCache: db.prepare(`INSERT INTO content_pipeline_cache (workspace_id, summary_json, cached_at, invalidated_at) VALUES (@workspace_id, @summary_json, @cached_at, @invalidated_at) ON CONFLICT(workspace_id) DO UPDATE SET summary_json = excluded.summary_json, cached_at = excluded.cached_at, invalidated_at = excluded.invalidated_at`),
+  invalidateCache: db.prepare(`UPDATE content_pipeline_cache SET invalidated_at = datetime('now') WHERE workspace_id = ?`),
+}));
+
 /**
- * Stub: content pipeline summary for workspace. Full implementation in Phase 2.
+ * Get aggregated content pipeline counts for a workspace, with 5-minute persistent cache.
  */
-export function getContentPipelineSummary(_workspaceId: string): null {
-  return null;
+export function getContentPipelineSummary(workspaceId: string): ContentPipelineSummary {
+  // Check persistent cache first
+  const cached = pipelineStmts().getCache.get(workspaceId) as { summary_json: string; cached_at: string; invalidated_at: string | null } | undefined;
+  if (cached && !cached.invalidated_at) {
+    const age = Date.now() - new Date(cached.cached_at).getTime();
+    if (age < 5 * 60 * 1000) {
+      const parsed = parseJsonFallback(cached.summary_json, null as unknown as ContentPipelineSummary);
+      if (parsed) return parsed;
+    }
+  }
+
+  const summary = computeContentPipelineSummary(workspaceId);
+
+  pipelineStmts().upsertCache.run({
+    workspace_id: workspaceId,
+    summary_json: JSON.stringify(summary),
+    cached_at: new Date().toISOString(),
+    invalidated_at: null,
+  });
+
+  return summary;
+}
+
+/**
+ * Invalidate the content pipeline cache for a workspace.
+ * Call after any mutation to content_briefs, content_posts, content_matrices,
+ * content_topic_requests, work_orders, or seo_suggestions.
+ */
+export function invalidateContentPipelineCache(workspaceId: string): void {
+  pipelineStmts().invalidateCache.run(workspaceId);
+}
+
+function computeContentPipelineSummary(workspaceId: string): ContentPipelineSummary {
+  const briefsRow = pipelineStmts().briefsTotal.get(workspaceId) as { cnt: number } | undefined;
+  const postsRow = pipelineStmts().postsTotal.get(workspaceId) as { cnt: number } | undefined;
+  const postsByStatusRows = pipelineStmts().postsByStatus.all(workspaceId) as { status: string; cnt: number }[];
+  const postsByStatus: Record<string, number> = {};
+  for (const r of postsByStatusRows) postsByStatus[r.status] = r.cnt;
+
+  const matricesRow = pipelineStmts().matricesTotal.get(workspaceId) as { cnt: number } | undefined;
+  const matricesCellRows = pipelineStmts().matricesCells.all(workspaceId) as { cells: string; stats: string }[];
+  let cellsPlanned = 0;
+  let cellsPublished = 0;
+  for (const r of matricesCellRows) {
+    try {
+      const cells = JSON.parse(r.cells || '[]') as { status?: string }[];
+      cellsPlanned += cells.length;
+      cellsPublished += cells.filter(c => c.status === 'published').length;
+    } catch { /* skip malformed */ }
+  }
+
+  const requestsByStatusRows = pipelineStmts().requestsByStatus.all(workspaceId) as { status: string; cnt: number }[];
+  const requestsMap: Record<string, number> = {};
+  for (const r of requestsByStatusRows) requestsMap[r.status] = r.cnt;
+
+  const woRow = pipelineStmts().workOrdersActive.get(workspaceId) as { cnt: number } | undefined;
+
+  const seoRows = pipelineStmts().seoEditsByStatus.all(workspaceId) as { status: string; cnt: number }[];
+  const seoMap: Record<string, number> = {};
+  for (const r of seoRows) seoMap[r.status] = r.cnt;
+
+  return {
+    briefs: { total: briefsRow?.cnt ?? 0, byStatus: {} },
+    posts: { total: postsRow?.cnt ?? 0, byStatus: postsByStatus },
+    matrices: { total: matricesRow?.cnt ?? 0, cellsPlanned, cellsPublished },
+    requests: {
+      pending: requestsMap['requested'] ?? 0,
+      inProgress: requestsMap['in_progress'] ?? 0,
+      delivered: requestsMap['delivered'] ?? 0,
+    },
+    workOrders: { active: woRow?.cnt ?? 0 },
+    seoEdits: {
+      pending: seoMap['pending'] ?? 0,
+      applied: seoMap['applied'] ?? 0,
+      dismissed: seoMap['dismissed'] ?? 0,
+    },
+  };
 }
