@@ -1,6 +1,6 @@
 /**
  * Bridge infrastructure — shared execution, debouncing, locking, and flag utilities.
- * All 16 event bridges route through executeBridge() for consistent logging,
+ * All event bridges route through executeBridge() for consistent logging,
  * feature-flag gating, timeout, and error isolation.
  *
  * Spec: docs/superpowers/specs/unified-workspace-intelligence.md §24-27
@@ -73,12 +73,13 @@ export async function executeBridge(
   try {
     const result = fn();
     if (result && typeof result.then === 'function') {
-      // Async bridge — race against timeout
+      // Async bridge — race against timeout, clear timer on success to avoid leaks
+      let timeoutId: ReturnType<typeof setTimeout>;
       await Promise.race([
-        result,
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error(`Bridge ${flag} timed out after ${timeoutMs}ms`)), timeoutMs),
-        ),
+        result.then((v: void) => { clearTimeout(timeoutId); return v; }),
+        new Promise<void>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(`Bridge ${flag} timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
       ]);
     }
     log.info({ flag, workspaceId, duration_ms: Date.now() - start }, 'Bridge executed');

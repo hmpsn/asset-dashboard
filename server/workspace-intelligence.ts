@@ -308,7 +308,7 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
   const deleted = intelligenceCache.deleteByPrefix(`intelligence:${workspaceId}:`);
   // Invalidate persistent sub-cache
   try {
-    invalidateSubCachePrefix(workspaceId, '');
+    invalidateSubCachePrefix(workspaceId, ''); // empty prefix = all keys for this workspace
   } catch {
     // Table may not exist yet — non-critical
   }
