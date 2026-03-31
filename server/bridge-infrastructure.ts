@@ -73,13 +73,24 @@ export async function executeBridge(
   try {
     const result = fn();
     if (result && typeof result.then === 'function') {
-      // Async bridge — race against timeout, clear timer on settle to avoid leaks
+      // Async bridge — race against timeout, clear timer on settle to avoid leaks.
+      // `timedOut` suppresses re-throw in the rejection handler: if the timeout wins the
+      // race and the bridge later rejects, we must NOT rethrow — doing so would create an
+      // unhandled promise rejection because Promise.race has already settled and nobody is
+      // awaiting the .then() chain anymore.
       let timeoutId: ReturnType<typeof setTimeout>;
+      let timedOut = false;
       const cleanup = () => clearTimeout(timeoutId);
       await Promise.race([
-        result.then((v: void) => { cleanup(); return v; }, (e: unknown) => { cleanup(); throw e; }),
+        result.then(
+          (v: void) => { cleanup(); return v; },
+          (e: unknown) => { cleanup(); if (!timedOut) throw e; },
+        ),
         new Promise<void>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error(`Bridge ${flag} timed out after ${timeoutMs}ms`)), timeoutMs);
+          timeoutId = setTimeout(() => {
+            timedOut = true;
+            reject(new Error(`Bridge ${flag} timed out after ${timeoutMs}ms`));
+          }, timeoutMs);
         }),
       ]);
     }
