@@ -34,6 +34,9 @@ export const FEATURE_FLAGS = {
   'outcome-adaptive-pipeline': false,
   'outcome-playbooks': false,
   'outcome-predictive': false,
+
+  // Unified Workspace Intelligence
+  'intelligence-shadow-mode': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;

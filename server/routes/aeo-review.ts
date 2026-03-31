@@ -8,7 +8,8 @@ import { getDataDir } from '../data-dir.js';
 import { reviewPage, reviewSitePages } from '../aeo-page-review.js';
 import { getWorkspace } from '../workspaces.js';
 import { getLatestSnapshot } from '../reports.js';
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from '../webflow.js';
+import { discoverCmsUrls, buildStaticPathSet } from '../webflow.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { isContentPage, isExcludedPage } from '../audit-page.js';
 import { addActivity } from '../activity-log.js';
 import { resolvePagePath } from '../helpers.js';
@@ -124,8 +125,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
 
     // 1. Static pages from Webflow API
     try {
-      const allPages = await listPages(ws.webflowSiteId, token || undefined);
-      const published = filterPublishedPages(allPages);
+      const published = await getWorkspacePages(workspaceId, ws.webflowSiteId);
       for (const p of published) {
         if (isExcludedPage(p.slug, p.title)) continue;
         const pagePath = resolvePagePath(p);

@@ -644,6 +644,16 @@
           "notes": "Shipped — Client-facing insight narratives, ROI attribution tracking, monthly performance digest, admin action queue with resolution workflow. Hardened: unified insight feed (server + local insights merged into InsightsDigest with card-style badges and click actions), GSC URL normalization with metric deduplication, digest copy quality (warm voice, no promises), force-recompute admin auth (owner + admin), diverse insight caps (max 5 per type), stable insight IDs, WS event naming convention (namespace:verb), CI pr-check diff detection fix."
         },
         {
+          "id": 530,
+          "title": "Unified Workspace Intelligence Layer — Phase 1 (Foundation)",
+          "source": "docs/superpowers/plans/2026-03-30-unified-workspace-intelligence-phase1.md",
+          "est": "8h",
+          "priority": "P1",
+          "notes": "Shipped — Shadow infrastructure layer: shared types (intelligence.ts), LRU cache + single-flight (intelligence-cache.ts), cached page accessors with two-view filtering (workspace-data.ts), core assembler with per-slice graceful degradation (workspace-intelligence.ts), API endpoint + health route, React Query hook, prompt formatter (3 verbosity levels). Migrated all 20 listPages() callers to centralized getWorkspacePages()/getWorkspaceAllPages(). Shadow-mode comparison in buildSeoContext() behind feature flag. DB migration 043.",
+          "status": "done",
+          "shippedAt": "2026-03-31"
+        },
+        {
           "id": 529,
           "title": "AI insight validation pass (quality gate on surfaced insights)",
           "source": "User feedback — 2026-03-28",
@@ -660,6 +670,15 @@
       "hours": "80+",
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
+        {
+          "id": 531,
+          "title": "Replace remaining hardcoded 'hmpsn.studio' strings with STUDIO_URL/STUDIO_BOT_UA constants",
+          "source": "pr-check.ts",
+          "est": "0.25h",
+          "priority": "P3",
+          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. 2/8 occurrences fixed (internal-links.ts, llms-txt-generator.ts). Remaining 6: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts. Quick find-and-replace.",
+          "status": "pending"
+        },
         {
           "id": 400,
           "title": "Content Templates backend (CRUD + migration 014)",

@@ -40,11 +40,10 @@ import {
   updatePageSeo,
   uploadAsset,
   getSiteSubdomain,
-  listPages,
-  filterPublishedPages,
   discoverCmsUrls,
   buildStaticPathSet,
 } from '../webflow.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import {
   listWorkspaces,
   getWorkspace,
@@ -620,8 +619,7 @@ router.post('/api/jobs', async (req, res) => {
             updateJob(paJob.id, { status: 'running', message: 'Discovering pages...' });
 
             // 1. Discover all pages (static + CMS)
-            const allPages = await listPages(paSiteId, paToken);
-            const published = filterPublishedPages(allPages);
+            const published = await getWorkspacePages(paWsId, paSiteId);
             interface PageItem { id: string; title: string; slug: string; path: string; source: 'static' | 'cms'; seoTitle?: string; metaDesc?: string }
             const pages: PageItem[] = published.map(p => ({
               id: p.id,
@@ -644,7 +642,7 @@ router.post('/api/jobs', async (req, res) => {
             }
             if (baseUrl) {
               try {
-                const staticPaths = buildStaticPathSet(allPages);
+                const staticPaths = buildStaticPathSet(published);
                 const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 200);
                 for (const cms of cmsUrls) {
                   pages.push({

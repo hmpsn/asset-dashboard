@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 export interface Job {
   id: string;
@@ -82,7 +83,7 @@ function rowToJob(row: JobRow): Job {
     progress: row.progress ?? undefined,
     total: row.total ?? undefined,
     message: row.message ?? undefined,
-    result: row.result ? JSON.parse(row.result) : undefined,
+    result: row.result ? parseJsonFallback(row.result, undefined) : undefined,
     error: row.error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

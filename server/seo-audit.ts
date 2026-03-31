@@ -1,4 +1,5 @@
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { getWorkspacePages } from './workspace-data.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { checkSiteLinks } from './link-checker.js';
 import type { DeadLink } from './link-checker.js';
@@ -130,12 +131,13 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     ? (siteInfo.customDomain.startsWith('http') ? siteInfo.customDomain : `https://${siteInfo.customDomain}`)
     : baseUrl;
   log.info(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
-  const allPages = await listPages(siteId, tokenOverride);
+  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const allPublished = wsId ? await getWorkspacePages(wsId, siteId) : [];
   // Filter published pages and exclude utility / legal / error pages
-  const pages = filterPublishedPages(allPages).filter(
+  const pages = allPublished.filter(
     (p: { title: string; slug: string }) => !isExcludedPage(p.slug, p.title)
   );
-  log.info(`SEO audit: ${allPages.length} total pages, ${pages.length} published (excluded utility/legal/password/draft pages)`);
+  log.info(`SEO audit: ${allPublished.length} total published pages, ${pages.length} published (excluded utility/legal/password/draft pages)`);
 
   // Fetch metadata and HTML in parallel (batch of 5), cache meta for site-wide checks
   const results: PageSeoResult[] = [];
@@ -304,7 +306,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
   // --- Redirect health check (runs inline, fast HEAD requests) ---
   try {
     log.info('Running redirect scan...');
-    const redirectResult = await scanRedirects(siteId, tokenOverride);
+    const redirectResult = await scanRedirects(siteId, wsId);
     const { summary, chains } = redirectResult;
 
     if (summary.notFound > 0) {
@@ -674,7 +676,7 @@ Respond in this exact JSON format (only include fields that need fixing):
   if (!skipLinkCheck) {
     try {
       log.info('Running dead link scan...');
-      const linkResult = await checkSiteLinks(siteId, tokenOverride);
+      const linkResult = await checkSiteLinks(siteId, wsId);
       const internalDead = linkResult.deadLinks.filter(l => l.type === 'internal').length;
       const externalDead = linkResult.deadLinks.filter(l => l.type === 'external').length;
       deadLinkSummary = {

@@ -11,7 +11,8 @@
  * - Removed 50-page CMS cap (now up to 500)
  * - Summary cache in SQLite for fast re-generation
  */
-import { listPages, filterPublishedPages, getSiteSubdomain, discoverCmsUrls, buildStaticPathSet } from './webflow-pages.js';
+import { getSiteSubdomain, discoverCmsUrls, buildStaticPathSet } from './webflow-pages.js';
+import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { listMatrices } from './content-matrices.js';
@@ -20,6 +21,7 @@ import { listContentRequests } from './content-requests.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { callOpenAI } from './openai-helpers.js';
+import { STUDIO_BOT_UA } from './constants.js';
 import db from './db/index.js';
 import { randomUUID } from 'crypto';
 
@@ -220,7 +222,7 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
             method: 'HEAD',
             signal: controller.signal,
             redirect: 'follow',
-            headers: { 'User-Agent': 'HmpsnStudioBot/1.0 (+https://hmpsn.studio)' },
+            headers: { 'User-Agent': STUDIO_BOT_UA },
           });
           clearTimeout(timeout);
           return res.ok ? url : null;
@@ -392,9 +394,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   // 1. Webflow static pages
   if (ws.webflowSiteId) {
     try {
-      const token = ws.webflowToken || process.env.WEBFLOW_API_TOKEN;
-      const allPages = await listPages(ws.webflowSiteId, token || undefined);
-      const published = filterPublishedPages(allPages);
+      const published = await getWorkspacePages(workspaceId, ws.webflowSiteId);
 
       for (const p of published) {
         const pagePath = resolvePagePath(p);
@@ -406,7 +406,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
       }
 
       // CMS pages from sitemap (removed 50-page cap — now up to 500)
-      const subdomain = await getSiteSubdomain(ws.webflowSiteId, token || undefined);
+      const subdomain = await getSiteSubdomain(ws.webflowSiteId, ws.webflowToken || undefined);
       const sitemapBase = baseUrl || (subdomain ? `https://${subdomain}.webflow.io` : '');
       if (sitemapBase) {
         const staticPaths = buildStaticPathSet(published);

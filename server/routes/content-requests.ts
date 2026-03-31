@@ -22,11 +22,10 @@ import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-consol
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import {
-  listPages,
-  filterPublishedPages,
   getSiteSubdomain,
   discoverSitemapUrls,
 } from '../webflow.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { getWorkspace, getTokenForSite, updatePageState } from '../workspaces.js';
 import { resolvePagePath } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
@@ -118,9 +117,7 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
   // 2. Webflow API pages (static pages with titles)
   if (ws.webflowSiteId) {
     try {
-      const token = getTokenForSite(ws.webflowSiteId) || undefined;
-      const allPages = await listPages(ws.webflowSiteId, token);
-      const published = filterPublishedPages(allPages);
+      const published = await getWorkspacePages(ws.id, ws.webflowSiteId);
       for (const p of published) {
         const pagePath = resolvePagePath(p);
         const key = pagePath.toLowerCase();

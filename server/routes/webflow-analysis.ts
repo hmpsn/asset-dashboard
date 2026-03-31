@@ -169,9 +169,9 @@ router.get('/api/webflow/link-check-domains/:siteId', requireWorkspaceAccessFrom
 
 router.get('/api/webflow/link-check/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
     const domain = typeof req.query.domain === 'string' ? req.query.domain : undefined;
-    const result = await checkSiteLinks(req.params.siteId, token, domain);
+    const linkCheckWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
+    const result = await checkSiteLinks(req.params.siteId, linkCheckWs?.id, domain);
     saveLinkCheck(req.params.siteId, result);
     res.json(result);
   } catch (err) {
@@ -189,7 +189,6 @@ router.get('/api/webflow/link-check-snapshot/:siteId', requireWorkspaceAccessFro
 // --- Redirect Scanner ---
 router.get('/api/webflow/redirect-scan/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
     // Resolve live domain + GSC property from workspace
     const allWs = listWorkspaces();
     const ws = allWs.find(w => w.webflowSiteId === req.params.siteId);
@@ -213,7 +212,7 @@ router.get('/api/webflow/redirect-scan/:siteId', requireWorkspaceAccessFromQuery
       }
     }
 
-    const result = await scanRedirects(req.params.siteId, token, ws?.liveDomain, gscGhostUrls);
+    const result = await scanRedirects(req.params.siteId, ws?.id, ws?.liveDomain, gscGhostUrls);
     // Persist to disk so results survive deploys
     saveRedirectSnapshot(req.params.siteId, result);
 

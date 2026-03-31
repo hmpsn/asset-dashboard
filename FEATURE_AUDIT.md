@@ -3014,6 +3014,21 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+## Unified Workspace Intelligence
+
+### 197. Unified Workspace Intelligence Layer — Phase 1 (Foundation)
+**What it does:** Shadow infrastructure layer that unifies workspace context (SEO data, insights, learnings, page profiles) into a single cached intelligence object. Three-layer architecture: shared data accessors (cached Webflow page data with workspace-scoped token resolution), intelligence core assembler (`buildWorkspaceIntelligence()` with per-slice graceful degradation, LRU cache, single-flight dedup), and API/frontend surface (`GET /api/intelligence/:workspaceId`, React Query hook). Migrates all 20 `listPages()` callers to centralized `getWorkspacePages()`/`getWorkspaceAllPages()` accessors with 10-minute caching. Shadow-mode comparison in `buildSeoContext()` validates new layer against existing code behind `intelligence-shadow-mode` feature flag. Two-view page cache: published pages (no CMS templates) for HTML scanning, all live pages (including CMS templates, excluding drafts/archived) for collection item enumeration.
+
+**Files:** `shared/types/intelligence.ts` (type definitions), `server/workspace-intelligence.ts` (core assembler + formatter), `server/workspace-data.ts` (cached page accessors), `server/intelligence-cache.ts` (LRU cache + single-flight), `server/routes/intelligence.ts` (API endpoint + health), `src/hooks/admin/useWorkspaceIntelligence.ts` (React Query hook), `src/api/intelligence.ts` (API client), `server/db/migrations/043-intelligence-caching-layer.sql` (DB tables), `server/seo-context.ts` (shadow-mode delegation), 20+ server files migrated from `listPages()` to shared accessors
+
+**Agency value:** Unified intelligence object replaces ad-hoc data fetching across features. Single API call provides all workspace context for AI advisors, strategy tools, and audit features. Shared page cache eliminates redundant Webflow API calls. Shadow-mode validation ensures correctness before switching callers.
+
+**Client value:** N/A — infrastructure only (Phase 1). Phase 2+ will expose intelligence-driven features to the client portal.
+
+**Mutual:** Foundation for cross-feature intelligence sharing. Every future feature that needs workspace context consumes from one source of truth instead of fetching independently.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3029,6 +3044,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**261 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**262 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **261**. Last updated: March 2026.
+Current feature count: **262**. Last updated: March 2026.

@@ -11,8 +11,6 @@ import {
   listAssets,
   updateAsset,
   deleteAsset,
-  listPages,
-  filterPublishedPages,
   updatePageSeo,
   publishSite,
   getSiteSubdomain,
@@ -24,6 +22,7 @@ import {
   getTokenForSite,
   updatePageState,
 } from '../workspaces.js';
+import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow');
@@ -107,10 +106,10 @@ router.post('/api/webflow/assets/bulk-delete', async (req, res) => {
 // --- Page SEO Editing ---
 router.get('/api/webflow/pages/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
   try {
-    const token = getTokenForSite(req.params.siteId) || undefined;
-    const allPages = await listPages(req.params.siteId, token);
-    const published = filterPublishedPages(allPages);
-    log.info(`Pages: ${allPages.length} total, ${published.length} published (filtered out ${allPages.length - published.length} drafts/collections/unpublished)`);
+    const { siteId } = req.params;
+    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
+    log.info(`Pages: ${published.length} published`);
     res.json(published);
   } catch (err) {
     log.error({ err: err }, 'Pages list error');
@@ -123,8 +122,8 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
   try {
     const { siteId } = req.params;
     const token = getTokenForSite(siteId) || undefined;
-    const allPages = await listPages(siteId, token);
-    const published = filterPublishedPages(allPages);
+    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
 
     // Build result from static pages
     const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms' }> = published.map(p => ({
@@ -148,7 +147,7 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
       }
 
       if (baseUrl) {
-        const staticPaths = buildStaticPathSet(allPages);
+        const staticPaths = buildStaticPathSet(published);
         const { cmsUrls } = await discoverCmsUrls(baseUrl, staticPaths, 500);
         for (const cms of cmsUrls) {
           result.push({
