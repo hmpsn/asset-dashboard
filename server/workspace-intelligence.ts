@@ -118,15 +118,17 @@ async function assembleSeoContext(
   opts?: IntelligenceOptions,
 ): Promise<SeoContextSlice> {
   const { buildSeoContext } = await import('./seo-context.js');
+  const { getWorkspace } = await import('./workspaces.js');
   // Pass _skipShadow to prevent circular recursion:
   // buildWorkspaceIntelligence → assembleSeoContext → buildSeoContext → shadow mode → buildWorkspaceIntelligence → ∞
   const ctx = buildSeoContext(workspaceId, opts?.pagePath, opts?.learningsDomain ?? 'all', { _skipShadow: true });
+  const workspace = getWorkspace(workspaceId);
 
   return {
     strategy: ctx.strategy,
     brandVoice: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
-    personas: [], // TODO: parse from personasBlock or load directly in Phase 2
+    personas: workspace?.personas ?? [],
     knowledgeBase: ctx.knowledgeBlock,
   };
 }
