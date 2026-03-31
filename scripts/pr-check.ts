@@ -258,6 +258,7 @@ const manualChecks = [
   'BRAND_DESIGN_LANGUAGE.md updated if UI changed',
   'Feature flag added if this is a multi-phase feature',
   'No route removals without updating Sidebar, Breadcrumbs, CommandPalette, routes.ts',
+  'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);
