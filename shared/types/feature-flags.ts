@@ -37,6 +37,23 @@ export const FEATURE_FLAGS = {
 
   // Unified Workspace Intelligence
   'intelligence-shadow-mode': false,
+
+  // Intelligence Phase 2 — Event Bridges (all default OFF, individually toggleable)
+  'bridge-outcome-reweight': false,         // #1: recordOutcome → reweight insight scores
+  'bridge-decay-suggested-brief': false,    // #2: content decay → suggested brief
+  'bridge-strategy-invalidate': false,      // #3: strategy updated → invalidate intelligence cache
+  'bridge-insight-to-action': false,        // #4: insight resolved → tracked action (already exists in routes/insights.ts)
+  'bridge-page-analysis-invalidate': false, // #5: page analysis → clear caches
+  'bridge-action-auto-resolve': false,      // #7: recordAction → auto-resolve related insights
+  'bridge-content-to-insight': false,       // #8: content published → content staleness insight (Phase 3)
+  'bridge-schema-to-insight': false,        // #9: schema validation → schema health insight (Phase 3)
+  'bridge-anomaly-boost': false,            // #10: anomaly → boost insight severity
+  'bridge-settings-cascade': false,         // #11: workspace settings → cascade invalidation
+  'bridge-audit-page-health': false,        // #12: audit → page_health insights
+  'bridge-action-annotation': false,        // #13: recordAction → create annotation
+  'bridge-annotation-to-insight': false,    // #14: annotation created → insight correlation (Phase 3)
+  'bridge-audit-site-health': false,        // #15: audit → site_health insights
+  'bridge-client-signal': false,            // #16: client feedback → signal insights (Phase 3)
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
