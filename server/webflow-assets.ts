@@ -7,7 +7,7 @@ import path from 'path';
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
-import { getWorkspacePages } from './workspace-data.js';
+import { getWorkspacePages, getWorkspaceAllPages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('webflow-assets');
@@ -181,7 +181,7 @@ export async function deleteAsset(assetId: string, tokenOverride?: string): Prom
 // --- Scan site for asset usage across published HTML and CMS ---
 export async function scanAssetUsage(siteId: string, tokenOverride?: string): Promise<Map<string, string[]>> {
   // Import page/CMS functions to avoid circular deps — they live in sibling modules
-  const { listPages, filterPublishedPages, getSiteSubdomain } = await import('./webflow-pages.js');
+  const { getSiteSubdomain } = await import('./webflow-pages.js');
   const { listCollections, listCollectionItems, getCollectionSchema } = await import('./webflow-cms.js');
 
   const usageMap = new Map<string, string[]>();
@@ -201,10 +201,10 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
   if (subdomain) {
     const baseUrl = `https://${subdomain}.webflow.io`;
     const wsId = listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
-    // allPages (unfiltered) needed for CMS template loop (collectionId pages excluded by filterPublishedPages)
-    const allPages = await listPages(siteId, tokenOverride);
-    // Use cached published pages for HTML scanning
-    const pages = wsId ? await getWorkspacePages(wsId, siteId) : filterPublishedPages(allPages);
+    // allPages includes CMS template pages (needed for the collection instance loop below)
+    const allPages = wsId ? await getWorkspaceAllPages(wsId, siteId) : [];
+    // Published pages for HTML scanning (excludes CMS templates — no fetchable URL)
+    const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
     const pageUrls: { url: string; title: string }[] = [
       { url: baseUrl, title: 'Home' },
     ];
