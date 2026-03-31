@@ -4,10 +4,12 @@
 import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
-import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
+import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow-keywords');
 
@@ -176,6 +178,13 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       ...(existing?.difficulty != null ? { difficulty: existing.difficulty } : {}),
     });
     log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
+    // Bridge #5: page analysis complete — clear caches
+    debouncedPageAnalysisInvalidate(workspaceId, () => {
+      clearSeoContextCache(workspaceId);
+      invalidateIntelligenceCache(workspaceId);
+      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
+      invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');
+    });
     res.json({ success: true, pagePath: normalized, hasAnalysis: true });
   } catch (err) {
     log.error({ err }, 'Failed to persist page analysis');

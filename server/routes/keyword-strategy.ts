@@ -35,6 +35,7 @@ import {
 import { getWorkspacePages } from '../workspace-data.js';
 import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
@@ -1739,6 +1740,12 @@ Rules:
     const prevPageMapForHistory = listPageKeywords(ws.id);
     // Save pageMap to dedicated table (replaces all existing entries)
     replaceAllPageKeywords(ws.id, pageMap);
+    // Bridge #5: page keywords replaced — invalidate page caches
+    debouncedPageAnalysisInvalidate(ws.id, () => {
+      clearSeoContextCache(ws.id);
+      invalidateSubCachePrefix(ws.id, 'slice:seoContext');
+      invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
+    });
 
     // Strategy-level data (no pageMap) goes to workspace JSON blob
     const { pageMap: _stripPageMap, ...strategyMeta } = strategy;
@@ -1773,6 +1780,11 @@ Rules:
     updateWorkspace(ws.id, { keywordStrategy });
     clearSeoContextCache(ws.id);
     invalidateIntelligenceCache(ws.id);
+    // Bridge #3: strategy updated — debounced intelligence invalidation
+    debouncedStrategyInvalidate(ws.id, () => {
+      invalidateIntelligenceCache(ws.id);
+      invalidateSubCachePrefix(ws.id, 'slice:seoContext');
+    });
     incrementUsage(ws.id, 'strategy_generations');
 
     try {
@@ -1910,6 +1922,12 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   // If pageMap is being updated, save to dedicated table
   if (req.body.pageMap) {
     replaceAllPageKeywords(ws.id, req.body.pageMap);
+    // Bridge #5: page keywords replaced — invalidate page caches
+    debouncedPageAnalysisInvalidate(ws.id, () => {
+      clearSeoContextCache(ws.id);
+      invalidateSubCachePrefix(ws.id, 'slice:seoContext');
+      invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
+    });
   }
   // Save non-pageMap fields to workspace blob
   const { pageMap: _pm, ...rest } = req.body;
@@ -1917,6 +1935,11 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   updateWorkspace(ws.id, { keywordStrategy: updated });
   clearSeoContextCache(ws.id);
   invalidateIntelligenceCache(ws.id);
+  // Bridge #3: strategy updated — debounced intelligence invalidation
+  debouncedStrategyInvalidate(ws.id, () => {
+    invalidateIntelligenceCache(ws.id);
+    invalidateSubCachePrefix(ws.id, 'slice:seoContext');
+  });
   // Respond with reassembled strategy
   const responsePageMap = listPageKeywords(ws.id);
   res.json({ ...updated, pageMap: responsePageMap });

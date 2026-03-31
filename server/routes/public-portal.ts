@@ -15,6 +15,8 @@ import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { debouncedStrategyInvalidate } from '../bridge-infrastructure.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('public-portal');
 
@@ -479,6 +481,8 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
 
     if (ws.keywordStrategy) {
       updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext: newContext } });
+      // Bridge #3: business priorities updated — invalidate intelligence cache
+      debouncedStrategyInvalidate(wsId, () => invalidateIntelligenceCache(wsId));
     }
   }
 
