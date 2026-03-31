@@ -55,7 +55,12 @@ export function clearSeoContextCache(workspaceId?: string): void {
  * @param pagePath - optional page path to find page-specific keywords
  * @param learningsDomain - which learning domain to inject (default 'strategy'); pass 'content' from content generation callers
  */
-export function buildSeoContext(workspaceId?: string, pagePath?: string, learningsDomain: 'content' | 'strategy' | 'technical' | 'all' = 'strategy'): SeoContext {
+export function buildSeoContext(
+  workspaceId?: string,
+  pagePath?: string,
+  learningsDomain: 'content' | 'strategy' | 'technical' | 'all' = 'strategy',
+  internalOpts?: { _skipShadow?: boolean },
+): SeoContext {
   if (workspaceId) {
     const cacheKey = `${workspaceId}:${pagePath || ''}:${learningsDomain}`;
     const cached = seoContextCache.get(cacheKey);
@@ -152,7 +157,7 @@ export function buildSeoContext(workspaceId?: string, pagePath?: string, learnin
   // Shadow-mode intelligence delegation (§14, §16)
   // Fire-and-forget — don't await, don't block the return.
   // ALWAYS returns the original result — shadow mode is observation-only.
-  if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId) {
+  if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId && !internalOpts?._skipShadow) {
     void (async () => {
       try {
         const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');

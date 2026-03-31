@@ -11,11 +11,13 @@ export const intelligenceApi = {
     workspaceId: string,
     slices?: IntelligenceSlice[],
     pagePath?: string,
+    learningsDomain?: 'content' | 'strategy' | 'technical' | 'all',
     signal?: AbortSignal,
   ): Promise<WorkspaceIntelligence> {
     const params = new URLSearchParams();
     if (slices?.length) params.set('slices', slices.join(','));
     if (pagePath) params.set('pagePath', pagePath);
+    if (learningsDomain) params.set('learningsDomain', learningsDomain);
     const qs = params.toString();
     return get<WorkspaceIntelligence>(
       `/api/intelligence/${workspaceId}${qs ? `?${qs}` : ''}`,

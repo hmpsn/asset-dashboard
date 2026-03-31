@@ -19,10 +19,11 @@ export function useWorkspaceIntelligence(
   workspaceId: string,
   slices?: IntelligenceSlice[],
   pagePath?: string,
+  learningsDomain?: 'content' | 'strategy' | 'technical' | 'all',
 ) {
   return useQuery({
-    queryKey: queryKeys.admin.intelligence(workspaceId, slices),
-    queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, slices, pagePath, signal),
+    queryKey: queryKeys.admin.intelligence(workspaceId, slices, pagePath),
+    queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, slices, pagePath, learningsDomain, signal),
     enabled: !!workspaceId,
     staleTime: 5 * 60 * 1000, // 5 min — matches server cache TTL
   });

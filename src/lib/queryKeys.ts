@@ -79,8 +79,8 @@ export const queryKeys = {
     outcomeOverview: () => ['admin-outcome-overview'] as const,
 
     // Intelligence
-    intelligence: (wsId: string, slices?: string[]) =>
-      ['admin-intelligence', wsId, ...(slices ?? [])] as const,
+    intelligence: (wsId: string, slices?: string[], pagePath?: string) =>
+      ['admin-intelligence', wsId, pagePath ?? '', ...(slices ?? [])] as const,
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
   },
 
