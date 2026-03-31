@@ -1,6 +1,8 @@
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
+import { getWorkspacePages } from './workspace-data.js';
+import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('pagespeed');
 
@@ -345,9 +347,10 @@ export async function runSiteSpeed(
   siteId: string,
   strategy: 'mobile' | 'desktop' = 'mobile',
   maxPages: number = 5,
-  tokenOverride?: string,
+  workspaceId?: string,
 ): Promise<SiteSpeedResult> {
-  const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
+  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const token = process.env.WEBFLOW_API_TOKEN || '';
   const subdomain = await getSiteSubdomain(siteId, token);
   const baseUrl = subdomain ? `https://${subdomain}.webflow.io` : '';
 
@@ -355,8 +358,7 @@ export async function runSiteSpeed(
     return { siteId, strategy, pages: [], averageScore: 0, averageVitals: { LCP: null, FID: null, CLS: null, FCP: null, INP: null, SI: null, TBT: null, TTI: null }, testedAt: new Date().toISOString() };
   }
 
-  const allPages = await listPages(siteId, tokenOverride);
-  const published = filterPublishedPages(allPages);
+  const published = wsId ? await getWorkspacePages(wsId, siteId) : [];
 
   // Prioritize: homepage first, then shortest slugs (important pages)
   const sorted = [...published].sort((a, b) => {

@@ -306,7 +306,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
   // --- Redirect health check (runs inline, fast HEAD requests) ---
   try {
     log.info('Running redirect scan...');
-    const redirectResult = await scanRedirects(siteId, tokenOverride);
+    const redirectResult = await scanRedirects(siteId, wsId);
     const { summary, chains } = redirectResult;
 
     if (summary.notFound > 0) {
@@ -676,7 +676,7 @@ Respond in this exact JSON format (only include fields that need fixing):
   if (!skipLinkCheck) {
     try {
       log.info('Running dead link scan...');
-      const linkResult = await checkSiteLinks(siteId, tokenOverride);
+      const linkResult = await checkSiteLinks(siteId, wsId);
       const internalDead = linkResult.deadLinks.filter(l => l.type === 'internal').length;
       const externalDead = linkResult.deadLinks.filter(l => l.type === 'external').length;
       deadLinkSummary = {

@@ -1,6 +1,8 @@
-import { listPages, filterPublishedPages, discoverCmsUrls, buildStaticPathSet } from './webflow.js';
+import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
+import { getWorkspacePages } from './workspace-data.js';
+import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('link-checker');
 
@@ -145,8 +147,9 @@ async function checkUrl(url: string, timeout = 10000): Promise<{ status: number 
   }
 }
 
-export async function checkSiteLinks(siteId: string, tokenOverride?: string, domain?: string): Promise<LinkCheckResult> {
-  const token = tokenOverride || process.env.WEBFLOW_API_TOKEN || '';
+export async function checkSiteLinks(siteId: string, workspaceId?: string, domain?: string): Promise<LinkCheckResult> {
+  const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  const token = process.env.WEBFLOW_API_TOKEN || '';
   const domains = await getSiteDomains(siteId, token);
   if (!domains) {
     return { totalLinks: 0, deadLinks: [], redirects: [], healthy: 0, checkedAt: new Date().toISOString() };
@@ -154,9 +157,8 @@ export async function checkSiteLinks(siteId: string, tokenOverride?: string, dom
   // Use provided domain, or default (custom domain if available, otherwise staging)
   const baseUrl = (domain || domains.defaultDomain).replace(/\/$/, '');
 
-  const allPages = await listPages(siteId, tokenOverride);
-  const pages = filterPublishedPages(allPages);
-  log.info(`Link checker: scanning ${pages.length} published pages on ${baseUrl} (filtered out ${allPages.length - pages.length})`);
+  const pages = wsId ? await getWorkspacePages(wsId, siteId) : [];
+  log.info(`Link checker: scanning ${pages.length} published pages on ${baseUrl}`);
 
   // Collect all links from all pages
   const allLinks: Array<{ href: string; text: string; page: string; pageSlug: string }> = [];

@@ -7,6 +7,8 @@ import path from 'path';
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
+import { getWorkspacePages } from './workspace-data.js';
+import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('webflow-assets');
 
@@ -198,8 +200,11 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
   const subdomain = await getSiteSubdomain(siteId, tokenOverride);
   if (subdomain) {
     const baseUrl = `https://${subdomain}.webflow.io`;
+    const wsId = listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+    // allPages (unfiltered) needed for CMS template loop (collectionId pages excluded by filterPublishedPages)
     const allPages = await listPages(siteId, tokenOverride);
-    const pages = filterPublishedPages(allPages);
+    // Use cached published pages for HTML scanning
+    const pages = wsId ? await getWorkspacePages(wsId, siteId) : filterPublishedPages(allPages);
     const pageUrls: { url: string; title: string }[] = [
       { url: baseUrl, title: 'Home' },
     ];
