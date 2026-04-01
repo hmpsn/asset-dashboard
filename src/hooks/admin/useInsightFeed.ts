@@ -136,6 +136,19 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       break;
     }
 
+    case 'audit_finding': {
+      const scope = data.scope as string | undefined;
+      const issueCount = data.issueCount as number | undefined;
+      if (scope === 'site') {
+        const siteScore = data.siteScore as number | undefined;
+        headline = siteScore !== undefined ? `site audit score ${siteScore}` : 'site audit issues';
+        if (issueCount) contextParts.push(`${issueCount} issue${issueCount !== 1 ? 's' : ''}`);
+      } else {
+        headline = issueCount ? `${issueCount} audit issue${issueCount !== 1 ? 's' : ''}` : 'audit finding';
+      }
+      break;
+    }
+
     case 'serp_opportunity': {
       headline = 'eligible for rich results';
       const schemaType = data.schemaType as string | undefined;

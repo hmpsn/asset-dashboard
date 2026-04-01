@@ -64,6 +64,13 @@ export interface SeoContextSlice {
   personas: AudiencePersona[];
   knowledgeBase: string;
   pageKeywords?: PageKeywordMap;
+  // New in 3A
+  businessProfile?: BusinessProfile;
+  backlinkProfile?: BacklinkProfile;
+  serpFeatures?: SerpFeatures;
+  rankTracking?: RankTrackingSummary;
+  keywordRecommendations?: Array<{ keyword: string; volume: number; difficulty: number; relevance: number }>;
+  strategyHistory?: StrategyHistory;
 }
 
 export interface InsightsSlice {
@@ -87,6 +94,11 @@ export interface LearningsSlice {
     outcomes: ActionOutcome[];
     hasActiveAction: boolean;
   };
+  // New in 3A
+  topWins?: TrackedAction[];
+  winRateByActionType?: Record<string, number>;
+  roiAttribution?: ROIAttribution[];
+  weCalledIt?: WeCalledItEntry[];
 }
 
 export interface PageProfileSlice {
@@ -116,7 +128,14 @@ export interface ContentPipelineSlice {
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
   coverageGaps: string[];
-  seoEdits: { pending: number; applied: number; dismissed: number };
+  seoEdits: { pending: number; applied: number; inReview: number };
+  // New in 3A
+  subscriptions?: { active: number; totalPages: number };
+  schemaDeployment?: { planned: number; deployed: number; types: string[] };
+  rewritePlaybook?: { patterns: string[]; lastUsedAt: string | null };
+  cannibalizationWarnings?: CannibalizationWarning[];
+  decayAlerts?: DecayAlert[];
+  suggestedBriefs?: number;
 }
 
 export interface SiteHealthSlice {
@@ -127,15 +146,30 @@ export interface SiteHealthSlice {
   schemaErrors: number;
   orphanPages: number;
   cwvPassRate: { mobile: number | null; desktop: number | null };
+  // New in 3A
+  redirectDetails?: RedirectDetail[];
+  aeoReadiness?: AeoReadiness;
+  schemaValidation?: SchemaValidationSummary;
+  performanceSummary?: PerformanceSummary | null;
+  anomalyCount?: number;
+  anomalyTypes?: string[];
+  seoChangeVelocity?: number;
 }
 
 export interface ClientSignalsSlice {
-  keywordFeedback: { approved: string[]; rejected: string[] };
+  keywordFeedback: { approved: string[]; rejected: string[]; patterns: { approveRate: number; topRejectionReasons: string[] } };
   contentGapVotes: { topic: string; votes: number }[];
   businessPriorities: string[];
   approvalPatterns: { approvalRate: number; avgResponseTime: number | null };
   recentChatTopics: string[];
   churnRisk: 'low' | 'medium' | 'high' | null;
+  // New in 3A
+  churnSignals?: ChurnSignalSummary[];
+  roi?: { organicValue: number; growth: number; period: string } | null;
+  engagement?: EngagementMetrics;
+  compositeHealthScore?: number | null;
+  feedbackItems?: Array<{ id: string; type: string; status: string; createdAt: string }>;
+  serviceRequests?: { pending: number; total: number };
 }
 
 export interface OperationalSlice {
@@ -144,6 +178,136 @@ export interface OperationalSlice {
    *  pageUrl is optional — populated only if derivable from context. May need schema update in Phase 3. */
   annotations: { date: string; label: string; pageUrl?: string }[];
   pendingJobs: number;
+  // New in 3A
+  timeSaved?: { totalMinutes: number; byFeature: Record<string, number> } | null;
+  approvalQueue?: { pending: number; oldestAge: number | null };
+  recommendationQueue?: { fixNow: number; fixSoon: number; fixLater: number };
+  actionBacklog?: { pendingMeasurement: number; oldestAge: number | null };
+  detectedPlaybooks?: string[];
+  workOrders?: { active: number; pending: number };
+  insightAcceptanceRate?: InsightAcceptanceRate | null;
+}
+
+// ── New supporting types (Phase 3A) ─────────────────────────────────
+
+export interface BusinessProfile {
+  industry: string;
+  goals: string[];
+  targetAudience: string;
+}
+
+export interface BacklinkProfile {
+  totalBacklinks: number;
+  referringDomains: number;
+  trend: 'growing' | 'stable' | 'declining';
+}
+
+export interface SerpFeatures {
+  featuredSnippets: number;
+  peopleAlsoAsk: number;
+  localPack: boolean;
+}
+
+export interface EngagementMetrics {
+  lastLoginAt: string | null;
+  loginFrequency: 'daily' | 'weekly' | 'monthly' | 'inactive';
+  chatSessionCount: number;
+  portalUsage: { pageViews: number; featuresUsed: string[] } | null;
+}
+
+/** Internal computation type for composite health scoring.
+ *  The slice exposes only the final `score` as `compositeHealthScore?: number | null` (0-100). */
+export interface CompositeHealthScore {
+  score: number;
+  components: {
+    churn: { score: number; weight: 0.4 };
+    roi: { score: number; weight: 0.3 };
+    engagement: { score: number; weight: 0.3 };
+  };
+  computedAt: string;
+}
+
+export interface ChurnSignalSummary {
+  type: string;
+  severity: string;
+  detectedAt: string;
+}
+
+export interface ROIAttribution {
+  actionId: string;
+  pageUrl: string;
+  actionType: string;
+  clicksBefore: number;
+  clicksAfter: number;
+  clickGain: number;
+  measuredAt: string;
+}
+
+export interface WeCalledItEntry {
+  actionId: string;
+  prediction: string;
+  outcome: string;
+  score: string;
+  pageUrl: string;
+  measuredAt: string;
+}
+
+export interface RankTrackingSummary {
+  trackedKeywords: number;
+  avgPosition: number | null;
+  positionChanges: { improved: number; declined: number; stable: number };
+}
+
+export interface StrategyHistory {
+  revisionsCount: number;
+  lastRevisedAt: string;
+  trajectory: string;
+}
+
+export interface DecayAlert {
+  pageUrl: string;
+  clickDrop: number;
+  detectedAt: string;
+  hasRefreshBrief: boolean;
+  isRepeatDecay: boolean;
+}
+
+export interface CannibalizationWarning {
+  keyword: string;
+  pages: string[];
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface RedirectDetail {
+  url: string;
+  target: string;
+  chainDepth: number;
+  status: number;
+}
+
+export interface AeoReadiness {
+  pagesChecked: number;
+  passingRate: number;
+}
+
+export interface SchemaValidationSummary {
+  valid: number;
+  warnings: number;
+  errors: number;
+}
+
+export interface PerformanceSummary {
+  avgLcp: number | null;
+  avgFid: number | null;
+  avgCls: number | null;
+  score: number | null;
+}
+
+export interface InsightAcceptanceRate {
+  totalShown: number;
+  confirmed: number;
+  dismissed: number;
+  rate: number;
 }
 
 // ── Prompt formatter options ────────────────────────────────────────────
@@ -183,5 +347,5 @@ export interface ContentPipelineSummary {
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
-  seoEdits: { pending: number; applied: number; dismissed: number };
+  seoEdits: { pending: number; applied: number; inReview: number };
 }

@@ -257,7 +257,7 @@ function computeContentPipelineSummary(workspaceId: string): ContentPipelineSumm
     seoEdits: {
       pending: seoMap['pending'] ?? 0,
       applied: seoMap['applied'] ?? 0,
-      dismissed: seoMap['dismissed'] ?? 0,
+      inReview: seoMap['in_review'] ?? seoMap['dismissed'] ?? 0,
     },
   };
 }

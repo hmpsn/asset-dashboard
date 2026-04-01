@@ -3823,6 +3823,46 @@
           "notes": "Full implementation: action tracking (10+ source systems), outcome measurement at 7/30/60/90d checkpoints (GSC + GA4 delta), win/loss/neutral scoring, workspace learnings with confidence thresholds (high 25+, medium 10-24, low <10), AI prompt injection, admin Outcomes Dashboard (4-tab: Overview/Actions/Wins/Learnings), client tiered reporting (Free top-3-wins, Growth scorecard, Premium detailed), We Called It external detection (2-cycle confirmation), multi-workspace overview with aggregate stats, action playbooks (pattern detection from multi-action pages), backfill engine (idempotent retroactive action creation from generated_posts/analytics_insights/recommendation_sets), cron scheduler for measurement and external detection. Feature flags: outcome-tracking, outcome-ai-injection, outcome-dashboard, outcome-client-reporting, outcome-external-detection, outcome-playbooks.",
           "status": "done",
           "shippedAt": "2026-03-29"
+        },
+        {
+          "id": "unified-workspace-intelligence-3a",
+          "title": "Unified Workspace Intelligence Layer Phase 3A",
+          "source": "docs/superpowers/plans/2026-04-01-unified-workspace-intelligence-phase3a.md",
+          "est": "20-30h",
+          "priority": "P1",
+          "sprint": "E",
+          "notes": "In progress. PR #118 covers Tasks 1-3 (shared types, bridge wiring, siteHealth assembler). Tasks 4-17 remaining.",
+          "status": "pending"
+        },
+        {
+          "id": "bridge-audit-finding-auto-resolve",
+          "title": "Auto-resolve audit_finding insights when issues are fixed",
+          "source": "PR #118 review flag",
+          "est": "2-3h",
+          "priority": "P2",
+          "sprint": "E",
+          "notes": "Bridge #12 and #15 create audit_finding insights marked in_progress, but there's no logic to auto-resolve them when subsequent audit runs show the issues are fixed. Stale in_progress findings accumulate. Needs a resolve-on-clean-audit mechanism.",
+          "status": "pending"
+        },
+        {
+          "id": "bridge-12-dedup-data-refresh",
+          "title": "Bridge #12: refresh audit_finding data on subsequent audit runs",
+          "source": "PR #118 review flag",
+          "est": "1-2h",
+          "priority": "P2",
+          "sprint": "E",
+          "notes": "The dedup check (existingForPage → continue) prevents upsertInsight from running, so audit issue data is never refreshed when issues change between runs. Should upsert with updated data instead of skipping entirely, while preserving resolution state.",
+          "status": "pending"
+        },
+        {
+          "id": "anomaly-boost-reversal-mechanism",
+          "title": "Anomaly boost score reversal/decay when anomalies are dismissed",
+          "source": "PR #118 review flag",
+          "est": "3-4h",
+          "priority": "P2",
+          "sprint": "E",
+          "notes": "Bridge #10 applies +10 anomaly boost to matching insights but never reverses it when anomalies age out or are dismissed. Boosted scores remain inflated permanently. Needs a decay or reversal mechanism (e.g., remove boost when no recent anomalies match, or time-decay the boost).",
+          "status": "pending"
         }
       ]
     }

@@ -7,6 +7,7 @@ import { addActivity } from './activity-log.js';
 import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
 import { applySuppressionsToAudit } from './helpers.js';
 import { createLogger } from './logger.js';
+import { fireBridge } from './bridge-infrastructure.js';
 
 const log = createLogger('scheduled-audit');
 
@@ -135,6 +136,75 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       `Scheduled audit completed — score ${effectiveAudit.siteScore}`,
       `${effectiveAudit.totalPages} pages, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
       { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore, scheduled: true });
+
+    // ── Bridge #12: Audit → page_health insights ──────────────────────
+    fireBridge('bridge-audit-page-health', ws.id, async () => {
+      const { upsertInsight, getInsights } = await import('./analytics-insights-store.js');
+      const existing = getInsights(ws.id);
+
+      // Map critical/warning audit issues to audit_finding insights
+      const criticalPages = effectiveAudit.pages
+        .filter(p => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
+
+      let created = 0;
+      for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
+        const pageIssues = page.issues?.filter(i => i.severity === 'error' || i.severity === 'warning') ?? [];
+        if (pageIssues.length === 0) continue;
+
+        // Deduplicate: skip if identical audit_finding insight exists for this page
+        const existingForPage = existing.find(
+          i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
+        );
+        if (existingForPage) continue;
+
+        upsertInsight({
+          workspaceId: ws.id,
+          insightType: 'audit_finding',
+          pageId: page.pageId,
+          pageTitle: page.page,
+          severity: pageIssues.some(i => i.severity === 'error') ? 'critical' : 'warning',
+          data: {
+            scope: 'page',
+            issueCount: pageIssues.length,
+            issueMessages: pageIssues.map(i => i.message).join('; '),
+            source: 'bridge_12_audit_page_health',
+          },
+          impactScore: pageIssues.some(i => i.severity === 'error') ? 80 : 50,
+          bridgeSource: 'bridge-audit-page-health',
+        });
+        created++;
+      }
+
+      return { modified: created };
+    });
+
+    // ── Bridge #15: Audit → site-level audit_finding insight ─────────
+    fireBridge('bridge-audit-site-health', ws.id, async () => {
+      const { upsertInsight } = await import('./analytics-insights-store.js');
+
+      // Create site-level insight from aggregate audit findings
+      const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;
+      const score = effectiveAudit.siteScore;
+      if (totalIssues > 0 && score < 70) {
+        upsertInsight({
+          workspaceId: ws.id,
+          insightType: 'audit_finding',
+          pageId: null,
+          severity: score < 50 ? 'critical' : 'warning',
+          data: {
+            scope: 'site',
+            issueCount: totalIssues,
+            issueMessages: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
+            siteScore: score,
+            source: 'bridge_15_audit_site_health',
+          },
+          impactScore: Math.max(0, 100 - score),
+          bridgeSource: 'bridge-audit-site-health',
+        });
+        return { modified: 1 };
+      }
+      return { modified: 0 };
+    });
 
     // Check for score drop using suppressed score
     if (oldScore !== undefined && oldScore > effectiveAudit.siteScore) {
