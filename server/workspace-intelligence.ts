@@ -6,6 +6,8 @@ import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
 import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import type {
@@ -569,7 +571,18 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
   } catch {
     // Table may not exist yet — non-critical
   }
-  log.info({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated (in-memory + persistent)');
+
+  // Broadcast to frontend so useWorkspaceIntelligence invalidates its React Query cache
+  try {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_CACHE_UPDATED, {
+      workspaceId,
+      invalidatedAt: new Date().toISOString(),
+    });
+  } catch {
+    // Broadcasting is best-effort — don't fail cache invalidation
+  }
+
+  log.info({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated (in-memory + persistent + broadcast)');
 }
 
 /** Cache stats for health endpoint (§18) */
