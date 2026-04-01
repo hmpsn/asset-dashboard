@@ -1,7 +1,7 @@
 import { TrendingUp, Target, Award, Code2, HeartPulse } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
-import type { AnalyticsInsight, QuickWinData, ContentDecayData, PageHealthData } from '../../../shared/types/analytics';
+import type { AnalyticsInsight, QuickWinData, ContentDecayData, PageHealthData, SiteHealthInsightData } from '../../../shared/types/analytics';
 
 interface InsightCardsProps {
   workspaceId: string;
@@ -334,7 +334,75 @@ export function ContentHealthCard({
   );
 }
 
-// ── InsightCards (5-card layout) ─────────────────────────────────
+// ── Site Health ──────────────────────────────────────────────────
+
+export function SiteHealthCard({
+  insights,
+  loading,
+}: {
+  insights: AnalyticsInsight[];
+  loading: boolean;
+}) {
+  const siteHealthInsights = insights.filter(i => i.insightType === 'site_health');
+  const latest = siteHealthInsights[0];
+  const data = latest ? (latest.data as unknown as SiteHealthInsightData) : null;
+
+  const deltaPositive = data?.scoreDelta != null && data.scoreDelta > 0;
+  const deltaNegative = data?.scoreDelta != null && data.scoreDelta < 0;
+
+  return (
+    <SectionCard
+      title="Site Health"
+      titleIcon={<HeartPulse size={14} className="text-teal-400" />}
+    >
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      ) : !data ? (
+        <p className="text-sm text-zinc-400">No site health data yet — run an audit to get started</p>
+      ) : (
+        <div className="space-y-2 text-sm">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-semibold text-zinc-100">{data.siteScore}</span>
+            <span className="text-zinc-500 text-xs">/ 100</span>
+            {data.scoreDelta != null && (
+              <span
+                className={
+                  deltaPositive
+                    ? 'text-teal-400 text-xs font-medium'
+                    : deltaNegative
+                      ? 'text-red-400 text-xs font-medium'
+                      : 'text-zinc-500 text-xs'
+                }
+              >
+                {deltaPositive ? '+' : ''}{data.scoreDelta} pts
+              </span>
+            )}
+          </div>
+          <div className="flex gap-4 text-xs text-zinc-400">
+            {data.errors > 0 && (
+              <span>
+                <span className="text-red-400 font-medium">{data.errors}</span> error{data.errors !== 1 ? 's' : ''}
+              </span>
+            )}
+            {data.warnings > 0 && (
+              <span>
+                <span className="text-blue-400 font-medium">{data.warnings}</span> warning{data.warnings !== 1 ? 's' : ''}
+              </span>
+            )}
+            {data.errors === 0 && data.warnings === 0 && (
+              <span className="text-teal-400">No critical issues found</span>
+            )}
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── InsightCards (6-card layout) ─────────────────────────────────
 
 export function InsightCards({ workspaceId: _workspaceId, insights, tier, loading }: InsightCardsProps) {
   return (
@@ -344,6 +412,7 @@ export function InsightCards({ workspaceId: _workspaceId, insights, tier, loadin
       <TopPerformersCard insights={insights} tier={tier} loading={loading} />
       <SchemaOpportunitiesCard insights={insights} tier={tier} loading={loading} />
       <ContentHealthCard insights={insights} tier={tier} loading={loading} />
+      <SiteHealthCard insights={insights} loading={loading} />
     </div>
   );
 }

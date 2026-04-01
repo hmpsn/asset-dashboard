@@ -33,12 +33,12 @@ const stmts = createStmtCache(() => ({
     INSERT INTO analytics_insights (
       id, workspace_id, page_id, insight_type, data, severity, computed_at,
       page_title, strategy_keyword, strategy_alignment, audit_issues,
-      pipeline_status, anomaly_linked, impact_score, domain
+      pipeline_status, anomaly_linked, impact_score, domain, resolution_source
     )
     VALUES (
       @id, @workspace_id, @page_id, @insight_type, @data, @severity, @computed_at,
       @page_title, @strategy_keyword, @strategy_alignment, @audit_issues,
-      @pipeline_status, @anomaly_linked, @impact_score, @domain
+      @pipeline_status, @anomaly_linked, @impact_score, @domain, @resolution_source
     )
     ON CONFLICT(workspace_id, COALESCE(page_id, '__workspace__'), insight_type) DO UPDATE SET
       data               = excluded.data,
@@ -51,7 +51,8 @@ const stmts = createStmtCache(() => ({
       pipeline_status    = excluded.pipeline_status,
       anomaly_linked     = excluded.anomaly_linked,
       impact_score       = excluded.impact_score,
-      domain             = excluded.domain
+      domain             = excluded.domain,
+      resolution_source  = COALESCE(@resolution_source, resolution_source)
       -- resolution_status, resolution_note, resolved_at intentionally omitted:
       -- background recomputation must not un-resolve admin work.
   `),
@@ -146,6 +147,7 @@ export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
     anomaly_linked: params.anomalyLinked ? 1 : 0,
     impact_score: params.impactScore ?? 0,
     domain: params.domain ?? 'cross',
+    resolution_source: params.resolutionSource ?? null,
   });
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
