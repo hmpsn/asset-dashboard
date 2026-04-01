@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Users, MousePointer, Shield, Zap,
   Target, FileText, Globe, Sparkles, CheckCircle2, Layers,
-  ArrowRight, ChevronDown, Activity, type LucideIcon,
+  ArrowRight, ChevronDown, Activity, HeartPulse, type LucideIcon,
 } from 'lucide-react';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
@@ -382,6 +382,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   serp_opportunity: Globe,
   strategy_alignment: FileText,
   anomaly_digest: Shield,
+  site_health: HeartPulse,
 };
 
 const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
@@ -411,6 +412,7 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   serp_opportunity: { label: 'View site health', tab: 'health' },
   anomaly_digest: { label: 'View analytics', tab: 'performance' },
   strategy_alignment: { label: 'View strategy', tab: 'strategy' },
+  site_health: { label: 'View site audit', tab: 'health' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {
