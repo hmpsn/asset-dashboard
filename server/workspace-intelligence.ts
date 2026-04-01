@@ -163,13 +163,71 @@ async function assembleSeoContext(
   const ctx = buildSeoContext(workspaceId, opts?.pagePath, opts?.learningsDomain ?? 'all', { _skipShadow: true });
   const workspace = getWorkspace(workspaceId);
 
-  return {
+  const base: SeoContextSlice = {
     strategy: ctx.strategy,
     brandVoice: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
     knowledgeBase: ctx.knowledgeBlock,
   };
+
+  // Rank tracking enrichment
+  try {
+    const { getTrackedKeywords, getLatestRanks } = await import('./rank-tracking.js');
+    const tracked = getTrackedKeywords(workspaceId);
+    const latest = getLatestRanks(workspaceId);
+    const improved = latest.filter((k: any) => (k.change ?? 0) < 0).length;
+    const declined = latest.filter((k: any) => (k.change ?? 0) > 0).length;
+    const stable = latest.length - improved - declined;
+    const positions = latest.map((k: any) => k.position).filter((p: number) => p > 0);
+    const avgPosition = positions.length > 0
+      ? positions.reduce((a: number, b: number) => a + b, 0) / positions.length
+      : null;
+
+    base.rankTracking = {
+      trackedKeywords: tracked.length,
+      avgPosition,
+      positionChanges: { improved, declined, stable },
+    };
+  } catch {
+    // Rank tracking optional
+  }
+
+  // Business profile from workspace settings
+  try {
+    const profile = (workspace as any)?.businessProfile;
+    if (profile && typeof profile === 'object') {
+      base.businessProfile = {
+        industry: profile.industry ?? '',
+        goals: Array.isArray(profile.goals) ? profile.goals : [],
+        targetAudience: profile.targetAudience ?? '',
+      };
+    }
+  } catch {
+    // Business profile optional
+  }
+
+  // Strategy history
+  try {
+    const rows = db.prepare(
+      'SELECT created_at, change_description FROM strategy_history WHERE workspace_id = ? ORDER BY created_at DESC',
+    ).all(workspaceId) as Array<{ created_at: string; change_description: string }>;
+    if (rows.length > 0) {
+      const recentChanges = rows.slice(0, 5).map(r => r.change_description?.toLowerCase() ?? '');
+      const expanding = recentChanges.filter(c => c.includes('add') || c.includes('expand') || c.includes('new')).length;
+      const narrowing = recentChanges.filter(c => c.includes('remove') || c.includes('narrow') || c.includes('focus')).length;
+      const trajectory = expanding > narrowing ? 'expanding' : narrowing > expanding ? 'narrowing' : 'stable';
+      base.strategyHistory = {
+        revisionsCount: rows.length,
+        lastRevisedAt: rows[0].created_at,
+        trajectory,
+      };
+    }
+  } catch {
+    // Strategy history table may not exist
+  }
+
+  return base;
 }
 
 async function assembleInsights(
