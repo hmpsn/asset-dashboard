@@ -26,6 +26,9 @@ import type {
   PromptVerbosity,
   CannibalizationWarning,
   DecayAlert,
+  ClientSignalsSlice,
+  ChurnSignalSummary,
+  EngagementMetrics,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
@@ -134,9 +137,11 @@ async function assembleSlice(
         log.warn({ workspaceId, slice, err }, 'siteHealth slice assembly failed — skipping');
       }
       break;
+    case 'clientSignals':
+      result.clientSignals = await assembleClientSignals(workspaceId, opts);
+      break;
     // Phase 3: remaining slices are stubbed — they return undefined
     case 'pageProfile':
-    case 'clientSignals':
     case 'operational':
       log.debug({ workspaceId, slice }, 'Slice not yet implemented — skipping');
       break;
@@ -538,6 +543,235 @@ async function assembleSiteHealth(
     anomalyCount,
     anomalyTypes,
     seoChangeVelocity,
+  };
+}
+
+async function assembleClientSignals(
+  workspaceId: string,
+  _opts?: IntelligenceOptions,
+): Promise<ClientSignalsSlice> {
+  // Keyword feedback (DB direct — no store module)
+  let keywordFeedback: ClientSignalsSlice['keywordFeedback'] = { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } };
+  try {
+    const approvedRows = db.prepare(
+      'SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
+    ).all(workspaceId, 'approved') as { keyword: string }[];
+    const rejectedRows = db.prepare(
+      'SELECT keyword, reason FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
+    ).all(workspaceId, 'declined') as { keyword: string; reason?: string }[];
+    const total = approvedRows.length + rejectedRows.length;
+    const reasons = rejectedRows.map(r => r.reason).filter(Boolean) as string[];
+    const reasonCounts = new Map<string, number>();
+    for (const r of reasons) reasonCounts.set(r, (reasonCounts.get(r) ?? 0) + 1);
+    const topRejectionReasons = [...reasonCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([reason]) => reason);
+    keywordFeedback = {
+      approved: approvedRows.map(r => r.keyword),
+      rejected: rejectedRows.map(r => r.keyword),
+      patterns: { approveRate: total > 0 ? approvedRows.length / total : 0, topRejectionReasons },
+    };
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'Keyword feedback table unavailable — skipping');
+  }
+
+  // Content gap votes (DB direct)
+  let contentGapVotes: { topic: string; votes: number }[] = [];
+  try {
+    const rows = db.prepare(
+      'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
+    ).all(workspaceId) as { keyword: string; cnt: number }[];
+    contentGapVotes = rows.map(r => ({ topic: r.keyword, votes: r.cnt }));
+  } catch {
+    // Table may not exist
+  }
+
+  // Business priorities (DB direct)
+  let businessPriorities: string[] = [];
+  try {
+    const row = db.prepare(
+      'SELECT priorities FROM client_business_priorities WHERE workspace_id = ?',
+    ).get(workspaceId) as { priorities: string } | undefined;
+    if (row) {
+      const parsed = JSON.parse(row.priorities);
+      businessPriorities = Array.isArray(parsed) ? parsed : [];
+    }
+  } catch {
+    // Table may not exist or bad JSON
+  }
+
+  // Churn signals
+  let churnSignals: ChurnSignalSummary[] = [];
+  let churnRisk: ClientSignalsSlice['churnRisk'] = null;
+  try {
+    const { listChurnSignals } = await import('./churn-signals.js');
+    const signals = listChurnSignals(workspaceId);
+    const active = signals.filter((s: any) => !s.dismissed);
+    churnSignals = active.map((s: any) => ({
+      type: s.signalType ?? s.type ?? '',
+      severity: s.severity ?? 'low',
+      detectedAt: s.detectedAt ?? '',
+    }));
+    const highCount = active.filter((s: any) => s.severity === 'high').length;
+    const medCount = active.filter((s: any) => s.severity === 'medium').length;
+    churnRisk = highCount > 0 ? 'high' : medCount >= 2 ? 'medium' : active.length > 0 ? 'low' : null;
+  } catch {
+    // Churn signals optional
+  }
+
+  // Approval patterns
+  let approvalPatterns = { approvalRate: 0, avgResponseTime: null as number | null };
+  try {
+    const { listBatches } = await import('./approvals.js');
+    const batches = listBatches(workspaceId);
+    let approved = 0, total = 0;
+    for (const batch of batches) {
+      for (const item of (batch as any).items ?? []) {
+        total++;
+        if (item.status === 'approved') approved++;
+      }
+    }
+    approvalPatterns = {
+      approvalRate: total > 0 ? approved / total : 0,
+      avgResponseTime: null,
+    };
+  } catch {
+    // Approvals optional
+  }
+
+  // Engagement metrics
+  let engagement: EngagementMetrics = { lastLoginAt: null, loginFrequency: 'inactive', chatSessionCount: 0, portalUsage: null };
+  try {
+    const { listClientUsers } = await import('./client-users.js');
+    const users = listClientUsers(workspaceId);
+    const latestLogin = users
+      .map((u: any) => u.lastLoginAt)
+      .filter(Boolean)
+      .sort()
+      .reverse()[0] ?? null;
+
+    let loginFrequency: EngagementMetrics['loginFrequency'] = 'inactive';
+    if (latestLogin) {
+      const daysSinceLogin = (Date.now() - new Date(latestLogin).getTime()) / (24 * 60 * 60 * 1000);
+      loginFrequency = daysSinceLogin <= 2 ? 'daily' : daysSinceLogin <= 8 ? 'weekly' : daysSinceLogin <= 35 ? 'monthly' : 'inactive';
+    }
+
+    let chatSessionCount = 0;
+    try {
+      const { getMonthlyConversationCount } = await import('./chat-memory.js');
+      chatSessionCount = getMonthlyConversationCount(workspaceId, 'client');
+    } catch {
+      // Chat memory optional
+    }
+
+    engagement = {
+      lastLoginAt: latestLogin,
+      loginFrequency,
+      chatSessionCount,
+      portalUsage: null,
+    };
+  } catch {
+    // Client users optional
+  }
+
+  // ROI data
+  let roi: ClientSignalsSlice['roi'] = null;
+  try {
+    const { getROISummary } = await import('./roi.js');
+    const roiData = getROISummary(workspaceId);
+    if (roiData) {
+      roi = {
+        organicValue: (roiData as any).organicValue ?? (roiData as any).value ?? 0,
+        growth: (roiData as any).growth ?? (roiData as any).growthPercent ?? 0,
+        period: (roiData as any).period ?? 'monthly',
+      };
+    }
+  } catch {
+    // ROI data optional
+  }
+
+  // Feedback items
+  let feedbackItems: ClientSignalsSlice['feedbackItems'] = [];
+  try {
+    const { listFeedback } = await import('./feedback.js');
+    const items = listFeedback(workspaceId);
+    feedbackItems = items.slice(0, 10).map((f: any) => ({
+      id: f.id,
+      type: f.type ?? 'general',
+      status: f.status ?? 'open',
+      createdAt: f.createdAt ?? '',
+    }));
+  } catch {
+    // Feedback optional
+  }
+
+  // Service requests
+  let serviceRequests = { pending: 0, total: 0 };
+  try {
+    const { listRequests } = await import('./requests.js');
+    const reqs = listRequests(workspaceId);
+    serviceRequests = {
+      pending: reqs.filter((r: any) => r.status === 'pending' || r.status === 'open').length,
+      total: reqs.length,
+    };
+  } catch {
+    // Requests optional
+  }
+
+  // Recent chat topics
+  let recentChatTopics: string[] = [];
+  try {
+    const { listSessions } = await import('./chat-memory.js');
+    const sessions = listSessions(workspaceId, 'client');
+    recentChatTopics = sessions
+      .slice(0, 5)
+      .map((s: any) => s.topic ?? s.title ?? '')
+      .filter(Boolean);
+  } catch {
+    // Chat memory optional
+  }
+
+  // Composite health score (40% churn + 30% ROI + 30% engagement)
+  let compositeHealthScore: number | null = null;
+  {
+    let components = 0;
+    let churnScore = 0;
+    if (churnRisk !== null) {
+      churnScore = churnRisk === 'high' ? 0 : churnRisk === 'medium' ? 30 : churnRisk === 'low' ? 60 : 100;
+      components++;
+    } else if (churnSignals.length === 0) {
+      churnScore = 100;
+      components++;
+    }
+    let roiScore = 0;
+    if (roi) {
+      roiScore = roi.growth > 10 ? 100 : roi.growth > 0 ? 70 : roi.growth === 0 ? 40 : 0;
+      components++;
+    }
+    let engagementScore = 0;
+    if (engagement.loginFrequency !== 'inactive') {
+      engagementScore = engagement.loginFrequency === 'daily' ? 100 : engagement.loginFrequency === 'weekly' ? 70 : 40;
+      components++;
+    }
+    if (components >= 2) {
+      compositeHealthScore = Math.round(churnScore * 0.4 + roiScore * 0.3 + engagementScore * 0.3);
+    }
+  }
+
+  return {
+    keywordFeedback,
+    contentGapVotes,
+    businessPriorities,
+    approvalPatterns,
+    recentChatTopics,
+    churnRisk,
+    churnSignals,
+    roi,
+    engagement,
+    compositeHealthScore,
+    feedbackItems,
+    serviceRequests,
   };
 }
 
