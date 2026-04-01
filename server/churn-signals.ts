@@ -24,6 +24,7 @@ import { listActivity } from './activity-log.js';
 import { listClientUsers } from './client-users.js';
 import { notifyTeamChurnSignal } from './email.js';
 import { createLogger } from './logger.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 
 const log = createLogger('churn-signals');
 
@@ -278,6 +279,9 @@ async function runChurnCheck() {
         description: `${ws.name} had ${weekChats} chat sessions and ${weekLogins} active users this week.`,
       });
     }
+
+    // Invalidate intelligence cache so next query gets fresh churn signal data
+    invalidateIntelligenceCache(ws.id);
   }
 
   // Send email notifications for critical signals

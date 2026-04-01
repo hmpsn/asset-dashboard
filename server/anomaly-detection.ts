@@ -29,6 +29,7 @@ import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-sto
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
 const log = createLogger('anomaly');
@@ -535,6 +536,9 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             positive: positive.length,
           });
         }
+
+        // Invalidate intelligence cache so next query gets fresh anomaly data
+        invalidateIntelligenceCache(ws.id);
 
         // ── Write anomaly digest insights (deduped via unique index) ──
         for (const a of detected) {

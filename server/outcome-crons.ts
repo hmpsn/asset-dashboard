@@ -4,6 +4,8 @@
 
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('outcome-crons');
 
@@ -31,6 +33,10 @@ export function startOutcomeCrons() {
     try {
       const { measurePendingOutcomes } = await import('./outcome-measurement.js');
       await measurePendingOutcomes();
+      // Invalidate intelligence cache for all workspaces so fresh outcome data is served
+      for (const ws of listWorkspaces()) {
+        invalidateIntelligenceCache(ws.id);
+      }
     } catch (err) {
       log.error({ err }, 'Failed to measure pending outcomes');
     }
@@ -40,6 +46,10 @@ export function startOutcomeCrons() {
     try {
       const { recomputeAllWorkspaceLearnings } = await import('./workspace-learnings.js');
       await recomputeAllWorkspaceLearnings();
+      // Invalidate intelligence cache for all workspaces so fresh learnings are served
+      for (const ws of listWorkspaces()) {
+        invalidateIntelligenceCache(ws.id);
+      }
     } catch (err) {
       log.error({ err }, 'Failed to compute workspace learnings');
     }
