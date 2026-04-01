@@ -26,7 +26,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
-import { debouncedAnomalyBoost } from './bridge-infrastructure.js';
+import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
@@ -600,38 +600,40 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // When anomalies are detected for pages that already have insights,
         // boost those insights' impact scores to surface them faster.
         debouncedAnomalyBoost(ws.id, async () => {
-          const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
-          const allInsights = fetchInsights(ws.id);
+          await withWorkspaceLock(ws.id, async () => {
+            const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
+            const allInsights = fetchInsights(ws.id);
 
-          // Anomaly detection is workspace-level (no per-page granularity in the Anomaly interface).
-          // Boost all non-resolved insights when fresh anomalies exist for this workspace.
-          const recentAnomalies = listAnomalies(ws.id, false)
-            .filter(a => !a.dismissedAt && Date.now() - new Date(a.detectedAt).getTime() < 24 * 60 * 60 * 1000);
+            // Anomaly detection is workspace-level (no per-page granularity in the Anomaly interface).
+            // Boost all non-resolved insights when fresh anomalies exist for this workspace.
+            const recentAnomalies = listAnomalies(ws.id, false)
+              .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60 * 1000);
 
-          if (recentAnomalies.length === 0) return;
+            if (recentAnomalies.length === 0) return;
 
-          for (const insight of allInsights) {
-            if (insight.resolutionStatus === 'resolved') continue;
-            const boosted = Math.min(100, (insight.impactScore ?? 50) + 10);
-            if (boosted !== insight.impactScore) {
-              updateInsight({
-                workspaceId: insight.workspaceId,
-                pageId: insight.pageId,
-                insightType: insight.insightType,
-                data: insight.data,
-                severity: insight.severity,
-                pageTitle: insight.pageTitle,
-                strategyKeyword: insight.strategyKeyword,
-                strategyAlignment: insight.strategyAlignment,
-                auditIssues: insight.auditIssues,
-                pipelineStatus: insight.pipelineStatus,
-                anomalyLinked: true,
-                impactScore: boosted,
-                domain: insight.domain,
-                resolutionSource: 'bridge_10_anomaly_boost',
-              });
+            for (const insight of allInsights) {
+              if (insight.resolutionStatus === 'resolved') continue;
+              const boosted = Math.min(100, (insight.impactScore ?? 50) + 10);
+              if (boosted !== insight.impactScore) {
+                updateInsight({
+                  workspaceId: insight.workspaceId,
+                  pageId: insight.pageId,
+                  insightType: insight.insightType,
+                  data: insight.data,
+                  severity: insight.severity,
+                  pageTitle: insight.pageTitle,
+                  strategyKeyword: insight.strategyKeyword,
+                  strategyAlignment: insight.strategyAlignment,
+                  auditIssues: insight.auditIssues,
+                  pipelineStatus: insight.pipelineStatus,
+                  anomalyLinked: true,
+                  impactScore: boosted,
+                  domain: insight.domain,
+                  resolutionSource: 'bridge_10_anomaly_boost',
+                });
+              }
             }
-          }
+          });
 
           const { broadcastToWorkspace: bc } = await import('./broadcast.js');
           const { WS_EVENTS: events } = await import('./ws-events.js');

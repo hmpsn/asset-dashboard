@@ -203,11 +203,11 @@ async function runScheduledAudit(schedule: AuditSchedule) {
           impactScore: Math.max(0, 100 - score),
           resolutionSource: 'bridge_15_audit_site_health',
         });
-      }
 
-      broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
-        bridge: 'bridge_15_audit_site_health',
-      });
+        broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
+          bridge: 'bridge_15_audit_site_health',
+        });
+      }
     });
 
     // Check for score drop using suppressed score
