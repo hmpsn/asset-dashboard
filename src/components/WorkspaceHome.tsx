@@ -17,6 +17,7 @@ import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
 import { type Page, adminPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
+import { WS_EVENTS } from '../lib/wsEvents';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -70,7 +71,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     'content-request:created': invalidateHome,
     'content-request:update': invalidateHome,
     'audit:complete': invalidateHome,
-    'insight:bridge_updated': () => queryClient.invalidateQueries({ queryKey: ['admin-intelligence', workspaceId] }),
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => queryClient.invalidateQueries({ queryKey: ['admin-intelligence', workspaceId] }),
   });
 
   // Derive data from query result

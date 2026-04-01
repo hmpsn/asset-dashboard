@@ -52,7 +52,7 @@ const stmts = createStmtCache(() => ({
       anomaly_linked     = excluded.anomaly_linked,
       impact_score       = excluded.impact_score,
       domain             = excluded.domain,
-      resolution_source  = COALESCE(@resolution_source, resolution_source)
+      resolution_source  = COALESCE(excluded.resolution_source, resolution_source)
       -- resolution_status, resolution_note, resolved_at intentionally omitted:
       -- background recomputation must not un-resolve admin work.
   `),

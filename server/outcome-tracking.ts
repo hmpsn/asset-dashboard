@@ -279,8 +279,10 @@ export function recordOutcome(params: {
   if (!outcome) throw new Error(`Failed to read back outcome for action ${params.actionId}`);
 
   // ── Bridge #1: Outcome → reweight insight scores ──────────────────
-  // Only fire if there's an actual score to act on
-  if (params.score) {
+  // Only fire for scores that produce a non-zero adjustment (win/strong_win/loss).
+  // Skip neutral/insufficient_data/inconclusive to avoid acquiring workspace lock for a no-op.
+  const actionableScores = new Set(['strong_win', 'win', 'loss']);
+  if (params.score && actionableScores.has(params.score)) {
     const actionRow = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
     if (actionRow) {
       const workspaceId = actionRow.workspace_id;

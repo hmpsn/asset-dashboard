@@ -168,18 +168,20 @@ export function buildSeoContext(
         });
 
         if (intel.seoContext) {
-          // Shadow-mode comparison: compare raw workspace field values against the
-          // intelligence assembler's output. The assembler wraps fields with headers
-          // (e.g. brandVoiceBlock includes "BRAND VOICE & STYLE" header + brand docs),
-          // so we compare against raw workspace fields to detect true divergence.
-          const workspace = getWorkspace(workspaceId);
+          // Shadow-mode comparison: compare buildSeoContext() output against the
+          // intelligence assembler's seoContext slice. Both sides originate from the
+          // same buildSeoContext() call (assembler calls it with _skipShadow: true),
+          // so they should match. The assembler maps:
+          //   brandVoice  = ctx.brandVoiceBlock (wrapped with headers)
+          //   knowledgeBase = ctx.knowledgeBlock  (wrapped with headers)
+          // So compare wrapped-to-wrapped (result.brandVoiceBlock vs intel.seoContext.brandVoice).
           const comparisonFields = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
-            // Compare raw workspace brand voice — not brandVoiceBlock (which wraps with headers)
-            { name: 'brandVoice', match: (workspace?.brandVoice ?? '') === (intel.seoContext.brandVoice ?? '') },
-            { name: 'businessContext', match: result.businessContext === (intel.seoContext.businessContext ?? '') },
-            // Compare raw workspace KB — not knowledgeBlock (which wraps with headers)
-            { name: 'knowledgeBase', match: (workspace?.knowledgeBase ?? '') === (intel.seoContext.knowledgeBase ?? '') },
+            // Both are the wrapped brandVoiceBlock (with "BRAND VOICE & STYLE" header + brand docs)
+            { name: 'brandVoice', match: (result.brandVoiceBlock ?? '') === (intel.seoContext.brandVoice ?? '') },
+            { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
+            // Both are the wrapped knowledgeBlock (with "BUSINESS KNOWLEDGE BASE" header)
+            { name: 'knowledgeBase', match: (result.knowledgeBlock ?? '') === (intel.seoContext.knowledgeBase ?? '') },
             // Personas: old path is prose string, new is structured array — compare presence as proxy
             { name: 'personas', match: (result.personasBlock ? 'present' : 'empty') === ((intel.seoContext.personas?.length ?? 0) > 0 ? 'present' : 'empty') },
           ];

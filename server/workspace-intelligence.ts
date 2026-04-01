@@ -6,6 +6,8 @@ import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
 import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
+import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -21,6 +23,12 @@ import type {
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
 const log = createLogger('workspace-intelligence');
+
+const stmts = createStmtCache(() => ({
+  schemaErrorCount: db.prepare(
+    `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
+  ),
+}));
 
 // ── Cache (§13, §33) ───────────────────────────────────────────────────
 
@@ -280,10 +288,7 @@ async function assembleSiteHealth(workspaceId: string): Promise<SiteHealthSlice>
   // Schema validation errors
   let schemaErrors = 0;
   try {
-    const db = (await import('./db/index.js')).default;
-    const schemaRow = db.prepare(
-      `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
-    ).get(workspaceId) as { cnt: number } | undefined;
+    const schemaRow = stmts().schemaErrorCount.get(workspaceId) as { cnt: number } | undefined;
     schemaErrors = schemaRow?.cnt ?? 0;
   } catch {
     // Table may not exist yet
