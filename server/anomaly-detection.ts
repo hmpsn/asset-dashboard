@@ -607,7 +607,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
-              .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60 * 1000);
+              .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
 
             if (recentAnomalies.length === 0) return;
 

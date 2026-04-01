@@ -148,6 +148,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       const criticalPages = effectiveAudit.pages
         .filter(p => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
 
+      let created = 0;
       for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
         const pageIssues = page.issues?.filter(i => i.severity === 'error' || i.severity === 'warning') ?? [];
         if (pageIssues.length === 0) continue;
@@ -179,11 +180,14 @@ async function runScheduledAudit(schedule: AuditSchedule) {
           'Bridge-generated audit page finding — protected from stale cleanup',
           'bridge_12_audit_page_health',
         );
+        created++;
       }
 
-      broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
-        bridge: 'bridge_12_audit_page_health',
-      });
+      if (created > 0) {
+        broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
+          bridge: 'bridge_12_audit_page_health',
+        });
+      }
     });
 
     // ── Bridge #15: Audit → site-level audit_finding insight ─────────
