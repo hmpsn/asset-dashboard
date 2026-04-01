@@ -154,7 +154,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
               if (errorCount === 0 && warningCount === 0) continue;
               const score = Math.max(0, 100 - (errorCount * 15) - (warningCount * 5));
               const severity = errorCount > 0 ? 'warning' : 'opportunity';
-              await upsertInsight({
+              upsertInsight({
                 workspaceId: ws.id,
                 pageId: page.url,
                 insightType: 'page_health',
@@ -166,7 +166,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
                 },
                 severity,
                 impactScore: 100 - score,
-                domain: 'technical',
+                domain: 'cross',
                 pageTitle: page.page ?? undefined,
                 resolutionSource: 'bridge_12_audit_page_health',
               });
@@ -181,31 +181,33 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
       // Bridge #15 — site-level health insight
       if (isFeatureEnabled('bridge-audit-site-health')) {
         fireBridge('bridge-audit-site-health', ws.id, async () => {
-          const { upsertInsight } = await import('./analytics-insights-store.js');
-          const delta = previousScore != null ? audit.siteScore - previousScore : null;
-          const severity =
-            audit.siteScore < 50 ? 'critical' :
-            audit.siteScore < 70 ? 'warning' :
-            delta != null && delta < -5 ? 'warning' :
-            'positive';
-          await upsertInsight({
-            workspaceId: ws.id,
-            pageId: null,
-            insightType: 'site_health',
-            data: {
-              auditSnapshotId: id,
-              siteScore: audit.siteScore,
-              previousScore: previousScore ?? null,
-              scoreDelta: delta,
-              totalPages: audit.totalPages,
-              errors: audit.errors,
-              warnings: audit.warnings,
-              siteWideIssueCount: audit.siteWideIssues?.length ?? 0,
-            },
-            severity,
-            impactScore: Math.max(0, 100 - audit.siteScore),
-            domain: 'technical',
-            resolutionSource: 'bridge_15_audit_site_health',
+          await withWorkspaceLock(ws.id, async () => {
+            const { upsertInsight } = await import('./analytics-insights-store.js');
+            const delta = previousScore != null ? audit.siteScore - previousScore : null;
+            const severity =
+              audit.siteScore < 50 ? 'critical' :
+              audit.siteScore < 70 ? 'warning' :
+              delta != null && delta < -5 ? 'warning' :
+              'positive';
+            upsertInsight({
+              workspaceId: ws.id,
+              pageId: null,
+              insightType: 'site_health',
+              data: {
+                auditSnapshotId: id,
+                siteScore: audit.siteScore,
+                previousScore: previousScore ?? null,
+                scoreDelta: delta,
+                totalPages: audit.totalPages,
+                errors: audit.errors,
+                warnings: audit.warnings,
+                siteWideIssueCount: audit.siteWideIssues?.length ?? 0,
+              },
+              severity,
+              impactScore: Math.max(0, 100 - audit.siteScore),
+              domain: 'cross',
+              resolutionSource: 'bridge_15_audit_site_health',
+            });
           });
           const { WS_EVENTS } = await import('./ws-events.js');
           const { broadcastToWorkspace } = await import('./broadcast.js');

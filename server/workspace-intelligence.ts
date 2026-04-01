@@ -223,9 +223,9 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     ) ?? [];
     const { listBriefs } = await import('./content-brief.js');
     const briefs = listBriefs(workspaceId);
-    const briefKeywords = new Set(briefs.map(b => b.targetKeyword?.toLowerCase()));
+    const briefKeywords = new Set(briefs.map(b => b.targetKeyword?.trim().toLowerCase()));
     coverageGaps = strategyKeywords
-      .filter(kw => !briefKeywords.has(kw.toLowerCase()))
+      .filter(kw => !briefKeywords.has(kw.trim().toLowerCase()))
       .slice(0, 10);
   } catch {
     // Non-critical — empty gaps is acceptable

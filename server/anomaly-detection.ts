@@ -596,12 +596,12 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             debouncedAnomalyBoost(a.workspaceId, async () => {
               await withWorkspaceLock(a.workspaceId, async () => {
                 const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
-                const boostDomain: InsightDomain = a.metric.includes('position') ? 'strategy' : 'content';
+                const boostDomain = a.metric.includes('position') ? 'search' : 'traffic';
                 const allInsights = getInsights(a.workspaceId);
                 const targets = allInsights
                   .filter(i =>
                     i.domain === boostDomain &&
-                    i.type !== 'anomaly_digest' &&
+                    i.insightType !== 'anomaly_digest' &&
                     i.resolutionStatus !== 'resolved'
                   )
                   .slice(0, 20);
@@ -625,9 +625,9 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                 }
               });
 
-              const { broadcast } = await import('./broadcast.js');
+              const { broadcastToWorkspace } = await import('./broadcast.js');
               const { WS_EVENTS } = await import('./ws-events.js');
-              broadcast(a.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
+              broadcastToWorkspace(a.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
             });
           } catch (digestErr) {
             log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');
