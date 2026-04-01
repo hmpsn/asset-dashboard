@@ -4,6 +4,7 @@ import {
   TrendingUp, Search, ArrowRight, ChevronRight, Clock,
 } from 'lucide-react';
 import { Badge } from '../ui';
+import { themeColor } from '../ui/constants';
 import type { MatrixCell } from './types';
 
 interface CellDetailPanelProps {
@@ -236,7 +237,7 @@ export function CellDetailPanel({
                 const toCfg = STATUS_CONFIG[entry.to];
                 return (
                   <div key={i} className="relative flex items-start gap-2.5 pb-2.5 last:pb-0">
-                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-zinc-900 ${toCfg ? `bg-${toCfg.color}-400` : 'bg-zinc-500'}`} style={{ backgroundColor: toCfg?.color === 'green' ? '#4ade80' : toCfg?.color === 'teal' ? '#2dd4bf' : toCfg?.color === 'amber' ? '#fbbf24' : toCfg?.color === 'blue' ? '#60a5fa' : toCfg?.color === 'orange' ? '#fb923c' : toCfg?.color === 'purple' ? '#a78bfa' : '#71717a' }} />
+                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-zinc-900 ${toCfg ? `bg-${toCfg.color}-400` : 'bg-zinc-500'}`} style={{ backgroundColor: toCfg?.color === 'green' ? '#4ade80' : toCfg?.color === 'teal' ? '#2dd4bf' : toCfg?.color === 'amber' ? '#fbbf24' : toCfg?.color === 'blue' ? '#60a5fa' : toCfg?.color === 'orange' ? '#fb923c' : toCfg?.color === 'purple' ? '#a78bfa' : themeColor('#71717a', '#94a3b8') }} />
                     <div className="min-w-0">
                       <span className="text-[11px] text-zinc-300 font-medium">{toCfg?.label || entry.to}</span>
                       <span className="text-[10px] text-zinc-600 ml-1.5">{relativeTime(entry.at)}</span>

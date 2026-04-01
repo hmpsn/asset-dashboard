@@ -4,9 +4,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
-  Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign,
+  Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader, MetricRing } from './ui';
+import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
@@ -15,7 +16,8 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { AnomalyAlerts } from './AnomalyAlerts';
 import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotations, SeoChangeImpact, WeeklyAccomplishments } from './workspace-home';
 import { type Page, adminPath } from '../routes';
-import { useWorkspaceHomeData, useAdminROI } from '../hooks/admin';
+import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
+import { WS_EVENTS } from '../lib/wsEvents';
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -47,6 +49,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const { audit } = useAuditSummary(workspaceId);
   const { data: homeData, isLoading: loading, isFetching: refreshing, dataUpdatedAt } = useWorkspaceHomeData(workspaceId);
   const { data: roiData } = useAdminROI(workspaceId);
+  const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth', 'contentPipeline']);
   const [now, setNow] = useState(() => new Date());
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [showSetupSuggestions, setShowSetupSuggestions] = useState(false);
@@ -68,6 +71,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     'content-request:created': invalidateHome,
     'content-request:update': invalidateHome,
     'audit:complete': invalidateHome,
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => queryClient.invalidateQueries({ queryKey: ['admin-intelligence', workspaceId] }),
   });
 
   // Derive data from query result
@@ -250,7 +254,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             staggerIndex={1}
           />
         ) : (
-          <StatCard label="Search Clicks" value="—" icon={Search} iconColor="#71717a" sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" staggerIndex={1} />
+          <StatCard label="Search Clicks" value="—" icon={Search} iconColor={themeColor('#71717a', '#94a3b8')} sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" staggerIndex={1} />
         )}
 
         {ga4Data ? (
@@ -267,14 +271,14 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             staggerIndex={2}
           />
         ) : (
-          <StatCard label="Users" value="—" icon={BarChart3} iconColor="#71717a" sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" staggerIndex={2} />
+          <StatCard label="Users" value="—" icon={BarChart3} iconColor={themeColor('#71717a', '#94a3b8')} sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" staggerIndex={2} />
         )}
 
         <StatCard
           label="Rank Changes"
           value={ranks.length > 0 ? `${ranks.length} tracked` : '—'}
           icon={TrendingUp}
-          iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : '#71717a'}
+          iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : themeColor('#71717a', '#94a3b8')}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, 'seo-ranks')) : undefined}
           size="hero"
@@ -314,7 +318,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               label="Content Pipeline"
               value={`${pct}%`}
               icon={Layers}
-              iconColor="#71717a"
+              iconColor={themeColor('#71717a', '#94a3b8')}
               sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
               onClick={() => navigate(adminPath(workspaceId, 'content'))}
               size="hero"
@@ -322,6 +326,19 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             />
           );
         })()}
+
+        {intel?.contentPipeline?.coverageGaps && intel.contentPipeline.coverageGaps.length > 0 && (
+          <StatCard
+            label="Coverage Gaps"
+            value={intel.contentPipeline.coverageGaps.length}
+            icon={Target}
+            iconColor="#f59e0b"
+            sub={`Strategy keywords without briefs`}
+            onClick={() => navigate(adminPath(workspaceId, 'content'))}
+            size="hero"
+            staggerIndex={7}
+          />
+        )}
       </div>
 
       {/* ── Needs Attention ── */}

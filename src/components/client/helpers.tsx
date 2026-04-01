@@ -1,6 +1,7 @@
 import { MetricBlock, ChartBlock, DataTableBlock, SparklineBlock } from '../ChatBlocks';
 import type { PerformanceTrend } from './types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { chartDotStroke } from '../ui/constants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DarkTooltip({ active, payload, label, metrics }: { active?: boolean; payload?: Array<{ value: number; payload: Record<string, any> }>; label?: string; metrics?: { label: string; key: string; color: string; fmt?: (v: number) => string }[] }) {
@@ -41,7 +42,7 @@ export function TrendChart({ data, metric, color }: { data: PerformanceTrend[]; 
           { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
           { label: 'Position', key: 'position', color: '#fbbf24' },
         ]} />} />
-        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: '#18181b', strokeWidth: 1.5 }} />
+        <Area type="monotone" dataKey={metric as string} stroke={color} strokeWidth={1.5} fill={`url(#cg-${metric})`} dot={false} activeDot={{ r: 3, fill: color, stroke: chartDotStroke(), strokeWidth: 1.5 }} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -76,8 +77,8 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
             { label: 'CTR', key: 'ctr', color: '#34d399', fmt: v => `${v}%` },
             { label: 'Position', key: 'position', color: '#fbbf24' },
           ]} />} />
-          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke="#2dd4bf" strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: '#18181b', strokeWidth: 1.5 }} />
-          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: '#60a5fa', stroke: '#18181b', strokeWidth: 1.5 }} />
+          <Area yAxisId="imps" type="monotone" dataKey="impressions" stroke="#2dd4bf" strokeWidth={1.2} strokeOpacity={0.6} fill="url(#cg-imps-dual)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
+          <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#60a5fa" strokeWidth={1.5} fill="url(#cg-clicks-dual)" dot={false} activeDot={{ r: 3, fill: '#60a5fa', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
           {anns?.map(ann => {
             const idx = data.findIndex(d => d.date === ann.date);
             if (idx < 0) return null;
@@ -126,7 +127,7 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
               </div>
             );
           }} />
-          <Area type="monotone" dataKey="siteScore" stroke="#34d399" strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: '#34d399', stroke: '#18181b', strokeWidth: 1.5 }} />
+          <Area type="monotone" dataKey="siteScore" stroke="#34d399" strokeWidth={2} fill="url(#sh-g)" dot={false} activeDot={{ r: 3, fill: '#34d399', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
         </AreaChart>
       </ResponsiveContainer>
       <div className="flex justify-between text-[11px] text-zinc-500 mt-1">

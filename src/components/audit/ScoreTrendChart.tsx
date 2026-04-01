@@ -3,6 +3,7 @@
  */
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import type { SnapshotSummary } from './types';
+import { chartGridColor, chartAxisColor, chartDotStroke, chartDotFill, scoreColor } from '../ui/constants';
 
 export function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
   const points = [...history].reverse().slice(-12);
@@ -27,15 +28,15 @@ export function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
             <stop offset="100%" stopColor="#2ed9c3" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid stroke="rgba(255,255,255,0.04)" horizontal vertical={false} />
-        <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 8 }} tickLine={false} axisLine={false} interval={points.length <= 6 ? 0 : 'preserveStartEnd'} />
-        <YAxis domain={[minS, maxS]} tick={{ fill: '#64748b', fontSize: 9 }} tickLine={false} axisLine={false} width={28} />
+        <CartesianGrid stroke={chartGridColor()} horizontal vertical={false} />
+        <XAxis dataKey="date" tick={{ fill: chartAxisColor(), fontSize: 8 }} tickLine={false} axisLine={false} interval={points.length <= 6 ? 0 : 'preserveStartEnd'} />
+        <YAxis domain={[minS, maxS]} tick={{ fill: chartAxisColor(), fontSize: 9 }} tickLine={false} axisLine={false} width={28} />
         <Tooltip content={({ active, payload }) => {
           if (!active || !payload?.length) return null;
           const row = payload[0]?.payload;
           if (!row) return null;
           const s = row.score as number;
-          const sc = s >= 80 ? '#34d399' : s >= 60 ? '#fbbf24' : '#f87171';
+          const sc = scoreColor(s);
           return (
             <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl shadow-black/40 min-w-[120px] overflow-hidden">
               <div className="px-3 py-1.5 border-b border-zinc-800 text-[11px] font-semibold text-zinc-200">{row.dateFull}</div>
@@ -45,7 +46,7 @@ export function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
             </div>
           );
         }} />
-        <Area type="monotone" dataKey="score" stroke="#2ed9c3" strokeWidth={2.5} fill="url(#trendGrad)" dot={{ r: 3.5, fill: '#0f1219', stroke: '#2ed9c3', strokeWidth: 2 }} activeDot={{ r: 4, fill: '#2ed9c3', stroke: '#18181b', strokeWidth: 2 }} />
+        <Area type="monotone" dataKey="score" stroke="#2ed9c3" strokeWidth={2.5} fill="url(#trendGrad)" dot={{ r: 3.5, fill: chartDotFill(), stroke: '#2ed9c3', strokeWidth: 2 }} activeDot={{ r: 4, fill: '#2ed9c3', stroke: chartDotStroke(), strokeWidth: 2 }} />
       </AreaChart>
     </ResponsiveContainer>
   );

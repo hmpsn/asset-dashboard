@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { MetricRingSvg, PageHeader, SectionCard, Badge, StatCard } from './ui';
+import { chartAxisColor, themeColor } from './ui/constants';
+import { STUDIO_NAME } from '../constants';
 
 // Types imported from useWorkspaceOverview hook
 
@@ -64,9 +66,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   if (data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6">
-        <img src="/logo.svg" alt="hmpsn.studio" className="h-10 opacity-40" />
+        <img src="/logo.svg" alt={STUDIO_NAME} className="h-10 opacity-40" />
         <div className="text-center max-w-sm">
-          <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to hmpsn studio</p>
+          <p className="text-base font-semibold mb-1 text-zinc-200">Welcome to {STUDIO_NAME}</p>
           <p className="text-xs leading-relaxed text-zinc-500">Create a workspace to get started.</p>
         </div>
       </div>
@@ -149,12 +151,12 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
       {/* ── Global Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="New Requests" value={totalNewRequests} icon={Bell} iconColor={totalNewRequests > 0 ? '#f87171' : '#71717a'} />
-        <StatCard label="Active Requests" value={totalActiveRequests} icon={MessageSquare} iconColor={totalActiveRequests > 0 ? '#fbbf24' : '#71717a'} />
-        <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? '#f59e0b' : totalInProgressContent > 0 ? '#60a5fa' : '#71717a'} />
-        <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? '#2dd4bf' : '#71717a'} />
-        <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : '#71717a'} />
-        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? '#a78bfa' : '#71717a'} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
+        <StatCard label="New Requests" value={totalNewRequests} icon={Bell} iconColor={totalNewRequests > 0 ? '#f87171' : themeColor('#71717a', '#94a3b8')} />
+        <StatCard label="Active Requests" value={totalActiveRequests} icon={MessageSquare} iconColor={totalActiveRequests > 0 ? '#fbbf24' : themeColor('#71717a', '#94a3b8')} />
+        <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? '#f59e0b' : totalInProgressContent > 0 ? '#60a5fa' : themeColor('#71717a', '#94a3b8')} />
+        <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? '#2dd4bf' : themeColor('#71717a', '#94a3b8')} />
+        <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : themeColor('#71717a', '#94a3b8')} />
+        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? '#60a5fa' : themeColor('#71717a', '#94a3b8')} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
       </div>
 
       {/* ── Online Now ── */}
@@ -402,7 +404,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
         return (
           <SectionCard
             title={`Client Feedback${newCount > 0 ? ` · ${newCount} new` : ''}`}
-            titleIcon={<MessageSquarePlus className="w-4 h-4 text-violet-400" />}
+            titleIcon={<MessageSquarePlus className="w-4 h-4 text-teal-400" />}
             noPadding
           >
             <div className="divide-y divide-zinc-800/50">
@@ -462,9 +464,9 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                               onChange={e => setFeedbackReply(prev => ({ ...prev, [item.id]: e.target.value }))}
                               onKeyDown={e => e.key === 'Enter' && handleReply(item.workspaceId, item.id)}
                               placeholder="Reply to client..."
-                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
                             />
-                            <button onClick={() => handleReply(item.workspaceId, item.id)} disabled={!feedbackReply[item.id]?.trim()} className="px-2 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg transition-colors">
+                            <button onClick={() => handleReply(item.workspaceId, item.id)} disabled={!feedbackReply[item.id]?.trim()} className="px-2 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-lg transition-colors">
                               <Send className="w-3 h-3 text-white" />
                             </button>
                           </div>
@@ -646,7 +648,7 @@ export function AIUsageSection() {
         {hasSemrush && (
           <div className="rounded-lg bg-zinc-800/50 border border-zinc-800 px-3 py-2.5">
             <div className="text-[11px] text-zinc-500 mb-0.5">SEMRush Credits</div>
-            <div className="text-sm font-semibold text-violet-400">{data.semrush.totalCredits.toLocaleString()}</div>
+            <div className="text-sm font-semibold text-blue-400">{data.semrush.totalCredits.toLocaleString()}</div>
             <div className="text-[9px] text-zinc-600 mt-0.5">{data.semrush.totalCalls - data.semrush.cachedCalls} API / {data.semrush.cachedCalls} cached</div>
           </div>
         )}
@@ -663,7 +665,7 @@ export function AIUsageSection() {
         </div>
         <ResponsiveContainer width="100%" height={120}>
           <BarChart data={chartDays} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-            <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 9 }} tickLine={false} axisLine={false} interval={'preserveStartEnd'} tickFormatter={(v: string) => v.slice(5)} />
+            <XAxis dataKey="date" tick={{ fill: chartAxisColor(), fontSize: 9 }} tickLine={false} axisLine={false} interval={'preserveStartEnd'} tickFormatter={(v: string) => v.slice(5)} />
             <YAxis hide />
             <Tooltip content={({ active, payload }) => {
               if (!active || !payload?.length) return null;

@@ -2154,7 +2154,90 @@ Create PR targeting `staging` with title: `feat(intelligence): Phase 2B — simp
 
 ## PR 2C: Complex Bridges + Slices
 
-> **Prerequisite:** PR 2B merged to staging and deployment verified.
+> **Prerequisite:** PR 2B merged to staging and deployment verified. ✅ Merged + verified 2026-04-01.
+
+### Phase 2B Learnings — Mandatory Guardrails for 2C
+
+These were discovered during PR 2B implementation and review. Every subagent dispatch must include these as constraints.
+
+#### G1: `broadcastToWorkspace()` must use `WS_EVENTS` constants — never string literals
+Every call to `broadcastToWorkspace()` must import and use `WS_EVENTS.X` from `server/ws-events.ts`. String literals like `'insight:bridge_updated'` are forbidden — they silently break if the constant value is ever renamed. This caused 3 separate fix rounds in PR 2B across 3 files.
+
+**Action for 2C:** Before any bridge implementation, define any new WS_EVENTS in both `server/ws-events.ts` AND `src/lib/wsEvents.ts`, and add `useWsInvalidation` handlers. This is a **Task 0 pre-commit step**.
+
+#### G2: Zod `validate()` schemas must NOT wrap in `body`
+The `validate()` middleware calls `schema.safeParse(req.body)` directly. Schemas with `z.object({ body: z.object({...}) })` always return 400. PR 2C doesn't add new routes, but subagents must know this pattern if they modify any validation.
+
+#### G3: Cache invalidation requires the full trio
+Every site that invalidates intelligence caches needs: (a) immediate `clearSeoContextCache()`, (b) immediate `invalidateIntelligenceCache()`, (c) debounced callback with `invalidateIntelligenceCache()` + `invalidateSubCachePrefix()`. Missing any one leaves stale data for up to 5 minutes. This was caught twice in PR 2B.
+
+#### G4: `resolutionStatus` ≠ `SuggestedBrief.status` — separate type systems
+`resolutionStatus` is `'in_progress' | 'resolved' | null` (AnalyticsInsight). `SuggestedBrief.status` is `'pending' | 'accepted' | 'dismissed' | 'snoozed'`. Tasks 16-17 operate on `resolutionStatus` — never filter against values from the other type.
+
+#### G5: New insight type = 4-part commit
+Adding `'site_health'` (Task 18) requires all four in the same commit: (1) `InsightType` union, (2) typed `XData` interface + `InsightDataMap` entry, (3) Zod schema, (4) frontend renderer case. Partial registration fails silently.
+
+#### G6: `pr-check.ts` scans entire files — fix pre-existing violations proactively
+When bridge wiring touches a file, `pr-check.ts` catches pre-existing violations (bare `JSON.parse`, etc.) that weren't introduced by the PR. Before writing bridge code in `outcome-tracking.ts`, `anomaly-detection.ts`, or `reports.ts`, grep each for `JSON.parse` and replace with `parseJsonFallback()` or `parseJsonSafe()` in the same commit.
+
+#### G7: Dynamic imports are correct for bridge callbacks
+Use `await import('./analytics-insights-store.js')` inside bridge callbacks — not to avoid circular deps, but to keep the static dependency graph lean. This is the established pattern from PR 2B.
+
+#### G8: Two annotation stores exist
+`annotations.ts` → `/api/annotations/` (simple user annotations, table: `annotations`). `analytics-annotations.ts` → `/api/google/annotations/` (structured with `category` + `createdBy`, table: `analytics_annotations`). Bridge #13 writes to analytics-annotations. Verify tests query the right one.
+
+#### G9: `fireBridge()` for sync callers, `executeBridge()` for async
+`recordOutcome()` and `saveSnapshot()` are synchronous — their bridge post-hooks must use `fireBridge()` (fire-and-forget). Never `await executeBridge()` from a sync function.
+
+#### G10: Quality gate execution order
+Run in this exact order before every push: `npx tsc --noEmit --skipLibCheck` → `npx vite build` → `npx vitest run` → `npx tsx scripts/pr-check.ts`. Skipping pr-check caused an extra CI failure round in PR 2B.
+
+#### G11: Staging bridge flags already enabled
+The following env vars are already set on Render staging: `FEATURE_BRIDGE_DECAY_SUGGESTED_BRIEF`, `FEATURE_BRIDGE_STRATEGY_INVALIDATE`, `FEATURE_BRIDGE_PAGE_ANALYSIS_INVALIDATE`, `FEATURE_BRIDGE_ACTION_AUTO_RESOLVE`, `FEATURE_BRIDGE_SETTINGS_CASCADE`, `FEATURE_BRIDGE_ACTION_ANNOTATION`. For PR 2C, also add: `FEATURE_BRIDGE_OUTCOME_REWEIGHT`, `FEATURE_BRIDGE_ANOMALY_BOOST`, `FEATURE_BRIDGE_AUDIT_PAGE_HEALTH`, `FEATURE_BRIDGE_AUDIT_SITE_HEALTH`.
+
+---
+
+### Task 15.5: Pre-Commit Shared Contracts (per G1, G5, G6)
+
+> **Must complete BEFORE dispatching any parallel agents for Tasks 16-21.**
+
+- [ ] **Step 1: Scan target files for pre-existing `pr-check` violations (G6)**
+
+```bash
+# Check for bare JSON.parse in files we'll touch
+grep -n 'JSON\.parse' server/outcome-tracking.ts server/anomaly-detection.ts server/reports.ts server/workspace-intelligence.ts
+```
+
+Fix any bare `JSON.parse` with `parseJsonFallback()`/`parseJsonSafe()` before bridge code is added.
+
+- [ ] **Step 2: Register `site_health` insight type (G5) — all 4 parts**
+
+All in one commit before bridge implementation:
+1. Add `'site_health'` to `InsightType` union in `shared/types/analytics.ts`
+2. Add `SiteHealthInsightData` interface + `InsightDataMap` entry in `shared/types/analytics.ts`
+3. Add Zod schema in `server/schemas/` (create `site-health-schema.ts` or add to existing)
+4. Add minimal frontend renderer case in the insight list component
+
+- [ ] **Step 3: No new WS_EVENTS needed**
+
+PR 2C bridges all use `WS_EVENTS.INSIGHT_BRIDGE_UPDATED` which was already defined in PR 2B. Verify present in both `server/ws-events.ts` and `src/lib/wsEvents.ts`.
+
+- [ ] **Step 4: Verify `withWorkspaceLock` and `debouncedOutcomeReweight` / `debouncedAnomalyBoost` are exported from bridge-infrastructure.ts**
+
+```bash
+grep -n 'withWorkspaceLock\|debouncedOutcomeReweight\|debouncedAnomalyBoost' server/bridge-infrastructure.ts
+```
+
+If missing, add them before dispatching bridge implementation agents.
+
+- [ ] **Step 5: Commit shared contracts**
+
+```bash
+git add shared/types/analytics.ts server/schemas/ src/components/
+git commit -m "feat(intelligence): register site_health insight type + pre-commit contracts for Phase 2C"
+```
+
+---
 
 ### Task 16: Bridge #1 — recordOutcome → Reweight Insight Scores (Option A)
 
@@ -2227,7 +2310,8 @@ After line 228 (just before `return rowToActionOutcome(outcome);` in `recordOutc
         });
         // Broadcast bridge event after reweighting
         const { broadcastToWorkspace } = await import('./broadcast.js');
-        broadcastToWorkspace(action.workspaceId, 'insight:bridge_updated', {
+        const { WS_EVENTS } = await import('./ws-events.js');
+        broadcastToWorkspace(action.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
           bridge: 'bridge_1_outcome_reweight',
         });
       });
@@ -2311,7 +2395,8 @@ debouncedAnomalyBoost(a.workspaceId, async () => {
   }); // end withWorkspaceLock
   // Broadcast bridge event after boosting
   const { broadcastToWorkspace } = await import('./broadcast.js');
-  broadcastToWorkspace(a.workspaceId, 'insight:bridge_updated', {
+  const { WS_EVENTS } = await import('./ws-events.js');
+  broadcastToWorkspace(a.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
     bridge: 'bridge_10_anomaly_boost',
   });
 });
@@ -2395,7 +2480,8 @@ After line 137 (the `insertSnapshotStmt().run(...)` call, just before `return sn
     });
     // Broadcast bridge event after page health insights
     const { broadcastToWorkspace } = await import('./broadcast.js');
-    broadcastToWorkspace(ws.id, 'insight:bridge_updated', {
+    const { WS_EVENTS } = await import('./ws-events.js');
+    broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
       bridge: 'bridge_12_audit_page_health',
     });
   });
@@ -2430,7 +2516,8 @@ After line 137 (the `insertSnapshotStmt().run(...)` call, just before `return sn
         });
         // Broadcast bridge event after site health insight
         const { broadcastToWorkspace } = await import('./broadcast.js');
-        broadcastToWorkspace(ws.id, 'insight:bridge_updated', {
+        const { WS_EVENTS } = await import('./ws-events.js');
+        broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
           bridge: 'bridge_15_audit_site_health',
         });
       });
@@ -2734,7 +2821,247 @@ git commit -m "feat(intelligence): expand shadow-mode comparison to 5 fields"
 
 ---
 
-### 🛑 Task 22: STOP — PR 2C Quality Gate & Review (FINAL)
+### Task 22: Wire `resolutionSource` into `upsertInsight()` SQL (Easy Win A)
+
+**Files:**
+- Modify: `server/analytics-insights-store.ts`
+
+**Context:** The `UpsertInsightParams` interface includes `resolutionSource?: string | null` and bridge code passes values like `'bridge_1_outcome_reweight'`, but the field is silently dropped — it's not in the INSERT/UPDATE SQL. Only `resolveInsight()` persists it. This means bridge attribution on upserted insights is lost.
+
+- [ ] **Step 1: Add `resolution_source` to the upsert SQL statement**
+
+Find the prepared statement for upsert (INSERT ... ON CONFLICT UPDATE). Add `resolution_source` to both the INSERT column list and the ON CONFLICT UPDATE SET clause:
+
+```typescript
+// In the INSERT columns:
+resolution_source,
+// In the VALUES:
+@resolution_source,
+// In the ON CONFLICT UPDATE:
+resolution_source = COALESCE(@resolution_source, resolution_source),
+```
+
+Use `COALESCE` on update so existing manual resolution sources aren't overwritten by bridge upserts that don't pass one.
+
+- [ ] **Step 2: Add the param mapping in the `.run()` call**
+
+```typescript
+resolution_source: params.resolutionSource ?? null,
+```
+
+- [ ] **Step 3: Verify TypeScript compiles + run tests**
+
+```bash
+npx tsc --noEmit --skipLibCheck && npx vitest run
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/analytics-insights-store.ts
+git commit -m "fix: wire resolutionSource into upsertInsight SQL for bridge attribution"
+```
+
+---
+
+### Task 23: Add Bridge Flags to Feature Flag Admin UI
+
+**Files:**
+- Modify: `src/components/FeatureFlagSettings.tsx`
+
+**Context:** Bridge flags exist in the system but aren't shown in the admin settings UI. Admins must use env vars or API calls to toggle them. The component has a `FLAG_GROUPS` array and `FLAG_LABELS` map that need bridge entries.
+
+- [ ] **Step 1: Add bridge group to `FLAG_GROUPS`**
+
+After the existing groups (Outcome Intelligence, Copy & Brand, Self-Service, Team, White-Label), add:
+
+```typescript
+{
+  label: 'Workspace Intelligence Bridges',
+  keys: [
+    'intelligence-shadow-mode',
+    'bridge-outcome-reweight',
+    'bridge-decay-suggested-brief',
+    'bridge-strategy-invalidate',
+    'bridge-insight-to-action',
+    'bridge-page-analysis-invalidate',
+    'bridge-action-auto-resolve',
+    'bridge-content-to-insight',
+    'bridge-schema-to-insight',
+    'bridge-anomaly-boost',
+    'bridge-settings-cascade',
+    'bridge-audit-page-health',
+    'bridge-action-annotation',
+    'bridge-annotation-to-insight',
+    'bridge-audit-site-health',
+    'bridge-client-signal',
+  ],
+},
+```
+
+- [ ] **Step 2: Add human-readable labels to `FLAG_LABELS`**
+
+```typescript
+// Workspace Intelligence
+'intelligence-shadow-mode':       'Shadow-mode comparison logging',
+'bridge-outcome-reweight':        '#1: Outcome → reweight insight scores',
+'bridge-decay-suggested-brief':   '#2: Content decay → suggested brief',
+'bridge-strategy-invalidate':     '#3: Strategy update → cache invalidation',
+'bridge-insight-to-action':       '#4: Insight resolved → tracked action',
+'bridge-page-analysis-invalidate':'#5: Page analysis → cache invalidation',
+'bridge-action-auto-resolve':     '#7: Action recorded → auto-resolve insights',
+'bridge-content-to-insight':      '#8: Content published → staleness insight',
+'bridge-schema-to-insight':       '#9: Schema validation → schema health insight',
+'bridge-anomaly-boost':           '#10: Anomaly → boost insight severity',
+'bridge-settings-cascade':        '#11: Settings change → cascade invalidation',
+'bridge-audit-page-health':       '#12: Audit → page health insights',
+'bridge-action-annotation':       '#13: Action recorded → analytics annotation',
+'bridge-annotation-to-insight':   '#14: Annotation → insight correlation',
+'bridge-audit-site-health':       '#15: Audit → site health insight',
+'bridge-client-signal':           '#16: Client feedback → signal insights',
+```
+
+- [ ] **Step 3: Verify build**
+
+```bash
+npx tsc --noEmit --skipLibCheck && npx vite build
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/components/FeatureFlagSettings.tsx
+git commit -m "feat(ui): add bridge flags to feature flag admin settings"
+```
+
+---
+
+### Task 24: Add `site_health` Renderer to Client Insight Components
+
+**Files:**
+- Modify: `src/components/client/InsightCards.tsx`
+- Modify: `src/components/client/InsightsDigest.tsx`
+
+**Context:** Bridge #15 creates `site_health` insights, but the client-facing components only render `page_health`, `content_decay`, `ranking_opportunity`, and `conversion_attribution`. The admin ActionQueue renders the raw `insightType` string, so it works automatically. But client-facing components filter by type and will silently drop `site_health` insights.
+
+- [ ] **Step 1: Add site_health section to InsightCards.tsx**
+
+After the `pageHealthInsights` filter (line 16), add:
+```typescript
+const siteHealthInsights = insights.filter(i => i.insightType === 'site_health');
+```
+
+Add a render section (can follow the `pageHealthInsights` section pattern):
+```typescript
+{siteHealthInsights.length > 0 && (
+  <SectionCard title="Site Health Overview">
+    {siteHealthInsights.map(insight => {
+      const data = insight.data as SiteHealthInsightData;
+      return (
+        <div key={insight.id} className="flex items-center justify-between py-2">
+          <div>
+            <span className="text-sm text-zinc-200">
+              Audit score: {data.siteScore ?? '—'}
+              {data.scoreDelta != null && (
+                <span className={data.scoreDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                  {' '}({data.scoreDelta > 0 ? '+' : ''}{data.scoreDelta})
+                </span>
+              )}
+            </span>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {data.errors} errors · {data.warnings} warnings · {data.totalPages} pages
+            </p>
+          </div>
+          <Badge variant={insight.severity === 'critical' ? 'error' : insight.severity === 'warning' ? 'warning' : 'success'}>
+            {insight.severity}
+          </Badge>
+        </div>
+      );
+    })}
+  </SectionCard>
+)}
+```
+
+Import `SiteHealthInsightData` from `shared/types/analytics.ts` (type-only import).
+
+- [ ] **Step 2: Add site_health to InsightsDigest.tsx icon + action maps**
+
+Add to the icon map (around line 376):
+```typescript
+site_health: Activity,  // or Shield — same icon family as page_health
+```
+
+Add to the action map (around line 406):
+```typescript
+site_health: { label: 'View site audit', tab: 'audit' },
+```
+
+- [ ] **Step 3: Verify build**
+
+```bash
+npx tsc --noEmit --skipLibCheck && npx vite build
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/components/client/InsightCards.tsx src/components/client/InsightsDigest.tsx
+git commit -m "feat(client): add site_health insight renderer to client insight components"
+```
+
+---
+
+### Task 25: Wire `useWorkspaceIntelligence` into Workspace Home Dashboard
+
+**Files:**
+- Modify: `src/components/WorkspaceHome.tsx` (or equivalent dashboard component)
+- Modify: `server/workspace-intelligence.ts` (if needed for slice response)
+
+**Context:** The `useWorkspaceIntelligence()` hook and `/api/intelligence/:workspaceId` endpoint exist but are consumed by zero components. The workspace home dashboard is the natural place to surface an intelligence summary — it already shows health scores, requests, content pipeline counts, and activity. Adding a compact "Intelligence" or "Site Health" card using the siteHealth slice creates the first real frontend consumer.
+
+- [ ] **Step 1: Identify the workspace home component**
+
+Find the workspace home/overview component that renders when you navigate to a workspace. Check `src/App.tsx` for the default workspace route rendering.
+
+- [ ] **Step 2: Add intelligence summary card**
+
+Import `useWorkspaceIntelligence` and request the `siteHealth` slice:
+
+```typescript
+const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth']);
+```
+
+Render a compact card (using `<StatCard>` or `<CompactStatBar>` from UI primitives):
+
+```typescript
+{intel?.siteHealth && (
+  <StatCard
+    label="Audit Health"
+    value={intel.siteHealth.auditScore ?? '—'}
+    delta={intel.siteHealth.auditScoreDelta}
+    suffix="/100"
+  />
+)}
+```
+
+This is intentionally minimal — a single stat card that proves the pipeline works end-to-end. More detailed intelligence UI is Phase 3.
+
+- [ ] **Step 3: Verify build**
+
+```bash
+npx tsc --noEmit --skipLibCheck && npx vite build
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/components/ src/hooks/
+git commit -m "feat(ui): wire useWorkspaceIntelligence into workspace home — first frontend consumer"
+```
+
+---
+
+### 🛑 Task 26: STOP — PR 2C Quality Gate & Review (FINAL)
 
 > **HARD STOP.** This is the final PR of Phase 2. Complete every step below, push the PR, and wait for human review + merge. After merge, verify staging, then merge staging → main.
 
@@ -2762,23 +3089,33 @@ npx vitest run
 npx tsx scripts/pr-check.ts
 ```
 
-- [ ] **Step 5: Run code review skill**
+- [ ] **Step 5: Verify all broadcasts use WS_EVENTS constants (G1)**
 
-Invoke `superpowers:requesting-code-review` on all files changed in this PR. Pay extra attention to:
-- `withWorkspaceLock` usage in Bridge #1 (deadlock potential?)
+```bash
+# Must return zero matches in server/ (excluding ws-events.ts definition)
+grep -rn "'insight:bridge_updated'\|'annotation:bridge_created'\|'suggested-brief:updated'" server/ --include='*.ts' | grep -v ws-events.ts
+```
+
+- [ ] **Step 6: Run code review skill**
+
+Invoke `scaled-code-review` on all files changed in this PR. Pay extra attention to:
+- `withWorkspaceLock` usage in Bridge #1 and #10 (deadlock potential?)
 - Transaction safety in Bridge #12/#15 (audit → insights)
-- New insight types registered correctly (all 4 items per CLAUDE.md)
+- New `site_health` insight type registered correctly (all 4 items per CLAUDE.md / G5)
+- No string literal broadcasts (G1)
+- `resolutionStatus` filters don't reference `'dismissed'` (G4)
+- Dynamic imports use `await import('./ws-events.js')` for WS_EVENTS in bridge callbacks (G7)
 
-- [ ] **Step 6: Fix any Critical/Important issues from review**
+- [ ] **Step 7: Fix any Critical/Important issues from review**
 
-- [ ] **Step 7: Update docs**
+- [ ] **Step 8: Update docs**
 
   - `FEATURE_AUDIT.md` — add entries for bridges #1, #10, #12, #15, contentPipeline slice, siteHealth slice
   - `data/roadmap.json` — mark Phase 2C item done
   - `BRAND_DESIGN_LANGUAGE.md` — update if any UI patterns changed
   - Run `npx tsx scripts/sort-roadmap.ts`
 
-- [ ] **Step 8: Push and create PR**
+- [ ] **Step 9: Push and create PR**
 
 ```bash
 git push -u origin HEAD
@@ -2786,13 +3123,13 @@ git push -u origin HEAD
 
 Create PR targeting `staging` with title: `feat(intelligence): Phase 2C — complex bridges (#1, #10, #12, #15) + contentPipeline/siteHealth slices`
 
-- [ ] **Step 9: WAIT for human review + merge to staging**
+- [ ] **Step 10: WAIT for human review + merge to staging**
 
-- [ ] **Step 10: Verify staging deployment**
+- [ ] **Step 11: Verify staging deployment**
 
-Check Render logs, hit health endpoint, verify no bridge errors in logs.
+Check Render logs, hit health endpoint, verify no bridge errors in logs. Enable new bridge flags on staging: `FEATURE_BRIDGE_OUTCOME_REWEIGHT`, `FEATURE_BRIDGE_ANOMALY_BOOST`, `FEATURE_BRIDGE_AUDIT_PAGE_HEALTH`, `FEATURE_BRIDGE_AUDIT_SITE_HEALTH` (per G11).
 
-- [ ] **Step 11: Merge staging → main**
+- [ ] **Step 12: Merge staging → main**
 
 🛑 **Phase 2 is complete after main merge + production verification.**
 
@@ -2853,3 +3190,53 @@ PR 2C (complex bridges — depends on 2B merged):
 | Task 20 (siteHealth slice) | Sonnet | Multi-source aggregation |
 | Task 21 (shadow mode) | Haiku | Expand comparison array |
 | Task 22 (QA) | Opus | Full-context judgment |
+
+---
+
+## Phase 3 Backlog (Deferred Context)
+
+> Items below are **not in scope for Phase 2C** but must not be forgotten. They complete the intelligence layer's vision and should be planned as a dedicated Phase 3 effort once Phase 2C is merged and stable.
+
+### P3-1: Migrate admin chat context to intelligence layer
+**Priority: High — this is the core purpose of the intelligence layer.**
+- `admin-chat-context.ts` and 18 other files still call `buildSeoContext()` directly
+- Goal: replace all `buildSeoContext()` consumers with `buildWorkspaceIntelligence()` so the intelligence cache, slices, and bridge-enriched data actually reach the AI assistant
+- Estimated scope: 19 files, ~2-3 hours with parallel agents
+- Risk: high-traffic code path; needs careful rollout with shadow-mode comparison before cutting over
+- Files to audit: `grep -r "buildSeoContext" server/ src/` for full list
+
+### P3-2: Bridge execution dashboard (admin UI)
+**Priority: Medium — observability for the bridge system.**
+- Admin-only page showing bridge health: execution counts, error rates, last-fired timestamps, debounce queue depth
+- Could leverage `bridge-infrastructure.ts` metrics (currently only logged, not persisted)
+- Consider: SQLite table for bridge execution log vs in-memory ring buffer
+- Frontend: new admin tab or section within existing settings page
+
+### P3-3: Populate remaining stub slices
+**Priority: Medium — completes the intelligence payload.**
+- `pageProfile` slice — per-page aggregation (audit scores, keyword rankings, content age, schema status)
+- `clientSignals` slice — client feedback, approval patterns, communication sentiment
+- `operational` slice — workspace activity patterns, queue depth, SLA metrics
+- All three have stub cases in `assembleSlice()` that currently fall through to a debug log
+- Each slice needs: assembler function, type definition, cache key, and at least one consumer
+
+### P3-4: Topic clusters in intelligence payload
+**Priority: Low — additive enrichment.**
+- Group keywords into semantic clusters for the AI assistant
+- Enables cluster-level performance analysis ("your 'enterprise security' cluster is declining")
+- Depends on keyword strategy data being rich enough to cluster
+- Could leverage OpenAI embeddings or simple TF-IDF grouping
+
+### P3-5: Real shadow-mode divergence detection
+**Priority: Low — currently a no-op.**
+- Shadow mode compares `buildSeoContext()` vs `buildWorkspaceIntelligence()` output
+- Currently both paths produce the same data (intelligence layer just wraps seo-context)
+- Divergence detection becomes meaningful only after P3-1 (when intelligence has its own data sources)
+- Should log structural diffs, not just "same/different" — field-level comparison with thresholds
+
+### P3-6: Wire `INTELLIGENCE_CACHE_UPDATED` WebSocket event
+**Priority: Low — defined but never used.**
+- `WS_EVENTS.INTELLIGENCE_CACHE_UPDATED` exists in both `server/ws-events.ts` and `src/lib/wsEvents.ts`
+- No server code currently broadcasts it; no frontend handler listens for it
+- Should be broadcast when intelligence cache is rebuilt (after bridge-triggered invalidation)
+- Frontend handler should invalidate the `useWorkspaceIntelligence` React Query key

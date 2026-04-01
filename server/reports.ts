@@ -2,6 +2,10 @@ import crypto from 'crypto';
 import type { SeoAuditResult } from './seo-audit.js';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { fireBridge, withWorkspaceLock } from './bridge-infrastructure.js';
+import { listWorkspaces } from './workspaces.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';
@@ -134,6 +138,85 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
     action_items: JSON.stringify([]),
     previous_score: previousScore ?? null,
   });
+
+  // Bridge #12 (audit → page_health) and Bridge #15 (audit → site_health)
+  if (isFeatureEnabled('bridge-audit-page-health') || isFeatureEnabled('bridge-audit-site-health')) {
+    const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+    if (ws) {
+      // Bridge #12 — per-page health insights
+      if (isFeatureEnabled('bridge-audit-page-health')) {
+        fireBridge('bridge-audit-page-health', ws.id, async () => {
+          await withWorkspaceLock(ws.id, async () => {
+            const { upsertInsight } = await import('./analytics-insights-store.js');
+            for (const page of audit.pages.slice(0, 50)) {
+              const issues = page.issues ?? [];
+              const errorCount = issues.filter(i => i.severity === 'error').length;
+              const warningCount = issues.filter(i => i.severity === 'warning').length;
+              if (errorCount === 0 && warningCount === 0) continue;
+              const score = Math.max(0, 100 - (errorCount * 15) - (warningCount * 5));
+              const severity = errorCount > 0 ? 'warning' : 'opportunity';
+              upsertInsight({
+                workspaceId: ws.id,
+                pageId: page.url,
+                insightType: 'page_health',
+                data: {
+                  auditSnapshotId: id,
+                  errorCount,
+                  warningCount,
+                  topIssues: issues.slice(0, 5).map(i => i.message),
+                },
+                severity,
+                impactScore: 100 - score,
+                domain: 'cross',
+                pageTitle: page.page ?? undefined,
+                resolutionSource: 'bridge_12_audit_page_health',
+              });
+            }
+          });
+          const { WS_EVENTS } = await import('./ws-events.js');
+          const { broadcastToWorkspace } = await import('./broadcast.js');
+          broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-page-health' });
+        });
+      }
+
+      // Bridge #15 — site-level health insight
+      if (isFeatureEnabled('bridge-audit-site-health')) {
+        fireBridge('bridge-audit-site-health', ws.id, async () => {
+          await withWorkspaceLock(ws.id, async () => {
+            const { upsertInsight } = await import('./analytics-insights-store.js');
+            const delta = previousScore != null ? audit.siteScore - previousScore : null;
+            const severity =
+              audit.siteScore < 50 ? 'critical' :
+              audit.siteScore < 70 ? 'warning' :
+              delta != null && delta < -5 ? 'warning' :
+              'positive';
+            upsertInsight({
+              workspaceId: ws.id,
+              pageId: null,
+              insightType: 'site_health',
+              data: {
+                auditSnapshotId: id,
+                siteScore: audit.siteScore,
+                previousScore: previousScore ?? null,
+                scoreDelta: delta,
+                totalPages: audit.totalPages,
+                errors: audit.errors,
+                warnings: audit.warnings,
+                siteWideIssueCount: audit.siteWideIssues?.length ?? 0,
+              },
+              severity,
+              impactScore: Math.max(0, 100 - audit.siteScore),
+              domain: 'cross',
+              resolutionSource: 'bridge_15_audit_site_health',
+            });
+          });
+          const { WS_EVENTS } = await import('./ws-events.js');
+          const { broadcastToWorkspace } = await import('./broadcast.js');
+          broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-site-health' });
+        });
+      }
+    }
+  }
 
   return snapshot;
 }
@@ -552,7 +635,7 @@ export function renderReportHTML(snapshot: AuditSnapshot): string {
           <g><path d="M46.137,267.39c-.706,.619-1.753,.656-2.484,.067-3.444-2.774-8.564-4.008-12.792-4.008-5.949,0-10.777,2.501-10.777,6.64,0,5.518,5.259,6.553,13.019,7.242,11.9,1.035,23.194,5.604,23.194,19.572,0,13.451-12.416,19.314-25.436,19.4-9.88,.082-20.147-3.547-25.527-11.109-.53-.745-.408-1.775,.225-2.435l5.464-5.699c.76-.792,2.03-.812,2.791-.021,4.697,4.877,11.559,7.022,17.133,7.022,7.157,0,12.072-2.845,12.072-7.158,.086-5.086-3.967-7.414-12.158-8.105-12.761-1.205-24.143-4.397-23.97-18.623,.087-11.986,11.468-18.365,23.884-18.365,8.61,0,15.229,1.768,21.085,7.758,.794,.813,.767,2.125-.087,2.875l-5.636,4.947Z" fill="#2ed9c3"/><path d="M100.176,265.95h-16.407c-1.082,0-1.959-.877-1.959-1.959v-8.067c0-1.082,.877-1.959,1.959-1.959h46.178c1.082,0,1.959,.877,1.959,1.959v8.067c0,1.082-.877,1.959-1.959,1.959h-16.407v46.412c0,1.082-.877,1.959-1.959,1.959h-9.446c-1.082,0-1.959-.877-1.959-1.959v-46.412Z" fill="#2ed9c3"/><path d="M213.833,254.051c1.082,0,1.959,.877,1.959,1.959v31.755c0,17.934-10.001,27.505-25.867,28.022-15.779,.517-29.143-8.536-29.143-28.022v-31.755c0-1.082,.877-1.959,1.959-1.959h9.446c1.082,0,1.959,.877,1.959,1.959v31.755c0,10.778,6.036,16.383,15.865,15.95,9.139-.603,12.416-6.898,12.416-15.95v-31.755c0-1.082,.877-1.959,1.959-1.959h9.446Z" fill="#2ed9c3"/><path d="M274.673,253.965c20.78,0,30.005,13.968,30.005,29.748s-8.881,30.609-30.005,30.609h-22.787c-1.082,0-1.959-.877-1.959-1.959v-56.438c0-1.082,.877-1.959,1.959-1.959h22.787Zm-11.468,47.941h11.468c13.106,0,16.727-9.657,16.727-18.365s-4.139-17.418-16.727-17.418h-11.468v35.783Z" fill="#2ed9c3"/><path d="M336.398,312.362v-56.438c0-1.082,.877-1.959,1.959-1.959h9.446c1.082,0,1.959,.877,1.959,1.959v56.438c0,1.082-.877,1.959-1.959,1.959h-9.446c-1.082,0-1.959-.877-1.959-1.959Z" fill="#2ed9c3"/><path d="M413.907,315.787c-19.314,0-32.592-11.986-32.592-31.644s13.278-31.644,32.592-31.644,32.592,11.986,32.592,31.644-13.278,31.644-32.592,31.644Zm0-51.216c-11.468,0-19.4,8.622-19.4,19.572,0,11.295,7.932,19.486,19.4,19.486,11.726,0,19.4-8.277,19.4-19.486,0-11.037-7.674-19.572-19.4-19.572Z" fill="#2ed9c3"/></g>
         </svg>
       </div>
-      <div style="font-size:12px;color:#64748b;margin-bottom:4px">Prepared by <a href="https://hmpsn.studio">hmpsn.studio</a></div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:4px">Prepared by <a href="${STUDIO_URL}">${STUDIO_NAME}</a></div>
       <div style="font-size:11px;color:#475569">Report ID: ${snapshot.id}</div>
     </div>
   </div>

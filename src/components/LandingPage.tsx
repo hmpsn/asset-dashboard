@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { STUDIO_NAME } from '../constants';
 import {
   Search, BarChart3, Target, TrendingUp, Zap,
   CheckCircle2, ChevronDown, ArrowRight, Sparkles,
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
-   hmpsn.studio Landing Page
+   Landing Page
    GTM-driven lead gen page for Webflow SEO platform
    ═══════════════════════════════════════════════════════════ */
 
@@ -208,7 +209,7 @@ function Solution() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pillars.map((p, i) => (
-            <div key={i} className={`rounded-xl border ${p.border} bg-gradient-to-br ${p.gradient} to-zinc-900/50 p-6 relative overflow-hidden`}>
+            <div key={i} className={`border ${p.border} bg-gradient-to-br ${p.gradient} to-zinc-900/50 p-6 relative overflow-hidden`} style={{ borderRadius: '6px 12px 6px 12px' }}>
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br from-white/[0.02] to-transparent -translate-y-1/2 translate-x-1/2" />
               <div className="relative">
                 <div className={`w-10 h-10 rounded-xl ${p.iconBg} flex items-center justify-center mb-4`}>
@@ -451,7 +452,7 @@ function FAQ() {
     },
     {
       q: "What are 'strategy & implementation hours' on Premium?",
-      a: "Premium includes 3 hours per month of hands-on SEO work by hmpsn studio — things like updating meta tags, implementing schema markup, setting up redirects, and publishing content. It's scoped to SEO execution, not general web development.",
+      a: `Premium includes 3 hours per month of hands-on SEO work by ${STUDIO_NAME} — things like updating meta tags, implementing schema markup, setting up redirects, and publishing content. It's scoped to SEO execution, not general web development.`,
     },
     {
       q: "Can I cancel anytime?",
@@ -514,7 +515,7 @@ function Footer() {
     <footer className="border-t border-zinc-800/50 py-10">
       <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <img src="/hmpsn-studio-logo-wordmark-white.svg" alt="hmpsn studio" className="h-5 opacity-60" />
-        <p className="text-xs text-zinc-600">&copy; {new Date().getFullYear()} hmpsn.studio. All rights reserved.</p>
+        <p className="text-xs text-zinc-600">&copy; {new Date().getFullYear()} {STUDIO_NAME}. All rights reserved.</p>
       </div>
     </footer>
   );
