@@ -319,12 +319,19 @@ export function recordOutcome(params: {
           for (const insight of nonResolved) {
             const scoreDelta = pageScoreMap.get(insight.pageId ?? '') ?? 0;
             if (scoreDelta !== 0) {
-              const adjusted = Math.max(0, Math.min(100, (insight.impactScore ?? 50) + scoreDelta));
+              // IDEMPOTENT: compute from the base score (before any outcome adjustment),
+              // not the current impactScore which may already include a previous adjustment.
+              // Store _outcomeBaseScore in data JSON so repeated invocations produce the same result.
+              const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+              const baseScore = (typeof dataObj._outcomeBaseScore === 'number')
+                ? dataObj._outcomeBaseScore
+                : (insight.impactScore ?? 50);
+              const adjusted = Math.max(0, Math.min(100, baseScore + scoreDelta));
               upsertInsight({
                 workspaceId: insight.workspaceId,
                 pageId: insight.pageId,
                 insightType: insight.insightType,
-                data: insight.data,
+                data: { ...dataObj, _outcomeBaseScore: baseScore },
                 severity: insight.severity,
                 pageTitle: insight.pageTitle,
                 strategyKeyword: insight.strategyKeyword,
@@ -334,7 +341,6 @@ export function recordOutcome(params: {
                 anomalyLinked: insight.anomalyLinked,
                 impactScore: adjusted,
                 domain: insight.domain,
-                resolutionSource: 'bridge_1_outcome_reweight',
               });
             }
           }

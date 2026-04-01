@@ -144,7 +144,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       const { upsertInsight, resolveInsight, getInsights } = await import('./analytics-insights-store.js');
       const existing = getInsights(ws.id);
 
-      // Map critical/warning audit issues to page_health insights
+      // Map critical/warning audit issues to audit_finding insights
       const criticalPages = effectiveAudit.pages
         .filter(p => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
 
@@ -152,32 +152,31 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         const pageIssues = page.issues?.filter(i => i.severity === 'error' || i.severity === 'warning') ?? [];
         if (pageIssues.length === 0) continue;
 
-        // Deduplicate: skip if identical page_health insight exists
+        // Deduplicate: skip if identical audit_finding insight exists for this page
         const existingForPage = existing.find(
-          i => i.insightType === 'page_health' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
+          i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
         );
         if (existingForPage) continue;
 
         const insight = upsertInsight({
           workspaceId: ws.id,
-          insightType: 'page_health',
+          insightType: 'audit_finding',
           pageId: page.pageId,
           pageTitle: page.page,
           severity: pageIssues.some(i => i.severity === 'error') ? 'critical' : 'warning',
           data: {
-            title: `Audit: ${pageIssues.length} issue(s) on ${page.page || page.pageId}`,
-            description: pageIssues.map(i => i.message).join('; '),
+            scope: 'page',
             issueCount: pageIssues.length,
+            issueMessages: pageIssues.map(i => i.message).join('; '),
             source: 'bridge_12_audit_page_health',
           },
           impactScore: pageIssues.some(i => i.severity === 'error') ? 80 : 50,
-          resolutionSource: 'bridge_12_audit_page_health',
         });
 
         // Mark as 'in_progress' so deleteStaleInsightsByType (resolution_status IS NULL)
         // does not silently delete bridge-generated audit insights.
         resolveInsight(insight.id, ws.id, 'in_progress',
-          'Bridge-generated audit page health insight — protected from stale cleanup',
+          'Bridge-generated audit page finding — protected from stale cleanup',
           'bridge_12_audit_page_health',
         );
       }
@@ -187,7 +186,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       });
     });
 
-    // ── Bridge #15: Audit → site_health insights ──────────────────────
+    // ── Bridge #15: Audit → site-level audit_finding insight ─────────
     fireBridge('bridge-audit-site-health', ws.id, async () => {
       const { upsertInsight, resolveInsight } = await import('./analytics-insights-store.js');
 
@@ -197,24 +196,23 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       if (totalIssues > 0 && score < 70) {
         const insight = upsertInsight({
           workspaceId: ws.id,
-          insightType: 'page_health',
+          insightType: 'audit_finding',
           pageId: null,
           severity: score < 50 ? 'critical' : 'warning',
           data: {
-            title: `Site health: ${totalIssues} issues, score ${score}/100`,
-            description: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
-            totalIssues,
+            scope: 'site',
+            issueCount: totalIssues,
+            issueMessages: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
             siteScore: score,
             source: 'bridge_15_audit_site_health',
           },
           impactScore: Math.max(0, 100 - score),
-          resolutionSource: 'bridge_15_audit_site_health',
         });
 
         // Mark as 'in_progress' so deleteStaleInsightsByType (resolution_status IS NULL)
         // does not silently delete this bridge-generated site-level insight.
         resolveInsight(insight.id, ws.id, 'in_progress',
-          'Bridge-generated site health insight — protected from stale cleanup',
+          'Bridge-generated site audit finding — protected from stale cleanup',
           'bridge_15_audit_site_health',
         );
 

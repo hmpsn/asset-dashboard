@@ -628,13 +628,20 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               const insightDomain = insight.domain ?? 'cross';
               if (!affectedDomains.has(insightDomain)) continue;
 
-              const boosted = Math.min(100, (insight.impactScore ?? 50) + 10);
+              // IDEMPOTENT: compute from the base score (before any anomaly boost),
+              // not the current impactScore which may already include a previous boost.
+              // Store _anomalyBaseScore in data JSON so repeated invocations are stable.
+              const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+              const baseScore = (typeof dataObj._anomalyBaseScore === 'number')
+                ? dataObj._anomalyBaseScore
+                : (insight.impactScore ?? 50);
+              const boosted = Math.min(100, baseScore + 10);
               if (boosted !== insight.impactScore) {
                 updateInsight({
                   workspaceId: insight.workspaceId,
                   pageId: insight.pageId,
                   insightType: insight.insightType,
-                  data: insight.data,
+                  data: { ...dataObj, _anomalyBaseScore: baseScore },
                   severity: insight.severity,
                   pageTitle: insight.pageTitle,
                   strategyKeyword: insight.strategyKeyword,
@@ -644,7 +651,6 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                   anomalyLinked: true,
                   impactScore: boosted,
                   domain: insight.domain,
-                  resolutionSource: 'bridge_10_anomaly_boost',
                 });
               }
             }

@@ -357,11 +357,9 @@ async function assembleSiteHealth(
         if (v.status === 'valid') valid++;
         else if (v.status === 'warnings') warnings++;
         else if (v.status === 'errors') errors++;
-        schemaErrors += v.errors?.length ?? 0;
       }
       schemaValidation = { valid, warnings, errors };
-      // Normalize: schemaErrors = count of pages with errors status
-      schemaErrors = errors;
+      schemaErrors = errors; // count of pages with errors status
     }
   } catch (err) {
     log.debug({ workspaceId, err }, 'siteHealth: schema validation failed — skipping');
