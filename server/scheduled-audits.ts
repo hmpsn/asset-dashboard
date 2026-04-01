@@ -141,7 +141,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #12: Audit → page_health insights ──────────────────────
     fireBridge('bridge-audit-page-health', ws.id, async () => {
-      const { upsertInsight, getInsights } = await import('./analytics-insights-store.js');
+      const { upsertInsight, resolveInsight, getInsights } = await import('./analytics-insights-store.js');
       const existing = getInsights(ws.id);
 
       // Map critical/warning audit issues to page_health insights
@@ -149,7 +149,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         .filter(p => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
 
       for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
-        const pageIssues = page.issues.filter(i => i.severity === 'error' || i.severity === 'warning');
+        const pageIssues = page.issues?.filter(i => i.severity === 'error' || i.severity === 'warning') ?? [];
         if (pageIssues.length === 0) continue;
 
         // Deduplicate: skip if identical page_health insight exists
@@ -158,7 +158,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         );
         if (existingForPage) continue;
 
-        upsertInsight({
+        const insight = upsertInsight({
           workspaceId: ws.id,
           insightType: 'page_health',
           pageId: page.pageId,
@@ -173,6 +173,13 @@ async function runScheduledAudit(schedule: AuditSchedule) {
           impactScore: pageIssues.some(i => i.severity === 'error') ? 80 : 50,
           resolutionSource: 'bridge_12_audit_page_health',
         });
+
+        // Mark as 'in_progress' so deleteStaleInsightsByType (resolution_status IS NULL)
+        // does not silently delete bridge-generated audit insights.
+        resolveInsight(insight.id, ws.id, 'in_progress',
+          'Bridge-generated audit page health insight — protected from stale cleanup',
+          'bridge_12_audit_page_health',
+        );
       }
 
       broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {

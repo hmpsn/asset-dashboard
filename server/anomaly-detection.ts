@@ -597,22 +597,37 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         }
 
         // ── Bridge #10: Anomaly → boost existing insight severity ──────────
-        // When anomalies are detected for pages that already have insights,
-        // boost those insights' impact scores to surface them faster.
+        // When anomalies are detected, boost insights in the MATCHING domain
+        // so that related insights surface faster. Domain mapping mirrors the
+        // anomaly→InsightDomain logic at lines 555-561.
         debouncedAnomalyBoost(ws.id, async () => {
           await withWorkspaceLock(ws.id, async () => {
             const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
             const allInsights = fetchInsights(ws.id);
 
-            // Anomaly detection is workspace-level (no per-page granularity in the Anomaly interface).
-            // Boost all non-resolved insights when fresh anomalies exist for this workspace.
             const recentAnomalies = listAnomalies(ws.id, false)
-              .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60 * 1000);
+              .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60 * 1000);
 
             if (recentAnomalies.length === 0) return;
 
+            // Build set of domains affected by recent anomalies
+            const affectedDomains = new Set<string>();
+            for (const anm of recentAnomalies) {
+              if (anm.type.includes('traffic') || anm.type.includes('bounce') || anm.type.includes('conversion')) {
+                affectedDomains.add('traffic');
+              } else if (anm.type.includes('impression') || anm.type.includes('position') || anm.type.includes('ctr')) {
+                affectedDomains.add('search');
+              } else {
+                affectedDomains.add('cross');
+              }
+            }
+
             for (const insight of allInsights) {
               if (insight.resolutionStatus === 'resolved') continue;
+              // Only boost insights whose domain matches an affected anomaly domain
+              const insightDomain = insight.domain ?? 'cross';
+              if (!affectedDomains.has(insightDomain)) continue;
+
               const boosted = Math.min(100, (insight.impactScore ?? 50) + 10);
               if (boosted !== insight.impactScore) {
                 updateInsight({
