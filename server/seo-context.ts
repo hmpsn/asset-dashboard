@@ -168,26 +168,28 @@ export function buildSeoContext(
         });
 
         if (intel.seoContext) {
-          // NOTE (Task 21 — Phase 2C): This comparison is currently trivial and produces no
-          // meaningful validation signal. assembleSeoContext() calls buildSeoContext() with
-          // _skipShadow: true, which prevents recursion but uses the same inputs and code
-          // path — so both sides always originate from the same call chain and will always
-          // match. Task 21 will replace this with a comparison against raw workspace field
-          // values (e.g. workspace.brandVoice vs result.brandVoiceBlock) to detect real
-          // divergence between the intelligence assembler and the legacy buildSeoContext path.
-          // Until then, shadow-mode fires the assembler (useful for latency/error telemetry)
-          // but the field comparison below is a no-op.
-          const mismatches: string[] = [];
-          if (intel.seoContext.brandVoice !== result.brandVoiceBlock) {
-            mismatches.push('brandVoice');
-          }
-          if (intel.seoContext.businessContext !== result.businessContext) {
-            mismatches.push('businessContext');
-          }
+          // Shadow-mode comparison: compare buildSeoContext() output against the
+          // intelligence assembler's seoContext slice. Both sides originate from the
+          // same buildSeoContext() call (assembler calls it with _skipShadow: true),
+          // so they should match. The assembler maps:
+          //   brandVoice  = ctx.brandVoiceBlock (wrapped with headers)
+          //   knowledgeBase = ctx.knowledgeBlock  (wrapped with headers)
+          // So compare wrapped-to-wrapped (result.brandVoiceBlock vs intel.seoContext.brandVoice).
+          const comparisonFields = [
+            { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
+            // Both are the wrapped brandVoiceBlock (with "BRAND VOICE & STYLE" header + brand docs)
+            { name: 'brandVoice', match: (result.brandVoiceBlock ?? '') === (intel.seoContext.brandVoice ?? '') },
+            { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
+            // Both are the wrapped knowledgeBlock (with "BUSINESS KNOWLEDGE BASE" header)
+            { name: 'knowledgeBase', match: (result.knowledgeBlock ?? '') === (intel.seoContext.knowledgeBase ?? '') },
+            // Personas: old path is prose string, new is structured array — compare presence as proxy
+            { name: 'personas', match: (result.personasBlock ? 'present' : 'empty') === ((intel.seoContext.personas?.length ?? 0) > 0 ? 'present' : 'empty') },
+          ];
+          const mismatches = comparisonFields.filter(f => !f.match).map(f => f.name);
           if (mismatches.length > 0) {
-            log.warn({ workspaceId, mismatches }, 'Intelligence shadow-mode mismatch detected');
+            log.warn({ workspaceId, mismatches, totalFields: comparisonFields.length }, 'Intelligence shadow-mode mismatch detected');
           } else {
-            log.debug({ workspaceId }, 'Intelligence shadow-mode: results match');
+            log.debug({ workspaceId, totalFields: comparisonFields.length }, 'Intelligence shadow-mode: all 5 fields match');
           }
         }
       } catch (err) {

@@ -21,7 +21,7 @@ import type {
   DeltaSummary,
   EarlySignal,
 } from '../shared/types/outcome-tracking.js';
-import { fireBridge } from './bridge-infrastructure.js';
+import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -277,6 +277,65 @@ export function recordOutcome(params: {
   const rows = stmts().getOutcomesByAction.all(params.actionId) as ActionOutcomeRow[];
   const outcome = rows.find(r => r.checkpoint_days === params.checkpointDays);
   if (!outcome) throw new Error(`Failed to read back outcome for action ${params.actionId}`);
+
+  // ── Bridge #1: Outcome → reweight insight scores ──────────────────
+  // Only fire for scores that produce a non-zero adjustment (win/strong_win/loss).
+  // Skip neutral/insufficient_data/inconclusive to avoid acquiring workspace lock for a no-op.
+  //
+  // IMPORTANT: debouncedOutcomeReweight uses last-call-wins semantics keyed by workspaceId.
+  // The callback must NOT capture per-outcome context (page_url, score) because only the
+  // last callback survives when multiple outcomes are recorded in quick succession.
+  // Instead, re-query all recently scored actions and reweight ALL non-resolved insights.
+  const actionableScores = new Set(['strong_win', 'win', 'loss']);
+  if (params.score && actionableScores.has(params.score)) {
+    const actionRow = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
+    if (actionRow) {
+      const workspaceId = actionRow.workspace_id;
+      debouncedOutcomeReweight(workspaceId, async () => {
+        await withWorkspaceLock(workspaceId, async () => {
+          const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
+          const insights = getInsights(workspaceId);
+          const nonResolved = insights.filter(i => i.resolutionStatus !== 'resolved');
+
+          // Re-query recent scored actions to compute a net adjustment per insight.
+          // This handles batch outcomes correctly — every scored action contributes.
+          const scoredRows = stmts().getScoredByWorkspace.all(workspaceId) as Array<TrackedActionRow & {
+            outcome_score: string; outcome_checkpoint_days: number; scored_at: string;
+          }>;
+
+          // Build a map of page_url → latest score delta
+          const pageScoreMap = new Map<string, number>();
+          for (const row of scoredRows) {
+            const pageUrl = row.page_url;
+            if (!pageUrl || pageScoreMap.has(pageUrl)) continue; // first = most recent
+            const delta =
+              row.outcome_score === 'strong_win' ? -20 :
+              row.outcome_score === 'win'        ? -10 :
+              row.outcome_score === 'loss'       ?  15 :
+              0;
+            if (delta !== 0) pageScoreMap.set(pageUrl, delta);
+          }
+
+          for (const insight of nonResolved) {
+            const scoreDelta = pageScoreMap.get(insight.pageId ?? '') ?? 0;
+            if (scoreDelta !== 0) {
+              const adjusted = Math.max(0, Math.min(100, (insight.impactScore ?? 50) + scoreDelta));
+              upsertInsight({
+                ...insight,
+                impactScore: adjusted,
+                resolutionSource: 'bridge_1_outcome_reweight',
+              });
+            }
+          }
+        });
+
+        const { broadcastToWorkspace: broadcast } = await import('./broadcast.js');
+        const { WS_EVENTS: WS } = await import('./ws-events.js');
+        broadcast(workspaceId, WS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_1_outcome_reweight' });
+      });
+    }
+  }
+
   return rowToActionOutcome(outcome);
 }
 
