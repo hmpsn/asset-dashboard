@@ -146,7 +146,8 @@ export function recordAction(params: RecordActionParams): TrackedAction {
       (params.targetKeyword && i.strategyKeyword === params.targetKeyword),
     ).filter(i =>
       i.resolutionStatus !== 'resolved' &&
-      i.resolutionStatus !== 'dismissed',
+      i.resolutionStatus !== 'dismissed' &&
+      i.resolutionStatus !== 'in_progress',
     );
     for (const insight of related) {
       resolveInsight(insight.id, params.workspaceId, 'in_progress',

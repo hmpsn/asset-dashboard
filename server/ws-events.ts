@@ -59,9 +59,12 @@ export const WS_EVENTS = {
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
 
   // Intelligence layer cache
-  // TODO(Phase 2): Broadcast when bridges write data that invalidates intelligence cache.
-  // Frontend consumer (useWebSocket handler + queryKeys.admin.intelligenceAll invalidation) needed at same time.
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
+
+  // Bridge events (Phase 2B — event propagation between subsystems)
+  SUGGESTED_BRIEF_UPDATED: 'suggested-brief:updated',
+  INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
+  ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

@@ -38,9 +38,7 @@ router.get(
 );
 
 const updateSchema = z.object({
-  body: z.object({
-    status: z.enum(['accepted', 'dismissed']),
-  }),
+  status: z.enum(['accepted', 'dismissed']),
 });
 
 // Update status (accept/dismiss)
@@ -57,9 +55,7 @@ router.patch(
 );
 
 const snoozeSchema = z.object({
-  body: z.object({
-    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  }),
+  until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 // Snooze
@@ -75,11 +71,10 @@ router.post(
   },
 );
 
-// Dismiss (empty body — validation for convention consistency)
+// Dismiss
 router.post(
   '/api/suggested-briefs/:workspaceId/:briefId/dismiss',
   requireWorkspaceAccess('workspaceId'),
-  validate(z.object({ body: z.object({}).passthrough() })),
   (req, res) => {
     const dismissed = dismissSuggestedBrief(req.params.briefId, req.params.workspaceId);
     if (!dismissed) return res.status(404).json({ error: 'Suggested brief not found' });

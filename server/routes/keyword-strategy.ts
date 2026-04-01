@@ -1743,6 +1743,7 @@ Rules:
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
+      invalidateIntelligenceCache(ws.id);
       invalidateSubCachePrefix(ws.id, 'slice:seoContext');
       invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
     });
@@ -1925,6 +1926,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
+      invalidateIntelligenceCache(ws.id);
       invalidateSubCachePrefix(ws.id, 'slice:seoContext');
       invalidateSubCachePrefix(ws.id, 'slice:pageProfile');
     });
