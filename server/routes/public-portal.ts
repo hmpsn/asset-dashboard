@@ -479,8 +479,9 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
 
     if (ws.keywordStrategy) {
       updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext: newContext } });
-      // Bridge #3: business priorities updated — flush seo context + debounced intelligence invalidation
+      // Bridge #3: business priorities updated — immediate flush + debounced defense-in-depth
       clearSeoContextCache(wsId);
+      invalidateIntelligenceCache(wsId);
       debouncedStrategyInvalidate(wsId, () => {
         invalidateIntelligenceCache(wsId);
         invalidateSubCachePrefix(wsId, 'slice:seoContext');
