@@ -215,6 +215,8 @@ export interface EngagementMetrics {
   portalUsage: { pageViews: number; featuresUsed: string[] } | null;
 }
 
+/** Internal computation type for composite health scoring.
+ *  The slice exposes only the final `score` as `compositeHealthScore?: number | null` (0-100). */
 export interface CompositeHealthScore {
   score: number;
   components: {
