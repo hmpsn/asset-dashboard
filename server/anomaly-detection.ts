@@ -27,6 +27,7 @@ import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
 import { computeImpactScore } from './insight-enrichment.js';
+import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
 const log = createLogger('anomaly');
@@ -589,6 +590,44 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               severity: insightSeverity,
               domain,
               impactScore,
+            });
+
+            // ── Bridge #10: anomaly → boost insight severity ──
+            debouncedAnomalyBoost(a.workspaceId, async () => {
+              await withWorkspaceLock(a.workspaceId, async () => {
+                const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
+                const boostDomain: InsightDomain = a.metric.includes('position') ? 'strategy' : 'content';
+                const allInsights = getInsights(a.workspaceId);
+                const targets = allInsights
+                  .filter(i =>
+                    i.domain === boostDomain &&
+                    i.type !== 'anomaly_digest' &&
+                    i.resolutionStatus !== 'resolved'
+                  )
+                  .slice(0, 20);
+
+                for (const insight of targets) {
+                  const newScore = Math.min(100, (insight.impactScore ?? 0) + 10);
+                  const newSeverity: InsightSeverity = newScore >= 80 ? 'critical' : insight.severity;
+                  upsertInsight({
+                    ...insight,
+                    impactScore: newScore,
+                    severity: newSeverity,
+                    anomalyLinked: true,
+                    resolutionSource: 'bridge_10_anomaly_boost',
+                    data: {
+                      ...(insight.data as Record<string, unknown>),
+                      anomalyBoosted: true,
+                      anomalyType: a.type,
+                      anomalyMetric: a.metric,
+                    },
+                  });
+                }
+              });
+
+              const { broadcast } = await import('./broadcast.js');
+              const { WS_EVENTS } = await import('./ws-events.js');
+              broadcast(a.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
             });
           } catch (digestErr) {
             log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');

@@ -21,7 +21,7 @@ import type {
   DeltaSummary,
   EarlySignal,
 } from '../shared/types/outcome-tracking.js';
-import { fireBridge } from './bridge-infrastructure.js';
+import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -277,6 +277,47 @@ export function recordOutcome(params: {
   const rows = stmts().getOutcomesByAction.all(params.actionId) as ActionOutcomeRow[];
   const outcome = rows.find(r => r.checkpoint_days === params.checkpointDays);
   if (!outcome) throw new Error(`Failed to read back outcome for action ${params.actionId}`);
+
+  // ── Bridge #1: Outcome → reweight insight scores ──────────────────
+  // Only fire if there's an actual score to act on
+  if (params.score) {
+    const actionRow = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
+    if (actionRow) {
+      const workspaceId = actionRow.workspace_id;
+      debouncedOutcomeReweight(workspaceId, async () => {
+        await withWorkspaceLock(workspaceId, async () => {
+          const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
+          const insights = getInsights(workspaceId);
+          const related = insights.filter(i =>
+            i.pageId === actionRow.page_url &&
+            i.resolutionStatus !== 'resolved',
+          );
+
+          const scoreDelta =
+            params.score === 'strong_win' ? -20 :
+            params.score === 'win'        ? -10 :
+            params.score === 'loss'       ?  15 :
+            0;
+
+          if (scoreDelta !== 0) {
+            for (const insight of related) {
+              const adjusted = Math.max(0, Math.min(100, (insight.impactScore ?? 50) + scoreDelta));
+              upsertInsight({
+                ...insight,
+                impactScore: adjusted,
+                resolutionSource: 'bridge_1_outcome_reweight',
+              });
+            }
+          }
+        });
+
+        const { broadcastToWorkspace: broadcast } = await import('./broadcast.js');
+        const { WS_EVENTS: WS } = await import('./ws-events.js');
+        broadcast(workspaceId, WS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_1_outcome_reweight' });
+      });
+    }
+  }
+
   return rowToActionOutcome(outcome);
 }
 
