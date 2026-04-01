@@ -63,4 +63,33 @@ describe('computeAdjustedScore', () => {
   it('returns currentImpactScore when no adjustments exist', () => {
     expect(computeAdjustedScore({}, 70)).toBe(70);
   });
+
+  it('falls back to currentImpactScore when _originalBaseScore is NaN', () => {
+    const data = { _originalBaseScore: NaN, _scoreAdjustments: { outcome: -10 } };
+    expect(computeAdjustedScore(data, 70)).toBe(70);
+  });
+
+  it('falls back to currentImpactScore when _scoreAdjustments is an array', () => {
+    const data = { _originalBaseScore: 50, _scoreAdjustments: [10, 20] };
+    expect(computeAdjustedScore(data, 70)).toBe(70);
+  });
+});
+
+describe('applyScoreAdjustment — corrupt data resilience', () => {
+  it('ignores NaN _originalBaseScore and uses currentImpactScore', () => {
+    const data: Record<string, unknown> = { _originalBaseScore: NaN };
+    const result = applyScoreAdjustment(data, 60, 'outcome', -10);
+    expect(result.data._originalBaseScore).toBe(60);
+    expect(result.adjustedScore).toBe(50);
+  });
+
+  it('skips non-finite delta values in existing adjustments', () => {
+    const data: Record<string, unknown> = {
+      _originalBaseScore: 50,
+      _scoreAdjustments: { corrupt: NaN, valid: 10 },
+    };
+    const result = applyScoreAdjustment(data, 50, 'outcome', -5);
+    // NaN from 'corrupt' is treated as 0, valid=10, outcome=-5 → 50 + 0 + 10 + (-5) = 55
+    expect(result.adjustedScore).toBe(55);
+  });
 });

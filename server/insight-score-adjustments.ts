@@ -10,7 +10,7 @@
  *   upsertInsight({ ...insight, data, impactScore: adjustedScore });
  */
 
-interface ScoreAdjustmentResult {
+export interface ScoreAdjustmentResult {
   /** Updated data object with _originalBaseScore and _scoreAdjustments */
   data: Record<string, unknown>;
   /** Final clamped score: base + sum(adjustments) */
@@ -31,9 +31,10 @@ export function applyScoreAdjustment(
   bridgeKey: string,
   delta: number,
 ): ScoreAdjustmentResult {
-  // Preserve the original base score — only set it on first adjustment
-  const originalBase = (typeof currentData._originalBaseScore === 'number')
-    ? currentData._originalBaseScore
+  // Preserve the original base score — only set it on first adjustment.
+  // Use Number.isFinite() instead of typeof to reject NaN from corrupt DB data.
+  const originalBase = Number.isFinite(currentData._originalBaseScore as number)
+    ? (currentData._originalBaseScore as number)
     : currentImpactScore;
 
   // Clone existing adjustments or start fresh
@@ -52,8 +53,11 @@ export function applyScoreAdjustment(
     existingAdj[bridgeKey] = delta;
   }
 
-  // Compute final score: base + sum(all adjustments)
-  const totalDelta = Object.values(existingAdj).reduce((sum, d) => sum + d, 0);
+  // Compute final score: base + sum(all adjustments).
+  // Guard each delta with Number.isFinite to prevent NaN from corrupt JSON entries.
+  const totalDelta = Object.values(existingAdj).reduce(
+    (sum, d) => sum + (Number.isFinite(d) ? d : 0), 0,
+  );
   const adjustedScore = Math.max(0, Math.min(100, originalBase + totalDelta));
 
   return {
@@ -74,9 +78,11 @@ export function computeAdjustedScore(
   data: Record<string, unknown>,
   currentImpactScore: number,
 ): number {
-  if (typeof data._originalBaseScore !== 'number') return currentImpactScore;
+  if (!Number.isFinite(data._originalBaseScore as number)) return currentImpactScore;
   const adj = data._scoreAdjustments as Record<string, number> | undefined;
-  if (!adj || typeof adj !== 'object') return currentImpactScore;
-  const totalDelta = Object.values(adj).reduce((sum, d) => sum + d, 0);
-  return Math.max(0, Math.min(100, data._originalBaseScore + totalDelta));
+  if (!adj || typeof adj !== 'object' || Array.isArray(adj)) return currentImpactScore;
+  const totalDelta = Object.values(adj).reduce(
+    (sum, d) => sum + (Number.isFinite(d) ? d : 0), 0,
+  );
+  return Math.max(0, Math.min(100, (data._originalBaseScore as number) + totalDelta));
 }
