@@ -24,6 +24,8 @@ import type {
   PerformanceSummary,
   PromptFormatOptions,
   PromptVerbosity,
+  CannibalizationWarning,
+  DecayAlert,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
@@ -253,6 +255,87 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     // Non-critical — empty gaps is acceptable
   }
 
+  // Subscriptions
+  let subscriptions: ContentPipelineSlice['subscriptions'];
+  try {
+    const { listContentSubscriptions } = await import('./content-subscriptions.js');
+    const subs = listContentSubscriptions(workspaceId) as any[];
+    const activeSubs = subs.filter((s: any) => s.status === 'active');
+    const totalPages = activeSubs.reduce((sum: number, s: any) => sum + (s.totalPages ?? s.postsPerMonth ?? 0), 0);
+    subscriptions = { active: activeSubs.length, totalPages };
+  } catch {
+    // Non-critical — subscriptions optional
+  }
+
+  // Schema deployment
+  let schemaDeployment: ContentPipelineSlice['schemaDeployment'];
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    if (ws?.siteId) {
+      const { getSchemaPlan } = await import('./schema-store.js');
+      const { listPendingSchemas } = await import('./schema-queue.js');
+      const plan = getSchemaPlan(ws.siteId) as any;
+      const pending = listPendingSchemas(workspaceId) as any[];
+      const planned = plan?.pages?.length ?? 0;
+      const deployed = Math.max(0, planned - pending.length);
+      const types = [...new Set((plan?.pages ?? []).map((p: any) => p.schemaType).filter(Boolean))] as string[];
+      schemaDeployment = { planned, deployed, types };
+    }
+  } catch {
+    // Non-critical — schema deployment optional
+  }
+
+  // Cannibalization warnings
+  let cannibalizationWarnings: CannibalizationWarning[] = [];
+  try {
+    const { listMatrices } = await import('./content-matrices.js');
+    const { detectMatrixCannibalization } = await import('./cannibalization-detection.js');
+    const matrices = listMatrices(workspaceId) as any[];
+    for (const matrix of matrices.slice(0, 5)) {
+      const report = detectMatrixCannibalization(workspaceId, matrix.id) as any;
+      if (report?.conflicts) {
+        for (const conflict of (report.conflicts as any[]).slice(0, 10)) {
+          cannibalizationWarnings.push({
+            keyword: conflict.keyword ?? '',
+            pages: conflict.pages ?? [],
+            severity: conflict.severity ?? 'low',
+          });
+        }
+      }
+    }
+  } catch {
+    // Non-critical — cannibalization detection optional
+  }
+
+  // Decay alerts
+  let decayAlerts: DecayAlert[] = [];
+  try {
+    const { loadDecayAnalysis } = await import('./content-decay.js');
+    const decay = loadDecayAnalysis(workspaceId) as any;
+    if (decay?.pages) {
+      decayAlerts = (decay.pages as any[]).slice(0, 20).map((p: any) => ({
+        pageUrl: p.url ?? p.pageUrl ?? '',
+        clickDrop: p.clickDrop ?? 0,
+        detectedAt: p.detectedAt ?? decay.analyzedAt ?? new Date().toISOString(),
+        hasRefreshBrief: !!p.briefId,
+        isRepeatDecay: false,
+      }));
+    }
+  } catch {
+    // Non-critical — decay data optional
+  }
+
+  // Suggested briefs count
+  let suggestedBriefs = 0;
+  try {
+    const { getSuggestedBriefs } = await import('./suggested-briefs-store.js');
+    const briefs = getSuggestedBriefs(workspaceId) as any[];
+    suggestedBriefs = briefs.filter((b: any) => b.status === 'pending').length;
+  } catch {
+    // Non-critical — suggested briefs optional
+  }
+
   return {
     briefs: summary.briefs,
     posts: summary.posts,
@@ -261,6 +344,11 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     workOrders: summary.workOrders,
     coverageGaps,
     seoEdits: summary.seoEdits,
+    subscriptions,
+    schemaDeployment,
+    cannibalizationWarnings,
+    decayAlerts,
+    suggestedBriefs,
   };
 }
 
