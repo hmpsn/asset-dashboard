@@ -141,7 +141,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
   // NOTE: recordAction() is SYNC — use fireBridge (fire-and-forget), not executeBridge
   fireBridge('bridge-action-auto-resolve', params.workspaceId, async () => {
     const { getInsights, resolveInsight } = await import('./analytics-insights-store.js');
-    if (!params.pageUrl && !params.targetKeyword) return;
+    if (!params.pageUrl && !params.targetKeyword) return { modified: 0 };
     const insights = getInsights(params.workspaceId);
     const related = insights.filter(i =>
       (params.pageUrl && i.pageId === params.pageUrl) ||
@@ -156,12 +156,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
         'bridge_7_action_auto_resolve',
       );
     }
-    if (related.length > 0) {
-      broadcastToWorkspace(params.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
-        bridge: 'bridge_7_auto_resolve',
-        count: related.length,
-      });
-    }
+    return { modified: related.length };
   });
 
   // ── Bridge #13: Create analytics annotation ───────────────────────
