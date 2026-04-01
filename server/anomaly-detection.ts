@@ -592,6 +592,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               domain,
               impactScore,
             });
+
           } catch (digestErr) {
             log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');
           }

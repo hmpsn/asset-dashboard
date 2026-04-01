@@ -45,6 +45,27 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
     label: 'White-Label',
     keys: ['white-label'],
   },
+  {
+    label: 'Workspace Intelligence Bridges',
+    keys: [
+      'intelligence-shadow-mode',
+      'bridge-outcome-reweight',
+      'bridge-decay-suggested-brief',
+      'bridge-strategy-invalidate',
+      'bridge-insight-to-action',
+      'bridge-page-analysis-invalidate',
+      'bridge-action-auto-resolve',
+      'bridge-content-to-insight',
+      'bridge-schema-to-insight',
+      'bridge-anomaly-boost',
+      'bridge-settings-cascade',
+      'bridge-audit-page-health',
+      'bridge-action-annotation',
+      'bridge-annotation-to-insight',
+      'bridge-audit-site-health',
+      'bridge-client-signal',
+    ],
+  },
 ];
 
 const FLAG_LABELS: Record<string, string> = {
@@ -68,6 +89,23 @@ const FLAG_LABELS: Record<string, string> = {
   'team-collaboration':         'Team management',
   // White-label
   'white-label':                'White-label domains',
+  // Workspace Intelligence Bridges
+  'intelligence-shadow-mode':        'Shadow-mode comparison logging',
+  'bridge-outcome-reweight':         '#1: Outcome → reweight insight scores',
+  'bridge-decay-suggested-brief':    '#2: Content decay → suggested brief',
+  'bridge-strategy-invalidate':      '#3: Strategy update → cache invalidation',
+  'bridge-insight-to-action':        '#4: Insight resolved → tracked action',
+  'bridge-page-analysis-invalidate': '#5: Page analysis → cache invalidation',
+  'bridge-action-auto-resolve':      '#7: Action recorded → auto-resolve insights',
+  'bridge-content-to-insight':       '#8: Content published → staleness insight',
+  'bridge-schema-to-insight':        '#9: Schema validation → schema health insight',
+  'bridge-anomaly-boost':            '#10: Anomaly → boost insight severity',
+  'bridge-settings-cascade':         '#11: Settings change → cascade invalidation',
+  'bridge-audit-page-health':        '#12: Audit → page health insights',
+  'bridge-action-annotation':        '#13: Action recorded → analytics annotation',
+  'bridge-annotation-to-insight':    '#14: Annotation → insight correlation',
+  'bridge-audit-site-health':        '#15: Audit → site health insight',
+  'bridge-client-signal':            '#16: Client feedback → signal insights',
 };
 
 const SOURCE_LABEL: Record<FlagMeta['source'], string> = {

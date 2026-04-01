@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { get, post, patch, del } from '../api/client';
 import { EmptyState } from './ui';
+import { chartGridColor, chartAxisColor } from './ui/constants';
 
 // ── Trend colors (blue/teal/green family per design system — no violet/indigo) ──
 const TREND_COLORS = ['#60a5fa', '#38bdf8', '#22d3ee', '#2dd4bf', '#34d399', '#06b6d4', '#0ea5e9'];
@@ -98,8 +99,8 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
         {/* Y gridlines + labels */}
         {yTicks.map(v => (
           <g key={v}>
-            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="#27272a" strokeDasharray="3,3" />
-            <text x={padL - 6} y={toY(v) + 3} textAnchor="end" fill="#52525b" fontSize="9">#{v}</text>
+            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke={chartGridColor()} strokeDasharray="3,3" />
+            <text x={padL - 6} y={toY(v) + 3} textAnchor="end" fill={chartAxisColor()} fontSize="9">#{v}</text>
           </g>
         ))}
         {/* Keyword lines */}
@@ -120,7 +121,7 @@ function TrendsChart({ data, keywords }: { data: HistoryPoint[]; keywords: strin
         })}
         {/* X-axis date labels */}
         {xLabels.map(({ idx, date }) => (
-          <text key={idx} x={toX(idx)} y={H - 6} textAnchor="middle" fill="#52525b" fontSize="9">
+          <text key={idx} x={toX(idx)} y={H - 6} textAnchor="middle" fill={chartAxisColor()} fontSize="9">
             {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </text>
         ))}

@@ -4,6 +4,7 @@ import {
   Users, Clock, ArrowDownRight, UserPlus,
 } from 'lucide-react';
 import { StatCard, EmptyState } from '../ui';
+import { chartDotStroke } from '../ui/constants';
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip, PieChart, Pie, Cell,
@@ -203,7 +204,7 @@ export function AnalyticsTab({
               }} />
               <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(45,212,191,0.3)" strokeWidth={1.5} fill="none" dot={false} />
               <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} fill="none" dot={false} />
-              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(45,212,191,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: '#18181b', strokeWidth: 1.5 }} />
+              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(45,212,191,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
@@ -422,7 +423,7 @@ export function AnalyticsTab({
                       </div>
                     );
                   }} />
-                  <Area type="monotone" dataKey="eventCount" stroke="#2dd4bf" strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: '#2dd4bf', opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: '#2dd4bf', stroke: '#18181b', strokeWidth: 1.5 }} />
+                  <Area type="monotone" dataKey="eventCount" stroke="#2dd4bf" strokeWidth={2} fill="url(#evtGrad)" dot={{ r: 2.5, fill: '#2dd4bf', opacity: 0.6, strokeWidth: 0 }} activeDot={{ r: 3, fill: '#2dd4bf', stroke: chartDotStroke(), strokeWidth: 1.5 }} />
                 </AreaChart>
               </ResponsiveContainer>
               <div className="flex items-center justify-between mt-2 text-[11px] text-zinc-500">

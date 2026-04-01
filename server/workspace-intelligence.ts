@@ -6,6 +6,8 @@ import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
 import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
+import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -13,6 +15,7 @@ import type {
   SeoContextSlice,
   InsightsSlice,
   LearningsSlice,
+  ContentPipelineSlice,
   SiteHealthSlice,
   RedirectDetail,
   SchemaValidationSummary,
@@ -23,6 +26,12 @@ import type {
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
 const log = createLogger('workspace-intelligence');
+
+const stmts = createStmtCache(() => ({
+  schemaErrorCount: db.prepare(
+    `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
+  ),
+}));
 
 // ── Cache (§13, §33) ───────────────────────────────────────────────────
 
@@ -106,6 +115,9 @@ async function assembleSlice(
     case 'learnings':
       result.learnings = await assembleLearnings(workspaceId, opts);
       break;
+    case 'contentPipeline':
+      result.contentPipeline = await assembleContentPipeline(workspaceId);
+      break;
     case 'siteHealth':
       try {
         result.siteHealth = await Promise.race([
@@ -118,9 +130,8 @@ async function assembleSlice(
         log.warn({ workspaceId, slice, err }, 'siteHealth slice assembly failed — skipping');
       }
       break;
-    // Phase 1: remaining slices are stubbed — they return undefined
+    // Phase 3: remaining slices are stubbed — they return undefined
     case 'pageProfile':
-    case 'contentPipeline':
     case 'clientSignals':
     case 'operational':
       log.debug({ workspaceId, slice }, 'Slice not yet implemented — skipping');
@@ -215,6 +226,39 @@ async function assembleLearnings(
     overallWinRate: summary?.overall.totalWinRate ?? 0,
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
+  };
+}
+
+async function assembleContentPipeline(workspaceId: string): Promise<ContentPipelineSlice> {
+  const { getContentPipelineSummary } = await import('./workspace-data.js');
+  const summary = getContentPipelineSummary(workspaceId);
+
+  // Coverage gaps: strategy keywords without any brief
+  let coverageGaps: string[] = [];
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    const strategyKeywords: string[] = ws?.keywordStrategy?.siteKeywords?.map((k: string | { keyword: string }) =>
+      typeof k === 'string' ? k : k.keyword,
+    ) ?? [];
+    const { listBriefs } = await import('./content-brief.js');
+    const briefs = listBriefs(workspaceId);
+    const briefKeywords = new Set(briefs.map(b => b.targetKeyword?.trim().toLowerCase()));
+    coverageGaps = strategyKeywords
+      .filter(kw => !briefKeywords.has(kw.trim().toLowerCase()))
+      .slice(0, 10);
+  } catch {
+    // Non-critical — empty gaps is acceptable
+  }
+
+  return {
+    briefs: summary.briefs,
+    posts: summary.posts,
+    matrices: summary.matrices,
+    requests: summary.requests,
+    workOrders: summary.workOrders,
+    coverageGaps,
+    seoEdits: summary.seoEdits,
   };
 }
 

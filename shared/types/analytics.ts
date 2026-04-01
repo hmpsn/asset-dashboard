@@ -199,7 +199,8 @@ export type InsightType =
   | 'serp_opportunity'       // new: rich result eligible
   | 'strategy_alignment'     // new: strategy vs reality
   | 'anomaly_digest'         // new: surfaced anomalies
-  | 'audit_finding';         // new: bridge-generated audit issues (page-level + site-level)
+  | 'audit_finding'          // new: bridge-generated audit issues (page-level + site-level)
+  | 'site_health';           // new: site-level audit health (Bridge #15)
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
 
@@ -355,6 +356,18 @@ export interface AuditFindingData {
   source: string;
 }
 
+/** Data shape for site_health insights (Bridge #15 — site-level audit health) */
+export interface SiteHealthInsightData {
+  auditSnapshotId: string;
+  siteScore: number;
+  previousScore: number | null;
+  scoreDelta: number | null;
+  totalPages: number;
+  errors: number;
+  warnings: number;
+  siteWideIssueCount: number;
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -372,6 +385,7 @@ export interface InsightDataMap {
   strategy_alignment: Record<string, unknown>;
   anomaly_digest: AnomalyDigestData;
   audit_finding: AuditFindingData;
+  site_health: SiteHealthInsightData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

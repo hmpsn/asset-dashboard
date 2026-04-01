@@ -5,6 +5,7 @@ import {
   Zap, Link2,
 } from 'lucide-react';
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader } from './ui';
+import { themeColor } from './ui/constants';
 import { siteArchitecture } from '../api/content';
 
 // ── Schema coverage types ──
@@ -331,7 +332,7 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
           label="Gaps Found"
           value={data.gaps.length}
           icon={AlertTriangle}
-          iconColor={data.gaps.length > 0 ? '#fbbf24' : '#71717a'}
+          iconColor={data.gaps.length > 0 ? '#fbbf24' : themeColor('#71717a', '#94a3b8')}
           sub={data.orphanPaths.length > 0 ? `${data.orphanPaths.length} orphan${data.orphanPaths.length !== 1 ? 's' : ''}` : 'No orphans'}
           size="hero"
           staggerIndex={4}

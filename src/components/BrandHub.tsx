@@ -5,6 +5,7 @@ import {
   Plus, Pencil, Trash2, Check,
 } from 'lucide-react';
 import { PageHeader } from './ui';
+import { themeColor } from './ui/constants';
 import { workspaces } from '../api';
 
 interface AudiencePersona {
@@ -89,8 +90,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       {/* ═══ BRAND VOICE ═══ */}
       <section className="overflow-hidden bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-violet-400" />
+          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+            <MessageSquare className="w-4 h-4 text-teal-400" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-zinc-200">Brand Voice & Style</h3>
@@ -216,7 +217,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               setEditingPersonaId(null);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{ backgroundColor: '#27272a', color: '#a1a1aa' }}>
+            style={{ backgroundColor: themeColor('#27272a', '#e2e8f0'), color: themeColor('#a1a1aa', '#64748b') }}>
             {showPersonas ? 'Close' : <><Plus className="w-3 h-3" /> Manage</>}
           </button>
         </div>

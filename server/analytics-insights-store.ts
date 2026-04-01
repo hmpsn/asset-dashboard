@@ -55,10 +55,10 @@ const stmts = createStmtCache(() => ({
       anomaly_linked     = excluded.anomaly_linked,
       impact_score       = excluded.impact_score,
       domain             = excluded.domain,
+      resolution_source  = COALESCE(excluded.resolution_source, resolution_source),
       bridge_source      = excluded.bridge_source
-      -- resolution_status, resolution_note, resolution_source, resolved_at
-      -- intentionally omitted from UPDATE: background recomputation must not
-      -- un-resolve admin work. resolution_source is set on INSERT only.
+      -- resolution_status, resolution_note, resolved_at intentionally omitted:
+      -- background recomputation must not un-resolve admin work.
   `),
   selectByWorkspace: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? ORDER BY impact_score DESC`,
