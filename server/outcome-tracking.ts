@@ -24,6 +24,7 @@ import type {
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { applyScoreAdjustment } from './insight-score-adjustments.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -140,7 +141,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
   // NOTE: recordAction() is SYNC — use fireBridge (fire-and-forget), not executeBridge
   fireBridge('bridge-action-auto-resolve', params.workspaceId, async () => {
     const { getInsights, resolveInsight } = await import('./analytics-insights-store.js');
-    if (!params.pageUrl && !params.targetKeyword) return;
+    if (!params.pageUrl && !params.targetKeyword) return { modified: 0 };
     const insights = getInsights(params.workspaceId);
     const related = insights.filter(i =>
       (params.pageUrl && i.pageId === params.pageUrl) ||
@@ -155,12 +156,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
         'bridge_7_action_auto_resolve',
       );
     }
-    if (related.length > 0) {
-      broadcastToWorkspace(params.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
-        bridge: 'bridge_7_auto_resolve',
-        count: related.length,
-      });
-    }
+    return { modified: related.length };
   });
 
   // ── Bridge #13: Create analytics annotation ───────────────────────
@@ -292,7 +288,7 @@ export function recordOutcome(params: {
     if (actionRow) {
       const workspaceId = actionRow.workspace_id;
       debouncedOutcomeReweight(workspaceId, async () => {
-        await withWorkspaceLock(workspaceId, async () => {
+        const modifiedCount = await withWorkspaceLock(workspaceId, async () => {
           const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
           const insights = getInsights(workspaceId);
           const nonResolved = insights.filter(i => i.resolutionStatus !== 'resolved');
@@ -316,22 +312,38 @@ export function recordOutcome(params: {
             if (delta !== 0) pageScoreMap.set(pageUrl, delta);
           }
 
+          let modified = 0;
           for (const insight of nonResolved) {
             const scoreDelta = pageScoreMap.get(insight.pageId ?? '') ?? 0;
             if (scoreDelta !== 0) {
-              const adjusted = Math.max(0, Math.min(100, (insight.impactScore ?? 50) + scoreDelta));
-              upsertInsight({
-                ...insight,
-                impactScore: adjusted,
-                resolutionSource: 'bridge_1_outcome_reweight',
-              });
+              const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+              const { data: newData, adjustedScore } = applyScoreAdjustment(
+                dataObj, insight.impactScore ?? 50, 'outcome', scoreDelta,
+              );
+              if (adjustedScore !== insight.impactScore) {
+                upsertInsight({
+                  workspaceId: insight.workspaceId,
+                  pageId: insight.pageId,
+                  insightType: insight.insightType,
+                  data: newData,
+                  severity: insight.severity,
+                  pageTitle: insight.pageTitle,
+                  strategyKeyword: insight.strategyKeyword,
+                  strategyAlignment: insight.strategyAlignment,
+                  auditIssues: insight.auditIssues,
+                  pipelineStatus: insight.pipelineStatus,
+                  anomalyLinked: insight.anomalyLinked,
+                  impactScore: adjustedScore,
+                  domain: insight.domain,
+                  bridgeSource: insight.bridgeSource,
+                });
+                modified++;
+              }
             }
           }
+          return modified;
         });
-
-        const { broadcastToWorkspace: broadcast } = await import('./broadcast.js');
-        const { WS_EVENTS: WS } = await import('./ws-events.js');
-        broadcast(workspaceId, WS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_1_outcome_reweight' });
+        return { modified: modifiedCount };
       });
     }
   }

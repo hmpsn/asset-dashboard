@@ -199,6 +199,7 @@ export type InsightType =
   | 'serp_opportunity'       // new: rich result eligible
   | 'strategy_alignment'     // new: strategy vs reality
   | 'anomaly_digest'         // new: surfaced anomalies
+  | 'audit_finding'          // new: bridge-generated audit issues (page-level + site-level)
   | 'site_health';           // new: site-level audit health (Bridge #15)
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
@@ -227,6 +228,8 @@ export interface AnalyticsInsight {
   resolutionNote?: string | null;
   resolvedAt?: string | null;
   resolutionSource?: string | null;
+  /** When non-null, this insight was created/updated by a bridge. Survives stale cleanup. */
+  bridgeSource?: string | null;
 }
 
 // ── Insight data shapes (used in data JSON field) ─────────────────
@@ -339,6 +342,20 @@ export interface AnomalyDigestData {
   severity: string;
 }
 
+/** Data shape for audit_finding insights (bridge-generated from scheduled audits) */
+export interface AuditFindingData {
+  /** 'page' for per-page issues, 'site' for aggregate site-level findings */
+  scope: 'page' | 'site';
+  /** Number of issues found (per-page or total) */
+  issueCount: number;
+  /** Concatenated issue messages (semicolon-separated) */
+  issueMessages: string;
+  /** Overall site audit score (site-level only) */
+  siteScore?: number;
+  /** Bridge that created this finding */
+  source: string;
+}
+
 /** Data shape for site_health insights (Bridge #15 — site-level audit health) */
 export interface SiteHealthInsightData {
   auditSnapshotId: string;
@@ -367,6 +384,7 @@ export interface InsightDataMap {
   serp_opportunity: SerpOpportunityData;
   strategy_alignment: Record<string, unknown>;
   anomaly_digest: AnomalyDigestData;
+  audit_finding: AuditFindingData;
   site_health: SiteHealthInsightData;
 }
 

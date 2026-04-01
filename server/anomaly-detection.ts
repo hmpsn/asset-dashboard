@@ -26,8 +26,9 @@ import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
-import { computeImpactScore } from './insight-enrichment.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
+import { applyScoreAdjustment } from './insight-score-adjustments.js';
+import { computeImpactScore } from './insight-enrichment.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
 const log = createLogger('anomaly');
@@ -157,15 +158,8 @@ const stmts = createStmtCache(() => ({
         WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL AND detected_at > ?
         LIMIT 1
       `),
-  getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
-  setLastScan: db.prepare(`
-        INSERT OR REPLACE INTO anomalies (id, workspace_id, workspace_name, type, severity,
-          title, description, metric, current_value, previous_value, change_pct,
-          ai_summary, detected_at, dismissed_at, acknowledged_at, source)
-        VALUES ('__last_scan__', '__system__', 'System', 'traffic_drop', 'warning',
-          'Last scan marker', '', 'last_scan', 0, 0, 0,
-          NULL, ?, 'system', NULL, 'gsc')
-      `),
+  getLastScan: db.prepare(`SELECT last_scan_at AS detected_at FROM anomaly_scan_tracker WHERE id = 'singleton'`),
+  setLastScan: db.prepare(`INSERT OR REPLACE INTO anomaly_scan_tracker (id, last_scan_at) VALUES ('singleton', ?)`),
 }));
 
 /** Get the timestamp of the last successful anomaly scan */
@@ -592,50 +586,71 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               impactScore,
             });
 
-            // ── Bridge #10: anomaly → boost insight severity ──
-            // NOTE: debouncedAnomalyBoost is keyed by workspaceId (5s, last-call-wins).
-            // When multiple anomalies fire in a single scan, only the last callback runs.
-            // To avoid domain-specific callbacks silently dropping other domains, we boost
-            // ALL non-resolved non-anomaly_digest insights. The debounce correctly collapses
-            // N anomaly detections into a single workspace-wide boost pass.
-            debouncedAnomalyBoost(a.workspaceId, async () => {
-              await withWorkspaceLock(a.workspaceId, async () => {
-                const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
-                const allInsights = getInsights(a.workspaceId);
-                const targets = allInsights
-                  .filter(i =>
-                    i.insightType !== 'anomaly_digest' &&
-                    i.resolutionStatus !== 'resolved'
-                  )
-                  .slice(0, 20);
-
-                for (const insight of targets) {
-                  const newScore = Math.min(100, (insight.impactScore ?? 0) + 10);
-                  const newSeverity: InsightSeverity = newScore >= 80 ? 'critical' : insight.severity;
-                  upsertInsight({
-                    ...insight,
-                    impactScore: newScore,
-                    severity: newSeverity,
-                    anomalyLinked: true,
-                    resolutionSource: 'bridge_10_anomaly_boost',
-                    data: {
-                      ...(insight.data as Record<string, unknown>),
-                      anomalyBoosted: true,
-                      anomalyType: a.type,
-                      anomalyMetric: a.metric,
-                    },
-                  });
-                }
-              });
-
-              const { broadcastToWorkspace } = await import('./broadcast.js');
-              const { WS_EVENTS } = await import('./ws-events.js');
-              broadcastToWorkspace(a.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
-            });
           } catch (digestErr) {
             log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');
           }
         }
+
+        // ── Bridge #10: Anomaly → boost existing insight severity ──────────
+        // When anomalies are detected, boost insights in the MATCHING domain
+        // so that related insights surface faster. Domain mapping mirrors the
+        // anomaly→InsightDomain logic at lines 555-561.
+        debouncedAnomalyBoost(ws.id, async () => {
+          const modifiedCount = await withWorkspaceLock(ws.id, async () => {
+            const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
+            const allInsights = fetchInsights(ws.id);
+
+            const recentAnomalies = listAnomalies(ws.id, false)
+              .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+
+            if (recentAnomalies.length === 0) return 0;
+
+            // Build set of domains affected by recent anomalies
+            const affectedDomains = new Set<string>();
+            for (const anm of recentAnomalies) {
+              if (anm.type.includes('traffic') || anm.type.includes('bounce') || anm.type.includes('conversion')) {
+                affectedDomains.add('traffic');
+              } else if (anm.type.includes('impression') || anm.type.includes('position') || anm.type.includes('ctr')) {
+                affectedDomains.add('search');
+              } else {
+                affectedDomains.add('cross');
+              }
+            }
+
+            let modified = 0;
+            for (const insight of allInsights) {
+              if (insight.resolutionStatus === 'resolved') continue;
+              const insightDomain = insight.domain ?? 'cross';
+              if (!affectedDomains.has(insightDomain)) continue;
+
+              const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+              const { data: newData, adjustedScore } = applyScoreAdjustment(
+                dataObj, insight.impactScore ?? 50, 'anomaly', 10,
+              );
+              if (adjustedScore !== insight.impactScore) {
+                updateInsight({
+                  workspaceId: insight.workspaceId,
+                  pageId: insight.pageId,
+                  insightType: insight.insightType,
+                  data: newData,
+                  severity: insight.severity,
+                  pageTitle: insight.pageTitle,
+                  strategyKeyword: insight.strategyKeyword,
+                  strategyAlignment: insight.strategyAlignment,
+                  auditIssues: insight.auditIssues,
+                  pipelineStatus: insight.pipelineStatus,
+                  anomalyLinked: true,
+                  impactScore: adjustedScore,
+                  domain: insight.domain,
+                  bridgeSource: insight.bridgeSource,
+                });
+                modified++;
+              }
+            }
+            return modified;
+          });
+          return { modified: modifiedCount };
+        });
       }
     } catch (err) {
       log.error({ err: err }, `Error scanning ${ws.name}:`);

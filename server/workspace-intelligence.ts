@@ -17,6 +17,9 @@ import type {
   LearningsSlice,
   ContentPipelineSlice,
   SiteHealthSlice,
+  RedirectDetail,
+  SchemaValidationSummary,
+  PerformanceSummary,
   PromptFormatOptions,
   PromptVerbosity,
 } from '../shared/types/intelligence.js';
@@ -116,7 +119,16 @@ async function assembleSlice(
       result.contentPipeline = await assembleContentPipeline(workspaceId);
       break;
     case 'siteHealth':
-      result.siteHealth = await assembleSiteHealth(workspaceId);
+      try {
+        result.siteHealth = await Promise.race([
+          assembleSiteHealth(workspaceId, opts),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('siteHealth assembler timed out')), 5000),
+          ),
+        ]);
+      } catch (err) {
+        log.warn({ workspaceId, slice, err }, 'siteHealth slice assembly failed — skipping');
+      }
       break;
     // Phase 3: remaining slices are stubbed — they return undefined
     case 'pageProfile':
@@ -250,48 +262,176 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   };
 }
 
-async function assembleSiteHealth(workspaceId: string): Promise<SiteHealthSlice> {
+async function assembleSiteHealth(
+  workspaceId: string,
+  _opts?: IntelligenceOptions,
+): Promise<SiteHealthSlice> {
   const { getWorkspace } = await import('./workspaces.js');
-  const ws = getWorkspace(workspaceId);
-  if (!ws?.webflowSiteId) {
-    return {
-      auditScore: null, auditScoreDelta: null, deadLinks: 0,
-      redirectChains: 0, schemaErrors: 0, orphanPages: 0,
-      cwvPassRate: { mobile: null, desktop: null },
-    };
-  }
+  const workspace = getWorkspace(workspaceId);
+  const siteId = workspace?.webflowSiteId ?? null;
 
-  const { getLatestSnapshot } = await import('./reports.js');
-  const snapshot = getLatestSnapshot(ws.webflowSiteId);
-  const auditScore = snapshot?.audit.siteScore ?? null;
-  const auditScoreDelta = snapshot?.previousScore != null && auditScore != null
-    ? auditScore - snapshot.previousScore
-    : null;
-
-  // Count issue categories from site-wide issues
+  // Defaults — each source fills in what it can
+  let auditScore: number | null = null;
+  let auditScoreDelta: number | null = null;
   let deadLinks = 0;
   let redirectChains = 0;
-  if (snapshot?.audit.siteWideIssues) {
-    for (const issue of snapshot.audit.siteWideIssues) {
-      const msg = issue.message.toLowerCase();
-      if (msg.includes('broken link') || msg.includes('dead link') || msg.includes('404')) deadLinks++;
-      if (msg.includes('redirect chain') || msg.includes('redirect loop')) redirectChains++;
+  let schemaErrors = 0;
+  let orphanPages = 0;
+  const cwvPassRate: { mobile: number | null; desktop: number | null } = { mobile: null, desktop: null };
+  let redirectDetails: RedirectDetail[] | undefined;
+  let schemaValidation: SchemaValidationSummary | undefined;
+  let performanceSummary: PerformanceSummary | null | undefined;
+  let anomalyCount = 0;
+  let anomalyTypes: string[] = [];
+  let seoChangeVelocity = 0;
+
+  // ── Audit snapshot (reports.ts) ──────────────────────────────────────
+  if (siteId) {
+    try {
+      const { getLatestSnapshot, listSnapshots } = await import('./reports.js');
+      const latest = getLatestSnapshot(siteId);
+      if (latest) {
+        auditScore = latest.audit.siteScore ?? null;
+        // Delta: compare with previous snapshot
+        const summaries = listSnapshots(siteId);
+        if (summaries.length >= 2) {
+          const prevScore = summaries[1].siteScore;
+          auditScoreDelta = auditScore !== null ? auditScore - prevScore : null;
+        } else if (latest.previousScore !== undefined) {
+          auditScoreDelta = auditScore !== null ? auditScore - latest.previousScore : null;
+        }
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: audit snapshot failed — skipping');
     }
   }
 
-  // Check deadLinkSummary if available
-  if (snapshot?.audit.deadLinkSummary) {
-    deadLinks = Math.max(deadLinks, snapshot.audit.deadLinkSummary.total);
-    redirectChains = Math.max(redirectChains, snapshot.audit.deadLinkSummary.redirects);
+  // ── Dead links (performance-store.ts / getLinkCheck) ────────────────
+  if (siteId) {
+    try {
+      const { getLinkCheck } = await import('./performance-store.js');
+      const linkSnap = getLinkCheck(siteId);
+      if (linkSnap?.result) {
+        const result = linkSnap.result as { deadLinks?: unknown[] };
+        deadLinks = Array.isArray(result.deadLinks) ? result.deadLinks.length : 0;
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: link check failed — skipping');
+    }
   }
 
-  // Schema validation errors
-  let schemaErrors = 0;
+  // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
+  if (siteId) {
+    try {
+      const { getPageSpeed } = await import('./performance-store.js');
+      const speedSnap = getPageSpeed(siteId);
+      if (speedSnap?.result) {
+        const siteSpeed = speedSnap.result as {
+          pages?: Array<{ score?: number; vitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null } }>;
+          averageScore?: number;
+          averageVitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null };
+        };
+        // CWV pass rate: % of pages with score >= 90
+        const pages = siteSpeed.pages ?? [];
+        if (pages.length > 0) {
+          const passing = pages.filter(p => (p.score ?? 0) >= 90).length;
+          const rate = passing / pages.length;
+          cwvPassRate.mobile = rate;
+        }
+        // Performance summary from averageVitals
+        if (siteSpeed.averageVitals) {
+          performanceSummary = {
+            avgLcp: siteSpeed.averageVitals.LCP ?? null,
+            avgFid: siteSpeed.averageVitals.FID ?? null,
+            avgCls: siteSpeed.averageVitals.CLS ?? null,
+            score: siteSpeed.averageScore ?? null,
+          };
+        }
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: pagespeed failed — skipping');
+    }
+  }
+
+  // ── Redirect chains (redirect-store.ts) ─────────────────────────────
+  if (siteId) {
+    try {
+      const { getRedirectSnapshot } = await import('./redirect-store.js');
+      const redirSnap = getRedirectSnapshot(siteId);
+      if (redirSnap?.result) {
+        redirectChains = redirSnap.result.summary.chainsDetected ?? 0;
+        // Map chains to RedirectDetail[]
+        redirectDetails = (redirSnap.result.chains ?? []).map(chain => ({
+          url: chain.originalUrl,
+          target: chain.finalUrl,
+          chainDepth: chain.totalHops,
+          status: chain.hops[0]?.status ?? 301,
+        }));
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: redirect snapshot failed — skipping');
+    }
+  }
+
+  // ── Orphan pages (site-architecture.ts) ─────────────────────────────
   try {
-    const schemaRow = stmts().schemaErrorCount.get(workspaceId) as { cnt: number } | undefined;
-    schemaErrors = schemaRow?.cnt ?? 0;
-  } catch {
-    // Table may not exist yet
+    const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
+    const arch = await Promise.race([
+      getCachedArchitecture(workspaceId),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    if (arch) {
+      orphanPages = arch.orphanPaths?.length ?? 0;
+      // Verify via flattenTree if orphanPaths is empty but tree has isolated nodes
+      if (orphanPages === 0) {
+        const nodes = flattenTree(arch.tree);
+        orphanPages = nodes.filter(n => n.source === 'existing' && n.hasContent && n.depth === 1 && n.children.length === 0).length;
+      }
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: site architecture failed — skipping');
+  }
+
+  // ── Schema errors (schema-validator.ts) ─────────────────────────────
+  try {
+    const { getValidations } = await import('./schema-validator.js');
+    const validations = getValidations(workspaceId);
+    if (validations.length > 0) {
+      let valid = 0;
+      let warnings = 0;
+      let errors = 0;
+      for (const v of validations) {
+        if (v.status === 'valid') valid++;
+        else if (v.status === 'warnings') warnings++;
+        else if (v.status === 'errors') errors++;
+      }
+      schemaValidation = { valid, warnings, errors };
+      schemaErrors = errors; // count of pages with errors status
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: schema validation failed — skipping');
+  }
+
+  // ── Anomaly count (anomaly-detection.ts) ─────────────────────────────
+  try {
+    const { listAnomalies } = await import('./anomaly-detection.js');
+    const anomalies = listAnomalies(workspaceId);
+    anomalyCount = anomalies.length;
+    anomalyTypes = [...new Set(anomalies.map(a => a.type))];
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: anomaly detection failed — skipping');
+  }
+
+  // ── SEO change velocity (seo-change-tracker.ts) ──────────────────────
+  try {
+    const { getSeoChanges } = await import('./seo-change-tracker.js');
+    // Pass 500 limit — the second param is a row limit, not days.
+    // Active workspaces may exceed the default 100-row cap within 30 days.
+    const changes = getSeoChanges(workspaceId, 500);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    seoChangeVelocity = changes.filter(c => c.changedAt >= thirtyDaysAgo).length;
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: seo change tracker failed — skipping');
   }
 
   return {
@@ -300,8 +440,14 @@ async function assembleSiteHealth(workspaceId: string): Promise<SiteHealthSlice>
     deadLinks,
     redirectChains,
     schemaErrors,
-    orphanPages: 0, // Accurate orphan detection requires link graph — Phase 3
-    cwvPassRate: { mobile: null, desktop: null }, // CWV data not yet integrated — Phase 3
+    orphanPages,
+    cwvPassRate,
+    redirectDetails,
+    schemaValidation,
+    performanceSummary,
+    anomalyCount,
+    anomalyTypes,
+    seoChangeVelocity,
   };
 }
 

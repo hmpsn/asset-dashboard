@@ -26,6 +26,7 @@ interface InsightRow {
   resolution_note: string | null;
   resolved_at: string | null;
   resolution_source: string | null;
+  bridge_source: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -33,12 +34,14 @@ const stmts = createStmtCache(() => ({
     INSERT INTO analytics_insights (
       id, workspace_id, page_id, insight_type, data, severity, computed_at,
       page_title, strategy_keyword, strategy_alignment, audit_issues,
-      pipeline_status, anomaly_linked, impact_score, domain, resolution_source
+      pipeline_status, anomaly_linked, impact_score, domain, resolution_source,
+      bridge_source
     )
     VALUES (
       @id, @workspace_id, @page_id, @insight_type, @data, @severity, @computed_at,
       @page_title, @strategy_keyword, @strategy_alignment, @audit_issues,
-      @pipeline_status, @anomaly_linked, @impact_score, @domain, @resolution_source
+      @pipeline_status, @anomaly_linked, @impact_score, @domain, @resolution_source,
+      @bridge_source
     )
     ON CONFLICT(workspace_id, COALESCE(page_id, '__workspace__'), insight_type) DO UPDATE SET
       data               = excluded.data,
@@ -52,7 +55,8 @@ const stmts = createStmtCache(() => ({
       anomaly_linked     = excluded.anomaly_linked,
       impact_score       = excluded.impact_score,
       domain             = excluded.domain,
-      resolution_source  = COALESCE(excluded.resolution_source, resolution_source)
+      resolution_source  = COALESCE(excluded.resolution_source, resolution_source),
+      bridge_source      = excluded.bridge_source
       -- resolution_status, resolution_note, resolved_at intentionally omitted:
       -- background recomputation must not un-resolve admin work.
   `),
@@ -81,7 +85,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM analytics_insights WHERE id = ? AND workspace_id = ?`,
   ),
   deleteStaleByType: db.prepare(
-    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL`,
+    `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL AND bridge_source IS NULL`,
   ),
 }));
 
@@ -106,6 +110,7 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     resolutionNote: row.resolution_note ?? null,
     resolvedAt: row.resolved_at ?? null,
     resolutionSource: row.resolution_source ?? null,
+    bridgeSource: row.bridge_source ?? null,
   };
 }
 
@@ -125,6 +130,7 @@ export interface UpsertInsightParams {
   impactScore?: number;
   domain?: InsightDomain;
   resolutionSource?: string | null;
+  bridgeSource?: string | null;
 }
 
 export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
@@ -148,6 +154,7 @@ export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
     impact_score: params.impactScore ?? 0,
     domain: params.domain ?? 'cross',
     resolution_source: params.resolutionSource ?? null,
+    bridge_source: params.bridgeSource ?? null,
   });
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
