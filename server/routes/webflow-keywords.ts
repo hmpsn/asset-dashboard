@@ -4,10 +4,13 @@
 import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
-import { buildSeoContext, buildKeywordMapContext } from '../seo-context.js';
+import { buildSeoContext, buildKeywordMapContext, clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
+import { parseJsonFallback } from '../db/json-validation.js';
+import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow-keywords');
 
@@ -99,10 +102,11 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       workspaceId,
     });
 
-    try {
-      const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+    const cleaned = aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    const analysis = parseJsonFallback(cleaned, null);
+    if (analysis) {
       res.json(analysis);
-    } catch {
+    } else {
       res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
     }
   } catch (err) {
@@ -176,6 +180,13 @@ router.post('/api/webflow/keyword-analysis/persist', requireWorkspaceAccessFromQ
       ...(existing?.difficulty != null ? { difficulty: existing.difficulty } : {}),
     });
     log.info({ workspaceId, pagePath: normalized }, 'Page analysis persisted');
+    // Bridge #5: page analysis complete — clear caches
+    debouncedPageAnalysisInvalidate(workspaceId, () => {
+      clearSeoContextCache(workspaceId);
+      invalidateIntelligenceCache(workspaceId);
+      invalidateSubCachePrefix(workspaceId, 'slice:seoContext');
+      invalidateSubCachePrefix(workspaceId, 'slice:pageProfile');
+    });
     res.json({ success: true, pagePath: normalized, hasAnalysis: true });
   } catch (err) {
     log.error({ err }, 'Failed to persist page analysis');

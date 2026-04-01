@@ -8,6 +8,10 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
+import { fireBridge } from '../bridge-infrastructure.js';
+import { createSuggestedBrief } from '../suggested-briefs-store.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const router = Router();
 const log = createLogger('content-decay');
@@ -18,6 +22,29 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const analysis = await analyzeContentDecay(ws);
+
+    // Bridge #2: Create suggested briefs for top decaying pages
+    fireBridge('bridge-decay-suggested-brief', ws.id, () => {
+      const topDecaying = analysis.decayingPages.slice(0, 5);
+      for (const page of topDecaying) {
+        const clickDelta = page.currentClicks - page.previousClicks;
+        createSuggestedBrief({
+          workspaceId: ws.id,
+          keyword: page.title || page.page,
+          pageUrl: page.page,
+          source: 'content_decay',
+          reason: `Content decay: ${Math.abs(clickDelta)} fewer clicks (${page.clickDeclinePct.toFixed(0)}% decline), severity: ${page.severity}`,
+          priority: page.severity === 'critical' ? 'high' : page.severity === 'warning' ? 'medium' : 'low',
+        });
+      }
+      if (topDecaying.length > 0) {
+        broadcastToWorkspace(ws.id, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, {
+          bridge: 'bridge_2_decay_suggested_brief',
+          count: topDecaying.length,
+        });
+      }
+    });
+
     res.json(analysis);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

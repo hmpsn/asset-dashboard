@@ -158,6 +158,23 @@ export interface PromptFormatOptions {
   pagePath?: string;
 }
 
+// ── Suggested briefs (shared between server store + frontend API client) ──
+
+export interface SuggestedBrief {
+  id: string;
+  workspaceId: string;
+  keyword: string;
+  pageUrl: string | null;
+  source: string;
+  reason: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'accepted' | 'dismissed' | 'snoozed';
+  createdAt: string;
+  resolvedAt: string | null;
+  snoozedUntil: string | null;
+  dismissedKeywordHash: string | null;
+}
+
 // ── Content pipeline summary (for shared data accessor) ─────────────────
 
 export interface ContentPipelineSummary {

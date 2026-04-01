@@ -654,6 +654,26 @@
           "shippedAt": "2026-03-31"
         },
         {
+          "id": 533,
+          "title": "Unified Workspace Intelligence Layer — Phase 2A (Bridge Infrastructure)",
+          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — Bridge execution framework: executeBridge() with flag gating/timeout/error isolation, fireBridge() for sync callers, debounceBridge() for rapid-fire invalidation, withWorkspaceLock() for serialized mutations. 15 bridge feature flags (all default OFF). Pre-configured debounced instances. Persistent sub-cache with surgical invalidation. LRU page cache with peek() for stale fallback. Content pipeline summary accessor. Bridge-pairing structural test.",
+          "status": "done",
+          "shippedAt": "2026-03-31"
+        },
+        {
+          "id": 534,
+          "title": "Unified Workspace Intelligence Layer — Phase 2B (Simple Bridges)",
+          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — 6 event bridges: #2 content decay → suggested briefs, #3 strategy → invalidate intelligence cache, #5 page analysis → clear caches, #7 action → auto-resolve insights, #11 settings → cascade invalidation, #13 action → create annotation. Suggested briefs CRUD store + REST routes + API client. resolution_source field on insights. Frontend WS handlers for 3 bridge events.",
+          "status": "done",
+          "shippedAt": "2026-03-31"
+        },
+        {
           "id": 529,
           "title": "AI insight validation pass (quality gate on surfaced insights)",
           "source": "User feedback — 2026-03-28",
