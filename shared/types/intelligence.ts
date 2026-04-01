@@ -116,7 +116,7 @@ export interface ContentPipelineSlice {
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
   coverageGaps: string[];
-  seoEdits: { pending: number; applied: number; inReview: number };
+  seoEdits: { pending: number; applied: number; dismissed: number };
 }
 
 export interface SiteHealthSlice {
@@ -158,6 +158,23 @@ export interface PromptFormatOptions {
   pagePath?: string;
 }
 
+// ── Suggested briefs (shared between server store + frontend API client) ──
+
+export interface SuggestedBrief {
+  id: string;
+  workspaceId: string;
+  keyword: string;
+  pageUrl: string | null;
+  source: string;
+  reason: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'accepted' | 'dismissed' | 'snoozed';
+  createdAt: string;
+  resolvedAt: string | null;
+  snoozedUntil: string | null;
+  dismissedKeywordHash: string | null;
+}
+
 // ── Content pipeline summary (for shared data accessor) ─────────────────
 
 export interface ContentPipelineSummary {
@@ -166,5 +183,5 @@ export interface ContentPipelineSummary {
   matrices: { total: number; cellsPlanned: number; cellsPublished: number };
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
-  seoEdits: { pending: number; applied: number; inReview: number };
+  seoEdits: { pending: number; applied: number; dismissed: number };
 }

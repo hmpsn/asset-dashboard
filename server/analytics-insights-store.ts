@@ -25,6 +25,7 @@ interface InsightRow {
   resolution_status: string | null;
   resolution_note: string | null;
   resolved_at: string | null;
+  resolution_source: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -70,7 +71,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
   ),
   updateResolution: db.prepare(
-    `UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`,
+    `UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolution_source = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`,
   ),
   selectUnresolved: db.prepare(
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND (resolution_status IS NULL OR resolution_status != 'resolved') AND severity IN ('critical', 'warning') ORDER BY impact_score DESC LIMIT 25`,
@@ -103,6 +104,7 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     resolutionStatus: row.resolution_status ?? null,
     resolutionNote: row.resolution_note ?? null,
     resolvedAt: row.resolved_at ?? null,
+    resolutionSource: row.resolution_source ?? null,
   };
 }
 
@@ -121,6 +123,7 @@ export interface UpsertInsightParams {
   anomalyLinked?: boolean;
   impactScore?: number;
   domain?: InsightDomain;
+  resolutionSource?: string | null;
 }
 
 export function upsertInsight(params: UpsertInsightParams): AnalyticsInsight {
@@ -240,9 +243,10 @@ export function resolveInsight(
   workspaceId: string,
   status: 'in_progress' | 'resolved',
   note?: string,
+  resolutionSource?: string,
 ): AnalyticsInsight | undefined {
   const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
-  const changes = stmts().updateResolution.run(status, note ?? null, resolvedAt, insightId, workspaceId);
+  const changes = stmts().updateResolution.run(status, note ?? null, resolutionSource ?? null, resolvedAt, insightId, workspaceId);
   // If workspace_id didn't match, UPDATE affects 0 rows — return undefined so the route sends 404
   if (changes.changes === 0) return undefined;
   return getInsightById(insightId, workspaceId);

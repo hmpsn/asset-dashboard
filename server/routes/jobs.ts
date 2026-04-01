@@ -33,7 +33,7 @@ import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildSeoContext } from '../seo-context.js';
+import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
 import {
   updateAsset,
   deleteAsset,
@@ -57,6 +57,8 @@ import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPage
 // Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
 import { buildKeywordMapContext } from '../seo-context.js';
 import { createLogger } from '../logger.js';
+import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('jobs');
 
@@ -847,6 +849,13 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
               updateJob(paJob.id, { status: 'done', progress: total, total, message: `Done — ${total} pages analyzed` });
             }
             addActivity(paWsId, 'page_analysis', `Bulk page analysis completed — ${done} pages`, `${pages.length} total pages, ${total} analyzed`);
+            // Bridge #5: bulk page analysis complete — clear caches
+            debouncedPageAnalysisInvalidate(paWsId, () => {
+              clearSeoContextCache(paWsId);
+              invalidateIntelligenceCache(paWsId);
+              invalidateSubCachePrefix(paWsId, 'slice:seoContext');
+              invalidateSubCachePrefix(paWsId, 'slice:pageProfile');
+            });
           } catch (err) {
             log.error({ err, jobId: paJob.id }, 'Page analysis job failed');
             if (!isJobCancelled(paJob.id)) {

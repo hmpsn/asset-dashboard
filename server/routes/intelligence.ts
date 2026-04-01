@@ -7,6 +7,7 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { buildWorkspaceIntelligence, getIntelligenceCacheStats } from '../workspace-intelligence.js';
 import { getPageCacheStats } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
+import { getBridgeFlags } from '../bridge-infrastructure.js';
 import type { IntelligenceSlice } from '../../shared/types/intelligence.js';
 
 const log = createLogger('intelligence-route');
@@ -26,6 +27,7 @@ router.get('/api/intelligence/health', (req, res) => {
       intelligence: getIntelligenceCacheStats(),
       pages: getPageCacheStats(),
     },
+    bridgeFlags: getBridgeFlags(),
   });
 });
 

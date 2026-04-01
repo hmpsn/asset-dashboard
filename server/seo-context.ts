@@ -168,6 +168,15 @@ export function buildSeoContext(
         });
 
         if (intel.seoContext) {
+          // NOTE (Task 21 — Phase 2C): This comparison is currently trivial and produces no
+          // meaningful validation signal. assembleSeoContext() calls buildSeoContext() with
+          // _skipShadow: true, which prevents recursion but uses the same inputs and code
+          // path — so both sides always originate from the same call chain and will always
+          // match. Task 21 will replace this with a comparison against raw workspace field
+          // values (e.g. workspace.brandVoice vs result.brandVoiceBlock) to detect real
+          // divergence between the intelligence assembler and the legacy buildSeoContext path.
+          // Until then, shadow-mode fires the assembler (useful for latency/error telemetry)
+          // but the field comparison below is a no-op.
           const mismatches: string[] = [];
           if (intel.seoContext.brandVoice !== result.brandVoiceBlock) {
             mismatches.push('brandVoice');

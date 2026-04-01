@@ -132,6 +132,12 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     : baseUrl;
   log.info(`SEO audit: subdomain=${siteInfo.subdomain}, baseUrl=${baseUrl}, siteWideUrl=${siteWideUrl}`);
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === siteId)?.id;
+  if (!wsId) {
+    // No workspace linked to this site — page-level SEO checks will be skipped.
+    // All route callers pass a workspaceId or are covered by the listWorkspaces() fallback.
+    // If this fires, the site has no linked workspace (e.g. a prospect/unlinked audit).
+    log.warn({ siteId }, 'SEO audit: no workspace found for site — page-level checks skipped');
+  }
   const allPublished = wsId ? await getWorkspacePages(wsId, siteId) : [];
   // Filter published pages and exclude utility / legal / error pages
   const pages = allPublished.filter(

@@ -21,6 +21,9 @@ import type {
   DeltaSummary,
   EarlySignal,
 } from '../shared/types/outcome-tracking.js';
+import { fireBridge } from './bridge-infrastructure.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -131,6 +134,55 @@ export function recordAction(params: RecordActionParams): TrackedAction {
 
   const row = stmts().getById.get(id) as TrackedActionRow | undefined;
   if (!row) throw new Error(`Failed to read back tracked action ${id}`);
+
+  // ── Bridge #7: Auto-resolve related insights ──────────────────────
+  // If this action relates to a page or keyword, auto-resolve matching insights to 'in_progress'
+  // NOTE: recordAction() is SYNC — use fireBridge (fire-and-forget), not executeBridge
+  fireBridge('bridge-action-auto-resolve', params.workspaceId, async () => {
+    const { getInsights, resolveInsight } = await import('./analytics-insights-store.js');
+    if (!params.pageUrl && !params.targetKeyword) return;
+    const insights = getInsights(params.workspaceId);
+    const related = insights.filter(i =>
+      (params.pageUrl && i.pageId === params.pageUrl) ||
+      (params.targetKeyword && i.strategyKeyword === params.targetKeyword),
+    ).filter(i =>
+      i.resolutionStatus !== 'resolved' &&
+      i.resolutionStatus !== 'in_progress',
+    );
+    for (const insight of related) {
+      resolveInsight(insight.id, params.workspaceId, 'in_progress',
+        `Auto-progressed: action "${params.actionType}" recorded`,
+        'bridge_7_action_auto_resolve',
+      );
+    }
+    if (related.length > 0) {
+      broadcastToWorkspace(params.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
+        bridge: 'bridge_7_auto_resolve',
+        count: related.length,
+      });
+    }
+  });
+
+  // ── Bridge #13: Create analytics annotation ───────────────────────
+  fireBridge('bridge-action-annotation', params.workspaceId, async () => {
+    const { createAnnotation } = await import('./analytics-annotations.js');
+    const pageCtx = params.pageUrl ? ` (${params.pageUrl})` : '';
+    const date = new Date().toISOString().split('T')[0];
+    const label = `Action: ${params.actionType}${pageCtx}`;
+    createAnnotation({
+      workspaceId: params.workspaceId,
+      date,
+      label,
+      category: 'site_change',
+      createdBy: 'bridge:action-annotation',
+    });
+    broadcastToWorkspace(params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
+      bridge: 'bridge_13_action_annotation',
+      date,
+      label,
+    });
+  });
+
   return rowToTrackedAction(row);
 }
 

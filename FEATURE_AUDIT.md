@@ -3027,6 +3027,28 @@ When the user asks to update this document with recent features, follow this pro
 
 **Mutual:** Foundation for cross-feature intelligence sharing. Every future feature that needs workspace context consumes from one source of truth instead of fetching independently.
 
+### 198. Unified Workspace Intelligence Layer — Phase 2A (Bridge Infrastructure)
+**What it does:** Builds the event bridge execution framework that all cross-system propagation routes through. `executeBridge()` provides feature-flag gating, timeout, error isolation, and structured logging. `fireBridge()` for sync callers, `debounceBridge()` for rapid-fire invalidation, `withWorkspaceLock()` for serialized mutations. 15 bridge feature flags (all default OFF). Pre-configured debounced instances for strategy, page analysis, and settings cascade bridges. Persistent sub-cache (`intelligence_sub_cache` table) with surgical key/prefix invalidation. Migrates page cache to LRU with `peek()` for stale fallback. Barrel export for `useWorkspaceIntelligence` hook. Content pipeline summary data accessor with 5-min persistent cache.
+
+**Files:** `server/bridge-infrastructure.ts`, `shared/types/feature-flags.ts` (15 bridge flags), `server/intelligence-cache.ts` (LRU `peek()`), `server/workspace-data.ts` (LRU migration, `getContentPipelineSummary()`), `server/workspace-intelligence.ts` (personas stub), `src/hooks/admin/index.ts` (barrel), `tests/bridge-infrastructure.test.ts`, `tests/bridge-pairing.test.ts`, `tests/workspace-data.test.ts`
+
+**Agency value:** Bridge infrastructure enables automatic cross-system effects — strategy changes automatically invalidate caches, actions auto-resolve insights, content decay auto-generates briefs. All behind feature flags for safe rollout.
+
+**Client value:** N/A — infrastructure only. Enables Phase 2B+ client-facing effects.
+
+**Mutual:** Foundation for intelligent automation. Agency work propagates effects automatically; client sees fresher, more connected data.
+
+### 199. Unified Workspace Intelligence Layer — Phase 2B (Simple Bridges)
+**What it does:** Wires 6 event bridges that propagate effects between subsystems. Bridge #2: content decay analysis → auto-suggest content briefs (top 5 decaying pages). Bridge #3: strategy save → debounced intelligence cache invalidation. Bridge #5: page analysis → debounced SEO context + intelligence cache clear. Bridge #7: action recorded → auto-resolve related insights to in_progress. Bridge #11: workspace settings change → cascade invalidation (intelligence + page cache + all slice caches). Bridge #13: action recorded → create analytics annotation on timeline. Also includes CRUD store + REST endpoints for suggested briefs table, frontend typed API client, and WebSocket handlers for 3 new bridge events.
+
+**Files:** `server/suggested-briefs-store.ts`, `server/routes/suggested-briefs.ts`, `src/api/suggested-briefs.ts`, `shared/types/intelligence.ts` (SuggestedBrief type), `server/analytics-insights-store.ts` (resolution_source), `server/outcome-tracking.ts` (Bridges #7, #13), `server/routes/content-decay.ts` (#2), `server/routes/keyword-strategy.ts` (#3, #5), `server/routes/public-portal.ts` (#3), `server/routes/webflow-keywords.ts` (#5), `server/routes/jobs.ts` (#5), `server/routes/workspaces.ts` (#11), `src/lib/wsEvents.ts`, `src/hooks/useWsInvalidation.ts`, `tests/bridges-simple.test.ts`, `tests/suggested-briefs-store.test.ts`
+
+**Agency value:** Subsystems talk to each other automatically. Strategy changes invalidate stale AI context. Recording an action auto-resolves insights and creates audit-trail annotations. Content decay analysis generates actionable brief suggestions without manual intervention.
+
+**Client value:** (Indirect — Phase 3 will expose suggested briefs and auto-resolved insights.) Fresher data, fewer stale recommendations, faster response to changes.
+
+**Mutual:** Closed intelligence loops. Every mutation propagates its effects without manual orchestration. Agency sees less stale data; system becomes self-maintaining.
+
 ---
 
 ## Platform Summary
@@ -3044,6 +3066,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**262 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**264 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **262**. Last updated: March 2026.
+Current feature count: **264**. Last updated: March 2026.
