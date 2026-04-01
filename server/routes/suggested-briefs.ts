@@ -75,10 +75,11 @@ router.post(
   },
 );
 
-// Dismiss
+// Dismiss (empty body — validation for convention consistency)
 router.post(
   '/api/suggested-briefs/:workspaceId/:briefId/dismiss',
   requireWorkspaceAccess('workspaceId'),
+  validate(z.object({ body: z.object({}).passthrough() })),
   (req, res) => {
     const dismissed = dismissSuggestedBrief(req.params.briefId, req.params.workspaceId);
     if (!dismissed) return res.status(404).json({ error: 'Suggested brief not found' });

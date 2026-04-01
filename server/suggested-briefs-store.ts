@@ -6,23 +6,9 @@
 import { randomUUID, createHash } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import type { SuggestedBrief } from '../shared/types/intelligence.js';
 
-// ── Types ──────────────────────────────────────────────────────────────
-
-export interface SuggestedBrief {
-  id: string;
-  workspaceId: string;
-  keyword: string;
-  pageUrl: string | null;
-  source: string;
-  reason: string;
-  priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'accepted' | 'dismissed' | 'snoozed';
-  createdAt: string;
-  resolvedAt: string | null;
-  snoozedUntil: string | null;
-  dismissedKeywordHash: string | null;
-}
+export type { SuggestedBrief };
 
 interface SuggestedBriefRow {
   id: string;

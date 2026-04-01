@@ -153,7 +153,6 @@ export function recordAction(params: RecordActionParams): TrackedAction {
         `Auto-progressed: action "${params.actionType}" recorded`,
         'bridge_7_action_auto_resolve',
       );
-      broadcastToWorkspace(params.workspaceId, 'insight:updated', { insightId: insight.id, status: 'in_progress' });
     }
     if (related.length > 0) {
       broadcastToWorkspace(params.workspaceId, 'insight:bridge_updated', {

@@ -1,19 +1,7 @@
 import { get, patch, post } from './client';
+import type { SuggestedBrief } from '../../shared/types/intelligence.js';
 
-export interface SuggestedBrief {
-  id: string;
-  workspaceId: string;
-  keyword: string;
-  pageUrl: string | null;
-  source: string;
-  reason: string;
-  priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'accepted' | 'dismissed' | 'snoozed';
-  createdAt: string;
-  resolvedAt: string | null;
-  snoozedUntil: string | null;
-  dismissedKeywordHash: string | null;
-}
+export type { SuggestedBrief };
 
 export const suggestedBriefsApi = {
   list(workspaceId: string, includeAll = false, signal?: AbortSignal) {
