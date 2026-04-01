@@ -13,6 +13,8 @@ import type {
   SeoContextSlice,
   InsightsSlice,
   LearningsSlice,
+  ContentPipelineSlice,
+  SiteHealthSlice,
   PromptFormatOptions,
   PromptVerbosity,
 } from '../shared/types/intelligence.js';
@@ -102,10 +104,14 @@ async function assembleSlice(
     case 'learnings':
       result.learnings = await assembleLearnings(workspaceId, opts);
       break;
-    // Phase 1: remaining slices are stubbed — they return undefined
-    case 'pageProfile':
     case 'contentPipeline':
+      result.contentPipeline = await assembleContentPipeline(workspaceId);
+      break;
     case 'siteHealth':
+      result.siteHealth = await assembleSiteHealth(workspaceId);
+      break;
+    // Phase 3: remaining slices are stubbed — they return undefined
+    case 'pageProfile':
     case 'clientSignals':
     case 'operational':
       log.debug({ workspaceId, slice }, 'Slice not yet implemented — skipping');
@@ -200,6 +206,97 @@ async function assembleLearnings(
     overallWinRate: summary?.overall.totalWinRate ?? 0,
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
+  };
+}
+
+async function assembleContentPipeline(workspaceId: string): Promise<ContentPipelineSlice> {
+  const { getContentPipelineSummary } = await import('./workspace-data.js');
+  const summary = getContentPipelineSummary(workspaceId);
+
+  // Coverage gaps: strategy keywords without any brief
+  let coverageGaps: string[] = [];
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    const strategyKeywords: string[] = ws?.keywordStrategy?.siteKeywords?.map((k: string | { keyword: string }) =>
+      typeof k === 'string' ? k : k.keyword,
+    ) ?? [];
+    const { listBriefs } = await import('./content-brief.js');
+    const briefs = listBriefs(workspaceId);
+    const briefKeywords = new Set(briefs.map(b => b.targetKeyword?.toLowerCase()));
+    coverageGaps = strategyKeywords
+      .filter(kw => !briefKeywords.has(kw.toLowerCase()))
+      .slice(0, 10);
+  } catch {
+    // Non-critical — empty gaps is acceptable
+  }
+
+  return {
+    briefs: summary.briefs,
+    posts: summary.posts,
+    matrices: summary.matrices,
+    requests: summary.requests,
+    workOrders: summary.workOrders,
+    coverageGaps,
+    seoEdits: summary.seoEdits,
+  };
+}
+
+async function assembleSiteHealth(workspaceId: string): Promise<SiteHealthSlice> {
+  const { getWorkspace } = await import('./workspaces.js');
+  const ws = getWorkspace(workspaceId);
+  if (!ws?.webflowSiteId) {
+    return {
+      auditScore: null, auditScoreDelta: null, deadLinks: 0,
+      redirectChains: 0, schemaErrors: 0, orphanPages: 0,
+      cwvPassRate: { mobile: null, desktop: null },
+    };
+  }
+
+  const { getLatestSnapshot } = await import('./reports.js');
+  const snapshot = getLatestSnapshot(ws.webflowSiteId);
+  const auditScore = snapshot?.audit.siteScore ?? null;
+  const auditScoreDelta = snapshot?.previousScore != null && auditScore != null
+    ? auditScore - snapshot.previousScore
+    : null;
+
+  // Count issue categories from site-wide issues
+  let deadLinks = 0;
+  let redirectChains = 0;
+  if (snapshot?.audit.siteWideIssues) {
+    for (const issue of snapshot.audit.siteWideIssues) {
+      const msg = issue.message.toLowerCase();
+      if (msg.includes('broken link') || msg.includes('dead link') || msg.includes('404')) deadLinks++;
+      if (msg.includes('redirect chain') || msg.includes('redirect loop')) redirectChains++;
+    }
+  }
+
+  // Check deadLinkSummary if available
+  if (snapshot?.audit.deadLinkSummary) {
+    deadLinks = Math.max(deadLinks, snapshot.audit.deadLinkSummary.total);
+    redirectChains = Math.max(redirectChains, snapshot.audit.deadLinkSummary.redirects);
+  }
+
+  // Schema validation errors
+  let schemaErrors = 0;
+  try {
+    const db = (await import('./db/index.js')).default;
+    const schemaRow = db.prepare(
+      `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
+    ).get(workspaceId) as { cnt: number } | undefined;
+    schemaErrors = schemaRow?.cnt ?? 0;
+  } catch {
+    // Table may not exist yet
+  }
+
+  return {
+    auditScore,
+    auditScoreDelta,
+    deadLinks,
+    redirectChains,
+    schemaErrors,
+    orphanPages: 0, // Accurate orphan detection requires link graph — Phase 3
+    cwvPassRate: { mobile: null, desktop: null }, // CWV data not yet integrated — Phase 3
   };
 }
 
