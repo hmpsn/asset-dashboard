@@ -10,6 +10,8 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonSafe } from './db/json-validation.js';
+import { z } from './middleware/validate.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -41,6 +43,21 @@ const log = createLogger('workspace-intelligence');
 const stmts = createStmtCache(() => ({
   schemaErrorCount: db.prepare(
     `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
+  ),
+  strategyHistory: db.prepare(
+    'SELECT created_at, change_description FROM strategy_history WHERE workspace_id = ? ORDER BY created_at DESC',
+  ),
+  keywordFeedbackApproved: db.prepare(
+    'SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
+  ),
+  keywordFeedbackDeclined: db.prepare(
+    'SELECT keyword, reason FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
+  ),
+  contentGapVotes: db.prepare(
+    'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
+  ),
+  clientBusinessPriorities: db.prepare(
+    'SELECT priorities FROM client_business_priorities WHERE workspace_id = ?',
   ),
 }));
 
@@ -211,9 +228,7 @@ async function assembleSeoContext(
 
   // Strategy history
   try {
-    const rows = db.prepare(
-      'SELECT created_at, change_description FROM strategy_history WHERE workspace_id = ? ORDER BY created_at DESC',
-    ).all(workspaceId) as Array<{ created_at: string; change_description: string }>;
+    const rows = stmts().strategyHistory.all(workspaceId) as Array<{ created_at: string; change_description: string }>;
     if (rows.length > 0) {
       const recentChanges = rows.slice(0, 5).map(r => r.change_description?.toLowerCase() ?? '');
       const expanding = recentChanges.filter(c => c.includes('add') || c.includes('expand') || c.includes('new')).length;
@@ -617,6 +632,7 @@ async function assembleSiteHealth(
 
   // ── Anomaly count (anomaly-detection.ts) ─────────────────────────────
   try {
+    // NOTE: dynamic import required — anomaly-detection.ts statically imports from this module
     const { listAnomalies } = await import('./anomaly-detection.js');
     const anomalies = listAnomalies(workspaceId);
     anomalyCount = anomalies.length;
@@ -661,12 +677,8 @@ async function assembleClientSignals(
   // Keyword feedback (DB direct — no store module)
   let keywordFeedback: ClientSignalsSlice['keywordFeedback'] = { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } };
   try {
-    const approvedRows = db.prepare(
-      'SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
-    ).all(workspaceId, 'approved') as { keyword: string }[];
-    const rejectedRows = db.prepare(
-      'SELECT keyword, reason FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
-    ).all(workspaceId, 'declined') as { keyword: string; reason?: string }[];
+    const approvedRows = stmts().keywordFeedbackApproved.all(workspaceId, 'approved') as { keyword: string }[];
+    const rejectedRows = stmts().keywordFeedbackDeclined.all(workspaceId, 'declined') as { keyword: string; reason?: string }[];
     const total = approvedRows.length + rejectedRows.length;
     const reasons = rejectedRows.map(r => r.reason).filter(Boolean) as string[];
     const reasonCounts = new Map<string, number>();
@@ -687,9 +699,7 @@ async function assembleClientSignals(
   // Content gap votes (DB direct)
   let contentGapVotes: { topic: string; votes: number }[] = [];
   try {
-    const rows = db.prepare(
-      'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
-    ).all(workspaceId) as { keyword: string; cnt: number }[];
+    const rows = stmts().contentGapVotes.all(workspaceId) as { keyword: string; cnt: number }[];
     contentGapVotes = rows.map(r => ({ topic: r.keyword, votes: r.cnt }));
   } catch {
     // Table may not exist
@@ -698,12 +708,9 @@ async function assembleClientSignals(
   // Business priorities (DB direct)
   let businessPriorities: string[] = [];
   try {
-    const row = db.prepare(
-      'SELECT priorities FROM client_business_priorities WHERE workspace_id = ?',
-    ).get(workspaceId) as { priorities: string } | undefined;
+    const row = stmts().clientBusinessPriorities.get(workspaceId) as { priorities: string } | undefined;
     if (row) {
-      const parsed = JSON.parse(row.priorities);
-      businessPriorities = Array.isArray(parsed) ? parsed : [];
+      businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), 'client_business_priorities') ?? [];
     }
   } catch {
     // Table may not exist or bad JSON
@@ -713,6 +720,7 @@ async function assembleClientSignals(
   let churnSignals: ChurnSignalSummary[] = [];
   let churnRisk: ClientSignalsSlice['churnRisk'] = null;
   try {
+    // NOTE: dynamic import required — churn-signals.ts statically imports from this module
     const { listChurnSignals } = await import('./churn-signals.js');
     const signals = listChurnSignals(workspaceId);
     const active = signals.filter((s: any) => !s.dismissed);
@@ -841,29 +849,37 @@ async function assembleClientSignals(
   }
 
   // Composite health score (40% churn + 30% ROI + 30% engagement)
+  // Weights are normalized to available components so missing data doesn't drag the score down.
   let compositeHealthScore: number | null = null;
   {
+    let totalWeight = 0;
+    let weightedSum = 0;
     let components = 0;
-    let churnScore = 0;
-    if (churnRisk !== null) {
-      churnScore = churnRisk === 'high' ? 0 : churnRisk === 'medium' ? 30 : churnRisk === 'low' ? 60 : 100;
-      components++;
-    } else if (churnSignals.length === 0) {
-      churnScore = 100;
+
+    // Churn component (weight 0.4)
+    if (churnRisk !== null || churnSignals.length === 0) {
+      const churnScore = churnRisk === 'high' ? 0 : churnRisk === 'medium' ? 30 : churnRisk === 'low' ? 60 : 100;
+      weightedSum += churnScore * 0.4;
+      totalWeight += 0.4;
       components++;
     }
-    let roiScore = 0;
+    // ROI component (weight 0.3)
     if (roi) {
-      roiScore = roi.growth > 10 ? 100 : roi.growth > 0 ? 70 : roi.growth === 0 ? 40 : 0;
+      const roiScore = roi.growth > 10 ? 100 : roi.growth > 0 ? 70 : roi.growth === 0 ? 40 : 0;
+      weightedSum += roiScore * 0.3;
+      totalWeight += 0.3;
       components++;
     }
-    let engagementScore = 0;
+    // Engagement component (weight 0.3)
     if (engagement.loginFrequency !== 'inactive') {
-      engagementScore = engagement.loginFrequency === 'daily' ? 100 : engagement.loginFrequency === 'weekly' ? 70 : 40;
+      const engagementScore = engagement.loginFrequency === 'daily' ? 100 : engagement.loginFrequency === 'weekly' ? 70 : 40;
+      weightedSum += engagementScore * 0.3;
+      totalWeight += 0.3;
       components++;
     }
-    if (components >= 2) {
-      compositeHealthScore = Math.round(churnScore * 0.4 + roiScore * 0.3 + engagementScore * 0.3);
+
+    if (components >= 2 && totalWeight > 0) {
+      compositeHealthScore = Math.round(weightedSum / totalWeight);
     }
   }
 
