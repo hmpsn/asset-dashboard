@@ -29,6 +29,8 @@ import type {
   ClientSignalsSlice,
   ChurnSignalSummary,
   EngagementMetrics,
+  OperationalSlice,
+  InsightAcceptanceRate,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
@@ -140,9 +142,11 @@ async function assembleSlice(
     case 'clientSignals':
       result.clientSignals = await assembleClientSignals(workspaceId, opts);
       break;
+    case 'operational':
+      result.operational = await assembleOperational(workspaceId, opts);
+      break;
     // Phase 3: remaining slices are stubbed — they return undefined
     case 'pageProfile':
-    case 'operational':
       log.debug({ workspaceId, slice }, 'Slice not yet implemented — skipping');
       break;
   }
@@ -772,6 +776,193 @@ async function assembleClientSignals(
     compositeHealthScore,
     feedbackItems,
     serviceRequests,
+  };
+}
+
+async function assembleOperational(
+  workspaceId: string,
+  _opts?: IntelligenceOptions,
+): Promise<OperationalSlice> {
+  // Recent activity
+  let recentActivity: OperationalSlice['recentActivity'] = [];
+  try {
+    const { listActivity } = await import('./activity-log.js');
+    const activity = listActivity(workspaceId, 20);
+    recentActivity = activity.map((a: any) => ({
+      type: a.type ?? '',
+      description: a.title ?? a.description ?? '',
+      timestamp: a.timestamp ?? a.createdAt ?? '',
+    }));
+  } catch {
+    // Activity log optional
+  }
+
+  // Annotations (merge both sources)
+  let annotations: OperationalSlice['annotations'] = [];
+  try {
+    const { getAnnotations } = await import('./analytics-annotations.js');
+    const analyticsAnnotations = getAnnotations(workspaceId);
+    annotations = analyticsAnnotations.slice(0, 20).map((a: any) => ({
+      date: a.date ?? '',
+      label: a.label ?? '',
+      pageUrl: (a as any).pageUrl,
+    }));
+  } catch {
+    // Analytics annotations optional
+  }
+  try {
+    const { listAnnotations } = await import('./annotations.js');
+    const timelineAnnotations = listAnnotations(workspaceId);
+    for (const a of timelineAnnotations.slice(0, 10)) {
+      annotations.push({ date: (a as any).date ?? '', label: (a as any).label ?? '' });
+    }
+  } catch {
+    // Timeline annotations optional
+  }
+
+  // Pending jobs
+  let pendingJobs = 0;
+  try {
+    const { listJobs } = await import('./jobs.js');
+    const jobs = listJobs(workspaceId);
+    pendingJobs = jobs.filter((j: any) => j.status === 'pending' || j.status === 'running').length;
+  } catch {
+    // Jobs optional
+  }
+
+  // Time saved (usage tracking)
+  let timeSaved: OperationalSlice['timeSaved'] = null;
+  try {
+    const { getUsageSummary } = await import('./usage-tracking.js');
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    const tier = (ws as any)?.tier ?? 'free';
+    const summary = getUsageSummary(workspaceId, tier);
+    let totalMinutes = 0;
+    const byFeature: Record<string, number> = {};
+    for (const [feature, data] of Object.entries(summary)) {
+      const minutes = ((data as any).used ?? 0) * 5;
+      totalMinutes += minutes;
+      if (minutes > 0) byFeature[feature] = minutes;
+    }
+    if (totalMinutes > 0) {
+      timeSaved = { totalMinutes, byFeature };
+    }
+  } catch {
+    // Usage tracking optional
+  }
+
+  // Approval queue
+  let approvalQueue: OperationalSlice['approvalQueue'] = { pending: 0, oldestAge: null };
+  try {
+    const { listBatches } = await import('./approvals.js');
+    const batches = listBatches(workspaceId);
+    let pending = 0;
+    let oldestMs = 0;
+    for (const batch of batches) {
+      for (const item of (batch as any).items ?? []) {
+        if (item.status === 'pending') {
+          pending++;
+          const age = Date.now() - new Date(item.createdAt ?? '').getTime();
+          if (age > oldestMs) oldestMs = age;
+        }
+      }
+    }
+    approvalQueue = { pending, oldestAge: pending > 0 ? Math.round(oldestMs / (60 * 60 * 1000)) : null };
+  } catch {
+    // Approvals optional
+  }
+
+  // Recommendation queue
+  let recommendationQueue = { fixNow: 0, fixSoon: 0, fixLater: 0 };
+  try {
+    const { loadRecommendations } = await import('./recommendations.js');
+    const recSet = loadRecommendations(workspaceId);
+    if ((recSet as any)?.recommendations) {
+      for (const rec of (recSet as any).recommendations) {
+        if (rec.status === 'pending' || !rec.status) {
+          if (rec.priority === 'fix_now') recommendationQueue.fixNow++;
+          else if (rec.priority === 'fix_soon') recommendationQueue.fixSoon++;
+          else recommendationQueue.fixLater++;
+        }
+      }
+    }
+  } catch {
+    // Recommendations optional
+  }
+
+  // Action backlog
+  let actionBacklog: OperationalSlice['actionBacklog'] = { pendingMeasurement: 0, oldestAge: null };
+  try {
+    const { getPendingActions } = await import('./outcome-tracking.js');
+    const pending = getPendingActions();
+    const wsActions = pending.filter((a: any) => a.workspaceId === workspaceId);
+    let oldestAge: number | null = null;
+    if (wsActions.length > 0) {
+      const oldest = wsActions.reduce((min: any, a: any) =>
+        new Date(a.createdAt).getTime() < new Date(min.createdAt).getTime() ? a : min,
+      );
+      oldestAge = Math.floor((Date.now() - new Date(oldest.createdAt).getTime()) / (24 * 60 * 60 * 1000));
+    }
+    actionBacklog = { pendingMeasurement: wsActions.length, oldestAge };
+  } catch {
+    // Outcome tracking optional
+  }
+
+  // Detected playbooks
+  let detectedPlaybooks: string[] = [];
+  try {
+    const { getPlaybooks } = await import('./outcome-playbooks.js');
+    const playbooks = getPlaybooks(workspaceId);
+    detectedPlaybooks = playbooks.slice(0, 5).map((p: any) => p.pattern ?? p.name ?? '').filter(Boolean);
+  } catch {
+    // Playbooks optional
+  }
+
+  // Work orders
+  let workOrders: OperationalSlice['workOrders'] = { active: 0, pending: 0 };
+  try {
+    const { listWorkOrders } = await import('./work-orders.js');
+    const orders = listWorkOrders(workspaceId);
+    workOrders = {
+      active: orders.filter((o: any) => o.status === 'active').length,
+      pending: orders.filter((o: any) => o.status === 'pending').length,
+    };
+  } catch {
+    // Work orders optional
+  }
+
+  // Insight acceptance rate
+  let insightAcceptanceRate: InsightAcceptanceRate | null = null;
+  try {
+    const { getInsights } = await import('./analytics-insights-store.js');
+    const insights = getInsights(workspaceId);
+    const totalShown = insights.length;
+    const confirmed = insights.filter((i: any) => i.resolutionStatus === 'resolved' || i.resolutionStatus === 'in_progress').length;
+    const dismissed = insights.filter((i: any) => i.resolutionStatus === 'dismissed').length;
+    if (totalShown > 0) {
+      insightAcceptanceRate = {
+        totalShown,
+        confirmed,
+        dismissed,
+        rate: confirmed / totalShown,
+      };
+    }
+  } catch {
+    // Insight feedback optional
+  }
+
+  return {
+    recentActivity,
+    annotations,
+    pendingJobs,
+    timeSaved,
+    approvalQueue,
+    recommendationQueue,
+    actionBacklog,
+    detectedPlaybooks,
+    workOrders,
+    insightAcceptanceRate,
   };
 }
 
