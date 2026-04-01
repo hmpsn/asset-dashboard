@@ -11,6 +11,7 @@ import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking
 import { fireBridge } from '../bridge-infrastructure.js';
 import { createSuggestedBrief } from '../suggested-briefs-store.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const router = Router();
 const log = createLogger('content-decay');
@@ -37,7 +38,7 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
         });
       }
       if (topDecaying.length > 0) {
-        broadcastToWorkspace(ws.id, 'suggested-brief:updated', {
+        broadcastToWorkspace(ws.id, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, {
           bridge: 'bridge_2_decay_suggested_brief',
           count: topDecaying.length,
         });

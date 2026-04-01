@@ -23,6 +23,7 @@ import type {
 } from '../shared/types/outcome-tracking.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -146,7 +147,6 @@ export function recordAction(params: RecordActionParams): TrackedAction {
       (params.targetKeyword && i.strategyKeyword === params.targetKeyword),
     ).filter(i =>
       i.resolutionStatus !== 'resolved' &&
-      i.resolutionStatus !== 'dismissed' &&
       i.resolutionStatus !== 'in_progress',
     );
     for (const insight of related) {
@@ -156,7 +156,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
       );
     }
     if (related.length > 0) {
-      broadcastToWorkspace(params.workspaceId, 'insight:bridge_updated', {
+      broadcastToWorkspace(params.workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
         bridge: 'bridge_7_auto_resolve',
         count: related.length,
       });
@@ -176,7 +176,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
       category: 'site_change',
       createdBy: 'bridge:action-annotation',
     });
-    broadcastToWorkspace(params.workspaceId, 'annotation:bridge_created', {
+    broadcastToWorkspace(params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
       bridge: 'bridge_13_action_annotation',
       date,
       label,
