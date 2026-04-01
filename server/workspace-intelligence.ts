@@ -31,6 +31,8 @@ import type {
   EngagementMetrics,
   OperationalSlice,
   InsightAcceptanceRate,
+  ROIAttribution,
+  WeCalledItEntry,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 
@@ -290,6 +292,48 @@ async function assembleLearnings(
   const summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
   const playbooks = getPlaybooks(workspaceId);
 
+  // ROI attribution enrichment
+  let roiAttribution: ROIAttribution[] = [];
+  try {
+    const { getROIHighlights } = await import('./roi-attribution.js');
+    const highlights = getROIHighlights(workspaceId, 10);
+    roiAttribution = highlights.map((h: any) => ({
+      actionId: h.id ?? '',
+      pageUrl: h.pageUrl ?? '',
+      actionType: h.actionType ?? '',
+      clicksBefore: h.clicksBefore ?? 0,
+      clicksAfter: h.clicksAfter ?? 0,
+      clickGain: h.clickGain ?? ((h.clicksAfter ?? 0) - (h.clicksBefore ?? 0)),
+      measuredAt: h.measuredAt ?? '',
+    }));
+  } catch {
+    // ROI attribution optional
+  }
+
+  // WeCalledIt entries — actions with strong_win outcomes
+  let weCalledIt: WeCalledItEntry[] = [];
+  try {
+    const { getActionsByWorkspace, getOutcomesForAction } = await import('./outcome-tracking.js');
+    const actions = getActionsByWorkspace(workspaceId);
+    for (const action of actions.slice(0, 50)) {
+      const outcomes = getOutcomesForAction(action.id);
+      const strongWin = outcomes.find((o: any) => o.score === 'strong_win');
+      if (strongWin) {
+        weCalledIt.push({
+          actionId: action.id,
+          prediction: `${(action as any).actionType} on ${(action as any).pageUrl ?? 'site'}`,
+          outcome: 'strong_win',
+          score: 'strong_win',
+          pageUrl: (action as any).pageUrl ?? '',
+          measuredAt: (strongWin as any).measuredAt ?? '',
+        });
+      }
+      if (weCalledIt.length >= 5) break;
+    }
+  } catch {
+    // Outcome data optional
+  }
+
   return {
     summary,
     confidence: summary?.confidence ?? null,
@@ -297,6 +341,8 @@ async function assembleLearnings(
     overallWinRate: summary?.overall.totalWinRate ?? 0,
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
+    roiAttribution,
+    weCalledIt,
   };
 }
 
