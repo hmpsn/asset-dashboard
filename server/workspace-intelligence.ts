@@ -332,7 +332,10 @@ async function assembleSiteHealth(
   // ── Orphan pages (site-architecture.ts) ─────────────────────────────
   try {
     const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
-    const arch = await getCachedArchitecture(workspaceId);
+    const arch = await Promise.race([
+      getCachedArchitecture(workspaceId),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
     if (arch) {
       orphanPages = arch.orphanPaths?.length ?? 0;
       // Verify via flattenTree if orphanPaths is empty but tree has isolated nodes
@@ -378,9 +381,9 @@ async function assembleSiteHealth(
   // ── SEO change velocity (seo-change-tracker.ts) ──────────────────────
   try {
     const { getSeoChanges } = await import('./seo-change-tracker.js');
-    // Use default limit (100) — the second param is a row limit, not days.
-    // Filter by date to get actual 30-day velocity.
-    const changes = getSeoChanges(workspaceId);
+    // Pass 500 limit — the second param is a row limit, not days.
+    // Active workspaces may exceed the default 100-row cap within 30 days.
+    const changes = getSeoChanges(workspaceId, 500);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     seoChangeVelocity = changes.filter(c => c.changedAt >= thirtyDaysAgo).length;
   } catch (err) {
