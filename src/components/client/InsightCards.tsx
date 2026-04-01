@@ -389,7 +389,7 @@ export function SiteHealthCard({
             )}
             {data.warnings > 0 && (
               <span>
-                <span className="text-blue-400 font-medium">{data.warnings}</span> warning{data.warnings !== 1 ? 's' : ''}
+                <span className="text-amber-400 font-medium">{data.warnings}</span> warning{data.warnings !== 1 ? 's' : ''}
               </span>
             )}
             {data.errors === 0 && data.warnings === 0 && (

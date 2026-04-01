@@ -593,14 +593,17 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             });
 
             // ── Bridge #10: anomaly → boost insight severity ──
+            // NOTE: debouncedAnomalyBoost is keyed by workspaceId (5s, last-call-wins).
+            // When multiple anomalies fire in a single scan, only the last callback runs.
+            // To avoid domain-specific callbacks silently dropping other domains, we boost
+            // ALL non-resolved non-anomaly_digest insights. The debounce correctly collapses
+            // N anomaly detections into a single workspace-wide boost pass.
             debouncedAnomalyBoost(a.workspaceId, async () => {
               await withWorkspaceLock(a.workspaceId, async () => {
                 const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
-                const boostDomain = a.metric.includes('position') ? 'search' : 'traffic';
                 const allInsights = getInsights(a.workspaceId);
                 const targets = allInsights
                   .filter(i =>
-                    i.domain === boostDomain &&
                     i.insightType !== 'anomaly_digest' &&
                     i.resolutionStatus !== 'resolved'
                   )
