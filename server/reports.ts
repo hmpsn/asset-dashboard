@@ -173,7 +173,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
             }
           });
           const { WS_EVENTS } = await import('./ws-events.js');
-          const { broadcastToWorkspace } = await import('./ws.js');
+          const { broadcastToWorkspace } = await import('./broadcast.js');
           broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-page-health' });
         });
       }
@@ -208,7 +208,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
             resolutionSource: 'bridge_15_audit_site_health',
           });
           const { WS_EVENTS } = await import('./ws-events.js');
-          const { broadcastToWorkspace } = await import('./ws.js');
+          const { broadcastToWorkspace } = await import('./broadcast.js');
           broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-site-health' });
         });
       }
