@@ -602,15 +602,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // so that related insights surface faster. Domain mapping mirrors the
         // anomaly→InsightDomain logic at lines 555-561.
         debouncedAnomalyBoost(ws.id, async () => {
-          let modified = 0;
-          await withWorkspaceLock(ws.id, async () => {
+          const modifiedCount = await withWorkspaceLock(ws.id, async () => {
             const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
               .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
 
-            if (recentAnomalies.length === 0) return;
+            if (recentAnomalies.length === 0) return 0;
 
             // Build set of domains affected by recent anomalies
             const affectedDomains = new Set<string>();
@@ -624,6 +623,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               }
             }
 
+            let modified = 0;
             for (const insight of allInsights) {
               if (insight.resolutionStatus === 'resolved') continue;
               const insightDomain = insight.domain ?? 'cross';
@@ -652,8 +652,9 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                 modified++;
               }
             }
+            return modified;
           });
-          return { modified };
+          return { modified: modifiedCount };
         });
       }
     } catch (err) {
