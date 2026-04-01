@@ -13,6 +13,10 @@ import type {
   SeoContextSlice,
   InsightsSlice,
   LearningsSlice,
+  SiteHealthSlice,
+  RedirectDetail,
+  SchemaValidationSummary,
+  PerformanceSummary,
   PromptFormatOptions,
   PromptVerbosity,
 } from '../shared/types/intelligence.js';
@@ -102,10 +106,21 @@ async function assembleSlice(
     case 'learnings':
       result.learnings = await assembleLearnings(workspaceId, opts);
       break;
+    case 'siteHealth':
+      try {
+        result.siteHealth = await Promise.race([
+          assembleSiteHealth(workspaceId, opts),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('siteHealth assembler timed out')), 5000),
+          ),
+        ]);
+      } catch (err) {
+        log.warn({ workspaceId, slice, err }, 'siteHealth slice assembly failed — skipping');
+      }
+      break;
     // Phase 1: remaining slices are stubbed — they return undefined
     case 'pageProfile':
     case 'contentPipeline':
-    case 'siteHealth':
     case 'clientSignals':
     case 'operational':
       log.debug({ workspaceId, slice }, 'Slice not yet implemented — skipping');
@@ -200,6 +215,193 @@ async function assembleLearnings(
     overallWinRate: summary?.overall.totalWinRate ?? 0,
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
+  };
+}
+
+async function assembleSiteHealth(
+  workspaceId: string,
+  _opts?: IntelligenceOptions,
+): Promise<SiteHealthSlice> {
+  const { getWorkspace } = await import('./workspaces.js');
+  const workspace = getWorkspace(workspaceId);
+  const siteId = workspace?.webflowSiteId ?? null;
+
+  // Defaults — each source fills in what it can
+  let auditScore: number | null = null;
+  let auditScoreDelta: number | null = null;
+  let deadLinks = 0;
+  let redirectChains = 0;
+  let schemaErrors = 0;
+  let orphanPages = 0;
+  const cwvPassRate: { mobile: number | null; desktop: number | null } = { mobile: null, desktop: null };
+  let redirectDetails: RedirectDetail[] | undefined;
+  let schemaValidation: SchemaValidationSummary | undefined;
+  let performanceSummary: PerformanceSummary | null | undefined;
+  let anomalyCount = 0;
+  let anomalyTypes: string[] = [];
+  let seoChangeVelocity = 0;
+
+  // ── Audit snapshot (reports.ts) ──────────────────────────────────────
+  if (siteId) {
+    try {
+      const { getLatestSnapshot, listSnapshots } = await import('./reports.js');
+      const latest = getLatestSnapshot(siteId);
+      if (latest) {
+        auditScore = latest.audit.siteScore ?? null;
+        // Delta: compare with previous snapshot
+        const summaries = listSnapshots(siteId);
+        if (summaries.length >= 2) {
+          const prevScore = summaries[1].siteScore;
+          auditScoreDelta = auditScore !== null ? auditScore - prevScore : null;
+        } else if (latest.previousScore !== undefined) {
+          auditScoreDelta = auditScore !== null ? auditScore - latest.previousScore : null;
+        }
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: audit snapshot failed — skipping');
+    }
+  }
+
+  // ── Dead links (performance-store.ts / getLinkCheck) ────────────────
+  if (siteId) {
+    try {
+      const { getLinkCheck } = await import('./performance-store.js');
+      const linkSnap = getLinkCheck(siteId);
+      if (linkSnap?.result) {
+        const result = linkSnap.result as { deadLinks?: unknown[] };
+        deadLinks = Array.isArray(result.deadLinks) ? result.deadLinks.length : 0;
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: link check failed — skipping');
+    }
+  }
+
+  // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
+  if (siteId) {
+    try {
+      const { getPageSpeed } = await import('./performance-store.js');
+      const speedSnap = getPageSpeed(siteId);
+      if (speedSnap?.result) {
+        const siteSpeed = speedSnap.result as {
+          pages?: Array<{ score?: number; vitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null } }>;
+          averageScore?: number;
+          averageVitals?: { LCP?: number | null; FID?: number | null; CLS?: number | null };
+        };
+        // CWV pass rate: % of pages with score >= 90
+        const pages = siteSpeed.pages ?? [];
+        if (pages.length > 0) {
+          const passing = pages.filter(p => (p.score ?? 0) >= 90).length;
+          const rate = passing / pages.length;
+          cwvPassRate.mobile = rate;
+        }
+        // Performance summary from averageVitals
+        if (siteSpeed.averageVitals) {
+          performanceSummary = {
+            avgLcp: siteSpeed.averageVitals.LCP ?? null,
+            avgFid: siteSpeed.averageVitals.FID ?? null,
+            avgCls: siteSpeed.averageVitals.CLS ?? null,
+            score: siteSpeed.averageScore ?? null,
+          };
+        }
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: pagespeed failed — skipping');
+    }
+  }
+
+  // ── Redirect chains (redirect-store.ts) ─────────────────────────────
+  if (siteId) {
+    try {
+      const { getRedirectSnapshot } = await import('./redirect-store.js');
+      const redirSnap = getRedirectSnapshot(siteId);
+      if (redirSnap?.result) {
+        redirectChains = redirSnap.result.summary.chainsDetected ?? 0;
+        // Map chains to RedirectDetail[]
+        redirectDetails = (redirSnap.result.chains ?? []).map(chain => ({
+          url: chain.originalUrl,
+          target: chain.finalUrl,
+          chainDepth: chain.totalHops,
+          status: chain.hops[0]?.status ?? 301,
+        }));
+      }
+    } catch (err) {
+      log.debug({ workspaceId, err }, 'siteHealth: redirect snapshot failed — skipping');
+    }
+  }
+
+  // ── Orphan pages (site-architecture.ts) ─────────────────────────────
+  try {
+    const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
+    const arch = await getCachedArchitecture(workspaceId);
+    if (arch) {
+      orphanPages = arch.orphanPaths?.length ?? 0;
+      // Verify via flattenTree if orphanPaths is empty but tree has isolated nodes
+      if (orphanPages === 0) {
+        const nodes = flattenTree(arch.tree);
+        orphanPages = nodes.filter(n => n.source === 'existing' && n.hasContent && n.depth === 1 && n.children.length === 0).length;
+      }
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: site architecture failed — skipping');
+  }
+
+  // ── Schema errors (schema-validator.ts) ─────────────────────────────
+  try {
+    const { getValidations } = await import('./schema-validator.js');
+    const validations = getValidations(workspaceId);
+    if (validations.length > 0) {
+      let valid = 0;
+      let warnings = 0;
+      let errors = 0;
+      for (const v of validations) {
+        if (v.status === 'valid') valid++;
+        else if (v.status === 'warnings') warnings++;
+        else if (v.status === 'errors') errors++;
+        schemaErrors += v.errors?.length ?? 0;
+      }
+      schemaValidation = { valid, warnings, errors };
+      // Normalize: schemaErrors = count of pages with errors status
+      schemaErrors = errors;
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: schema validation failed — skipping');
+  }
+
+  // ── Anomaly count (anomaly-detection.ts) ─────────────────────────────
+  try {
+    const { listAnomalies } = await import('./anomaly-detection.js');
+    const anomalies = listAnomalies(workspaceId);
+    anomalyCount = anomalies.length;
+    anomalyTypes = [...new Set(anomalies.map(a => a.type))];
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: anomaly detection failed — skipping');
+  }
+
+  // ── SEO change velocity (seo-change-tracker.ts) ──────────────────────
+  try {
+    const { getSeoChanges } = await import('./seo-change-tracker.js');
+    const changes = getSeoChanges(workspaceId, 30);
+    // Velocity = changes in the last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    seoChangeVelocity = changes.filter(c => c.changedAt >= thirtyDaysAgo).length;
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: seo change tracker failed — skipping');
+  }
+
+  return {
+    auditScore,
+    auditScoreDelta,
+    deadLinks,
+    redirectChains,
+    schemaErrors,
+    orphanPages,
+    cwvPassRate,
+    redirectDetails,
+    schemaValidation,
+    performanceSummary,
+    anomalyCount,
+    anomalyTypes,
+    seoChangeVelocity,
   };
 }
 
