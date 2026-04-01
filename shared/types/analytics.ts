@@ -227,6 +227,8 @@ export interface AnalyticsInsight {
   resolutionNote?: string | null;
   resolvedAt?: string | null;
   resolutionSource?: string | null;
+  /** When non-null, this insight was created/updated by a bridge. Survives stale cleanup. */
+  bridgeSource?: string | null;
 }
 
 // ── Insight data shapes (used in data JSON field) ─────────────────
