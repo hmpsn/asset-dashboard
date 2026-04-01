@@ -158,15 +158,8 @@ const stmts = createStmtCache(() => ({
         WHERE workspace_id = ? AND type = ? AND dismissed_at IS NULL AND detected_at > ?
         LIMIT 1
       `),
-  getLastScan: db.prepare(`SELECT detected_at FROM anomalies ORDER BY detected_at DESC LIMIT 1`),
-  setLastScan: db.prepare(`
-        INSERT OR REPLACE INTO anomalies (id, workspace_id, workspace_name, type, severity,
-          title, description, metric, current_value, previous_value, change_pct,
-          ai_summary, detected_at, dismissed_at, acknowledged_at, source)
-        VALUES ('__last_scan__', '__system__', 'System', 'traffic_drop', 'warning',
-          'Last scan marker', '', 'last_scan', 0, 0, 0,
-          NULL, ?, 'system', NULL, 'gsc')
-      `),
+  getLastScan: db.prepare(`SELECT last_scan_at AS detected_at FROM anomaly_scan_tracker WHERE id = 'singleton'`),
+  setLastScan: db.prepare(`INSERT OR REPLACE INTO anomaly_scan_tracker (id, last_scan_at) VALUES ('singleton', ?)`),
 }));
 
 /** Get the timestamp of the last successful anomaly scan */
