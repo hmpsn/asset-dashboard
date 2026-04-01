@@ -292,7 +292,7 @@ export function recordOutcome(params: {
     if (actionRow) {
       const workspaceId = actionRow.workspace_id;
       debouncedOutcomeReweight(workspaceId, async () => {
-        await withWorkspaceLock(workspaceId, async () => {
+        const modifiedCount = await withWorkspaceLock(workspaceId, async () => {
           const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
           const insights = getInsights(workspaceId);
           const nonResolved = insights.filter(i => i.resolutionStatus !== 'resolved');
@@ -316,6 +316,7 @@ export function recordOutcome(params: {
             if (delta !== 0) pageScoreMap.set(pageUrl, delta);
           }
 
+          let modified = 0;
           for (const insight of nonResolved) {
             const scoreDelta = pageScoreMap.get(insight.pageId ?? '') ?? 0;
             if (scoreDelta !== 0) {
@@ -342,13 +343,17 @@ export function recordOutcome(params: {
                 impactScore: adjusted,
                 domain: insight.domain,
               });
+              modified++;
             }
           }
+          return modified;
         });
 
-        const { broadcastToWorkspace: broadcast } = await import('./broadcast.js');
-        const { WS_EVENTS: WS } = await import('./ws-events.js');
-        broadcast(workspaceId, WS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_1_outcome_reweight' });
+        if (modifiedCount > 0) {
+          const { broadcastToWorkspace: broadcast } = await import('./broadcast.js');
+          const { WS_EVENTS: WS } = await import('./ws-events.js');
+          broadcast(workspaceId, WS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_1_outcome_reweight' });
+        }
       });
     }
   }

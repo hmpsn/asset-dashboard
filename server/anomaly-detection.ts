@@ -601,6 +601,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // so that related insights surface faster. Domain mapping mirrors the
         // anomaly→InsightDomain logic at lines 555-561.
         debouncedAnomalyBoost(ws.id, async () => {
+          let modified = 0;
           await withWorkspaceLock(ws.id, async () => {
             const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
             const allInsights = fetchInsights(ws.id);
@@ -652,13 +653,16 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                   impactScore: boosted,
                   domain: insight.domain,
                 });
+                modified++;
               }
             }
           });
 
-          const { broadcastToWorkspace: bc } = await import('./broadcast.js');
-          const { WS_EVENTS: events } = await import('./ws-events.js');
-          bc(ws.id, events.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
+          if (modified > 0) {
+            const { broadcastToWorkspace: bc } = await import('./broadcast.js');
+            const { WS_EVENTS: events } = await import('./ws-events.js');
+            bc(ws.id, events.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
+          }
         });
       }
     } catch (err) {
