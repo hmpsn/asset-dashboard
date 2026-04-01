@@ -380,8 +380,9 @@ async function assembleSiteHealth(
   // ── SEO change velocity (seo-change-tracker.ts) ──────────────────────
   try {
     const { getSeoChanges } = await import('./seo-change-tracker.js');
-    const changes = getSeoChanges(workspaceId, 30);
-    // Velocity = changes in the last 30 days
+    // Use default limit (100) — the second param is a row limit, not days.
+    // Filter by date to get actual 30-day velocity.
+    const changes = getSeoChanges(workspaceId);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     seoChangeVelocity = changes.filter(c => c.changedAt >= thirtyDaysAgo).length;
   } catch (err) {

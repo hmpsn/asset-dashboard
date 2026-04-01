@@ -182,13 +182,13 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #15: Audit → site_health insights ──────────────────────
     fireBridge('bridge-audit-site-health', ws.id, async () => {
-      const { upsertInsight } = await import('./analytics-insights-store.js');
+      const { upsertInsight, resolveInsight } = await import('./analytics-insights-store.js');
 
       // Create site-level insight from aggregate audit findings
       const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;
       const score = effectiveAudit.siteScore;
       if (totalIssues > 0 && score < 70) {
-        upsertInsight({
+        const insight = upsertInsight({
           workspaceId: ws.id,
           insightType: 'page_health',
           pageId: null,
@@ -203,6 +203,13 @@ async function runScheduledAudit(schedule: AuditSchedule) {
           impactScore: Math.max(0, 100 - score),
           resolutionSource: 'bridge_15_audit_site_health',
         });
+
+        // Mark as 'in_progress' so deleteStaleInsightsByType (resolution_status IS NULL)
+        // does not silently delete this bridge-generated site-level insight.
+        resolveInsight(insight.id, ws.id, 'in_progress',
+          'Bridge-generated site health insight — protected from stale cleanup',
+          'bridge_15_audit_site_health',
+        );
 
         broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
           bridge: 'bridge_15_audit_site_health',
