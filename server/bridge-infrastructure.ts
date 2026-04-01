@@ -44,17 +44,28 @@ interface BridgeOptions {
   dryRun?: boolean;
 }
 
+/** Return from bridge callbacks to trigger auto-broadcast when modified > 0 */
+export interface BridgeResult {
+  /** Number of insights/records modified. When > 0, infrastructure broadcasts automatically. */
+  modified: number;
+}
+
+type BridgeCallback = () => Promise<BridgeResult | void> | BridgeResult | void;
+
 /**
  * Execute a bridge function with feature-flag gating, timeout, error isolation, and logging.
  * Bridges NEVER throw — errors are logged and swallowed to protect the triggering mutation.
  *
  * Returns a Promise, but callers in SYNC functions (recordAction, saveSnapshot) should use
  * fireBridge() instead to avoid floating promises.
+ *
+ * When the callback returns a BridgeResult with modified > 0, broadcasts INSIGHT_BRIDGE_UPDATED
+ * automatically — bridge callbacks no longer need to handle their own broadcasts.
  */
 export async function executeBridge(
   flag: FeatureFlagKey,
   workspaceId: string,
-  fn: () => Promise<void> | void,
+  fn: BridgeCallback,
   opts?: BridgeOptions,
 ): Promise<void> {
   if (!isFeatureEnabled(flag)) {
@@ -71,8 +82,9 @@ export async function executeBridge(
   const timeoutMs = opts?.timeoutMs ?? 5000;
 
   try {
+    let bridgeResult: BridgeResult | void;
     const result = fn();
-    if (result && typeof result.then === 'function') {
+    if (result && typeof (result as Promise<unknown>).then === 'function') {
       // Async bridge — race against timeout, clear timer on settle to avoid leaks.
       // `timedOut` suppresses re-throw in the rejection handler: if the timeout wins the
       // race and the bridge later rejects, we must NOT rethrow — doing so would create an
@@ -82,8 +94,8 @@ export async function executeBridge(
       let timedOut = false;
       const cleanup = () => clearTimeout(timeoutId);
       await Promise.race([
-        result.then(
-          (v: void) => { cleanup(); return v; },
+        (result as Promise<BridgeResult | void>).then(
+          (v) => { cleanup(); bridgeResult = v; },
           (e: unknown) => { cleanup(); if (!timedOut) throw e; },
         ),
         new Promise<void>((_, reject) => {
@@ -93,8 +105,23 @@ export async function executeBridge(
           }, timeoutMs);
         }),
       ]);
+    } else {
+      // Sync bridge
+      bridgeResult = result as BridgeResult | void;
     }
+
     log.info({ flag, workspaceId, duration_ms: Date.now() - start }, 'Bridge executed');
+
+    // Auto-broadcast when bridge reports modifications
+    if (bridgeResult && typeof bridgeResult === 'object' && 'modified' in bridgeResult && bridgeResult.modified > 0) {
+      try {
+        const { broadcastToWorkspace } = await import('./broadcast.js');
+        const { WS_EVENTS } = await import('./ws-events.js');
+        broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: flag });
+      } catch (bcErr) {
+        log.warn({ flag, workspaceId, err: bcErr }, 'Bridge auto-broadcast failed');
+      }
+    }
   } catch (err) {
     log.warn({ flag, workspaceId, err, duration_ms: Date.now() - start }, 'Bridge failed — swallowed');
   }
@@ -108,7 +135,7 @@ export async function executeBridge(
 export function fireBridge(
   flag: FeatureFlagKey,
   workspaceId: string,
-  fn: () => Promise<void> | void,
+  fn: BridgeCallback,
   opts?: BridgeOptions,
 ): void {
   // Intentional fire-and-forget — executeBridge catches all errors internally
@@ -125,11 +152,11 @@ export function fireBridge(
 export function debounceBridge(
   flag: FeatureFlagKey,
   delayMs: number,
-): (workspaceId: string, fn: () => Promise<void> | void) => void {
+): (workspaceId: string, fn: BridgeCallback) => void {
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
-  const pending = new Map<string, () => Promise<void> | void>();
+  const pending = new Map<string, BridgeCallback>();
 
-  return (workspaceId: string, fn: () => Promise<void> | void) => {
+  return (workspaceId: string, fn: BridgeCallback) => {
     pending.set(workspaceId, fn);
 
     const existing = timers.get(workspaceId);
