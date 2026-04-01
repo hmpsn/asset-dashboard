@@ -36,3 +36,68 @@ describe('Bridge #15: audit→audit_finding insights (site-level)', () => {
     expect(src).toContain("scope: 'site'");
   });
 });
+
+describe('Bridge infrastructure: bridgeSource pattern', () => {
+  it('Bridge #12 uses bridgeSource instead of resolveInsight hack', () => {
+    const src = fs.readFileSync(path.join(serverDir, 'scheduled-audits.ts'), 'utf-8');
+    expect(src).toContain("bridgeSource: 'bridge-audit-page-health'");
+    // The resolveInsight('in_progress') hack should be gone from bridge sections
+    const bridge12Section = src.slice(src.indexOf('Bridge #12'), src.indexOf('Bridge #15'));
+    expect(bridge12Section).not.toContain('resolveInsight(insight.id');
+  });
+
+  it('Bridge #15 uses bridgeSource instead of resolveInsight hack', () => {
+    const src = fs.readFileSync(path.join(serverDir, 'scheduled-audits.ts'), 'utf-8');
+    expect(src).toContain("bridgeSource: 'bridge-audit-site-health'");
+    const bridge15Section = src.slice(src.indexOf('Bridge #15'));
+    expect(bridge15Section).not.toContain('resolveInsight(insight.id');
+  });
+});
+
+describe('Bridge infrastructure: composable score adjustments', () => {
+  it('Bridge #1 uses applyScoreAdjustment instead of _outcomeBaseScore', () => {
+    const src = fs.readFileSync(path.join(serverDir, 'outcome-tracking.ts'), 'utf-8');
+    expect(src).toContain('applyScoreAdjustment');
+    expect(src).not.toContain('_outcomeBaseScore');
+  });
+
+  it('Bridge #10 uses applyScoreAdjustment instead of _anomalyBaseScore', () => {
+    const src = fs.readFileSync(path.join(serverDir, 'anomaly-detection.ts'), 'utf-8');
+    expect(src).toContain('applyScoreAdjustment');
+    expect(src).not.toContain('_anomalyBaseScore');
+  });
+});
+
+describe('Bridge infrastructure: auto-broadcast', () => {
+  it('no bridge callback manually imports broadcastToWorkspace for bridge events', () => {
+    const outcomeTrackingSrc = fs.readFileSync(path.join(serverDir, 'outcome-tracking.ts'), 'utf-8');
+    const anomalyDetectionSrc = fs.readFileSync(path.join(serverDir, 'anomaly-detection.ts'), 'utf-8');
+
+    // Bridge #1 callback section should not contain broadcastToWorkspace
+    // (Other parts of outcome-tracking.ts still use it for non-bridge purposes)
+    // Use a specific anchor to avoid matching "Bridge #13" which precedes Bridge #1 in the file
+    const bridge1Section = outcomeTrackingSrc.slice(
+      outcomeTrackingSrc.indexOf('Bridge #1: Outcome'),
+      outcomeTrackingSrc.indexOf('return rowToActionOutcome'),
+    );
+    expect(bridge1Section).not.toContain('broadcastToWorkspace');
+    expect(bridge1Section).toContain('return { modified');
+
+    // Bridge #10 callback section — end at the unique log.error line that follows it
+    const bridge10Start = anomalyDetectionSrc.indexOf('Bridge #10');
+    const bridge10Section = anomalyDetectionSrc.slice(
+      bridge10Start,
+      anomalyDetectionSrc.indexOf('log.error({ err', bridge10Start),
+    );
+    expect(bridge10Section).not.toContain('broadcastToWorkspace');
+    expect(bridge10Section).toContain('return { modified');
+  });
+});
+
+describe('Bridge infrastructure: BridgeResult support', () => {
+  it('executeBridge supports BridgeResult return type', () => {
+    const src = fs.readFileSync(path.join(serverDir, 'bridge-infrastructure.ts'), 'utf-8');
+    expect(src).toContain('export interface BridgeResult');
+    expect(src).toContain('INSIGHT_BRIDGE_UPDATED');
+  });
+});
