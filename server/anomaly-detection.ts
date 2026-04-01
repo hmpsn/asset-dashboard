@@ -27,6 +27,7 @@ import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
+import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
@@ -625,24 +626,19 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
 
             for (const insight of allInsights) {
               if (insight.resolutionStatus === 'resolved') continue;
-              // Only boost insights whose domain matches an affected anomaly domain
               const insightDomain = insight.domain ?? 'cross';
               if (!affectedDomains.has(insightDomain)) continue;
 
-              // IDEMPOTENT: compute from the base score (before any anomaly boost),
-              // not the current impactScore which may already include a previous boost.
-              // Store _anomalyBaseScore in data JSON so repeated invocations are stable.
               const dataObj = (insight.data ?? {}) as Record<string, unknown>;
-              const baseScore = (typeof dataObj._anomalyBaseScore === 'number')
-                ? dataObj._anomalyBaseScore
-                : (insight.impactScore ?? 50);
-              const boosted = Math.min(100, baseScore + 10);
-              if (boosted !== insight.impactScore) {
+              const { data: newData, adjustedScore } = applyScoreAdjustment(
+                dataObj, insight.impactScore ?? 50, 'anomaly', 10,
+              );
+              if (adjustedScore !== insight.impactScore) {
                 updateInsight({
                   workspaceId: insight.workspaceId,
                   pageId: insight.pageId,
                   insightType: insight.insightType,
-                  data: { ...dataObj, _anomalyBaseScore: baseScore },
+                  data: newData,
                   severity: insight.severity,
                   pageTitle: insight.pageTitle,
                   strategyKeyword: insight.strategyKeyword,
@@ -650,19 +646,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                   auditIssues: insight.auditIssues,
                   pipelineStatus: insight.pipelineStatus,
                   anomalyLinked: true,
-                  impactScore: boosted,
+                  impactScore: adjustedScore,
                   domain: insight.domain,
                 });
                 modified++;
               }
             }
           });
-
-          if (modified > 0) {
-            const { broadcastToWorkspace: bc } = await import('./broadcast.js');
-            const { WS_EVENTS: events } = await import('./ws-events.js');
-            bc(ws.id, events.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_10_anomaly_boost' });
-          }
+          return { modified };
         });
       }
     } catch (err) {

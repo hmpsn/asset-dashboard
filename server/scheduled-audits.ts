@@ -8,8 +8,6 @@ import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
 import { applySuppressionsToAudit } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
-import { broadcastToWorkspace } from './broadcast.js';
-import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('scheduled-audit');
 
@@ -141,7 +139,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #12: Audit → page_health insights ──────────────────────
     fireBridge('bridge-audit-page-health', ws.id, async () => {
-      const { upsertInsight, resolveInsight, getInsights } = await import('./analytics-insights-store.js');
+      const { upsertInsight, getInsights } = await import('./analytics-insights-store.js');
       const existing = getInsights(ws.id);
 
       // Map critical/warning audit issues to audit_finding insights
@@ -159,7 +157,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
         );
         if (existingForPage) continue;
 
-        const insight = upsertInsight({
+        upsertInsight({
           workspaceId: ws.id,
           insightType: 'audit_finding',
           pageId: page.pageId,
@@ -172,33 +170,23 @@ async function runScheduledAudit(schedule: AuditSchedule) {
             source: 'bridge_12_audit_page_health',
           },
           impactScore: pageIssues.some(i => i.severity === 'error') ? 80 : 50,
+          bridgeSource: 'bridge-audit-page-health',
         });
-
-        // Mark as 'in_progress' so deleteStaleInsightsByType (resolution_status IS NULL)
-        // does not silently delete bridge-generated audit insights.
-        resolveInsight(insight.id, ws.id, 'in_progress',
-          'Bridge-generated audit page finding — protected from stale cleanup',
-          'bridge_12_audit_page_health',
-        );
         created++;
       }
 
-      if (created > 0) {
-        broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
-          bridge: 'bridge_12_audit_page_health',
-        });
-      }
+      return { modified: created };
     });
 
     // ── Bridge #15: Audit → site-level audit_finding insight ─────────
     fireBridge('bridge-audit-site-health', ws.id, async () => {
-      const { upsertInsight, resolveInsight } = await import('./analytics-insights-store.js');
+      const { upsertInsight } = await import('./analytics-insights-store.js');
 
       // Create site-level insight from aggregate audit findings
       const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;
       const score = effectiveAudit.siteScore;
       if (totalIssues > 0 && score < 70) {
-        const insight = upsertInsight({
+        upsertInsight({
           workspaceId: ws.id,
           insightType: 'audit_finding',
           pageId: null,
@@ -211,19 +199,11 @@ async function runScheduledAudit(schedule: AuditSchedule) {
             source: 'bridge_15_audit_site_health',
           },
           impactScore: Math.max(0, 100 - score),
+          bridgeSource: 'bridge-audit-site-health',
         });
-
-        // Mark as 'in_progress' so deleteStaleInsightsByType (resolution_status IS NULL)
-        // does not silently delete this bridge-generated site-level insight.
-        resolveInsight(insight.id, ws.id, 'in_progress',
-          'Bridge-generated site audit finding — protected from stale cleanup',
-          'bridge_15_audit_site_health',
-        );
-
-        broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, {
-          bridge: 'bridge_15_audit_site_health',
-        });
+        return { modified: 1 };
       }
+      return { modified: 0 };
     });
 
     // Check for score drop using suppressed score

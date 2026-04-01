@@ -24,6 +24,7 @@ import type {
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { applyScoreAdjustment } from './insight-score-adjustments.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -320,40 +321,33 @@ export function recordOutcome(params: {
           for (const insight of nonResolved) {
             const scoreDelta = pageScoreMap.get(insight.pageId ?? '') ?? 0;
             if (scoreDelta !== 0) {
-              // IDEMPOTENT: compute from the base score (before any outcome adjustment),
-              // not the current impactScore which may already include a previous adjustment.
-              // Store _outcomeBaseScore in data JSON so repeated invocations produce the same result.
               const dataObj = (insight.data ?? {}) as Record<string, unknown>;
-              const baseScore = (typeof dataObj._outcomeBaseScore === 'number')
-                ? dataObj._outcomeBaseScore
-                : (insight.impactScore ?? 50);
-              const adjusted = Math.max(0, Math.min(100, baseScore + scoreDelta));
-              upsertInsight({
-                workspaceId: insight.workspaceId,
-                pageId: insight.pageId,
-                insightType: insight.insightType,
-                data: { ...dataObj, _outcomeBaseScore: baseScore },
-                severity: insight.severity,
-                pageTitle: insight.pageTitle,
-                strategyKeyword: insight.strategyKeyword,
-                strategyAlignment: insight.strategyAlignment,
-                auditIssues: insight.auditIssues,
-                pipelineStatus: insight.pipelineStatus,
-                anomalyLinked: insight.anomalyLinked,
-                impactScore: adjusted,
-                domain: insight.domain,
-              });
-              modified++;
+              const { data: newData, adjustedScore } = applyScoreAdjustment(
+                dataObj, insight.impactScore ?? 50, 'outcome', scoreDelta,
+              );
+              if (adjustedScore !== insight.impactScore) {
+                upsertInsight({
+                  workspaceId: insight.workspaceId,
+                  pageId: insight.pageId,
+                  insightType: insight.insightType,
+                  data: newData,
+                  severity: insight.severity,
+                  pageTitle: insight.pageTitle,
+                  strategyKeyword: insight.strategyKeyword,
+                  strategyAlignment: insight.strategyAlignment,
+                  auditIssues: insight.auditIssues,
+                  pipelineStatus: insight.pipelineStatus,
+                  anomalyLinked: insight.anomalyLinked,
+                  impactScore: adjustedScore,
+                  domain: insight.domain,
+                });
+                modified++;
+              }
             }
           }
           return modified;
         });
-
-        if (modifiedCount > 0) {
-          const { broadcastToWorkspace: broadcast } = await import('./broadcast.js');
-          const { WS_EVENTS: WS } = await import('./ws-events.js');
-          broadcast(workspaceId, WS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge_1_outcome_reweight' });
-        }
+        return { modified: modifiedCount };
       });
     }
   }
