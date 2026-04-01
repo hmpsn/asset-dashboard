@@ -34,7 +34,7 @@ Task 1 (Types) ✅ DONE
     ├──→ Task 2 (Bridges #1, #10, #12, #15) ✅ DONE
     │         └──→ Task 7 (Bridge #8, #9, #14)
     ├──→ Task 3 (siteHealth assembler) ✅ DONE
-    ├──→ Task 4 (contentPipeline assembler) ✅ DONE (base; 3A-expansion fields remain)
+    ├──→ Task 4 (contentPipeline assembler) — base done, 3A-expansion fields remain
     ├──→ Task 5 (clientSignals assembler)
     ├──→ Task 6 (operational assembler)
     ├──→ Task 8 (pageProfile assembler) — after Tasks 5-6 (cross-references)
@@ -54,8 +54,8 @@ Task 1 (Types) ✅ DONE
 | Batch | Tasks | Prerequisite |
 |-------|-------|-------------|
 | ~~**Batch 0**~~ | ~~Task 1 (types)~~ | ✅ DONE |
-| ~~**Batch 1a**~~ | ~~Tasks 2, 3, 4~~ | ✅ DONE (hardening + earlier PRs) |
-| **Batch 1b** | Tasks 5, 6, 9, 10, 11, 12 (all parallel) | None — prerequisites are committed |
+| ~~**Batch 1a**~~ | ~~Tasks 2, 3~~ | ✅ DONE (hardening + earlier PRs) |
+| **Batch 1b** | Tasks 4, 5, 6, 9, 10, 11, 12 (all parallel) | None — prerequisites are committed |
 | **Batch 2** | Tasks 7, 8 | Batch 1b committed |
 | **Batch 3** | Task 13 (formatForPrompt) | Batch 2 committed |
 | **Batch 4** | Task 14 (tokenBudget) | Task 13 committed |
@@ -67,7 +67,8 @@ Task 1 (Types) ✅ DONE
 |------|-------|-----------|
 | ~~Task 1 (types)~~ | ~~Sonnet~~ | ✅ DONE |
 | ~~Task 2 (bridges)~~ | ~~Sonnet~~ | ✅ DONE |
-| ~~Tasks 3-4 (siteHealth, contentPipeline)~~ | ~~Sonnet~~ | ✅ DONE |
+| ~~Task 3 (siteHealth)~~ | ~~Sonnet~~ | ✅ DONE |
+| Task 4 (contentPipeline expansion) | **Sonnet** | Base assembler done; 6 expansion fields need data source wiring |
 | Tasks 5-6 (clientSignals, operational) | **Sonnet** | Each assembler imports from 5-14 modules, needs judgment on error handling |
 | Task 7 (read-time bridges) | **Sonnet** | Enrichment logic requires domain understanding; must follow Bridge Authoring Rules |
 | Task 8 (pageProfile) | **Sonnet** | Most complex assembler — cross-references 4 other slices |
@@ -84,10 +85,10 @@ Task 1 (Types) ✅ DONE
 | PR | Tasks | Gate | Review Focus |
 |----|-------|------|-------------|
 | ~~**PR 1: Foundation**~~ | ~~1 (types), 2 (bridge wiring)~~ | ✅ MERGED (PR #118 + bridge hardening) | N/A |
-| **PR 2: Assemblers** | 5-6 (2 assemblers), 7 (read-time bridges), 8 (pageProfile), 9-10 (enrichments), 11-12 (WS + scheduler) | `/api/intelligence/:wsId` returns all 8 slices, values match underlying stores | Data correctness per slice. Error handling: no silent catches, per-slice try/catch wrapper, 5s timeout on async. |
+| **PR 2: Assemblers** | 4 (expansion), 5-6 (2 assemblers), 7 (read-time bridges), 8 (pageProfile), 9-10 (enrichments), 11-12 (WS + scheduler) | `/api/intelligence/:wsId` returns all 8 slices, values match underlying stores | Data correctness per slice. Error handling: no silent catches, per-slice try/catch wrapper, 5s timeout on async. |
 | **PR 3: Formatting + Integration** | 13 (formatForPrompt), 14 (tokenBudget), 15 (integration + bridge runtime tests), 16 (mini builder verification), 17 (pr-check guards) | Full test suite green, `pr-check` zero errors | formatForPrompt output at all 3 verbosities. tokenBudget truncation order. Persona bug fix. Bridge runtime side effects verified. |
 
-**Note:** PR 1 (Tasks 1-4) was completed across PR #118 (bridge infrastructure hardening) and earlier Phase 2 work. Types, bridge wiring for #1/#10/#12/#15, siteHealth assembler, and contentPipeline base assembler are all merged to main.
+**Note:** PR 1 (Tasks 1-3) was completed across PR #118 (bridge infrastructure hardening) and earlier Phase 2 work. Types, bridge wiring for #1/#10/#12/#15, and siteHealth assembler are all merged to main. Task 4's base assembler is merged but expansion fields remain.
 
 ---
 
@@ -1272,22 +1273,14 @@ CWV pass rate, anomaly counts, and SEO change velocity from 9 data sources."
 
 ---
 
-### Task 4: Implement `contentPipeline` Slice Assembler — ✅ BASE DONE
+### Task 4: Implement `contentPipeline` Slice Assembler — BASE DONE, EXPANSION REMAINING
 
-> **Completed (base):** `assembleContentPipeline()` at `server/workspace-intelligence.ts:232-263`.
+> **Base assembler exists:** `assembleContentPipeline()` at `server/workspace-intelligence.ts:232-263`.
 > Pulls from `workspace-data.ts` (getContentPipelineSummary) and `content-brief.ts` (coverage gaps).
 >
-> **Remaining 3A-expansion fields (not yet populated):**
-> - `subscriptions` (from `content-subscriptions.ts`)
-> - `schemaDeployment` (from `schema-store.ts` / `schema-queue.ts`)
-> - `rewritePlaybook` (from content patterns)
-> - `cannibalizationWarnings` (from `cannibalization-detection.ts`)
-> - `decayAlerts` (from `content-decay.ts`)
-> - `suggestedBriefs` (from `suggested-briefs-store.ts`)
->
-> These enrichment fields can be wired as a sub-step of Task 4 or folded into Task 13
-> (formatForPrompt) since they're only meaningful once formatted for AI consumption.
-> The base assembler with coverage gaps provides enough for the pipeline slice to be useful.
+> **Remaining work:** Wire the 6 expansion fields listed below into the existing assembler.
+> Each is an independent data source import with a try/catch — follow the same pattern
+> as the existing `coverageGaps` block.
 
 **Files:**
 - Modify: `server/workspace-intelligence.ts`
