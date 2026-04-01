@@ -648,6 +648,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                   anomalyLinked: true,
                   impactScore: adjustedScore,
                   domain: insight.domain,
+                  bridgeSource: insight.bridgeSource,
                 });
                 modified++;
               }

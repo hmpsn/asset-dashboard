@@ -340,6 +340,7 @@ export function recordOutcome(params: {
                   anomalyLinked: insight.anomalyLinked,
                   impactScore: adjustedScore,
                   domain: insight.domain,
+                  bridgeSource: insight.bridgeSource,
                 });
                 modified++;
               }
