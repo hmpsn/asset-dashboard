@@ -15,6 +15,7 @@ import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import { debouncedStrategyInvalidate } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
@@ -426,12 +427,8 @@ router.get('/api/public/business-priorities/:workspaceId', (req, res) => {
   const row = db.prepare('SELECT priorities, updated_at FROM client_business_priorities WHERE workspace_id = ?').get(wsId) as { priorities: string; updated_at: string } | undefined;
   if (!row) return res.json({ priorities: [], updatedAt: null });
 
-  try {
-    const priorities = JSON.parse(row.priorities);
-    res.json({ priorities, updatedAt: row.updated_at });
-  } catch {
-    res.json({ priorities: [], updatedAt: null });
-  }
+  const priorities = parseJsonFallback(row.priorities, []);
+  res.json({ priorities, updatedAt: row.updated_at });
 });
 
 router.post('/api/public/business-priorities/:workspaceId', (req, res) => {

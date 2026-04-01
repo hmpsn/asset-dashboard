@@ -8,6 +8,7 @@ import { buildSeoContext, buildKeywordMapContext, clearSeoContextCache } from '.
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
@@ -101,10 +102,11 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       workspaceId,
     });
 
-    try {
-      const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+    const cleaned = aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    const analysis = parseJsonFallback(cleaned, null);
+    if (analysis) {
       res.json(analysis);
-    } catch {
+    } else {
       res.json({ error: 'Failed to parse AI response', raw: aiResult.text.slice(0, 500) });
     }
   } catch (err) {
