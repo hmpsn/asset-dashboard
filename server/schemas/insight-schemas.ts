@@ -13,13 +13,14 @@ export const auditFindingDataSchema = z.object({
 });
 
 // --- AnomalyDigestData (InsightDataMap['anomaly_digest']) ---
+// Cross-referenced against shared/types/analytics.ts:331-340
 export const anomalyDigestDataSchema = z.object({
-  anomalyId: z.string(),
   anomalyType: z.string(),
   metric: z.string(),
   currentValue: z.number(),
   expectedValue: z.number(),
-  direction: z.enum(['spike', 'drop']),
-  detectedAt: z.string(),
-  description: z.string().optional(),
+  deviationPercent: z.number(),
+  durationDays: z.number(),
+  firstDetected: z.string(),
+  severity: z.string(),
 });
