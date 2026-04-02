@@ -53,6 +53,20 @@ import type { SeoChangeEvent } from './seo-change-tracker.js';
 import type { CannibalizationReport } from './cannibalization-detection.js';
 import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
 import type { Annotation as TimelineAnnotation } from './annotations.js';
+import type { ActionOutcome, ActionPlaybook } from '../shared/types/outcome-tracking.js';
+import type { SafeClientUser } from '../shared/types/users.js';
+import type { ClientRequest } from '../shared/types/requests.js';
+import type { ContentBrief } from '../shared/types/content.js';
+import type { WorkOrder } from '../shared/types/payments.js';
+import type { RankEntry } from './rank-tracking.js';
+import type { FeedbackItem } from './feedback.js';
+import type { SessionSummary } from './chat-memory.js';
+import type { ActivityEntry } from './activity-log.js';
+import type { Job } from './jobs.js';
+import type { SchemaValidation } from './schema-validator.js';
+import type { SiteNode } from './site-architecture.js';
+import type { PageSeoResult, SeoIssue } from './audit-page.js';
+import type { Snapshot } from './performance-store.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -211,11 +225,11 @@ async function assembleSeoContext(
   try {
     const { getTrackedKeywords, getLatestRanks } = await import('./rank-tracking.js');
     const tracked = getTrackedKeywords(workspaceId);
-    const latest = getLatestRanks(workspaceId);
-    const improved = latest.filter((k: any) => (k.change ?? 0) < 0).length;
-    const declined = latest.filter((k: any) => (k.change ?? 0) > 0).length;
+    const latest: RankEntry[] = getLatestRanks(workspaceId);
+    const improved = latest.filter(k => (k.change ?? 0) < 0).length;
+    const declined = latest.filter(k => (k.change ?? 0) > 0).length;
     const stable = latest.length - improved - declined;
-    const positions = latest.map((k: any) => k.position).filter((p: number) => p > 0);
+    const positions = latest.map(k => k.position).filter(p => p > 0);
     const avgPosition = positions.length > 0
       ? positions.reduce((a: number, b: number) => a + b, 0) / positions.length
       : null;
@@ -231,7 +245,7 @@ async function assembleSeoContext(
 
   // Business profile from workspace settings
   try {
-    const profile = (workspace as any)?.businessProfile;
+    const profile = workspace?.businessProfile;
     if (profile && typeof profile === 'object') {
       base.businessProfile = {
         industry: profile.industry ?? '',
@@ -348,16 +362,16 @@ async function assembleLearnings(
     const { getActionsByWorkspace, getOutcomesForAction } = await import('./outcome-tracking.js');
     const actions = getActionsByWorkspace(workspaceId);
     for (const action of actions.slice(0, 50)) {
-      const outcomes = getOutcomesForAction(action.id);
-      const strongWin = outcomes.find((o: any) => o.score === 'strong_win');
+      const outcomes: ActionOutcome[] = getOutcomesForAction(action.id);
+      const strongWin = outcomes.find(o => o.score === 'strong_win');
       if (strongWin) {
         weCalledIt.push({
           actionId: action.id,
-          prediction: `${(action as any).actionType} on ${(action as any).pageUrl ?? 'site'}`,
+          prediction: `${action.actionType} on ${action.pageUrl ?? 'site'}`,
           outcome: 'strong_win',
           score: 'strong_win',
-          pageUrl: (action as any).pageUrl ?? '',
-          measuredAt: (strongWin as any).measuredAt ?? '',
+          pageUrl: action.pageUrl ?? '',
+          measuredAt: strongWin.measuredAt ?? '',
         });
       }
       if (weCalledIt.length >= 5) break;
@@ -781,10 +795,10 @@ async function assembleClientSignals(
   let engagement: EngagementMetrics = { lastLoginAt: null, loginFrequency: 'inactive', chatSessionCount: 0, portalUsage: null };
   try {
     const { listClientUsers } = await import('./client-users.js');
-    const users = listClientUsers(workspaceId);
+    const users: SafeClientUser[] = listClientUsers(workspaceId);
     const latestLogin = users
-      .map(u => (u as any).lastLoginAt as string | undefined)
-      .filter(Boolean)
+      .map(u => u.lastLoginAt)
+      .filter((v): v is string => !!v)
       .sort()
       .reverse()[0] ?? null;
 
@@ -833,10 +847,10 @@ async function assembleClientSignals(
   try {
     const { listFeedback } = await import('./feedback.js');
     const items = listFeedback(workspaceId);
-    feedbackItems = items.slice(0, 10).map((f: any) => ({
+    feedbackItems = items.slice(0, 10).map((f: FeedbackItem) => ({
       id: f.id,
       type: f.type ?? 'general',
-      status: f.status ?? 'open',
+      status: f.status ?? 'new',
       createdAt: f.createdAt ?? '',
     }));
   } catch {
@@ -847,9 +861,9 @@ async function assembleClientSignals(
   let serviceRequests = { pending: 0, total: 0 };
   try {
     const { listRequests } = await import('./requests.js');
-    const reqs = listRequests(workspaceId);
+    const reqs: ClientRequest[] = listRequests(workspaceId);
     serviceRequests = {
-      pending: reqs.filter((r: any) => r.status === 'pending' || r.status === 'open').length,
+      pending: reqs.filter(r => r.status === 'new' || r.status === 'in_review').length,
       total: reqs.length,
     };
   } catch {
@@ -863,7 +877,7 @@ async function assembleClientSignals(
     const sessions = listSessions(workspaceId, 'client');
     recentChatTopics = sessions
       .slice(0, 5)
-      .map((s: any) => s.topic ?? s.title ?? '')
+      .map((s: SessionSummary) => s.title ?? '')
       .filter(Boolean);
   } catch {
     // Chat memory optional
@@ -929,10 +943,10 @@ async function assembleOperational(
   try {
     const { listActivity } = await import('./activity-log.js');
     const activity = listActivity(workspaceId, 20);
-    recentActivity = activity.map((a: any) => ({
+    recentActivity = activity.map((a: ActivityEntry) => ({
       type: a.type ?? '',
       description: a.title ?? a.description ?? '',
-      timestamp: a.timestamp ?? a.createdAt ?? '',
+      timestamp: a.createdAt ?? '',
     }));
   } catch {
     // Activity log optional
@@ -965,7 +979,7 @@ async function assembleOperational(
   try {
     const { listJobs } = await import('./jobs.js');
     const jobs = listJobs(workspaceId);
-    pendingJobs = jobs.filter((j: any) => j.status === 'pending' || j.status === 'running').length;
+    pendingJobs = jobs.filter((j: Job) => j.status === 'pending' || j.status === 'running').length;
   } catch {
     // Jobs optional
   }
@@ -1036,10 +1050,10 @@ async function assembleOperational(
   try {
     const { getPendingActions } = await import('./outcome-tracking.js');
     const pending = getPendingActions();
-    const wsActions = pending.filter((a: any) => a.workspaceId === workspaceId);
+    const wsActions: TrackedAction[] = pending.filter((a: TrackedAction) => a.workspaceId === workspaceId);
     let oldestAge: number | null = null;
     if (wsActions.length > 0) {
-      const oldest = wsActions.reduce((min: any, a: any) =>
+      const oldest = wsActions.reduce((min, a) =>
         new Date(a.createdAt).getTime() < new Date(min.createdAt).getTime() ? a : min,
       );
       oldestAge = Math.floor((Date.now() - new Date(oldest.createdAt).getTime()) / (24 * 60 * 60 * 1000));
@@ -1054,7 +1068,7 @@ async function assembleOperational(
   try {
     const { getPlaybooks } = await import('./outcome-playbooks.js');
     const playbooks = getPlaybooks(workspaceId);
-    detectedPlaybooks = playbooks.slice(0, 5).map((p: any) => p.pattern ?? p.name ?? '').filter(Boolean);
+    detectedPlaybooks = playbooks.slice(0, 5).map((p: ActionPlaybook) => p.name ?? '').filter(Boolean);
   } catch {
     // Playbooks optional
   }
@@ -1065,8 +1079,8 @@ async function assembleOperational(
     const { listWorkOrders } = await import('./work-orders.js');
     const orders = listWorkOrders(workspaceId);
     workOrders = {
-      active: orders.filter((o: any) => o.status === 'active').length,
-      pending: orders.filter((o: any) => o.status === 'pending').length,
+      active: orders.filter((o: WorkOrder) => o.status === 'in_progress').length,
+      pending: orders.filter((o: WorkOrder) => o.status === 'pending').length,
     };
   } catch {
     // Work orders optional
@@ -1078,8 +1092,8 @@ async function assembleOperational(
     const { getInsights } = await import('./analytics-insights-store.js');
     const insights = getInsights(workspaceId);
     const totalShown = insights.length;
-    const confirmed = insights.filter((i: any) => i.resolutionStatus === 'resolved' || i.resolutionStatus === 'in_progress').length;
-    const dismissed = insights.filter((i: any) => i.resolutionStatus === 'dismissed').length;
+    const confirmed = insights.filter(i => i.resolutionStatus === 'resolved' || i.resolutionStatus === 'in_progress').length;
+    const dismissed = insights.filter(i => i.resolutionStatus === 'dismissed').length;
     if (totalShown > 0) {
       insightAcceptanceRate = {
         totalShown,
@@ -1228,10 +1242,10 @@ async function assemblePageProfile(
   try {
     const { getLatestRanks } = await import('./rank-tracking.js');
     const latest = getLatestRanks(workspaceId);
-    const pageRank = latest.find((k: any) => k.query === pageKw?.primaryKeyword);
+    const pageRank: RankEntry | undefined = latest.find(k => k.query === pageKw?.primaryKeyword);
     if (pageRank) {
-      current = (pageRank as any).position ?? current;
-      const change = (pageRank as any).change ?? 0;
+      current = pageRank.position ?? current;
+      const change = pageRank.change ?? 0;
       trend = change < 0 ? 'up' : change > 0 ? 'down' : 'stable';
     } else if (current != null && previous != null) {
       // Rank tracking has no match for this keyword — fall back to page-keywords data
@@ -1290,9 +1304,9 @@ async function assemblePageProfile(
       const { getLatestSnapshot } = await import('./reports.js');
       const snap = getLatestSnapshot(ws.webflowSiteId);
       if (snap?.audit?.pages) {
-        const pagData = (snap.audit.pages as any[]).find((p: any) => p.url === pagePath || p.slug === pagePath);
+        const pagData = (snap.audit.pages as PageSeoResult[]).find(p => p.url === pagePath || p.slug === pagePath);
         if (pagData?.issues) {
-          auditIssues = pagData.issues.map((i: any) => i.message ?? i.title ?? '').filter(Boolean);
+          auditIssues = pagData.issues.map((i: SeoIssue) => i.message).filter(Boolean);
         }
       }
     }
@@ -1304,17 +1318,17 @@ async function assemblePageProfile(
   let schemaStatus: PageProfileSlice['schemaStatus'] = 'none';
   try {
     const { getValidations } = await import('./schema-validator.js');
-    const validations = getValidations(workspaceId);
-    const pageValidation = validations.find((v: any) => v.url === pagePath || v.pageUrl === pagePath);
+    const validations: SchemaValidation[] = getValidations(workspaceId);
+    const pageValidation = validations.find(v => v.pageId === pagePath);
     if (pageValidation) {
-      const status = (pageValidation as any).status ?? 'none';
+      const status = pageValidation.status;
       schemaStatus = status === 'valid' ? 'valid' : status === 'warnings' ? 'warnings' : status === 'errors' ? 'errors' : 'none';
     }
   } catch {
     schemaStatus = 'none';
   }
 
-  // Link health
+  // Link health — SiteNode doesn't carry link counts; use orphanPaths from architecture result
   let linkHealth = { inbound: 0, outbound: 0, orphan: false };
   try {
     const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
@@ -1322,14 +1336,14 @@ async function assemblePageProfile(
       getCachedArchitecture(workspaceId),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
     ]);
-    if (arch?.tree) {
-      const nodes = flattenTree(arch.tree);
-      const node = nodes.find((n: any) => n.path === pagePath || n.slug === pagePath);
-      if (node) {
+    if (arch) {
+      const nodes: SiteNode[] = flattenTree(arch.tree);
+      const nodeExists = nodes.some(n => n.path === pagePath);
+      if (nodeExists) {
         linkHealth = {
-          inbound: (node as any).inboundLinks ?? 0,
-          outbound: (node as any).outboundLinks ?? 0,
-          orphan: (node as any).orphan ?? false,
+          inbound: 0, // Not available from site architecture tree
+          outbound: 0,
+          orphan: arch.orphanPaths?.includes(pagePath) ?? false,
         };
       }
     }
@@ -1356,18 +1370,22 @@ async function assemblePageProfile(
   let contentStatus: PageProfileSlice['contentStatus'] = null;
   try {
     const { listBriefs } = await import('./content-brief.js');
-    const briefs = listBriefs(workspaceId);
-    const hasBrief = briefs.some((b: any) => b.pageUrl === pagePath || b.targetUrl === pagePath);
+    const briefs: ContentBrief[] = listBriefs(workspaceId);
+    // ContentBrief matches pages via targetKeyword, not URL
+    const primaryKw = pageKw?.primaryKeyword?.toLowerCase();
+    const hasBrief = primaryKw ? briefs.some(b => b.targetKeyword?.toLowerCase() === primaryKw) : false;
+    const matchingBrief = primaryKw ? briefs.find(b => b.targetKeyword?.toLowerCase() === primaryKw) : undefined;
 
     let hasPost = false;
     let isPublished = false;
     try {
       const { listPosts } = await import('./content-posts-db.js');
-      const posts = listPosts(workspaceId);
-      hasPost = posts.some((p: any) => p.pageUrl === pagePath || p.targetUrl === pagePath);
-      isPublished = posts.some((p: any) =>
-        ((p as any).pageUrl === pagePath || (p as any).targetUrl === pagePath) && (p as any).status === 'published',
-      );
+      const posts: GeneratedPost[] = listPosts(workspaceId);
+      // GeneratedPost links to a brief via briefId; match if the brief targets this page's keyword
+      if (matchingBrief) {
+        hasPost = posts.some(p => p.briefId === matchingBrief.id);
+        isPublished = posts.some(p => p.briefId === matchingBrief.id && p.status === 'approved');
+      }
     } catch {
       // Posts optional
     }
@@ -1395,8 +1413,9 @@ async function assemblePageProfile(
       const { getPageSpeed } = await import('./performance-store.js');
       const speedSnap = getPageSpeed(ws.webflowSiteId);
       if (speedSnap?.result) {
-        const pages = (speedSnap.result as any).pages ?? [];
-        const pageData = pages.find((p: any) => p.url === pagePath || p.slug === pagePath);
+        const result = speedSnap.result as { pages?: Array<{ url?: string; slug?: string; score?: number }> }; // as-any-ok: untyped PageSpeed JSON blob
+        const pages = result.pages ?? [];
+        const pageData = pages.find(p => p.url === pagePath || p.slug === pagePath);
         if (pageData?.score != null) {
           cwvStatus = pageData.score >= 90 ? 'good' : pageData.score >= 50 ? 'needs_improvement' : 'poor';
         }

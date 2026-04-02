@@ -24,7 +24,7 @@ vi.mock('../server/db/stmt-cache.js', () => ({
 
 vi.mock('../server/activity-log.js', () => ({
   listActivity: vi.fn(() => [
-    { id: 'a1', type: 'content', title: 'Brief created', description: 'Test brief', timestamp: '2026-03-30T10:00:00Z' },
+    { id: 'a1', type: 'content', title: 'Brief created', description: 'Test brief', createdAt: '2026-03-30T10:00:00Z' },
   ]),
 }));
 
@@ -73,10 +73,10 @@ vi.mock('../server/annotations.js', () => ({
 
 vi.mock('../server/work-orders.js', () => ({
   listWorkOrders: vi.fn(() => [
-    { id: 'wo1', status: 'active' },
-    { id: 'wo2', status: 'active' },
+    { id: 'wo1', status: 'in_progress' },
+    { id: 'wo2', status: 'in_progress' },
     { id: 'wo3', status: 'pending' },
-    { id: 'wo4', status: 'done' },
+    { id: 'wo4', status: 'completed' },
   ]),
 }));
 
@@ -175,7 +175,7 @@ describe('assembleOperational', () => {
     // Re-apply default mock implementations after clearAllMocks
     const { listActivity } = await import('../server/activity-log.js');
     vi.mocked(listActivity).mockReturnValue([
-      { id: 'a1', type: 'content', title: 'Brief created', description: 'Test brief', timestamp: '2026-03-30T10:00:00Z' } as any,
+      { id: 'a1', type: 'content', title: 'Brief created', description: 'Test brief', createdAt: '2026-03-30T10:00:00Z' } as any,
     ]);
 
     const { loadRecommendations } = await import('../server/recommendations.js');
@@ -218,10 +218,10 @@ describe('assembleOperational', () => {
 
     const { listWorkOrders } = await import('../server/work-orders.js');
     vi.mocked(listWorkOrders).mockReturnValue([
-      { id: 'wo1', status: 'active' } as any,
-      { id: 'wo2', status: 'active' } as any,
+      { id: 'wo1', status: 'in_progress' } as any,
+      { id: 'wo2', status: 'in_progress' } as any,
       { id: 'wo3', status: 'pending' } as any,
-      { id: 'wo4', status: 'done' } as any,
+      { id: 'wo4', status: 'completed' } as any,
     ]);
 
     const { getPendingActions } = await import('../server/outcome-tracking.js');
@@ -374,9 +374,9 @@ describe('assembleOperational', () => {
     expect(op.detectedPlaybooks).toBeDefined();
     expect(Array.isArray(op.detectedPlaybooks)).toBe(true);
     expect(op.detectedPlaybooks?.length).toBe(3);
-    expect(op.detectedPlaybooks).toContain('internal-link-boost');
-    expect(op.detectedPlaybooks).toContain('title-refresh');
-    expect(op.detectedPlaybooks).toContain('schema-markup');
+    expect(op.detectedPlaybooks).toContain('Internal Link Boost');
+    expect(op.detectedPlaybooks).toContain('Title Refresh');
+    expect(op.detectedPlaybooks).toContain('Schema Markup');
   });
 
   it('counts workOrders by status', async () => {

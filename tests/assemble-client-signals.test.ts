@@ -310,8 +310,8 @@ describe('assembleClientSignals', () => {
   it('populates serviceRequests from listRequests', async () => {
     const { listRequests } = await import('../server/requests.js');
     vi.mocked(listRequests).mockReturnValueOnce([
-      { id: 'r1', status: 'pending' } as any,
-      { id: 'r2', status: 'open' } as any,
+      { id: 'r1', status: 'new' } as any,
+      { id: 'r2', status: 'in_review' } as any,
       { id: 'r3', status: 'completed' } as any,
     ]);
 
@@ -357,9 +357,9 @@ describe('assembleClientSignals', () => {
   it('populates recentChatTopics from listSessions', async () => {
     const { listSessions } = await import('../server/chat-memory.js');
     vi.mocked(listSessions).mockReturnValueOnce([
-      { id: 's1', topic: 'keyword strategy' } as any,
-      { id: 's2', topic: 'blog content' } as any,
-      { id: 's3', topic: '' } as any, // empty topic should be filtered
+      { id: 's1', title: 'keyword strategy' } as any,
+      { id: 's2', title: 'blog content' } as any,
+      { id: 's3', title: '' } as any, // empty title should be filtered
     ]);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');

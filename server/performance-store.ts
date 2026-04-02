@@ -50,7 +50,7 @@ interface PerfRow {
   result: string;
 }
 
-interface Snapshot<T> {
+export interface Snapshot<T> {
   siteId: string;
   createdAt: string;
   result: T;

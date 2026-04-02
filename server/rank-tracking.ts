@@ -130,7 +130,9 @@ export function getRankHistory(
   });
 }
 
-export function getLatestRanks(workspaceId: string): { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }[] {
+export interface RankEntry { query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }
+
+export function getLatestRanks(workspaceId: string): RankEntry[] {
   const snapshots = readSnapshots(workspaceId);
   if (snapshots.length === 0) return [];
   const latest = snapshots[snapshots.length - 1];
