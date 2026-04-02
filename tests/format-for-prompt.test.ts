@@ -454,6 +454,16 @@ describe('formatForPrompt', () => {
       expect(output).not.toContain('Anomaly types');
     });
 
+    it('does not append % after n/a when desktop CWV pass rate is null', () => {
+      // Regression: desktop ternary resolved to 'n/a' but % was unconditionally appended, producing 'n/a%'
+      const intel = makeFullIntelligence();
+      intel.siteHealth = { ...makeSiteHealth(), cwvPassRate: { mobile: 0.85, desktop: null } };
+      const output = formatForPrompt(intel, { verbosity: 'detailed' });
+      expect(output).toContain('mobile 85%');
+      expect(output).toContain('desktop n/a');
+      expect(output).not.toContain('n/a%');
+    });
+
     it('handles operational with no time saved', () => {
       const intel = makeFullIntelligence();
       intel.operational = { ...makeOperational(), timeSaved: null };

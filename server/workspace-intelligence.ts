@@ -213,8 +213,15 @@ async function assembleSeoContext(
   const ctx = buildSeoContext(workspaceId, opts?.pagePath, opts?.learningsDomain ?? 'all', { _skipShadow: true });
   const workspace = getWorkspace(workspaceId);
 
+  // Populate pageMap from the page_keywords table (not from the stored keyword_strategy column,
+  // which has pageMap stripped before storage — it only exists at the route layer).
+  const { listPageKeywords } = await import('./page-keywords.js');
+  const livePageMap = listPageKeywords(workspaceId);
+
   const base: SeoContextSlice = {
-    strategy: ctx.strategy,
+    strategy: ctx.strategy
+      ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
+      : ctx.strategy,
     brandVoice: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
@@ -1433,7 +1440,7 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
   if (verbosity === 'detailed') {
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
-    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? Math.round(health.cwvPassRate.desktop * 100) : 'n/a'}%`);
+    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? `${Math.round(health.cwvPassRate.desktop * 100)}%` : 'n/a'}`);
   }
 
   return lines.join('\n');
