@@ -209,6 +209,41 @@ describe('pageProfile-only callers intentionally omit learnings', () => {
   });
 });
 
+// ── slices/sections consistency — every section must have its slice assembled ─
+
+describe('slices/sections consistency — learnings section requires learnings slice', () => {
+  /**
+   * The silent-data-loss bug class: formatForPrompt silently skips sections whose
+   * slice data is undefined. If a caller requests sections: ['seoContext', 'learnings']
+   * but only assembles slices: ['seoContext'], the learnings section is silently dropped.
+   * TypeScript cannot catch this — the slices/sections are string arrays, not type-linked.
+   *
+   * This test scans every file that uses sections: ['seoContext', 'learnings'] and verifies
+   * the corresponding buildWorkspaceIntelligence call also includes 'learnings' in slices.
+   */
+  const callerFiles = [
+    { label: 'content-posts-ai.ts', src: read('content-posts-ai.ts') },
+    { label: 'seo-audit.ts', src: read('seo-audit.ts') },
+    { label: 'content-decay.ts', src: read('content-decay.ts') },
+    { label: 'keyword-recommendations.ts', src: read('keyword-recommendations.ts') },
+    { label: 'routes/google.ts', src: readRoute('google.ts') },
+    { label: 'routes/public-analytics.ts', src: readRoute('public-analytics.ts') },
+    { label: 'routes/content-posts.ts', src: readRoute('content-posts.ts') },
+    { label: 'routes/jobs.ts', src: readRoute('jobs.ts') },
+    { label: 'routes/webflow-keywords.ts', src: readRoute('webflow-keywords.ts') },
+  ];
+
+  for (const { label, src } of callerFiles) {
+    it(`${label}: if sections include 'learnings', slices must also include 'learnings'`, () => {
+      const hasSectionsWithLearnings = src.includes("sections: ['seoContext', 'learnings']");
+      if (!hasSectionsWithLearnings) return; // Not applicable — no learnings section requested
+
+      // Must have 'learnings' in at least one slices array
+      expect(src).toMatch(/slices:\s*\[[^\]]*'learnings'[^\]]*\]/);
+    });
+  }
+});
+
 // ── assembleLearnings feature flag gate ──────────────────────────────────────
 
 describe('assembleLearnings feature flag gate', () => {
