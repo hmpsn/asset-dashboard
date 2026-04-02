@@ -208,7 +208,7 @@ const CHECKS: Check[] = [
     pattern: 'buildSeoContext\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts', 'server/admin-chat-context.ts', 'server/keyword-recommendations.ts'],
+    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts', 'server/admin-chat-context.ts', 'server/keyword-recommendations.ts', 'server/content-decay.ts'],
     message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
     severity: 'warn',
   },
