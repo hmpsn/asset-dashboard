@@ -1336,7 +1336,16 @@ function formatInsightsSection(insights: InsightsSlice, verbosity: PromptVerbosi
 }
 
 function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity): string {
-  if (!learnings.summary && learnings.topActionTypes.length === 0 && !learnings.roiAttribution?.length && !learnings.weCalledIt?.length) return '';
+  // Guard must be verbosity-aware: only pass if there's content that will actually render
+  // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
+  const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
+  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
+  const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0;
+  const willRender =
+    hasBaseContent ||
+    ((verbosity === 'standard' || verbosity === 'detailed') && hasStandardContent) ||
+    (verbosity === 'detailed' && hasDetailedContent);
+  if (!willRender) return '';
 
   const lines: string[] = ['## Outcome Learnings'];
 

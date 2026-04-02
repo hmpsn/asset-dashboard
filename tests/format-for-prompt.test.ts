@@ -389,6 +389,28 @@ describe('formatForPrompt', () => {
       expect(output).not.toContain('Outcome Learnings');
     });
 
+    it('does not emit bare Outcome Learnings header at compact when only weCalledIt/roiAttribution have data', () => {
+      // Regression: guard was verbosity-blind — passed for weCalledIt data but those fields
+      // only render at standard/detailed, producing an empty ## Outcome Learnings header at compact.
+      const intel = makeFullIntelligence();
+      intel.learnings = {
+        summary: null,
+        confidence: null,
+        topActionTypes: [],
+        overallWinRate: 0,
+        recentTrend: null,
+        playbooks: [],
+        weCalledIt: [{ actionId: 'a1', prediction: 'rank top 3', outcome: 'win', score: 'strong_win', pageUrl: '/p', measuredAt: '2026-03-01' }],
+        roiAttribution: [{ actionId: 'a2', actionType: 'content_refreshed', pageUrl: '/p', clickGain: 120, measuredAt: '2026-03-01' }],
+      };
+      const compact = formatForPrompt(intel, { verbosity: 'compact' });
+      expect(compact).not.toContain('Outcome Learnings');
+      // Same data at standard should still render the section
+      const standard = formatForPrompt(intel, { verbosity: 'standard' });
+      expect(standard).toContain('Outcome Learnings');
+      expect(standard).toContain('rank top 3');
+    });
+
     it('verbosity progression: detailed > standard > compact length', () => {
       const intel = makeFullIntelligence();
       const compact = formatForPrompt(intel, { verbosity: 'compact' });
