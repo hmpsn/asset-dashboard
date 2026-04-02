@@ -369,6 +369,18 @@ grep -n "intelligenceProfile\|BusinessProfile" shared/types/workspace.ts
 
 ## Tasks 4-10: Mini-builder migration (parallel groups)
 
+### ⚠️ Batch 2 Recurring Bug Patterns (from PR 1 retrospective)
+
+These exact patterns caused bugs in PR 1. Check each one at every new call site.
+
+| Pattern | What went wrong | Rule |
+|---------|----------------|------|
+| **Verbosity-blind section guards** | `formatLearningsSection` guard passed for `weCalledIt` data but that field only renders at standard/detailed — produced empty `## Outcome Learnings` at compact | If you write a section guard that checks for data existence, only count fields that actually render at the requested verbosity. |
+| **Case-sensitive string comparisons** | `pagePath` filter matched `/About` but not `/about` | Normalize every URL/keyword/path comparison with `.toLowerCase()` on both sides. No exceptions for pagePath, keyword, or domain comparisons. |
+| **Missing `invalidateIntelligenceCache`** | Intelligence-profile route saved data consumed by assembler without cache invalidation — stale data served for up to 5 min | Any route that mutates workspace data used by an assembler slice must call `invalidateIntelligenceCache(workspaceId)`. |
+| **Optional chaining on "typed" fields** | `g.targetKeyword.toLowerCase()` threw for null values from malformed DB data even though TypeScript typed it non-optional | Add `?.` for any field read from `keywordStrategy`, `intelligenceProfile`, or any DB JSON column — TypeScript types don't guarantee runtime shape. |
+| **`parseJsonFallback` instead of `parseJsonSafe` + Zod** | `intelligenceProfile` used `parseJsonFallback`, silently returning stale data instead of validated data | New JSON columns: always define a Zod schema in `server/schemas/workspace-schemas.ts` and use `parseJsonSafe` in the mapper. |
+
 **CRITICAL rules for all migration tasks:**
 1. **Verify the enclosing function is async** before adding `await buildWorkspaceIntelligence()`. All known callers are in async functions, but verify per-callsite.
 2. **Read the mini-builder's return type before writing.** For `buildSeoContext`: read `server/seo-context.ts` to see what it returns. For `buildPageAnalysisContext`: same file. For `buildKeywordMapContext`: same file.
