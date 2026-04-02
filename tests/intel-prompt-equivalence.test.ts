@@ -88,6 +88,8 @@ describe('buildIntelPrompt behavioral equivalence', () => {
     const { buildIntelPrompt } = await import('../server/workspace-intelligence.js');
     const result = await buildIntelPrompt(WS_ID, ['seoContext']);
     expect(result).toContain('Professional, data-driven, and authoritative');
+    // Emphatic header must be present
+    expect(result).toContain('BRAND VOICE');
   });
 
   // 2. Business context flows through
@@ -102,6 +104,8 @@ describe('buildIntelPrompt behavioral equivalence', () => {
     const { buildIntelPrompt } = await import('../server/workspace-intelligence.js');
     const result = await buildIntelPrompt(WS_ID, ['seoContext']);
     expect(result).toContain('real-time rank tracking');
+    // Knowledge base emphatic header must be present
+    expect(result).toContain('BUSINESS KNOWLEDGE BASE');
   });
 
   // 4. Site keywords flow through
