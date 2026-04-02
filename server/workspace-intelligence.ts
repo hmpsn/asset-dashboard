@@ -36,6 +36,7 @@ import type {
   InsightAcceptanceRate,
   ROIAttribution,
   WeCalledItEntry,
+  ContentPipelineSummary,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
@@ -419,7 +420,14 @@ async function assembleLearnings(
 }
 
 async function assembleContentPipeline(workspaceId: string): Promise<ContentPipelineSlice> {
-  let summary: ReturnType<Awaited<typeof import('./workspace-data.js')>['getContentPipelineSummary']> | undefined;
+  let summary: ContentPipelineSummary = {
+    briefs: { total: 0, byStatus: {} },
+    posts: { total: 0, byStatus: {} },
+    matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
+    requests: { pending: 0, inProgress: 0, delivered: 0 },
+    workOrders: { active: 0 },
+    seoEdits: { pending: 0, applied: 0, inReview: 0 },
+  };
   try {
     const { getContentPipelineSummary } = await import('./workspace-data.js');
     summary = getContentPipelineSummary(workspaceId);
