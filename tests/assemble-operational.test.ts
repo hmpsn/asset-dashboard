@@ -126,6 +126,8 @@ vi.mock('../server/seo-context.js', () => ({
     businessContext: '',
     knowledgeBlock: '',
   })),
+  getRawBrandVoice: vi.fn(() => ''),
+  getRawKnowledge: vi.fn(() => ''),
 }));
 
 vi.mock('../server/feature-flags.js', () => ({

@@ -523,6 +523,8 @@ vi.mock('../server/seo-context.js', () => ({
     strategy: null, brandVoiceBlock: 'Voice: concise', businessContext: 'B2B SaaS',
     knowledgeBlock: '', personasBlock: '',
   })),
+  getRawBrandVoice: vi.fn(() => ''),
+  getRawKnowledge: vi.fn(() => ''),
 }));
 vi.mock('../server/feature-flags.js', () => ({ isFeatureEnabled: vi.fn(() => false) }));
 vi.mock('../server/workspaces.js', () => ({

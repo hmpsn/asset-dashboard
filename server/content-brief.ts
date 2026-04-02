@@ -5,6 +5,8 @@ import {
   formatKeywordsForPrompt,
   formatPersonasForPrompt,
   formatPageMapForPrompt,
+  formatBrandVoiceForPrompt,
+  formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callOpenAI } from './openai-helpers.js';
@@ -492,8 +494,8 @@ export async function regenerateBrief(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = seo?.brandVoice ?? '';
-  const knowledgeBlock = seo?.knowledgeBase ?? '';
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
@@ -666,7 +668,7 @@ export async function regenerateOutline(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = seo?.brandVoice ?? '';
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
@@ -774,9 +776,9 @@ export async function generateBrief(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = seo?.brandVoice ?? '';
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
   const stratBizCtx = seo?.businessContext ?? '';
-  const knowledgeBlock = seo?.knowledgeBase ?? '';
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
   const personasBlock = formatPersonasForPrompt(seo?.personas);
   const kwMapContext = formatPageMapForPrompt(seo);
   const bizCtx = context.businessContext || stratBizCtx;

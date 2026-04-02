@@ -207,7 +207,7 @@ async function assembleSeoContext(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<SeoContextSlice> {
-  const { buildSeoContext } = await import('./seo-context.js');
+  const { buildSeoContext, getRawBrandVoice, getRawKnowledge } = await import('./seo-context.js');
   const { getWorkspace } = await import('./workspaces.js');
   // Pass _skipShadow to prevent circular recursion:
   // buildWorkspaceIntelligence → assembleSeoContext → buildSeoContext → shadow mode → buildWorkspaceIntelligence → ∞
@@ -228,10 +228,13 @@ async function assembleSeoContext(
     strategy: ctx.strategy
       ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
       : ctx.strategy,
-    brandVoice: ctx.brandVoiceBlock,
+    // Store RAW values (no headers). Callers that need formatted blocks use
+    // formatBrandVoiceForPrompt() / formatKnowledgeBaseForPrompt() from this module.
+    // This prevents double-formatting when formatSeoContextSection adds its own prefixes.
+    brandVoice: getRawBrandVoice(workspaceId),
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
-    knowledgeBase: ctx.knowledgeBlock,
+    knowledgeBase: getRawKnowledge(workspaceId),
   };
 
   // Page-specific keywords — populate from strategy.pageMap when pagePath is provided
@@ -1926,6 +1929,24 @@ export function getIntelligenceCacheStats() {
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
 // These produce prompt-ready text from intelligence slice data, matching the
 // output format of the legacy mini-builders in seo-context.ts.
+
+/**
+ * Format raw brand voice text into a prompt block matching buildSeoContext().brandVoiceBlock format.
+ * Required because seoContext.brandVoice stores the RAW voice text (no header).
+ */
+export function formatBrandVoiceForPrompt(brandVoice: string | null | undefined): string {
+  if (!brandVoice?.trim()) return '';
+  return `\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${brandVoice}`;
+}
+
+/**
+ * Format raw knowledge base text into a prompt block matching buildSeoContext().knowledgeBlock format.
+ * Required because seoContext.knowledgeBase stores the RAW knowledge text (no header).
+ */
+export function formatKnowledgeBaseForPrompt(knowledgeBase: string | null | undefined): string {
+  if (!knowledgeBase?.trim()) return '';
+  return `\n\nBUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${knowledgeBase}`;
+}
 
 /**
  * Format site keywords into a prompt block matching buildSeoContext().keywordBlock format.

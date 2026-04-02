@@ -15,7 +15,7 @@ import {
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
 import {
@@ -72,9 +72,9 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   const rewriteIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'], pagePath: pagePath || undefined });
   const rewriteSeo = rewriteIntel.seoContext;
   const keywordContext = formatKeywordsForPrompt(rewriteSeo);
-  const brandVoiceBlock = rewriteSeo?.brandVoice ?? '';
+  const brandVoiceBlock = formatBrandVoiceForPrompt(rewriteSeo?.brandVoice);
   const personasBlock = formatPersonasForPrompt(rewriteSeo?.personas ?? []);
-  const knowledgeBlock = rewriteSeo?.knowledgeBase ?? '';
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(rewriteSeo?.knowledgeBase);
 
   // Resolve explicit brand name so the AI doesn't guess from the domain
   let brandName = '';
@@ -405,9 +405,9 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
       const bulkFixIntel = await buildWorkspaceIntelligence(workspaceId || ws?.id || '', { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
       const bulkFixSeo = bulkFixIntel.seoContext;
       const keywordBlock = formatKeywordsForPrompt(bulkFixSeo);
-      const bvBlock = bulkFixSeo?.brandVoice ?? '';
+      const bvBlock = formatBrandVoiceForPrompt(bulkFixSeo?.brandVoice);
       const bulkPersonasBlock = formatPersonasForPrompt(bulkFixSeo?.personas ?? []);
-      const bulkKnowledgeBlock = bulkFixSeo?.knowledgeBase ?? '';
+      const bulkKnowledgeBlock = formatKnowledgeBaseForPrompt(bulkFixSeo?.knowledgeBase);
 
       // Fetch page content if not provided and we have a base URL
       let contentExcerpt = page.pageContent || '';
@@ -618,9 +618,9 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       const rwIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext', 'pageProfile'], pagePath: page.slug ? `/${page.slug}` : undefined });
       const rwSeo = rwIntel.seoContext;
       const keywordBlock = formatKeywordsForPrompt(rwSeo);
-      const bvBlock = rwSeo?.brandVoice ?? '';
+      const bvBlock = formatBrandVoiceForPrompt(rwSeo?.brandVoice);
       const rwPersonasBlock = formatPersonasForPrompt(rwSeo?.personas ?? []);
-      const rwKnowledgeBlock = rwSeo?.knowledgeBase ?? '';
+      const rwKnowledgeBlock = formatKnowledgeBaseForPrompt(rwSeo?.knowledgeBase);
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
@@ -937,7 +937,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   const copyIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath });
   const copySeo = copyIntel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(copySeo);
-  const brandVoiceBlock = copySeo?.brandVoice ?? '';
+  const brandVoiceBlock = formatBrandVoiceForPrompt(copySeo?.brandVoice);
   const kwMapContext = formatPageMapForPrompt(copySeo);
 
   // If no page content was passed, try to fetch it from the live site

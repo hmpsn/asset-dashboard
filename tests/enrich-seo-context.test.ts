@@ -7,6 +7,8 @@ vi.mock('../server/seo-context.js', () => ({
     businessContext: 'SaaS company',
     knowledgeBlock: 'Domain knowledge',
   })),
+  getRawBrandVoice: vi.fn(() => 'Professional'),
+  getRawKnowledge: vi.fn(() => 'Domain knowledge'),
 }));
 
 vi.mock('../server/workspaces.js', () => ({

@@ -31,7 +31,7 @@ import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './seo-context.js';
-import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -313,11 +313,11 @@ export async function assembleAdminContext(
 
   const keywordBlock = formatKeywordsForPrompt(seoCtx);
   const strategy = seoCtx?.strategy;
-  const brandVoiceBlock = seoCtx?.brandVoice ?? '';
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seoCtx?.brandVoice);
   const bizCtx = seoCtx?.businessContext ?? '';
   const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
   const personasContext = formatPersonasForPrompt(seoCtx?.personas);
-  const knowledgeBase = seoCtx?.knowledgeBase ?? '';
+  const knowledgeBase = formatKnowledgeBaseForPrompt(seoCtx?.knowledgeBase);
 
   if (keywordBlock || kwMapContext || bizCtx) {
     const stratParts = [keywordBlock, kwMapContext, bizCtx ? `\nBusiness: ${bizCtx}` : '', brandVoiceBlock].filter(Boolean);
@@ -545,7 +545,7 @@ export async function assembleAdminContext(
           // If analyzing a specific page, pull its audit data
           if (pageContext) {
             const targetSlug = pageContext.url.replace(/^https?:\/\/[^/]+/, '');
-            const pageAudit = pages?.find((p: any) => {
+            const pageAudit = pages?.find((p) => {
               const pSlug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
               return pSlug === targetSlug || pSlug === `${targetSlug}/` || targetSlug.endsWith(pSlug);
             });

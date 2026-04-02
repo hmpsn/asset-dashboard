@@ -18,6 +18,8 @@ vi.mock('../server/seo-context.js', () => ({
     keywordBlock: '',
     fullContext: '',
   })),
+  getRawBrandVoice: vi.fn(() => 'Professional, data-driven, and authoritative. No fluff.'),
+  getRawKnowledge: vi.fn(() => 'We specialize in enterprise SEO analytics with real-time rank tracking and AI-powered insights.'),
   clearSeoContextCache: vi.fn(),
 }));
 
@@ -192,6 +194,8 @@ describe('buildIntelPrompt behavioral equivalence', () => {
       keywordBlock: '',
       fullContext: '',
     } as ReturnType<typeof seoContext.buildSeoContext>);
+    vi.mocked(seoContext.getRawBrandVoice).mockReturnValueOnce('');
+    vi.mocked(seoContext.getRawKnowledge).mockReturnValueOnce('');
 
     await invalidateCache();
 
