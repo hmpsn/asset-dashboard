@@ -1330,7 +1330,7 @@ async function assemblePageProfile(
     const changes = getSeoChanges(workspaceId, 50);
     const pageChanges = changes.filter((c: any) => c.pageSlug === pagePath || c.pageId === pagePath);
     if (pageChanges.length > 0) {
-      seoEdits.lastEditedAt = (pageChanges[0] as any)?.createdAt ?? null;
+      seoEdits.lastEditedAt = (pageChanges[0] as any)?.changedAt ?? null;
     }
     seoEdits.currentTitle = (pageKw as any)?.currentTitle ?? '';
     seoEdits.currentMeta = (pageKw as any)?.currentMeta ?? '';
