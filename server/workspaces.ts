@@ -18,7 +18,7 @@ import {
   eventDisplayConfigSchema, eventGroupSchema,
   keywordStrategySchema,
   contentPricingSchema, portalContactSchema, auditSuppressionSchema,
-  publishTargetSchema, businessProfileSchema, audiencePersonaSchema,
+  publishTargetSchema, businessProfileSchema, audiencePersonaSchema, intelligenceProfileSchema,
 } from './schemas/workspace-schemas.js';
 import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { z } from 'zod';
@@ -151,7 +151,10 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     if (bp) ws.businessProfile = bp;
   }
   if (row.scoring_config) ws.scoringConfig = parseJsonSafe(row.scoring_config, scoringConfigOverrideSchema, {}, { workspaceId: row.id, field: 'scoring_config', table: 'workspaces' });
-  if (row.intelligence_profile) ws.intelligenceProfile = parseJsonFallback(row.intelligence_profile, undefined);
+  if (row.intelligence_profile) {
+    const ip = parseJsonSafe(row.intelligence_profile, intelligenceProfileSchema, null, { workspaceId: row.id, field: 'intelligence_profile', table: 'workspaces' });
+    if (ip) ws.intelligenceProfile = ip;
+  }
   return ws;
 }
 

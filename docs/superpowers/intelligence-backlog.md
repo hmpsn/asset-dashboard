@@ -150,6 +150,28 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 
 ---
 
+## Known Edge Cases (document, don't fix yet)
+
+### 14. Cold-start check ignores `sections` filter in `formatForPrompt`
+
+`formatForPrompt` at `server/workspace-intelligence.ts:~1134` checks `seoContext`, `insights`, and `learnings` to detect a cold-start workspace, regardless of which sections the caller requested via `opts.sections`. A caller requesting only `sections: ['pageProfile']` on a cold workspace would get a cold-start message instead of page content.
+
+**Why it's acceptable:** A workspace with page data almost always has some SEO context. The cold-start is a workspace-level concept. If this causes real issues, fix by scoping the cold-start check to sections actually requested.
+
+**Effort:** ~30min.
+
+---
+
+### 15. Token budget priority chain drops explicitly-requested sections
+
+`applyTokenBudget` in `formatForPrompt` operates on section headers (e.g., `s.startsWith('## Operational')`), not on which sections were requested via `opts.sections`. If a caller requests `sections: ['operational']` with a very tight token budget, the operational section is dropped first and the final fallback returns `seoContext` — which wasn't requested.
+
+**Why it's acceptable:** No current caller combines a specific `sections` filter with a tight `tokenBudget`. The two options are designed for different use cases. Fix if a future caller needs both.
+
+**Effort:** ~1h — check `opts.sections` in the priority chain and preserve requested sections.
+
+---
+
 ## Priority Ranking
 
 | # | Item | Effort | Value | Phase |
@@ -164,3 +186,5 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 | 8 | actionBacklog escalation | 1-2h | Medium | Post-3B |
 | 9 | SEO audit + cannibalization | 1h | Medium | Post-3B |
 | 10 | Server-side intelligence consumers | 8-12h | High (long-term) | Phase 4+ |
+| 14 | Cold-start ignores section filter | 30min | Low | If needed |
+| 15 | Token budget drops requested sections | 1h | Low | If needed |
