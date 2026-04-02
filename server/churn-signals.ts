@@ -24,6 +24,7 @@ import { listActivity } from './activity-log.js';
 import { listClientUsers } from './client-users.js';
 import { notifyTeamChurnSignal } from './email.js';
 import { createLogger } from './logger.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 
 const log = createLogger('churn-signals');
@@ -222,8 +223,9 @@ async function runChurnCheck() {
       const auditDir = path.join(UPLOAD_ROOT, ws.folder);
       const auditFiles = fs.readdirSync(auditDir).filter(f => f.startsWith('audit-') && f.endsWith('.json')).sort().reverse();
       if (auditFiles.length >= 2) {
-        const latest = JSON.parse(fs.readFileSync(path.join(auditDir, auditFiles[0]), 'utf-8'));
-        const previous = JSON.parse(fs.readFileSync(path.join(auditDir, auditFiles[1]), 'utf-8'));
+        const latest = parseJsonFallback(fs.readFileSync(path.join(auditDir, auditFiles[0]), 'utf-8'), null);
+        const previous = parseJsonFallback(fs.readFileSync(path.join(auditDir, auditFiles[1]), 'utf-8'), null);
+        if (!latest || !previous) throw new Error('Audit file parse failed');
         const latestScore = latest.audit?.siteScore ?? latest.siteScore;
         const prevScore = previous.audit?.siteScore ?? previous.siteScore;
         if (latestScore != null && prevScore != null && prevScore - latestScore >= 10) {

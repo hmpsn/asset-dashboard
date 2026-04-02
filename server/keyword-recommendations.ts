@@ -141,9 +141,9 @@ export async function getKeywordRecommendations(
         const range = kd < 30 ? 'low' : kd < 60 ? 'medium' : 'high';
         const rangeData = (learnings as any).byKdRange?.[range];
         if (rangeData?.winRate > 0.5) {
-          candidate._score = (candidate._score ?? 0) * 1.2;
+          candidate._score = Math.round((candidate._score ?? 0) * 1.2);
         } else if (rangeData?.winRate < 0.3 && rangeData?.count >= 3) {
-          candidate._score = (candidate._score ?? 0) * 0.8;
+          candidate._score = Math.round((candidate._score ?? 0) * 0.8);
         }
       }
       // Re-sort after score adjustments

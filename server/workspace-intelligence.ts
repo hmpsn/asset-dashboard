@@ -722,11 +722,13 @@ async function assembleClientSignals(
   // Churn signals
   let churnSignals: ChurnSignalSummary[] = [];
   let churnRisk: ClientSignalsSlice['churnRisk'] = null;
+  let churnFetchSucceeded = false;
   try {
     // NOTE: dynamic import required — churn-signals.ts statically imports from this module
     const { listChurnSignals } = await import('./churn-signals.js');
     // listChurnSignals already filters to undismissed signals via SQL (WHERE dismissed_at IS NULL)
     const signals = listChurnSignals(workspaceId);
+    churnFetchSucceeded = true;
     churnSignals = signals.map((s: any) => ({
       type: s.type ?? '',
       severity: s.severity ?? 'warning',
@@ -737,7 +739,7 @@ async function assembleClientSignals(
     const warningCount = signals.filter((s: any) => s.severity === 'warning').length;
     churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : signals.length > 0 ? 'low' : null;
   } catch {
-    // Churn signals optional
+    // Churn signals optional — churnFetchSucceeded stays false
   }
 
   // Approval patterns
@@ -860,8 +862,8 @@ async function assembleClientSignals(
     let weightedSum = 0;
     let components = 0;
 
-    // Churn component (weight 0.4)
-    if (churnRisk !== null || churnSignals.length === 0) {
+    // Churn component (weight 0.4) — only include if churn subsystem loaded successfully
+    if (churnFetchSucceeded) {
       const churnScore = churnRisk === 'high' ? 0 : churnRisk === 'medium' ? 30 : churnRisk === 'low' ? 60 : 100;
       weightedSum += churnScore * 0.4;
       totalWeight += 0.4;
@@ -1207,7 +1209,7 @@ async function assemblePageProfile(
 
   // Rank history
   let current: number | null = pageKw?.currentPosition ?? null;
-  let best: number | null = current;
+  let previous: number | null = pageKw?.previousPosition ?? null;
   let trend: 'up' | 'down' | 'stable' = 'stable';
   try {
     const { getLatestRanks } = await import('./rank-tracking.js');
@@ -1220,11 +1222,13 @@ async function assemblePageProfile(
     }
   } catch {
     // Rank tracking optional — fall back to page-keywords data
-    const previous = pageKw?.previousPosition ?? null;
     if (current != null && previous != null) {
       trend = current < previous ? 'up' : current > previous ? 'down' : 'stable';
     }
   }
+  // best = lowest position number seen (lower is better in SEO)
+  const best = (current != null && previous != null) ? Math.min(current, previous)
+    : current ?? previous;
 
   // Recommendations for this page
   let recommendations: string[] = [];
@@ -1370,9 +1374,9 @@ async function assemblePageProfile(
   try {
     const { getWorkspace } = await import('./workspaces.js');
     const ws = getWorkspace(workspaceId);
-    if ((ws as any)?.siteId) {
+    if (ws?.webflowSiteId) {
       const { getPageSpeed } = await import('./performance-store.js');
-      const speedSnap = getPageSpeed((ws as any).siteId);
+      const speedSnap = getPageSpeed(ws.webflowSiteId);
       if (speedSnap?.result) {
         const pages = (speedSnap.result as any).pages ?? [];
         const pageData = pages.find((p: any) => p.url === pagePath || p.slug === pagePath);
