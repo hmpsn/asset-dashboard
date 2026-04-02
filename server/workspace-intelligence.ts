@@ -1546,7 +1546,10 @@ async function assemblePageProfile(
   try {
     const { getLatestRanks } = await import('./rank-tracking.js');
     const latest = getLatestRanks(workspaceId);
-    const pageRank: RankEntry | undefined = latest.find(k => k.query === pageKw?.primaryKeyword);
+    const primaryKw = pageKw?.primaryKeyword?.toLowerCase();
+    const pageRank: RankEntry | undefined = primaryKw
+      ? latest.find(k => k.query.toLowerCase() === primaryKw)
+      : undefined;
     if (pageRank) {
       current = pageRank.position ?? current;
       const change = pageRank.change ?? 0;
