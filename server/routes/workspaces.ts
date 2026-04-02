@@ -322,6 +322,7 @@ const intelligenceProfileSchema = z.object({
 router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(), validate(intelligenceProfileSchema), (req, res) => {
   const ws = updateWorkspace(req.params.id, { intelligenceProfile: req.body });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  invalidateIntelligenceCache(req.params.id);
   broadcastToWorkspace(req.params.id, 'workspace:updated', { intelligenceProfile: ws.intelligenceProfile });
   res.json({ intelligenceProfile: ws.intelligenceProfile });
 });
