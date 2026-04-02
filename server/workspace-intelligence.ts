@@ -243,19 +243,11 @@ async function assembleSeoContext(
     // Rank tracking optional
   }
 
-  // Business profile from workspace settings
-  try {
-    const profile = workspace?.businessProfile;
-    if (profile && typeof profile === 'object') {
-      base.businessProfile = {
-        industry: profile.industry ?? '',
-        goals: Array.isArray(profile.goals) ? profile.goals : [],
-        targetAudience: profile.targetAudience ?? '',
-      };
-    }
-  } catch {
-    // Business profile optional
-  }
+  // Business profile — Workspace.businessProfile has contact info (phone/email/address),
+  // not industry/goals/targetAudience. The intelligence BusinessProfile type requires
+  // structured data that doesn't exist on the workspace yet. This will be wired when
+  // a structured business profile editor is added (Phase 3B).
+  // For now, businessProfile remains undefined in the slice output.
 
   // Strategy history
   try {
@@ -476,7 +468,7 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
       decayAlerts = decay.decayingPages.slice(0, 20).map(p => ({
         pageUrl: p.page ?? '',
         clickDrop: p.clickDeclinePct ?? 0,
-        detectedAt: p.detectedAt ?? decay.analyzedAt ?? new Date().toISOString(),
+        detectedAt: decay.analyzedAt ?? new Date().toISOString(),
         hasRefreshBrief: !!p.refreshRecommendation,
         isRepeatDecay: p.isRepeatDecay ?? false,
       }));
@@ -1274,12 +1266,13 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     } else if (verbosity === 'standard') {
       lines.push('Personas:');
       for (const p of ctx.personas) {
-        lines.push(`  - ${p.name}${p.role ? ` (${p.role})` : ''}`);
+        const desc = p.description ? `: ${p.description.length > 60 ? p.description.slice(0, 60) + '...' : p.description}` : '';
+        lines.push(`  - ${p.name}${desc}`);
       }
     } else {
       lines.push('Personas:');
       for (const p of ctx.personas) {
-        lines.push(`  - ${p.name}${p.role ? ` (${p.role})` : ''}${p.description ? `: ${p.description}` : ''}`);
+        lines.push(`  - ${p.name}${p.description ? `: ${p.description}` : ''}`);
       }
     }
   }

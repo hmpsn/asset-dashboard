@@ -20,11 +20,10 @@ function makeSeoContext(): SeoContextSlice {
     brandVoice: 'Professional and authoritative',
     businessContext: 'Enterprise SaaS analytics platform',
     personas: [
-      { name: 'Marketing Maya', role: 'Head of Marketing', description: 'Experienced marketer focused on growth' },
-      { name: 'Dev Dan', role: 'CTO', description: 'Technical decision maker' },
+      { name: 'Marketing Maya', description: 'Experienced marketer focused on growth', id: 'p1', painPoints: [], goals: [], objections: [] },
+      { name: 'Dev Dan', description: 'Technical decision maker', id: 'p2', painPoints: [], goals: [], objections: [] },
     ],
     knowledgeBase: 'Specializes in enterprise SEO analytics for Fortune 500 companies',
-    businessProfile: { industry: 'SaaS', goals: ['Grow organic traffic', 'Increase conversions'], targetAudience: 'B2B marketing teams' },
     rankTracking: { trackedKeywords: 150, avgPosition: 12.5, positionChanges: { improved: 30, declined: 10, stable: 110 } },
   };
 }
@@ -170,9 +169,9 @@ describe('formatForPrompt', () => {
 
       expect(compact).toContain('Marketing Maya');
       expect(standard).toContain('Marketing Maya');
-      expect(standard).toContain('Head of Marketing');
+      expect(standard).toContain('Experienced marketer');
       expect(detailed).toContain('Marketing Maya');
-      expect(detailed).toContain('Experienced marketer');
+      expect(detailed).toContain('Experienced marketer focused on growth');
     });
 
     it('includes knowledgeBase at standard verbosity', () => {
@@ -180,8 +179,11 @@ describe('formatForPrompt', () => {
       expect(standard).toContain('enterprise SEO analytics');
     });
 
-    it('includes businessProfile at standard+ verbosity', () => {
-      const standard = formatForPrompt(makeFullIntelligence(), { verbosity: 'standard' });
+    it('includes businessProfile at standard+ verbosity when present', () => {
+      const intel = makeFullIntelligence();
+      // Manually set businessProfile (not auto-populated from workspace yet — Phase 3B)
+      intel.seoContext!.businessProfile = { industry: 'SaaS', goals: ['Grow organic traffic'], targetAudience: 'B2B marketing teams' };
+      const standard = formatForPrompt(intel, { verbosity: 'standard' });
       expect(standard).toContain('SaaS');
     });
 

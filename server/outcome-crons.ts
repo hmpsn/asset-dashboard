@@ -5,7 +5,6 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
-import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('outcome-crons');
 

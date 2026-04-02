@@ -135,14 +135,16 @@ export async function getKeywordRecommendations(
   try {
     const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
     const learnings = getWorkspaceLearnings(workspaceId, 'strategy');
-    if ((learnings as any)?.byKdRange) {
+    const kdRangeWinRates = learnings?.strategy?.winRateByDifficultyRange;
+    if (kdRangeWinRates && Object.keys(kdRangeWinRates).length > 0) {
       for (const candidate of scored) {
         const kd = candidate.difficulty ?? 0;
-        const range = kd < 30 ? 'low' : kd < 60 ? 'medium' : 'high';
-        const rangeData = (learnings as any).byKdRange?.[range];
-        if (rangeData?.winRate > 0.5) {
+        // Match KD to the range buckets used by workspace-learnings: 0-20, 21-40, 41-60, 61-80, 81-100
+        const range = kd <= 20 ? '0-20' : kd <= 40 ? '21-40' : kd <= 60 ? '41-60' : kd <= 80 ? '61-80' : '81-100';
+        const winRate = kdRangeWinRates[range];
+        if (winRate != null && winRate > 0.5) {
           candidate._score = Math.round((candidate._score ?? 0) * 1.2);
-        } else if (rangeData?.winRate < 0.3 && rangeData?.count >= 3) {
+        } else if (winRate != null && winRate < 0.3) {
           candidate._score = Math.round((candidate._score ?? 0) * 0.8);
         }
       }
