@@ -173,7 +173,7 @@ Answer Engine Optimization (AEO) principles:
 - Include citations and data points
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
-${formatKeywordsForPrompt(seo)}${formatBrandVoiceForPrompt(seo?.brandVoice)}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
+${formatKeywordsForPrompt(seo)}${formatBrandVoiceForPrompt(seo?.brandVoice)}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`; // bip-ok: intel used for raw seo field access above
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },

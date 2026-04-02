@@ -76,7 +76,7 @@ const stmts = createStmtCache(() => ({
     `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
   ),
   strategyHistory: db.prepare(
-    'SELECT created_at, change_description FROM strategy_history WHERE workspace_id = ? ORDER BY created_at DESC',
+    'SELECT generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC',
   ),
   keywordFeedbackApproved: db.prepare(
     'SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
@@ -278,16 +278,11 @@ async function assembleSeoContext(
 
   // Strategy history
   try {
-    const rows = stmts().strategyHistory.all(workspaceId) as Array<{ created_at: string; change_description: string }>;
+    const rows = stmts().strategyHistory.all(workspaceId) as Array<{ generated_at: string }>;
     if (rows.length > 0) {
-      const recentChanges = rows.slice(0, 5).map(r => r.change_description?.toLowerCase() ?? '');
-      const expanding = recentChanges.filter(c => c.includes('add') || c.includes('expand') || c.includes('new')).length;
-      const narrowing = recentChanges.filter(c => c.includes('remove') || c.includes('narrow') || c.includes('focus')).length;
-      const trajectory = expanding > narrowing ? 'expanding' : narrowing > expanding ? 'narrowing' : 'stable';
       base.strategyHistory = {
         revisionsCount: rows.length,
-        lastRevisedAt: rows[0].created_at,
-        trajectory,
+        lastRevisedAt: rows[0].generated_at,
       };
     }
   } catch {
@@ -1409,6 +1404,10 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     }
   }
 
+  if (ctx.strategyHistory && verbosity === 'detailed') {
+    lines.push(`Strategy: revised ${ctx.strategyHistory.revisionsCount}x, last ${ctx.strategyHistory.lastRevisedAt.slice(0, 10)}`);
+  }
+
   // Return empty string rather than a bare header when no content was added
   if (lines.length === 1) return '';
 
@@ -1526,6 +1525,10 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
         lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain ?? 0} clicks`);
       }
     }
+
+    if (learnings.playbooks?.length > 0 && verbosity === 'detailed') {
+      lines.push(`Playbooks: ${learnings.playbooks.slice(0, 3).map(p => p.name).join(', ')}`);
+    }
   }
 
   // Cap at 25 content lines to stay within token budget
@@ -1550,6 +1553,15 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     }
     if (pipeline.subscriptions) {
       lines.push(`Subscriptions: ${pipeline.subscriptions.active} active, ${pipeline.subscriptions.totalPages} pages`);
+    }
+    if (pipeline.requests && (pipeline.requests.pending > 0 || pipeline.requests.inProgress > 0)) {
+      lines.push(`Content requests: ${pipeline.requests.pending} pending, ${pipeline.requests.inProgress} in progress`);
+    }
+    if (pipeline.workOrders?.active > 0) {
+      lines.push(`Work orders: ${pipeline.workOrders.active} active`);
+    }
+    if (pipeline.seoEdits && (pipeline.seoEdits.pending > 0 || pipeline.seoEdits.applied > 0)) {
+      lines.push(`SEO edits: ${pipeline.seoEdits.pending} pending, ${pipeline.seoEdits.applied} applied`);
     }
   }
 
@@ -1772,6 +1784,12 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
       lines.push(`Structural audit issues: ${profile.auditIssues.length}`);
     }
     lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
+    if (profile.linkHealth) {
+      lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' ⚠ orphan page' : ''}`);
+    }
+    if (profile.seoEdits?.currentTitle) {
+      lines.push(`Current title: ${profile.seoEdits.currentTitle}`);
+    }
   }
 
   return lines.join('\n');

@@ -50,6 +50,22 @@ function hasSlicesSeoContextLearnings(src: string): boolean {
 }
 
 /**
+ * Returns true if the source assembles 'learnings' in any slices call.
+ * Used for parity checks — verifies learnings is assembled (not necessarily alongside seoContext).
+ * Accepts both combined calls and the split-assembly pattern (learnings hoisted separately).
+ */
+function hasSliceLearnings(src: string): boolean {
+  return (
+    // learnings in any inline slices call
+    /slices:\s*\[[^\]]*'learnings'/.test(src) ||
+    // slices-var containing learnings
+    /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'learnings'[^\]]*\]/.test(src) ||
+    // buildIntelPrompt with learnings
+    /buildIntelPrompt\([^,]+,\s*\[[^\]]*'learnings'[^\]]*\]/.test(src)
+  );
+}
+
+/**
  * Returns true if the source formats with sections containing 'seoContext' and 'learnings'.
  * Accepts:
  *   - Inline literal:  sections: ['seoContext', 'learnings']
@@ -106,6 +122,40 @@ describe('webflow-keywords.ts migration contracts', () => {
   });
 });
 
+// ── webflow-seo.ts (N+1 prevention) ──────────────────────────────────────────
+
+describe('webflow-seo.ts N+1 prevention contracts', () => {
+  const src = readRoute('webflow-seo.ts');
+
+  it('bulk-fix loop: seoContext assembled before the for-of loop (not inside it)', () => {
+    // Pre-assembly must appear before `for (const page of pages)`.
+    // If seoContext is assembled inside the loop, 300-page sites fire 300 DB round-trips.
+    const loopIdx = src.indexOf('for (const page of pages)');
+    expect(loopIdx).toBeGreaterThan(-1);
+    const beforeLoop = src.slice(0, loopIdx);
+    expect(beforeLoop).toContain("slices: ['seoContext']");
+  });
+
+  it('bulk-rewrite loop: seoContext assembled before the batch for-loop (not inside it)', () => {
+    // Pre-assembly must appear before `for (let i = 0; i < pages.length`.
+    const loopIdx = src.indexOf('for (let i = 0; i < pages.length');
+    expect(loopIdx).toBeGreaterThan(-1);
+    const beforeLoop = src.slice(0, loopIdx);
+    // Second occurrence of slices: ['seoContext'] — first is bulk-fix, second is bulk-rewrite
+    const firstIdx = beforeLoop.indexOf("slices: ['seoContext']");
+    const secondIdx = beforeLoop.indexOf("slices: ['seoContext']", firstIdx + 1);
+    expect(secondIdx).toBeGreaterThan(-1);
+  });
+
+  it('bulk-rewrite loop: pageProfile still assembled per-page with pagePath inside loop', () => {
+    // pageProfile is page-specific (optimization issues + recommendations require pagePath).
+    // Must remain inside the per-page map callback, not hoisted.
+    const loopIdx = src.indexOf('for (let i = 0; i < pages.length');
+    const afterLoop = src.slice(loopIdx);
+    expect(afterLoop).toContain("slices: ['pageProfile']");
+  });
+});
+
 // ── seo-audit.ts ──────────────────────────────────────────────────────────────
 
 describe('seo-audit.ts migration contracts', () => {
@@ -119,6 +169,21 @@ describe('seo-audit.ts migration contracts', () => {
   it('formats with seoContext + learnings sections', () => {
     // Accepts ['seoContext', 'learnings'] or ['seoContext', 'learnings', 'pageProfile'] (combined call)
     expect(hasSectionsSeoContextLearnings(src)).toBe(true);
+  });
+
+  it('N+1 prevention: seoContext assembled before the per-page batch loop (not inside it)', () => {
+    // Pre-assembly must appear before `for (let i = 0; i < pagesNeedingFixes`.
+    // seoContext is workspace-level; pageKeywords derived inline via pageMap.find().
+    const loopIdx = src.indexOf('for (let i = 0; i < pagesNeedingFixes');
+    expect(loopIdx).toBeGreaterThan(-1);
+    const beforeLoop = src.slice(0, loopIdx);
+    expect(beforeLoop).toContain("'seoContext'");
+  });
+
+  it('N+1 prevention: pageProfile still assembled per-page with pagePath inside loop', () => {
+    const loopIdx = src.indexOf('for (let i = 0; i < pagesNeedingFixes');
+    const afterLoop = src.slice(loopIdx);
+    expect(afterLoop).toContain("slices: ['pageProfile']");
   });
 });
 
@@ -290,8 +355,10 @@ describe('slices/sections consistency — learnings section requires learnings s
       const hasSectionsWithLearnings = hasSectionsSeoContextLearnings(src);
       if (!hasSectionsWithLearnings) return; // Not applicable — no learnings section requested
 
-      // Must have 'learnings' in slices — inline literal, slices-var, or buildIntelPrompt
-      expect(hasSlicesSeoContextLearnings(src)).toBe(true);
+      // Must assemble 'learnings' — inline literal, slices-var, or buildIntelPrompt.
+      // Uses hasSliceLearnings (not hasSlicesSeoContextLearnings) to allow the split-assembly
+      // pattern where learnings is hoisted separately from seoContext (e.g. seo-audit.ts).
+      expect(hasSliceLearnings(src)).toBe(true);
     });
   }
 });

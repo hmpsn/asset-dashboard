@@ -211,7 +211,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
 
   try {
     // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
-    const pageAnalysisBlock = formatForPrompt(rewriteIntel, { verbosity: 'detailed', sections: ['pageProfile'] });
+    const pageAnalysisBlock = formatForPrompt(rewriteIntel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: rewriteIntel used for raw field access above
 
     // Assemble all context blocks
     const contextBlocks = [
@@ -399,11 +399,23 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
   const inlineBrandName = getBrandName(ws);
 
+  // Pre-assemble workspace-level seoContext once — brandVoice, personas, knowledgeBase,
+  // rank tracking, and strategy are identical for every page. pageKeywords (the only
+  // page-specific field) is a simple find() on the pre-built pageMap, done inline per page.
+  const resolvedWsIdBulk = workspaceId || ws?.id || '';
+  const wsIntelBulk = await buildWorkspaceIntelligence(resolvedWsIdBulk, { slices: ['seoContext'] });
+  const wsBulkSeo = wsIntelBulk.seoContext;
+
   const results = [];
   for (const page of pages) {
     try {
-      const bulkFixIntel = await buildWorkspaceIntelligence(workspaceId || ws?.id || '', { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
-      const bulkFixSeo = bulkFixIntel.seoContext;
+      // Derive per-page keywords from the pre-built pageMap — no extra DB call
+      const bulkPagePath = page.slug ? `/${page.slug}` : undefined;
+      const bulkFixSeo = wsBulkSeo ? { ...wsBulkSeo } : undefined;
+      if (bulkFixSeo && bulkPagePath && bulkFixSeo.strategy?.pageMap?.length) {
+        const kw = bulkFixSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === bulkPagePath.toLowerCase());
+        if (kw) bulkFixSeo.pageKeywords = kw;
+      }
       const keywordBlock = formatKeywordsForPrompt(bulkFixSeo);
       const bvBlock = formatBrandVoiceForPrompt(bulkFixSeo?.brandVoice);
       const bulkPersonasBlock = formatPersonasForPrompt(bulkFixSeo?.personas ?? []);
@@ -611,16 +623,29 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   const suggestions: SeoSuggestion[] = [];
   const errors: Array<{ pageId: string; error: string }> = [];
 
+  // Pre-assemble workspace-level seoContext once. pageProfile stays per-page
+  // (page-specific optimization issues + recommendations require pagePath).
+  const wsIntelRw = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
+  const wsRwSeo = wsIntelRw.seoContext;
+
   // Process in concurrent batches for performance
   for (let i = 0; i < pages.length; i += CONCURRENCY) {
     const batch = pages.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.allSettled(batch.map(async (page) => {
-      const rwIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext', 'pageProfile'], pagePath: page.slug ? `/${page.slug}` : undefined });
-      const rwSeo = rwIntel.seoContext;
+      // Derive per-page keywords from the pre-built pageMap — no extra DB call for seoContext
+      const rwPagePath = page.slug ? `/${page.slug}` : undefined;
+      const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
+      if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
+        const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
+        if (kw) rwSeo.pageKeywords = kw;
+      }
       const keywordBlock = formatKeywordsForPrompt(rwSeo);
       const bvBlock = formatBrandVoiceForPrompt(rwSeo?.brandVoice);
       const rwPersonasBlock = formatPersonasForPrompt(rwSeo?.personas ?? []);
       const rwKnowledgeBlock = formatKnowledgeBaseForPrompt(rwSeo?.knowledgeBase);
+      // pageProfile is page-specific — assemble per page then merge with hoisted intel
+      const pageProfileIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['pageProfile'], pagePath: rwPagePath });
+      const rwIntel = { ...wsIntelRw, seoContext: rwSeo, pageProfile: pageProfileIntel.pageProfile };
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
@@ -680,7 +705,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       }
 
       // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
-      const rwPageAnalysis = formatForPrompt(rwIntel, { verbosity: 'detailed', sections: ['pageProfile'] });
+      const rwPageAnalysis = formatForPrompt(rwIntel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: rwIntel used for raw field access above
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
