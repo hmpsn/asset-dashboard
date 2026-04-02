@@ -1556,6 +1556,18 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     if (pipeline.schemaDeployment) {
       lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
     }
+    if (pipeline.cannibalizationWarnings && pipeline.cannibalizationWarnings.length > 0) {
+      lines.push('Keyword cannibalization:');
+      for (const cw of pipeline.cannibalizationWarnings.slice(0, 5)) {
+        lines.push(`  - "${cw.keyword}" [${cw.severity}]: ${cw.pages.join(', ')}`);
+      }
+    }
+    if (pipeline.decayAlerts && pipeline.decayAlerts.length > 0) {
+      lines.push('Decay alert details:');
+      for (const da of pipeline.decayAlerts.slice(0, 5)) {
+        lines.push(`  - ${da.pageUrl}: -${da.clickDrop}% clicks${da.isRepeatDecay ? ' (repeat decay)' : ''}`);
+      }
+    }
   }
 
   return lines.join('\n');
@@ -1583,6 +1595,16 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
     if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? `${Math.round(health.cwvPassRate.desktop * 100)}%` : 'n/a'}`);
+    if (health.schemaValidation) {
+      lines.push(`Schema validation: ${health.schemaValidation.valid} valid, ${health.schemaValidation.warnings} warnings, ${health.schemaValidation.errors} errors`);
+    }
+    if (health.performanceSummary) {
+      const perfParts: string[] = [];
+      if (health.performanceSummary.avgLcp != null) perfParts.push(`LCP: ${health.performanceSummary.avgLcp.toFixed(1)}s`);
+      if (health.performanceSummary.avgFid != null) perfParts.push(`FID: ${health.performanceSummary.avgFid}ms`);
+      if (health.performanceSummary.avgCls != null) perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
+      if (perfParts.length > 0) lines.push(`Core Web Vitals: ${perfParts.join(', ')}`);
+    }
   }
 
   return lines.join('\n');
@@ -1606,6 +1628,12 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     if (signals.approvalPatterns.approvalRate > 0) {
       lines.push(`Approval rate: ${Math.round(signals.approvalPatterns.approvalRate * 100)}%`);
     }
+    if (signals.businessPriorities.length > 0) {
+      lines.push(`Business priorities: ${signals.businessPriorities.join('; ')}`);
+    }
+    if (signals.serviceRequests) {
+      lines.push(`Service requests: ${signals.serviceRequests.pending} pending, ${signals.serviceRequests.total} total`);
+    }
   }
 
   if (verbosity === 'detailed') {
@@ -1621,6 +1649,18 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     }
     if (signals.recentChatTopics.length > 0) {
       lines.push(`Recent topics: ${signals.recentChatTopics.join(', ')}`);
+    }
+    if (signals.keywordFeedback.approved.length > 0 || signals.keywordFeedback.rejected.length > 0) {
+      lines.push(`Keyword feedback: ${Math.round(signals.keywordFeedback.patterns.approveRate * 100)}% approve rate`);
+      if (signals.keywordFeedback.approved.length > 0) {
+        lines.push(`  Approved: ${signals.keywordFeedback.approved.slice(0, 5).join(', ')}`);
+      }
+      if (signals.keywordFeedback.patterns.topRejectionReasons.length > 0) {
+        lines.push(`  Top rejection reasons: ${signals.keywordFeedback.patterns.topRejectionReasons.join(', ')}`);
+      }
+    }
+    if (signals.contentGapVotes.length > 0) {
+      lines.push(`Content gap votes: ${signals.contentGapVotes.slice(0, 5).map(v => `${v.topic} (${v.votes})`).join(', ')}`);
     }
   }
 
@@ -1645,6 +1685,12 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
     if (ops.timeSaved) {
       lines.push(`Time saved: ${ops.timeSaved.totalMinutes} minutes`);
     }
+    if (ops.pendingJobs > 0) {
+      lines.push(`Background jobs: ${ops.pendingJobs} pending`);
+    }
+    if (ops.workOrders) {
+      lines.push(`Work orders: ${ops.workOrders.active} active, ${ops.workOrders.pending} pending`);
+    }
   }
 
   if (verbosity === 'detailed') {
@@ -1656,6 +1702,15 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
       for (const [feature, minutes] of Object.entries(ops.timeSaved.byFeature).slice(0, 5)) {
         lines.push(`  ${feature}: ${minutes} min`);
       }
+    }
+    if (ops.annotations.length > 0) {
+      lines.push('Timeline annotations:');
+      for (const a of ops.annotations.slice(0, 5)) {
+        lines.push(`  - ${a.date}: ${a.label}`);
+      }
+    }
+    if (ops.insightAcceptanceRate) {
+      lines.push(`Insight acceptance rate: ${Math.round(ops.insightAcceptanceRate.rate * 100)}% (${ops.insightAcceptanceRate.confirmed}/${ops.insightAcceptanceRate.totalShown})`);
     }
   }
 
