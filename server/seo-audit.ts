@@ -589,10 +589,8 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
           // Build keyword strategy + brand voice + KB + personas context for this page
           const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
-          const intel = await buildWorkspaceIntelligence(wsId, {
-            slices: ['seoContext', 'pageProfile'],
-            pagePath,
-          });
+          const intel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext', 'pageProfile'],
+            pagePath });
           const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
           const pageAnalysisBlock = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] });
 

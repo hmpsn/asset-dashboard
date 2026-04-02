@@ -791,10 +791,8 @@ export async function generateBrief(
   );
   let pageAnalysisBlock = '';
   if (matchedPage) {
-    const pageIntel = await buildWorkspaceIntelligence(workspaceId, {
-      slices: ['pageProfile'],
-      pagePath: matchedPage.pagePath,
-    });
+    const pageIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['pageProfile'],
+      pagePath: matchedPage.pagePath });
     const profile = pageIntel.pageProfile;
     if (profile) {
       const parts: string[] = [];

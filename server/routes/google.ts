@@ -139,7 +139,7 @@ router.post('/api/google/search-chat/:siteId', async (req, res) => {
 
   // Look up workspace for keyword strategy context
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === req.params.siteId)?.id;
-  const intel = wsId ? await buildWorkspaceIntelligence(wsId) : null;
+  const intel = wsId ? await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'] }) : null;
   const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] }) : '';
   const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
   const bizCtx = intel?.seoContext?.businessContext ?? '';

@@ -225,10 +225,8 @@ export async function generateRefreshRecommendation(
   ws: Workspace,
   page: DecayingPage,
 ): Promise<string> {
-  const intel = await buildWorkspaceIntelligence(ws.id, {
-    slices: ['seoContext', 'pageProfile'],
-    pagePath: page.page,
-  });
+  const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'pageProfile'],
+    pagePath: page.page });
   const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
   const pageAnalysis = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] });
 

@@ -123,10 +123,8 @@ router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceI
 
     // Build workspace intelligence (seoContext + pageProfile combined call)
     const pagePath = pageUrl ? new URL(pageUrl).pathname : undefined;
-    const intel = await buildWorkspaceIntelligence(workspaceId, {
-      slices: ['seoContext', 'pageProfile'],
-      pagePath,
-    });
+    const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'],
+      pagePath });
     const seo = intel.seoContext;
     const knowledgeBase = seo?.knowledgeBase ?? '';
 

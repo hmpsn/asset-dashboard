@@ -214,6 +214,18 @@ const CHECKS: Check[] = [
     severity: 'warn',
   },
   {
+    name: 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
+    // Matches calls that don't specify slices — typically: buildWorkspaceIntelligence(id) or buildWorkspaceIntelligence(id, { pagePath })
+    pattern: 'buildWorkspaceIntelligence\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts'],
+    // Lines with slices: already correct; lines in route/intelligence.ts that dynamically pass slices are also fine
+    excludeLines: ['slices:', '// bwi-all-ok'],
+    message: 'Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional.',
+    severity: 'warn',
+  },
+  {
     name: 'Unguarded recordAction() call',
     pattern: 'recordAction\\s*\\(\\s*\\{',
     fileGlobs: ['*.ts'],
