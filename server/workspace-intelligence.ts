@@ -243,11 +243,15 @@ async function assembleSeoContext(
     // Rank tracking optional
   }
 
-  // Business profile — Workspace.businessProfile has contact info (phone/email/address),
-  // not industry/goals/targetAudience. The intelligence BusinessProfile type requires
-  // structured data that doesn't exist on the workspace yet. This will be wired when
-  // a structured business profile editor is added (Phase 3B).
-  // For now, businessProfile remains undefined in the slice output.
+  // Business profile from structured intelligence editor (Phase 3B)
+  const iProfile = workspace?.intelligenceProfile;
+  if (iProfile && (iProfile.industry || (iProfile.goals && iProfile.goals.length > 0) || iProfile.targetAudience)) {
+    base.businessProfile = {
+      industry: iProfile.industry ?? '',
+      goals: Array.isArray(iProfile.goals) ? iProfile.goals : [],
+      targetAudience: iProfile.targetAudience ?? '',
+    };
+  }
 
   // Strategy history
   try {
@@ -1711,6 +1715,24 @@ async function assemblePageProfile(
     contentStatus = null;
   }
 
+  // contentGaps — from strategy content gaps filtered to this page
+  let contentGaps: string[] = [];
+  try {
+    const { getWorkspace: getWsForGaps } = await import('./workspaces.js');
+    const wsForGaps = getWsForGaps(workspaceId);
+    const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
+    if (allGaps.length > 0) {
+      const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
+      const matched = primaryKwLower
+        ? allGaps.filter(g => g.targetKeyword.toLowerCase() === primaryKwLower)
+        : [];
+      const source = matched.length > 0 ? matched : allGaps;
+      contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
+    }
+  } catch {
+    contentGaps = [];
+  }
+
   // CWV status
   let cwvStatus: PageProfileSlice['cwvStatus'] = null;
   try {
@@ -1738,7 +1760,7 @@ async function assemblePageProfile(
     searchIntent: pageKw?.searchIntent ?? null,
     optimizationScore: pageKw?.optimizationScore ?? null,
     recommendations,
-    contentGaps: [],
+    contentGaps,
     insights,
     actions,
     auditIssues,
