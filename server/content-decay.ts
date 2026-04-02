@@ -172,7 +172,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
     try {
       const { getActionsByPage, getOutcomesForAction } = await import('./outcome-tracking.js');
       const priorActions = getActionsByPage(ws.id, pagePath);
-      const refreshActions = priorActions.filter(a => a.actionType === 'content_refresh');
+      const refreshActions = priorActions.filter(a => a.actionType === 'content_refreshed');
       if (refreshActions.length > 0) {
         for (const action of refreshActions) {
           const outcomes = getOutcomesForAction(action.id);

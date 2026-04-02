@@ -327,16 +327,16 @@ async function assembleLearnings(
   // ROI attribution enrichment
   let roiAttribution: ROIAttribution[] = [];
   try {
-    const { getROIHighlights } = await import('./roi-attribution.js');
-    const highlights = getROIHighlights(workspaceId, 10);
-    roiAttribution = highlights.map((h: any) => ({
-      actionId: h.id ?? '',
-      pageUrl: h.pageUrl ?? '',
-      actionType: h.actionType ?? '',
-      clicksBefore: h.clicksBefore ?? 0,
-      clicksAfter: h.clicksAfter ?? 0,
-      clickGain: h.clickGain ?? ((h.clicksAfter ?? 0) - (h.clicksBefore ?? 0)),
-      measuredAt: h.measuredAt ?? '',
+    const { getROIAttributionsRaw } = await import('./roi-attribution.js');
+    const rows = getROIAttributionsRaw(workspaceId, 10);
+    roiAttribution = rows.map(h => ({
+      actionId: h.id,
+      pageUrl: h.pageUrl,
+      actionType: h.actionType,
+      clicksBefore: h.clicksBefore,
+      clicksAfter: h.clicksAfter,
+      clickGain: h.clickGain,
+      measuredAt: h.measuredAt,
     }));
   } catch {
     // ROI attribution optional

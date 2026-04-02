@@ -20,7 +20,7 @@ vi.mock('../server/outcome-playbooks.js', () => ({
 }));
 
 vi.mock('../server/roi-attribution.js', () => ({
-  getROIHighlights: vi.fn(() => [
+  getROIAttributionsRaw: vi.fn(() => [
     { id: 'roi-1', pageUrl: '/blog/seo', actionType: 'content_refresh', clicksBefore: 10, clicksAfter: 25, clickGain: 15, measuredAt: '2026-03-28' },
   ]),
 }));

@@ -239,7 +239,8 @@ export interface TopWin {
   scoredAt: string;
 }
 
-export interface WeCalledItEntry {
+/** Client-facing "we called it" win entry for outcome API routes and WeCalledIt component. */
+export interface OutcomeWinEntry {
   actionId: string;
   actionType: ActionType;
   pageUrl: string | null;
@@ -248,6 +249,12 @@ export interface WeCalledItEntry {
   delta: DeltaSummary;
   detectedAt: string;
 }
+
+/**
+ * @deprecated Use `OutcomeWinEntry` instead. Kept for backward compatibility.
+ * Not to be confused with `WeCalledItEntry` in `shared/types/intelligence.ts` (different shape).
+ */
+export type WeCalledItEntry = OutcomeWinEntry;
 
 export interface WorkspaceOutcomeOverview {
   workspaceId: string;
