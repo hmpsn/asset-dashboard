@@ -221,6 +221,13 @@ async function assembleSeoContext(
     knowledgeBase: ctx.knowledgeBlock,
   };
 
+  // Page-specific keywords — populate from strategy.pageMap when pagePath is provided
+  if (opts?.pagePath && base.strategy?.pageMap?.length) {
+    const pagePathLower = opts.pagePath.toLowerCase();
+    const pageKw = base.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePathLower);
+    if (pageKw) base.pageKeywords = pageKw;
+  }
+
   // Rank tracking enrichment
   try {
     const { getTrackedKeywords, getLatestRanks } = await import('./rank-tracking.js');
