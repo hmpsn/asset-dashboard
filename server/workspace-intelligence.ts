@@ -19,6 +19,7 @@ import type {
   SeoContextSlice,
   InsightsSlice,
   LearningsSlice,
+  PageProfileSlice,
   ContentPipelineSlice,
   SiteHealthSlice,
   RedirectDetail,
@@ -37,6 +38,7 @@ import type {
   WeCalledItEntry,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
+import type { TrackedAction } from '../shared/types/outcome-tracking.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -164,9 +166,10 @@ async function assembleSlice(
     case 'operational':
       result.operational = await assembleOperational(workspaceId, opts);
       break;
-    // Phase 3: remaining slices are stubbed — they return undefined
     case 'pageProfile':
-      log.debug({ workspaceId, slice }, 'Slice not yet implemented — skipping');
+      if (opts?.pagePath) {
+        result.pageProfile = await assemblePageProfile(workspaceId, opts.pagePath, opts);
+      }
       break;
   }
 }
@@ -1183,6 +1186,221 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
   }
 
   return lines.join('\n');
+}
+
+// ── Page Profile assembler ──────────────────────────────────────────────
+
+async function assemblePageProfile(
+  workspaceId: string,
+  pagePath: string,
+  _opts?: IntelligenceOptions,
+): Promise<PageProfileSlice> {
+  // Page keywords (primary source)
+  let pageKw: any = null;
+  try {
+    const { getPageKeyword } = await import('./page-keywords.js');
+    pageKw = getPageKeyword(workspaceId, pagePath);
+  } catch {
+    // page-keywords optional
+  }
+
+  // Rank history
+  let current: number | null = pageKw?.currentPosition ?? null;
+  let best: number | null = current;
+  let trend: 'up' | 'down' | 'stable' = 'stable';
+  try {
+    const { getLatestRanks } = await import('./rank-tracking.js');
+    const latest = getLatestRanks(workspaceId);
+    const pageRank = latest.find((k: any) => k.query === pageKw?.primaryKeyword);
+    if (pageRank) {
+      current = (pageRank as any).position ?? current;
+      const change = (pageRank as any).change ?? 0;
+      trend = change < 0 ? 'up' : change > 0 ? 'down' : 'stable';
+    }
+  } catch {
+    // Rank tracking optional — fall back to page-keywords data
+    const previous = pageKw?.previousPosition ?? null;
+    if (current != null && previous != null) {
+      trend = current < previous ? 'up' : current > previous ? 'down' : 'stable';
+    }
+  }
+
+  // Recommendations for this page
+  let recommendations: string[] = [];
+  try {
+    const { loadRecommendations } = await import('./recommendations.js');
+    const recSet = loadRecommendations(workspaceId);
+    if ((recSet as any)?.recommendations) {
+      recommendations = (recSet as any).recommendations
+        .filter((r: any) => r.pageUrl === pagePath && (r.status === 'pending' || !r.status))
+        .map((r: any) => r.title ?? r.description ?? '')
+        .filter(Boolean);
+    }
+  } catch {
+    // Recommendations optional
+  }
+
+  // Page-specific insights
+  let insights: AnalyticsInsight[] = [];
+  try {
+    const { getInsights } = await import('./analytics-insights-store.js');
+    const all = getInsights(workspaceId);
+    insights = all.filter(i => i.pageId === pagePath).slice(0, 10);
+  } catch {
+    // Insights optional
+  }
+
+  // Page actions
+  let actions: TrackedAction[] = [];
+  try {
+    const { getActionsByPage } = await import('./outcome-tracking.js');
+    actions = getActionsByPage(workspaceId, pagePath);
+  } catch {
+    // Actions optional
+  }
+
+  // Audit issues for this page
+  let auditIssues: string[] = [];
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    if (ws?.siteId) {
+      const { getLatestSnapshot } = await import('./reports.js');
+      const snap = getLatestSnapshot(ws.siteId);
+      if ((snap as any)?.pages) {
+        const pagData = ((snap as any).pages as any[]).find((p: any) => p.url === pagePath || p.slug === pagePath);
+        if (pagData?.issues) {
+          auditIssues = pagData.issues.map((i: any) => i.message ?? i.title ?? '').filter(Boolean);
+        }
+      }
+    }
+  } catch {
+    // Audit data optional
+  }
+
+  // Schema status
+  let schemaStatus: PageProfileSlice['schemaStatus'] = 'none';
+  try {
+    const { getValidations } = await import('./schema-validator.js');
+    const validations = getValidations(workspaceId);
+    const pageValidation = validations.find((v: any) => v.url === pagePath || v.pageUrl === pagePath);
+    if (pageValidation) {
+      const status = (pageValidation as any).status ?? 'none';
+      schemaStatus = status === 'valid' ? 'valid' : status === 'warnings' ? 'warnings' : status === 'errors' ? 'errors' : 'none';
+    }
+  } catch {
+    schemaStatus = 'none';
+  }
+
+  // Link health
+  let linkHealth = { inbound: 0, outbound: 0, orphan: false };
+  try {
+    const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
+    const arch = await Promise.race([
+      getCachedArchitecture(workspaceId),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    if (arch?.tree) {
+      const nodes = flattenTree(arch.tree);
+      const node = nodes.find((n: any) => n.path === pagePath || n.slug === pagePath);
+      if (node) {
+        linkHealth = {
+          inbound: (node as any).inboundLinks ?? 0,
+          outbound: (node as any).outboundLinks ?? 0,
+          orphan: (node as any).orphan ?? false,
+        };
+      }
+    }
+  } catch {
+    // Architecture optional
+  }
+
+  // SEO edits
+  let seoEdits = { currentTitle: '', currentMeta: '', lastEditedAt: null as string | null };
+  try {
+    const { getSeoChanges } = await import('./seo-change-tracker.js');
+    const changes = getSeoChanges(workspaceId, 50);
+    const pageChanges = changes.filter((c: any) => c.pageSlug === pagePath || c.pageId === pagePath);
+    if (pageChanges.length > 0) {
+      seoEdits.lastEditedAt = (pageChanges[0] as any)?.createdAt ?? null;
+    }
+    seoEdits.currentTitle = (pageKw as any)?.currentTitle ?? '';
+    seoEdits.currentMeta = (pageKw as any)?.currentMeta ?? '';
+  } catch {
+    // SEO changes optional
+  }
+
+  // Content status
+  let contentStatus: PageProfileSlice['contentStatus'] = null;
+  try {
+    const { listBriefs } = await import('./content-brief.js');
+    const briefs = listBriefs(workspaceId);
+    const hasBrief = briefs.some((b: any) => b.pageUrl === pagePath || b.targetUrl === pagePath);
+
+    let hasPost = false;
+    let isPublished = false;
+    try {
+      const { listPosts } = await import('./content-posts-db.js');
+      const posts = listPosts(workspaceId);
+      hasPost = posts.some((p: any) => p.pageUrl === pagePath || p.targetUrl === pagePath);
+      isPublished = posts.some((p: any) =>
+        ((p as any).pageUrl === pagePath || (p as any).targetUrl === pagePath) && (p as any).status === 'published',
+      );
+    } catch {
+      // Posts optional
+    }
+
+    let isDecaying = false;
+    try {
+      const { loadDecayAnalysis } = await import('./content-decay.js');
+      const decay = loadDecayAnalysis(workspaceId);
+      isDecaying = decay?.pages?.some((d: any) => (d.url ?? d.pageUrl ?? '') === pagePath) ?? false;
+    } catch {
+      // Decay optional
+    }
+
+    contentStatus = isDecaying ? 'decay_detected' : isPublished ? 'published' : hasPost ? 'has_post' : hasBrief ? 'has_brief' : null;
+  } catch {
+    contentStatus = null;
+  }
+
+  // CWV status
+  let cwvStatus: PageProfileSlice['cwvStatus'] = null;
+  try {
+    const { getWorkspace } = await import('./workspaces.js');
+    const ws = getWorkspace(workspaceId);
+    if ((ws as any)?.siteId) {
+      const { getPageSpeed } = await import('./performance-store.js');
+      const speedSnap = getPageSpeed((ws as any).siteId);
+      if (speedSnap?.result) {
+        const pages = (speedSnap.result as any).pages ?? [];
+        const pageData = pages.find((p: any) => p.url === pagePath || p.slug === pagePath);
+        if (pageData?.score != null) {
+          cwvStatus = pageData.score >= 90 ? 'good' : pageData.score >= 50 ? 'needs_improvement' : 'poor';
+        }
+      }
+    }
+  } catch {
+    cwvStatus = null;
+  }
+
+  return {
+    pagePath,
+    primaryKeyword: pageKw?.primaryKeyword ?? null,
+    searchIntent: pageKw?.searchIntent ?? null,
+    optimizationScore: (pageKw as any)?.optimizationScore ?? null,
+    recommendations,
+    contentGaps: [],
+    insights,
+    actions,
+    auditIssues,
+    schemaStatus,
+    linkHealth,
+    seoEdits,
+    rankHistory: { current, best, trend },
+    contentStatus,
+    cwvStatus,
+  };
 }
 
 // ── Cache management ────────────────────────────────────────────────────
