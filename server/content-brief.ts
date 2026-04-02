@@ -796,8 +796,9 @@ export async function generateBrief(
     const profile = pageIntel.pageProfile;
     if (profile) {
       const parts: string[] = [];
-      if (profile.auditIssues?.length) {
-        parts.push(`ISSUES IDENTIFIED:\n${profile.auditIssues.map(i => `- ${i}`).join('\n')}`);
+      // Use optimizationIssues (AI per-page keyword analysis) — not auditIssues (structural Webflow audit)
+      if (profile.optimizationIssues?.length) {
+        parts.push(`ISSUES IDENTIFIED:\n${profile.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
       }
       if (profile.recommendations?.length) {
         parts.push(`RECOMMENDATIONS:\n${profile.recommendations.map(r => `- ${r}`).join('\n')}`);
@@ -807,6 +808,24 @@ export async function generateBrief(
       }
       if (profile.optimizationScore != null) {
         parts.push(`OPTIMIZATION SCORE: ${profile.optimizationScore}/100`);
+      }
+      if (profile.primaryKeywordPresence) {
+        const p = profile.primaryKeywordPresence;
+        const missing = (['inTitle', 'inMeta', 'inContent', 'inSlug'] as const)
+          .filter(k => !p[k])
+          .map(k => ({ inTitle: 'title tag', inMeta: 'meta description', inContent: 'page content', inSlug: 'URL slug' }[k]));
+        if (missing.length > 0) {
+          parts.push(`PRIMARY KEYWORD MISSING FROM: ${missing.join(', ')}`);
+        }
+      }
+      if (profile.competitorKeywords?.length) {
+        parts.push(`COMPETITOR KEYWORDS TO CONSIDER: ${profile.competitorKeywords.join(', ')}`);
+      }
+      if (profile.topicCluster) {
+        parts.push(`TOPIC CLUSTER: ${profile.topicCluster}`);
+      }
+      if (profile.estimatedDifficulty) {
+        parts.push(`ESTIMATED DIFFICULTY: ${profile.estimatedDifficulty}`);
       }
       if (parts.length > 0) {
         pageAnalysisBlock = `\n\nPAGE ANALYSIS (address these issues in your rewrite — this is what our platform flagged for this page):\n${parts.join('\n')}`;

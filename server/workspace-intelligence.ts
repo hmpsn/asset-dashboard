@@ -1770,22 +1770,25 @@ async function assemblePageProfile(
     contentStatus = null;
   }
 
-  // contentGaps — from strategy content gaps filtered to this page
-  let contentGaps: string[] = [];
-  try {
-    const { getWorkspace: getWsForGaps } = await import('./workspaces.js');
-    const wsForGaps = getWsForGaps(workspaceId);
-    const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
-    if (allGaps.length > 0) {
-      const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
-      const matched = primaryKwLower
-        ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
-        : [];
-      const source = matched.length > 0 ? matched : allGaps;
-      contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
+  // contentGaps — prefer per-page AI keyword analysis (same source as old buildPageAnalysisContext),
+  // fall back to strategy content gaps filtered by keyword if page analysis hasn't run yet.
+  let contentGaps: string[] = pageKw?.contentGaps ?? [];
+  if (contentGaps.length === 0) {
+    try {
+      const { getWorkspace: getWsForGaps } = await import('./workspaces.js');
+      const wsForGaps = getWsForGaps(workspaceId);
+      const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
+      if (allGaps.length > 0) {
+        const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
+        const matched = primaryKwLower
+          ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
+          : [];
+        const source = matched.length > 0 ? matched : allGaps;
+        contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
+      }
+    } catch {
+      contentGaps = [];
     }
-  } catch {
-    contentGaps = [];
   }
 
   // CWV status
@@ -1809,16 +1812,28 @@ async function assemblePageProfile(
     cwvStatus = null;
   }
 
+  // Merge platform recs with AI keyword analysis recs — both are page-relevant.
+  // pageKw.recommendations come from the per-page AI keyword analysis job.
+  const kwRecs = pageKw?.recommendations ?? [];
+  const allRecommendations = kwRecs.length > 0
+    ? [...kwRecs, ...recommendations.filter(r => !kwRecs.includes(r))]
+    : recommendations;
+
   return {
     pagePath,
     primaryKeyword: pageKw?.primaryKeyword ?? null,
     searchIntent: pageKw?.searchIntent ?? null,
     optimizationScore: pageKw?.optimizationScore ?? null,
-    recommendations,
+    recommendations: allRecommendations,
     contentGaps,
     insights,
     actions,
     auditIssues,
+    optimizationIssues: pageKw?.optimizationIssues ?? [],
+    primaryKeywordPresence: pageKw?.primaryKeywordPresence ?? null,
+    competitorKeywords: pageKw?.competitorKeywords ?? [],
+    topicCluster: pageKw?.topicCluster ?? null,
+    estimatedDifficulty: pageKw?.estimatedDifficulty ?? null,
     schemaStatus,
     linkHealth,
     seoEdits,

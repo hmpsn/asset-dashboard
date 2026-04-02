@@ -106,11 +106,21 @@ export interface PageProfileSlice {
   primaryKeyword: string | null;
   searchIntent: string | null;
   optimizationScore: number | null;
+  /** Platform-wide action recommendations filtered to this page (from recommendation store). */
   recommendations: string[];
+  /** Per-page content gap topics from AI keyword analysis (getPageKeyword). */
   contentGaps: string[];
   insights: AnalyticsInsight[];
   actions: TrackedAction[];
+  /** Structural SEO issues from Webflow audit snapshot (missing tags, OG issues, etc.). */
   auditIssues: string[];
+  /** Keyword optimization issues from AI per-page keyword analysis. Distinct from auditIssues. */
+  optimizationIssues: string[];
+  /** Whether the primary keyword appears in key placement locations (from AI keyword analysis). */
+  primaryKeywordPresence: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | null;
+  competitorKeywords: string[];
+  topicCluster: string | null;
+  estimatedDifficulty: string | null;
   schemaStatus: 'valid' | 'warnings' | 'errors' | 'none';
   linkHealth: { inbound: number; outbound: number; orphan: boolean };
   seoEdits: { currentTitle: string; currentMeta: string; lastEditedAt: string | null };
