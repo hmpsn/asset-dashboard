@@ -159,8 +159,11 @@ export async function getKeywordRecommendations(
   if (useAI && candidates.length > 1) {
     try {
       const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+      const seoCtx = kwIntel.seoContext;
+      // Only call AI ranking when meaningful workspace context exists (formatForPrompt always returns non-empty)
+      const hasMeaningfulContext = !!(seoCtx?.businessContext || seoCtx?.knowledgeBase || seoCtx?.brandVoice || seoCtx?.personas?.length);
       // Use full context (business context + brand voice + personas + knowledge) for richer ranking
-      const bizContext = formatForPrompt(kwIntel, { verbosity: 'detailed', sections: ['seoContext'] });
+      const bizContext = hasMeaningfulContext ? formatForPrompt(kwIntel, { verbosity: 'detailed', sections: ['seoContext'] }) : '';
       if (bizContext) {
         const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
         // Mark the AI-recommended keyword

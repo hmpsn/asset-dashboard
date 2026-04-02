@@ -245,7 +245,7 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
     const teamName = 'hmpsn studio';
 
     // Pre-compute SEO context blocks for the system prompt
-    const intel = await buildWorkspaceIntelligence(ws.id);
+    const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
     const seoContextBlock = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] }) + formatPageMapForPrompt(intel.seoContext);
 
     // Content plan context (templates + matrices) — fetched server-side

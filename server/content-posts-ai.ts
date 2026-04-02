@@ -69,7 +69,7 @@ export async function callCreativeAI(opts: {
 }
 
 export async function buildVoiceContext(workspaceId: string): Promise<string> {
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], learningsDomain: 'content' });
   const seo = intel.seoContext;
   const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
   const kwMapBlock = formatPageMapForPrompt(seo);
