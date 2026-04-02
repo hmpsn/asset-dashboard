@@ -3062,6 +3062,19 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 201. Unified Workspace Intelligence Layer — Phase 3A Batch 1c (Prompt Formatting + Token Budget + Quality Gates)
+**What it does:** Completes Phase 3A with prompt-layer infrastructure and regression protection. (1) **`formatForPrompt()` expansion**: 5 new slice formatters (contentPipeline, siteHealth, clientSignals, operational, pageProfile) each with compact/standard/detailed verbosity. Fixed pre-existing gaps: personas at all verbosity levels, knowledgeBase at standard+, businessProfile at standard+, WeCalledIt proven predictions at standard+. (2) **`applyTokenBudget()` truncation**: §20 priority chain — drop operational → truncate insights to 5 → drop clientSignals → summarize learnings → never drop seoContext. Token estimation ~4 chars/token. Section filtering via `opts.sections` Set. (3) **Regression guards in `scripts/pr-check.ts`**: three new warn-severity rules — no direct `listPages()` outside workspace-data.ts, no direct `buildSeoContext()` outside grandfathered callers, `recordAction()` must be gated by `workspaceId`. (4) **120+ new tests**: format-for-prompt (34), token-budget (8), intelligence-integration (5), mini-builder-extraction (6), enrich-seo-context (3), scheduler-invalidation (4), ws-intelligence-cache (1). (5) **Bridge #9 fix**: `winRateByDifficultyRange` was dead code via `as any` cast on `byKdRange` — fixed to correct field and proper bucket keys (`'0-20'` through `'81-100'`). (6) **Isolated `getPendingActions()` error path**: split try/catch in outcome-crons so transient DB errors don't silently skip measurement.
+
+**Files:** `server/workspace-intelligence.ts` (formatForPrompt + applyTokenBudget), `scripts/pr-check.ts` (3 regression guards), `server/keyword-recommendations.ts` (Bridge #9 fix), `server/outcome-crons.ts` (isolated error paths), `tests/format-for-prompt.test.ts`, `tests/token-budget.test.ts`, `tests/intelligence-integration.test.ts`, `tests/mini-builder-extraction.test.ts`, `tests/enrich-seo-context.test.ts`, `tests/scheduler-invalidation.test.ts`, `tests/ws-intelligence-cache.test.ts`
+
+**Agency value:** AI advisors now receive token-budget-aware, priority-ordered context from all 8 intelligence slices. The system never drops seoContext under token pressure — operational data is truncated first. pr-check guards enforce the migration path for Phase 3B.
+
+**Client value:** (Indirect) Richer, prioritized AI context drives better recommendations and strategy suggestions with no token waste.
+
+**Mutual:** Completes Phase 3A. Foundation for Phase 3B mini-builder retirement — all callers can now migrate from `buildSeoContext()` to `buildWorkspaceIntelligence()` with full prompt formatting support.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3077,6 +3090,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**265 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**266 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **265**. Last updated: April 2026.
+Current feature count: **266**. Last updated: April 2026.
