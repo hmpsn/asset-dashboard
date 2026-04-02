@@ -170,6 +170,21 @@ describe('seo-audit.ts migration contracts', () => {
     // Accepts ['seoContext', 'learnings'] or ['seoContext', 'learnings', 'pageProfile'] (combined call)
     expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
+
+  it('N+1 prevention: seoContext assembled before the per-page batch loop (not inside it)', () => {
+    // Pre-assembly must appear before `for (let i = 0; i < pagesNeedingFixes`.
+    // seoContext is workspace-level; pageKeywords derived inline via pageMap.find().
+    const loopIdx = src.indexOf('for (let i = 0; i < pagesNeedingFixes');
+    expect(loopIdx).toBeGreaterThan(-1);
+    const beforeLoop = src.slice(0, loopIdx);
+    expect(beforeLoop).toContain("'seoContext'");
+  });
+
+  it('N+1 prevention: pageProfile still assembled per-page with pagePath inside loop', () => {
+    const loopIdx = src.indexOf('for (let i = 0; i < pagesNeedingFixes');
+    const afterLoop = src.slice(loopIdx);
+    expect(afterLoop).toContain("slices: ['pageProfile']");
+  });
 });
 
 // ── content-decay.ts ─────────────────────────────────────────────────────────

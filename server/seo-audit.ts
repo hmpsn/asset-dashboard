@@ -566,8 +566,10 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       return headingStr + text.slice(0, 2000);
     };
 
-    // Pre-assemble learnings once — workspace-level, doesn't use pagePath
-    const wsIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['learnings'] as const });
+    // Pre-assemble workspace-level slices once — learnings and seoContext base data are identical
+    // for every page. pageKeywords (the only page-specific seoContext field) is a find() on the
+    // pre-built pageMap, derived inline per page. pageProfile remains per-page (requires pagePath).
+    const wsIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['learnings', 'seoContext'] as const });
 
     const aiBatch = 15;
     for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
@@ -592,8 +594,14 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
           // Build keyword strategy + brand voice + KB + personas context for this page
           const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
-          const pageIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['seoContext', 'pageProfile'] as const, pagePath });
-          const intel = { ...wsIntel, seoContext: pageIntel.seoContext, pageProfile: pageIntel.pageProfile };
+          // Derive per-page keywords from pre-built pageMap — no extra DB call for seoContext
+          const seoCtx = wsIntel.seoContext ? { ...wsIntel.seoContext } : undefined;
+          if (seoCtx && pagePath && seoCtx.strategy?.pageMap?.length) {
+            const kw = seoCtx.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePath.toLowerCase());
+            if (kw) seoCtx.pageKeywords = kw;
+          }
+          const pageProfileIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['pageProfile'] as const, pagePath });
+          const intel = { ...wsIntel, seoContext: seoCtx, pageProfile: pageProfileIntel.pageProfile };
           const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
