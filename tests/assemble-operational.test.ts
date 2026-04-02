@@ -301,14 +301,15 @@ describe('assembleOperational', () => {
     expect(labels).toContain('Content refresh');
   });
 
-  it('preserves pageUrl on analytics annotations that have it', async () => {
+  it('analytics annotations do not include pageUrl (not in AnalyticsAnnotation interface)', async () => {
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['operational'] });
 
     const op = result.operational as OperationalSlice;
-    const withPageUrl = op.annotations.find(a => a.pageUrl === '/blog/test');
-    expect(withPageUrl).toBeDefined();
-    expect(withPageUrl?.label).toBe('Traffic spike');
+    // AnalyticsAnnotation has: id, workspaceId, date, label, category, createdBy, createdAt — no pageUrl
+    const trafficSpike = op.annotations.find(a => a.label === 'Traffic spike');
+    expect(trafficSpike).toBeDefined();
+    expect(trafficSpike?.pageUrl).toBeUndefined();
   });
 
   it('counts pending and running jobs as pendingJobs', async () => {

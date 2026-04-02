@@ -31,7 +31,7 @@ vi.mock('../server/content-subscriptions.js', () => ({
 }));
 
 vi.mock('../server/suggested-briefs-store.js', () => ({
-  getSuggestedBriefs: vi.fn(() => [
+  listSuggestedBriefs: vi.fn(() => [
     { id: 'sb1', status: 'pending' },
     { id: 'sb2', status: 'pending' },
     { id: 'sb3', status: 'accepted' },
@@ -111,9 +111,9 @@ describe('assembleContentPipeline', () => {
 
   it('returns sensible defaults when optional sources return empty/null', async () => {
     const { listContentSubscriptions } = await import('../server/content-subscriptions.js');
-    const { getSuggestedBriefs } = await import('../server/suggested-briefs-store.js');
+    const { listSuggestedBriefs } = await import('../server/suggested-briefs-store.js');
     vi.mocked(listContentSubscriptions).mockReturnValueOnce([]);
-    vi.mocked(getSuggestedBriefs).mockReturnValueOnce([]);
+    vi.mocked(listSuggestedBriefs).mockReturnValueOnce([]);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', {

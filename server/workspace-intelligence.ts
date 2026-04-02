@@ -39,6 +39,20 @@ import type {
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
+import type { Workspace } from '../shared/types/workspace.js';
+import type { PageKeywordMap } from '../shared/types/workspace.js';
+import type { ContentSubscription, ContentMatrix, GeneratedPost } from '../shared/types/content.js';
+import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
+import type { RecommendationSet } from '../shared/types/recommendations.js';
+import type { ApprovalBatch } from '../shared/types/approvals.js';
+import type { ChurnSignal } from './churn-signals.js';
+import type { DecayAnalysis } from './content-decay.js';
+import type { AuditSnapshot } from './reports.js';
+import type { ROIData } from './roi.js';
+import type { SeoChangeEvent } from './seo-change-tracker.js';
+import type { CannibalizationReport } from './cannibalization-detection.js';
+import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
+import type { Annotation as TimelineAnnotation } from './annotations.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -390,9 +404,9 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   let subscriptions: ContentPipelineSlice['subscriptions'];
   try {
     const { listContentSubscriptions } = await import('./content-subscriptions.js');
-    const subs = listContentSubscriptions(workspaceId) as any[];
-    const activeSubs = subs.filter((s: any) => s.status === 'active');
-    const totalPages = activeSubs.reduce((sum: number, s: any) => sum + (s.totalPages ?? s.postsPerMonth ?? 0), 0);
+    const subs: ContentSubscription[] = listContentSubscriptions(workspaceId);
+    const activeSubs = subs.filter(s => s.status === 'active');
+    const totalPages = activeSubs.reduce((sum, s) => sum + (s.postsPerMonth ?? 0), 0);
     subscriptions = { active: activeSubs.length, totalPages };
   } catch {
     // Non-critical — subscriptions optional
@@ -406,11 +420,11 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     if (ws?.webflowSiteId) {
       const { getSchemaPlan } = await import('./schema-store.js');
       const { listPendingSchemas } = await import('./schema-queue.js');
-      const plan = getSchemaPlan(ws.webflowSiteId) as any;
-      const pending = listPendingSchemas(workspaceId) as any[];
-      const planned = plan?.pages?.length ?? 0;
+      const plan: SchemaSitePlan | null = getSchemaPlan(ws.webflowSiteId);
+      const pending = listPendingSchemas(workspaceId);
+      const planned = plan?.pageRoles?.length ?? 0;
       const deployed = Math.max(0, planned - pending.length);
-      const types = [...new Set((plan?.pages ?? []).map((p: any) => p.schemaType).filter(Boolean))] as string[];
+      const types = [...new Set((plan?.pageRoles ?? []).map(p => p.primaryType).filter(Boolean))];
       schemaDeployment = { planned, deployed, types };
     }
   } catch {
@@ -422,11 +436,11 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   try {
     const { listMatrices } = await import('./content-matrices.js');
     const { detectMatrixCannibalization } = await import('./cannibalization-detection.js');
-    const matrices = listMatrices(workspaceId) as any[];
+    const matrices: ContentMatrix[] = listMatrices(workspaceId);
     for (const matrix of matrices.slice(0, 5)) {
-      const report = detectMatrixCannibalization(workspaceId, matrix.id) as any;
+      const report: CannibalizationReport = detectMatrixCannibalization(workspaceId, matrix.id);
       if (report?.conflicts) {
-        for (const conflict of (report.conflicts as any[]).slice(0, 10)) {
+        for (const conflict of report.conflicts.slice(0, 10)) {
           cannibalizationWarnings.push({
             keyword: conflict.keyword ?? '',
             pages: conflict.pages ?? [],
@@ -443,9 +457,9 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   let decayAlerts: DecayAlert[] = [];
   try {
     const { loadDecayAnalysis } = await import('./content-decay.js');
-    const decay = loadDecayAnalysis(workspaceId) as any;
+    const decay: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
     if (decay?.decayingPages) {
-      decayAlerts = (decay.decayingPages as any[]).slice(0, 20).map((p: any) => ({
+      decayAlerts = decay.decayingPages.slice(0, 20).map(p => ({
         pageUrl: p.page ?? '',
         clickDrop: p.clickDeclinePct ?? 0,
         detectedAt: p.detectedAt ?? decay.analyzedAt ?? new Date().toISOString(),
@@ -460,9 +474,9 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   // Suggested briefs count
   let suggestedBriefs = 0;
   try {
-    const { getSuggestedBriefs } = await import('./suggested-briefs-store.js');
-    const briefs = getSuggestedBriefs(workspaceId) as any[];
-    suggestedBriefs = briefs.filter((b: any) => b.status === 'pending').length;
+    const { listSuggestedBriefs } = await import('./suggested-briefs-store.js');
+    const briefs = listSuggestedBriefs(workspaceId);
+    suggestedBriefs = briefs.filter(b => b.status === 'pending').length;
   } catch {
     // Non-critical — suggested briefs optional
   }
@@ -727,16 +741,16 @@ async function assembleClientSignals(
     // NOTE: dynamic import required — churn-signals.ts statically imports from this module
     const { listChurnSignals } = await import('./churn-signals.js');
     // listChurnSignals already filters to undismissed signals via SQL (WHERE dismissed_at IS NULL)
-    const signals = listChurnSignals(workspaceId);
+    const signals: ChurnSignal[] = listChurnSignals(workspaceId);
     churnFetchSucceeded = true;
-    churnSignals = signals.map((s: any) => ({
-      type: s.type ?? '',
-      severity: s.severity ?? 'warning',
-      detectedAt: s.detectedAt ?? '',
+    churnSignals = signals.map(s => ({
+      type: s.type,
+      severity: s.severity,
+      detectedAt: s.detectedAt,
     }));
     // ChurnSignal.severity is 'critical' | 'warning' | 'positive' — map to churnRisk levels
-    const criticalCount = signals.filter((s: any) => s.severity === 'critical').length;
-    const warningCount = signals.filter((s: any) => s.severity === 'warning').length;
+    const criticalCount = signals.filter(s => s.severity === 'critical').length;
+    const warningCount = signals.filter(s => s.severity === 'warning').length;
     churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : signals.length > 0 ? 'low' : null;
   } catch {
     // Churn signals optional — churnFetchSucceeded stays false
@@ -746,10 +760,10 @@ async function assembleClientSignals(
   let approvalPatterns = { approvalRate: 0, avgResponseTime: null as number | null };
   try {
     const { listBatches } = await import('./approvals.js');
-    const batches = listBatches(workspaceId);
+    const batches: ApprovalBatch[] = listBatches(workspaceId);
     let approved = 0, total = 0;
     for (const batch of batches) {
-      for (const item of (batch as any).items ?? []) {
+      for (const item of batch.items ?? []) {
         total++;
         if (item.status === 'approved') approved++;
       }
@@ -768,7 +782,7 @@ async function assembleClientSignals(
     const { listClientUsers } = await import('./client-users.js');
     const users = listClientUsers(workspaceId);
     const latestLogin = users
-      .map((u: any) => u.lastLoginAt)
+      .map(u => (u as any).lastLoginAt as string | undefined)
       .filter(Boolean)
       .sort()
       .reverse()[0] ?? null;
@@ -800,13 +814,13 @@ async function assembleClientSignals(
   // ROI data
   let roi: ClientSignalsSlice['roi'] = null;
   try {
-    const { getROISummary } = await import('./roi.js');
-    const roiData = getROISummary(workspaceId);
+    const { computeROI } = await import('./roi.js');
+    const roiData: ROIData | null = computeROI(workspaceId);
     if (roiData) {
       roi = {
-        organicValue: (roiData as any).organicValue ?? (roiData as any).value ?? 0,
-        growth: (roiData as any).growth ?? (roiData as any).growthPercent ?? 0,
-        period: (roiData as any).period ?? 'monthly',
+        organicValue: roiData.organicTrafficValue,
+        growth: roiData.growthPercent ?? 0,
+        period: 'monthly',
       };
     }
   } catch {
@@ -927,20 +941,19 @@ async function assembleOperational(
   let annotations: OperationalSlice['annotations'] = [];
   try {
     const { getAnnotations } = await import('./analytics-annotations.js');
-    const analyticsAnnotations = getAnnotations(workspaceId);
-    annotations = analyticsAnnotations.slice(0, 20).map((a: any) => ({
+    const analyticsAnnotations: AnalyticsAnnotation[] = getAnnotations(workspaceId);
+    annotations = analyticsAnnotations.slice(0, 20).map(a => ({
       date: a.date ?? '',
       label: a.label ?? '',
-      pageUrl: (a as any).pageUrl,
     }));
   } catch {
     // Analytics annotations optional
   }
   try {
     const { listAnnotations } = await import('./annotations.js');
-    const timelineAnnotations = listAnnotations(workspaceId);
+    const timelineAnnotations: TimelineAnnotation[] = listAnnotations(workspaceId);
     for (const a of timelineAnnotations.slice(0, 10)) {
-      annotations.push({ date: (a as any).date ?? '', label: (a as any).label ?? '' });
+      annotations.push({ date: a.date ?? '', label: a.label ?? '' });
     }
   } catch {
     // Timeline annotations optional
@@ -961,13 +974,13 @@ async function assembleOperational(
   try {
     const { getUsageSummary } = await import('./usage-tracking.js');
     const { getWorkspace } = await import('./workspaces.js');
-    const ws = getWorkspace(workspaceId);
-    const tier = (ws as any)?.tier ?? 'free';
+    const ws: Workspace | undefined = getWorkspace(workspaceId);
+    const tier = ws?.tier ?? 'free';
     const summary = getUsageSummary(workspaceId, tier);
     let totalMinutes = 0;
     const byFeature: Record<string, number> = {};
     for (const [feature, data] of Object.entries(summary)) {
-      const minutes = ((data as any).used ?? 0) * 5;
+      const minutes = (data.used ?? 0) * 5;
       totalMinutes += minutes;
       if (minutes > 0) byFeature[feature] = minutes;
     }
@@ -982,11 +995,11 @@ async function assembleOperational(
   let approvalQueue: OperationalSlice['approvalQueue'] = { pending: 0, oldestAge: null };
   try {
     const { listBatches } = await import('./approvals.js');
-    const batches = listBatches(workspaceId);
+    const batches: ApprovalBatch[] = listBatches(workspaceId);
     let pending = 0;
     let oldestMs = 0;
     for (const batch of batches) {
-      for (const item of (batch as any).items ?? []) {
+      for (const item of batch.items ?? []) {
         if (item.status === 'pending') {
           pending++;
           const age = Date.now() - new Date(item.createdAt ?? '').getTime();
@@ -1003,9 +1016,9 @@ async function assembleOperational(
   let recommendationQueue = { fixNow: 0, fixSoon: 0, fixLater: 0 };
   try {
     const { loadRecommendations } = await import('./recommendations.js');
-    const recSet = loadRecommendations(workspaceId);
-    if ((recSet as any)?.recommendations) {
-      for (const rec of (recSet as any).recommendations) {
+    const recSet: RecommendationSet | null = loadRecommendations(workspaceId);
+    if (recSet?.recommendations) {
+      for (const rec of recSet.recommendations) {
         if (rec.status === 'pending' || !rec.status) {
           if (rec.priority === 'fix_now') recommendationQueue.fixNow++;
           else if (rec.priority === 'fix_soon') recommendationQueue.fixSoon++;
@@ -1199,7 +1212,7 @@ async function assemblePageProfile(
   _opts?: IntelligenceOptions,
 ): Promise<PageProfileSlice> {
   // Page keywords (primary source)
-  let pageKw: any = null;
+  let pageKw: PageKeywordMap | undefined;
   try {
     const { getPageKeyword } = await import('./page-keywords.js');
     pageKw = getPageKeyword(workspaceId, pagePath);
@@ -1238,10 +1251,11 @@ async function assemblePageProfile(
   try {
     const { loadRecommendations } = await import('./recommendations.js');
     const recSet = loadRecommendations(workspaceId);
-    if ((recSet as any)?.recommendations) {
-      recommendations = (recSet as any).recommendations
-        .filter((r: any) => r.pageUrl === pagePath && (r.status === 'pending' || !r.status))
-        .map((r: any) => r.title ?? r.description ?? '')
+    const recSetPP: RecommendationSet | null = loadRecommendations(workspaceId);
+    if (recSetPP?.recommendations) {
+      recommendations = recSetPP.recommendations
+        .filter(r => r.affectedPages?.includes(pagePath) && (r.status === 'pending' || !r.status))
+        .map(r => r.title ?? r.description ?? '')
         .filter(Boolean);
     }
   } catch {
@@ -1327,13 +1341,13 @@ async function assemblePageProfile(
   let seoEdits = { currentTitle: '', currentMeta: '', lastEditedAt: null as string | null };
   try {
     const { getSeoChanges } = await import('./seo-change-tracker.js');
-    const changes = getSeoChanges(workspaceId, 50);
-    const pageChanges = changes.filter((c: any) => c.pageSlug === pagePath || c.pageId === pagePath);
+    const changes: SeoChangeEvent[] = getSeoChanges(workspaceId, 50);
+    const pageChanges = changes.filter(c => c.pageSlug === pagePath || c.pageId === pagePath);
     if (pageChanges.length > 0) {
-      seoEdits.lastEditedAt = (pageChanges[0] as any)?.changedAt ?? null;
+      seoEdits.lastEditedAt = pageChanges[0].changedAt ?? null;
     }
-    seoEdits.currentTitle = (pageKw as any)?.currentTitle ?? '';
-    seoEdits.currentMeta = (pageKw as any)?.currentMeta ?? '';
+    seoEdits.currentTitle = pageKw?.pageTitle ?? '';
+    seoEdits.currentMeta = '';
   } catch {
     // SEO changes optional
   }
@@ -1361,8 +1375,8 @@ async function assemblePageProfile(
     let isDecaying = false;
     try {
       const { loadDecayAnalysis } = await import('./content-decay.js');
-      const decay = loadDecayAnalysis(workspaceId);
-      isDecaying = (decay as any)?.decayingPages?.some((d: any) => d.page === pagePath) ?? false;
+      const decayPP: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
+      isDecaying = decayPP?.decayingPages?.some(d => d.page === pagePath) ?? false;
     } catch {
       // Decay optional
     }
@@ -1396,7 +1410,7 @@ async function assemblePageProfile(
     pagePath,
     primaryKeyword: pageKw?.primaryKeyword ?? null,
     searchIntent: pageKw?.searchIntent ?? null,
-    optimizationScore: (pageKw as any)?.optimizationScore ?? null,
+    optimizationScore: pageKw?.optimizationScore ?? null,
     recommendations,
     contentGaps: [],
     insights,

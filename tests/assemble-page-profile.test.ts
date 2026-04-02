@@ -13,7 +13,7 @@ vi.mock('../server/page-keywords.js', () => ({
 vi.mock('../server/recommendations.js', () => ({
   loadRecommendations: vi.fn(() => ({
     recommendations: [
-      { id: 'r1', priority: 'fix_now', status: 'pending', pageUrl: '/about', title: 'Add meta description' },
+      { id: 'r1', priority: 'fix_now', status: 'pending', affectedPages: ['/about'], title: 'Add meta description' },
     ],
   })),
 }));

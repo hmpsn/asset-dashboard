@@ -29,7 +29,7 @@ vi.mock('../server/approvals.js', () => ({
 }));
 
 vi.mock('../server/roi.js', () => ({
-  getROISummary: vi.fn(() => null),
+  computeROI: vi.fn(() => null),
 }));
 
 vi.mock('../server/feedback.js', () => ({
@@ -256,7 +256,7 @@ describe('assembleClientSignals', () => {
 
   it('computes compositeHealthScore when enough components are available', async () => {
     const { listClientUsers } = await import('../server/client-users.js');
-    const { getROISummary } = await import('../server/roi.js');
+    const { computeROI } = await import('../server/roi.js');
     const { listChurnSignals } = await import('../server/churn-signals.js');
 
     // Daily login = high engagement
@@ -267,7 +267,7 @@ describe('assembleClientSignals', () => {
     // No churn signals = 100 churn score
     vi.mocked(listChurnSignals).mockReturnValueOnce([]);
     // Positive ROI growth
-    vi.mocked(getROISummary).mockReturnValueOnce({ organicValue: 5000, growth: 15, period: 'monthly' } as any);
+    vi.mocked(computeROI).mockReturnValueOnce({ organicTrafficValue: 5000, adSpendEquivalent: 3000, growthPercent: 15, pageBreakdown: [], totalClicks: 100, totalImpressions: 1000, avgCPC: 1.5, trackedPages: 10, contentROI: null, contentItems: [] } as any);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['clientSignals'] });
@@ -280,8 +280,8 @@ describe('assembleClientSignals', () => {
 
   it('omits compositeHealthScore when only 1 component is available', async () => {
     // Only ROI — no login data, no churn signals
-    const { getROISummary } = await import('../server/roi.js');
-    vi.mocked(getROISummary).mockReturnValueOnce({ organicValue: 1000, growth: 5, period: 'monthly' } as any);
+    const { computeROI } = await import('../server/roi.js');
+    vi.mocked(computeROI).mockReturnValueOnce({ organicTrafficValue: 1000, adSpendEquivalent: 600, growthPercent: 5, pageBreakdown: [], totalClicks: 50, totalImpressions: 500, avgCPC: 1.0, trackedPages: 5, contentROI: null, contentItems: [] } as any);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['clientSignals'] });
@@ -340,9 +340,9 @@ describe('assembleClientSignals', () => {
     expect(cs.feedbackItems?.length).toBe(10);
   });
 
-  it('populates ROI from getROISummary', async () => {
-    const { getROISummary } = await import('../server/roi.js');
-    vi.mocked(getROISummary).mockReturnValueOnce({ organicValue: 3500, growth: 8.5, period: 'monthly' } as any);
+  it('populates ROI from computeROI', async () => {
+    const { computeROI } = await import('../server/roi.js');
+    vi.mocked(computeROI).mockReturnValueOnce({ organicTrafficValue: 3500, adSpendEquivalent: 2000, growthPercent: 8.5, pageBreakdown: [], totalClicks: 80, totalImpressions: 800, avgCPC: 1.2, trackedPages: 8, contentROI: null, contentItems: [] } as any);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['clientSignals'] });
@@ -400,7 +400,7 @@ describe('assembleClientSignals', () => {
     const { listChurnSignals } = await import('../server/churn-signals.js');
     const { listBatches } = await import('../server/approvals.js');
     const { listClientUsers } = await import('../server/client-users.js');
-    const { getROISummary } = await import('../server/roi.js');
+    const { computeROI } = await import('../server/roi.js');
     const { listFeedback } = await import('../server/feedback.js');
     const { listRequests } = await import('../server/requests.js');
     const { listSessions } = await import('../server/chat-memory.js');
@@ -408,7 +408,7 @@ describe('assembleClientSignals', () => {
     vi.mocked(listChurnSignals).mockImplementationOnce(() => { throw new Error('churn db down'); });
     vi.mocked(listBatches).mockImplementationOnce(() => { throw new Error('approvals db down'); });
     vi.mocked(listClientUsers).mockImplementationOnce(() => { throw new Error('users db down'); });
-    vi.mocked(getROISummary).mockImplementationOnce(() => { throw new Error('roi db down'); });
+    vi.mocked(computeROI).mockImplementationOnce(() => { throw new Error('roi db down'); });
     vi.mocked(listFeedback).mockImplementationOnce(() => { throw new Error('feedback db down'); });
     vi.mocked(listRequests).mockImplementationOnce(() => { throw new Error('requests db down'); });
     vi.mocked(listSessions).mockImplementationOnce(() => { throw new Error('chat db down'); });
