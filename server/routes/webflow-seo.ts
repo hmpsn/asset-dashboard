@@ -402,7 +402,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
   const results = [];
   for (const page of pages) {
     try {
-      const bulkFixIntel = await buildWorkspaceIntelligence(workspaceId || ws?.id, { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
+      const bulkFixIntel = await buildWorkspaceIntelligence(workspaceId || ws?.id || '', { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
       const bulkFixSeo = bulkFixIntel.seoContext;
       const keywordBlock = formatKeywordsForPrompt(bulkFixSeo);
       const bvBlock = bulkFixSeo?.brandVoice ?? '';

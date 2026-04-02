@@ -406,7 +406,7 @@ router.post('/api/jobs', async (req, res) => {
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
-                const bwsIntel = await buildWorkspaceIntelligence(bwsId ?? '', { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
+                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
                 const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
                 const bvb = bwsIntel.seoContext?.brandVoice ?? '';
 

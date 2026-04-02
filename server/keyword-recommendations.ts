@@ -158,9 +158,9 @@ export async function getKeywordRecommendations(
   // If AI scoring is enabled and we have business context, re-rank
   if (useAI && candidates.length > 1) {
     try {
-      const _kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+      const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
       // Use full context (business context + brand voice + personas + knowledge) for richer ranking
-      const bizContext = formatForPrompt(_kwIntel, { verbosity: 'detailed', sections: ['seoContext'] });
+      const bizContext = formatForPrompt(kwIntel, { verbosity: 'detailed', sections: ['seoContext'] });
       if (bizContext) {
         const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
         // Mark the AI-recommended keyword

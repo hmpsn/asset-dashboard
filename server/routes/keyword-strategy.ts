@@ -649,10 +649,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (businessContext) {
       businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
     }
-    const _strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
-    const _strategySeo = _strategyIntel.seoContext;
-    const kbBlock = _strategySeo?.knowledgeBase ?? '';
-    const persBlock = formatPersonasForPrompt(_strategySeo?.personas ?? []);
+    const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const strategySeo = strategyIntel.seoContext;
+    const kbBlock = strategySeo?.knowledgeBase ?? '';
+    const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
     if (kbBlock) {
       businessSection += kbBlock + '\n';
     }
