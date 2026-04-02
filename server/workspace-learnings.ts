@@ -611,6 +611,12 @@ export function invalidateLearningsCache(workspaceId: string): void {
   log.info({ workspaceId }, 'Workspace learnings cache invalidated');
 }
 
+/** Returns workspace IDs that have scored outcomes (same set recomputeAll processes). */
+export function getWorkspaceIdsWithOutcomes(): string[] {
+  const rows = stmts().allWorkspaceIds.all() as Array<{ workspace_id: string }>;
+  return rows.map(r => r.workspace_id);
+}
+
 // --- Batch recompute (for daily cron) ---
 
 export async function recomputeAllWorkspaceLearnings(): Promise<void> {
