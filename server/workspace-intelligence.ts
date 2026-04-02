@@ -297,8 +297,13 @@ async function assembleInsights(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<InsightsSlice> {
-  const { getInsights } = await import('./analytics-insights-store.js');
-  const all: AnalyticsInsight[] = getInsights(workspaceId);
+  let all: AnalyticsInsight[] = [];
+  try {
+    const { getInsights } = await import('./analytics-insights-store.js');
+    all = getInsights(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'assembleInsights: getInsights failed, returning empty slice');
+  }
 
   // Cap at 100, sorted by impact score descending (§13)
   const sorted = [...all].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
@@ -348,10 +353,16 @@ async function assembleLearnings(
     };
   }
 
-  const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
-  const { getPlaybooks } = await import('./outcome-playbooks.js');
-  const summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
-  const playbooks = getPlaybooks(workspaceId);
+  let summary: ReturnType<Awaited<typeof import('./workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
+  let playbooks: ReturnType<Awaited<typeof import('./outcome-playbooks.js')>['getPlaybooks']> = [];
+  try {
+    const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
+    const { getPlaybooks } = await import('./outcome-playbooks.js');
+    summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
+    playbooks = getPlaybooks(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'assembleLearnings: core data load failed, degrading to empty learnings');
+  }
 
   // ROI attribution enrichment
   let roiAttribution: ROIAttribution[] = [];
@@ -408,8 +419,13 @@ async function assembleLearnings(
 }
 
 async function assembleContentPipeline(workspaceId: string): Promise<ContentPipelineSlice> {
-  const { getContentPipelineSummary } = await import('./workspace-data.js');
-  const summary = getContentPipelineSummary(workspaceId);
+  let summary: ReturnType<Awaited<typeof import('./workspace-data.js')>['getContentPipelineSummary']> | undefined;
+  try {
+    const { getContentPipelineSummary } = await import('./workspace-data.js');
+    summary = getContentPipelineSummary(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'assembleContentPipeline: getContentPipelineSummary failed, degrading to empty slice');
+  }
 
   // Coverage gaps: strategy keywords without any brief
   let coverageGaps: string[] = [];
