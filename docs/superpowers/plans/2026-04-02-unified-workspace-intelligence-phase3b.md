@@ -442,6 +442,11 @@ const kwMapBlock = formatPageMapForPrompt(seo!);
 
 - [ ] **Verify equivalence:** The AI-facing prompt string must contain the same data as before. Add or update existing brief-generation tests to verify.
 
+- [ ] **Prompt enrichment (stretch goal):** Since `buildWorkspaceIntelligence` can return multiple slices in one cached call, request `slices: ['seoContext', 'learnings', 'contentPipeline']` and inject:
+  - **`learnings.topPatterns`** — "your highest-performing content format is X" helps the AI recommend outline structure
+  - **`contentPipeline.cannibalizationWarnings`** — if the target keyword is cannibalized, the brief should note "differentiate from [competing page]" rather than writing a generic page
+  - Format as an optional `## Workspace Learnings` block appended to the prompt — callers that don't benefit can omit it
+
 **Acceptance criteria:**
 - [ ] All 5 callers migrated — no `buildSeoContext`, `buildKeywordMapContext`, or `buildPageAnalysisContext` imports remain
 - [ ] `npx tsx scripts/pr-check.ts` shows no buildSeoContext warning for `content-brief.ts`
@@ -464,6 +469,8 @@ const kwMapBlock = formatPageMapForPrompt(seo!);
   - `aeo-page-review.ts:157` — extracts 5 fields → replace with `buildWorkspaceIntelligence({ slices: ['seoContext'] })` + individual field access
   - `content-posts-ai.ts:73` — extracts `fullContext` → use `formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] })`
   - `content-posts-ai.ts:74` — `buildKeywordMapContext` → use `formatPageMapForPrompt(seo!)`
+
+- [ ] **Prompt enrichment (stretch goal) for `aeo-page-review.ts`:** Request `slices: ['seoContext', 'learnings']` and inject `learnings.topPatterns` as a `## Data-Backed Patterns` block. AEO recommendations become more credible when backed by "pages with author bylines and 3+ sources rank higher in your workspace."
 
 **Acceptance criteria:**
 - [ ] All 4 callers migrated
@@ -626,6 +633,8 @@ This is the highest-density file. Read it carefully before touching.
 
 - [ ] **Remove from pr-check exclude list** (handled in Task 12)
 
+- [ ] **Prompt enrichment (stretch goal):** The admin chat orchestrator already fetches learnings separately — but after migration, a single `buildWorkspaceIntelligence({ slices: ['seoContext', 'learnings', 'clientSignals'] })` call replaces both. Inject `clientSignals.compositeHealthScore` as a headline metric so the AI can say "your workspace health is 72/100 (engagement down, ROI up)" when asked for a status update.
+
 **Acceptance criteria:**
 - [ ] No `buildSeoContext` or `buildPageAnalysisContext` imports remain in `admin-chat-context.ts`
 - [ ] Admin chat still works end-to-end (test by asking a question that triggers strategy/SEO context)
@@ -674,6 +683,16 @@ This is the highest-density file. Read it carefully before touching.
   npx tsx scripts/pr-check.ts --all 2>&1 | grep -E "buildSeoContext|buildKeywordMapContext|buildPageAnalysisContext"
   ```
   Should show only `✓` lines for all three rules.
+
+- [ ] **Remove all `clearSeoContextCache` calls (now dead code):**
+  After migration, the mini-builder cache is no longer used. Remove:
+  - `routes/workspaces.ts:211` — remove `clearSeoContextCache(req.params.id)` (keep the `invalidateIntelligenceCache` call that's already there)
+  - `routes/webflow-keywords.ts:185` — remove `clearSeoContextCache(workspaceId)` (keep `invalidateIntelligenceCache`)
+  - `routes/keyword-strategy.ts:1745,1782,1928,1938` — remove all 4 `clearSeoContextCache` calls (keep `invalidateIntelligenceCache`)
+  - `routes/jobs.ts:854` — remove `clearSeoContextCache(paWsId)` (keep `invalidateIntelligenceCache`)
+  - `routes/public-portal.ts:483` — remove `clearSeoContextCache(wsId)` (keep `invalidateIntelligenceCache`)
+  - Remove the `clearSeoContextCache` import from each of these files
+  - Do NOT remove the function definition in `seo-context.ts` yet — it will be removed when the file itself is deprecated
 
 - [ ] **Consider upgrading `listPages` rule to `error` as well** — all 20 callers were migrated in Phase 1. Check if any remain:
   ```bash
@@ -809,5 +828,6 @@ Once `buildSeoContext` is error-severity, consider adding a complementary positi
 | pr-check buildSeoContext rule → error | Task 12 | — |
 | pr-check buildKeywordMapContext + buildPageAnalysisContext rules added | Task 12 | — |
 | Grandfathered exclusions removed | Task 12 | — |
+| clearSeoContextCache dead code removed (8 call sites) | Task 12 | — |
 | Equivalence test suite passes | Task 13 | — |
 | FEATURE_AUDIT + roadmap updated | Task 14 | — |
