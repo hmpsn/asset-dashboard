@@ -39,7 +39,7 @@ import type {
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
-import type { Workspace } from '../shared/types/workspace.js';
+import type { Workspace, AudiencePersona } from '../shared/types/workspace.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
 import type { ContentSubscription, ContentMatrix, GeneratedPost } from '../shared/types/content.js';
 import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
@@ -1787,4 +1787,87 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
 /** Cache stats for health endpoint (§18) */
 export function getIntelligenceCacheStats() {
   return intelligenceCache.stats();
+}
+
+// ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
+// These produce prompt-ready text from intelligence slice data, matching the
+// output format of the legacy mini-builders in seo-context.ts.
+
+/**
+ * Format site keywords into a prompt block matching buildSeoContext().keywordBlock format.
+ * Used by migrated callers to replace buildSeoContext() with buildWorkspaceIntelligence().
+ */
+export function formatKeywordsForPrompt(seo: SeoContextSlice | null | undefined): string {
+  if (!seo?.strategy) return '';
+
+  let keywordBlock = '';
+
+  // Site-level keywords (matches seo-context.ts line 111-112)
+  const siteKw = seo.strategy.siteKeywords?.slice(0, 8).join(', ');
+  if (siteKw) keywordBlock += `Site target keywords: ${siteKw}`;
+
+  // Business context (matches seo-context.ts line 115-118)
+  const businessContext = seo.businessContext || seo.strategy.businessContext || '';
+  if (businessContext) {
+    keywordBlock += `\nGeneral business context: ${businessContext}`;
+  }
+
+  // Page-specific keywords from pageKeywords slice field (matches seo-context.ts line 121-133)
+  const pageKw = seo.pageKeywords;
+  if (pageKw) {
+    keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
+    keywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
+    if (pageKw.secondaryKeywords?.length) {
+      keywordBlock += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
+    }
+    if (pageKw.searchIntent) {
+      keywordBlock += `\nSearch intent: ${pageKw.searchIntent}`;
+    }
+    keywordBlock += `\nIMPORTANT: If this page's keywords reference a specific location (city, state, region), ALWAYS use THAT location. Do NOT substitute the business headquarters or a different location from the general business context. The page-level keyword is the authoritative signal for what this page targets.`;
+  }
+
+  if (!keywordBlock) return '';
+  return `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
+}
+
+/**
+ * Format audience personas into a prompt block matching buildSeoContext().personasBlock format.
+ * Used by migrated callers to replace buildSeoContext() with buildWorkspaceIntelligence().
+ */
+export function formatPersonasForPrompt(personas: AudiencePersona[] | null | undefined): string {
+  if (!personas?.length) return '';
+
+  // Matches buildPersonasContext() in seo-context.ts lines 322-331
+  const personaStr = personas.map(p => {
+    const parts = [`**${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
+    if (p.painPoints.length) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
+    if (p.goals.length) parts.push(`  Goals: ${p.goals.join('; ')}`);
+    if (p.objections.length) parts.push(`  Objections: ${p.objections.join('; ')}`);
+    if (p.preferredContentFormat) parts.push(`  Prefers: ${p.preferredContentFormat}`);
+    return parts.join('\n');
+  }).join('\n\n');
+
+  return `\n\nTARGET AUDIENCE PERSONAS (write to address these specific people — their pain points, goals, and objections):\n${personaStr}`;
+}
+
+/**
+ * Format page keyword map into a prompt block matching buildKeywordMapContext() format.
+ * If pagePath is provided, includes only the matching page's data. Otherwise includes all pages.
+ * Used by migrated callers to replace buildKeywordMapContext() with buildWorkspaceIntelligence().
+ */
+export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, pagePath?: string): string {
+  if (!seo?.strategy?.pageMap?.length) return '';
+
+  const pageMap = pagePath
+    ? seo.strategy.pageMap.filter(p => p.pagePath === pagePath)
+    : seo.strategy.pageMap;
+
+  if (!pageMap.length) return '';
+
+  // Matches buildKeywordMapContext() in seo-context.ts lines 395-399
+  const mapStr = pageMap.map(
+    p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}`
+  ).join('\n');
+
+  return `\n\nEXISTING KEYWORD MAP (avoid cannibalization, suggest internal links where relevant):\n${mapStr}`;
 }
