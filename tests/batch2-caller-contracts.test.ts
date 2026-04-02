@@ -41,14 +41,27 @@ function hasSlicesSeoContextLearnings(src: string): boolean {
   return (
     src.includes("slices: ['seoContext', 'learnings']") ||
     src.includes("slices: ['seoContext', 'learnings',") ||
-    // split-assembly pattern: learnings hoisted outside loop as its own standalone call
-    src.includes("slices: ['learnings']") ||
-    src.includes("slices: ['learnings',") ||
     // slices-var pattern: array literal assigned to a const
     /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'seoContext'[^\]]*'learnings'[^\]]*\]/.test(src) ||
     /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'learnings'[^\]]*\]/.test(src) ||
     // buildIntelPrompt pattern B
     /buildIntelPrompt\([^,]+,\s*\[[^\]]*'seoContext'[^\]]*'learnings'[^\]]*\]/.test(src)
+  );
+}
+
+/**
+ * Returns true if the source assembles 'learnings' in any slices call.
+ * Used for parity checks — verifies learnings is assembled (not necessarily alongside seoContext).
+ * Accepts both combined calls and the split-assembly pattern (learnings hoisted separately).
+ */
+function hasSliceLearnings(src: string): boolean {
+  return (
+    // learnings in any inline slices call
+    /slices:\s*\[[^\]]*'learnings'/.test(src) ||
+    // slices-var containing learnings
+    /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'learnings'[^\]]*\]/.test(src) ||
+    // buildIntelPrompt with learnings
+    /buildIntelPrompt\([^,]+,\s*\[[^\]]*'learnings'[^\]]*\]/.test(src)
   );
 }
 
@@ -293,8 +306,10 @@ describe('slices/sections consistency — learnings section requires learnings s
       const hasSectionsWithLearnings = hasSectionsSeoContextLearnings(src);
       if (!hasSectionsWithLearnings) return; // Not applicable — no learnings section requested
 
-      // Must have 'learnings' in slices — inline literal, slices-var, or buildIntelPrompt
-      expect(hasSlicesSeoContextLearnings(src)).toBe(true);
+      // Must assemble 'learnings' — inline literal, slices-var, or buildIntelPrompt.
+      // Uses hasSliceLearnings (not hasSlicesSeoContextLearnings) to allow the split-assembly
+      // pattern where learnings is hoisted separately from seoContext (e.g. seo-audit.ts).
+      expect(hasSliceLearnings(src)).toBe(true);
     });
   }
 });
