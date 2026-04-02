@@ -3831,7 +3831,7 @@
           "est": "20-30h",
           "priority": "P1",
           "sprint": "E",
-          "notes": "In progress. PR #118 covers Tasks 1-3 (shared types, bridge wiring, siteHealth assembler). Tasks 4-17 remaining.",
+          "notes": "In progress. PR #118 covers Tasks 1-3 (shared types, bridge wiring, siteHealth assembler). PR #119 covers Tasks 4-12 (all 8 slice assemblers, read-time bridges #8/#9/#14, scheduler/churn invalidation, WebSocket handler, compositeHealthScore). Tasks 13-17 remaining (formatForPrompt, tokenBudget, integration tests, mini builder, pr-check guards).",
           "status": "pending"
         },
         {

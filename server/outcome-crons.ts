@@ -4,6 +4,8 @@
 
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('outcome-crons');
 
@@ -29,8 +31,21 @@ export function startOutcomeCrons() {
 
   const runMeasure = async () => {
     try {
+      const { getPendingActions } = await import('./outcome-tracking.js');
+      const pending = getPendingActions();
+      // Collect affected workspace IDs BEFORE measurement (measurement consumes them)
+      const affectedWsIds = [...new Set(pending.map(a => a.workspaceId))];
+
       const { measurePendingOutcomes } = await import('./outcome-measurement.js');
       await measurePendingOutcomes();
+
+      // Only invalidate workspaces that had pending measurements
+      for (const wsId of affectedWsIds) {
+        invalidateIntelligenceCache(wsId);
+      }
+      if (affectedWsIds.length > 0) {
+        log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for measured workspaces');
+      }
     } catch (err) {
       log.error({ err }, 'Failed to measure pending outcomes');
     }
@@ -38,8 +53,17 @@ export function startOutcomeCrons() {
 
   const runLearnings = async () => {
     try {
-      const { recomputeAllWorkspaceLearnings } = await import('./workspace-learnings.js');
+      const { recomputeAllWorkspaceLearnings, getWorkspaceIdsWithOutcomes } = await import('./workspace-learnings.js');
       await recomputeAllWorkspaceLearnings();
+
+      // Only invalidate workspaces that have outcome data (same set learnings processes)
+      const affectedWsIds = getWorkspaceIdsWithOutcomes();
+      for (const wsId of affectedWsIds) {
+        invalidateIntelligenceCache(wsId);
+      }
+      if (affectedWsIds.length > 0) {
+        log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for learnings workspaces');
+      }
     } catch (err) {
       log.error({ err }, 'Failed to compute workspace learnings');
     }

@@ -131,6 +131,28 @@ export async function getKeywordRecommendations(
     .map(c => ({ ...c, _score: opportunityScore(c.volume, c.difficulty) }))
     .sort((a, b) => b._score - a._score);
 
+  // ── Bridge #9: Weight by empirical win rate per KD range ──────────
+  try {
+    const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
+    const learnings = getWorkspaceLearnings(workspaceId, 'strategy');
+    if ((learnings as any)?.byKdRange) {
+      for (const candidate of scored) {
+        const kd = candidate.difficulty ?? 0;
+        const range = kd < 30 ? 'low' : kd < 60 ? 'medium' : 'high';
+        const rangeData = (learnings as any).byKdRange?.[range];
+        if (rangeData?.winRate > 0.5) {
+          candidate._score = Math.round((candidate._score ?? 0) * 1.2);
+        } else if (rangeData?.winRate < 0.3 && rangeData?.count >= 3) {
+          candidate._score = Math.round((candidate._score ?? 0) * 0.8);
+        }
+      }
+      // Re-sort after score adjustments
+      scored.sort((a, b) => b._score - a._score);
+    }
+  } catch {
+    // Learnings enrichment optional — degrade gracefully
+  }
+
   // If AI scoring is enabled and we have business context, re-rank
   if (useAI && candidates.length > 1) {
     try {

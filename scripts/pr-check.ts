@@ -116,6 +116,7 @@ const CHECKS: Check[] = [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
+      'server/performance-store.ts', 'server/rank-tracking.ts',
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -157,6 +158,18 @@ const CHECKS: Check[] = [
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     message: 'Wrap SUM() with COALESCE: COALESCE(SUM(col), 0). SQLite SUM returns NULL (not 0) when no rows match.',
+    severity: 'warn',
+  },
+  {
+    name: 'as any on dynamic import results',
+    // Catches patterns like: `(h: any)`, `(m: any)`, `as any).`, `as any,`, `as any;`
+    // These hide wrong property/function names — the #1 source of silent data bugs.
+    pattern: '(\\([a-z]+:\\s*any\\)|as any[);,.])',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/json-validation.ts', 'server/middleware/'],
+    excludeLines: ['// as-any-ok'],
+    message: 'Use `import type { T } from "./module.js"` instead of `as any`. Guessed property names are the #1 bug source. Add `// as-any-ok` comment if truly unavoidable.',
     severity: 'warn',
   },
   {

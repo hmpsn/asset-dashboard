@@ -3049,6 +3049,17 @@ When the user asks to update this document with recent features, follow this pro
 
 **Mutual:** Closed intelligence loops. Every mutation propagates its effects without manual orchestration. Agency sees less stale data; system becomes self-maintaining.
 
+### 200. Unified Workspace Intelligence Layer — Phase 3A Batch 1b (Slice Assemblers + Bridges + Invalidation)
+**What it does:** Implements 8 full intelligence slice assemblers (seoContext enrichment, learnings enrichment, contentPipeline, siteHealth, clientSignals, operational, pageProfile) with compositeHealthScore computation (40% churn + 30% ROI + 30% engagement, weight-normalized). Read-time bridges: Bridge #8 (repeat-decay detection via outcome history), Bridge #9 (keyword score adjustment by KD-range win rates), Bridge #14 (cache invalidation wired to schedulers/anomaly-detection/churn-signals). WebSocket `INTELLIGENCE_CACHE_UPDATED` event broadcasts on invalidation → frontend React Query auto-refresh. All slices use per-slice try/catch isolation for graceful degradation.
+
+**Files:** `server/workspace-intelligence.ts` (8 slice assemblers, LRU cache invalidation with broadcast), `shared/types/intelligence.ts` (slice type contracts), `server/content-decay.ts` (Bridge #8 repeat-decay + `isRepeatDecay`/`priority` on DecayingPage), `server/keyword-recommendations.ts` (Bridge #9 score adjustment), `server/churn-signals.ts` (conditional cache invalidation), `server/outcome-crons.ts` (Bridge #14 invalidation wiring), `server/scheduled-audits.ts` (invalidation after audit), `server/anomaly-detection.ts` (conditional invalidation on new anomalies), `src/hooks/useWsInvalidation.ts` (INTELLIGENCE_CACHE_UPDATED handler), 9 test files
+
+**Agency value:** `/api/intelligence/:wsId` returns complete workspace context in a single call — all 8 slices with cross-system enrichment. AI advisors, strategy tools, and dashboards get unified data without ad-hoc fetching. compositeHealthScore gives at-a-glance client health assessment. Automatic cache invalidation keeps data fresh after audits, outcome measurements, learnings recomputation, and churn signal detection.
+
+**Client value:** (Indirect — Phase 3B+ will consume slices in client-facing views.) Richer, cross-referenced intelligence data drives better AI recommendations and strategy suggestions.
+
+**Mutual:** Intelligence layer is now fully populated. Every workspace mutation that affects intelligence data automatically invalidates the cache and notifies connected frontends. Foundation for `formatForPrompt()` token-budget-aware AI context injection.
+
 ---
 
 ## Platform Summary
@@ -3066,6 +3077,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**264 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**265 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **264**. Last updated: March 2026.
+Current feature count: **265**. Last updated: April 2026.
