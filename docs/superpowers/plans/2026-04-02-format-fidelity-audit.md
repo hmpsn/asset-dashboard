@@ -2569,6 +2569,64 @@ git commit -m "chore: format fidelity audit complete — all gaps fixed and test
 
 ---
 
+## Task 9a: Render the 7 Assembled-but-Unrendered Fields (pr-check surfaced)
+
+**Goal:** Close the remaining assembled-but-never-rendered gaps identified by `npx tsx scripts/pr-check.ts --all`.
+
+**Files:**
+- Modify: `server/workspace-intelligence.ts`
+
+**Why now:** These fields are assembled at query time and stored in slice objects but silently dropped at format time — the AI never sees them. The pr-check rule added in Task 7 now surfaces them on every run touching `workspace-intelligence.ts`. Fix them before Phase 3 so they don't accumulate as permanent noise.
+
+**Fields to render (from pr-check output):**
+
+| Field | Slice | Formatter | What to render |
+|-------|-------|-----------|----------------|
+| `strategyHistory` | `SeoContextSlice` | `formatSeoContextSection` | At `detailed`: `Strategy revised ${revisionsCount}x, last ${lastRevisedAt}, trajectory: ${trajectory}` |
+| `playbooks` | `LearningsSlice` | `formatLearningsSection` | At `detailed`: list playbook names (up to 3) if any exist |
+| `linkHealth` | `PageProfileSlice` | `formatPageProfileSection` | At `detailed`: `Links: ${inbound} inbound, ${outbound} outbound${orphan ? ' ⚠ orphan page' : ''}` |
+| `seoEdits` | `PageProfileSlice` | `formatPageProfileSection` | At `detailed`: `Current title: ${currentTitle}` if present |
+| `requests` | `ContentPipelineSlice` | `formatContentPipelineSection` | At `standard+`: `Content requests: ${pending} pending, ${inProgress} in progress` if any |
+| `workOrders` | `ContentPipelineSlice` | `formatContentPipelineSection` | At `standard+`: include `${workOrders.active} active work orders` in pipeline summary |
+| `seoEdits` | `ContentPipelineSlice` | `formatContentPipelineSection` | At `standard+`: `SEO edits: ${pending} pending, ${applied} applied` if any |
+
+**Steps:**
+
+- [ ] **Step 1: Read current formatter implementations**
+
+Read the relevant sections of `formatSeoContextSection`, `formatLearningsSection`, `formatPageProfileSection`, and `formatContentPipelineSection` in `server/workspace-intelligence.ts`. Understand where each new field fits in the existing output structure.
+
+- [ ] **Step 2: Add rendering for each field**
+
+Add minimal rendering for each field. Keep each addition to 1-4 lines. Guard with null/undefined checks. Follow the verbosity pattern already used in each formatter.
+
+- [ ] **Step 3: Run pr-check to confirm fields are now referenced**
+
+```bash
+npx tsx scripts/pr-check.ts --all 2>&1 | grep "assembled-but\|not referenced"
+```
+Expected: no more `not referenced` warnings for these 7 fields.
+
+- [ ] **Step 4: Run full test suite**
+
+```bash
+npx vitest run
+```
+Expected: all tests pass (enrichment coverage tests from Task 4c should now also pass any assertions about these fields).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add server/workspace-intelligence.ts
+git commit -m "fix: render 7 assembled-but-unrendered fields surfaced by pr-check
+
+strategyHistory (seoContext), playbooks (learnings), linkHealth + seoEdits
+(pageProfile), requests + workOrders + seoEdits (contentPipeline) were
+assembled but silently dropped at format time — AI never saw them."
+```
+
+---
+
 ## Phase 9: N+1 Pre-Assembly — Workspace-Level Slices (Immediate Followup)
 
 **Goal:** Eliminate per-page re-assembly of workspace-level intelligence slices in batch loops.
