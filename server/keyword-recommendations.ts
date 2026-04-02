@@ -158,12 +158,12 @@ export async function getKeywordRecommendations(
   // If AI scoring is enabled and we have business context, re-rank
   if (useAI && candidates.length > 1) {
     try {
-      const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+      const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'learnings'] });
       const seoCtx = kwIntel.seoContext;
       // Only call AI ranking when meaningful workspace context exists (formatForPrompt always returns non-empty)
       const hasMeaningfulContext = !!(seoCtx?.businessContext || seoCtx?.knowledgeBase || seoCtx?.brandVoice || seoCtx?.personas?.length);
-      // Use full context (business context + brand voice + personas + knowledge) for richer ranking
-      const bizContext = hasMeaningfulContext ? formatForPrompt(kwIntel, { verbosity: 'detailed', sections: ['seoContext'] }) : '';
+      // Use full context (business context + brand voice + personas + knowledge + learnings) for richer ranking
+      const bizContext = hasMeaningfulContext ? formatForPrompt(kwIntel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] }) : '';
       if (bizContext) {
         const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
         // Mark the AI-recommended keyword

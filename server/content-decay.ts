@@ -225,9 +225,9 @@ export async function generateRefreshRecommendation(
   ws: Workspace,
   page: DecayingPage,
 ): Promise<string> {
-  const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'pageProfile'],
+  const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'learnings', 'pageProfile'],
     pagePath: page.page });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
+  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] });
   const pageAnalysis = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] });
 
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.

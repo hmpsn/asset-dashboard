@@ -251,8 +251,8 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
   const ws = getWorkspace(req.params.workspaceId);
 
   // Build full business context for brand voice checking
-  const intel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext'] });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
+  const intel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext', 'learnings'] });
+  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] });
 
   // Build a text summary of the post content for AI analysis
   const allContent = [
