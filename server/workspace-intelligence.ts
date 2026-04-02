@@ -1206,7 +1206,7 @@ export function formatForPrompt(
 
   // Learnings
   if (intelligence.learnings && (!include || include.has('learnings'))) {
-    sections.push(formatLearningsSection(intelligence.learnings, verbosity));
+    sections.push(formatLearningsSection(intelligence.learnings, verbosity, opts?.learningsDomain ?? 'all'));
   }
 
   // Page Profile
@@ -1424,29 +1424,84 @@ function formatInsightsSection(insights: InsightsSlice, verbosity: PromptVerbosi
   return lines.join('\n');
 }
 
-function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity): string {
+function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity, domain: 'content' | 'strategy' | 'technical' | 'all' = 'all'): string {
   // Guard must be verbosity-aware: only pass if there's content that will actually render
   // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
   const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
   const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
-  const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0;
+  const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0 || !!learnings.summary?.content || !!learnings.summary?.strategy || !!learnings.summary?.technical;
   const willRender =
     hasBaseContent ||
     ((verbosity === 'standard' || verbosity === 'detailed') && hasStandardContent) ||
     (verbosity === 'detailed' && hasDetailedContent);
   if (!willRender) return '';
 
-  const lines: string[] = ['## Outcome Learnings'];
+  const lines: string[] = [];
+  const summary = learnings.summary;
 
-  if (learnings.recentTrend) lines.push(`Trend: ${learnings.recentTrend}`);
-  if (learnings.confidence) lines.push(`Confidence: ${learnings.confidence}`);
-  if (learnings.overallWinRate > 0) lines.push(`Overall win rate: ${Math.round(learnings.overallWinRate * 100)}%`);
+  // Header with scored actions count (matches old formatLearningsForPrompt)
+  const totalActions = summary?.totalScoredActions ?? 0;
+  lines.push(`## Outcome Learnings${totalActions > 0 ? ` (${totalActions} tracked outcomes, ${learnings.confidence ?? 'unknown'} confidence)` : ''}`);
+
+  if (learnings.recentTrend && learnings.recentTrend !== 'stable') lines.push(`Trend: ${learnings.recentTrend}`);
+
+  // Overall win rate with strong wins (matches old: "62% (28% strong wins)")
+  if (learnings.overallWinRate > 0) {
+    const strongRate = summary?.overall?.strongWinRate;
+    const strongSuffix = strongRate != null ? ` (${Math.round(strongRate * 100)}% strong wins)` : '';
+    lines.push(`Overall win rate: ${Math.round(learnings.overallWinRate * 100)}%${strongSuffix}`);
+  }
 
   if (verbosity === 'detailed' || verbosity === 'standard') {
     if (learnings.topActionTypes.length > 0) {
       lines.push('Win rates by action type:');
       for (const { type, winRate, count } of learnings.topActionTypes) {
         lines.push(`  ${type}: ${Math.round(winRate * 100)}% (${count} actions)`);
+      }
+    }
+
+    // Domain-specific learnings from summary
+    // Domain filtering: only render domains matching the requested learningsDomain
+    if (summary && verbosity === 'detailed') {
+      // Content learnings
+      if ((domain === 'content' || domain === 'all') && summary.content) {
+        const c = summary.content;
+        const topFormats = Object.entries(c.winRateByFormat)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2);
+        if (topFormats.length >= 2) {
+          const [f1, r1] = topFormats[0];
+          const [f2, r2] = topFormats[1];
+          lines.push(`${f1.replace(/_/g, ' ')} outperforms ${f2.replace(/_/g, ' ')} (${Math.round(r1 * 100)}% vs ${Math.round(r2 * 100)}% win rate)`);
+        }
+        if (c.avgDaysToPage1 != null) lines.push(`Content reaches page 1 in ~${c.avgDaysToPage1} days on average`);
+        if (c.refreshRecoveryRate > 0) lines.push(`Content refreshes recover traffic ${Math.round(c.refreshRecoveryRate * 100)}% of the time`);
+        if (c.bestPerformingTopics.length > 0) lines.push(`Best performing topics: ${c.bestPerformingTopics.slice(0, 3).join(', ')}`);
+      }
+
+      // Strategy learnings
+      if ((domain === 'strategy' || domain === 'all') && summary.strategy) {
+        const s = summary.strategy;
+        const topDifficulty = Object.entries(s.winRateByDifficultyRange).sort((a, b) => b[1] - a[1]).slice(0, 1);
+        if (topDifficulty.length > 0) {
+          const [range, rate] = topDifficulty[0];
+          lines.push(`Keywords with difficulty ${range} have highest win rate (${Math.round(rate * 100)}%)`);
+        }
+        if (s.keywordVolumeSweetSpot) lines.push(`Optimal keyword volume range: ${s.keywordVolumeSweetSpot.min}–${s.keywordVolumeSweetSpot.max}/month`);
+        if (s.bestIntentTypes.length > 0) lines.push(`Best intent types: ${s.bestIntentTypes.join(', ')}`);
+      }
+
+      // Technical learnings
+      if ((domain === 'technical' || domain === 'all') && summary.technical) {
+        const t = summary.technical;
+        const topFix = Object.entries(t.winRateByFixType).sort((a, b) => b[1] - a[1]).slice(0, 1);
+        if (topFix.length > 0) {
+          const [fixType, rate] = topFix[0];
+          lines.push(`${fixType.replace(/_/g, ' ')} has highest technical win rate (${Math.round(rate * 100)}%)`);
+        }
+        if (t.schemaTypesWithRichResults.length > 0) lines.push(`Schema types producing rich results: ${t.schemaTypesWithRichResults.join(', ')}`);
+        if (t.avgHealthScoreImprovement > 0) lines.push(`Average health score improvement: +${t.avgHealthScoreImprovement}`);
+        if (t.internalLinkEffectiveness > 0) lines.push(`Internal link additions improve rankings ${Math.round(t.internalLinkEffectiveness * 100)}% of the time`);
       }
     }
 
@@ -1465,6 +1520,11 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
         lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain} clicks`);
       }
     }
+  }
+
+  // Cap at 25 content lines to stay within token budget
+  if (lines.length > 25) {
+    return [...lines.slice(0, 25), '  (additional learnings truncated)'].join('\n');
   }
 
   return lines.join('\n');
