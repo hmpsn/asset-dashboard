@@ -17,9 +17,11 @@
  *   - Raw fetch() in components (use typed API client)
  *   - z.array(z.unknown()) on server (use parseJsonSafeArray + typed schema)
  *   - Bare SUM() in db.prepare() strings (use COALESCE to avoid NULL aggregates)
+ *   - Assembled-but-never-rendered slice fields (warns if a slice field is in the type but not the formatter)
  */
 
 import { execSync, execFileSync } from 'child_process';
+import { readFileSync } from 'fs';
 import path from 'path';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -344,6 +346,150 @@ for (const check of CHECKS) {
 
   if (check.severity === 'error') errors++;
   else warnings++;
+}
+
+// ─── Assembled-but-never-rendered slice field check ───────────────────────────
+//
+// Warns if a field is present in a *Slice interface in shared/types/intelligence.ts
+// but not referenced in the corresponding format*Section function in
+// server/workspace-intelligence.ts. These fields are assembled at query time but
+// silently dropped at format time — they never reach the AI prompt.
+//
+// Map of slice interface name → formatter function name
+const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> = [
+  { sliceName: 'SeoContextSlice', formatterName: 'formatSeoContextSection' },
+  { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
+  { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
+  { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
+  { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
+  { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
+  { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
+  { sliceName: 'OperationalSlice', formatterName: 'formatOperationalSection' },
+];
+
+// Fields intentionally not rendered (complex nested types, metadata, or rendering handled differently)
+// Also includes fields that ARE rendered but accessed via destructuring or local variable
+// (e.g. `const { bySeverity } = insights`) which the property-access regex won't catch.
+const KNOWN_UNRENDERED_FIELDS = new Set([
+  // SeoContextSlice
+  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
+  // InsightsSlice
+  'byType', 'forPage',
+  // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
+  'bySeverity',
+  // LearningsSlice
+  'forPage', 'topWins', 'winRateByActionType',
+  // ContentPipelineSlice
+  'rewritePlaybook', 'suggestedBriefs',
+  // SiteHealthSlice
+  'aeoReadiness', 'redirectDetails',
+  // PageProfileSlice
+  // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
+  'searchIntent',
+  // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
+  'insights',
+  // ClientSignalsSlice — these are rendered but may not appear by field name
+  // OperationalSlice
+  // none
+]);
+
+function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
+  // Find the interface body: interface Foo { ... }
+  const interfaceRegex = new RegExp(`interface ${interfaceName}\\s*\\{([^}]+)\\}`, 's');
+  const match = interfaceRegex.exec(typeFileContent);
+  if (!match) return [];
+
+  const body = match[1];
+  // Extract field names: lines like `  fieldName:` or `  fieldName?:`
+  const fieldRegex = /^\s+(\w+)\??:/gm;
+  const fields: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = fieldRegex.exec(body)) !== null) {
+    fields.push(m[1]);
+  }
+  return fields;
+}
+
+function extractFormatterBody(formatterFileContent: string, formatterName: string): string {
+  // Find the function body start
+  const fnStart = formatterFileContent.indexOf(`function ${formatterName}(`);
+  if (fnStart === -1) return '';
+
+  // Find the opening brace
+  const braceStart = formatterFileContent.indexOf('{', fnStart);
+  if (braceStart === -1) return '';
+
+  // Walk forward counting braces to find the closing brace
+  let depth = 0;
+  let i = braceStart;
+  while (i < formatterFileContent.length) {
+    if (formatterFileContent[i] === '{') depth++;
+    else if (formatterFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        return formatterFileContent.slice(braceStart, i + 1);
+      }
+    }
+    i++;
+  }
+  return '';
+}
+
+// Only run this check when scanning the whole codebase (--all) or when workspace-intelligence.ts changed
+const shouldRunSliceCheck = SCAN_ALL || changedFiles.some(f =>
+  f.includes('workspace-intelligence.ts') || f.includes('intelligence.ts'),
+);
+
+if (shouldRunSliceCheck) {
+  const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
+  const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
+  let typesContent = '';
+  let serverContent = '';
+  try {
+    typesContent = readFileSync(typesPath, 'utf-8');
+    serverContent = readFileSync(serverPath, 'utf-8');
+  } catch {
+    // Files not found — skip
+  }
+
+  if (typesContent && serverContent) {
+    const unrenderedFindings: string[] = [];
+
+    for (const { sliceName, formatterName } of SLICE_FORMATTER_MAP) {
+      const fields = extractInterfaceFields(typesContent, sliceName);
+      const formatterBody = extractFormatterBody(serverContent, formatterName);
+
+      if (!formatterBody) {
+        unrenderedFindings.push(`  ${sliceName}: formatter ${formatterName} not found`);
+        continue;
+      }
+
+      for (const field of fields) {
+        if (KNOWN_UNRENDERED_FIELDS.has(field)) continue;
+        // Check if the field name appears in the formatter body (as a property access)
+        if (!formatterBody.includes(`.${field}`) && !formatterBody.includes(`['${field}']`) && !formatterBody.includes(`["${field}"]`)) {
+          unrenderedFindings.push(`  ${sliceName}.${field} → not referenced in ${formatterName}`);
+        }
+      }
+    }
+
+    if (unrenderedFindings.length > 0) {
+      console.log(`\n  ⚠ Assembled-but-never-rendered slice fields`);
+      console.log(`    These fields are assembled in *Slice types but not referenced in their format*Section formatter.`);
+      console.log(`    The data is assembled at query time but never reaches the AI prompt.`);
+      console.log(`    Add to KNOWN_UNRENDERED_FIELDS if intentionally omitted.`);
+      console.log(`    Fields (${unrenderedFindings.length}):`);
+      for (const finding of unrenderedFindings.slice(0, 10)) {
+        console.log(`      ${finding}`);
+      }
+      if (unrenderedFindings.length > 10) {
+        console.log(`      ... and ${unrenderedFindings.length - 10} more`);
+      }
+      warnings++;
+    } else {
+      console.log(`  ✓ Assembled-but-never-rendered slice fields`);
+    }
+  }
 }
 
 // ─── Manual checklist ─────────────────────────────────────────────────────────
