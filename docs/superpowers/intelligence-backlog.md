@@ -172,6 +172,19 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 
 ---
 
+### 16. Token budget Step 5 drops `contentPipeline`, `siteHealth`, `pageProfile` without gradual degradation
+
+`applyTokenBudget` steps 1-4 drop/truncate specific slices in order (operational → insights → clientSignals → learnings). If none of those steps bring the output under budget, Step 5 jumps directly to keeping only `seoContext`, discarding `contentPipeline`, `siteHealth`, and `pageProfile` all at once. There's no gradual fallback for these three slices — they either survive entirely or disappear entirely when budget is very tight.
+
+**Why it's acceptable:** Matches the documented §20 priority chain. These three slices are lower-priority than SEO context for prompt completeness. The abrupt behavior only appears at very tight budgets.
+
+**Fix if needed:** Add intermediate steps between Step 4 and Step 5 that individually drop `pageProfile`, then `siteHealth`, then `contentPipeline` before falling back to seoContext-only.
+
+**Effort:** ~1h.
+
+
+---
+
 ## Priority Ranking
 
 | # | Item | Effort | Value | Phase |
@@ -188,3 +201,4 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 | 10 | Server-side intelligence consumers | 8-12h | High (long-term) | Phase 4+ |
 | 14 | Cold-start ignores section filter | 30min | Low | If needed |
 | 15 | Token budget drops requested sections | 1h | Low | If needed |
+| 16 | Token budget Step 5 abrupt drop (contentPipeline/siteHealth/pageProfile) | 1h | Low | If needed |

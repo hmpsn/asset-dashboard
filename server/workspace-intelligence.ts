@@ -1731,7 +1731,7 @@ async function assemblePageProfile(
     if (allGaps.length > 0) {
       const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
       const matched = primaryKwLower
-        ? allGaps.filter(g => g.targetKeyword.toLowerCase() === primaryKwLower)
+        ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
         : [];
       const source = matched.length > 0 ? matched : allGaps;
       contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
