@@ -9,8 +9,7 @@
 
 import type { Workspace } from './workspaces.js';
 import { getWorkspace, getBrandName } from './workspaces.js';
-import { isFeatureEnabled } from './feature-flags.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { formatLearningsForPrompt } from './workspace-learnings.js';
 import { getLatestSnapshot } from './reports.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
@@ -32,10 +31,10 @@ import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
 import {
-  buildSeoContext,
-  buildKeywordMapContext,
+  buildPersonasContext,
   RICH_BLOCKS_PROMPT,
 } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatPageMapForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -311,8 +310,24 @@ export async function assembleAdminContext(
   let pageContext: AssembledContext['pageContext'] | undefined;
 
   // ── Always include: strategy, brand voice, knowledge base, personas ──
-  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx, personasBlock: personasContext, knowledgeBlock: knowledgeBase } = buildSeoContext(workspaceId);
-  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const slices = ['seoContext', 'learnings'] as const;
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices, learningsDomain: 'all' });
+  const seoCtx = intel.seoContext;
+
+  // Reconstruct keyword strategy block from intel (equivalent to buildSeoContext keywordBlock)
+  const strategy = seoCtx?.strategy;
+  let keywordBlock = '';
+  if (strategy) {
+    const siteKw = strategy.siteKeywords?.slice(0, 8).join(', ');
+    if (siteKw) keywordBlock += `Site target keywords: ${siteKw}`;
+    if (strategy.businessContext) keywordBlock += `\nGeneral business context: ${strategy.businessContext}`;
+    if (keywordBlock) keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
+  }
+  const brandVoiceBlock = seoCtx?.brandVoice ?? '';
+  const bizCtx = seoCtx?.businessContext ?? '';
+  const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
+  const personasContext = buildPersonasContext(workspaceId);
+  const knowledgeBase = seoCtx?.knowledgeBase ?? '';
 
   if (keywordBlock || kwMapContext || bizCtx) {
     const stratParts = [keywordBlock, kwMapContext, bizCtx ? `\nBusiness: ${bizCtx}` : '', brandVoiceBlock].filter(Boolean);
@@ -371,10 +386,21 @@ export async function assembleAdminContext(
       }
       pageContext = { url: targetUrl };
 
-      // Get page-specific keyword context
-      const pageKeywords = buildSeoContext(workspaceId, targetUrl);
-      if (pageKeywords.keywordBlock) {
-        pageContext.keywordContext = pageKeywords.keywordBlock;
+      // Get page-specific keyword context from strategy pageMap
+      const normalizedPath = targetUrl.startsWith('/') ? targetUrl : targetUrl.replace(/^https?:\/\/[^/]+/, '');
+      const pageKw = strategy?.pageMap?.find(p => p.pagePath === normalizedPath)
+        ?? strategy?.pageMap?.find(p => normalizedPath.endsWith(p.pagePath) || p.pagePath.endsWith(normalizedPath));
+      if (pageKw) {
+        let pageKeywordBlock = `\n\nTHIS PAGE'S TARGET (overrides general context):`;
+        pageKeywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
+        if (pageKw.secondaryKeywords?.length) {
+          pageKeywordBlock += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
+        }
+        if (pageKw.searchIntent) {
+          pageKeywordBlock += `\nSearch intent: ${pageKw.searchIntent}`;
+        }
+        pageKeywordBlock += `\nIMPORTANT: If this page's keywords reference a specific location (city, state, region), ALWAYS use THAT location. Do NOT substitute the business headquarters or a different location from the general business context. The page-level keyword is the authoritative signal for what this page targets.`;
+        pageContext.keywordContext = pageKeywordBlock;
       }
     }
   }
@@ -802,15 +828,12 @@ export async function assembleAdminContext(
     }
   }
 
-  // ── Inject workspace learnings if available ──
-  if (isFeatureEnabled('outcome-ai-injection')) {
-    const learnings = getWorkspaceLearnings(workspaceId);
-    if (learnings) {
-      const learningsBlock = formatLearningsForPrompt(learnings, 'all');
-      if (learningsBlock) {
-        sections.push(learningsBlock);
-        dataSources.push('Workspace Outcome Learnings');
-      }
+  // ── Inject workspace learnings from intelligence layer ──
+  if (intel.learnings?.summary) {
+    const learningsBlock = formatLearningsForPrompt(intel.learnings.summary, 'all');
+    if (learningsBlock) {
+      sections.push(learningsBlock);
+      dataSources.push('Workspace Outcome Learnings');
     }
   }
 
