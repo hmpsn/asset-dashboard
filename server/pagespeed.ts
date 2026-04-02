@@ -91,7 +91,11 @@ async function runPageSpeed(url: string, strategy: 'mobile' | 'desktop'): Promis
     }
     return await res.json() as Record<string, unknown>;
   } catch (err) {
-    log.error({ err: err }, `PageSpeed fetch error for ${url}:`);
+    if (err instanceof Error && err.name === 'AbortError') {
+      log.warn({ url }, `PageSpeed timeout (>60s) for ${url} — skipping`);
+    } else {
+      log.error({ err }, `PageSpeed fetch error for ${url}:`);
+    }
     return null;
   }
 }
