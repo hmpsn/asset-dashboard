@@ -89,7 +89,7 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
   try {
     const type = req.query.type as InsightType | undefined;
     // Only allow force recompute for authenticated admin users
-    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token;
+    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token; // as-any-ok: cookie-parser types not in Express.Request
     const payload = token ? verifyToken(token) : null;
     const force = req.query.force === 'true' && (payload?.role === 'admin' || payload?.role === 'owner');
     const insights = await getOrComputeInsights(ws.id, type, { force });

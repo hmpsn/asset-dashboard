@@ -117,6 +117,7 @@ const CHECKS: Check[] = [
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
       'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
+      'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',

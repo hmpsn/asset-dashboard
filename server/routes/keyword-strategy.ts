@@ -1792,7 +1792,7 @@ Rules:
     incrementUsage(ws.id, 'strategy_generations');
 
     try {
-      if (!getActionBySource('strategy', ws.id)) recordAction({
+      if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
         workspaceId: ws.id,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',

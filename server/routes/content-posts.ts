@@ -181,7 +181,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
             // Record for outcome tracking — guard prevents duplicates if .then() fires more than once
             try {
               if (!getActionByWorkspaceAndSource(req.params.workspaceId, 'post', req.params.postId)) {
-                const postAction = recordAction({
+                const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
                   workspaceId: req.params.workspaceId,
                   actionType: 'content_published',
                   sourceType: 'post',
