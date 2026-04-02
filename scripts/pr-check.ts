@@ -394,18 +394,39 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
 ]);
 
 function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
-  // Find the interface body: interface Foo { ... }
-  const interfaceRegex = new RegExp(`interface ${interfaceName}\\s*\\{([^}]+)\\}`, 's');
-  const match = interfaceRegex.exec(typeFileContent);
-  if (!match) return [];
+  // Find the interface declaration — use brace-depth counting to handle nested object types
+  const declStart = typeFileContent.search(new RegExp(`interface ${interfaceName}\\s*\\{`));
+  if (declStart === -1) return [];
 
-  const body = match[1];
-  // Extract field names: lines like `  fieldName:` or `  fieldName?:`
-  const fieldRegex = /^\s+(\w+)\??:/gm;
+  const braceStart = typeFileContent.indexOf('{', declStart);
+  if (braceStart === -1) return [];
+
+  // Walk forward counting braces to find the matching closing brace of the interface itself
+  let depth = 0;
+  let i = braceStart;
+  while (i < typeFileContent.length) {
+    if (typeFileContent[i] === '{') depth++;
+    else if (typeFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) break;
+    }
+    i++;
+  }
+  const body = typeFileContent.slice(braceStart + 1, i);
+
+  // Extract only top-level field names (depth=0 within the body, lines like `  fieldName:`)
+  // Walk the body tracking nested depth so we only extract interface-level keys
   const fields: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = fieldRegex.exec(body)) !== null) {
-    fields.push(m[1]);
+  let nestedDepth = 0;
+  for (const line of body.split('\n')) {
+    for (const ch of line) {
+      if (ch === '{') nestedDepth++;
+      else if (ch === '}') nestedDepth--;
+    }
+    if (nestedDepth === 0) {
+      const m = line.match(/^\s+(\w+)\??:/);
+      if (m) fields.push(m[1]);
+    }
   }
   return fields;
 }
