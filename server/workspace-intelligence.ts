@@ -207,7 +207,7 @@ async function assembleSeoContext(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<SeoContextSlice> {
-  const { buildSeoContext } = await import('./seo-context.js');
+  const { buildSeoContext, getRawBrandVoice, getRawKnowledge } = await import('./seo-context.js');
   const { getWorkspace } = await import('./workspaces.js');
   // Pass _skipShadow to prevent circular recursion:
   // buildWorkspaceIntelligence → assembleSeoContext → buildSeoContext → shadow mode → buildWorkspaceIntelligence → ∞
@@ -228,10 +228,13 @@ async function assembleSeoContext(
     strategy: ctx.strategy
       ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
       : ctx.strategy,
-    brandVoice: ctx.brandVoiceBlock,
+    // Store RAW values (no headers). Callers that need formatted blocks use
+    // formatBrandVoiceForPrompt() / formatKnowledgeBaseForPrompt() from this module.
+    // This prevents double-formatting when formatSeoContextSection adds its own prefixes.
+    brandVoice: getRawBrandVoice(workspaceId),
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
-    knowledgeBase: ctx.knowledgeBlock,
+    knowledgeBase: getRawKnowledge(workspaceId),
   };
 
   // Page-specific keywords — populate from strategy.pageMap when pagePath is provided
@@ -1181,7 +1184,7 @@ export function formatForPrompt(
     intelligence.seoContext.knowledgeBase ||
     (intelligence.seoContext.personas && intelligence.seoContext.personas.length > 0)
   );
-  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary;
+  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary || intelligence.pageProfile;
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
@@ -1203,7 +1206,7 @@ export function formatForPrompt(
 
   // Learnings
   if (intelligence.learnings && (!include || include.has('learnings'))) {
-    sections.push(formatLearningsSection(intelligence.learnings, verbosity));
+    sections.push(formatLearningsSection(intelligence.learnings, verbosity, opts?.learningsDomain ?? 'all'));
   }
 
   // Page Profile
@@ -1238,6 +1241,24 @@ export function formatForPrompt(
   }
 
   return sections.filter(Boolean).join('\n\n');
+}
+
+/**
+ * Type-safe convenience wrapper: assembles the requested slices and formats them
+ * in a single call, guaranteeing that sections === slices (no mismatch possible).
+ *
+ * Use this instead of separate buildWorkspaceIntelligence + formatForPrompt calls
+ * whenever you want all assembled slices included in the prompt context.
+ * If you need the raw intelligence object for field access alongside the prompt
+ * text, call buildWorkspaceIntelligence + formatForPrompt directly.
+ */
+export async function buildIntelPrompt(
+  workspaceId: string,
+  slices: IntelligenceSlice[],
+  opts?: Omit<IntelligenceOptions, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget' | 'learningsDomain'>,
+): Promise<string> {
+  const intel = await buildWorkspaceIntelligence(workspaceId, { ...opts, slices });
+  return formatForPrompt(intel, { verbosity: opts?.verbosity, sections: slices, tokenBudget: opts?.tokenBudget, learningsDomain: opts?.learningsDomain });
 }
 
 /**
@@ -1286,7 +1307,7 @@ function applyTokenBudget(
   current = current.map(s => {
     if (s.startsWith('## Outcome Learnings') && intelligence.learnings) {
       const rate = intelligence.learnings.overallWinRate;
-      return `## Outcome Learnings\nWin rate: ${Math.round(rate * 100)}%${intelligence.learnings.recentTrend ? ` (${intelligence.learnings.recentTrend})` : ''}`;
+      return `## Outcome Learnings\nWin rate: ${pct(rate)}${intelligence.learnings.recentTrend ? ` (${intelligence.learnings.recentTrend})` : ''}`;
     }
     return s;
   });
@@ -1300,37 +1321,56 @@ function applyTokenBudget(
   return seoOnly.join('\n\n');
 }
 
+/** Safely format a 0-1 rate as a percentage string. Returns 'n/a' for NaN/null/undefined. */
+function pct(rate: number | null | undefined): string {
+  if (rate == null || isNaN(rate)) return 'n/a';
+  return `${Math.round(rate * 100)}%`;
+}
+
+/**
+ * Renders SeoContextSlice as a `## SEO Context` summary block for formatForPrompt().
+ *
+ * TWO-PATH FORMAT SPLIT: Callers using formatForPrompt() get this combined block.
+ * Callers that need individual fields at different prompt positions use the standalone
+ * helpers instead: formatBrandVoiceForPrompt(), formatKeywordsForPrompt(), etc.
+ * These intentionally produce DIFFERENT output (standalone helpers add emphatic standalone
+ * headers; this function renders compact inline labels within the ## SEO Context block).
+ */
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = ['## SEO Context'];
 
-  if (ctx.brandVoice) lines.push(`Brand voice: ${ctx.brandVoice}`);
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
+  // Emphatic brand voice directive — AI models respond to capitalized instructional headers
+  if (ctx.brandVoice) lines.push(`BRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${ctx.brandVoice}`);
 
-  // Personas — always include when present (was silently dropped before)
+  // Personas — always include when present
+  // Must match formatPersonasForPrompt (standalone helper) for content parity
   if (ctx.personas && ctx.personas.length > 0) {
     if (verbosity === 'compact') {
-      lines.push(`Personas: ${ctx.personas.map(p => p.name).join(', ')}`);
-    } else if (verbosity === 'standard') {
-      lines.push('Personas:');
-      for (const p of ctx.personas) {
-        const desc = p.description ? `: ${p.description.length > 60 ? p.description.slice(0, 60) + '...' : p.description}` : '';
-        lines.push(`  - ${p.name}${desc}`);
-      }
+      // Compact: names + buying stage only
+      lines.push(`Personas: ${ctx.personas.map(p => `${p.name}${p.buyingStage ? ` (${p.buyingStage})` : ''}`).join(', ')}`);
     } else {
-      lines.push('Personas:');
+      // Standard + detailed: full persona detail (pain points, goals, objections)
+      // AI models need this context to write audience-relevant content
+      lines.push('TARGET AUDIENCE PERSONAS:');
       for (const p of ctx.personas) {
-        lines.push(`  - ${p.name}${p.description ? `: ${p.description}` : ''}`);
+        const parts = [`  **${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
+        if (p.painPoints?.length) parts.push(`    Pain points: ${p.painPoints.join('; ')}`);
+        if (p.goals?.length) parts.push(`    Goals: ${p.goals.join('; ')}`);
+        if (p.objections?.length) parts.push(`    Objections: ${p.objections.join('; ')}`);
+        if (p.preferredContentFormat) parts.push(`    Prefers: ${p.preferredContentFormat}`);
+        lines.push(parts.join('\n'));
       }
     }
   }
 
-  // Knowledge base — at all verbosity levels (was detailed only)
+  // Knowledge base — emphatic header at all verbosity levels
   if (ctx.knowledgeBase) {
     if (verbosity === 'compact') {
       const summary = ctx.knowledgeBase.length > 80 ? ctx.knowledgeBase.slice(0, 80) + '...' : ctx.knowledgeBase;
-      lines.push(`Knowledge: ${summary}`);
+      lines.push(`BUSINESS KNOWLEDGE BASE:\n${summary}`);
     } else {
-      lines.push(`Knowledge: ${ctx.knowledgeBase}`);
+      lines.push(`BUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${ctx.knowledgeBase}`);
     }
   }
 
@@ -1349,8 +1389,24 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
   }
 
-  if (verbosity === 'detailed') {
-    if (ctx.strategy) lines.push(`Strategy: ${ctx.strategy.siteKeywords?.length ?? 0} site keywords`);
+  // Site keywords — always include when present; compact shows fewer
+  if (ctx.strategy?.siteKeywords?.length) {
+    const kw = verbosity === 'compact'
+      ? ctx.strategy.siteKeywords.slice(0, 3).join(', ')
+      : ctx.strategy.siteKeywords.slice(0, 8).join(', ');
+    lines.push(`Site target keywords: ${kw}`);
+  }
+
+  // Page-specific keyword targeting — when pagePath was provided, show the page's own keywords
+  if (ctx.pageKeywords) {
+    const pk = ctx.pageKeywords;
+    lines.push(`THIS PAGE'S TARGET: "${pk.primaryKeyword}"`);
+    if (pk.secondaryKeywords?.length) {
+      lines.push(`  Secondary: ${pk.secondaryKeywords.join(', ')}`);
+    }
+    if (pk.searchIntent) {
+      lines.push(`  Intent: ${pk.searchIntent}`);
+    }
   }
 
   // Return empty string rather than a bare header when no content was added
@@ -1374,29 +1430,84 @@ function formatInsightsSection(insights: InsightsSlice, verbosity: PromptVerbosi
   return lines.join('\n');
 }
 
-function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity): string {
+function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity, domain: 'content' | 'strategy' | 'technical' | 'all' = 'all'): string {
   // Guard must be verbosity-aware: only pass if there's content that will actually render
   // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
   const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
   const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
-  const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0;
+  const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0 || !!learnings.summary?.content || !!learnings.summary?.strategy || !!learnings.summary?.technical;
   const willRender =
     hasBaseContent ||
     ((verbosity === 'standard' || verbosity === 'detailed') && hasStandardContent) ||
     (verbosity === 'detailed' && hasDetailedContent);
   if (!willRender) return '';
 
-  const lines: string[] = ['## Outcome Learnings'];
+  const lines: string[] = [];
+  const summary = learnings.summary;
 
-  if (learnings.recentTrend) lines.push(`Trend: ${learnings.recentTrend}`);
-  if (learnings.confidence) lines.push(`Confidence: ${learnings.confidence}`);
-  if (learnings.overallWinRate > 0) lines.push(`Overall win rate: ${Math.round(learnings.overallWinRate * 100)}%`);
+  // Header with scored actions count (matches old formatLearningsForPrompt)
+  const totalActions = summary?.totalScoredActions ?? 0;
+  lines.push(`## Outcome Learnings${totalActions > 0 ? ` (${totalActions} tracked outcomes, ${learnings.confidence ?? 'unknown'} confidence)` : ''}`);
+
+  if (learnings.recentTrend && learnings.recentTrend !== 'stable') lines.push(`Trend: ${learnings.recentTrend}`);
+
+  // Overall win rate with strong wins (matches old: "62% (28% strong wins)")
+  if (learnings.overallWinRate > 0) {
+    const strongRate = summary?.overall?.strongWinRate;
+    const strongSuffix = strongRate != null ? ` (${pct(strongRate)} strong wins)` : '';
+    lines.push(`Overall win rate: ${pct(learnings.overallWinRate)}${strongSuffix}`);
+  }
 
   if (verbosity === 'detailed' || verbosity === 'standard') {
     if (learnings.topActionTypes.length > 0) {
       lines.push('Win rates by action type:');
       for (const { type, winRate, count } of learnings.topActionTypes) {
-        lines.push(`  ${type}: ${Math.round(winRate * 100)}% (${count} actions)`);
+        lines.push(`  ${type}: ${pct(winRate)} (${count} actions)`);
+      }
+    }
+
+    // Domain-specific learnings from summary
+    // Domain filtering: only render domains matching the requested learningsDomain
+    if (summary && verbosity === 'detailed') {
+      // Content learnings
+      if ((domain === 'content' || domain === 'all') && summary.content) {
+        const c = summary.content;
+        const topFormats = Object.entries(c.winRateByFormat)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2);
+        if (topFormats.length >= 2) {
+          const [f1, r1] = topFormats[0];
+          const [f2, r2] = topFormats[1];
+          lines.push(`${f1.replace(/_/g, ' ')} outperforms ${f2.replace(/_/g, ' ')} (${pct(r1)} vs ${pct(r2)} win rate)`);
+        }
+        if (c.avgDaysToPage1 != null) lines.push(`Content reaches page 1 in ~${c.avgDaysToPage1} days on average`);
+        if (c.refreshRecoveryRate > 0) lines.push(`Content refreshes recover traffic ${pct(c.refreshRecoveryRate)} of the time`);
+        if (c.bestPerformingTopics.length > 0) lines.push(`Best performing topics: ${c.bestPerformingTopics.slice(0, 3).join(', ')}`);
+      }
+
+      // Strategy learnings
+      if ((domain === 'strategy' || domain === 'all') && summary.strategy) {
+        const s = summary.strategy;
+        const topDifficulty = Object.entries(s.winRateByDifficultyRange).sort((a, b) => b[1] - a[1]).slice(0, 1);
+        if (topDifficulty.length > 0) {
+          const [range, rate] = topDifficulty[0];
+          lines.push(`Keywords with difficulty ${range} have highest win rate (${pct(rate)})`);
+        }
+        if (s.keywordVolumeSweetSpot) lines.push(`Optimal keyword volume range: ${s.keywordVolumeSweetSpot.min}–${s.keywordVolumeSweetSpot.max}/month`);
+        if (s.bestIntentTypes.length > 0) lines.push(`Best intent types: ${s.bestIntentTypes.join(', ')}`);
+      }
+
+      // Technical learnings
+      if ((domain === 'technical' || domain === 'all') && summary.technical) {
+        const t = summary.technical;
+        const topFix = Object.entries(t.winRateByFixType).sort((a, b) => b[1] - a[1]).slice(0, 1);
+        if (topFix.length > 0) {
+          const [fixType, rate] = topFix[0];
+          lines.push(`${fixType.replace(/_/g, ' ')} has highest technical win rate (${pct(rate)})`);
+        }
+        if (t.schemaTypesWithRichResults.length > 0) lines.push(`Schema types producing rich results: ${t.schemaTypesWithRichResults.join(', ')}`);
+        if (t.avgHealthScoreImprovement > 0) lines.push(`Average health score improvement: +${t.avgHealthScoreImprovement}`);
+        if (t.internalLinkEffectiveness > 0) lines.push(`Internal link additions improve rankings ${pct(t.internalLinkEffectiveness)} of the time`);
       }
     }
 
@@ -1412,9 +1523,14 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
     if (learnings.roiAttribution && learnings.roiAttribution.length > 0 && verbosity === 'detailed') {
       lines.push('ROI highlights:');
       for (const roi of learnings.roiAttribution.slice(0, 5)) {
-        lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain} clicks`);
+        lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain ?? 0} clicks`);
       }
     }
+  }
+
+  // Cap at 25 content lines to stay within token budget
+  if (lines.length > 25) {
+    return [...lines.slice(0, 25), '  (additional learnings truncated)'].join('\n');
   }
 
   return lines.join('\n');
@@ -1446,6 +1562,18 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     if (pipeline.schemaDeployment) {
       lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
     }
+    if (pipeline.cannibalizationWarnings && pipeline.cannibalizationWarnings.length > 0) {
+      lines.push('Keyword cannibalization:');
+      for (const cw of pipeline.cannibalizationWarnings.slice(0, 5)) {
+        lines.push(`  - "${cw.keyword}" [${cw.severity}]: ${cw.pages.join(', ')}`);
+      }
+    }
+    if (pipeline.decayAlerts && pipeline.decayAlerts.length > 0) {
+      lines.push('Decay alert details:');
+      for (const da of pipeline.decayAlerts.slice(0, 5)) {
+        lines.push(`  - ${da.pageUrl}: -${da.clickDrop}% clicks${da.isRepeatDecay ? ' (repeat decay)' : ''}`);
+      }
+    }
   }
 
   return lines.join('\n');
@@ -1472,7 +1600,17 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
   if (verbosity === 'detailed') {
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
-    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? `${Math.round(health.cwvPassRate.desktop * 100)}%` : 'n/a'}`);
+    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${pct(health.cwvPassRate.mobile)}, desktop ${health.cwvPassRate.desktop != null ? pct(health.cwvPassRate.desktop) : 'n/a'}`);
+    if (health.schemaValidation) {
+      lines.push(`Schema validation: ${health.schemaValidation.valid} valid, ${health.schemaValidation.warnings} warnings, ${health.schemaValidation.errors} errors`);
+    }
+    if (health.performanceSummary) {
+      const perfParts: string[] = [];
+      if (health.performanceSummary.avgLcp != null) perfParts.push(`LCP: ${health.performanceSummary.avgLcp.toFixed(1)}s`);
+      if (health.performanceSummary.avgFid != null) perfParts.push(`FID: ${health.performanceSummary.avgFid}ms`);
+      if (health.performanceSummary.avgCls != null) perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
+      if (perfParts.length > 0) lines.push(`Core Web Vitals: ${perfParts.join(', ')}`);
+    }
   }
 
   return lines.join('\n');
@@ -1494,7 +1632,13 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
       lines.push(`Engagement: ${signals.engagement.loginFrequency} login frequency, ${signals.engagement.chatSessionCount} chat sessions`);
     }
     if (signals.approvalPatterns.approvalRate > 0) {
-      lines.push(`Approval rate: ${Math.round(signals.approvalPatterns.approvalRate * 100)}%`);
+      lines.push(`Approval rate: ${pct(signals.approvalPatterns.approvalRate)}`);
+    }
+    if (signals.businessPriorities.length > 0) {
+      lines.push(`Business priorities: ${signals.businessPriorities.join('; ')}`);
+    }
+    if (signals.serviceRequests) {
+      lines.push(`Service requests: ${signals.serviceRequests.pending} pending, ${signals.serviceRequests.total} total`);
     }
   }
 
@@ -1511,6 +1655,18 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     }
     if (signals.recentChatTopics.length > 0) {
       lines.push(`Recent topics: ${signals.recentChatTopics.join(', ')}`);
+    }
+    if (signals.keywordFeedback.approved.length > 0 || signals.keywordFeedback.rejected.length > 0) {
+      lines.push(`Keyword feedback: ${pct(signals.keywordFeedback.patterns.approveRate)} approve rate`);
+      if (signals.keywordFeedback.approved.length > 0) {
+        lines.push(`  Approved: ${signals.keywordFeedback.approved.slice(0, 5).join(', ')}`);
+      }
+      if (signals.keywordFeedback.patterns.topRejectionReasons.length > 0) {
+        lines.push(`  Top rejection reasons: ${signals.keywordFeedback.patterns.topRejectionReasons.join(', ')}`);
+      }
+    }
+    if (signals.contentGapVotes.length > 0) {
+      lines.push(`Content gap votes: ${signals.contentGapVotes.slice(0, 5).map(v => `${v.topic} (${v.votes})`).join(', ')}`);
     }
   }
 
@@ -1535,6 +1691,12 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
     if (ops.timeSaved) {
       lines.push(`Time saved: ${ops.timeSaved.totalMinutes} minutes`);
     }
+    if (ops.pendingJobs > 0) {
+      lines.push(`Background jobs: ${ops.pendingJobs} pending`);
+    }
+    if (ops.workOrders) {
+      lines.push(`Work orders: ${ops.workOrders.active} active, ${ops.workOrders.pending} pending`);
+    }
   }
 
   if (verbosity === 'detailed') {
@@ -1546,6 +1708,15 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
       for (const [feature, minutes] of Object.entries(ops.timeSaved.byFeature).slice(0, 5)) {
         lines.push(`  ${feature}: ${minutes} min`);
       }
+    }
+    if (ops.annotations.length > 0) {
+      lines.push('Timeline annotations:');
+      for (const a of ops.annotations.slice(0, 5)) {
+        lines.push(`  - ${a.date}: ${a.label}`);
+      }
+    }
+    if (ops.insightAcceptanceRate) {
+      lines.push(`Insight acceptance rate: ${pct(ops.insightAcceptanceRate.rate)} (${ops.insightAcceptanceRate.confirmed}/${ops.insightAcceptanceRate.totalShown})`);
     }
   }
 
@@ -1567,14 +1738,38 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
   }
 
   if (verbosity === 'detailed') {
+    if (profile.optimizationIssues?.length > 0) {
+      lines.push('Optimization issues:');
+      for (const issue of profile.optimizationIssues.slice(0, 5)) {
+        lines.push(`  - ${issue}`);
+      }
+    }
     if (profile.recommendations.length > 0) {
       lines.push('Recommendations:');
       for (const rec of profile.recommendations.slice(0, 5)) {
         lines.push(`  - ${rec}`);
       }
     }
-    if (profile.auditIssues.length > 0) {
-      lines.push(`Audit issues: ${profile.auditIssues.length}`);
+    if (profile.contentGaps.length > 0) {
+      lines.push('Content gaps:');
+      for (const gap of profile.contentGaps.slice(0, 3)) {
+        lines.push(`  - ${gap}`);
+      }
+    }
+    if (profile.primaryKeywordPresence) {
+      const p = profile.primaryKeywordPresence;
+      const missing = (['inTitle', 'inMeta', 'inContent', 'inSlug'] as const)
+        .filter(k => !p[k])
+        .map(k => ({ inTitle: 'title', inMeta: 'meta', inContent: 'content', inSlug: 'slug' }[k]));
+      if (missing.length > 0) lines.push(`Keyword missing from: ${missing.join(', ')}`);
+    }
+    if (profile.competitorKeywords?.length) {
+      lines.push(`Competitor keywords: ${profile.competitorKeywords.slice(0, 5).join(', ')}`);
+    }
+    if (profile.topicCluster) lines.push(`Topic cluster: ${profile.topicCluster}`);
+    if (profile.estimatedDifficulty) lines.push(`Difficulty: ${profile.estimatedDifficulty}`);
+    if (profile.auditIssues?.length > 0) {
+      lines.push(`Structural audit issues: ${profile.auditIssues.length}`);
     }
     lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
   }
@@ -1770,22 +1965,25 @@ async function assemblePageProfile(
     contentStatus = null;
   }
 
-  // contentGaps — from strategy content gaps filtered to this page
-  let contentGaps: string[] = [];
-  try {
-    const { getWorkspace: getWsForGaps } = await import('./workspaces.js');
-    const wsForGaps = getWsForGaps(workspaceId);
-    const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
-    if (allGaps.length > 0) {
-      const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
-      const matched = primaryKwLower
-        ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
-        : [];
-      const source = matched.length > 0 ? matched : allGaps;
-      contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
+  // contentGaps — prefer per-page AI keyword analysis (same source as old buildPageAnalysisContext),
+  // fall back to strategy content gaps filtered by keyword if page analysis hasn't run yet.
+  let contentGaps: string[] = pageKw?.contentGaps ?? [];
+  if (contentGaps.length === 0) {
+    try {
+      const { getWorkspace: getWsForGaps } = await import('./workspaces.js');
+      const wsForGaps = getWsForGaps(workspaceId);
+      const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
+      if (allGaps.length > 0) {
+        const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
+        const matched = primaryKwLower
+          ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
+          : [];
+        const source = matched.length > 0 ? matched : allGaps;
+        contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
+      }
+    } catch {
+      contentGaps = [];
     }
-  } catch {
-    contentGaps = [];
   }
 
   // CWV status
@@ -1809,16 +2007,28 @@ async function assemblePageProfile(
     cwvStatus = null;
   }
 
+  // Merge platform recs with AI keyword analysis recs — both are page-relevant.
+  // pageKw.recommendations come from the per-page AI keyword analysis job.
+  const kwRecs = pageKw?.recommendations ?? [];
+  const allRecommendations = kwRecs.length > 0
+    ? [...kwRecs, ...recommendations.filter(r => !kwRecs.includes(r))]
+    : recommendations;
+
   return {
     pagePath,
     primaryKeyword: pageKw?.primaryKeyword ?? null,
     searchIntent: pageKw?.searchIntent ?? null,
     optimizationScore: pageKw?.optimizationScore ?? null,
-    recommendations,
+    recommendations: allRecommendations,
     contentGaps,
     insights,
     actions,
     auditIssues,
+    optimizationIssues: pageKw?.optimizationIssues ?? [],
+    primaryKeywordPresence: pageKw?.primaryKeywordPresence ?? null,
+    competitorKeywords: pageKw?.competitorKeywords ?? [],
+    topicCluster: pageKw?.topicCluster ?? null,
+    estimatedDifficulty: pageKw?.estimatedDifficulty ?? null,
     schemaStatus,
     linkHealth,
     seoEdits,
@@ -1869,6 +2079,24 @@ export function getIntelligenceCacheStats() {
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
 // These produce prompt-ready text from intelligence slice data, matching the
 // output format of the legacy mini-builders in seo-context.ts.
+
+/**
+ * Format raw brand voice text into a prompt block matching buildSeoContext().brandVoiceBlock format.
+ * Required because seoContext.brandVoice stores the RAW voice text (no header).
+ */
+export function formatBrandVoiceForPrompt(brandVoice: string | null | undefined): string {
+  if (!brandVoice?.trim()) return '';
+  return `\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${brandVoice}`;
+}
+
+/**
+ * Format raw knowledge base text into a prompt block matching buildSeoContext().knowledgeBlock format.
+ * Required because seoContext.knowledgeBase stores the RAW knowledge text (no header).
+ */
+export function formatKnowledgeBaseForPrompt(knowledgeBase: string | null | undefined): string {
+  if (!knowledgeBase?.trim()) return '';
+  return `\n\nBUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${knowledgeBase}`;
+}
 
 /**
  * Format site keywords into a prompt block matching buildSeoContext().keywordBlock format.

@@ -5,7 +5,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { generateAltText } from '../alttext.js';
-import { buildSeoContext } from '../seo-context.js';
+import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import {
   listSites,
   updateAsset,
@@ -77,7 +77,8 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
 
     const resolvedWsId = altWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
     if (resolvedWsId) {
-      const { businessContext: altBizCtx } = buildSeoContext(resolvedWsId);
+      const altIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
+      const altBizCtx = altIntel.seoContext?.businessContext ?? '';
       const ws = getWorkspace(resolvedWsId);
       const brandVoice = ws?.brandVoice;
       const kwParts: string[] = [];
@@ -136,7 +137,8 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
 
   const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
   if (bulkWsId) {
-    const { businessContext: bulkBizCtx } = buildSeoContext(bulkWsId);
+    const bulkIntel = await buildWorkspaceIntelligence(bulkWsId, { slices: ['seoContext'] });
+    const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
     const bulkWs = getWorkspace(bulkWsId);
     const kwParts: string[] = [];
     if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);

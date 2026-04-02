@@ -38,6 +38,8 @@ vi.mock('../server/outcome-tracking.js', () => ({
 // Mock other assembler dependencies to prevent import errors
 vi.mock('../server/seo-context.js', () => ({
   buildSeoContext: vi.fn(() => ({ strategy: null, brandVoiceBlock: '', businessContext: '', knowledgeBlock: '' })),
+  getRawBrandVoice: vi.fn(() => ''),
+  getRawKnowledge: vi.fn(() => ''),
 }));
 vi.mock('../server/workspaces.js', () => ({
   getWorkspace: vi.fn(() => ({ id: 'ws-1', personas: [] })),

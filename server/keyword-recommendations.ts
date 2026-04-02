@@ -8,7 +8,7 @@
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 
@@ -158,9 +158,14 @@ export async function getKeywordRecommendations(
   // If AI scoring is enabled and we have business context, re-rank
   if (useAI && candidates.length > 1) {
     try {
-      const seoCtx = buildSeoContext(workspaceId);
-      // Use full context (business context + brand voice + personas + knowledge) for richer ranking
-      const bizContext = seoCtx.fullContext || seoCtx.businessContext || '';
+      const slices = ['seoContext', 'learnings'] as const;
+      const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices });
+      const seoCtx = kwIntel.seoContext;
+      // Only call AI ranking when meaningful workspace context exists (formatForPrompt always returns non-empty).
+      // Include strategy check — workspaces with only a keyword strategy still benefit from AI ranking.
+      const hasMeaningfulContext = !!(seoCtx?.businessContext || seoCtx?.knowledgeBase || seoCtx?.brandVoice || seoCtx?.personas?.length || seoCtx?.strategy);
+      // Use full context (business context + brand voice + personas + knowledge + learnings) for richer ranking
+      const bizContext = hasMeaningfulContext ? formatForPrompt(kwIntel, { verbosity: 'detailed', sections: slices }) : '';
       if (bizContext) {
         const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
         // Mark the AI-recommended keyword

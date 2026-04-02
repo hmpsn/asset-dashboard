@@ -825,6 +825,29 @@ Once `buildSeoContext` is error-severity, consider adding a complementary positi
 
 ---
 
+## Post-Launch Followup Items (from Batch 2 audit, 2026-04-02)
+
+These were identified during the store-vs-format root cause fix and subsequent audits.
+None are blocking for launch — all are quality-of-life or recurrence prevention.
+
+### Quick wins (documentation only, ~5 min total)
+
+- [ ] **JSDoc on `SeoContextSlice.brandVoice` and `.knowledgeBase`** — Add `/** Raw text — no headers. Use formatBrandVoiceForPrompt() / formatKnowledgeBaseForPrompt() before injecting into prompts. */` to both fields in `WorkspaceIntelligence` / `SeoContextSlice` type definitions. Prevents the double-formatting bug from recurring silently.
+
+- [ ] **JSDoc explaining the two-path format split** — Add a comment block on `formatSeoContextSection` and `formatBrandVoiceForPrompt` explaining that these intentionally produce different output: `formatSeoContextSection` renders compact (`Brand voice: [text]`) inside the `## SEO Context` summary block, while `formatBrandVoiceForPrompt` renders emphatic (`\n\nBRAND VOICE & STYLE...\n[text]`) for standalone prompt injection. Without this, the "inconsistency" looks like a bug.
+
+### Requires more thought
+
+- [ ] **Shared mock factory for `seo-context.ts`** — Create `tests/__mocks__/seo-context.ts` as a shared Vitest mock factory. Currently 10 test files each re-declare the full mock; every new export to `seo-context.ts` requires updating all 10. A shared factory means one file changes. Do this before the next time a new export is added to `seo-context.ts`.
+
+- [ ] **pr-check rule for direct `SeoContextSlice` field access** — A rule that flags `.brandVoice` or `.knowledgeBase` accessed outside `workspace-intelligence.ts` without a format helper call. Hard to write without false positives (need to distinguish `ws.brandVoice` on the workspace model from `seoCtx.brandVoice` on the slice). Requires careful regex work and probably a path-based allowlist.
+
+- [ ] **`schema-suggester.ts` consistency** — `SchemaContext.knowledgeBase` at line 1695 manually adds the "BUSINESS KNOWLEDGE BASE" header inline rather than using `formatKnowledgeBaseForPrompt`. Works correctly as-is; the risk is that if the helper's header wording ever changes, `schema-suggester.ts` won't track. Low priority until the header is actually changed.
+
+- [ ] **`formatSeoContextSection` verbosity audit** — `knowledgeBase` only renders at `verbosity: 'detailed'`, but `formatKnowledgeBaseForPrompt` callers always inject it regardless of verbosity. This is likely intentional (compact SEO summary vs. full context injection) but undocumented. Needs a deliberate decision before touching either path.
+
+---
+
 ## Spec Compliance Checklist
 
 | Phase 3B requirement | Task | Status |

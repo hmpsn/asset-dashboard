@@ -4,7 +4,7 @@ import { scanRedirects } from './redirect-scanner.js';
 import { checkSiteLinks } from './link-checker.js';
 import type { DeadLink } from './link-checker.js';
 import { runSinglePageSpeed } from './pagespeed.js';
-import { buildSeoContext, buildPageAnalysisContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
@@ -589,7 +589,9 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
           // Build keyword strategy + brand voice + KB + personas context for this page
           const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
-          const { fullContext } = buildSeoContext(wsId, pagePath);
+          const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
+          const intel = await buildWorkspaceIntelligence(wsId ?? '', { slices, pagePath });
+          const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
 
@@ -598,7 +600,7 @@ URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
-${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}${buildPageAnalysisContext(wsId, pagePath)}
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}

@@ -116,7 +116,8 @@ const CHECKS: Check[] = [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
-      'server/performance-store.ts', 'server/rank-tracking.ts',
+      'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
+      'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -210,6 +211,31 @@ const CHECKS: Check[] = [
     pathFilter: 'server/',
     exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts', 'server/admin-chat-context.ts', 'server/keyword-recommendations.ts', 'server/content-decay.ts'],
     message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
+    severity: 'warn',
+  },
+  {
+    name: 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
+    // Matches calls that don't specify slices — typically: buildWorkspaceIntelligence(id) or buildWorkspaceIntelligence(id, { pagePath })
+    pattern: 'buildWorkspaceIntelligence\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts'],
+    // Lines with slices: already correct; lines in route/intelligence.ts that dynamically pass slices are also fine
+    // 'slices:' catches key:value form; ' slices,' and ' slices }' catch object shorthand (const slices = [...]; { slices, pagePath })
+    excludeLines: ['slices:', ' slices,', ' slices }', ' slices)', '// bwi-all-ok'],
+    message: 'Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional.',
+    severity: 'warn',
+  },
+  {
+    name: 'formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices)',
+    // Catches formatForPrompt( calls that pass a literal array for sections, e.g. sections: ['seoContext', 'learnings']
+    // These are dangerous because the literal can diverge from the slices array.
+    pattern: 'formatForPrompt\\(.*sections:\\s*\\[',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts', 'tests/'],
+    excludeLines: ['// bip-ok'],
+    message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
     severity: 'warn',
   },
   {

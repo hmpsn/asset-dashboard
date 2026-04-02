@@ -33,7 +33,7 @@ import { runSalesAudit } from '../sales-audit.js';
 import { saveSchemaSnapshot } from '../schema-store.js';
 import { generateSchemaSuggestions } from '../schema-suggester.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
+import { clearSeoContextCache } from '../seo-context.js';
 import {
   updateAsset,
   deleteAsset,
@@ -55,10 +55,9 @@ import {
 import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPageKeywords, countAnalyzedPages } from '../page-keywords.js';
 // SEMRush imports removed — bulk analysis skips SEMRush to conserve API credits.
 // Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
-import { buildKeywordMapContext } from '../seo-context.js';
 import { createLogger } from '../logger.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt, formatBrandVoiceForPrompt } from '../workspace-intelligence.js';
 
 const log = createLogger('jobs');
 
@@ -407,7 +406,10 @@ router.post('/api/jobs', async (req, res) => {
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
-                const { keywordBlock: kwb, brandVoiceBlock: bvb } = buildSeoContext(bwsId, page.slug ? `/${page.slug}` : undefined);
+                const bwsSlices = ['seoContext'] as const;
+                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: page.slug ? `/${page.slug}` : undefined });
+                const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
+                const bvb = formatBrandVoiceForPrompt(bwsIntel.seoContext?.brandVoice);
 
                 // Fetch page content for context (best-effort)
                 let contentExcerpt = '';
@@ -693,8 +695,10 @@ router.post('/api/jobs', async (req, res) => {
               return;
             }
 
-            const { fullContext } = buildSeoContext(paWsId);
-            const kwMapCtx = buildKeywordMapContext(paWsId);
+            const paSlices = ['seoContext', 'learnings'] as const;
+            const paIntel = await buildWorkspaceIntelligence(paWsId, { slices: paSlices });
+            const fullContext = formatForPrompt(paIntel, { verbosity: 'detailed', sections: paSlices });
+            const kwMapCtx = formatPageMapForPrompt(paIntel.seoContext);
 
             const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };
 

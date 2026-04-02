@@ -161,27 +161,22 @@ export function buildSeoContext(
     void (async () => {
       try {
         const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');
-        const intel = await buildWorkspaceIntelligence(workspaceId, {
-          slices: ['seoContext'],
-          pagePath,
-          learningsDomain,
-        });
+        const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath, learningsDomain });
 
         if (intel.seoContext) {
           // Shadow-mode comparison: compare buildSeoContext() output against the
           // intelligence assembler's seoContext slice. Both sides originate from the
-          // same buildSeoContext() call (assembler calls it with _skipShadow: true),
-          // so they should match. The assembler maps:
-          //   brandVoice  = ctx.brandVoiceBlock (wrapped with headers)
-          //   knowledgeBase = ctx.knowledgeBlock  (wrapped with headers)
-          // So compare wrapped-to-wrapped (result.brandVoiceBlock vs intel.seoContext.brandVoice).
+          // same source data. The assembler maps:
+          //   brandVoice  = getRawBrandVoice() (raw, no header)
+          //   knowledgeBase = getRawKnowledge() (raw, no header)
+          // So compare raw-to-raw (voiceParts.join vs intel.seoContext.brandVoice).
           const comparisonFields = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
-            // Both are the wrapped brandVoiceBlock (with "BRAND VOICE & STYLE" header + brand docs)
-            { name: 'brandVoice', match: (result.brandVoiceBlock ?? '') === (intel.seoContext.brandVoice ?? '') },
+            // Both are raw brand voice (no "BRAND VOICE & STYLE" header)
+            { name: 'brandVoice', match: getRawBrandVoice(workspaceId) === (intel.seoContext.brandVoice ?? '') },
             { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
-            // Both are the wrapped knowledgeBlock (with "BUSINESS KNOWLEDGE BASE" header)
-            { name: 'knowledgeBase', match: (result.knowledgeBlock ?? '') === (intel.seoContext.knowledgeBase ?? '') },
+            // Both are raw knowledge (no "BUSINESS KNOWLEDGE BASE" header)
+            { name: 'knowledgeBase', match: getRawKnowledge(workspaceId) === (intel.seoContext.knowledgeBase ?? '') },
             // Personas: old path is prose string, new is structured array — compare presence as proxy
             { name: 'personas', match: (result.personasBlock ? 'present' : 'empty') === ((intel.seoContext.personas?.length ?? 0) > 0 ? 'present' : 'empty') },
           ];
@@ -226,6 +221,20 @@ function readBrandDocs(workspaceFolder: string): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * Get raw brand voice content for a workspace (inline + brand-docs/ files, no header).
+ * Use this when you need the raw text — e.g. for intelligence slice storage that adds its own header.
+ */
+export function getRawBrandVoice(workspaceId: string): string {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return '';
+  const voiceParts: string[] = [];
+  if (ws.brandVoice) voiceParts.push(ws.brandVoice);
+  const brandDocsContent = readBrandDocs(ws.folder);
+  if (brandDocsContent) voiceParts.push(brandDocsContent);
+  return voiceParts.join('\n\n');
 }
 
 /**

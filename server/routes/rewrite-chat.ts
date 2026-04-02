@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { callOpenAI } from '../openai-helpers.js';
-import { buildSeoContext, buildPageAnalysisContext } from '../seo-context.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   addMessage,
@@ -121,10 +121,12 @@ router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceI
       addMessage(ws.id, sessionId, 'admin', 'user', question);
     }
 
-    // Build SEO context (includes KB + personas)
-    const slug = pageUrl ? new URL(pageUrl).pathname.replace(/^\//, '') : '';
-    const seoCtx = buildSeoContext(workspaceId, slug);
-    const knowledgeBase = seoCtx.knowledgeBlock;
+    // Build workspace intelligence (seoContext + pageProfile combined call)
+    const pagePath = pageUrl ? new URL(pageUrl).pathname : undefined;
+    const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'],
+      pagePath });
+    const seo = intel.seoContext;
+    const knowledgeBase = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
 
     // Build rewriting playbook block
     let playbookBlock = '';
@@ -171,7 +173,7 @@ Answer Engine Optimization (AEO) principles:
 - Include citations and data points
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
-${seoCtx.keywordBlock}${seoCtx.brandVoiceBlock}${seoCtx.personasBlock}${knowledgeBase}${buildPageAnalysisContext(workspaceId, pageUrl ? new URL(pageUrl).pathname : undefined)}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
+${formatKeywordsForPrompt(seo)}${formatBrandVoiceForPrompt(seo?.brandVoice)}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`;
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },

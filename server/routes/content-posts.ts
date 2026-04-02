@@ -37,7 +37,7 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
-import { buildSeoContext } from '../seo-context.js';
+import { buildIntelPrompt } from '../workspace-intelligence.js';
 
 const log = createLogger('content-posts');
 
@@ -181,7 +181,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
             // Record for outcome tracking — guard prevents duplicates if .then() fires more than once
             try {
               if (!getActionByWorkspaceAndSource(req.params.workspaceId, 'post', req.params.postId)) {
-                const postAction = recordAction({
+                const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
                   workspaceId: req.params.workspaceId,
                   actionType: 'content_published',
                   sourceType: 'post',
@@ -251,7 +251,7 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
   const ws = getWorkspace(req.params.workspaceId);
 
   // Build full business context for brand voice checking
-  const { fullContext } = buildSeoContext(req.params.workspaceId);
+  const fullContext = await buildIntelPrompt(req.params.workspaceId, ['seoContext', 'learnings'], { verbosity: 'detailed' });
 
   // Build a text summary of the post content for AI analysis
   const allContent = [
