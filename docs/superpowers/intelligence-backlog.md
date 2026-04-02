@@ -172,6 +172,18 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 
 ---
 
+### 17. outcome-crons Stale Cache When `getPendingActions` Fails
+
+**What it is:** `runMeasure` in `server/outcome-crons.ts` wraps `getPendingActions` in its own try/catch to isolate it from blocking measurement. If `getPendingActions` throws, `affectedWsIds` stays `[]` and no `invalidateIntelligenceCache()` calls are made — even if `measurePendingOutcomes` later succeeds and writes new data. Result: updated outcome data sits behind a stale cache until the next natural TTL expiry (5 min).
+
+**Why it's acceptable:** Low-probability scenario (transient DB error on a read-only query). The 5-minute TTL provides eventual consistency. New behavior (measurement not blocked by cache-tracking failure) is arguably preferable to the old behavior (measurement skipped entirely).
+
+**Fix if needed:** Collect `affectedWsIds` inside the `measurePendingOutcomes` return value rather than pre-computing from `getPendingActions`, so cache invalidation is always tied to actual write results.
+
+**Effort:** ~30min.
+
+---
+
 ### 16. Token budget Step 5 drops `contentPipeline`, `siteHealth`, `pageProfile` without gradual degradation
 
 `applyTokenBudget` steps 1-4 drop/truncate specific slices in order (operational → insights → clientSignals → learnings). If none of those steps bring the output under budget, Step 5 jumps directly to keeping only `seoContext`, discarding `contentPipeline`, `siteHealth`, and `pageProfile` all at once. There's no gradual fallback for these three slices — they either survive entirely or disappear entirely when budget is very tight.
@@ -202,3 +214,4 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 | 14 | Cold-start ignores section filter | 30min | Low | If needed |
 | 15 | Token budget drops requested sections | 1h | Low | If needed |
 | 16 | Token budget Step 5 abrupt drop (contentPipeline/siteHealth/pageProfile) | 1h | Low | If needed |
+| 17 | outcome-crons stale cache on getPendingActions failure | 30min | Low | Post-3B |
