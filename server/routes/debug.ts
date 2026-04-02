@@ -11,7 +11,8 @@ const VALID_SLICES: Set<string> = new Set([
   'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
 ]);
 
-const IS_PROD = process.env.NODE_ENV === 'production';
+// Disabled when DISABLE_DEBUG_ENDPOINTS=true (set this in production, not staging)
+const DISABLED = process.env.DISABLE_DEBUG_ENDPOINTS === 'true';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ const router = Router();
  * Returns plain text prompt output for inspection.
  */
 router.get('/api/debug/prompt', async (req, res) => {
-  if (IS_PROD) {
+  if (DISABLED) {
     return res.status(404).json({ error: 'Not found' });
   }
 
