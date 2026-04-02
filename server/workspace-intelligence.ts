@@ -1324,8 +1324,9 @@ function applyTokenBudget(
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = ['## SEO Context'];
 
-  if (ctx.brandVoice) lines.push(`Brand voice: ${ctx.brandVoice}`);
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
+  // Emphatic brand voice directive — AI models respond to capitalized instructional headers
+  if (ctx.brandVoice) lines.push(`BRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${ctx.brandVoice}`);
 
   // Personas — always include when present (was silently dropped before)
   if (ctx.personas && ctx.personas.length > 0) {
@@ -1345,13 +1346,13 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     }
   }
 
-  // Knowledge base — at all verbosity levels (was detailed only)
+  // Knowledge base — emphatic header at all verbosity levels
   if (ctx.knowledgeBase) {
     if (verbosity === 'compact') {
       const summary = ctx.knowledgeBase.length > 80 ? ctx.knowledgeBase.slice(0, 80) + '...' : ctx.knowledgeBase;
-      lines.push(`Knowledge: ${summary}`);
+      lines.push(`BUSINESS KNOWLEDGE BASE:\n${summary}`);
     } else {
-      lines.push(`Knowledge: ${ctx.knowledgeBase}`);
+      lines.push(`BUSINESS KNOWLEDGE BASE (use this to give informed, business-aware answers):\n${ctx.knowledgeBase}`);
     }
   }
 
