@@ -31,7 +31,8 @@ import {
 import {
   listGscSites,
 } from '../search-console.js';
-import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
 import { listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
@@ -138,8 +139,10 @@ router.post('/api/google/search-chat/:siteId', async (req, res) => {
 
   // Look up workspace for keyword strategy context
   const wsId = workspaceId || listWorkspaces().find(w => w.webflowSiteId === req.params.siteId)?.id;
-  const { fullContext, businessContext: bizCtx } = buildSeoContext(wsId);
-  const kwMapContext = buildKeywordMapContext(wsId);
+  const intel = wsId ? await buildWorkspaceIntelligence(wsId) : null;
+  const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] }) : '';
+  const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
+  const bizCtx = intel?.seoContext?.businessContext ?? '';
 
   try {
     const strategySection = (fullContext || kwMapContext || bizCtx)

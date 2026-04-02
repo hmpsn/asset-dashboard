@@ -41,7 +41,8 @@ import {
   fetchSearchTypes,
   fetchSearchComparison,
 } from '../analytics-data.js';
-import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
@@ -244,8 +245,8 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
     const teamName = 'hmpsn studio';
 
     // Pre-compute SEO context blocks for the system prompt
-    const seoCtx = buildSeoContext(ws.id);
-    const seoContextBlock = seoCtx.fullContext + buildKeywordMapContext(ws.id);
+    const intel = await buildWorkspaceIntelligence(ws.id);
+    const seoContextBlock = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] }) + formatPageMapForPrompt(intel.seoContext);
 
     // Content plan context (templates + matrices) — fetched server-side
     let contentPlanSection = '';

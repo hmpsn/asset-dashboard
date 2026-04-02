@@ -4,13 +4,13 @@
 import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
-import { buildSeoContext, buildKeywordMapContext, clearSeoContextCache } from '../seo-context.js';
+import { clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const log = createLogger('webflow-keywords');
 
@@ -25,8 +25,9 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const { fullContext } = buildSeoContext(workspaceId, slug ? `/${slug}` : undefined);
-  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const intel = workspaceId ? await buildWorkspaceIntelligence(workspaceId) : null;
+  const fullContext = intel ? formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] }) : '';
+  const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext, slug ? `/${slug}` : undefined) : '';
 
   // Fetch real keyword data for accuracy
   let semrushBlock = '';
