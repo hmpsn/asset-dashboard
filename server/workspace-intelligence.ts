@@ -1241,6 +1241,24 @@ export function formatForPrompt(
 }
 
 /**
+ * Type-safe convenience wrapper: assembles the requested slices and formats them
+ * in a single call, guaranteeing that sections === slices (no mismatch possible).
+ *
+ * Use this instead of separate buildWorkspaceIntelligence + formatForPrompt calls
+ * whenever you want all assembled slices included in the prompt context.
+ * If you need the raw intelligence object for field access alongside the prompt
+ * text, call buildWorkspaceIntelligence + formatForPrompt directly.
+ */
+export async function buildIntelPrompt(
+  workspaceId: string,
+  slices: IntelligenceSlice[],
+  opts?: Omit<IntelligenceOptions, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget'>,
+): Promise<string> {
+  const intel = await buildWorkspaceIntelligence(workspaceId, { ...opts, slices });
+  return formatForPrompt(intel, { verbosity: opts?.verbosity, sections: slices, tokenBudget: opts?.tokenBudget });
+}
+
+/**
  * Token budget truncation — §20 priority chain:
  * 1. Drop `operational` first (lowest value density)
  * 2. Truncate `insights` to top 5
@@ -1567,14 +1585,38 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
   }
 
   if (verbosity === 'detailed') {
+    if (profile.optimizationIssues?.length > 0) {
+      lines.push('Optimization issues:');
+      for (const issue of profile.optimizationIssues.slice(0, 5)) {
+        lines.push(`  - ${issue}`);
+      }
+    }
     if (profile.recommendations.length > 0) {
       lines.push('Recommendations:');
       for (const rec of profile.recommendations.slice(0, 5)) {
         lines.push(`  - ${rec}`);
       }
     }
-    if (profile.auditIssues.length > 0) {
-      lines.push(`Audit issues: ${profile.auditIssues.length}`);
+    if (profile.contentGaps.length > 0) {
+      lines.push('Content gaps:');
+      for (const gap of profile.contentGaps.slice(0, 3)) {
+        lines.push(`  - ${gap}`);
+      }
+    }
+    if (profile.primaryKeywordPresence) {
+      const p = profile.primaryKeywordPresence;
+      const missing = (['inTitle', 'inMeta', 'inContent', 'inSlug'] as const)
+        .filter(k => !p[k])
+        .map(k => ({ inTitle: 'title', inMeta: 'meta', inContent: 'content', inSlug: 'slug' }[k]));
+      if (missing.length > 0) lines.push(`Keyword missing from: ${missing.join(', ')}`);
+    }
+    if (profile.competitorKeywords?.length) {
+      lines.push(`Competitor keywords: ${profile.competitorKeywords.slice(0, 5).join(', ')}`);
+    }
+    if (profile.topicCluster) lines.push(`Topic cluster: ${profile.topicCluster}`);
+    if (profile.estimatedDifficulty) lines.push(`Difficulty: ${profile.estimatedDifficulty}`);
+    if (profile.auditIssues?.length > 0) {
+      lines.push(`Structural audit issues: ${profile.auditIssues.length}`);
     }
     lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
   }

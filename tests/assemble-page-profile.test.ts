@@ -7,6 +7,13 @@ vi.mock('../server/page-keywords.js', () => ({
     searchIntent: 'informational',
     currentPosition: 12,
     previousPosition: 15,
+    optimizationIssues: ['Primary keyword missing from H1', 'Meta description too short'],
+    recommendations: ['Add primary keyword to H1', 'Expand meta description to 150 chars'],
+    contentGaps: ['Local SEO signals', 'Customer testimonials section'],
+    primaryKeywordPresence: { inTitle: true, inMeta: false, inContent: true, inSlug: false },
+    competitorKeywords: ['competitor term A', 'competitor term B'],
+    topicCluster: 'Brand & Company',
+    estimatedDifficulty: 'medium',
   })),
 }));
 
@@ -130,12 +137,61 @@ describe('assemblePageProfile', () => {
     expect(pp).toHaveProperty('insights');
     expect(pp).toHaveProperty('actions');
     expect(pp).toHaveProperty('auditIssues');
+    expect(pp).toHaveProperty('optimizationIssues');
+    expect(pp).toHaveProperty('primaryKeywordPresence');
+    expect(pp).toHaveProperty('competitorKeywords');
+    expect(pp).toHaveProperty('topicCluster');
+    expect(pp).toHaveProperty('estimatedDifficulty');
     expect(pp).toHaveProperty('schemaStatus');
     expect(pp).toHaveProperty('linkHealth');
     expect(pp).toHaveProperty('seoEdits');
     expect(pp).toHaveProperty('rankHistory');
     expect(pp).toHaveProperty('contentStatus');
     expect(pp).toHaveProperty('cwvStatus');
+  });
+
+  it('populates optimizationIssues from pageKw (AI keyword analysis source)', async () => {
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['pageProfile'], pagePath: '/about' });
+    const pp = result.pageProfile!;
+    expect(pp.optimizationIssues).toContain('Primary keyword missing from H1');
+    expect(pp.optimizationIssues).toContain('Meta description too short');
+  });
+
+  it('populates primaryKeywordPresence from pageKw', async () => {
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['pageProfile'], pagePath: '/about' });
+    const pp = result.pageProfile!;
+    expect(pp.primaryKeywordPresence).toEqual({ inTitle: true, inMeta: false, inContent: true, inSlug: false });
+  });
+
+  it('populates competitorKeywords, topicCluster, estimatedDifficulty from pageKw', async () => {
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['pageProfile'], pagePath: '/about' });
+    const pp = result.pageProfile!;
+    expect(pp.competitorKeywords).toContain('competitor term A');
+    expect(pp.topicCluster).toBe('Brand & Company');
+    expect(pp.estimatedDifficulty).toBe('medium');
+  });
+
+  it('prefers pageKw.contentGaps over strategy gaps when both exist', async () => {
+    // pageKw mock returns contentGaps: ['Local SEO signals', 'Customer testimonials section']
+    // Strategy gaps (from workspace mock) are absent — just verifying pageKw wins when present
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['pageProfile'], pagePath: '/about' });
+    const gaps = result.pageProfile!.contentGaps;
+    expect(gaps).toContain('Local SEO signals');
+    expect(gaps).toContain('Customer testimonials section');
+  });
+
+  it('merges pageKw.recommendations with platform recs, pageKw recs first', async () => {
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['pageProfile'], pagePath: '/about' });
+    const recs = result.pageProfile!.recommendations;
+    // pageKw recs come first
+    expect(recs[0]).toBe('Add primary keyword to H1');
+    // Platform rec ('Add meta description' from loadRecommendations mock) is also present
+    expect(recs).toContain('Add meta description');
   });
 
   it('derives rank trend from page-keywords fallback when rank-tracking throws', async () => {
@@ -153,7 +209,15 @@ describe('assemblePageProfile', () => {
     expect(result.pageProfile!.rankHistory.current).toBe(12);
   });
 
-  it('populates contentGaps from strategy gaps matching the page primary keyword', async () => {
+  it('falls back to strategy gaps matching page keyword when pageKw has no contentGaps', async () => {
+    // Override pageKw to have no contentGaps — tests the fallback path
+    const pageKeywords = await import('../server/page-keywords.js');
+    vi.mocked(pageKeywords.getPageKeyword).mockReturnValueOnce({
+      pagePath: '/about', primaryKeyword: 'about us', searchIntent: 'informational',
+      currentPosition: 12, previousPosition: 15,
+      // No contentGaps — forces fallback to strategy
+    } as ReturnType<typeof pageKeywords.getPageKeyword>);
+
     const workspaces = await import('../server/workspaces.js');
     // Use mockReturnValue (not Once) — getWorkspace is called multiple times per assembly
     vi.mocked(workspaces.getWorkspace).mockReturnValue({
@@ -191,7 +255,13 @@ describe('assemblePageProfile', () => {
     }
   });
 
-  it('returns all gaps (capped at 5) when no page keyword matches any gap', async () => {
+  it('fallback: returns all strategy gaps (capped at 5) when no keyword matches and pageKw has no gaps', async () => {
+    const pageKeywords = await import('../server/page-keywords.js');
+    vi.mocked(pageKeywords.getPageKeyword).mockReturnValueOnce({
+      pagePath: '/about', primaryKeyword: 'about us', searchIntent: 'informational',
+      currentPosition: 12, previousPosition: 15,
+    } as ReturnType<typeof pageKeywords.getPageKeyword>);
+
     const workspaces = await import('../server/workspaces.js');
     vi.mocked(workspaces.getWorkspace).mockReturnValue({
       id: 'ws-1',
@@ -225,8 +295,14 @@ describe('assemblePageProfile', () => {
     }
   });
 
-  it('returns empty contentGaps when workspace has no keywordStrategy', async () => {
-    // Default mock has no keywordStrategy — no override needed
+  it('fallback: returns empty contentGaps when pageKw has none and workspace has no keywordStrategy', async () => {
+    const pageKeywords = await import('../server/page-keywords.js');
+    vi.mocked(pageKeywords.getPageKeyword).mockReturnValueOnce({
+      pagePath: '/about', primaryKeyword: 'about us', searchIntent: 'informational',
+      currentPosition: 12, previousPosition: 15,
+      // No contentGaps — forces fallback; default workspace mock has no keywordStrategy either
+    } as ReturnType<typeof pageKeywords.getPageKeyword>);
+
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', {
       slices: ['pageProfile'],

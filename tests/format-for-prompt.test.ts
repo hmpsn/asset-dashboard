@@ -132,6 +132,11 @@ function makePageProfile(): PageProfileSlice {
     insights: [],
     actions: [],
     auditIssues: ['Missing alt text on 3 images'],
+    optimizationIssues: ['Primary keyword density too low', 'H1 missing keyword'],
+    primaryKeywordPresence: { inTitle: true, inMeta: false, inContent: true, inSlug: true },
+    competitorKeywords: ['seo tools', 'analytics software'],
+    topicCluster: 'SEO Analytics',
+    estimatedDifficulty: 'high',
     schemaStatus: 'valid',
     linkHealth: { inbound: 5, outbound: 12, orphan: false },
     seoEdits: { currentTitle: 'SEO Analytics Guide', currentMeta: 'Learn about SEO analytics', lastEditedAt: '2026-03-28' },
@@ -481,5 +486,76 @@ describe('formatForPrompt', () => {
       expect(output).toContain('Page Profile');
       expect(output).not.toContain('Position:');
     });
+
+    it('pageProfile detailed output includes optimizationIssues', () => {
+      const intel = makeFullIntelligence();
+      const output = formatForPrompt(intel, { verbosity: 'detailed' });
+      expect(output).toContain('Primary keyword density too low');
+      expect(output).toContain('H1 missing keyword');
+    });
+
+    it('pageProfile detailed output includes primaryKeywordPresence missing fields', () => {
+      const intel = makeFullIntelligence();
+      const output = formatForPrompt(intel, { verbosity: 'detailed' });
+      // inMeta is false — should report "meta" as missing
+      expect(output).toContain('meta');
+      // inTitle/inContent/inSlug are true — not missing
+    });
+
+    it('pageProfile detailed output includes competitorKeywords, topicCluster, estimatedDifficulty', () => {
+      const intel = makeFullIntelligence();
+      const output = formatForPrompt(intel, { verbosity: 'detailed' });
+      expect(output).toContain('seo tools');
+      expect(output).toContain('SEO Analytics');
+      expect(output).toContain('high');
+    });
+  });
+});
+
+// ── buildIntelPrompt — slices/sections consistency guarantee ─────────────────
+// buildIntelPrompt passes the same array for both slices and sections,
+// making a mismatch structurally impossible. These tests verify the contract.
+
+import { vi } from 'vitest';
+
+vi.mock('../server/seo-context.js', () => ({
+  buildSeoContext: vi.fn(() => ({
+    strategy: null, brandVoiceBlock: 'Voice: concise', businessContext: 'B2B SaaS',
+    knowledgeBlock: '', personasBlock: '',
+  })),
+}));
+vi.mock('../server/feature-flags.js', () => ({ isFeatureEnabled: vi.fn(() => false) }));
+vi.mock('../server/workspaces.js', () => ({
+  getWorkspace: vi.fn(() => ({ id: 'ws-test', personas: [], webflowSiteId: null })),
+}));
+vi.mock('../server/workspace-learnings.js', () => ({ getWorkspaceLearnings: vi.fn(() => null) }));
+
+describe('buildIntelPrompt', () => {
+  it('exports buildIntelPrompt from workspace-intelligence', async () => {
+    const mod = await import('../server/workspace-intelligence.js');
+    expect(typeof mod.buildIntelPrompt).toBe('function');
+  });
+
+  it('returns a non-empty string for a valid workspace', async () => {
+    const { buildIntelPrompt } = await import('../server/workspace-intelligence.js');
+    const result = await buildIntelPrompt('ws-test', ['seoContext']);
+    expect(typeof result).toBe('string');
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it('sections cannot diverge from slices — the same array is used for both', async () => {
+    // This is the structural guarantee: buildIntelPrompt(id, slices) internally passes
+    // slices as both the assembly slices AND the format sections. No caller can create
+    // a mismatch. Verify by inspecting the source.
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const src = readFileSync(resolve(import.meta.dirname, '../server/workspace-intelligence.ts'), 'utf-8');
+    const fnStart = src.indexOf('export async function buildIntelPrompt(');
+    const fnEnd = src.indexOf('\n}', fnStart) + 2;
+    const fnBody = src.slice(fnStart, fnEnd);
+    // sections must equal slices (same variable, not a separate literal)
+    expect(fnBody).toContain('sections: slices');
+    // Must NOT contain a separate sections array literal
+    expect(fnBody).not.toMatch(/sections:\s*\[/);
   });
 });
