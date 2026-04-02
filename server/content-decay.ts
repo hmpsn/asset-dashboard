@@ -150,7 +150,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
       clickDecline <= -50 ? 'critical' :
       clickDecline <= -30 ? 'warning' : 'watch';
 
-    decayingPages.push({
+    const decayingPage: DecayingPage = {
       page: pagePath,
       currentClicks: current.clicks,
       previousClicks: prev.clicks,
@@ -162,7 +162,30 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
       previousPosition: Math.round(prev.position * 10) / 10,
       positionChange: Math.round(positionChange * 10) / 10,
       severity,
-    });
+    };
+
+    // ── Bridge #8: Check for repeat_decay ─────────────────────────────
+    // If a prior content_refresh action for this page scored 'loss', tag as repeat_decay
+    try {
+      const { getActionsByPage, getOutcomesForAction } = await import('./outcome-tracking.js');
+      const priorActions = getActionsByPage(ws.id, pagePath);
+      const refreshActions = priorActions.filter(a => a.actionType === 'content_refresh');
+      if (refreshActions.length > 0) {
+        for (const action of refreshActions) {
+          const outcomes = getOutcomesForAction(action.id);
+          const hasLoss = outcomes.some(o => o.score === 'loss');
+          if (hasLoss) {
+            (decayingPage as any).isRepeatDecay = true;
+            (decayingPage as any).priority = 'high';
+            break;
+          }
+        }
+      }
+    } catch {
+      // Non-critical — outcome tracking may not have data for this page
+    }
+
+    decayingPages.push(decayingPage);
   }
 
   // Sort by decline severity
