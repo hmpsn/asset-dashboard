@@ -8,7 +8,7 @@
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 
@@ -158,9 +158,9 @@ export async function getKeywordRecommendations(
   // If AI scoring is enabled and we have business context, re-rank
   if (useAI && candidates.length > 1) {
     try {
-      const seoCtx = buildSeoContext(workspaceId);
+      const _kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
       // Use full context (business context + brand voice + personas + knowledge) for richer ranking
-      const bizContext = seoCtx.fullContext || seoCtx.businessContext || '';
+      const bizContext = formatForPrompt(_kwIntel, { verbosity: 'detailed', sections: ['seoContext'] });
       if (bizContext) {
         const aiRanked = await aiRankKeywords(scored, bizContext, workspaceId);
         // Mark the AI-recommended keyword
