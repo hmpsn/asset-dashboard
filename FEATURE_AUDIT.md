@@ -3075,6 +3075,19 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 202. Unified Workspace Intelligence Layer — Phase 3B (Mini-Builder Retirement + Advanced Slices)
+**What it does:** Completes the intelligence layer migration. (1) **Mini-builder retirement**: all 25 `buildSeoContext()` callers and 6 `buildPageAnalysisContext()` callers migrated to `buildWorkspaceIntelligence()` with explicit slice selection. (2) **BusinessProfile editor**: structured `industry`, `goals`, `targetAudience` fields added to workspace settings and wired into `SeoContextSlice`. (3) **ContentGaps bridge**: strategy layer populates `PageProfileSlice.contentGaps` automatically on strategy update. (4) **N+1 elimination**: `seo-audit.ts` and `webflow-seo.ts` bulk-fix/bulk-rewrite loops hoist workspace-level slices before per-page loops — from N full DB assemblies to 1 + N in-memory `pageMap.find()` lookups (critical for 300-page clients). (5) **strategyHistory SQL fix**: wrong column names silently killed the entire `stmts()` prepared statement cache, breaking keyword feedback, content gap votes, and schema error counts across all workspaces. (6) **Format fidelity**: 7 previously-assembled but never-rendered fields now appear in prompt formatters (rankTracking, businessProfile, strategyHistory, decayAlerts, cannibalizationWarnings, anomalyCount/types, timeSaved, roiAttribution, weCalledIt). (7) **pr-check guard upgrade**: `buildSeoContext` and `listPages` rules promoted from `warn` to `error`; stale exclusions removed. (8) **25+ new contract tests**.
+
+**Files:** `server/seo-audit.ts`, `server/routes/webflow-seo.ts`, `server/routes/rewrite-chat.ts`, `server/workspace-intelligence.ts`, `server/analytics-intelligence.ts`, `server/content-brief.ts`, `server/internal-links.ts`, `server/aeo-page-review.ts`, `server/content-posts-ai.ts`, `server/content-decay.ts`, `server/keyword-recommendations.ts`, `server/admin-chat-context.ts`, `server/routes/jobs.ts`, `server/routes/webflow-alt-text.ts`, `server/routes/google.ts`, `server/routes/public-analytics.ts`, `server/routes/content-posts.ts`, `server/routes/webflow-keywords.ts`, `server/routes/keyword-strategy.ts`, `server/routes/intelligence.ts`, `shared/types/intelligence.ts`, `scripts/pr-check.ts`, `tests/batch2-caller-contracts.test.ts`
+
+**Agency value:** Every AI prompt draws from the unified intelligence layer — consistent context, no stale mini-builder data, no redundant DB calls. N+1 fix makes bulk SEO viable for 300-page clients. Critical silent bug was wiping keyword feedback and content gaps across all workspaces.
+
+**Client value:** (Indirect) Faster SEO audit and bulk-fix operations. Content gap suggestions and keyword feedback now populate correctly after the SQL fix.
+
+**Mutual:** Closes the mini-builder era. All future AI features build on `buildWorkspaceIntelligence()`. pr-check enforces this as a hard error.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3092,4 +3105,4 @@ When the user asks to update this document with recent features, follow this pro
 
 **266 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **266**. Last updated: April 2026.
+Current feature count: **267**. Last updated: April 2026.

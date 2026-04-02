@@ -3842,8 +3842,9 @@
           "est": "12-16h",
           "priority": "P1",
           "sprint": "F",
-          "notes": "Retire buildSeoContext (25 callers) and buildPageAnalysisContext (6 callers) — all migrate to buildWorkspaceIntelligence(). Add structured businessProfile editor (industry/goals/targetAudience) to workspace settings + wire into SeoContextSlice. Bridge contentGaps from strategy layer to PageProfileSlice. Upgrade pr-check buildSeoContext rule from warn → error once migration complete.",
-          "status": "pending"
+          "notes": "Shipped — PR #125. Retired buildSeoContext (all callers migrated to buildWorkspaceIntelligence). Structured businessProfile editor + wire into SeoContextSlice. contentGaps bridge from strategy to PageProfileSlice. N+1 pre-assembly in seo-audit.ts and webflow-seo.ts (hoist workspace slices before per-page loops). Fixed strategyHistory SQL (wrong column names silently broke stmts() cache). Removed as-any cast on seoDataProvider. Format fidelity: 7 previously-assembled fields now rendered in prompt formatters. pr-check guards upgraded from warn → error (buildSeoContext + listPages). 25+ new contract tests.",
+          "shippedAt": "2026-04-02",
+          "status": "done"
         },
         {
           "id": "bridge-audit-finding-auto-resolve",
