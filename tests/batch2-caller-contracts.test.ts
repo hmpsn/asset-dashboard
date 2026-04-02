@@ -41,6 +41,9 @@ function hasSlicesSeoContextLearnings(src: string): boolean {
   return (
     src.includes("slices: ['seoContext', 'learnings']") ||
     src.includes("slices: ['seoContext', 'learnings',") ||
+    // split-assembly pattern: learnings hoisted outside loop as its own standalone call
+    src.includes("slices: ['learnings']") ||
+    src.includes("slices: ['learnings',") ||
     // slices-var pattern: array literal assigned to a const
     /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'seoContext'[^\]]*'learnings'[^\]]*\]/.test(src) ||
     /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'learnings'[^\]]*\]/.test(src) ||
