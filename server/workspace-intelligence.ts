@@ -215,8 +215,13 @@ async function assembleSeoContext(
 
   // Populate pageMap from the page_keywords table (not from the stored keyword_strategy column,
   // which has pageMap stripped before storage — it only exists at the route layer).
-  const { listPageKeywords } = await import('./page-keywords.js');
-  const livePageMap = listPageKeywords(workspaceId);
+  let livePageMap: Awaited<ReturnType<typeof import('./page-keywords.js').listPageKeywords>> = [];
+  try {
+    const { listPageKeywords } = await import('./page-keywords.js');
+    livePageMap = listPageKeywords(workspaceId);
+  } catch (pkErr) {
+    log.warn({ err: pkErr, workspaceId }, 'assembleSeoContext: listPageKeywords failed, falling back to stored pageMap');
+  }
 
   const base: SeoContextSlice = {
     strategy: ctx.strategy
