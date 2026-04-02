@@ -240,8 +240,8 @@ async function assembleSeoContext(
     const { getTrackedKeywords, getLatestRanks } = await import('./rank-tracking.js');
     const tracked = getTrackedKeywords(workspaceId);
     const latest: RankEntry[] = getLatestRanks(workspaceId);
-    const improved = latest.filter(k => (k.change ?? 0) < 0).length;
-    const declined = latest.filter(k => (k.change ?? 0) > 0).length;
+    const improved = latest.filter(k => (k.change ?? 0) < 0).length; // negative = position number decreased = moved up in SERPs
+    const declined = latest.filter(k => (k.change ?? 0) > 0).length; // positive = position number increased = dropped in SERPs
     const stable = latest.length - improved - declined;
     const positions = latest.map(k => k.position).filter(p => p > 0);
     const avgPosition = positions.length > 0
@@ -372,6 +372,7 @@ async function assembleLearnings(
     const { getActionsByWorkspace, getOutcomesForAction } = await import('./outcome-tracking.js');
     const actions = getActionsByWorkspace(workspaceId);
     for (const action of actions.slice(0, 50)) {
+      if (weCalledIt.length >= 5) break; // guard before DB call to avoid redundant queries
       const outcomes: ActionOutcome[] = getOutcomesForAction(action.id);
       const strongWin = outcomes.find(o => o.score === 'strong_win');
       if (strongWin) {
@@ -384,7 +385,6 @@ async function assembleLearnings(
           measuredAt: strongWin.measuredAt ?? '',
         });
       }
-      if (weCalledIt.length >= 5) break;
     }
   } catch {
     // Outcome data optional
@@ -1323,6 +1323,9 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (verbosity === 'detailed') {
     if (ctx.strategy) lines.push(`Strategy: ${ctx.strategy.siteKeywords?.length ?? 0} site keywords`);
   }
+
+  // Return empty string rather than a bare header when no content was added
+  if (lines.length === 1) return '';
 
   return lines.join('\n');
 }
