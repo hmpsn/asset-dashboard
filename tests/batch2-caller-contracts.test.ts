@@ -59,6 +59,8 @@ function hasSlicesSeoContextLearnings(src: string): boolean {
 function hasSectionsSeoContextLearnings(src: string): boolean {
   return (
     src.includes("sections: ['seoContext', 'learnings']") ||
+    // sections array that starts with seoContext + learnings but may have more entries
+    src.includes("sections: ['seoContext', 'learnings',") ||
     // slices-var pattern: sections: <identifier> where identifier is a slices variable
     // matches "sections: slices", "sections: paSlices", "sections: mySlices", etc.
     /sections:\s+\w*[Ss]lices\b/.test(src) ||
@@ -115,7 +117,8 @@ describe('seo-audit.ts migration contracts', () => {
   });
 
   it('formats with seoContext + learnings sections', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    // Accepts ['seoContext', 'learnings'] or ['seoContext', 'learnings', 'pageProfile'] (combined call)
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -129,7 +132,8 @@ describe('content-decay.ts migration contracts', () => {
   });
 
   it('formats with seoContext + learnings sections', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    // Accepts ['seoContext', 'learnings'] or ['seoContext', 'learnings', 'pageProfile'] (combined call)
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 

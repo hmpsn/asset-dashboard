@@ -227,8 +227,8 @@ export async function generateRefreshRecommendation(
 ): Promise<string> {
   const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
   const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] }); // bip-ok: slices is a superset
-  const pageAnalysis = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: slices is a superset
+  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
+  const pageAnalysis = ''; // folded into fullContext above — pageProfile section included
 
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.
 

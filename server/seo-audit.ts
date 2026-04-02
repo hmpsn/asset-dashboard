@@ -591,8 +591,8 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
           const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
           const intel = await buildWorkspaceIntelligence(wsId ?? '', { slices, pagePath });
-          const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] }); // bip-ok: slices is a superset
-          const pageAnalysisBlock = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: slices is a superset
+          const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
+          const pageAnalysisBlock = ''; // folded into fullContext above — pageProfile section included
 
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
 
