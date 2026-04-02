@@ -143,19 +143,82 @@ describe('keyword-recommendations.ts meaningful-context guard', () => {
     expect(src).toContain('hasMeaningfulContext');
   });
 
-  it('hasMeaningfulContext checks all four context fields', () => {
-    // Strategy alone is not sufficient — business context, KB, brand voice, or personas required.
+  it('hasMeaningfulContext checks all five context fields including strategy', () => {
+    // Strategy alone IS sufficient — a workspace with only keyword strategy should still
+    // get AI ranking (old code: fullContext included keywordBlock → truthy when strategy exists).
     const guardBlock = src.slice(
       src.indexOf('hasMeaningfulContext'),
-      src.indexOf('hasMeaningfulContext') + 200,
+      src.indexOf('hasMeaningfulContext') + 250,
     );
     expect(guardBlock).toContain('businessContext');
     expect(guardBlock).toContain('knowledgeBase');
     expect(guardBlock).toContain('brandVoice');
     expect(guardBlock).toContain('personas');
+    expect(guardBlock).toContain('strategy');
   });
 
   it('requests seoContext + learnings slices for AI ranking context', () => {
     expect(src).toContain("slices: ['seoContext', 'learnings']");
+  });
+});
+
+// ── jobs.ts (page-analysis job) ───────────────────────────────────────────────
+
+describe('jobs.ts page-analysis job migration contracts', () => {
+  const src = readRoute('jobs.ts');
+
+  it('requests seoContext + learnings slices for PA job AI context', () => {
+    // fullContext fed to per-page AI analysis — previously used buildSeoContext().fullContext
+    // which included learnings. Must include learnings slice.
+    expect(src).toContain("slices: ['seoContext', 'learnings']");
+  });
+
+  it('formats with seoContext + learnings sections in PA job', () => {
+    expect(src).toContain("sections: ['seoContext', 'learnings']");
+  });
+});
+
+// ── webflow-keywords.ts — fullContext learnings ───────────────────────────────
+
+describe('webflow-keywords.ts fullContext includes learnings', () => {
+  const src = readRoute('webflow-keywords.ts');
+
+  it('formats with seoContext + learnings sections for AI keyword analysis', () => {
+    expect(src).toContain("sections: ['seoContext', 'learnings']");
+  });
+});
+
+// ── Intentional learnings-free callers (pageProfile-only) ────────────────────
+
+describe('pageProfile-only callers intentionally omit learnings', () => {
+  it('rewrite-chat.ts uses pageProfile section only (seoContext assembled manually above prompt)', () => {
+    const src = readRoute('rewrite-chat.ts');
+    // rewrite-chat builds seoContext fields manually (brandVoice, keywords, personas).
+    // The formatForPrompt call is only for pageProfile — no seoContext or learnings section.
+    expect(src).toContain("sections: ['pageProfile']");
+    // Confirm it does NOT use formatForPrompt for seoContext (manual assembly only)
+    expect(src).not.toContain("sections: ['seoContext'");
+  });
+
+  it('webflow-seo.ts SEO rewrite handlers use pageProfile section only', () => {
+    const src = readRoute('webflow-seo.ts');
+    // Both /seo-rewrite and /seo-bulk-rewrite handlers only use formatForPrompt for pageProfile.
+    // The keyword/brand voice blocks are assembled manually from seo.* fields.
+    expect(src).toContain("sections: ['pageProfile']");
+    expect(src).not.toContain("sections: ['seoContext'");
+  });
+});
+
+// ── assembleLearnings feature flag gate ──────────────────────────────────────
+
+describe('assembleLearnings feature flag gate', () => {
+  it('workspace-intelligence.ts: assembleLearnings checks outcome-ai-injection flag before assembling', () => {
+    const src = readFileSync(resolve(serverDir, 'workspace-intelligence.ts'), 'utf-8');
+    // Feature flag gate must appear INSIDE assembleLearnings, before the expensive DB calls.
+    // This ensures behavioral parity with old buildSeoContext() which also gated on this flag.
+    const fnStart = src.indexOf('async function assembleLearnings(');
+    const fnEnd = src.indexOf('\nasync function ', fnStart + 1);
+    const fnBody = src.slice(fnStart, fnEnd > 0 ? fnEnd : fnStart + 2000);
+    expect(fnBody).toContain("isFeatureEnabled('outcome-ai-injection')");
   });
 });

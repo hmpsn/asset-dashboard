@@ -694,8 +694,8 @@ router.post('/api/jobs', async (req, res) => {
               return;
             }
 
-            const paIntel = await buildWorkspaceIntelligence(paWsId, { slices: ['seoContext'] });
-            const fullContext = formatForPrompt(paIntel, { verbosity: 'detailed', sections: ['seoContext'] });
+            const paIntel = await buildWorkspaceIntelligence(paWsId, { slices: ['seoContext', 'learnings'] });
+            const fullContext = formatForPrompt(paIntel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] });
             const kwMapCtx = formatPageMapForPrompt(paIntel.seoContext);
 
             const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };

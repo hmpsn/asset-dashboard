@@ -160,8 +160,9 @@ export async function getKeywordRecommendations(
     try {
       const kwIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'learnings'] });
       const seoCtx = kwIntel.seoContext;
-      // Only call AI ranking when meaningful workspace context exists (formatForPrompt always returns non-empty)
-      const hasMeaningfulContext = !!(seoCtx?.businessContext || seoCtx?.knowledgeBase || seoCtx?.brandVoice || seoCtx?.personas?.length);
+      // Only call AI ranking when meaningful workspace context exists (formatForPrompt always returns non-empty).
+      // Include strategy check — workspaces with only a keyword strategy still benefit from AI ranking.
+      const hasMeaningfulContext = !!(seoCtx?.businessContext || seoCtx?.knowledgeBase || seoCtx?.brandVoice || seoCtx?.personas?.length || seoCtx?.strategy);
       // Use full context (business context + brand voice + personas + knowledge + learnings) for richer ranking
       const bizContext = hasMeaningfulContext ? formatForPrompt(kwIntel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] }) : '';
       if (bizContext) {
