@@ -30,11 +30,8 @@ import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown,
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
-import {
-  buildPersonasContext,
-  RICH_BLOCKS_PROMPT,
-} from './seo-context.js';
-import { buildWorkspaceIntelligence, formatPageMapForPrompt } from './workspace-intelligence.js';
+import { RICH_BLOCKS_PROMPT } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -314,19 +311,12 @@ export async function assembleAdminContext(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices, learningsDomain: 'all' });
   const seoCtx = intel.seoContext;
 
-  // Reconstruct keyword strategy block from intel (equivalent to buildSeoContext keywordBlock)
+  const keywordBlock = formatKeywordsForPrompt(seoCtx);
   const strategy = seoCtx?.strategy;
-  let keywordBlock = '';
-  if (strategy) {
-    const siteKw = strategy.siteKeywords?.slice(0, 8).join(', ');
-    if (siteKw) keywordBlock += `Site target keywords: ${siteKw}`;
-    if (strategy.businessContext) keywordBlock += `\nGeneral business context: ${strategy.businessContext}`;
-    if (keywordBlock) keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
-  }
   const brandVoiceBlock = seoCtx?.brandVoice ?? '';
   const bizCtx = seoCtx?.businessContext ?? '';
   const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
-  const personasContext = buildPersonasContext(workspaceId);
+  const personasContext = formatPersonasForPrompt(seoCtx?.personas);
   const knowledgeBase = seoCtx?.knowledgeBase ?? '';
 
   if (keywordBlock || kwMapContext || bizCtx) {
