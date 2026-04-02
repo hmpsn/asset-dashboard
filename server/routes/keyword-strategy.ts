@@ -34,7 +34,7 @@ import {
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { clearSeoContextCache } from '../seo-context.js';
-import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
@@ -651,7 +651,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     }
     const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
     const strategySeo = strategyIntel.seoContext;
-    const kbBlock = strategySeo?.knowledgeBase ?? '';
+    const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
     const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
     if (kbBlock) {
       businessSection += kbBlock + '\n';

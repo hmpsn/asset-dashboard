@@ -57,7 +57,7 @@ import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPage
 // Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
 import { createLogger } from '../logger.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt, formatBrandVoiceForPrompt } from '../workspace-intelligence.js';
 
 const log = createLogger('jobs');
 
@@ -409,7 +409,7 @@ router.post('/api/jobs', async (req, res) => {
                 const bwsSlices = ['seoContext'] as const;
                 const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: page.slug ? `/${page.slug}` : undefined });
                 const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
-                const bvb = bwsIntel.seoContext?.brandVoice ?? '';
+                const bvb = formatBrandVoiceForPrompt(bwsIntel.seoContext?.brandVoice);
 
                 // Fetch page content for context (best-effort)
                 let contentExcerpt = '';
