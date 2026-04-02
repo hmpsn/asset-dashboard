@@ -275,7 +275,6 @@ export interface RankTrackingSummary {
 export interface StrategyHistory {
   revisionsCount: number;
   lastRevisedAt: string;
-  trajectory: string;
 }
 
 export interface DecayAlert {

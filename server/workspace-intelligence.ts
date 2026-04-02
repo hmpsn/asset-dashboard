@@ -76,7 +76,7 @@ const stmts = createStmtCache(() => ({
     `SELECT COUNT(*) as cnt FROM schema_validations WHERE workspace_id = ? AND status = 'errors'`,
   ),
   strategyHistory: db.prepare(
-    'SELECT created_at, change_description FROM strategy_history WHERE workspace_id = ? ORDER BY created_at DESC',
+    'SELECT generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC',
   ),
   keywordFeedbackApproved: db.prepare(
     'SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?',
@@ -278,16 +278,11 @@ async function assembleSeoContext(
 
   // Strategy history
   try {
-    const rows = stmts().strategyHistory.all(workspaceId) as Array<{ created_at: string; change_description: string }>;
+    const rows = stmts().strategyHistory.all(workspaceId) as Array<{ generated_at: string }>;
     if (rows.length > 0) {
-      const recentChanges = rows.slice(0, 5).map(r => r.change_description?.toLowerCase() ?? '');
-      const expanding = recentChanges.filter(c => c.includes('add') || c.includes('expand') || c.includes('new')).length;
-      const narrowing = recentChanges.filter(c => c.includes('remove') || c.includes('narrow') || c.includes('focus')).length;
-      const trajectory = expanding > narrowing ? 'expanding' : narrowing > expanding ? 'narrowing' : 'stable';
       base.strategyHistory = {
         revisionsCount: rows.length,
-        lastRevisedAt: rows[0].created_at,
-        trajectory,
+        lastRevisedAt: rows[0].generated_at,
       };
     }
   } catch {
@@ -1410,7 +1405,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   }
 
   if (ctx.strategyHistory && verbosity === 'detailed') {
-    lines.push(`Strategy: revised ${ctx.strategyHistory.revisionsCount}x, last ${ctx.strategyHistory.lastRevisedAt.slice(0, 10)}, trajectory: ${ctx.strategyHistory.trajectory}`);
+    lines.push(`Strategy: revised ${ctx.strategyHistory.revisionsCount}x, last ${ctx.strategyHistory.lastRevisedAt.slice(0, 10)}`);
   }
 
   // Return empty string rather than a bare header when no content was added
