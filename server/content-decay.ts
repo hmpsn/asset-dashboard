@@ -228,7 +228,6 @@ export async function generateRefreshRecommendation(
   const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
   const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
   const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
-  const pageAnalysis = ''; // folded into fullContext above — pageProfile section included
 
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.
 
@@ -237,7 +236,7 @@ Click decline: ${page.clickDeclinePct}% (from ${page.previousClicks} to ${page.c
 Impression change: ${page.impressionChangePct}%
 Position change: ${page.positionChange > 0 ? '+' : ''}${page.positionChange} (now ${page.currentPosition})
 
-${fullContext ? `SEO Context:\n${fullContext}\n` : ''}${pageAnalysis}
+${fullContext ? `SEO Context:\n${fullContext}\n` : ''}
 
 Provide a concise, actionable content refresh plan (3-5 bullet points). Focus on:
 1. What's likely causing the decline (algorithm changes, fresher competitors, outdated info)

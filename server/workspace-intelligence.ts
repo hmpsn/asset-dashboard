@@ -1255,10 +1255,10 @@ export function formatForPrompt(
 export async function buildIntelPrompt(
   workspaceId: string,
   slices: IntelligenceSlice[],
-  opts?: Omit<IntelligenceOptions, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget'>,
+  opts?: Omit<IntelligenceOptions, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget' | 'learningsDomain'>,
 ): Promise<string> {
   const intel = await buildWorkspaceIntelligence(workspaceId, { ...opts, slices });
-  return formatForPrompt(intel, { verbosity: opts?.verbosity, sections: slices, tokenBudget: opts?.tokenBudget });
+  return formatForPrompt(intel, { verbosity: opts?.verbosity, sections: slices, tokenBudget: opts?.tokenBudget, learningsDomain: opts?.learningsDomain });
 }
 
 /**
