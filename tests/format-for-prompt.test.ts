@@ -389,6 +389,29 @@ describe('formatForPrompt', () => {
       expect(output).not.toContain('Outcome Learnings');
     });
 
+    it('does not emit bare Outcome Learnings header at compact when only weCalledIt/roiAttribution have data', () => {
+      // Regression: guard was verbosity-blind — passed for weCalledIt data but those fields
+      // only render at standard/detailed, producing an empty ## Outcome Learnings header at compact.
+      const intel = makeFullIntelligence();
+      intel.learnings = {
+        summary: null,
+        confidence: null,
+        topActionTypes: [],
+        overallWinRate: 0,
+        recentTrend: null,
+        playbooks: [],
+        weCalledIt: [{ actionId: 'a1', prediction: 'rank top 3', outcome: 'win', score: 'strong_win', pageUrl: '/p', measuredAt: '2026-03-01' }],
+        roiAttribution: [{ actionId: 'a2', actionType: 'content_refreshed', pageUrl: '/p', clickGain: 120, measuredAt: '2026-03-01' }],
+      };
+      const compact = formatForPrompt(intel, { verbosity: 'compact' });
+      expect(compact).not.toContain('Outcome Learnings');
+      // Same data at standard should still render the section
+      const standard = formatForPrompt(intel, { verbosity: 'standard' });
+      expect(standard).toContain('Outcome Learnings');
+      expect(standard).toContain('rank top 3');
+    });
+
+
     it('verbosity progression: detailed > standard > compact length', () => {
       const intel = makeFullIntelligence();
       const compact = formatForPrompt(intel, { verbosity: 'compact' });
@@ -431,6 +454,17 @@ describe('formatForPrompt', () => {
       expect(output).not.toContain('Critical issues');
       expect(output).not.toContain('Anomaly types');
     });
+
+    it('does not append % after n/a when desktop CWV pass rate is null', () => {
+      // Regression: desktop ternary resolved to 'n/a' but % was unconditionally appended, producing 'n/a%'
+      const intel = makeFullIntelligence();
+      intel.siteHealth = { ...makeSiteHealth(), cwvPassRate: { mobile: 0.85, desktop: null } };
+      const output = formatForPrompt(intel, { verbosity: 'detailed' });
+      expect(output).toContain('mobile 85%');
+      expect(output).toContain('desktop n/a');
+      expect(output).not.toContain('n/a%');
+    });
+
 
     it('handles operational with no time saved', () => {
       const intel = makeFullIntelligence();

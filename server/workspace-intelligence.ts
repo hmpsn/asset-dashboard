@@ -36,10 +36,11 @@ import type {
   InsightAcceptanceRate,
   ROIAttribution,
   WeCalledItEntry,
+  ContentPipelineSummary,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
-import type { Workspace } from '../shared/types/workspace.js';
+import type { Workspace, AudiencePersona } from '../shared/types/workspace.js';
 import type { PageKeywordMap } from '../shared/types/workspace.js';
 import type { ContentSubscription, ContentMatrix, GeneratedPost } from '../shared/types/content.js';
 import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
@@ -213,21 +214,40 @@ async function assembleSeoContext(
   const ctx = buildSeoContext(workspaceId, opts?.pagePath, opts?.learningsDomain ?? 'all', { _skipShadow: true });
   const workspace = getWorkspace(workspaceId);
 
+  // Populate pageMap from the page_keywords table (not from the stored keyword_strategy column,
+  // which has pageMap stripped before storage — it only exists at the route layer).
+  let livePageMap: Awaited<ReturnType<typeof import('./page-keywords.js').listPageKeywords>> = [];
+  try {
+    const { listPageKeywords } = await import('./page-keywords.js');
+    livePageMap = listPageKeywords(workspaceId);
+  } catch (pkErr) {
+    log.warn({ err: pkErr, workspaceId }, 'assembleSeoContext: listPageKeywords failed, falling back to stored pageMap');
+  }
+
   const base: SeoContextSlice = {
-    strategy: ctx.strategy,
+    strategy: ctx.strategy
+      ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
+      : ctx.strategy,
     brandVoice: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
     knowledgeBase: ctx.knowledgeBlock,
   };
 
+  // Page-specific keywords — populate from strategy.pageMap when pagePath is provided
+  if (opts?.pagePath && base.strategy?.pageMap?.length) {
+    const pagePathLower = opts.pagePath.toLowerCase();
+    const pageKw = base.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePathLower);
+    if (pageKw) base.pageKeywords = pageKw;
+  }
+
   // Rank tracking enrichment
   try {
     const { getTrackedKeywords, getLatestRanks } = await import('./rank-tracking.js');
     const tracked = getTrackedKeywords(workspaceId);
     const latest: RankEntry[] = getLatestRanks(workspaceId);
-    const improved = latest.filter(k => (k.change ?? 0) < 0).length;
-    const declined = latest.filter(k => (k.change ?? 0) > 0).length;
+    const improved = latest.filter(k => (k.change ?? 0) < 0).length; // negative = position number decreased = moved up in SERPs
+    const declined = latest.filter(k => (k.change ?? 0) > 0).length; // positive = position number increased = dropped in SERPs
     const stable = latest.length - improved - declined;
     const positions = latest.map(k => k.position).filter(p => p > 0);
     const avgPosition = positions.length > 0
@@ -243,11 +263,15 @@ async function assembleSeoContext(
     // Rank tracking optional
   }
 
-  // Business profile — Workspace.businessProfile has contact info (phone/email/address),
-  // not industry/goals/targetAudience. The intelligence BusinessProfile type requires
-  // structured data that doesn't exist on the workspace yet. This will be wired when
-  // a structured business profile editor is added (Phase 3B).
-  // For now, businessProfile remains undefined in the slice output.
+  // Business profile from structured intelligence editor (Phase 3B)
+  const iProfile = workspace?.intelligenceProfile;
+  if (iProfile && (iProfile.industry || (iProfile.goals && iProfile.goals.length > 0) || iProfile.targetAudience)) {
+    base.businessProfile = {
+      industry: iProfile.industry ?? '',
+      goals: Array.isArray(iProfile.goals) ? iProfile.goals : [],
+      targetAudience: iProfile.targetAudience ?? '',
+    };
+  }
 
   // Strategy history
   try {
@@ -274,8 +298,13 @@ async function assembleInsights(
   workspaceId: string,
   opts?: IntelligenceOptions,
 ): Promise<InsightsSlice> {
-  const { getInsights } = await import('./analytics-insights-store.js');
-  const all: AnalyticsInsight[] = getInsights(workspaceId);
+  let all: AnalyticsInsight[] = [];
+  try {
+    const { getInsights } = await import('./analytics-insights-store.js');
+    all = getInsights(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'assembleInsights: getInsights failed, returning empty slice');
+  }
 
   // Cap at 100, sorted by impact score descending (§13)
   const sorted = [...all].sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0));
@@ -325,10 +354,16 @@ async function assembleLearnings(
     };
   }
 
-  const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
-  const { getPlaybooks } = await import('./outcome-playbooks.js');
-  const summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
-  const playbooks = getPlaybooks(workspaceId);
+  let summary: ReturnType<Awaited<typeof import('./workspace-learnings.js')>['getWorkspaceLearnings']> | undefined;
+  let playbooks: ReturnType<Awaited<typeof import('./outcome-playbooks.js')>['getPlaybooks']> = [];
+  try {
+    const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
+    const { getPlaybooks } = await import('./outcome-playbooks.js');
+    summary = getWorkspaceLearnings(workspaceId, opts?.learningsDomain ?? 'all');
+    playbooks = getPlaybooks(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'assembleLearnings: core data load failed, degrading to empty learnings');
+  }
 
   // ROI attribution enrichment
   let roiAttribution: ROIAttribution[] = [];
@@ -354,6 +389,7 @@ async function assembleLearnings(
     const { getActionsByWorkspace, getOutcomesForAction } = await import('./outcome-tracking.js');
     const actions = getActionsByWorkspace(workspaceId);
     for (const action of actions.slice(0, 50)) {
+      if (weCalledIt.length >= 5) break; // guard before DB call to avoid redundant queries
       const outcomes: ActionOutcome[] = getOutcomesForAction(action.id);
       const strongWin = outcomes.find(o => o.score === 'strong_win');
       if (strongWin) {
@@ -366,7 +402,6 @@ async function assembleLearnings(
           measuredAt: strongWin.measuredAt ?? '',
         });
       }
-      if (weCalledIt.length >= 5) break;
     }
   } catch {
     // Outcome data optional
@@ -385,8 +420,20 @@ async function assembleLearnings(
 }
 
 async function assembleContentPipeline(workspaceId: string): Promise<ContentPipelineSlice> {
-  const { getContentPipelineSummary } = await import('./workspace-data.js');
-  const summary = getContentPipelineSummary(workspaceId);
+  let summary: ContentPipelineSummary = {
+    briefs: { total: 0, byStatus: {} },
+    posts: { total: 0, byStatus: {} },
+    matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
+    requests: { pending: 0, inProgress: 0, delivered: 0 },
+    workOrders: { active: 0 },
+    seoEdits: { pending: 0, applied: 0, inReview: 0 },
+  };
+  try {
+    const { getContentPipelineSummary } = await import('./workspace-data.js');
+    summary = getContentPipelineSummary(workspaceId);
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'assembleContentPipeline: getContentPipelineSummary failed, degrading to empty slice');
+  }
 
   // Coverage gaps: strategy keywords without any brief
   let coverageGaps: string[] = [];
@@ -1306,6 +1353,9 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     if (ctx.strategy) lines.push(`Strategy: ${ctx.strategy.siteKeywords?.length ?? 0} site keywords`);
   }
 
+  // Return empty string rather than a bare header when no content was added
+  if (lines.length === 1) return '';
+
   return lines.join('\n');
 }
 
@@ -1325,7 +1375,16 @@ function formatInsightsSection(insights: InsightsSlice, verbosity: PromptVerbosi
 }
 
 function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity): string {
-  if (!learnings.summary && learnings.topActionTypes.length === 0 && !learnings.roiAttribution?.length && !learnings.weCalledIt?.length) return '';
+  // Guard must be verbosity-aware: only pass if there's content that will actually render
+  // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
+  const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
+  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
+  const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0;
+  const willRender =
+    hasBaseContent ||
+    ((verbosity === 'standard' || verbosity === 'detailed') && hasStandardContent) ||
+    (verbosity === 'detailed' && hasDetailedContent);
+  if (!willRender) return '';
 
   const lines: string[] = ['## Outcome Learnings'];
 
@@ -1413,7 +1472,7 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
   if (verbosity === 'detailed') {
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
-    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? Math.round(health.cwvPassRate.desktop * 100) : 'n/a'}%`);
+    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? `${Math.round(health.cwvPassRate.desktop * 100)}%` : 'n/a'}`);
   }
 
   return lines.join('\n');
@@ -1711,6 +1770,24 @@ async function assemblePageProfile(
     contentStatus = null;
   }
 
+  // contentGaps — from strategy content gaps filtered to this page
+  let contentGaps: string[] = [];
+  try {
+    const { getWorkspace: getWsForGaps } = await import('./workspaces.js');
+    const wsForGaps = getWsForGaps(workspaceId);
+    const allGaps = wsForGaps?.keywordStrategy?.contentGaps ?? [];
+    if (allGaps.length > 0) {
+      const primaryKwLower = pageKw?.primaryKeyword?.toLowerCase();
+      const matched = primaryKwLower
+        ? allGaps.filter(g => g.targetKeyword?.toLowerCase() === primaryKwLower)
+        : [];
+      const source = matched.length > 0 ? matched : allGaps;
+      contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
+    }
+  } catch {
+    contentGaps = [];
+  }
+
   // CWV status
   let cwvStatus: PageProfileSlice['cwvStatus'] = null;
   try {
@@ -1738,7 +1815,7 @@ async function assemblePageProfile(
     searchIntent: pageKw?.searchIntent ?? null,
     optimizationScore: pageKw?.optimizationScore ?? null,
     recommendations,
-    contentGaps: [],
+    contentGaps,
     insights,
     actions,
     auditIssues,
@@ -1787,4 +1864,88 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
 /** Cache stats for health endpoint (§18) */
 export function getIntelligenceCacheStats() {
   return intelligenceCache.stats();
+}
+
+// ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
+// These produce prompt-ready text from intelligence slice data, matching the
+// output format of the legacy mini-builders in seo-context.ts.
+
+/**
+ * Format site keywords into a prompt block matching buildSeoContext().keywordBlock format.
+ * Used by migrated callers to replace buildSeoContext() with buildWorkspaceIntelligence().
+ */
+export function formatKeywordsForPrompt(seo: SeoContextSlice | null | undefined): string {
+  if (!seo?.strategy) return '';
+
+  let keywordBlock = '';
+
+  // Site-level keywords (matches seo-context.ts line 111-112)
+  const siteKw = seo.strategy.siteKeywords?.slice(0, 8).join(', ');
+  if (siteKw) keywordBlock += `Site target keywords: ${siteKw}`;
+
+  // Business context (matches seo-context.ts line 115-118)
+  const businessContext = seo.businessContext || seo.strategy.businessContext || '';
+  if (businessContext) {
+    keywordBlock += `\nGeneral business context: ${businessContext}`;
+  }
+
+  // Page-specific keywords from pageKeywords slice field (matches seo-context.ts line 121-133)
+  const pageKw = seo.pageKeywords;
+  if (pageKw) {
+    keywordBlock += `\n\nTHIS PAGE'S TARGET (overrides general context):`;
+    keywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
+    if (pageKw.secondaryKeywords?.length) {
+      keywordBlock += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
+    }
+    if (pageKw.searchIntent) {
+      keywordBlock += `\nSearch intent: ${pageKw.searchIntent}`;
+    }
+    keywordBlock += `\nIMPORTANT: If this page's keywords reference a specific location (city, state, region), ALWAYS use THAT location. Do NOT substitute the business headquarters or a different location from the general business context. The page-level keyword is the authoritative signal for what this page targets.`;
+  }
+
+  if (!keywordBlock) return '';
+  return `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
+}
+
+/**
+ * Format audience personas into a prompt block matching buildSeoContext().personasBlock format.
+ * Used by migrated callers to replace buildSeoContext() with buildWorkspaceIntelligence().
+ */
+export function formatPersonasForPrompt(personas: AudiencePersona[] | null | undefined): string {
+  if (!personas?.length) return '';
+
+  // Matches buildPersonasContext() in seo-context.ts lines 322-331
+  const personaStr = personas.map(p => {
+    const parts = [`**${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
+    if (p.painPoints.length) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
+    if (p.goals.length) parts.push(`  Goals: ${p.goals.join('; ')}`);
+    if (p.objections.length) parts.push(`  Objections: ${p.objections.join('; ')}`);
+    if (p.preferredContentFormat) parts.push(`  Prefers: ${p.preferredContentFormat}`);
+    return parts.join('\n');
+  }).join('\n\n');
+
+  return `\n\nTARGET AUDIENCE PERSONAS (write to address these specific people — their pain points, goals, and objections):\n${personaStr}`;
+}
+
+/**
+ * Format page keyword map into a prompt block matching buildKeywordMapContext() format.
+ * If pagePath is provided, includes only the matching page's data. Otherwise includes all pages.
+ * Used by migrated callers to replace buildKeywordMapContext() with buildWorkspaceIntelligence().
+ */
+export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, pagePath?: string): string {
+  if (!seo?.strategy?.pageMap?.length) return '';
+
+  const pagePathLower = pagePath?.toLowerCase();
+  const pageMap = pagePathLower
+    ? seo.strategy.pageMap.filter(p => p.pagePath.toLowerCase() === pagePathLower)
+    : seo.strategy.pageMap;
+
+  if (!pageMap.length) return '';
+
+  // Matches buildKeywordMapContext() in seo-context.ts lines 395-399
+  const mapStr = pageMap.map(
+    p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}`
+  ).join('\n');
+
+  return `\n\nEXISTING KEYWORD MAP (avoid cannibalization, suggest internal links where relevant):\n${mapStr}`;
 }

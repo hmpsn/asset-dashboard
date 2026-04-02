@@ -67,13 +67,38 @@ describe('assembleSeoContext enrichment', () => {
     expect(result.seoContext!.rankTracking!.positionChanges.declined).toBe(1); // change 3
   });
 
-  it('businessProfile is undefined until structured editor exists (Phase 3B)', async () => {
+  it('businessProfile is undefined when intelligenceProfile is absent', async () => {
     // Workspace.businessProfile has contact info (phone/email/address), not industry/goals.
-    // The intelligence BusinessProfile type requires structured data not yet on the workspace.
+    // The intelligence BusinessProfile type requires intelligenceProfile on the workspace.
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['seoContext'] });
 
     expect(result.seoContext!.businessProfile).toBeUndefined();
+  });
+
+  it('businessProfile is populated from intelligenceProfile when present', async () => {
+    // Mock a workspace with intelligenceProfile data
+    const { getWorkspace: originalGetWorkspace } = await import('../server/workspaces.js');
+    vi.mocked(originalGetWorkspace).mockReturnValueOnce({
+      id: 'ws-1',
+      siteId: 'site-1',
+      personas: [{ name: 'Dev', role: 'Developer' }],
+      businessProfile: { industry: 'Tech', goals: ['Growth'], targetAudience: 'B2B' },
+      intelligenceProfile: {
+        industry: 'SaaS',
+        goals: ['Market Expansion', 'Brand Awareness'],
+        targetAudience: 'Enterprise CTO',
+      },
+    });
+
+    const { buildWorkspaceIntelligence, invalidateIntelligenceCache } = await import('../server/workspace-intelligence.js');
+    invalidateIntelligenceCache('ws-1');
+    const result = await buildWorkspaceIntelligence('ws-1', { slices: ['seoContext'] });
+
+    expect(result.seoContext!.businessProfile).toBeDefined();
+    expect(result.seoContext!.businessProfile!.industry).toBe('SaaS');
+    expect(result.seoContext!.businessProfile!.goals).toEqual(['Market Expansion', 'Brand Awareness']);
+    expect(result.seoContext!.businessProfile!.targetAudience).toBe('Enterprise CTO');
   });
 
   it('preserves base seoContext fields', async () => {

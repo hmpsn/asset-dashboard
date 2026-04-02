@@ -312,6 +312,21 @@ router.put('/api/workspaces/:id/business-profile', requireWorkspaceAccess(), val
   res.json({ businessProfile: ws.businessProfile });
 });
 
+// --- Intelligence Profile (structured business intelligence: industry, goals, target audience) ---
+const intelligenceProfileSchema = z.object({
+  industry: z.string().max(200).optional(),
+  goals: z.array(z.string().max(500)).max(20).optional(),
+  targetAudience: z.string().max(2000).optional(),
+});
+
+router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(), validate(intelligenceProfileSchema), (req, res) => {
+  const ws = updateWorkspace(req.params.id, { intelligenceProfile: req.body });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  invalidateIntelligenceCache(req.params.id);
+  broadcastToWorkspace(req.params.id, 'workspace:updated', { intelligenceProfile: ws.intelligenceProfile });
+  res.json({ intelligenceProfile: ws.intelligenceProfile });
+});
+
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -445,7 +460,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
     });
 
     try {
-      if (!getActionBySource('brand_voice', req.params.id)) recordAction({
+      if (!getActionBySource('brand_voice', req.params.id)) recordAction({ // recordAction-ok: req.params.id is workspaceId (workspaces route)
         workspaceId: req.params.id,
         actionType: 'voice_calibrated',
         sourceType: 'brand_voice',

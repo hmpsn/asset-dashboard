@@ -537,9 +537,6 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
           });
         }
 
-        // Invalidate intelligence cache so next query gets fresh anomaly data
-        invalidateIntelligenceCache(ws.id);
-
         // ── Write anomaly digest insights (deduped via unique index) ──
         for (const a of detected) {
           try {
@@ -594,6 +591,9 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');
           }
         }
+
+        // Invalidate intelligence cache AFTER all insight writes complete
+        invalidateIntelligenceCache(ws.id);
 
         // ── Bridge #10: Anomaly → boost existing insight severity ──────────
         // When anomalies are detected, boost insights in the MATCHING domain

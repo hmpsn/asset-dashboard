@@ -3831,7 +3831,18 @@
           "est": "20-30h",
           "priority": "P1",
           "sprint": "E",
-          "notes": "In progress. PR #118 covers Tasks 1-3 (shared types, bridge wiring, siteHealth assembler). PR #119 covers Tasks 4-12 (all 8 slice assemblers, read-time bridges #8/#9/#14, scheduler/churn invalidation, WebSocket handler, compositeHealthScore). Tasks 13-17 remaining (formatForPrompt, tokenBudget, integration tests, mini builder, pr-check guards).",
+          "notes": "Shipped — 5 PRs (#116-#120). Shared types + bridge scaffolding. All 8 slice assemblers + compositeHealthScore + read-time bridges #8/#9/#14 + scheduler/churn/anomaly cache invalidation + WS INTELLIGENCE_CACHE_UPDATED handler. as-any elimination (38 casts → import type, surfaced 9 hidden data bugs). formatForPrompt expansion (5 new slice formatters, verbosity levels), tokenBudget §20 priority chain, pr-check regression guards (listPages, buildSeoContext, recordAction), 120+ new tests. Deferred to Phase 3B: mini-builder retirement (25 buildSeoContext callers + 6 buildPageAnalysisContext callers), businessProfile enrichment (needs structured editor UI), contentGaps bridge.",
+          "status": "done",
+          "shippedAt": "2026-04-02"
+        },
+        {
+          "id": "unified-workspace-intelligence-3b",
+          "title": "Unified Workspace Intelligence Layer — Phase 3B (Mini-Builder Retirement + Advanced Slices)",
+          "source": "docs/superpowers/plans/2026-04-02-unified-workspace-intelligence-phase3b.md",
+          "est": "12-16h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Retire buildSeoContext (25 callers) and buildPageAnalysisContext (6 callers) — all migrate to buildWorkspaceIntelligence(). Add structured businessProfile editor (industry/goals/targetAudience) to workspace settings + wire into SeoContextSlice. Bridge contentGaps from strategy layer to PageProfileSlice. Upgrade pr-check buildSeoContext rule from warn → error once migration complete.",
           "status": "pending"
         },
         {

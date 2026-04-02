@@ -152,4 +152,87 @@ describe('assemblePageProfile', () => {
     expect(result.pageProfile!.rankHistory.trend).toBe('up');
     expect(result.pageProfile!.rankHistory.current).toBe(12);
   });
+
+  it('populates contentGaps from strategy gaps matching the page primary keyword', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    // Use mockReturnValue (not Once) — getWorkspace is called multiple times per assembly
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      keywordStrategy: {
+        siteKeywords: [],
+        pageMap: [],
+        opportunities: [],
+        generatedAt: '2025-01-01T00:00:00.000Z',
+        contentGaps: [
+          { topic: 'About Us History', targetKeyword: 'about us', intent: 'informational', priority: 'high', rationale: 'core page' },
+          { topic: 'Pricing Guide', targetKeyword: 'pricing', intent: 'commercial', priority: 'medium', rationale: 'conversion page' },
+          { topic: 'Contact Methods', targetKeyword: 'contact us', intent: 'navigational', priority: 'low', rationale: 'support' },
+        ],
+      },
+    } as ReturnType<typeof workspaces.getWorkspace>);
+
+    try {
+      const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+      // pagePath /about has primaryKeyword 'about us' from the page-keywords mock
+      const result = await buildWorkspaceIntelligence('ws-1', {
+        slices: ['pageProfile'],
+        pagePath: '/about',
+      });
+
+      const gaps = result.pageProfile!.contentGaps;
+      expect(gaps.length).toBeGreaterThan(0);
+      expect(gaps).toContain('About Us History');
+      // Non-matching gap topics must not appear
+      expect(gaps).not.toContain('Pricing Guide');
+      expect(gaps).not.toContain('Contact Methods');
+    } finally {
+      // Restore default mock for subsequent tests
+      vi.mocked(workspaces.getWorkspace).mockReturnValue({ id: 'ws-1', personas: [], siteId: null } as ReturnType<typeof workspaces.getWorkspace>);
+    }
+  });
+
+  it('returns all gaps (capped at 5) when no page keyword matches any gap', async () => {
+    const workspaces = await import('../server/workspaces.js');
+    vi.mocked(workspaces.getWorkspace).mockReturnValue({
+      id: 'ws-1',
+      keywordStrategy: {
+        siteKeywords: [],
+        pageMap: [],
+        opportunities: [],
+        generatedAt: '2025-01-01T00:00:00.000Z',
+        contentGaps: [
+          { topic: 'Gap One', targetKeyword: 'unrelated-kw-1', intent: 'informational', priority: 'high', rationale: 'a' },
+          { topic: 'Gap Two', targetKeyword: 'unrelated-kw-2', intent: 'informational', priority: 'medium', rationale: 'b' },
+          { topic: 'Gap Three', targetKeyword: 'unrelated-kw-3', intent: 'informational', priority: 'low', rationale: 'c' },
+        ],
+      },
+    } as ReturnType<typeof workspaces.getWorkspace>);
+
+    try {
+      const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+      // primaryKeyword is 'about us' from mock, which matches none of the gaps above
+      const result = await buildWorkspaceIntelligence('ws-1', {
+        slices: ['pageProfile'],
+        pagePath: '/about',
+      });
+
+      const gaps = result.pageProfile!.contentGaps;
+      // Falls back to all gaps since no match found
+      expect(gaps.length).toBeGreaterThan(0);
+      expect(gaps).toContain('Gap One');
+    } finally {
+      vi.mocked(workspaces.getWorkspace).mockReturnValue({ id: 'ws-1', personas: [], siteId: null } as ReturnType<typeof workspaces.getWorkspace>);
+    }
+  });
+
+  it('returns empty contentGaps when workspace has no keywordStrategy', async () => {
+    // Default mock has no keywordStrategy — no override needed
+    const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
+    const result = await buildWorkspaceIntelligence('ws-1', {
+      slices: ['pageProfile'],
+      pagePath: '/about',
+    });
+
+    expect(result.pageProfile!.contentGaps).toEqual([]);
+  });
 });
