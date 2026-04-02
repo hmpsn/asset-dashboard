@@ -751,7 +751,8 @@ async function assembleClientSignals(
     // ChurnSignal.severity is 'critical' | 'warning' | 'positive' — map to churnRisk levels
     const criticalCount = signals.filter(s => s.severity === 'critical').length;
     const warningCount = signals.filter(s => s.severity === 'warning').length;
-    churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : signals.length > 0 ? 'low' : null;
+    const riskSignalCount = criticalCount + warningCount;
+    churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : riskSignalCount > 0 ? 'low' : null;
   } catch {
     // Churn signals optional — churnFetchSucceeded stays false
   }
@@ -1250,7 +1251,6 @@ async function assemblePageProfile(
   let recommendations: string[] = [];
   try {
     const { loadRecommendations } = await import('./recommendations.js');
-    const recSet = loadRecommendations(workspaceId);
     const recSetPP: RecommendationSet | null = loadRecommendations(workspaceId);
     if (recSetPP?.recommendations) {
       recommendations = recSetPP.recommendations
