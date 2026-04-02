@@ -1181,7 +1181,7 @@ export function formatForPrompt(
     intelligence.seoContext.knowledgeBase ||
     (intelligence.seoContext.personas && intelligence.seoContext.personas.length > 0)
   );
-  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary;
+  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary || intelligence.pageProfile;
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
