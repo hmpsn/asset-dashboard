@@ -460,7 +460,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
     });
 
     try {
-      if (!getActionBySource('brand_voice', req.params.id)) recordAction({
+      if (!getActionBySource('brand_voice', req.params.id)) recordAction({ // recordAction-ok: req.params.id is workspaceId (workspaces route)
         workspaceId: req.params.id,
         actionType: 'voice_calibrated',
         sourceType: 'brand_voice',
