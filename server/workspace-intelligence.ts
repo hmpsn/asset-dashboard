@@ -1307,7 +1307,7 @@ function applyTokenBudget(
   current = current.map(s => {
     if (s.startsWith('## Outcome Learnings') && intelligence.learnings) {
       const rate = intelligence.learnings.overallWinRate;
-      return `## Outcome Learnings\nWin rate: ${Math.round(rate * 100)}%${intelligence.learnings.recentTrend ? ` (${intelligence.learnings.recentTrend})` : ''}`;
+      return `## Outcome Learnings\nWin rate: ${pct(rate)}${intelligence.learnings.recentTrend ? ` (${intelligence.learnings.recentTrend})` : ''}`;
     }
     return s;
   });
@@ -1319,6 +1319,12 @@ function applyTokenBudget(
     s.startsWith('[Workspace Intelligence]') || s.startsWith('## SEO Context'),
   );
   return seoOnly.join('\n\n');
+}
+
+/** Safely format a 0-1 rate as a percentage string. Returns 'n/a' for NaN/null/undefined. */
+function pct(rate: number | null | undefined): string {
+  if (rate == null || isNaN(rate)) return 'n/a';
+  return `${Math.round(rate * 100)}%`;
 }
 
 /**
@@ -1448,15 +1454,15 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
   // Overall win rate with strong wins (matches old: "62% (28% strong wins)")
   if (learnings.overallWinRate > 0) {
     const strongRate = summary?.overall?.strongWinRate;
-    const strongSuffix = strongRate != null ? ` (${Math.round(strongRate * 100)}% strong wins)` : '';
-    lines.push(`Overall win rate: ${Math.round(learnings.overallWinRate * 100)}%${strongSuffix}`);
+    const strongSuffix = strongRate != null ? ` (${pct(strongRate)} strong wins)` : '';
+    lines.push(`Overall win rate: ${pct(learnings.overallWinRate)}${strongSuffix}`);
   }
 
   if (verbosity === 'detailed' || verbosity === 'standard') {
     if (learnings.topActionTypes.length > 0) {
       lines.push('Win rates by action type:');
       for (const { type, winRate, count } of learnings.topActionTypes) {
-        lines.push(`  ${type}: ${Math.round(winRate * 100)}% (${count} actions)`);
+        lines.push(`  ${type}: ${pct(winRate)} (${count} actions)`);
       }
     }
 
@@ -1472,10 +1478,10 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
         if (topFormats.length >= 2) {
           const [f1, r1] = topFormats[0];
           const [f2, r2] = topFormats[1];
-          lines.push(`${f1.replace(/_/g, ' ')} outperforms ${f2.replace(/_/g, ' ')} (${Math.round(r1 * 100)}% vs ${Math.round(r2 * 100)}% win rate)`);
+          lines.push(`${f1.replace(/_/g, ' ')} outperforms ${f2.replace(/_/g, ' ')} (${pct(r1)} vs ${pct(r2)} win rate)`);
         }
         if (c.avgDaysToPage1 != null) lines.push(`Content reaches page 1 in ~${c.avgDaysToPage1} days on average`);
-        if (c.refreshRecoveryRate > 0) lines.push(`Content refreshes recover traffic ${Math.round(c.refreshRecoveryRate * 100)}% of the time`);
+        if (c.refreshRecoveryRate > 0) lines.push(`Content refreshes recover traffic ${pct(c.refreshRecoveryRate)} of the time`);
         if (c.bestPerformingTopics.length > 0) lines.push(`Best performing topics: ${c.bestPerformingTopics.slice(0, 3).join(', ')}`);
       }
 
@@ -1485,7 +1491,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
         const topDifficulty = Object.entries(s.winRateByDifficultyRange).sort((a, b) => b[1] - a[1]).slice(0, 1);
         if (topDifficulty.length > 0) {
           const [range, rate] = topDifficulty[0];
-          lines.push(`Keywords with difficulty ${range} have highest win rate (${Math.round(rate * 100)}%)`);
+          lines.push(`Keywords with difficulty ${range} have highest win rate (${pct(rate)})`);
         }
         if (s.keywordVolumeSweetSpot) lines.push(`Optimal keyword volume range: ${s.keywordVolumeSweetSpot.min}–${s.keywordVolumeSweetSpot.max}/month`);
         if (s.bestIntentTypes.length > 0) lines.push(`Best intent types: ${s.bestIntentTypes.join(', ')}`);
@@ -1497,11 +1503,11 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
         const topFix = Object.entries(t.winRateByFixType).sort((a, b) => b[1] - a[1]).slice(0, 1);
         if (topFix.length > 0) {
           const [fixType, rate] = topFix[0];
-          lines.push(`${fixType.replace(/_/g, ' ')} has highest technical win rate (${Math.round(rate * 100)}%)`);
+          lines.push(`${fixType.replace(/_/g, ' ')} has highest technical win rate (${pct(rate)})`);
         }
         if (t.schemaTypesWithRichResults.length > 0) lines.push(`Schema types producing rich results: ${t.schemaTypesWithRichResults.join(', ')}`);
         if (t.avgHealthScoreImprovement > 0) lines.push(`Average health score improvement: +${t.avgHealthScoreImprovement}`);
-        if (t.internalLinkEffectiveness > 0) lines.push(`Internal link additions improve rankings ${Math.round(t.internalLinkEffectiveness * 100)}% of the time`);
+        if (t.internalLinkEffectiveness > 0) lines.push(`Internal link additions improve rankings ${pct(t.internalLinkEffectiveness)} of the time`);
       }
     }
 
@@ -1517,7 +1523,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
     if (learnings.roiAttribution && learnings.roiAttribution.length > 0 && verbosity === 'detailed') {
       lines.push('ROI highlights:');
       for (const roi of learnings.roiAttribution.slice(0, 5)) {
-        lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain} clicks`);
+        lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain ?? 0} clicks`);
       }
     }
   }
@@ -1594,7 +1600,7 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
   if (verbosity === 'detailed') {
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
-    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? `${Math.round(health.cwvPassRate.desktop * 100)}%` : 'n/a'}`);
+    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${pct(health.cwvPassRate.mobile)}, desktop ${health.cwvPassRate.desktop != null ? pct(health.cwvPassRate.desktop) : 'n/a'}`);
     if (health.schemaValidation) {
       lines.push(`Schema validation: ${health.schemaValidation.valid} valid, ${health.schemaValidation.warnings} warnings, ${health.schemaValidation.errors} errors`);
     }
@@ -1626,7 +1632,7 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
       lines.push(`Engagement: ${signals.engagement.loginFrequency} login frequency, ${signals.engagement.chatSessionCount} chat sessions`);
     }
     if (signals.approvalPatterns.approvalRate > 0) {
-      lines.push(`Approval rate: ${Math.round(signals.approvalPatterns.approvalRate * 100)}%`);
+      lines.push(`Approval rate: ${pct(signals.approvalPatterns.approvalRate)}`);
     }
     if (signals.businessPriorities.length > 0) {
       lines.push(`Business priorities: ${signals.businessPriorities.join('; ')}`);
@@ -1651,7 +1657,7 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
       lines.push(`Recent topics: ${signals.recentChatTopics.join(', ')}`);
     }
     if (signals.keywordFeedback.approved.length > 0 || signals.keywordFeedback.rejected.length > 0) {
-      lines.push(`Keyword feedback: ${Math.round(signals.keywordFeedback.patterns.approveRate * 100)}% approve rate`);
+      lines.push(`Keyword feedback: ${pct(signals.keywordFeedback.patterns.approveRate)} approve rate`);
       if (signals.keywordFeedback.approved.length > 0) {
         lines.push(`  Approved: ${signals.keywordFeedback.approved.slice(0, 5).join(', ')}`);
       }
@@ -1710,7 +1716,7 @@ function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbos
       }
     }
     if (ops.insightAcceptanceRate) {
-      lines.push(`Insight acceptance rate: ${Math.round(ops.insightAcceptanceRate.rate * 100)}% (${ops.insightAcceptanceRate.confirmed}/${ops.insightAcceptanceRate.totalShown})`);
+      lines.push(`Insight acceptance rate: ${pct(ops.insightAcceptanceRate.rate)} (${ops.insightAcceptanceRate.confirmed}/${ops.insightAcceptanceRate.totalShown})`);
     }
   }
 
