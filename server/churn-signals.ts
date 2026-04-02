@@ -160,6 +160,9 @@ async function runChurnCheck() {
   for (const ws of workspaces) {
     if (!ws.clientPortalEnabled) continue;
 
+    // Track whether new signals are created for this workspace (for cache invalidation)
+    const signalsBefore = (stmts().selectActiveByWorkspace.all(ws.id) as ChurnSignalRow[]).length;
+
     const activities = listActivity(ws.id, 100);
     const clientUsers = listClientUsers(ws.id);
 
@@ -280,8 +283,11 @@ async function runChurnCheck() {
       });
     }
 
-    // Invalidate intelligence cache so next query gets fresh churn signal data
-    invalidateIntelligenceCache(ws.id);
+    // Only invalidate intelligence cache if new signals were created for this workspace
+    const signalsAfter = (stmts().selectActiveByWorkspace.all(ws.id) as ChurnSignalRow[]).length;
+    if (signalsAfter !== signalsBefore) {
+      invalidateIntelligenceCache(ws.id);
+    }
   }
 
   // Send email notifications for critical signals

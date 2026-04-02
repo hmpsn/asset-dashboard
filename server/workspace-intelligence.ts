@@ -444,13 +444,13 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   try {
     const { loadDecayAnalysis } = await import('./content-decay.js');
     const decay = loadDecayAnalysis(workspaceId) as any;
-    if (decay?.pages) {
-      decayAlerts = (decay.pages as any[]).slice(0, 20).map((p: any) => ({
-        pageUrl: p.url ?? p.pageUrl ?? '',
-        clickDrop: p.clickDrop ?? 0,
+    if (decay?.decayingPages) {
+      decayAlerts = (decay.decayingPages as any[]).slice(0, 20).map((p: any) => ({
+        pageUrl: p.page ?? '',
+        clickDrop: p.clickDeclinePct ?? 0,
         detectedAt: p.detectedAt ?? decay.analyzedAt ?? new Date().toISOString(),
-        hasRefreshBrief: !!p.briefId,
-        isRepeatDecay: false,
+        hasRefreshBrief: !!p.refreshRecommendation,
+        isRepeatDecay: p.isRepeatDecay ?? false,
       }));
     }
   } catch {
@@ -725,16 +725,17 @@ async function assembleClientSignals(
   try {
     // NOTE: dynamic import required — churn-signals.ts statically imports from this module
     const { listChurnSignals } = await import('./churn-signals.js');
+    // listChurnSignals already filters to undismissed signals via SQL (WHERE dismissed_at IS NULL)
     const signals = listChurnSignals(workspaceId);
-    const active = signals.filter((s: any) => !s.dismissed);
-    churnSignals = active.map((s: any) => ({
-      type: s.signalType ?? s.type ?? '',
-      severity: s.severity ?? 'low',
+    churnSignals = signals.map((s: any) => ({
+      type: s.type ?? '',
+      severity: s.severity ?? 'warning',
       detectedAt: s.detectedAt ?? '',
     }));
-    const highCount = active.filter((s: any) => s.severity === 'high').length;
-    const medCount = active.filter((s: any) => s.severity === 'medium').length;
-    churnRisk = highCount > 0 ? 'high' : medCount >= 2 ? 'medium' : active.length > 0 ? 'low' : null;
+    // ChurnSignal.severity is 'critical' | 'warning' | 'positive' — map to churnRisk levels
+    const criticalCount = signals.filter((s: any) => s.severity === 'critical').length;
+    const warningCount = signals.filter((s: any) => s.severity === 'warning').length;
+    churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : signals.length > 0 ? 'low' : null;
   } catch {
     // Churn signals optional
   }
@@ -1354,7 +1355,7 @@ async function assemblePageProfile(
     try {
       const { loadDecayAnalysis } = await import('./content-decay.js');
       const decay = loadDecayAnalysis(workspaceId);
-      isDecaying = decay?.pages?.some((d: any) => (d.url ?? d.pageUrl ?? '') === pagePath) ?? false;
+      isDecaying = (decay as any)?.decayingPages?.some((d: any) => d.page === pagePath) ?? false;
     } catch {
       // Decay optional
     }

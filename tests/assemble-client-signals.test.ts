@@ -161,10 +161,10 @@ describe('assembleClientSignals', () => {
     expect(cs.serviceRequests?.total).toBe(0);
   });
 
-  it('computes churnRisk = high when a high-severity signal is active', async () => {
+  it('computes churnRisk = high when a critical-severity signal is active', async () => {
     const { listChurnSignals } = await import('../server/churn-signals.js');
     vi.mocked(listChurnSignals).mockReturnValueOnce([
-      { type: 'no-login', severity: 'high', detectedAt: '2026-01-01T00:00:00Z', dismissed: false } as any,
+      { id: 'cs_1', workspaceId: 'ws-1', workspaceName: 'Test', type: 'no_login_14d', severity: 'critical', detectedAt: '2026-01-01T00:00:00Z' } as any,
     ]);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
@@ -173,15 +173,15 @@ describe('assembleClientSignals', () => {
     const cs = result.clientSignals as ClientSignalsSlice;
     expect(cs.churnRisk).toBe('high');
     expect(cs.churnSignals?.length).toBe(1);
-    expect(cs.churnSignals?.[0].type).toBe('no-login');
-    expect(cs.churnSignals?.[0].severity).toBe('high');
+    expect(cs.churnSignals?.[0].type).toBe('no_login_14d');
+    expect(cs.churnSignals?.[0].severity).toBe('critical');
   });
 
-  it('computes churnRisk = medium when 2+ medium signals are active', async () => {
+  it('computes churnRisk = medium when 2+ warning signals are active', async () => {
     const { listChurnSignals } = await import('../server/churn-signals.js');
     vi.mocked(listChurnSignals).mockReturnValueOnce([
-      { type: 'declining-engagement', severity: 'medium', detectedAt: '2026-01-01T00:00:00Z', dismissed: false } as any,
-      { type: 'low-satisfaction', severity: 'medium', detectedAt: '2026-01-02T00:00:00Z', dismissed: false } as any,
+      { id: 'cs_2', workspaceId: 'ws-1', workspaceName: 'Test', type: 'chat_dropoff', severity: 'warning', detectedAt: '2026-01-01T00:00:00Z' } as any,
+      { id: 'cs_3', workspaceId: 'ws-1', workspaceName: 'Test', type: 'no_requests_30d', severity: 'warning', detectedAt: '2026-01-02T00:00:00Z' } as any,
     ]);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
@@ -191,10 +191,10 @@ describe('assembleClientSignals', () => {
     expect(cs.churnRisk).toBe('medium');
   });
 
-  it('computes churnRisk = low when only 1 medium signal is active', async () => {
+  it('computes churnRisk = low when only 1 warning signal is active', async () => {
     const { listChurnSignals } = await import('../server/churn-signals.js');
     vi.mocked(listChurnSignals).mockReturnValueOnce([
-      { type: 'low-satisfaction', severity: 'medium', detectedAt: '2026-01-01T00:00:00Z', dismissed: false } as any,
+      { id: 'cs_4', workspaceId: 'ws-1', workspaceName: 'Test', type: 'no_requests_30d', severity: 'warning', detectedAt: '2026-01-01T00:00:00Z' } as any,
     ]);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
@@ -204,11 +204,10 @@ describe('assembleClientSignals', () => {
     expect(cs.churnRisk).toBe('low');
   });
 
-  it('filters dismissed churn signals from risk computation', async () => {
+  it('listChurnSignals already filters dismissed — all returned signals are active', async () => {
+    // listChurnSignals uses SQL WHERE dismissed_at IS NULL, so dismissed signals never arrive
     const { listChurnSignals } = await import('../server/churn-signals.js');
-    vi.mocked(listChurnSignals).mockReturnValueOnce([
-      { type: 'no-login', severity: 'high', detectedAt: '2026-01-01T00:00:00Z', dismissed: true } as any,
-    ]);
+    vi.mocked(listChurnSignals).mockReturnValueOnce([]);
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['clientSignals'] });

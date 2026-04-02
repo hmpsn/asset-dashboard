@@ -30,6 +30,8 @@ export interface DecayingPage {
   positionChange: number;
   severity: 'critical' | 'warning' | 'watch';
   refreshRecommendation?: string;
+  isRepeatDecay?: boolean;
+  priority?: string;
 }
 
 export interface DecayAnalysis {
@@ -175,8 +177,8 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
           const outcomes = getOutcomesForAction(action.id);
           const hasLoss = outcomes.some(o => o.score === 'loss');
           if (hasLoss) {
-            (decayingPage as any).isRepeatDecay = true;
-            (decayingPage as any).priority = 'high';
+            decayingPage.isRepeatDecay = true;
+            decayingPage.priority = 'high';
             break;
           }
         }
