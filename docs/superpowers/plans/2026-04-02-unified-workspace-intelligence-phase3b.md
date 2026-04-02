@@ -2,9 +2,31 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Retire the three mini-builders (`buildSeoContext`, `buildPageAnalysisContext`, `admin-chat-context`'s inline builder calls) by migrating all 31 callers to `buildWorkspaceIntelligence()`. Add a structured business profile editor so `SeoContextSlice.businessProfile` can be populated. Bridge content gaps from the strategy layer to `PageProfileSlice`. Upgrade pr-check guards from `warn` to `error` once migration is complete.
+**Goal:** Retire the three mini-builders (`buildSeoContext` ~25 callers, `buildPageAnalysisContext` ~6 callers, `buildKeywordMapContext` ~8 callers) plus `admin-chat-context`'s inline builder calls by migrating all ~39 call sites to `buildWorkspaceIntelligence()`. Add a structured business profile editor so `SeoContextSlice.businessProfile` can be populated. Bridge content gaps from the strategy layer to `PageProfileSlice`. Upgrade pr-check guards from `warn` to `error` once migration is complete.
 
 **Architecture:** Phase 3B is a migration + extension phase — no new slice types, no new assembler logic. The intelligence layer is complete. This phase makes everything else use it instead of going around it.
+
+### Critical: Sync → Async Migration
+
+`buildSeoContext()`, `buildPageAnalysisContext()`, and `buildKeywordMapContext()` are **synchronous**. `buildWorkspaceIntelligence()` is **async**. Every caller needs `await`. All callers in this plan are already inside async functions (Express route handlers, async generators), but each migration task MUST verify the enclosing function is async before adding `await`.
+
+### Critical: Pre-formatted Strings → Structured Data
+
+The mini-builders return ready-to-inject prompt text (`keywordBlock`, `personasBlock`, etc.). The intelligence layer returns **structured data**. Callers that destructure individual blocks and place them at different prompt positions CANNOT simply use `formatForPrompt()` (which returns one combined blob). Instead:
+
+| Mini-builder field | Intelligence layer equivalent | Type | Notes |
+|---|---|---|---|
+| `brandVoiceBlock` | `intel.seoContext.brandVoice` | `string` | Direct replacement |
+| `businessContext` | `intel.seoContext.businessContext` | `string` | Direct replacement |
+| `knowledgeBlock` | `intel.seoContext.knowledgeBase` | `string` | Direct replacement |
+| `personasBlock` | Format from `intel.seoContext.personas` | `AudiencePersona[]` | **Needs formatting** — use `personas.map(p => \`${p.name}: ${p.description}\`).join('\\n')` or similar |
+| `keywordBlock` | Format from `intel.seoContext.strategy?.siteKeywords` | `SiteKeyword[]` | **Needs formatting** — use `siteKeywords.map(k => \`${k.keyword} (vol: ${k.volume})\`).join('\\n')` or similar |
+| `fullContext` | `formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] })` | `string` | Closest match but has `## SEO Context` header, not identical |
+| `strategy` | `workspace.keywordStrategy` (read from workspace directly) | `KeywordStrategy` | **NOT** `seo.strategyHistory` which is a summary object |
+| `kwMapContext` | Format from `intel.seoContext.strategy?.pageMap` | `PageKeywordMap[]` | **Needs formatting** — iterate page map, format per-page keyword data |
+| Page analysis block | `formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })` | `string` | Or access `intel.pageProfile.auditIssues`, `.recommendations`, `.optimizationScore` directly |
+
+**For fields marked "Needs formatting"**: create a `formatPersonasForPrompt(personas)` and `formatKeywordsForPrompt(siteKeywords)` helper in `workspace-intelligence.ts` (exported) so callers don't each hand-roll formatting. These are Task 0 deliverables.
 
 **Tech Stack:** TypeScript (strict), SQLite (better-sqlite3), Express, React 19 + Vite, TailwindCSS 4, React Router DOM 7
 
@@ -32,27 +54,31 @@ These bugs were found during Phase 3A code review. Every one was caused by guess
 ## Dependency Graph
 
 ```
+Task 0 (formatting helpers: formatPersonasForPrompt, formatKeywordsForPrompt, formatPageMapForPrompt)
+    └──→ Tasks 4-10 depend on these helpers
+
 Task 1 (businessProfile editor: DB + type + UI)
     └──→ Task 2 (businessProfile assembler wiring) — after Task 1 UI is committed
 
 Task 3 (contentGaps bridge) — independent
 
-Tasks 4-10 (mini-builder migration, parallel groups) — independent of each other
+Tasks 4-10 (mini-builder migration, parallel groups) — independent of each other, depend on Task 0
     └──→ Task 11 (admin-chat-context.ts migration) — after Tasks 4-10 committed
 
 Task 12 (pr-check upgrade + cleanup) — after Task 11
-Task 13 (docs: FEATURE_AUDIT + roadmap) — after Task 12
+Task 13 (equivalence test suite) — after Tasks 4-11, can run parallel with Task 12
+Task 14 (docs: FEATURE_AUDIT + roadmap) — after Tasks 12+13
 ```
 
 ## Parallelization Strategy
 
 | Batch | Tasks | Prerequisite |
 |-------|-------|-------------|
-| **Batch 0** | Task 1 (businessProfile editor) | None |
-| **Batch 1** | Task 2 (assembler wiring), Task 3 (contentGaps bridge) | Task 1 committed |
-| **Batch 2** | Tasks 4-10 (mini-builder migration groups, all parallel) | None (independent of Batch 0-1) |
+| **Batch 0** | Task 0 (formatting helpers), Task 1 (businessProfile editor) | None — run in parallel |
+| **Batch 1** | Task 2 (assembler wiring), Task 3 (contentGaps bridge) | Task 0 + Task 1 committed |
+| **Batch 2** | Tasks 4-10 (mini-builder migration groups, all parallel) | Task 0 committed |
 | **Batch 3** | Task 11 (admin-chat-context) | Batch 2 committed |
-| **Batch 4** | Task 12 (pr-check upgrade), Task 13 (docs) | Task 11 committed |
+| **Batch 4** | Task 12 (pr-check upgrade), Task 13 (equivalence tests), Task 14 (docs) | Task 11 committed |
 
 Note: Batches 0-1 and Batch 2 are **independent** and can run concurrently if desired. The businessProfile work does not block migration and vice versa.
 
@@ -60,21 +86,26 @@ Note: Batches 0-1 and Batch 2 are **independent** and can run concurrently if de
 
 | Task | Model | Rationale |
 |------|-------|-----------|
+| Task 0 (formatting helpers) | **Sonnet** | Needs judgment on formatting that matches existing mini-builder output |
 | Task 1 (businessProfile UI) | **Sonnet** | React component + DB migration + type update |
 | Task 2 (assembler wiring) | **Haiku** | Mechanical — read type, fill two fields in existing assembler |
 | Task 3 (contentGaps bridge) | **Sonnet** | Data shape decision + bridge implementation |
 | Tasks 4-10 (migration groups) | **Sonnet** | Each caller needs correct slice + field extraction |
 | Task 11 (admin-chat) | **Sonnet** | Large orchestrator, surgical replacement |
 | Task 12 (pr-check upgrade) | **Haiku** | Config change — remove exclusions, flip severity |
-| Task 13 (docs) | **Haiku** | Mechanical doc updates |
+| Task 13 (equivalence tests) | **Sonnet** | Needs judgment on equivalence assertions, seeding test data |
+| Task 14 (docs) | **Haiku** | Mechanical doc updates |
 
-## PR Strategy (3 PRs)
+## PR Strategy (4 PRs)
+
+> **IMPORTANT:** Each PR boundary below is a hard STOP. Do not start the next PR until the current one passes all quality gates and is merged to staging.
 
 | PR | Tasks | Gate | Review Focus |
 |----|-------|------|-------------|
-| **PR 1: businessProfile + contentGaps** | Tasks 1-3 | UI renders, assembler populates field, contentGaps non-empty for a workspace with strategy data | Type shape correctness: `Workspace.intelligenceProfile` vs `BusinessProfile` in intelligence.ts must match exactly |
-| **PR 2: Mini-builder migration** | Tasks 4-11 | All migrated callers return equivalent data; `npx tsx scripts/pr-check.ts` shows zero new warnings on changed files | Field-by-field equivalence for each caller's extracted data. No `as any` casts introduced. |
-| **PR 3: Cleanup + docs** | Tasks 12-13 | `pr-check --all` shows zero buildSeoContext warnings; roadmap + FEATURE_AUDIT updated | Guard severity is `error` and no new callers bypass it |
+| **PR 1: Formatting helpers + businessProfile + contentGaps** | Tasks 0-3 | Formatting helpers produce output matching mini-builder format. UI renders. businessProfile populated. contentGaps non-empty. | **Type shape correctness:** `Workspace.intelligenceProfile` vs `BusinessProfile` in intelligence.ts. **Format equivalence:** `formatKeywordsForPrompt` output compared against `buildSeoContext().keywordBlock` for same workspace. |
+| **PR 2: Migration batch A** (server modules) | Tasks 4-6 | All migrated callers produce equivalent AI prompts. `npx tsx scripts/pr-check.ts` zero new warnings. | **No `as any` casts.** Verify each caller's prompt output against the pre-migration output. |
+| **PR 3: Migration batch B** (routes + admin-chat) | Tasks 7-11 | All remaining callers migrated. Admin chat e2e works. `npx tsx scripts/pr-check.ts` zero new warnings. | **Route handlers async.** workspaceId variable name correct per handler. admin-chat context quality unchanged. |
+| **PR 4: Enforcement + tests + docs** | Tasks 12-14 | `pr-check --all` zero buildSeoContext warnings. Equivalence test suite passes. Roadmap + FEATURE_AUDIT updated. | Guard severity is `error`. No false positives on full scan. |
 
 ---
 
@@ -93,20 +124,21 @@ Note: Batches 0-1 and Batch 2 are **independent** and can run concurrently if de
 | `server/internal-links.ts` | Task 5 | 2 buildSeoContext callers |
 | `server/seo-audit.ts` | Task 6 | 1 buildSeoContext + 1 buildPageAnalysisContext caller |
 | `server/content-decay.ts` | Task 6 | 1 buildSeoContext + 1 buildPageAnalysisContext caller |
-| `server/routes/webflow-seo.ts` | Task 7 | 4 buildSeoContext + 2 buildPageAnalysisContext callers |
-| `server/routes/jobs.ts` | Task 8 | 2 buildSeoContext callers |
+| `server/routes/webflow-seo.ts` | Task 7 | 4 buildSeoContext + 2 buildPageAnalysisContext + 1 buildKeywordMapContext callers |
+| `server/routes/jobs.ts` | Task 8 | 2 buildSeoContext + 1 buildKeywordMapContext callers |
 | `server/routes/webflow-alt-text.ts` | Task 8 | 2 buildSeoContext callers |
-| `server/routes/google.ts` | Task 9 | 1 buildSeoContext caller |
-| `server/routes/public-analytics.ts` | Task 9 | 1 buildSeoContext caller |
+| `server/routes/google.ts` | Task 9 | 1 buildSeoContext + 1 buildKeywordMapContext callers |
+| `server/routes/public-analytics.ts` | Task 9 | 1 buildSeoContext + 1 buildKeywordMapContext callers |
 | `server/routes/content-posts.ts` | Task 9 | 1 buildSeoContext caller |
-| `server/routes/webflow-keywords.ts` | Task 9 | 1 buildSeoContext caller |
+| `server/routes/webflow-keywords.ts` | Task 9 | 1 buildSeoContext + 1 buildKeywordMapContext callers |
 | `server/routes/keyword-strategy.ts` | Task 10 | 1 buildSeoContext caller |
 | `server/routes/rewrite-chat.ts` | Task 10 | 1 buildSeoContext + 1 buildPageAnalysisContext caller |
 | `server/keyword-recommendations.ts` | Task 10 | 1 buildSeoContext caller |
-| `server/admin-chat-context.ts` | Task 11 | SEQUENTIAL ONLY — 2 buildSeoContext callers + inline builder logic |
-| `scripts/pr-check.ts` | Task 12 | Remove grandfathered exclusions, flip warn → error |
-| `FEATURE_AUDIT.md` | Task 13 | Add Phase 3B entry |
-| `data/roadmap.json` | Task 13 | Mark Phase 3B done |
+| `server/admin-chat-context.ts` | Task 11 | SEQUENTIAL ONLY — 2 buildSeoContext + 1 buildKeywordMapContext callers + inline builder logic |
+| `scripts/pr-check.ts` | Task 12 | Remove grandfathered exclusions, flip warn → error, add buildKeywordMapContext + buildPageAnalysisContext rules |
+| `tests/migration-equivalence.test.ts` | Task 13 | New — equivalence test suite |
+| `FEATURE_AUDIT.md` | Task 14 | Add Phase 3B entry |
+| `data/roadmap.json` | Task 14 | Mark Phase 3B done |
 
 **Files that must NOT be touched in parallel:**
 - `server/workspace-intelligence.ts` — owned by Tasks 2 and 3 only. Tasks 4-11 read from it but must not modify it.
@@ -133,6 +165,46 @@ npx tsx scripts/pr-check.ts --all 2>&1 | grep -E "⚠|✗|buildSeoContext|listPa
 # Confirm intelligenceProfile does NOT yet exist on Workspace type
 grep -n "intelligenceProfile\|BusinessProfile" shared/types/workspace.ts
 ```
+
+---
+
+## Task 0: Formatting helpers (MUST be committed before any migration task)
+
+**Goal:** Create exported helper functions that produce prompt-ready text from intelligence slice data, matching the existing mini-builder output format. Without these, every migration task will hand-roll its own formatting — leading to inconsistency and bugs.
+
+**Read before writing:**
+- `server/seo-context.ts` lines 58-160 — understand EXACTLY what `buildSeoContext` returns for `keywordBlock`, `personasBlock`, and how `fullContext` is assembled
+- `server/seo-context.ts` lines 390+ — understand `buildKeywordMapContext` output format
+- `shared/types/intelligence.ts` — `SeoContextSlice` and `SiteKeyword`, `AudiencePersona` types
+
+### Steps
+
+- [ ] **0a. Read mini-builder output format**
+  Read `server/seo-context.ts` end-to-end. Document what each block contains and its formatting conventions.
+
+- [ ] **0b. Add formatting helpers to `server/workspace-intelligence.ts`**
+  Export these functions:
+  ```typescript
+  /** Format site keywords into a prompt block matching buildSeoContext().keywordBlock */
+  export function formatKeywordsForPrompt(seo: SeoContextSlice): string
+
+  /** Format audience personas into a prompt block matching buildSeoContext().personasBlock */
+  export function formatPersonasForPrompt(personas: AudiencePersona[]): string
+
+  /** Format page keyword map into a prompt block matching buildKeywordMapContext() */
+  export function formatPageMapForPrompt(seo: SeoContextSlice, pagePath?: string): string
+  ```
+
+- [ ] **0c. Equivalence snapshot test**
+  Create `tests/formatting-equivalence.test.ts`:
+  - For a test workspace, call `buildSeoContext()` and capture `keywordBlock`, `personasBlock`
+  - Call the new formatting helpers with the equivalent intelligence data
+  - Assert the output contains the same substantive content (exact string match is too brittle — assert same keywords appear, same persona names, same structure)
+
+**Acceptance criteria:**
+- [ ] Helpers exported and typed
+- [ ] Snapshot test confirms formatting matches mini-builder output
+- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
 
 ---
 
@@ -285,91 +357,113 @@ grep -n "intelligenceProfile\|BusinessProfile" shared/types/workspace.ts
 
 ---
 
+---
+
+## ⛔ PR 1 BOUNDARY — STOP HERE
+
+**Gate:** Formatting helpers pass equivalence tests. businessProfile UI saves + loads. contentGaps non-empty for workspaces with strategy. All quality gates pass.
+
+**Merge PR 1 to staging before continuing.**
+
+---
+
 ## Tasks 4-10: Mini-builder migration (parallel groups)
 
 **CRITICAL rules for all migration tasks:**
-1. **Read the mini-builder's return type before writing.** For `buildSeoContext`: read `server/seo-context.ts` to see what it returns. For `buildPageAnalysisContext`: same file.
-2. **Read `shared/types/intelligence.ts` for the slice type** before accessing any field on the result.
-3. **Never access a field that doesn't exist on the slice type.** If you need data that's not in the slice, it stays as a mini-builder call (flag it in a comment).
-4. **No `as any` casts.** Use `import type` for type-only imports. The pr-check `as-any` guard will catch violations.
-5. **The intelligence layer uses LRU caching.** Replacing `buildSeoContext()` with `buildWorkspaceIntelligence()` means the second call in the same request is free. Don't add manual caching.
+1. **Verify the enclosing function is async** before adding `await buildWorkspaceIntelligence()`. All known callers are in async functions, but verify per-callsite.
+2. **Read the mini-builder's return type before writing.** For `buildSeoContext`: read `server/seo-context.ts` to see what it returns. For `buildPageAnalysisContext`: same file. For `buildKeywordMapContext`: same file.
+3. **Read `shared/types/intelligence.ts` for the slice type** before accessing any field on the result.
+4. **Never access a field that doesn't exist on the slice type.** If you need data that's not in the slice, it stays as a mini-builder call (flag it in a comment).
+5. **No `as any` casts.** Use `import type` for type-only imports. The pr-check `as-any` guard will catch violations.
+6. **The intelligence layer uses LRU caching.** Replacing `buildSeoContext()` with `buildWorkspaceIntelligence()` means the second call in the same request is free. Don't add manual caching.
+7. **Use the formatting helpers from Task 0.** Do NOT hand-roll formatting of keywords, personas, or page maps.
 
 **Migration pattern for each caller:**
 
 ```typescript
 // BEFORE
+import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
 const { keywordBlock, brandVoiceBlock, personasBlock } = buildSeoContext(workspaceId);
-// ... use keywordBlock, brandVoiceBlock, personasBlock in prompt
+const kwMapBlock = buildKeywordMapContext(workspaceId);
 
 // AFTER
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
 const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
 const seo = intel.seoContext;
-// Use seo.siteKeywords for keyword data
-// Use seo.brandVoice for brand voice
-// Use seo.personas for personas
-// Use formatForPrompt(intel, { verbosity: 'standard', sections: ['seoContext'] }) to get the formatted block
+const keywordBlock = formatKeywordsForPrompt(seo!);
+const brandVoiceBlock = seo?.brandVoice ?? '';
+const personasBlock = formatPersonasForPrompt(seo?.personas ?? []);
+const knowledgeBlock = seo?.knowledgeBase ?? '';
+const kwMapBlock = formatPageMapForPrompt(seo!);
 ```
 
-**Key field mappings** (mini-builder output → slice field):
+**Key field mappings** (mini-builder output → intelligence layer):
 
-| buildSeoContext field | SeoContextSlice field | Notes |
-|----------------------|----------------------|-------|
-| `keywordBlock` | Use `formatForPrompt(intel, { sections: ['seoContext'] })` | Or access `seo.siteKeywords` for raw data |
-| `brandVoiceBlock` | `seo.brandVoice` | String |
-| `businessContext` | `seo.businessContext` | String |
-| `personasBlock` | `seo.personas` | Array of `AudiencePersona` — format manually or use formatForPrompt |
-| `knowledgeBlock` | `seo.knowledgeBase` | String |
-| `fullContext` | `formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] })` | Full formatted string |
-| `strategy` | `seo.strategyHistory` | Summary object |
+| buildSeoContext field | Replacement | Notes |
+|----------------------|-------------|-------|
+| `keywordBlock` | `formatKeywordsForPrompt(seo)` | Task 0 helper |
+| `brandVoiceBlock` | `seo.brandVoice ?? ''` | Direct string |
+| `businessContext` | `seo.businessContext ?? ''` | Direct string |
+| `personasBlock` | `formatPersonasForPrompt(seo.personas ?? [])` | Task 0 helper |
+| `knowledgeBlock` | `seo.knowledgeBase ?? ''` | Direct string |
+| `fullContext` | `formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] })` | Combined block with `## SEO Context` header |
+| `strategy` | `workspace.keywordStrategy` (read from workspace, NOT `seo.strategyHistory`) | ⚠️ `strategyHistory` is a summary, NOT the full strategy object. Only `content-brief.ts:767` uses this. |
 
-| buildPageAnalysisContext field | PageProfileSlice field | Notes |
-|-------------------------------|----------------------|-------|
-| Full page analysis block | `formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })` | Or raw fields below |
-| Optimization issues | `pageProfile.auditIssues` | Array |
-| Recommendations | `pageProfile.recommendations` | Array |
-| Optimization score | `pageProfile.optimizationScore` | number \| null |
+| buildKeywordMapContext output | Replacement | Notes |
+|------|-------------|-------|
+| `kwMapContext` | `formatPageMapForPrompt(seo)` | Task 0 helper |
+
+| buildPageAnalysisContext field | Replacement | Notes |
+|------|-------------|-------|
+| Full page analysis block | `formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })` | Or access individual fields below |
+| Optimization issues | `intel.pageProfile.auditIssues` | Array |
+| Recommendations | `intel.pageProfile.recommendations` | Array |
+| Optimization score | `intel.pageProfile.optimizationScore` | number \| null |
 
 ---
 
-### Task 4: content-brief.ts (3 callers)
+### Task 4: content-brief.ts (5 callers: 3 buildSeoContext + 1 buildKeywordMapContext + 1 buildPageAnalysisContext)
 
 **File:** `server/content-brief.ts`
-**Callers:** Lines ~487, ~657, ~762
+**Callers:** Lines ~487, ~657, ~762 (buildSeoContext) + ~763 (buildKeywordMapContext) + ~772 (buildPageAnalysisContext)
 
 - [ ] **Read before touching:**
-  - Read `server/content-brief.ts` lines 480-800 to understand all three call sites in context
+  - Read `server/content-brief.ts` lines 480-800 to understand all call sites in context
   - Read `shared/types/intelligence.ts` — `SeoContextSlice` and `PageProfileSlice` fields
-  - Run `grep -n "buildSeoContext\|buildPageAnalysisContext" server/content-brief.ts`
+  - Run `grep -n "buildSeoContext\|buildPageAnalysisContext\|buildKeywordMapContext" server/content-brief.ts`
 
 - [ ] **Migrate each caller:**
-  - Line ~487: extracts `keywordBlock, brandVoiceBlock, knowledgeBlock` → replace with `buildWorkspaceIntelligence({ slices: ['seoContext'] })`
+  - Line ~487: extracts `keywordBlock, brandVoiceBlock, knowledgeBlock` → use Task 0 formatting helpers
   - Line ~657: extracts `keywordBlock, brandVoiceBlock` → same
-  - Line ~762: extracts most fields + calls `buildPageAnalysisContext` → replace with `buildWorkspaceIntelligence({ slices: ['seoContext', 'pageProfile'], pagePath: targetPagePath })`
+  - Line ~762: extracts most fields + `strategy` object → use helpers for keyword/persona/knowledge blocks. **⚠️ `strategy?.pageMap?.find()` at line ~767**: read `workspace.keywordStrategy` directly (via `getWorkspace()`) — the intelligence `strategyHistory` is a summary, NOT the full strategy.
+  - Line ~763: `buildKeywordMapContext` → use `formatPageMapForPrompt(seo)`
+  - Line ~772: `buildPageAnalysisContext` → use `buildWorkspaceIntelligence({ slices: ['pageProfile'], pagePath: ... })`
   - Brief generation is async — `buildWorkspaceIntelligence` is already async, no change needed
 
 - [ ] **Verify equivalence:** The AI-facing prompt string must contain the same data as before. Add or update existing brief-generation tests to verify.
 
 **Acceptance criteria:**
-- [ ] All 3 callers migrated — `buildSeoContext` and `buildPageAnalysisContext` no longer imported
+- [ ] All 5 callers migrated — no `buildSeoContext`, `buildKeywordMapContext`, or `buildPageAnalysisContext` imports remain
 - [ ] `npx tsx scripts/pr-check.ts` shows no buildSeoContext warning for `content-brief.ts`
 - [ ] Existing brief generation tests pass
 
 ---
 
-### Task 5: internal-links.ts, aeo-page-review.ts, content-posts-ai.ts (4 callers total)
+### Task 5: internal-links.ts, aeo-page-review.ts, content-posts-ai.ts (6 callers total)
 
-**Files:** `server/internal-links.ts` (2 callers), `server/aeo-page-review.ts` (1 caller), `server/content-posts-ai.ts` (1 caller)
+**Files:** `server/internal-links.ts` (2 buildSeoContext), `server/aeo-page-review.ts` (1 buildSeoContext), `server/content-posts-ai.ts` (1 buildSeoContext + 1 buildKeywordMapContext)
 
 - [ ] **Read before touching:**
-  - Run `grep -n "buildSeoContext" server/internal-links.ts server/aeo-page-review.ts server/content-posts-ai.ts`
+  - Run `grep -n "buildSeoContext\|buildKeywordMapContext" server/internal-links.ts server/aeo-page-review.ts server/content-posts-ai.ts`
   - Read each call site in context (±20 lines)
   - Read `shared/types/intelligence.ts` — `SeoContextSlice` fields
 
 - [ ] **Migrate each caller:**
-  - `internal-links.ts:275` — extracts `brandVoiceBlock` → `intel.seoContext?.brandVoice`
-  - `internal-links.ts:313` — extracts `knowledgeBlock, personasBlock` → `intel.seoContext?.knowledgeBase`, `intel.seoContext?.personas`
-  - `aeo-page-review.ts:157` — extracts 5 fields → replace with `buildWorkspaceIntelligence({ slices: ['seoContext'] })`
+  - `internal-links.ts:275` — extracts `brandVoiceBlock` → `seo?.brandVoice ?? ''`
+  - `internal-links.ts:313` — extracts `knowledgeBlock, personasBlock` → `seo?.knowledgeBase ?? ''`, `formatPersonasForPrompt(seo?.personas ?? [])`
+  - `aeo-page-review.ts:157` — extracts 5 fields → replace with `buildWorkspaceIntelligence({ slices: ['seoContext'] })` + individual field access
   - `content-posts-ai.ts:73` — extracts `fullContext` → use `formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] })`
+  - `content-posts-ai.ts:74` — `buildKeywordMapContext` → use `formatPageMapForPrompt(seo!)`
 
 **Acceptance criteria:**
 - [ ] All 4 callers migrated
@@ -403,10 +497,20 @@ Note: `content-decay.ts` is already in the pr-check exclude list from Phase 3A. 
 
 ---
 
-### Task 7: routes/webflow-seo.ts (6 callers)
+---
+
+## ⛔ PR 2 BOUNDARY — STOP HERE
+
+**Gate:** All server module callers (content-brief, internal-links, aeo-page-review, content-posts-ai, seo-audit, content-decay) migrated. No `buildSeoContext`, `buildPageAnalysisContext`, or `buildKeywordMapContext` imports remain in these 6 files. `npx tsx scripts/pr-check.ts` zero new warnings. Full test suite passes.
+
+**Merge PR 2 to staging before continuing.**
+
+---
+
+### Task 7: routes/webflow-seo.ts (7 callers)
 
 **File:** `server/routes/webflow-seo.ts`
-**Callers:** Lines ~72, ~400, ~608, ~922 (buildSeoContext ×4) + ~209, ~668 (buildPageAnalysisContext ×2)
+**Callers:** Lines ~72, ~400, ~608, ~922 (buildSeoContext ×4) + ~209, ~668 (buildPageAnalysisContext ×2) + ~923 (buildKeywordMapContext ×1)
 
 This is the highest-density file. Read it carefully before touching.
 
@@ -417,54 +521,61 @@ This is the highest-density file. Read it carefully before touching.
 - [ ] **Migrate each caller:**
   - Lines ~72, ~400, ~608, ~922: all extract keyword/brand voice/personas/knowledge → `buildWorkspaceIntelligence({ slices: ['seoContext'] })`
   - Lines ~209, ~668: page analysis → `buildWorkspaceIntelligence({ slices: ['pageProfile'], pagePath: ... })`
+  - Line ~923: `buildKeywordMapContext` → `formatPageMapForPrompt(seo!)`
   - Multiple calls in the same handler can share one `buildWorkspaceIntelligence` call — the LRU cache makes deduplication free, but a single call per handler is cleaner
 
 - [ ] **Check for `workspaceId` vs `wsId` vs `resolvedWsId`** — these routes use different variable names for the workspace ID. Verify the correct ID variable is passed to `buildWorkspaceIntelligence`.
 
 **Acceptance criteria:**
-- [ ] All 6 callers migrated
+- [ ] All 7 callers migrated
 - [ ] No `buildSeoContext` or `buildPageAnalysisContext` imports remain
 - [ ] `npx tsx scripts/pr-check.ts` shows no warnings for `webflow-seo.ts`
 - [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
 
 ---
 
-### Task 8: routes/jobs.ts, routes/webflow-alt-text.ts (4 callers)
+### Task 8: routes/jobs.ts, routes/webflow-alt-text.ts (5 callers)
 
-**Files:** `server/routes/jobs.ts` (2 callers at ~410 and ~696), `server/routes/webflow-alt-text.ts` (2 callers at ~80 and ~139)
+**Files:** `server/routes/jobs.ts` (2 buildSeoContext at ~410 and ~696 + 1 buildKeywordMapContext at ~697), `server/routes/webflow-alt-text.ts` (2 buildSeoContext at ~80 and ~139)
 
 - [ ] **Read before touching:**
-  - Run `grep -n "buildSeoContext" server/routes/jobs.ts server/routes/webflow-alt-text.ts`
+  - Run `grep -n "buildSeoContext\|buildKeywordMapContext" server/routes/jobs.ts server/routes/webflow-alt-text.ts`
   - Read each call site in context — jobs.ts callers are inside nested async callbacks; verify correct workspaceId variable
 
 - [ ] **Migrate each caller:**
   - `jobs.ts:410` — extracts `keywordBlock, brandVoiceBlock` → seoContext slice
   - `jobs.ts:696` — extracts `fullContext` → formatForPrompt
+  - `jobs.ts:697` — `buildKeywordMapContext(paWsId)` → `formatPageMapForPrompt(seo!)`. **⚠️ Note the variable is `paWsId` not `workspaceId`** — verify the correct ID is passed to `buildWorkspaceIntelligence`.
   - `webflow-alt-text.ts:80` — extracts `businessContext` → `intel.seoContext?.businessContext`
   - `webflow-alt-text.ts:139` — same pattern
 
 **Acceptance criteria:**
-- [ ] All 4 callers migrated
+- [ ] All 5 callers migrated
 - [ ] `npx tsx scripts/pr-check.ts` shows no warnings for these files
 
 ---
 
-### Task 9: routes/google.ts, routes/public-analytics.ts, routes/content-posts.ts, routes/webflow-keywords.ts (4 callers)
+### Task 9: routes/google.ts, routes/public-analytics.ts, routes/content-posts.ts, routes/webflow-keywords.ts (7 callers)
 
-**Files:** One caller each in four route files.
+**Files:** `routes/google.ts` (1 buildSeoContext + 1 buildKeywordMapContext), `routes/public-analytics.ts` (1 buildSeoContext + 1 buildKeywordMapContext), `routes/content-posts.ts` (1 buildSeoContext), `routes/webflow-keywords.ts` (1 buildSeoContext + 1 buildKeywordMapContext)
 
 - [ ] **Read before touching:**
   ```bash
-  grep -n "buildSeoContext" server/routes/google.ts server/routes/public-analytics.ts server/routes/content-posts.ts server/routes/webflow-keywords.ts
+  grep -n "buildSeoContext\|buildKeywordMapContext" server/routes/google.ts server/routes/public-analytics.ts server/routes/content-posts.ts server/routes/webflow-keywords.ts
   ```
   - Read each call site in context
 
-- [ ] **Migrate each caller** per the field mapping table above
+- [ ] **Migrate each caller:**
+  - `google.ts:~140` — buildSeoContext → seoContext slice + formatForPrompt
+  - `google.ts:~142` — `buildKeywordMapContext(wsId)` → `formatPageMapForPrompt(seo!)`
+  - `public-analytics.ts:~248` — `seoCtx.fullContext + buildKeywordMapContext(ws.id)` → `formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] }) + formatPageMapForPrompt(seo!)`
+  - `content-posts.ts` — buildSeoContext → seoContext slice
+  - `webflow-keywords.ts:~29` — `buildKeywordMapContext(workspaceId)` → `formatPageMapForPrompt(seo!)`
 
 - [ ] **Note for `routes/public-analytics.ts`:** This may be a public (unauthenticated) route — verify the workspaceId is available and accessible before calling `buildWorkspaceIntelligence`. If the route is called without a valid workspaceId, the intelligence layer should gracefully return empty slices (it already does).
 
 **Acceptance criteria:**
-- [ ] All 4 callers migrated
+- [ ] All 7 callers migrated
 - [ ] `npx tsx scripts/pr-check.ts` shows no warnings for these files
 
 ---
@@ -494,7 +605,7 @@ This is the highest-density file. Read it carefully before touching.
 **File:** `server/admin-chat-context.ts`
 **Why sequential:** This is a large (~750 line) orchestrator touched by many features. It must not be modified while Tasks 4-10 are in flight.
 
-**Scope:** Two `buildSeoContext()` calls (lines ~314 and ~375) and any inline mini-builder logic. The rest of the orchestrator (GSC/GA4 parallel fetching, question classification, churn, anomalies, audit) stays untouched.
+**Scope:** Two `buildSeoContext()` calls (lines ~314 and ~375), one `buildKeywordMapContext()` call (line ~315), and any inline mini-builder logic. The rest of the orchestrator (GSC/GA4 parallel fetching, question classification, churn, anomalies, audit) stays untouched.
 
 - [ ] **Read the entire file before touching:**
   ```bash
@@ -522,6 +633,16 @@ This is the highest-density file. Read it carefully before touching.
 
 ---
 
+---
+
+## ⛔ PR 3 BOUNDARY — STOP HERE
+
+**Gate:** All route callers + admin-chat-context migrated. Zero `buildSeoContext`, `buildPageAnalysisContext`, or `buildKeywordMapContext` imports remain outside of `seo-context.ts` and `workspace-intelligence.ts`. Admin chat works end-to-end. `npx tsx scripts/pr-check.ts` zero new warnings.
+
+**Merge PR 3 to staging before continuing.**
+
+---
+
 ## Task 12: pr-check cleanup and guard upgrade
 
 **Goal:** Remove all grandfathered exclusions from pr-check and upgrade the `buildSeoContext` rule from `warn` to `error`.
@@ -542,11 +663,17 @@ This is the highest-density file. Read it carefully before touching.
   severity: 'error',  // was 'warn'
   ```
 
+- [ ] **Add `buildKeywordMapContext` pr-check rule:**
+  Add a new rule (severity `error`) that flags any `buildKeywordMapContext(` call outside of `server/seo-context.ts` and `server/workspace-intelligence.ts`. Pattern: `buildKeywordMapContext\s*\(`. This prevents new callers from bypassing the intelligence layer.
+
+- [ ] **Add `buildPageAnalysisContext` pr-check rule:**
+  Same pattern — flag any `buildPageAnalysisContext(` call outside the two core files.
+
 - [ ] **Verify no false positives:**
   ```bash
-  npx tsx scripts/pr-check.ts --all 2>&1 | grep "buildSeoContext"
+  npx tsx scripts/pr-check.ts --all 2>&1 | grep -E "buildSeoContext|buildKeywordMapContext|buildPageAnalysisContext"
   ```
-  Should show only the `✓ Direct buildSeoContext() call` line.
+  Should show only `✓` lines for all three rules.
 
 - [ ] **Consider upgrading `listPages` rule to `error` as well** — all 20 callers were migrated in Phase 1. Check if any remain:
   ```bash
@@ -561,7 +688,73 @@ This is the highest-density file. Read it carefully before touching.
 
 ---
 
-## Task 13: Doc updates
+## Task 13: Equivalence test suite
+
+**Goal:** Verify that migrated callers produce equivalent prompt content to the old mini-builders. This catches silent regressions where the intelligence layer returns different data shapes or missing fields.
+
+**Prerequisite:** Tasks 4-11 committed (all callers migrated).
+
+- [ ] **Create `tests/migration-equivalence.test.ts`:**
+
+  The test strategy is:
+  1. For a seeded workspace with keywords, personas, strategy, and page data:
+     - Call the old mini-builder (`buildSeoContext`, `buildKeywordMapContext`, `buildPageAnalysisContext`)
+     - Call the new intelligence layer + formatting helpers
+     - Assert the new output contains the same substantive content
+
+  **Test cases:**
+
+  ```typescript
+  describe('mini-builder → intelligence equivalence', () => {
+    // Seed a workspace with keywords, personas, brand voice, strategy, pages
+
+    it('formatKeywordsForPrompt matches buildSeoContext().keywordBlock content', () => {
+      const old = buildSeoContext(wsId);
+      const intel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext'] });
+      const newBlock = formatKeywordsForPrompt(intel.seoContext!);
+      // Assert same keywords appear (not exact string match — formatting may differ)
+      for (const kw of intel.seoContext!.strategy!.siteKeywords!) {
+        expect(newBlock).toContain(kw.keyword);
+      }
+      // Assert old block contained the same keywords
+      for (const kw of intel.seoContext!.strategy!.siteKeywords!) {
+        expect(old.keywordBlock).toContain(kw.keyword);
+      }
+    });
+
+    it('formatPersonasForPrompt matches buildSeoContext().personasBlock content', () => {
+      // Same pattern — assert persona names appear in both old and new
+    });
+
+    it('formatPageMapForPrompt matches buildKeywordMapContext content', () => {
+      // Assert page paths and primary keywords appear in both
+    });
+
+    it('seoContext direct fields match mini-builder fields', () => {
+      // brandVoice === brandVoiceBlock
+      // businessContext === businessContext
+      // knowledgeBase === knowledgeBlock
+    });
+
+    it('pageProfile formatForPrompt contains audit issues and recommendations', () => {
+      // Compare buildPageAnalysisContext output against pageProfile formatted output
+    });
+  });
+  ```
+
+- [ ] **Run the equivalence tests:**
+  ```bash
+  npx vitest run tests/migration-equivalence.test.ts
+  ```
+
+**Acceptance criteria:**
+- [ ] All equivalence tests pass
+- [ ] Tests cover all 3 mini-builders: `buildSeoContext`, `buildKeywordMapContext`, `buildPageAnalysisContext`
+- [ ] No false passes on empty data (tests seed real workspace data first)
+
+---
+
+## Task 14: Doc updates
 
 - [ ] **`FEATURE_AUDIT.md`** — Add Phase 3B entry (Feature #202):
   - What it does: mini-builder retirement, businessProfile editor, contentGaps bridge
@@ -580,10 +773,11 @@ This is the highest-density file. Read it carefully before touching.
 - [ ] `npx vite build` — builds successfully
 - [ ] `npx vitest run` — full test suite passes (not just new tests)
 - [ ] `npx tsx scripts/pr-check.ts` — zero errors
-- [ ] No `buildSeoContext` or `buildPageAnalysisContext` imports in migrated files (grep to verify)
+- [ ] No `buildSeoContext`, `buildPageAnalysisContext`, or `buildKeywordMapContext` imports in migrated files (grep to verify)
 - [ ] No `as any` casts introduced in any migrated file
 - [ ] For PR 2: spot-check one migrated caller end-to-end (e.g., generate a brief, verify it contains keyword/brand voice context)
-- [ ] For PR 3: `npx tsx scripts/pr-check.ts --all` shows zero `buildSeoContext` warnings
+- [ ] For PR 3: `npx tsx scripts/pr-check.ts --all` shows zero `buildSeoContext` / `buildKeywordMapContext` / `buildPageAnalysisContext` warnings
+- [ ] For PR 4: equivalence test suite passes (`npx vitest run tests/migration-equivalence.test.ts`)
 
 ---
 
@@ -604,12 +798,16 @@ Once `buildSeoContext` is error-severity, consider adding a complementary positi
 
 | Phase 3B requirement | Task | Status |
 |---------------------|------|--------|
+| Formatting helpers (keywords, personas, pageMap) | Task 0 | — |
 | businessProfile editor in workspace settings | Task 1 | — |
 | businessProfile populated in SeoContextSlice | Task 2 | — |
 | contentGaps bridged from strategy to pageProfile | Task 3 | — |
-| All buildSeoContext callers migrated | Tasks 4-11 | — |
-| All buildPageAnalysisContext callers migrated | Tasks 4-11 | — |
+| All buildSeoContext callers migrated (~25) | Tasks 4-11 | — |
+| All buildPageAnalysisContext callers migrated (~6) | Tasks 4-11 | — |
+| All buildKeywordMapContext callers migrated (~8) | Tasks 4-11 | — |
 | admin-chat-context uses intelligence layer | Task 11 | — |
 | pr-check buildSeoContext rule → error | Task 12 | — |
+| pr-check buildKeywordMapContext + buildPageAnalysisContext rules added | Task 12 | — |
 | Grandfathered exclusions removed | Task 12 | — |
-| FEATURE_AUDIT + roadmap updated | Task 13 | — |
+| Equivalence test suite passes | Task 13 | — |
+| FEATURE_AUDIT + roadmap updated | Task 14 | — |
