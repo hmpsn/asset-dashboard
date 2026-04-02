@@ -57,6 +57,21 @@
 | `formatBrandVoiceForPrompt` | **None** |
 | `formatKnowledgeBaseForPrompt` | **None** |
 
+### New Enrichment: Assembled but Never Rendered (upgrade value at risk)
+
+The new system assembles 26+ data fields the old path never had. But if `format*Section` doesn't render them, the upgrade is invisible to AI consumers. These are NOT regressions (old path never had them) but they represent unrealized upgrade value.
+
+| Formatter | Assembled but not rendered | Priority |
+|-----------|---------------------------|----------|
+| `formatPageProfileSection` | `searchIntent`, `insights[]` (page-specific), `linkHealth` (inbound/outbound/orphan), `seoEdits` (currentTitle/currentMeta/lastEditedAt) | Medium |
+| `formatContentPipelineSection` | `cannibalizationWarnings`, `decayAlerts`, `suggestedBriefs`, `subscriptions`, `schemaDeployment`, `rewritePlaybook` | Low (3A optional fields, not yet assembled) |
+| `formatSiteHealthSection` | `redirectDetails[]`, `schemaValidation` breakdown, `performanceSummary` (avgLcp/avgFid/avgCls), `anomalyCount`/`anomalyTypes`, `seoChangeVelocity`, `aeoReadiness` | Medium |
+| `formatClientSignalsSection` | `keywordFeedback`, `contentGapVotes`, `businessPriorities`, `serviceRequests`, `churnSignals`, `roi`, `engagement`, `compositeHealthScore`, `feedbackItems` | Medium |
+| `formatOperationalSection` | `annotations`, `pendingJobs`, `workOrders`, `insightAcceptanceRate`, `timeSaved`, `approvalQueue`, `recommendationQueue`, `actionBacklog`, `detectedPlaybooks` | Medium |
+| `formatLearningsSection` | `topWins`, `winRateByActionType`, `roiAttribution`, `weCalledIt` (all 3A fields) | Medium |
+
+**Note on "regressions"**: Initial audit flagged 9 page-level fields as regressions. On closer inspection, `assemblePageProfile` IS fully implemented and returns all 9 fields (optimizationScore, recommendations, contentGaps, primaryKeywordPresence, competitorKeywords, topicCluster, estimatedDifficulty, plus more). `formatPageProfileSection` renders most of them at `detailed` verbosity. The only gaps are 4 assembled-but-not-rendered fields listed above. No true regressions exist for page-level data.
+
 ### Deferred Items Resolved in This Plan
 
 | Item from Phase 3B post-launch followup | Resolution |
@@ -80,9 +95,11 @@ Task 0   (rich fixture + shared mock factory)
        ▼
 Task 3b  (NaN/undefined guards across all formatters)
        │
-       ├─► Task 4  (page profile fidelity test)        ─┐
-       ├─► Task 5  (standalone helper fidelity tests)  ─┤ parallelizable
-       ├─► Task 6  (Phase 3A test audit)               ─┘
+       ├─► Task 4   (OLD-vs-NEW contract comparison)   ─┐
+       ├─► Task 4b  (page profile fidelity test)       ─┤
+       ├─► Task 4c  (enrichment coverage test)         ─┤ parallelizable
+       ├─► Task 5   (standalone helper fidelity tests) ─┤
+       ├─► Task 6   (Phase 3A test audit)              ─┘
        │
        ▼
 Task 7   (pr-check rule for assembled-but-never-rendered)
@@ -94,9 +111,9 @@ Task 7b  (edge case + empty data tests — all formatters)
 Task 8   (final verification + commit)
 ```
 
-**Parallelization:** Tasks 1-3 are independent (different format functions). Tasks 4, 5, 6 are independent (different test files). Task 3b depends on Tasks 1-3 (format functions must be final before adding guards). Tasks 7, 7b depend on all fixes.
+**Parallelization:** Tasks 1-3 are independent (different format functions). Tasks 4, 4b, 4c, 5, 6 are independent (different test files). Task 3b depends on Tasks 1-3 (format functions must be final before adding guards). Tasks 7, 7b depend on all fixes.
 
-**Model assignments:** Tasks 0-3b = Sonnet (mechanical fixes). Tasks 4-5 = Sonnet (test writing). Task 6 = Opus (judgment — auditing existing tests). Task 7 = Sonnet (script). Task 7b = Sonnet (edge case tests).
+**Model assignments:** Tasks 0-3b = Sonnet (mechanical fixes). Tasks 4-4c, 5 = Sonnet (test writing). Task 6 = Opus (judgment — auditing existing tests). Task 7 = Sonnet (script). Task 7b = Sonnet (edge case tests).
 
 ---
 
@@ -1793,6 +1810,269 @@ Expected: ALL PASS (page profile formatter should already render these — this 
 ```bash
 git add tests/unit/format-page-profile-section.test.ts
 git commit -m "test: add page profile format fidelity tests (all fields, all verbosities)"
+```
+
+---
+
+## Task 4c: Enrichment Coverage Test — "If It's Assembled, It Must Render"
+
+**Files:**
+- Create: `tests/contract/enrichment-coverage.test.ts`
+
+This test ensures the new system's upgrade value is real — every non-optional field that an assembler populates must produce visible output in `formatForPrompt`. Without this test, we could assemble rich data from the DB and silently drop it in formatting, making the "upgrade" invisible to AI consumers.
+
+The test works by: (1) building a `WorkspaceIntelligence` object with ALL fields populated, (2) calling `formatForPrompt` at `detailed` verbosity, (3) asserting that each assembled field has a corresponding string in the output. This is NOT the same as Task 4 (old-vs-new comparison) — it covers NEW data that the old path never had.
+
+- [ ] **Step 1: Write the enrichment coverage test**
+
+```typescript
+// tests/contract/enrichment-coverage.test.ts
+import { describe, it, expect } from 'vitest';
+import { formatForPrompt } from '../../server/workspace-intelligence.js';
+import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
+import {
+  RICH_SEO_CONTEXT,
+  RICH_INSIGHTS,
+  RICH_LEARNINGS,
+  RICH_PAGE_PROFILE,
+  RICH_CONTENT_PIPELINE,
+  RICH_SITE_HEALTH,
+  RICH_CLIENT_SIGNALS,
+  RICH_OPERATIONAL,
+} from '../fixtures/rich-intelligence.js';
+
+// Full intelligence with every slice populated
+const fullIntel: WorkspaceIntelligence = {
+  version: 1,
+  workspaceId: 'ws-enrichment',
+  assembledAt: '2026-04-01T00:00:00Z',
+  seoContext: RICH_SEO_CONTEXT,
+  insights: RICH_INSIGHTS,
+  learnings: RICH_LEARNINGS,
+  pageProfile: RICH_PAGE_PROFILE,
+  contentPipeline: RICH_CONTENT_PIPELINE,
+  siteHealth: RICH_SITE_HEALTH,
+  clientSignals: RICH_CLIENT_SIGNALS,
+  operational: RICH_OPERATIONAL,
+};
+
+// Detailed verbosity — maximizes what should appear
+const allSections = [
+  'seoContext', 'insights', 'learnings', 'pageProfile',
+  'contentPipeline', 'siteHealth', 'clientSignals', 'operational',
+] as const;
+
+const output = formatForPrompt(fullIntel, {
+  verbosity: 'detailed',
+  sections: [...allSections],
+});
+
+describe('enrichment coverage — every assembled field must render', () => {
+  // ── SEO Context (migrated + structured) ─────────────────────────
+  describe('seoContext enrichment', () => {
+    it('renders brand voice content', () => {
+      expect(output).toContain('Professional, data-driven');
+    });
+    it('renders business context', () => {
+      expect(output).toContain('Fortune 500');
+    });
+    it('renders knowledge base content', () => {
+      expect(output).toContain('real-time rank tracking');
+    });
+    it('renders site keywords by name', () => {
+      expect(output).toContain('enterprise seo');
+    });
+    it('renders persona names', () => {
+      expect(output).toContain('Marketing Director');
+    });
+    it('renders persona pain points', () => {
+      // After Task 1 fix
+      expect(output).toContain('Proving SEO ROI');
+    });
+    it('renders persona goals', () => {
+      // After Task 1 fix
+      expect(output).toContain('Increase organic traffic');
+    });
+  });
+
+  // ── Insights (100% new) ─────────────────────────────────────────
+  describe('insights enrichment', () => {
+    it('renders insight severity counts', () => {
+      expect(output).toContain('critical');
+    });
+    it('renders top insights by impact', () => {
+      // Rich fixture should have at least one insight title/description
+      const hasInsightContent = RICH_INSIGHTS.topByImpact.length > 0;
+      expect(hasInsightContent).toBe(true);
+      // The formatter should render at least one insight description
+      expect(output).toMatch(/insight|drop|spike|anomaly/i);
+    });
+  });
+
+  // ── Learnings (migrated + enriched) ─────────────────────────────
+  describe('learnings enrichment', () => {
+    it('renders overall win rate', () => {
+      expect(output).toContain('75%');
+    });
+    it('renders confidence level', () => {
+      expect(output).toMatch(/high|medium|low/i);
+    });
+    it('renders top action types', () => {
+      expect(output).toContain('title_optimization');
+    });
+    it('renders recent trend', () => {
+      expect(output).toMatch(/improving|stable|declining/i);
+    });
+    it('renders strong win rate', () => {
+      // After Task 2 fix — strongWinRate was previously dropped
+      expect(output).toContain('50%');
+    });
+    it('renders playbook titles when present', () => {
+      if (RICH_LEARNINGS.playbooks.length > 0) {
+        const title = RICH_LEARNINGS.playbooks[0].name;
+        expect(output).toContain(title);
+      }
+    });
+  });
+
+  // ── Page Profile (most fields new) ──────────────────────────────
+  describe('pageProfile enrichment', () => {
+    it('renders primary keyword', () => {
+      expect(output).toContain(RICH_PAGE_PROFILE.primaryKeyword!);
+    });
+    it('renders optimization score', () => {
+      expect(output).toContain(String(RICH_PAGE_PROFILE.optimizationScore));
+    });
+    it('renders rank position', () => {
+      expect(output).toContain(String(RICH_PAGE_PROFILE.rankHistory.current));
+    });
+    it('renders recommendations', () => {
+      expect(output).toContain(RICH_PAGE_PROFILE.recommendations[0]);
+    });
+    it('renders content gaps', () => {
+      expect(output).toContain(RICH_PAGE_PROFILE.contentGaps[0]);
+    });
+    it('renders competitor keywords', () => {
+      expect(output).toContain(RICH_PAGE_PROFILE.competitorKeywords[0]);
+    });
+    it('renders topic cluster', () => {
+      expect(output).toContain(RICH_PAGE_PROFILE.topicCluster!);
+    });
+    it('renders search intent', () => {
+      // After pageProfile fix (Task 3 or new sub-task)
+      expect(output).toContain(RICH_PAGE_PROFILE.searchIntent!);
+    });
+    it('renders link health orphan status when orphan', () => {
+      // After pageProfile fix
+      if (RICH_PAGE_PROFILE.linkHealth.orphan) {
+        expect(output).toMatch(/orphan/i);
+      }
+    });
+  });
+
+  // ── Content Pipeline (100% new) ─────────────────────────────────
+  describe('contentPipeline enrichment', () => {
+    it('renders brief count', () => {
+      expect(output).toContain(String(RICH_CONTENT_PIPELINE.briefs.total));
+    });
+    it('renders post count', () => {
+      expect(output).toContain(String(RICH_CONTENT_PIPELINE.posts.total));
+    });
+    it('renders coverage gaps', () => {
+      if (RICH_CONTENT_PIPELINE.coverageGaps.length > 0) {
+        expect(output).toContain(RICH_CONTENT_PIPELINE.coverageGaps[0]);
+      }
+    });
+    it('renders SEO edits summary', () => {
+      expect(output).toMatch(/seo edit|pending|applied/i);
+    });
+  });
+
+  // ── Site Health (100% new) ──────────────────────────────────────
+  describe('siteHealth enrichment', () => {
+    it('renders audit score', () => {
+      expect(output).toContain(String(RICH_SITE_HEALTH.auditScore));
+    });
+    it('renders dead links count', () => {
+      expect(output).toContain(String(RICH_SITE_HEALTH.deadLinks));
+    });
+    it('renders redirect chains count', () => {
+      expect(output).toContain(String(RICH_SITE_HEALTH.redirectChains));
+    });
+    it('renders CWV pass rate', () => {
+      if (RICH_SITE_HEALTH.cwvPassRate.mobile != null) {
+        expect(output).toMatch(/cwv|core web vital|mobile/i);
+      }
+    });
+  });
+
+  // ── Client Signals (100% new) ───────────────────────────────────
+  describe('clientSignals enrichment', () => {
+    it('renders approval rate', () => {
+      expect(output).toMatch(/approval|approve/i);
+    });
+    it('renders churn risk', () => {
+      expect(output).toMatch(/churn/i);
+    });
+    it('renders recent chat topics', () => {
+      if (RICH_CLIENT_SIGNALS.recentChatTopics.length > 0) {
+        expect(output).toContain(RICH_CLIENT_SIGNALS.recentChatTopics[0]);
+      }
+    });
+  });
+
+  // ── Operational (100% new) ──────────────────────────────────────
+  describe('operational enrichment', () => {
+    it('renders recent activity', () => {
+      if (RICH_OPERATIONAL.recentActivity.length > 0) {
+        expect(output).toMatch(/activity|recent/i);
+      }
+    });
+  });
+});
+
+// ── Meta-test: catch future assembled-but-unrendered fields ────────
+describe('enrichment completeness meta-check', () => {
+  it('output is non-trivial (> 500 chars for full detailed output)', () => {
+    expect(output.length).toBeGreaterThan(500);
+  });
+
+  it('every section header is present', () => {
+    // Each format*Section should produce a ## header
+    expect(output).toContain('## SEO Context');
+    expect(output).toContain('## Analytics Insights');
+    expect(output).toContain('## Outcome Learnings');
+    expect(output).toContain('## Page Profile');
+    expect(output).toContain('## Content Pipeline');
+    expect(output).toContain('## Site Health');
+    expect(output).toContain('## Client Signals');
+    expect(output).toContain('## Operational');
+  });
+});
+```
+
+- [ ] **Step 2: Run enrichment coverage test**
+
+Run: `npx vitest run tests/contract/enrichment-coverage.test.ts`
+Expected: Most pass after Tasks 1-3 fixes. Failures indicate fields still being dropped — fix the corresponding formatter.
+
+- [ ] **Step 3: Fix any newly discovered assembled-but-not-rendered fields**
+
+If the test reveals fields that are assembled in slices but not rendered by `format*Section`, add rendering logic. Priority fields for `formatPageProfileSection`:
+- `searchIntent` — render as `Intent: {searchIntent}` alongside primary keyword
+- `linkHealth` — render orphan status as `⚠ Orphan page (no internal links)` at detailed
+- `seoEdits.currentTitle` — render as `Current title: {title}` at detailed
+- `insights` (page-level) — render count as `Page insights: {N}` at standard+
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add tests/contract/enrichment-coverage.test.ts
+git commit -m "test: add enrichment coverage test — every assembled field must render
+
+Ensures the upgrade from old buildSeoContext to new buildWorkspaceIntelligence
+actually delivers value: 26+ new data fields must appear in formatForPrompt
+output, not just be assembled into slice objects and silently dropped."
 ```
 
 ---
