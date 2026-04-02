@@ -59,9 +59,13 @@ export interface WorkspaceIntelligence {
 
 export interface SeoContextSlice {
   strategy: KeywordStrategy | undefined;
+  /** Raw text — no headers. Use formatBrandVoiceForPrompt() before injecting into prompts.
+   *  formatSeoContextSection renders this with an emphatic BRAND VOICE header automatically. */
   brandVoice: string;
   businessContext: string;
   personas: AudiencePersona[];
+  /** Raw text — no headers. Use formatKnowledgeBaseForPrompt() before injecting into prompts.
+   *  formatSeoContextSection renders this with a KNOWLEDGE BASE header automatically. */
   knowledgeBase: string;
   pageKeywords?: PageKeywordMap;
   // New in 3A

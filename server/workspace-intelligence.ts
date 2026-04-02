@@ -1321,6 +1321,15 @@ function applyTokenBudget(
   return seoOnly.join('\n\n');
 }
 
+/**
+ * Renders SeoContextSlice as a `## SEO Context` summary block for formatForPrompt().
+ *
+ * TWO-PATH FORMAT SPLIT: Callers using formatForPrompt() get this combined block.
+ * Callers that need individual fields at different prompt positions use the standalone
+ * helpers instead: formatBrandVoiceForPrompt(), formatKeywordsForPrompt(), etc.
+ * These intentionally produce DIFFERENT output (standalone helpers add emphatic standalone
+ * headers; this function renders compact inline labels within the ## SEO Context block).
+ */
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = ['## SEO Context'];
 
@@ -1328,20 +1337,23 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   // Emphatic brand voice directive — AI models respond to capitalized instructional headers
   if (ctx.brandVoice) lines.push(`BRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${ctx.brandVoice}`);
 
-  // Personas — always include when present (was silently dropped before)
+  // Personas — always include when present
+  // Must match formatPersonasForPrompt (standalone helper) for content parity
   if (ctx.personas && ctx.personas.length > 0) {
     if (verbosity === 'compact') {
-      lines.push(`Personas: ${ctx.personas.map(p => p.name).join(', ')}`);
-    } else if (verbosity === 'standard') {
-      lines.push('Personas:');
-      for (const p of ctx.personas) {
-        const desc = p.description ? `: ${p.description.length > 60 ? p.description.slice(0, 60) + '...' : p.description}` : '';
-        lines.push(`  - ${p.name}${desc}`);
-      }
+      // Compact: names + buying stage only
+      lines.push(`Personas: ${ctx.personas.map(p => `${p.name}${p.buyingStage ? ` (${p.buyingStage})` : ''}`).join(', ')}`);
     } else {
-      lines.push('Personas:');
+      // Standard + detailed: full persona detail (pain points, goals, objections)
+      // AI models need this context to write audience-relevant content
+      lines.push('TARGET AUDIENCE PERSONAS:');
       for (const p of ctx.personas) {
-        lines.push(`  - ${p.name}${p.description ? `: ${p.description}` : ''}`);
+        const parts = [`  **${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
+        if (p.painPoints?.length) parts.push(`    Pain points: ${p.painPoints.join('; ')}`);
+        if (p.goals?.length) parts.push(`    Goals: ${p.goals.join('; ')}`);
+        if (p.objections?.length) parts.push(`    Objections: ${p.objections.join('; ')}`);
+        if (p.preferredContentFormat) parts.push(`    Prefers: ${p.preferredContentFormat}`);
+        lines.push(parts.join('\n'));
       }
     }
   }
@@ -1377,6 +1389,18 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
       ? ctx.strategy.siteKeywords.slice(0, 3).join(', ')
       : ctx.strategy.siteKeywords.slice(0, 8).join(', ');
     lines.push(`Site target keywords: ${kw}`);
+  }
+
+  // Page-specific keyword targeting — when pagePath was provided, show the page's own keywords
+  if (ctx.pageKeywords) {
+    const pk = ctx.pageKeywords;
+    lines.push(`THIS PAGE'S TARGET: "${pk.primaryKeyword}"`);
+    if (pk.secondaryKeywords?.length) {
+      lines.push(`  Secondary: ${pk.secondaryKeywords.join(', ')}`);
+    }
+    if (pk.searchIntent) {
+      lines.push(`  Intent: ${pk.searchIntent}`);
+    }
   }
 
   // Return empty string rather than a bare header when no content was added
