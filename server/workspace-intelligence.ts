@@ -1887,8 +1887,9 @@ export function formatPersonasForPrompt(personas: AudiencePersona[] | null | und
 export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, pagePath?: string): string {
   if (!seo?.strategy?.pageMap?.length) return '';
 
-  const pageMap = pagePath
-    ? seo.strategy.pageMap.filter(p => p.pagePath === pagePath)
+  const pagePathLower = pagePath?.toLowerCase();
+  const pageMap = pagePathLower
+    ? seo.strategy.pageMap.filter(p => p.pagePath.toLowerCase() === pagePathLower)
     : seo.strategy.pageMap;
 
   if (!pageMap.length) return '';
