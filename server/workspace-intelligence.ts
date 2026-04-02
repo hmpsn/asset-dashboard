@@ -403,10 +403,10 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
   try {
     const { getWorkspace } = await import('./workspaces.js');
     const ws = getWorkspace(workspaceId);
-    if (ws?.siteId) {
+    if (ws?.webflowSiteId) {
       const { getSchemaPlan } = await import('./schema-store.js');
       const { listPendingSchemas } = await import('./schema-queue.js');
-      const plan = getSchemaPlan(ws.siteId) as any;
+      const plan = getSchemaPlan(ws.webflowSiteId) as any;
       const pending = listPendingSchemas(workspaceId) as any[];
       const planned = plan?.pages?.length ?? 0;
       const deployed = Math.max(0, planned - pending.length);
@@ -1219,9 +1219,12 @@ async function assemblePageProfile(
       current = (pageRank as any).position ?? current;
       const change = (pageRank as any).change ?? 0;
       trend = change < 0 ? 'up' : change > 0 ? 'down' : 'stable';
+    } else if (current != null && previous != null) {
+      // Rank tracking has no match for this keyword — fall back to page-keywords data
+      trend = current < previous ? 'up' : current > previous ? 'down' : 'stable';
     }
   } catch {
-    // Rank tracking optional — fall back to page-keywords data
+    // Rank tracking module failed — fall back to page-keywords data
     if (current != null && previous != null) {
       trend = current < previous ? 'up' : current > previous ? 'down' : 'stable';
     }
@@ -1269,11 +1272,11 @@ async function assemblePageProfile(
   try {
     const { getWorkspace } = await import('./workspaces.js');
     const ws = getWorkspace(workspaceId);
-    if (ws?.siteId) {
+    if (ws?.webflowSiteId) {
       const { getLatestSnapshot } = await import('./reports.js');
-      const snap = getLatestSnapshot(ws.siteId);
-      if ((snap as any)?.pages) {
-        const pagData = ((snap as any).pages as any[]).find((p: any) => p.url === pagePath || p.slug === pagePath);
+      const snap = getLatestSnapshot(ws.webflowSiteId);
+      if (snap?.audit?.pages) {
+        const pagData = (snap.audit.pages as any[]).find((p: any) => p.url === pagePath || p.slug === pagePath);
         if (pagData?.issues) {
           auditIssues = pagData.issues.map((i: any) => i.message ?? i.title ?? '').filter(Boolean);
         }
