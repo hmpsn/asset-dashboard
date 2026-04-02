@@ -2566,3 +2566,43 @@ Expected: zero errors
 git add -A
 git commit -m "chore: format fidelity audit complete — all gaps fixed and tested"
 ```
+
+---
+
+## Phase 9: N+1 Pre-Assembly — Workspace-Level Slices (Immediate Followup)
+
+**Goal:** Eliminate per-page re-assembly of workspace-level intelligence slices in batch loops.
+
+**Problem:** In `seo-audit.ts` and `webflow-seo.ts`, `buildWorkspaceIntelligence` is called inside a per-page loop with slices that include `seoContext` and `learnings`. These slices are workspace-scoped — identical for every page in the batch — but they are re-assembled on every iteration. For a 15-page audit, this means 15× redundant DB queries, brand voice builds, and learnings computations.
+
+**Fix Pattern:**
+
+Pre-assemble workspace-level slices once before the loop, then spread into per-page assembly:
+
+```typescript
+// BEFORE (N+1):
+for (const page of pages) {
+  const intel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext', 'learnings', 'pageProfile'], pagePath: page });
+  const prompt = formatForPrompt(intel, { sections: ['seoContext', 'learnings', 'pageProfile'] });
+}
+
+// AFTER (pre-assembled):
+const wsIntel = await buildWorkspaceIntelligence(wsId, { slices: ['seoContext', 'learnings'] });
+for (const page of pages) {
+  const pageIntel = await buildWorkspaceIntelligence(wsId, { slices: ['pageProfile'], pagePath: page });
+  const intel = { ...wsIntel, ...pageIntel };
+  const prompt = formatForPrompt(intel, { sections: ['seoContext', 'learnings', 'pageProfile'] });
+}
+```
+
+**Files to update:**
+- `server/seo-audit.ts` — meta tag suggestion loop (line ~593)
+- `server/webflow-seo.ts` — check for similar per-page loops
+
+**Acceptance criteria:**
+- `buildWorkspaceIntelligence` called at most once per workspace per batch (not once per page)
+- `pageProfile` slice still assembled per-page with correct `pagePath`
+- Prompt output identical to current (same slices, same sections)
+- Full test suite still passes
+
+**Priority:** High — workspace with 15+ pages gets 14× speedup on audit runs.
