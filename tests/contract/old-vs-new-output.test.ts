@@ -140,8 +140,7 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
     const { buildWorkspaceIntelligence, formatForPrompt } = await import('../../server/workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['seoContext'] });
     const newOutput = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
-    // seo-context-mock's getRawKnowledge returns this text
-    expect(newOutput).toContain('enterprise SEO analytics');
+    expect(newOutput).toContain('real-time rank tracking');
   });
 
   it('seoContext: site keyword NAMES preserved (not just count)', async () => {
