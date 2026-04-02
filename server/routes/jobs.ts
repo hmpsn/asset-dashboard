@@ -406,7 +406,8 @@ router.post('/api/jobs', async (req, res) => {
             for (let i = 0; i < pages.length; i++) {
               const page = pages[i];
               try {
-                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: ['seoContext'], pagePath: page.slug ? `/${page.slug}` : undefined });
+                const bwsSlices = ['seoContext'] as const;
+                const bwsIntel = await buildWorkspaceIntelligence(bwsId || bulkWs?.id || '', { slices: bwsSlices, pagePath: page.slug ? `/${page.slug}` : undefined });
                 const kwb = formatKeywordsForPrompt(bwsIntel.seoContext);
                 const bvb = bwsIntel.seoContext?.brandVoice ?? '';
 
@@ -694,8 +695,9 @@ router.post('/api/jobs', async (req, res) => {
               return;
             }
 
-            const paIntel = await buildWorkspaceIntelligence(paWsId, { slices: ['seoContext', 'learnings'] });
-            const fullContext = formatForPrompt(paIntel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] });
+            const paSlices = ['seoContext', 'learnings'] as const;
+            const paIntel = await buildWorkspaceIntelligence(paWsId, { slices: paSlices });
+            const fullContext = formatForPrompt(paIntel, { verbosity: 'detailed', sections: paSlices });
             const kwMapCtx = formatPageMapForPrompt(paIntel.seoContext);
 
             const FETCH_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' };

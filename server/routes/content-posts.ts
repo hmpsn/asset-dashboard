@@ -37,7 +37,7 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
-import { buildWorkspaceIntelligence, formatForPrompt } from '../workspace-intelligence.js';
+import { buildIntelPrompt } from '../workspace-intelligence.js';
 
 const log = createLogger('content-posts');
 
@@ -251,8 +251,7 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
   const ws = getWorkspace(req.params.workspaceId);
 
   // Build full business context for brand voice checking
-  const intel = await buildWorkspaceIntelligence(req.params.workspaceId, { slices: ['seoContext', 'learnings'] });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] });
+  const fullContext = await buildIntelPrompt(req.params.workspaceId, ['seoContext', 'learnings'], { verbosity: 'detailed' });
 
   // Build a text summary of the post content for AI analysis
   const allContent = [

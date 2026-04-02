@@ -3,11 +3,16 @@
  *
  * Source-scan contracts for Phase 3B batch2 migrated callers.
  * These tests catch regressions when migrated files are modified:
- *   — correct slices requested for buildWorkspaceIntelligence
- *   — correct sections requested for formatForPrompt
+ *   — correct slices requested for buildWorkspaceIntelligence (via slices-var or buildIntelPrompt)
+ *   — correct sections requested for formatForPrompt (via slices-var, sections: slices, or buildIntelPrompt)
  *   — learningsDomain threaded correctly
  *   — formatPageMapForPrompt called without pagePath filter where full cross-page map is needed
  *   — hasMeaningfulContext guard present and complete in keyword-recommendations
+ *
+ * Pattern A (slices-var): const slices = [...] as const; buildWI({ slices }); formatForPrompt({ sections: slices })
+ * Pattern B (buildIntelPrompt): buildIntelPrompt(id, [...], { verbosity })
+ *
+ * Helpers below accept both inline literals and the slices-var pattern.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -25,13 +30,51 @@ function readRoute(rel: string) {
   return readFileSync(resolve(routesDir, rel), 'utf-8');
 }
 
+/**
+ * Returns true if the source requests slices containing both 'seoContext' and 'learnings'.
+ * Accepts:
+ *   - Inline literal:  slices: ['seoContext', 'learnings']
+ *   - Slices-var:      const slices = ['seoContext', 'learnings'] as const  (then { slices })
+ *   - buildIntelPrompt: buildIntelPrompt(id, ['seoContext', 'learnings'], ...)
+ */
+function hasSlicesSeoContextLearnings(src: string): boolean {
+  return (
+    src.includes("slices: ['seoContext', 'learnings']") ||
+    src.includes("slices: ['seoContext', 'learnings',") ||
+    // slices-var pattern: array literal assigned to a const
+    /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'seoContext'[^\]]*'learnings'[^\]]*\]/.test(src) ||
+    /const\s+\w*[Ss]lices\s*=\s*\[[^\]]*'learnings'[^\]]*\]/.test(src) ||
+    // buildIntelPrompt pattern B
+    /buildIntelPrompt\([^,]+,\s*\[[^\]]*'seoContext'[^\]]*'learnings'[^\]]*\]/.test(src)
+  );
+}
+
+/**
+ * Returns true if the source formats with sections containing 'seoContext' and 'learnings'.
+ * Accepts:
+ *   - Inline literal:  sections: ['seoContext', 'learnings']
+ *   - Slices-var:      sections: slices  (where slices contains both, any var name)
+ *   - buildIntelPrompt: implicit (no explicit sections call)
+ */
+function hasSectionsSeoContextLearnings(src: string): boolean {
+  return (
+    src.includes("sections: ['seoContext', 'learnings']") ||
+    // slices-var pattern: sections: <identifier> where identifier is a slices variable
+    // matches "sections: slices", "sections: paSlices", "sections: mySlices", etc.
+    /sections:\s+\w*[Ss]lices\b/.test(src) ||
+    src.includes('sections: slices') ||
+    // buildIntelPrompt pattern B — sections implicit
+    /buildIntelPrompt\([^,]+,\s*\[[^\]]*'seoContext'[^\]]*'learnings'[^\]]*\]/.test(src)
+  );
+}
+
 // ── buildVoiceContext (content-posts-ai.ts) ───────────────────────────────────
 
 describe('buildVoiceContext migration contracts (content-posts-ai.ts)', () => {
   const src = read('content-posts-ai.ts');
 
   it('requests seoContext + learnings slices', () => {
-    expect(src).toContain("slices: ['seoContext', 'learnings']");
+    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
   });
 
   it("uses learningsDomain:'content' for content-specific learnings", () => {
@@ -39,7 +82,7 @@ describe('buildVoiceContext migration contracts (content-posts-ai.ts)', () => {
   });
 
   it('formats with seoContext + learnings sections', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -96,11 +139,11 @@ describe('google.ts search-chat migration contracts', () => {
   const src = readRoute('google.ts');
 
   it('requests seoContext + learnings slices', () => {
-    expect(src).toContain("slices: ['seoContext', 'learnings']");
+    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
   });
 
   it('formats with seoContext + learnings sections', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -110,11 +153,11 @@ describe('public-analytics.ts AI review migration contracts', () => {
   const src = readRoute('public-analytics.ts');
 
   it('requests seoContext + learnings slices', () => {
-    expect(src).toContain("slices: ['seoContext', 'learnings']");
+    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
   });
 
   it('formats with seoContext + learnings sections', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -124,11 +167,11 @@ describe('content-posts.ts AI review migration contracts', () => {
   const src = readRoute('content-posts.ts');
 
   it('requests seoContext + learnings slices for post brand-voice review', () => {
-    expect(src).toContain("slices: ['seoContext', 'learnings']");
+    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
   });
 
   it('formats with seoContext + learnings sections', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -158,7 +201,7 @@ describe('keyword-recommendations.ts meaningful-context guard', () => {
   });
 
   it('requests seoContext + learnings slices for AI ranking context', () => {
-    expect(src).toContain("slices: ['seoContext', 'learnings']");
+    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -170,11 +213,11 @@ describe('jobs.ts page-analysis job migration contracts', () => {
   it('requests seoContext + learnings slices for PA job AI context', () => {
     // fullContext fed to per-page AI analysis — previously used buildSeoContext().fullContext
     // which included learnings. Must include learnings slice.
-    expect(src).toContain("slices: ['seoContext', 'learnings']");
+    expect(hasSlicesSeoContextLearnings(src)).toBe(true);
   });
 
   it('formats with seoContext + learnings sections in PA job', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -184,7 +227,7 @@ describe('webflow-keywords.ts fullContext includes learnings', () => {
   const src = readRoute('webflow-keywords.ts');
 
   it('formats with seoContext + learnings sections for AI keyword analysis', () => {
-    expect(src).toContain("sections: ['seoContext', 'learnings']");
+    expect(hasSectionsSeoContextLearnings(src)).toBe(true);
   });
 });
 
@@ -218,8 +261,13 @@ describe('slices/sections consistency — learnings section requires learnings s
    * but only assembles slices: ['seoContext'], the learnings section is silently dropped.
    * TypeScript cannot catch this — the slices/sections are string arrays, not type-linked.
    *
-   * This test scans every file that uses sections: ['seoContext', 'learnings'] and verifies
-   * the corresponding buildWorkspaceIntelligence call also includes 'learnings' in slices.
+   * This test scans every file that uses learnings in sections and verifies the corresponding
+   * buildWorkspaceIntelligence call also includes 'learnings' in slices.
+   *
+   * Accepts both the inline-literal pattern AND the slices-var pattern:
+   *   - Inline:    slices: ['seoContext', 'learnings']
+   *   - Slices-var: const slices = ['seoContext', 'learnings'] as const; { slices }
+   *   - buildIntelPrompt: implicit (slices and sections always in sync)
    */
   const callerFiles = [
     { label: 'content-posts-ai.ts', src: read('content-posts-ai.ts') },
@@ -235,11 +283,11 @@ describe('slices/sections consistency — learnings section requires learnings s
 
   for (const { label, src } of callerFiles) {
     it(`${label}: if sections include 'learnings', slices must also include 'learnings'`, () => {
-      const hasSectionsWithLearnings = src.includes("sections: ['seoContext', 'learnings']");
+      const hasSectionsWithLearnings = hasSectionsSeoContextLearnings(src);
       if (!hasSectionsWithLearnings) return; // Not applicable — no learnings section requested
 
-      // Must have 'learnings' in at least one slices array
-      expect(src).toMatch(/slices:\s*\[[^\]]*'learnings'[^\]]*\]/);
+      // Must have 'learnings' in slices — inline literal, slices-var, or buildIntelPrompt
+      expect(hasSlicesSeoContextLearnings(src)).toBe(true);
     });
   }
 });

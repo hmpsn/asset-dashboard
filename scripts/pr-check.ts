@@ -221,8 +221,21 @@ const CHECKS: Check[] = [
     pathFilter: 'server/',
     exclude: ['server/workspace-intelligence.ts'],
     // Lines with slices: already correct; lines in route/intelligence.ts that dynamically pass slices are also fine
-    excludeLines: ['slices:', '// bwi-all-ok'],
+    // 'slices:' catches key:value form; ' slices,' and ' slices }' catch object shorthand (const slices = [...]; { slices, pagePath })
+    excludeLines: ['slices:', ' slices,', ' slices }', ' slices)', '// bwi-all-ok'],
     message: 'Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional.',
+    severity: 'warn',
+  },
+  {
+    name: 'formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices)',
+    // Catches formatForPrompt( calls that pass a literal array for sections, e.g. sections: ['seoContext', 'learnings']
+    // These are dangerous because the literal can diverge from the slices array.
+    pattern: 'formatForPrompt\\(.*sections:\\s*\\[',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts', 'tests/'],
+    excludeLines: ['// bip-ok'],
+    message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
     severity: 'warn',
   },
   {

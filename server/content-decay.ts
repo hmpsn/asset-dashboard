@@ -225,10 +225,10 @@ export async function generateRefreshRecommendation(
   ws: Workspace,
   page: DecayingPage,
 ): Promise<string> {
-  const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'learnings', 'pageProfile'],
-    pagePath: page.page });
-  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] });
-  const pageAnalysis = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] });
+  const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
+  const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
+  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings'] }); // bip-ok: slices is a superset
+  const pageAnalysis = formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: slices is a superset
 
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.
 
