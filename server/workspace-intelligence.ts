@@ -243,19 +243,11 @@ async function assembleSeoContext(
     // Rank tracking optional
   }
 
-  // Business profile from workspace settings
-  try {
-    const profile = workspace?.businessProfile;
-    if (profile && typeof profile === 'object') {
-      base.businessProfile = {
-        industry: profile.industry ?? '',
-        goals: Array.isArray(profile.goals) ? profile.goals : [],
-        targetAudience: profile.targetAudience ?? '',
-      };
-    }
-  } catch {
-    // Business profile optional
-  }
+  // Business profile — Workspace.businessProfile has contact info (phone/email/address),
+  // not industry/goals/targetAudience. The intelligence BusinessProfile type requires
+  // structured data that doesn't exist on the workspace yet. This will be wired when
+  // a structured business profile editor is added (Phase 3B).
+  // For now, businessProfile remains undefined in the slice output.
 
   // Strategy history
   try {
@@ -476,7 +468,7 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
       decayAlerts = decay.decayingPages.slice(0, 20).map(p => ({
         pageUrl: p.page ?? '',
         clickDrop: p.clickDeclinePct ?? 0,
-        detectedAt: p.detectedAt ?? decay.analyzedAt ?? new Date().toISOString(),
+        detectedAt: decay.analyzedAt ?? new Date().toISOString(),
         hasRefreshBrief: !!p.refreshRecommendation,
         isRepeatDecay: p.isRepeatDecay ?? false,
       }));
@@ -1127,6 +1119,7 @@ export function formatForPrompt(
   opts?: PromptFormatOptions,
 ): string {
   const verbosity = opts?.verbosity ?? 'standard';
+  const include = opts?.sections ? new Set(opts.sections) : null;
   const sections: string[] = [];
 
   sections.push('[Workspace Intelligence]');
@@ -1152,21 +1145,112 @@ export function formatForPrompt(
   }
 
   // SEO Context
-  if (intelligence.seoContext) {
+  if (intelligence.seoContext && (!include || include.has('seoContext'))) {
     sections.push(formatSeoContextSection(intelligence.seoContext, verbosity));
   }
 
   // Insights
-  if (intelligence.insights && intelligence.insights.all.length > 0) {
+  if (intelligence.insights && intelligence.insights.all.length > 0 && (!include || include.has('insights'))) {
     sections.push(formatInsightsSection(intelligence.insights, verbosity));
   }
 
   // Learnings
-  if (intelligence.learnings) {
+  if (intelligence.learnings && (!include || include.has('learnings'))) {
     sections.push(formatLearningsSection(intelligence.learnings, verbosity));
   }
 
+  // Page Profile
+  if (intelligence.pageProfile && (!include || include.has('pageProfile'))) {
+    sections.push(formatPageProfileSection(intelligence.pageProfile, verbosity));
+  }
+
+  // Content Pipeline
+  if (intelligence.contentPipeline && (!include || include.has('contentPipeline'))) {
+    sections.push(formatContentPipelineSection(intelligence.contentPipeline, verbosity));
+  }
+
+  // Site Health
+  if (intelligence.siteHealth && (!include || include.has('siteHealth'))) {
+    sections.push(formatSiteHealthSection(intelligence.siteHealth, verbosity));
+  }
+
+  // Client Signals
+  if (intelligence.clientSignals && (!include || include.has('clientSignals'))) {
+    sections.push(formatClientSignalsSection(intelligence.clientSignals, verbosity));
+  }
+
+  // Operational
+  if (intelligence.operational && (!include || include.has('operational'))) {
+    sections.push(formatOperationalSection(intelligence.operational, verbosity));
+  }
+
+  // Apply tokenBudget truncation if requested (§20 priority chain)
+  const tokenBudget = opts?.tokenBudget;
+  if (tokenBudget && tokenBudget > 0) {
+    return applyTokenBudget(sections, intelligence, tokenBudget);
+  }
+
   return sections.filter(Boolean).join('\n\n');
+}
+
+/**
+ * Token budget truncation — §20 priority chain:
+ * 1. Drop `operational` first (lowest value density)
+ * 2. Truncate `insights` to top 5
+ * 3. Drop `clientSignals`
+ * 4. Summarize `learnings` to one line
+ * 5. Never drop `seoContext`
+ */
+function applyTokenBudget(
+  sections: string[],
+  intelligence: WorkspaceIntelligence,
+  budget: number,
+): string {
+  const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+  let current = sections.filter(Boolean);
+  let output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 1: Drop operational
+  current = current.filter(s => !s.startsWith('## Operational'));
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 2: Truncate insights to top 5
+  current = current.map(s => {
+    if (s.startsWith('## Active Insights')) {
+      const lines = s.split('\n');
+      const header = lines.filter(l => !l.startsWith('- ['));
+      const items = lines.filter(l => l.startsWith('- ['));
+      return [...header, ...items.slice(0, 5)].join('\n');
+    }
+    return s;
+  });
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 3: Drop clientSignals
+  current = current.filter(s => !s.startsWith('## Client Signals'));
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 4: Summarize learnings to one line
+  current = current.map(s => {
+    if (s.startsWith('## Outcome Learnings') && intelligence.learnings) {
+      const rate = intelligence.learnings.overallWinRate;
+      return `## Outcome Learnings\nWin rate: ${Math.round(rate * 100)}%${intelligence.learnings.recentTrend ? ` (${intelligence.learnings.recentTrend})` : ''}`;
+    }
+    return s;
+  });
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 5: Drop everything except seoContext (never dropped)
+  const seoOnly = current.filter(s =>
+    s.startsWith('[Workspace Intelligence]') || s.startsWith('## SEO Context'),
+  );
+  return seoOnly.join('\n\n');
 }
 
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
@@ -1175,8 +1259,50 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.brandVoice) lines.push(`Brand voice: ${ctx.brandVoice}`);
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
 
+  // Personas — always include when present (was silently dropped before)
+  if (ctx.personas && ctx.personas.length > 0) {
+    if (verbosity === 'compact') {
+      lines.push(`Personas: ${ctx.personas.map(p => p.name).join(', ')}`);
+    } else if (verbosity === 'standard') {
+      lines.push('Personas:');
+      for (const p of ctx.personas) {
+        const desc = p.description ? `: ${p.description.length > 60 ? p.description.slice(0, 60) + '...' : p.description}` : '';
+        lines.push(`  - ${p.name}${desc}`);
+      }
+    } else {
+      lines.push('Personas:');
+      for (const p of ctx.personas) {
+        lines.push(`  - ${p.name}${p.description ? `: ${p.description}` : ''}`);
+      }
+    }
+  }
+
+  // Knowledge base — at all verbosity levels (was detailed only)
+  if (ctx.knowledgeBase) {
+    if (verbosity === 'compact') {
+      const summary = ctx.knowledgeBase.length > 80 ? ctx.knowledgeBase.slice(0, 80) + '...' : ctx.knowledgeBase;
+      lines.push(`Knowledge: ${summary}`);
+    } else {
+      lines.push(`Knowledge: ${ctx.knowledgeBase}`);
+    }
+  }
+
+  // Business profile — at standard+ verbosity
+  if (ctx.businessProfile && verbosity !== 'compact') {
+    const bp = ctx.businessProfile;
+    lines.push(`Industry: ${bp.industry}${bp.targetAudience ? ` | Audience: ${bp.targetAudience}` : ''}`);
+    if (bp.goals.length > 0 && verbosity === 'detailed') {
+      lines.push(`Goals: ${bp.goals.join(', ')}`);
+    }
+  }
+
+  // Rank tracking — at standard+ verbosity
+  if (ctx.rankTracking && verbosity !== 'compact') {
+    const rt = ctx.rankTracking;
+    lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
+  }
+
   if (verbosity === 'detailed') {
-    if (ctx.knowledgeBase) lines.push(`Knowledge: ${ctx.knowledgeBase}`);
     if (ctx.strategy) lines.push(`Strategy: ${ctx.strategy.siteKeywords?.length ?? 0} site keywords`);
   }
 
@@ -1199,7 +1325,7 @@ function formatInsightsSection(insights: InsightsSlice, verbosity: PromptVerbosi
 }
 
 function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerbosity): string {
-  if (!learnings.summary && learnings.topActionTypes.length === 0) return '';
+  if (!learnings.summary && learnings.topActionTypes.length === 0 && !learnings.roiAttribution?.length && !learnings.weCalledIt?.length) return '';
 
   const lines: string[] = ['## Outcome Learnings'];
 
@@ -1214,6 +1340,184 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
         lines.push(`  ${type}: ${Math.round(winRate * 100)}% (${count} actions)`);
       }
     }
+
+    // WeCalledIt proven predictions
+    if (learnings.weCalledIt && learnings.weCalledIt.length > 0) {
+      lines.push('Proven predictions:');
+      for (const entry of learnings.weCalledIt.slice(0, verbosity === 'detailed' ? 5 : 3)) {
+        lines.push(`  - ${entry.prediction} → ${entry.score}${entry.pageUrl ? ` (${entry.pageUrl})` : ''}`);
+      }
+    }
+
+    // ROI attribution — detailed only
+    if (learnings.roiAttribution && learnings.roiAttribution.length > 0 && verbosity === 'detailed') {
+      lines.push('ROI highlights:');
+      for (const roi of learnings.roiAttribution.slice(0, 5)) {
+        lines.push(`  - ${roi.actionType} on ${roi.pageUrl}: +${roi.clickGain} clicks`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## Content Pipeline'];
+
+  lines.push(`Briefs: ${pipeline.briefs.total}, Posts: ${pipeline.posts.total}, Matrices: ${pipeline.matrices.total}`);
+
+  if (verbosity !== 'compact') {
+    if (pipeline.coverageGaps.length > 0) {
+      lines.push(`Coverage gaps: ${pipeline.coverageGaps.slice(0, 5).join(', ')}`);
+    }
+    if (pipeline.decayAlerts && pipeline.decayAlerts.length > 0) {
+      lines.push(`Decay alerts: ${pipeline.decayAlerts.length} pages declining`);
+    }
+    if (pipeline.subscriptions) {
+      lines.push(`Subscriptions: ${pipeline.subscriptions.active} active, ${pipeline.subscriptions.totalPages} pages`);
+    }
+  }
+
+  if (verbosity === 'detailed') {
+    const bs = pipeline.briefs.byStatus;
+    lines.push(`Brief status: ${Object.entries(bs).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
+    const ps = pipeline.posts.byStatus;
+    lines.push(`Post status: ${Object.entries(ps).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
+    lines.push(`Matrix: ${pipeline.matrices.cellsPublished}/${pipeline.matrices.cellsPlanned} cells published`);
+    if (pipeline.schemaDeployment) {
+      lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## Site Health'];
+
+  lines.push(`Audit score: ${health.auditScore ?? 'n/a'}${health.auditScoreDelta != null ? ` (${health.auditScoreDelta >= 0 ? '+' : ''}${health.auditScoreDelta})` : ''}`);
+  if (health.anomalyCount != null && health.anomalyCount > 0) {
+    lines.push(`Critical issues: ${health.anomalyCount} anomalies`);
+  }
+
+  if (verbosity !== 'compact') {
+    if (health.performanceSummary?.score != null) {
+      lines.push(`Performance: ${health.performanceSummary.score}/100`);
+    }
+    lines.push(`Links: ${health.deadLinks} dead, ${health.redirectChains} redirect chains, ${health.orphanPages} orphan pages`);
+    if (health.anomalyTypes && health.anomalyTypes.length > 0) {
+      lines.push(`Anomaly types: ${health.anomalyTypes.join(', ')}`);
+    }
+  }
+
+  if (verbosity === 'detailed') {
+    if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
+    if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
+    if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${Math.round(health.cwvPassRate.mobile * 100)}%, desktop ${health.cwvPassRate.desktop != null ? Math.round(health.cwvPassRate.desktop * 100) : 'n/a'}%`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## Client Signals'];
+
+  lines.push(`Churn risk: ${signals.churnRisk ?? 'unknown'}`);
+  if (signals.roi) {
+    lines.push(`ROI: $${signals.roi.organicValue} organic value, ${signals.roi.growth > 0 ? '+' : ''}${signals.roi.growth}% growth (${signals.roi.period})`);
+  }
+  if (signals.compositeHealthScore != null) {
+    lines.push(`Health score: ${signals.compositeHealthScore}/100`);
+  }
+
+  if (verbosity !== 'compact') {
+    if (signals.engagement) {
+      lines.push(`Engagement: ${signals.engagement.loginFrequency} login frequency, ${signals.engagement.chatSessionCount} chat sessions`);
+    }
+    if (signals.approvalPatterns.approvalRate > 0) {
+      lines.push(`Approval rate: ${Math.round(signals.approvalPatterns.approvalRate * 100)}%`);
+    }
+  }
+
+  if (verbosity === 'detailed') {
+    if (signals.churnSignals && signals.churnSignals.length > 0) {
+      lines.push('Churn signals:');
+      for (const s of signals.churnSignals.slice(0, 5)) {
+        lines.push(`  - [${s.severity}] ${s.type}`);
+      }
+    }
+    if (signals.feedbackItems && signals.feedbackItems.length > 0) {
+      const openCount = signals.feedbackItems.filter(f => f.status === 'new').length;
+      lines.push(`Feedback: ${signals.feedbackItems.length} items (${openCount} open)`);
+    }
+    if (signals.recentChatTopics.length > 0) {
+      lines.push(`Recent topics: ${signals.recentChatTopics.join(', ')}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatOperationalSection(ops: OperationalSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = ['## Operational'];
+
+  const approvals = ops.approvalQueue?.pending ?? 0;
+  const actions = ops.actionBacklog?.pendingMeasurement ?? 0;
+  const recs = (ops.recommendationQueue?.fixNow ?? 0) + (ops.recommendationQueue?.fixSoon ?? 0) + (ops.recommendationQueue?.fixLater ?? 0);
+  lines.push(`Pending: ${approvals} approvals, ${actions} actions awaiting measurement, ${recs} recommendations`);
+
+  if (verbosity !== 'compact') {
+    if (ops.recommendationQueue) {
+      lines.push(`Recommendations: ${ops.recommendationQueue.fixNow} fix now, ${ops.recommendationQueue.fixSoon} fix soon, ${ops.recommendationQueue.fixLater} fix later`);
+    }
+    if (ops.recentActivity.length > 0) {
+      lines.push(`Recent: ${ops.recentActivity.slice(0, 3).map(a => a.description).join('; ')}`);
+    }
+    if (ops.timeSaved) {
+      lines.push(`Time saved: ${ops.timeSaved.totalMinutes} minutes`);
+    }
+  }
+
+  if (verbosity === 'detailed') {
+    if (ops.detectedPlaybooks && ops.detectedPlaybooks.length > 0) {
+      lines.push(`Detected playbooks: ${ops.detectedPlaybooks.slice(0, 3).join(', ')}`);
+    }
+    if (ops.timeSaved?.byFeature) {
+      lines.push('Time saved by feature:');
+      for (const [feature, minutes] of Object.entries(ops.timeSaved.byFeature).slice(0, 5)) {
+        lines.push(`  ${feature}: ${minutes} min`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVerbosity): string {
+  const lines: string[] = [`## Page Profile: ${profile.pagePath}`];
+
+  lines.push(`Keyword: ${profile.primaryKeyword ?? 'none'} | Health: ${profile.optimizationScore ?? 'n/a'}`);
+
+  if (verbosity !== 'compact') {
+    if (profile.rankHistory.current != null) {
+      lines.push(`Position: ${profile.rankHistory.current} (${profile.rankHistory.trend})`);
+    }
+    if (profile.actions.length > 0) {
+      lines.push(`Actions: ${profile.actions.length} tracked`);
+    }
+  }
+
+  if (verbosity === 'detailed') {
+    if (profile.recommendations.length > 0) {
+      lines.push('Recommendations:');
+      for (const rec of profile.recommendations.slice(0, 5)) {
+        lines.push(`  - ${rec}`);
+      }
+    }
+    if (profile.auditIssues.length > 0) {
+      lines.push(`Audit issues: ${profile.auditIssues.length}`);
+    }
+    lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
   }
 
   return lines.join('\n');
@@ -1242,7 +1546,10 @@ async function assemblePageProfile(
   try {
     const { getLatestRanks } = await import('./rank-tracking.js');
     const latest = getLatestRanks(workspaceId);
-    const pageRank: RankEntry | undefined = latest.find(k => k.query === pageKw?.primaryKeyword);
+    const primaryKw = pageKw?.primaryKeyword?.toLowerCase();
+    const pageRank: RankEntry | undefined = primaryKw
+      ? latest.find(k => k.query.toLowerCase() === primaryKw)
+      : undefined;
     if (pageRank) {
       current = pageRank.position ?? current;
       const change = pageRank.change ?? 0;

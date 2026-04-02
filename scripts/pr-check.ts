@@ -194,6 +194,34 @@ const CHECKS: Check[] = [
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
     severity: 'warn',
   },
+  {
+    name: 'Direct listPages() outside workspace-data',
+    pattern: 'listPages\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-data.ts', 'server/webflow-pages.ts'],
+    message: 'Use getWorkspacePages() from workspace-data.ts instead of calling listPages() directly.',
+    severity: 'warn',
+  },
+  {
+    name: 'Direct buildSeoContext() call',
+    pattern: 'buildSeoContext\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts', 'server/admin-chat-context.ts', 'server/keyword-recommendations.ts', 'server/content-decay.ts'],
+    message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
+    severity: 'warn',
+  },
+  {
+    name: 'Unguarded recordAction() call',
+    pattern: 'recordAction\\s*\\(\\s*\\{',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/outcome-tracking.ts'],
+    excludeLines: ['// recordAction-ok'],
+    message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

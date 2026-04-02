@@ -5,7 +5,6 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
-import { listWorkspaces } from './workspaces.js';
 
 const log = createLogger('outcome-crons');
 
@@ -30,12 +29,18 @@ export function startOutcomeCrons() {
   if (measureInterval) return; // already started
 
   const runMeasure = async () => {
+    // Collect affected workspace IDs BEFORE measurement (measurement consumes them).
+    // Isolated try/catch so a transient DB error here doesn't skip measurement.
+    let affectedWsIds: string[] = [];
     try {
       const { getPendingActions } = await import('./outcome-tracking.js');
       const pending = getPendingActions();
-      // Collect affected workspace IDs BEFORE measurement (measurement consumes them)
-      const affectedWsIds = [...new Set(pending.map(a => a.workspaceId))];
+      affectedWsIds = [...new Set(pending.map(a => a.workspaceId))];
+    } catch (err) {
+      log.warn({ err }, 'Could not collect pending action workspace IDs — cache invalidation will be skipped');
+    }
 
+    try {
       const { measurePendingOutcomes } = await import('./outcome-measurement.js');
       await measurePendingOutcomes();
 

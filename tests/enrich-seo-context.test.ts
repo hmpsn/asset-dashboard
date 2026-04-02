@@ -67,13 +67,13 @@ describe('assembleSeoContext enrichment', () => {
     expect(result.seoContext!.rankTracking!.positionChanges.declined).toBe(1); // change 3
   });
 
-  it('includes businessProfile from workspace', async () => {
+  it('businessProfile is undefined until structured editor exists (Phase 3B)', async () => {
+    // Workspace.businessProfile has contact info (phone/email/address), not industry/goals.
+    // The intelligence BusinessProfile type requires structured data not yet on the workspace.
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
     const result = await buildWorkspaceIntelligence('ws-1', { slices: ['seoContext'] });
 
-    expect(result.seoContext!.businessProfile).toBeDefined();
-    expect(result.seoContext!.businessProfile!.industry).toBe('Tech');
-    expect(result.seoContext!.businessProfile!.goals).toEqual(['Growth']);
+    expect(result.seoContext!.businessProfile).toBeUndefined();
   });
 
   it('preserves base seoContext fields', async () => {
