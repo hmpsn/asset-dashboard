@@ -1,6 +1,11 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from './seo-context.js';
+import {
+  buildWorkspaceIntelligence,
+  formatKeywordsForPrompt,
+  formatPersonasForPrompt,
+  formatPageMapForPrompt,
+} from './workspace-intelligence.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
@@ -484,7 +489,11 @@ export async function regenerateBrief(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const { keywordBlock, brandVoiceBlock, knowledgeBlock } = buildSeoContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = seo?.brandVoice ?? '';
+  const knowledgeBlock = seo?.knowledgeBase ?? '';
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
@@ -654,7 +663,10 @@ export async function regenerateOutline(
   const existingBrief = getBrief(workspaceId, briefId);
   if (!existingBrief) return null;
 
-  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = seo?.brandVoice ?? '';
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
@@ -759,18 +771,50 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx, knowledgeBlock, personasBlock, strategy } = buildSeoContext(workspaceId);
-  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = seo?.brandVoice ?? '';
+  const stratBizCtx = seo?.businessContext ?? '';
+  const knowledgeBlock = seo?.knowledgeBase ?? '';
+  const personasBlock = formatPersonasForPrompt(seo?.personas);
+  const kwMapContext = formatPageMapForPrompt(seo);
   const bizCtx = context.businessContext || stratBizCtx;
 
-  // Find if any page in the strategy targets this keyword — inject its analysis data
-  const matchedPage = strategy?.pageMap?.find(p =>
+  // Find if any page in the strategy targets this keyword — inject its analysis data.
+  // Use intel.seoContext.strategy.pageMap (populated from the live page_keywords table
+  // by assembleSeoContext) rather than getWorkspace().keywordStrategy (which has pageMap
+  // stripped before storage).
+  const matchedPage = seo?.strategy?.pageMap?.find(p =>
     p.primaryKeyword?.toLowerCase() === targetKeyword.toLowerCase()
     || p.secondaryKeywords?.some(sk => sk.toLowerCase() === targetKeyword.toLowerCase())
   );
-  let pageAnalysisBlock = matchedPage
-    ? buildPageAnalysisContext(workspaceId, matchedPage.pagePath)
-    : '';
+  let pageAnalysisBlock = '';
+  if (matchedPage) {
+    const pageIntel = await buildWorkspaceIntelligence(workspaceId, {
+      slices: ['pageProfile'],
+      pagePath: matchedPage.pagePath,
+    });
+    const profile = pageIntel.pageProfile;
+    if (profile) {
+      const parts: string[] = [];
+      if (profile.auditIssues?.length) {
+        parts.push(`ISSUES IDENTIFIED:\n${profile.auditIssues.map(i => `- ${i}`).join('\n')}`);
+      }
+      if (profile.recommendations?.length) {
+        parts.push(`RECOMMENDATIONS:\n${profile.recommendations.map(r => `- ${r}`).join('\n')}`);
+      }
+      if (profile.contentGaps?.length) {
+        parts.push(`CONTENT GAPS:\n${profile.contentGaps.map(g => `- ${g}`).join('\n')}`);
+      }
+      if (profile.optimizationScore != null) {
+        parts.push(`OPTIMIZATION SCORE: ${profile.optimizationScore}/100`);
+      }
+      if (parts.length > 0) {
+        pageAnalysisBlock = `\n\nPAGE ANALYSIS (address these issues in your rewrite — this is what our platform flagged for this page):\n${parts.join('\n')}`;
+      }
+    }
+  }
 
   // If no match found via keyword lookup, use pre-computed analysis from Page Intelligence
   if (!pageAnalysisBlock && context.pageAnalysisContext) {
