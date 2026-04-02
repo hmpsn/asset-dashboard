@@ -3,7 +3,7 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { buildSeoContext, buildKeywordMapContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from './workspace-intelligence.js';
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import type { ContentBrief } from './content-brief.js';
@@ -68,10 +68,11 @@ export async function callCreativeAI(opts: {
   return result.text.trim();
 }
 
-export function buildVoiceContext(workspaceId: string): string {
-  // Pass 'content' domain so buildSeoContext injects content-domain learnings (not strategy-domain)
-  const { fullContext } = buildSeoContext(workspaceId, undefined, 'content');
-  const kwMapBlock = buildKeywordMapContext(workspaceId);
+export async function buildVoiceContext(workspaceId: string): Promise<string> {
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext'] });
+  const kwMapBlock = formatPageMapForPrompt(seo);
   return `${fullContext}${kwMapBlock}`;
 }
 
@@ -690,7 +691,7 @@ export async function scoreVoiceMatch(
   brief: ContentBrief,
   workspaceId: string,
 ): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
-  const voiceCtx = buildVoiceContext(workspaceId);
+  const voiceCtx = await buildVoiceContext(workspaceId);
 
   // Build a text summary of the post content for analysis
   const allContent = [

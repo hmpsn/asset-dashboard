@@ -116,7 +116,7 @@ const CHECKS: Check[] = [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
-      'server/performance-store.ts', 'server/rank-tracking.ts',
+      'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',

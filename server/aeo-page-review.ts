@@ -10,7 +10,7 @@
  */
 
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
 
@@ -154,7 +154,13 @@ export async function reviewPage(
 
   const pageStructure = extractPageStructure(html);
   const issueBlock = formatAuditIssues(auditIssues);
-  const { keywordBlock, brandVoiceBlock, businessContext, knowledgeBlock, personasBlock } = buildSeoContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = seo?.brandVoice ?? '';
+  const businessContext = seo?.businessContext ?? '';
+  const knowledgeBlock = seo?.knowledgeBase ?? '';
+  const personasBlock = formatPersonasForPrompt(seo?.personas ?? []);
 
   const prompt = `You are an AEO (Answer Engine Optimization) expert reviewing an existing page for an agency team. Your job is to produce specific, actionable content change recommendations that will make this page more likely to be cited by AI answer engines (ChatGPT, Perplexity, Google AI Overviews, etc.).
 
