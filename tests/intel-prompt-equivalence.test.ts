@@ -106,7 +106,7 @@ describe('buildIntelPrompt behavioral equivalence', () => {
 
   // 4. Site keywords flow through
   it('seoContext slice includes site keywords', async () => {
-    // formatSeoContextSection renders "Strategy: N site keywords" at detailed verbosity.
+    // formatSeoContextSection renders "Site target keywords: [names]" — not just a count.
     // Verify the strategy object with 3 siteKeywords flows through correctly.
     const { buildIntelPrompt, buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
 
@@ -114,10 +114,11 @@ describe('buildIntelPrompt behavioral equivalence', () => {
     const intel = await buildWorkspaceIntelligence(WS_ID, { slices: ['seoContext'] });
     expect(intel.seoContext?.strategy?.siteKeywords).toContain('enterprise seo');
 
-    // Formatted output at detailed verbosity — confirm the count line renders
+    // Formatted output at detailed verbosity — confirm keyword names render (not just count)
     await invalidateCache();
     const detailedResult = await buildIntelPrompt(WS_ID, ['seoContext'], { verbosity: 'detailed' });
-    expect(detailedResult).toContain('3 site keywords');
+    expect(detailedResult).toContain('Site target keywords:');
+    expect(detailedResult).toContain('enterprise seo');
   });
 
   // 5. Learnings slice safely returns empty/no-op when feature flag is off

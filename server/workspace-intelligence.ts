@@ -1371,8 +1371,12 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
   }
 
-  if (verbosity === 'detailed') {
-    if (ctx.strategy) lines.push(`Strategy: ${ctx.strategy.siteKeywords?.length ?? 0} site keywords`);
+  // Site keywords — always include when present; compact shows fewer
+  if (ctx.strategy?.siteKeywords?.length) {
+    const kw = verbosity === 'compact'
+      ? ctx.strategy.siteKeywords.slice(0, 3).join(', ')
+      : ctx.strategy.siteKeywords.slice(0, 8).join(', ');
+    lines.push(`Site target keywords: ${kw}`);
   }
 
   // Return empty string rather than a bare header when no content was added
