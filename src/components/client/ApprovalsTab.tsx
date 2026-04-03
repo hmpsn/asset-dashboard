@@ -80,12 +80,13 @@ export function ApprovalsTab({
   };
 
   function findPageKeywords(pageSlug: string) {
-    if (!pageMap) return null;
+    if (!pageMap || !pageSlug) return null;
     const slug = pageSlug.toLowerCase();
+    // Exact match first (top-level pages), then suffix match for nested paths (/services/seo → slug 'seo')
     return pageMap.find(p => {
       const path = p.pagePath.toLowerCase();
       return path === '/' + slug || path === slug;
-    }) ?? null;
+    }) ?? pageMap.find(p => p.pagePath.toLowerCase().endsWith('/' + slug)) ?? null;
   }
 
   return (
