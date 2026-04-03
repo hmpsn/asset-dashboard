@@ -221,6 +221,46 @@ Three enhancements to the strategy recommendation cards in the client portal:
 
 ---
 
+## Central Intelligence Wiring
+
+These connections were identified during review and must be included in the implementation — not optional additions.
+
+### Intelligence Slice Implementations
+
+**`clientSignals` slice (currently stubbed — returns `undefined`)**
+- Implement `assembleClientSignals()` in `workspace-intelligence.ts`
+- Data sources: new `client_signals` table (1.1), existing `churn-signals.ts`, `roi.ts`, `activity-log.ts`, `content-requests.ts`
+- Output: churn risk level, ROI trend, engagement score, recent signal history, composite health score
+- Add `formatClientSignalsSection()` to `formatForPrompt()` so admin chat can answer "how engaged is this client?"
+- Admin chat `assembleAdminContext()` already has a `'client'` question category — once this slice is populated, it gets the data for free
+
+**`pageProfile` slice (currently stubbed — returns `undefined`)**
+- Implement `assemblePageProfile()` as a direct output of the Page Intelligence + Strategy blend (2.4)
+- Strategy already writes all page keyword data to `page_keywords` during generation — this slice reads it
+- No new data collection required: same fields, exposed as an intelligence slice
+- Enables admin chat to answer per-page questions with structured data rather than ad-hoc queries
+
+### Smart Placeholder Hook — Intelligence-First
+
+The `useSmartPlaceholder` hook (3.3) must read from the existing `seoContext` intelligence slice rather than making independent AI calls per section. The `seoContext` slice already contains brand voice, personas, keywords, and business context — everything needed to generate placeholder suggestions.
+
+- Single intelligence fetch per workspace session (already cached at 5-minute TTL)
+- Placeholder generation uses the cached context to derive suggestions — no additional AI call unless context is stale
+- Consistent with every other AI endpoint in the platform (all 26 callers use `buildSeoContext()`)
+
+### Easy Wins — Fold In
+
+**`bridge-client-signal` flag is already defined** in `bridge-infrastructure.ts`. Group 1 implementation just needs to point at it — zero new bridge infrastructure required.
+
+**`INTELLIGENCE_CACHE_UPDATED` WebSocket event is defined but never broadcast.** Wire it during this work: when intelligence cache is invalidated, broadcast this event. Frontend React Query automatically invalidates. One connection, platform-wide benefit.
+
+**Cache invalidation call sites for new mutations:**
+- New `client_signals` insert → `invalidateIntelligenceCache(workspaceId)` + `invalidateSubCachePrefix(workspaceId, 'slice:clientSignals')`
+- CMS SEO apply (2.3) → `invalidateIntelligenceCache(workspaceId)` (same as existing static page SEO apply)
+- Brand profile client edit (3.1) → `clearSeoContextCache(workspaceId)` + `debouncedSettingsCascade()`
+
+---
+
 ## Implementation Groups Summary
 
 | Group | Items | Key constraint |
