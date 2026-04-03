@@ -3869,6 +3869,16 @@
           "status": "done"
         },
         {
+          "title": "Unified Workspace Intelligence Layer — Phase 4C (Client Intelligence API + Portal Widget)",
+          "source": "session planning 2026-04-03",
+          "est": "2-3h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #130. ClientIntelligence shared type (5 interfaces — scrubbed, tier-gated view; no knowledgeBase/brandVoice/churnRisk/operational/strategy_alignment). GET /api/public/intelligence/:workspaceId: free gets insightsSummary+pipelineStatus, growth adds learningHighlights, premium adds siteHealthSummary. useClientIntelligence hook (5-min stale, React Query). IntelligenceSummaryCard in client OverviewTab: high-priority insights + briefs in progress (blue, all tiers), win rate (teal, Growth+ TierGate). 13 tests across 4 test files.",
+          "shippedAt": "2026-04-03",
+          "status": "done"
+        },
+        {
           "id": "bridge-audit-finding-auto-resolve",
           "title": "Auto-resolve audit_finding insights when issues are fixed",
           "source": "PR #118 review flag",

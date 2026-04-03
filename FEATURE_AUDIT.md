@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **269 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **270 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3114,6 +3114,19 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 205. Unified Workspace Intelligence Layer — Phase 4C (Client Intelligence API + Portal Widget)
+**What it does:** Exposes a scrubbed, tier-gated view of `WorkspaceIntelligence` to the client portal. Four new components: (1) **`ClientIntelligence` shared type** (`shared/types/intelligence.ts`) — five interfaces (`ClientInsightsSummary`, `ClientPipelineStatus`, `ClientLearningHighlights`, `ClientSiteHealthSummary`, `ClientIntelligence`) that define what the client may see; admin-only fields (`knowledgeBase`, `brandVoice`, `churnRisk`, `operational`, `strategy_alignment` insight type, `impact_score`, `resolution_source`) are never included. (2) **`GET /api/public/intelligence/:workspaceId`** — server route that calls `buildWorkspaceIntelligence()`, assembles `ClientIntelligence` from appropriate slices, and applies tier gating: free gets insights summary + pipeline status; growth adds `learningHighlights`; premium adds `siteHealthSummary`. (3) **`useClientIntelligence` hook** — React Query hook with 5-minute stale time, barrel-exported from `src/hooks/client/index.ts`, using `queryKeys.client.intelligence()`. (4) **`IntelligenceSummaryCard`** client portal component — 2-column grid card: high-priority insights count (blue, all tiers), briefs in progress (blue, all tiers), action win rate (teal, Growth+ behind `TierGate`). Placed in `OverviewTab` after the `MonthlyDigest` card, wrapped in `ErrorBoundary`.
+
+**Files:** `shared/types/intelligence.ts`, `server/routes/client-intelligence.ts`, `server/app.ts`, `src/api/analytics.ts`, `src/hooks/client/useClientIntelligence.ts`, `src/hooks/client/index.ts`, `src/lib/queryKeys.ts`, `src/components/client/IntelligenceSummaryCard.tsx`, `src/components/client/OverviewTab.tsx`, `tests/client-intelligence-types.test.ts`, `tests/client-intelligence-route.test.ts`, `tests/use-client-intelligence.test.ts`, `tests/intelligence-summary-card.test.ts`
+
+**Agency value:** The intelligence layer built for admin AI features now flows through to clients — a second consumer of the same cached data at zero additional query cost. Clients can see high-level health signals in their portal without any new DB work.
+
+**Client value:** A single "Site Intelligence" card surfaces the most important signals (top insights, content in flight, win rate) in their overview — transparent proof of work without overwhelming detail. Tier gating ensures premium features remain an upgrade motivator.
+
+**Mutual:** Reuses the existing LRU-cached `buildWorkspaceIntelligence()` infrastructure. Client-facing data is scrubbed at the route layer so there's no risk of admin fields leaking.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3129,6 +3142,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**269 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**270 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **269**. Last updated: April 2026.
+Current feature count: **270**. Last updated: April 2026.
