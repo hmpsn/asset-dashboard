@@ -15,23 +15,26 @@ let isRunning = false;
 async function runIntelligenceRefresh(): Promise<void> {
   if (isRunning) { log.warn('Intelligence refresh already in progress — skipping cycle'); return; }
   isRunning = true;
-  const workspaces = listWorkspaces();
-  let refreshed = 0;
-  let skipped = 0;
-  for (const ws of workspaces) {
-    try {
-      const recent = listActivity(ws.id, 1);
-      if (recent.length === 0) { skipped++; continue; }
-      await buildWorkspaceIntelligence(ws.id, { // bwi-all-ok — explicit slices on next line
-        slices: ['seoContext', 'insights', 'learnings', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational'],
-      });
-      refreshed++;
-    } catch (err) {
-      log.warn({ workspaceId: ws.id, err }, 'Intelligence refresh failed for workspace — skipping');
+  try {
+    const workspaces = listWorkspaces();
+    let refreshed = 0;
+    let skipped = 0;
+    for (const ws of workspaces) {
+      try {
+        const recent = listActivity(ws.id, 1);
+        if (recent.length === 0) { skipped++; continue; }
+        await buildWorkspaceIntelligence(ws.id, { // bwi-all-ok — explicit slices on next line
+          slices: ['seoContext', 'insights', 'learnings', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational'],
+        });
+        refreshed++;
+      } catch (err) {
+        log.warn({ workspaceId: ws.id, err }, 'Intelligence refresh failed for workspace — skipping');
+      }
     }
+    log.info({ refreshed, skipped, total: workspaces.length }, 'Intelligence refresh cycle complete');
+  } finally {
+    isRunning = false;
   }
-  isRunning = false;
-  log.info({ refreshed, skipped, total: workspaces.length }, 'Intelligence refresh cycle complete');
 }
 
 export function startIntelligenceCrons(): void {
