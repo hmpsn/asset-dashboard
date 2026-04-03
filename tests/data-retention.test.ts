@@ -19,7 +19,7 @@ describe('data-retention cleanup functions', () => {
     expect(typeof deleted).toBe('number');
     expect(deleted).toBeGreaterThanOrEqual(0);
   });
-  it('cleanupOldSnapshots with keepPerSite=999999 deletes nothing', () => {
+  it('cleanupOldSnapshots with maxAgeDays=999999 deletes nothing', () => {
     const deleted = cleanupOldSnapshots(999999);
     expect(deleted).toBe(0);
   });

@@ -90,13 +90,7 @@ let _cleanupOldSnapshots: ReturnType<typeof db.prepare> | null = null;
 function cleanupOldSnapshotsStmt() {
   if (!_cleanupOldSnapshots) {
     _cleanupOldSnapshots = db.prepare(`
-      DELETE FROM audit_snapshots
-      WHERE id NOT IN (
-        SELECT id FROM audit_snapshots AS inner_s
-        WHERE inner_s.site_id = audit_snapshots.site_id
-        ORDER BY inner_s.created_at DESC
-        LIMIT ?
-      )
+      DELETE FROM audit_snapshots WHERE created_at < datetime('now', ? || ' days')
     `);
   }
   return _cleanupOldSnapshots;
@@ -126,9 +120,9 @@ function rowToSnapshot(row: SnapshotRow): AuditSnapshot {
   };
 }
 
-export function cleanupOldSnapshots(keepPerSite: number = 10): number {
-  const info = cleanupOldSnapshotsStmt().run(keepPerSite);
-  return info.changes;
+export function cleanupOldSnapshots(maxAgeDays: number = 365): number {
+  const result = cleanupOldSnapshotsStmt().run(`-${maxAgeDays}`);
+  return (result as { changes: number }).changes;
 }
 
 export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditResult, logoUrl?: string): AuditSnapshot {

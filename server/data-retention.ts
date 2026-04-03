@@ -12,7 +12,7 @@ let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 async function runRetention(): Promise<void> {
   try {
     const sessions = cleanupOldChatSessions(180);
-    const snapshots = cleanupOldSnapshots(10);
+    const snapshots = cleanupOldSnapshots(365);
     const llmsTxt = cleanupOldLlmsTxt(90);
     log.info({ sessions, snapshots, llmsTxt }, 'Data retention cycle complete');
   } catch (err) {

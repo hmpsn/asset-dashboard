@@ -3,7 +3,7 @@
 
 import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
-import { listActivity } from './activity-log.js';
+import { hasRecentActivity } from './activity-log.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 
 const log = createLogger('intelligence-crons');
@@ -21,8 +21,7 @@ async function runIntelligenceRefresh(): Promise<void> {
     let skipped = 0;
     for (const ws of workspaces) {
       try {
-        const recent = listActivity(ws.id, 1);
-        if (recent.length === 0) { skipped++; continue; }
+        if (!hasRecentActivity(ws.id, 30)) { skipped++; continue; }
         await buildWorkspaceIntelligence(ws.id, { // bwi-all-ok — explicit slices on next line
           slices: ['seoContext', 'insights', 'learnings', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational'],
         });
