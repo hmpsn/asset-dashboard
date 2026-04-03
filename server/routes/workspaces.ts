@@ -342,7 +342,7 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     const siteName = ws.name || 'this website';
     const keywordBlock = seoCtx ? formatKeywordsForPrompt(seoCtx) : '';
     const bizContext = seoCtx?.businessContext ?? '';
-    const contentGapTopics = seoCtx?.strategy?.contentGaps?.slice(0, 5).map((g: { topic: string }) => g.topic).join(', ') ?? '';
+    const contentGapTopics = seoCtx?.strategy?.contentGaps?.slice(0, 5).map(g => g.topic).join(', ') ?? '';
 
     const contextParts: string[] = [`Site name: ${siteName}`];
     if (keywordBlock) contextParts.push(`Target keywords:\n${keywordBlock}`);

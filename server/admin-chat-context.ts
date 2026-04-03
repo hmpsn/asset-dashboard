@@ -75,10 +75,10 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   insights: [/what.*should.*work/i, /priorit/i, /quick.*win/i, /opportunit/i, /declin/i, /cannibali/i, /page.*health/i, /health.*score/i, /what.*focus/i, /biggest.*impact/i],
 };
 
-/** Token budget for intelligence context in general/multi-category admin chat queries.
- *  The intelligence layer's §20 priority chain truncates gracefully at this limit.
- *  TASK 8: pass this as tokenBudget when expanding slices for 'general' queries. */
-const GENERAL_INTEL_TOKEN_BUDGET = 6000;
+/** Context size for general queries is managed through selective slice inclusion, not
+ *  through formatForPrompt() tokenBudget (which admin-chat-context does not call).
+ *  General queries union operational+siteHealth+clientSignals; the section-building
+ *  code below naturally limits output to relevant fields rather than full slice dumps. */
 
 /**
  * Classify which data categories a question needs.
@@ -318,10 +318,9 @@ export async function assembleAdminContext(
   if (categories.has('client') || categories.has('general')) intelSlices.push('clientSignals');
   if (categories.has('approvals') && !intelSlices.includes('operational')) intelSlices.push('operational');
 
-  const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — general queries union all categories; slices built dynamically above
+  const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — slices built dynamically above; general queries union operational+siteHealth+clientSignals
     slices: intelSlices as IntelligenceSlice[],
     learningsDomain: 'all',
-    ...(categories.has('general') ? { tokenBudget: GENERAL_INTEL_TOKEN_BUDGET } : {}),
   });
   const seoCtx = intel.seoContext;
 
