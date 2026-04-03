@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { cleanupOldChatSessions } from '../server/chat-memory.js';
 import { cleanupOldSnapshots } from '../server/reports.js';
 import { cleanupOldLlmsTxt } from '../server/llms-txt-generator.js';
+import { startDataRetentionCrons, stopDataRetentionCrons } from '../server/data-retention.js';
 
 describe('data-retention cleanup functions', () => {
   it('cleanupOldChatSessions returns a number >= 0', () => {
@@ -33,7 +34,6 @@ describe('data-retention cleanup functions', () => {
   });
 });
 
-import { startDataRetentionCrons, stopDataRetentionCrons } from '../server/data-retention.js';
 describe('data-retention cron lifecycle', () => {
   it('startDataRetentionCrons is idempotent', () => {
     startDataRetentionCrons();

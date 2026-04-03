@@ -7,6 +7,7 @@ import { cleanupOldLlmsTxt } from './llms-txt-generator.js';
 const log = createLogger('data-retention');
 const DAILY_MS = 24 * 60 * 60 * 1000;
 let retentionInterval: ReturnType<typeof setInterval> | null = null;
+let startupTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function runRetention(): Promise<void> {
   try {
@@ -21,7 +22,7 @@ async function runRetention(): Promise<void> {
 
 export function startDataRetentionCrons(): void {
   if (retentionInterval) return;
-  const startupTimeout = setTimeout(() => { void runRetention(); }, 2 * 60 * 1000);
+  startupTimeout = setTimeout(() => { void runRetention(); }, 2 * 60 * 1000);
   startupTimeout.unref?.();
   retentionInterval = setInterval(() => { void runRetention(); }, DAILY_MS);
   retentionInterval.unref?.();
@@ -29,5 +30,6 @@ export function startDataRetentionCrons(): void {
 }
 
 export function stopDataRetentionCrons(): void {
+  if (startupTimeout) { clearTimeout(startupTimeout); startupTimeout = null; }
   if (retentionInterval) { clearInterval(retentionInterval); retentionInterval = null; }
 }
