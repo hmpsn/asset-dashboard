@@ -34,7 +34,6 @@ const stmts = createStmtCache(() => ({
     INSERT OR REPLACE INTO workspace_learnings (id, workspace_id, learnings, computed_at)
     VALUES (@id, @workspace_id, @learnings, @computed_at)
   `),
-  delete: db.prepare('DELETE FROM workspace_learnings WHERE workspace_id = ?'),
   allWorkspaceIds: db.prepare('SELECT DISTINCT workspace_id FROM tracked_actions'),
 }));
 
@@ -602,13 +601,6 @@ export function formatLearningsForPrompt(
   const header = lines[0];
   const bullets = lines.slice(1).slice(0, 9);
   return [header, ...bullets].join('\n');
-}
-
-// --- Cache invalidation ---
-
-export function invalidateLearningsCache(workspaceId: string): void {
-  stmts().delete.run(workspaceId);
-  log.info({ workspaceId }, 'Workspace learnings cache invalidated');
 }
 
 /** Returns workspace IDs that have scored outcomes (same set recomputeAll processes). */

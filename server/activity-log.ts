@@ -132,7 +132,6 @@ const stmts = createStmtCache(() => ({
   hasRecent: db.prepare(
     `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
   ),
-  deleteById: db.prepare('DELETE FROM activity_log WHERE id = ?'),
   countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
   pruneOldest: db.prepare(`
         DELETE FROM activity_log WHERE id IN (
@@ -193,11 +192,6 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
 export function listClientActivity(workspaceId: string, limit = 50): ActivityEntry[] {
   const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit) as ActivityRow[];
   return rows.map(rowToEntry);
-}
-
-export function deleteActivity(id: string): boolean {
-  const info = stmts().deleteById.run(id);
-  return info.changes > 0;
 }
 
 /** Returns true if the workspace has any activity log entry within the last `withinDays` days. */
