@@ -208,7 +208,7 @@ export interface OperationalSlice {
 // admin-only insight types (strategy_alignment), or bridge source tags.
 
 export interface ClientInsightsSummary {
-  /** Total active insights across all types */
+  /** Total actionable insights (critical + warning + opportunity; positive excluded) */
   total: number;
   /** highPriority = critical+warning; mediumPriority = opportunity */
   highPriority: number;
@@ -238,7 +238,7 @@ export interface ClientSiteHealthSummary {
   auditScore: number | null;
   /** Direction vs previous audit */
   auditScoreDelta: number | null;
-  /** CWV pass rate as 0-100 integer (mobile-only; desktop data not yet assembled) */
+  /** CWV pass rate as 0-100 integer (average of available rates; currently mobile-only until assembler populates desktop) */
   cwvPassRatePct: number | null;
   /** Count of dead links */
   deadLinks: number;

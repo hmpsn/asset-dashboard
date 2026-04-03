@@ -29,7 +29,12 @@ const log = createLogger('client-intelligence');
 const ADMIN_ONLY_INSIGHT_TYPES = new Set(['strategy_alignment']);
 
 function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSummary {
-  const visible = insights.all.filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType));
+  // Exclude positive-severity insights: they aren't actionable priority items and
+  // including them in 'total' would create a gap vs. highPriority + mediumPriority
+  // that clients would have no way to explain.
+  const visible = insights.all.filter(
+    i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType) && i.severity !== 'positive',
+  );
   return {
     total: visible.length,
     highPriority: visible.filter(i => i.severity === 'critical' || i.severity === 'warning').length,
