@@ -250,10 +250,12 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       .finally(() => setPagesLoading(false));
   }, [siteId]);
 
-  // Auto-expand target page from fixContext
+  // Auto-expand target page from fixContext.
+  // Guard on targetRoute so stale fixContext from audit/seo-editor navigations doesn't
+  // unexpectedly scroll to a page when PageIntelligence mounts for an unrelated reason.
   const fixConsumed = useRef(false);
   useEffect(() => {
-    if (fixContext?.pageSlug && !fixConsumed.current && unifiedPages.length > 0) {
+    if (fixContext?.pageSlug && fixContext.targetRoute === 'page-intelligence' && !fixConsumed.current && unifiedPages.length > 0) {
       const match = unifiedPages.find(p =>
         p.slug === fixContext.pageSlug || p.path === `/${fixContext.pageSlug}` || p.id === fixContext.pageId
       );

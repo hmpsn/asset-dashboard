@@ -329,7 +329,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           window.history.replaceState({}, '', url.toString());
         }
       })
-      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? 'This dashboard is currently unavailable. Please contact hmpsn studio for access.' : 'Failed to load dashboard'); setLoading(false); });
+      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? `This dashboard is currently unavailable. Please contact ${STUDIO_NAME} for access.` : 'Failed to load dashboard'); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]); // large init effect — only re-runs on workspace change; missing deps are stable useState setters
 
@@ -391,7 +391,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex flex-col items-center mb-6">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-7 opacity-60 mb-4" />
+            <img src="/logo.svg" alt={STUDIO_NAME} className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
               <Lock className="w-6 h-6 text-teal-400" />
             </div>
@@ -650,7 +650,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+            <img src="/logo.svg" alt={STUDIO_NAME} className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <div className="flex items-center gap-2">
