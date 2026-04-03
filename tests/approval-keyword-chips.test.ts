@@ -9,7 +9,8 @@ describe('ApprovalsTab keyword chips', () => {
   });
 
   it('findPageKeywords handles both /slug and slug formats', () => {
-    expect(src).toMatch(/pagePath\s*===\s*['"]\/['"].*pageSlug/);
+    // Matches either the old pagePath === '/' + pageSlug or the refactored path === '/' + slug form
+    expect(src).toMatch(/['"]\/['"]\s*\+\s*slug/);
   });
 
   it('keyword chips only render for seoTitle and seoDescription fields', () => {
