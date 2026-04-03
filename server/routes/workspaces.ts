@@ -327,6 +327,57 @@ router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(),
   res.json({ intelligenceProfile: ws.intelligenceProfile });
 });
 
+router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspaceAccess(), async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.id);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Fetch seoContext slice for keyword/strategy context.
+    // businessProfile is intentionally NOT requested here — that's what we're generating.
+    const { buildWorkspaceIntelligence, formatKeywordsForPrompt } = await import('../workspace-intelligence.js');
+    const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const seoCtx = intel.seoContext;
+
+    const siteName = ws.name || 'this website';
+    const keywordBlock = seoCtx ? formatKeywordsForPrompt(seoCtx) : '';
+    const bizContext = seoCtx?.businessContext ?? '';
+    const contentGapTopics = seoCtx?.strategy?.contentGaps?.slice(0, 5).map((g: { topic: string }) => g.topic).join(', ') ?? '';
+
+    const contextParts: string[] = [`Site name: ${siteName}`];
+    if (keywordBlock) contextParts.push(`Target keywords:\n${keywordBlock}`);
+    if (bizContext) contextParts.push(`Business context: ${bizContext}`);
+    if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
+
+    const result = await callOpenAI({
+      model: 'gpt-4.1-mini',
+      feature: 'intelligence-profile-autofill',
+      workspaceId: ws.id,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
+        },
+        {
+          role: 'user',
+          content: `Based on this website context, suggest a business intelligence profile:\n\n${contextParts.join('\n\n')}\n\nRespond with JSON: {"industry": "string", "goals": ["string", ...], "targetAudience": "string"}`,
+        },
+      ],
+    });
+
+    let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
+    try { suggestion = JSON.parse(result.text); } catch { /* fallback to empty */ }
+
+    return res.json({
+      industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',
+      goals: Array.isArray(suggestion.goals) ? suggestion.goals.filter((g: unknown) => typeof g === 'string') : [],
+      targetAudience: typeof suggestion.targetAudience === 'string' ? suggestion.targetAudience : '',
+    });
+  } catch (err) {
+    log.error({ err }, 'Intelligence profile autofill failed');
+    return res.status(500).json({ error: 'Auto-fill failed — try again or fill manually' });
+  }
+});
+
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
   const ws = getWorkspace(req.params.id);
