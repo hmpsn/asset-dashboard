@@ -13,7 +13,6 @@ import { formatLearningsForPrompt } from './workspace-learnings.js';
 import { getLatestSnapshot } from './reports.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
-import { listActivity } from './activity-log.js';
 import { listBatches } from './approvals.js';
 import { getLatestRanks, getTrackedKeywords } from './rank-tracking.js';
 import { loadDecayAnalysis } from './content-decay.js';
@@ -22,10 +21,8 @@ import { listTemplates } from './content-templates.js';
 import { listMatrices } from './content-matrices.js';
 import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
-import { listChurnSignals } from './churn-signals.js';
 import { listAnomalies } from './anomaly-detection.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { getPageSpeed, getPageWeight, getLinkCheck } from './performance-store.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
@@ -36,6 +33,7 @@ import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
+import type { IntelligenceSlice } from '../shared/types/intelligence.js';
 import { STUDIO_NAME } from './constants.js';
 
 const log = createLogger('admin-chat-context');
@@ -313,10 +311,18 @@ export async function assembleAdminContext(
   let pageContext: AssembledContext['pageContext'] | undefined;
 
   // ── Always include: strategy, brand voice, knowledge base, personas ──
-  const slices = ['seoContext', 'learnings'] as const;
-  // For 'general' queries (Task 8): expand slices to all 7 + pass tokenBudget: GENERAL_INTEL_TOKEN_BUDGET
-  // to prevent silent overflow. Current 2-slice fetch does not need the budget.
-  const intel = await buildWorkspaceIntelligence(workspaceId, { slices, learningsDomain: 'all' });
+  // Build slice list based on question categories (Task 8)
+  const intelSlices: string[] = ['seoContext', 'learnings'];
+  if (categories.has('activity') || categories.has('general')) intelSlices.push('operational');
+  if (categories.has('performance') || categories.has('general')) intelSlices.push('siteHealth');
+  if (categories.has('client') || categories.has('general')) intelSlices.push('clientSignals');
+  if (categories.has('approvals') && !intelSlices.includes('operational')) intelSlices.push('operational');
+
+  const intel = await buildWorkspaceIntelligence(workspaceId, {
+    slices: intelSlices as IntelligenceSlice[],
+    learningsDomain: 'all',
+    ...(categories.has('general') ? { tokenBudget: GENERAL_INTEL_TOKEN_BUDGET } : {}),
+  });
   const seoCtx = intel.seoContext;
 
   const keywordBlock = formatKeywordsForPrompt(seoCtx);
@@ -639,10 +645,10 @@ export async function assembleAdminContext(
   // Activity Log
   if (categories.has('activity') || categories.has('general')) {
     try {
-      const activities = listActivity(workspaceId, 15);
-      if (activities.length > 0) {
-        const actSummary = activities.map(a => ({
-          type: a.type, title: a.title, date: a.createdAt?.slice(0, 10),
+      const recentActivity = intel.operational?.recentActivity ?? [];
+      if (recentActivity.length > 0) {
+        const actSummary = recentActivity.slice(0, 15).map(a => ({
+          type: a.type, description: a.description, date: a.timestamp?.slice(0, 10),
         }));
         sections.push(`RECENT ACTIVITY LOG:\n${JSON.stringify(actSummary, null, 1)}`);
         dataSources.push('Activity Log (recent workspace events)');
@@ -674,6 +680,12 @@ export async function assembleAdminContext(
         };
         sections.push(`APPROVAL BATCHES:\n${JSON.stringify(approvalSummary, null, 1)}`);
         dataSources.push(`Approvals (${approvalSummary.pendingItems} items pending client review)`);
+        // Supplement: operational slice provides a concise queue summary for cross-referencing
+        const queue = intel.operational?.approvalQueue;
+        if (queue && queue.pending > 0) {
+          const age = queue.oldestAge != null ? ` (oldest: ${queue.oldestAge}h ago)` : '';
+          sections.push(`APPROVAL QUEUE SUMMARY: ${queue.pending} items pending${age}`);
+        }
       }
     } catch { /* non-critical */ }
   }
@@ -770,44 +782,55 @@ export async function assembleAdminContext(
     } catch { /* non-critical */ }
   }
 
-  // Churn Signals
+  // Client Health (churn signals via intelligence slice)
   if (categories.has('client') || categories.has('general')) {
     try {
-      const signals = listChurnSignals(workspaceId);
-      if (signals.length > 0) {
-        sections.push(`CLIENT CHURN SIGNALS (risk indicators):\n${JSON.stringify(signals.slice(0, 5), null, 1)}`);
-        dataSources.push('Churn Signals (client engagement risk indicators)');
+      const cs = intel.clientSignals;
+      if (cs) {
+        const clientParts: string[] = [];
+        if (cs.compositeHealthScore != null)
+          clientParts.push(`Health score: ${cs.compositeHealthScore}/100`);
+        if (cs.churnRisk)
+          clientParts.push(`Churn risk: ${cs.churnRisk}`);
+        if (cs.roi?.organicValue)
+          clientParts.push(`Organic traffic value: $${cs.roi.organicValue.toFixed(0)}/mo`);
+        if (cs.engagement?.loginFrequency)
+          clientParts.push(`Portal activity: ${cs.engagement.loginFrequency}`);
+        if (cs.churnSignals && cs.churnSignals.length > 0) {
+          const signalLines = cs.churnSignals.slice(0, 5)
+            .map(s => `  - [${s.severity}] ${s.type}: detected ${s.detectedAt?.slice(0, 10)}`);
+          clientParts.push(`Churn signals:\n${signalLines.join('\n')}`);
+        }
+        if (clientParts.length > 0) {
+          sections.push(`CLIENT HEALTH:\n${clientParts.join('\n')}`);
+          dataSources.push('Client Health (composite score, churn risk, engagement, signals)');
+        }
       }
     } catch { /* non-critical */ }
   }
 
-  // Performance (PageSpeed / Page Weight)
+  // Performance (via intelligence siteHealth slice)
   if (categories.has('performance') || categories.has('general')) {
-    if (ws.webflowSiteId) {
-      try {
-        const psi = getPageSpeed(ws.webflowSiteId);
-        if (psi) {
-          sections.push(`PAGESPEED INSIGHTS (latest snapshot):\n${JSON.stringify(psi, null, 1)}`);
-          dataSources.push('PageSpeed Insights (Core Web Vitals, performance scores)');
+    try {
+      const health = intel.siteHealth;
+      if (health) {
+        const perfParts: string[] = [];
+        if (health.performanceSummary?.score != null)
+          perfParts.push(`Performance score: ${health.performanceSummary.score}/100`);
+        if (health.performanceSummary?.avgLcp != null)
+          perfParts.push(`LCP: ${health.performanceSummary.avgLcp.toFixed(1)}s`);
+        if (health.performanceSummary?.avgCls != null)
+          perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
+        if (health.cwvPassRate.mobile != null)
+          perfParts.push(`CWV pass rate: ${health.cwvPassRate.mobile}% mobile`);
+        if (health.deadLinks > 0) perfParts.push(`Dead links: ${health.deadLinks}`);
+        if (health.redirectChains > 0) perfParts.push(`Redirect chains: ${health.redirectChains}`);
+        if (perfParts.length > 0) {
+          sections.push(`SITE PERFORMANCE:\n${perfParts.join('\n')}`);
+          dataSources.push('Site Performance (Core Web Vitals, PageSpeed, link health)');
         }
-      } catch { /* non-critical */ }
-
-      try {
-        const pw = getPageWeight(ws.webflowSiteId);
-        if (pw) {
-          sections.push(`PAGE WEIGHT ANALYSIS:\n${JSON.stringify(pw, null, 1)}`);
-          dataSources.push('Page Weight Analysis (asset sizes, optimization opportunities)');
-        }
-      } catch { /* non-critical */ }
-
-      try {
-        const lc = getLinkCheck(ws.webflowSiteId);
-        if (lc) {
-          sections.push(`DEAD LINK CHECK:\n${JSON.stringify(lc, null, 1)}`);
-          dataSources.push('Dead Link Check (broken links, redirects)');
-        }
-      } catch { /* non-critical */ }
-    }
+      }
+    } catch { /* non-critical */ }
   }
 
   // ── Page-specific analysis results ──
