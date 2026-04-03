@@ -148,9 +148,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   }, [pages, workspaceId]);
 
   // Auto-expand target page from audit Fix→
+  // Guard on targetRoute so stale fixContext from other tabs doesn't scroll/expand a page unexpectedly.
   const fixConsumed = useRef(false);
   useEffect(() => {
-    if (fixContext?.pageId && pages.length > 0 && !fixConsumed.current) {
+    if (fixContext?.pageId && fixContext.targetRoute === 'seo-editor' && pages.length > 0 && !fixConsumed.current) {
       const match = pages.find(p => p.id === fixContext.pageId || p.slug === fixContext.pageSlug);
       if (match) {
         fixConsumed.current = true;

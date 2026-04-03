@@ -36,6 +36,7 @@ import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
+import { STUDIO_NAME } from './constants.js';
 
 const log = createLogger('admin-chat-context');
 
@@ -378,8 +379,8 @@ export async function assembleAdminContext(
 
       // Get page-specific keyword context from strategy pageMap
       const normalizedPath = targetUrl.startsWith('/') ? targetUrl : targetUrl.replace(/^https?:\/\/[^/]+/, '');
-      const pageKw = strategy?.pageMap?.find(p => p.pagePath === normalizedPath)
-        ?? strategy?.pageMap?.find(p => normalizedPath.endsWith(p.pagePath) || p.pagePath.endsWith(normalizedPath));
+      const pageKw = strategy?.pageMap?.find(p => p.pagePath.toLowerCase() === normalizedPath.toLowerCase())
+        ?? (normalizedPath ? strategy?.pageMap?.find(p => normalizedPath.toLowerCase().endsWith(p.pagePath.toLowerCase()) || p.pagePath.toLowerCase().endsWith(normalizedPath.toLowerCase())) : undefined);
       if (pageKw) {
         let pageKeywordBlock = `\n\nTHIS PAGE'S TARGET (overrides general context):`;
         pageKeywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
@@ -858,7 +859,7 @@ function buildAnalystPrompt(
   days: number,
   priorContext: string,
 ): string {
-  return `You are an expert internal analytics analyst for **${getBrandName(ws)}**. You're embedded in the admin dashboard of hmpsn studio's platform. The user is a team member managing this client's website — give them unfiltered, technical, data-driven analysis.
+  return `You are an expert internal analytics analyst for **${getBrandName(ws)}**. You're embedded in the admin dashboard of ${STUDIO_NAME}'s platform. The user is a team member managing this client's website — give them unfiltered, technical, data-driven analysis.
 
 AVAILABLE DATA:
 ${assembled.dataSources.map(d => `• ${d}`).join('\n')}
