@@ -23,6 +23,8 @@ import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
 import { listAnomalies } from './anomaly-detection.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { getLinkCheck, getPageSpeed } from './performance-store.js';
+import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
@@ -821,12 +823,48 @@ export async function assembleAdminContext(
         if (health.performanceSummary?.avgCls != null)
           perfParts.push(`CLS: ${health.performanceSummary.avgCls.toFixed(2)}`);
         if (health.cwvPassRate.mobile != null)
-          perfParts.push(`CWV pass rate: ${health.cwvPassRate.mobile}% mobile`);
+          perfParts.push(`CWV pass rate: ${(health.cwvPassRate.mobile * 100).toFixed(0)}% mobile`);
         if (health.deadLinks > 0) perfParts.push(`Dead links: ${health.deadLinks}`);
         if (health.redirectChains > 0) perfParts.push(`Redirect chains: ${health.redirectChains}`);
+
+        // Supplement with per-URL dead link detail and worst-performing pages.
+        // siteHealth slice stores counts only; raw snapshots hold the full arrays.
+        // Direct calls preserved for this granularity (same pattern as listBatches() for approvals).
+        if (ws?.webflowSiteId) {
+          try {
+            const linkSnap = getLinkCheck(ws.webflowSiteId);
+            if (linkSnap?.result) {
+              const linkResult = linkSnap.result as { deadLinks?: DeadLink[] };
+              const dead = linkResult.deadLinks ?? [];
+              if (dead.length > 0) {
+                const deadDetail = dead.slice(0, 10).map(d =>
+                  `    ${d.url} [${d.status}] — found on "${d.foundOn}" (anchor: "${d.anchorText}")`
+                );
+                perfParts.push(`Dead link URLs (top ${Math.min(dead.length, 10)} of ${dead.length}):\n${deadDetail.join('\n')}`);
+              }
+            }
+          } catch { /* non-critical */ }
+
+          try {
+            const speedSnap = getPageSpeed(ws.webflowSiteId);
+            if (speedSnap?.result) {
+              const siteSpeed = speedSnap.result as { pages?: Array<{ url?: string; score?: number }> };
+              const pages = siteSpeed.pages ?? [];
+              const worst = pages
+                .filter(p => p.url && p.score != null)
+                .sort((a, b) => (a.score ?? 100) - (b.score ?? 100))
+                .slice(0, 5);
+              if (worst.length > 0) {
+                const worstDetail = worst.map(p => `    ${p.url} — score ${p.score}/100`);
+                perfParts.push(`Worst-performing pages (PageSpeed):\n${worstDetail.join('\n')}`);
+              }
+            }
+          } catch { /* non-critical */ }
+        }
+
         if (perfParts.length > 0) {
           sections.push(`SITE PERFORMANCE:\n${perfParts.join('\n')}`);
-          dataSources.push('Site Performance (Core Web Vitals, PageSpeed, link health)');
+          dataSources.push('Site Performance (Core Web Vitals, PageSpeed, link health, per-URL dead links)');
         }
       }
     } catch { /* non-critical */ }
