@@ -1167,6 +1167,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         navigate(adminPath(workspaceId, 'seo-briefs'), {
                           state: {
                             fixContext: {
+                              targetRoute: 'seo-briefs',
                               pageSlug: page.slug,
                               pageName: page.title,
                               primaryKeyword: sp?.primaryKeyword || kw?.primaryKeyword || undefined,

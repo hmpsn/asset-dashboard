@@ -71,6 +71,11 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
+/** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
+ *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
+const BRIEF_ROUTES = ['seo-briefs', 'content-pipeline'] as const;
+type BriefRoute = typeof BRIEF_ROUTES[number];
+
 export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
   const queryClient = useQueryClient();
   const briefsQ = useAdminBriefsList(workspaceId);
@@ -99,16 +104,21 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
 
-  // Capture fixContext in a ref so handleGenerate can use it even after the parent clears it
+  // Capture fixContext in a ref so handleGenerate can use it even after the parent clears it.
+  // Only capture when the targetRoute confirms this fixContext is intended for brief generation.
   const fixContextRef = useRef<FixContext | null | undefined>(fixContext);
   useEffect(() => {
-    if (fixContext) fixContextRef.current = fixContext;
-  }, [fixContext]);
+    if (fixContext && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
+      fixContextRef.current = fixContext;
+    }
+  }, [fixContext]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-fill keyword from Page Intelligence context and optionally auto-generate
+  // Auto-fill keyword from Page Intelligence context and optionally auto-generate.
+  // Guard on targetRoute so stale fixContext from seo-editor/seo-schema navigations
+  // doesn't pre-fill the keyword field when ContentBriefs mounts at an unrelated tab.
   const fixConsumed = useRef(false);
   useEffect(() => {
-    if (fixContext && !fixConsumed.current) {
+    if (fixContext && !fixConsumed.current && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
       fixConsumed.current = true;
       // Prefer the actual primary keyword over page name
       const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';

@@ -78,7 +78,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                       <Layers className="w-3 h-3" /> Add to Planner
                     </button>
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageName: gap.targetKeyword } } })}
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword } } })}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                     >
                       <Sparkles className="w-3 h-3" /> Generate Brief
