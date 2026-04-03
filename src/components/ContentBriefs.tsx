@@ -105,8 +105,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [briefSearch, setBriefSearch] = useState('');
 
   // Capture fixContext in a ref so handleGenerate can use it even after the parent clears it.
-  // Only capture when the targetRoute confirms this fixContext is intended for brief generation.
-  const fixContextRef = useRef<FixContext | null | undefined>(fixContext);
+  // Initialize to null (not the raw prop) so the initial value also passes the targetRoute guard.
+  // Stale fixContext from seo-editor/seo-schema has no targetRoute and must never pre-populate this ref.
+  const fixContextRef = useRef<FixContext | null | undefined>(null);
   useEffect(() => {
     if (fixContext && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
       fixContextRef.current = fixContext;
