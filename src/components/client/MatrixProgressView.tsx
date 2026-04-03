@@ -14,7 +14,7 @@ interface MatrixProgressViewProps {
   onDownload: (format: 'docx' | 'pdf') => void;
 }
 
-const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'purple' | 'teal' | 'orange' | 'green' }> = {
+const STATUS_DISPLAY: Record<MatrixCell['status'], { label: string; icon: typeof CheckCircle2; color: string; badgeColor: 'zinc' | 'blue' | 'amber' | 'teal' | 'orange' | 'green' }> = {
   planned:           { label: 'Planned',       icon: Clock,        color: 'text-zinc-500',   badgeColor: 'zinc' },
   keyword_validated:  { label: 'In Progress',   icon: Clock,        color: 'text-blue-400',   badgeColor: 'blue' },
   brief_generated:   { label: 'Brief Ready',   icon: FileText,     color: 'text-amber-400',  badgeColor: 'amber' },

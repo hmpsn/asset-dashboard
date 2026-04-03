@@ -3,6 +3,8 @@
  * Used by content briefs (reference URLs), SERP scraping, and style examples.
  */
 
+import { STUDIO_BOT_UA } from './constants.js';
+
 export interface ScrapedPage {
   url: string;
   title: string;
@@ -27,10 +29,7 @@ export interface SerpData {
   fetchedAt: string;
 }
 
-import { STUDIO_URL } from './constants.js';
-
 const SCRAPE_TIMEOUT = 8000;
-const USER_AGENT = `Mozilla/5.0 (compatible; HmpsnStudioBot/1.0; +${STUDIO_URL})`;
 
 /**
  * Scrape a single URL and extract structured content.
@@ -43,7 +42,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedPage | null> {
 
     const res = await fetch(url, {
       headers: {
-        'User-Agent': USER_AGENT,
+        'User-Agent': STUDIO_BOT_UA,
         'Accept': 'text/html,application/xhtml+xml',
       },
       signal: controller.signal,
