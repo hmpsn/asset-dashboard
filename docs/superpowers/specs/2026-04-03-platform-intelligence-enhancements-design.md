@@ -77,6 +77,8 @@ Three groups of improvements spanning chat/notifications, strategy/SEO tooling, 
 
 **Behavior:** Pick a random entry from the pool on each new AI response. Display it in the same location as the current dots. Fade in/out on change if the response takes long enough to warrant a second pick (>4s).
 
+**Note:** `ChatPanel.tsx` is the shared component used by both client chat and admin chat. This change applies to both automatically — no separate implementation needed for the admin side.
+
 ---
 
 ## Group 2 — Strategy + SEO
@@ -95,6 +97,14 @@ Three groups of improvements spanning chat/notifications, strategy/SEO tooling, 
 - `impressions` — existing GSC impressions
 
 **Server:** `generateBrief()` in `server/content-brief.ts` receives this as a `strategyCardContext` object and injects it into the brief generation prompt. Calibrates competition framing (difficulty), urgency (trend), differentiation angle (competitorProof), and opportunity size (volume).
+
+**Easy win — `pageType`-specific tone guidance:** `pageType` is already passed through the pipeline but not used to calibrate the brief prompt. Wire it in the same pass:
+- `blog` → conversational, educational, long-form structure, H2/H3 hierarchy
+- `landing` → persuasive, conversion-focused, benefit-led, minimal friction
+- `service` → authoritative, trust-building, outcome-oriented, FAQ-ready
+- `location` → locally grounded, NAP-consistent, proximity signals
+- `pillar` → comprehensive, internally linked, cluster-anchoring tone
+- `product` → feature-benefit balance, objection handling, social proof hooks
 
 ---
 
@@ -143,6 +153,8 @@ Three enhancements to the strategy recommendation cards in the client portal:
 - CMS pages show a "Publishes to Webflow" indicator in the editor so the write path is transparent
 
 **Read-only fallback:** If a CMS page's collection is not mapped in `publishTarget.fieldMap`, suggestions are generated but marked "Manual apply required" — user can copy/paste into Webflow directly.
+
+**Easy win — select-all per collection:** Each collection chip in the filter bar gets a checkbox that selects all pages in that collection in one click. Saves manually checking every blog post row before bulk generating.
 
 ---
 
