@@ -21,6 +21,7 @@ interface Props {
   workspaceId: string;
   onRequestCountChange?: (count: number) => void;
   fixContext?: FixContext | null;
+  clearFixContext?: () => void;
 }
 
 const TABS = [
@@ -57,7 +58,7 @@ interface DecaySummary {
   avgDeclinePct: number;
 }
 
-export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext }: Props) {
+export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
   const [activeTab, setActiveTab] = useState<PipelineTab>('briefs');
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -88,10 +89,14 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
     return () => document.removeEventListener('mousedown', handleClick);
   }, [exportOpen]);
 
-  // Auto-switch to briefs tab when arriving via "Send to Planner" navigation
+  // Auto-switch to briefs tab when arriving via "Send to Planner" navigation.
+  // clearFixContext() nulls App.tsx state so revisiting the tab doesn't re-trigger.
   useEffect(() => {
-    if (fixContext) setActiveTab('briefs');
-  }, [fixContext]);
+    if (fixContext) {
+      setActiveTab('briefs');
+      clearFixContext?.();
+    }
+  }, [fixContext, clearFixContext]);
 
   const handleExport = (dataset: string, format: 'csv' | 'json') => {
     window.open(`/api/export/${workspaceId}/${dataset}?format=${format}`, '_blank');

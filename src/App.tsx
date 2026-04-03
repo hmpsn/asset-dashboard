@@ -343,7 +343,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
-    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
+    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={() => setFixContext(null)} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
