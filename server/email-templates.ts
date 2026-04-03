@@ -9,14 +9,17 @@ import { STUDIO_NAME } from './constants.js';
 // ── Shared helpers ──
 
 /** HTML-escape a string for safe interpolation into raw HTML template literals.
- *  Do NOT wrap values that flow into layout()/itemRow() — those helpers already call esc().
- *  Only use esc() when injecting directly into a `${...}` inside an HTML string. */
+ *  layout() escapes: preheader, headline, subtitle, footer, CTA label.
+ *  itemRow() escapes: title, detail, badge label.
+ *  Do NOT pre-escape values passed to those fields — only use esc() when
+ *  injecting directly into a `${...}` inside a raw HTML string (e.g. body content). */
 function esc(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── Layout ──
-// NOTE: layout() escapes preheader, headline, subtitle, and footer internally.
+// layout() escapes preheader, headline, subtitle, footer, and CTA label internally.
+// body is intentionally raw HTML (it contains styled divs, links, etc.).
 // Do NOT pre-escape values passed to these fields — it causes double-encoding.
 
 function layout(opts: {
@@ -66,8 +69,8 @@ function layout(opts: {
 
         <!-- Header -->
         <div style="padding:28px 28px 0;">
-          <h1 class="text-primary" style="margin:0 0 2px;font-size:18px;font-weight:600;color:#202945;line-height:1.3;">${opts.headline}</h1>
-          ${opts.subtitle ? `<div class="text-secondary" style="font-size:13px;color:#6b7280;margin-top:4px;">${opts.subtitle}</div>` : ''}
+          <h1 class="text-primary" style="margin:0 0 2px;font-size:18px;font-weight:600;color:#202945;line-height:1.3;">${esc(opts.headline)}</h1>
+          ${opts.subtitle ? `<div class="text-secondary" style="font-size:13px;color:#6b7280;margin-top:4px;">${esc(opts.subtitle)}</div>` : ''}
         </div>
 
         <!-- Body -->
@@ -85,7 +88,7 @@ function layout(opts: {
 
       <!-- Footer -->
       <div style="text-align:center;margin-top:20px;">
-        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${opts.footer || `Automated notification from ${esc(STUDIO_NAME)}`}</span>
+        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${esc(opts.footer || `Automated notification from ${STUDIO_NAME}`)}</span>
       </div>
 
     </div>
@@ -462,7 +465,7 @@ function renderPasswordReset(event: EmailEvent, logoUrl?: string) {
           <span style="font-size:12px;color:#92400e;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</span>
         </div>`,
       cta: { label: 'Reset Password', url: resetUrl },
-      footer: `You're receiving this because a password reset was requested for your account on ${esc(ws)}`,
+      footer: `You're receiving this because a password reset was requested for your account on ${ws}`,
       logoUrl: logoUrl || deriveLogoUrl(resetUrl),
     }),
   };
@@ -511,7 +514,7 @@ function renderTrialExpiryWarning(event: EmailEvent, logoUrl?: string) {
           <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact ${esc(STUDIO_NAME)} to discuss plans.</span>
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
-      footer: `You're receiving this because your Growth trial on ${esc(ws)} is ending soon`,
+      footer: `You're receiving this because your Growth trial on ${ws} is ending soon`,
       logoUrl: logoUrl || deriveLogoUrl(dashUrl),
     }),
   };
@@ -537,7 +540,7 @@ function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
     subject: `Welcome to your dashboard — ${ws}`,
     html: layout({
       preheader: `Your ${ws} insights dashboard is ready`,
-      headline: `Welcome, ${esc(name)}!`,
+      headline: `Welcome, ${name}!`,
       subtitle: `Your ${ws} dashboard is ready`,
       body: `
         <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
@@ -547,7 +550,7 @@ function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
           <span style="font-size:12px;color:#0d9488;">Questions? Just reply to this email — we're here to help.</span>
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
-      footer: `You're receiving this because an account was created for you on ${esc(ws)}`,
+      footer: `You're receiving this because an account was created for you on ${ws}`,
       logoUrl: logoUrl || deriveLogoUrl(dashUrl),
     }),
   };
@@ -713,7 +716,7 @@ export function renderMonthlyReport(data: {
       subtitle: `${d.workspaceName} · ${d.monthName}`,
       body: trialBanner + scoreSection + cwvSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
-      footer: `Automated monthly summary from ${esc(STUDIO_NAME)}`,
+      footer: `Automated monthly summary from ${STUDIO_NAME}`,
       logoUrl: deriveLogoUrl(d.dashboardUrl),
     }),
   };
