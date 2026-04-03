@@ -58,7 +58,7 @@ router.get('/api/debug/prompt', async (req, res) => {
   const formatDomain = (['content', 'strategy', 'technical', 'all'] as const).find(d => d === learningsDomain) ?? 'all';
 
   try {
-    const intel = await buildWorkspaceIntelligence(workspaceId, { slices, pagePath });
+    const intel = await buildWorkspaceIntelligence(workspaceId, { slices, pagePath, learningsDomain: formatDomain });
     const formatOpts: PromptFormatOptions = {
       verbosity: formatVerbosity,
       sections: slices,

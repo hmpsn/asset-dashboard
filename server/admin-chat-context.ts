@@ -379,7 +379,7 @@ export async function assembleAdminContext(
       // Get page-specific keyword context from strategy pageMap
       const normalizedPath = targetUrl.startsWith('/') ? targetUrl : targetUrl.replace(/^https?:\/\/[^/]+/, '');
       const pageKw = strategy?.pageMap?.find(p => p.pagePath.toLowerCase() === normalizedPath.toLowerCase())
-        ?? strategy?.pageMap?.find(p => normalizedPath.toLowerCase().endsWith(p.pagePath.toLowerCase()) || p.pagePath.toLowerCase().endsWith(normalizedPath.toLowerCase()));
+        ?? (normalizedPath ? strategy?.pageMap?.find(p => normalizedPath.toLowerCase().endsWith(p.pagePath.toLowerCase()) || p.pagePath.toLowerCase().endsWith(normalizedPath.toLowerCase())) : undefined);
       if (pageKw) {
         let pageKeywordBlock = `\n\nTHIS PAGE'S TARGET (overrides general context):`;
         pageKeywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
