@@ -23,7 +23,7 @@ import { getSeoChanges } from './seo-change-tracker.js';
 import { loadRecommendations } from './recommendations.js';
 import { listAnomalies } from './anomaly-detection.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { getLinkCheck, getPageSpeed } from './performance-store.js';
+import { getLinkCheck, getPageSpeed, getPageWeight } from './performance-store.js';
 import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
@@ -860,11 +860,36 @@ export async function assembleAdminContext(
               }
             }
           } catch { /* non-critical */ }
+
+          try {
+            const weightSnap = getPageWeight(ws.webflowSiteId);
+            if (weightSnap?.result) {
+              const pw = weightSnap.result as {
+                totalAssetSize?: number;
+                pages?: Array<{ page: string; totalSize: number; assetCount: number; assets: Array<{ name: string; size: number; contentType: string }> }>;
+              };
+              const pwPages = pw.pages ?? [];
+              if (pwPages.length > 0) {
+                const totalMb = pw.totalAssetSize != null ? (pw.totalAssetSize / 1024 / 1024).toFixed(1) : null;
+                const heaviestPages = pwPages.slice(0, 5).map(p => {
+                  const pageMb = (p.totalSize / 1024 / 1024).toFixed(1);
+                  const heaviestAsset = p.assets[0];
+                  const assetNote = heaviestAsset
+                    ? ` (heaviest asset: ${heaviestAsset.name}, ${(heaviestAsset.size / 1024).toFixed(0)}KB ${heaviestAsset.contentType})`
+                    : '';
+                  return `    ${p.page} — ${pageMb}MB${assetNote}`;
+                });
+                perfParts.push(
+                  `Page weight (total: ${totalMb != null ? `${totalMb}MB` : 'unknown'}, heaviest pages):\n${heaviestPages.join('\n')}`,
+                );
+              }
+            }
+          } catch { /* non-critical */ }
         }
 
         if (perfParts.length > 0) {
           sections.push(`SITE PERFORMANCE:\n${perfParts.join('\n')}`);
-          dataSources.push('Site Performance (Core Web Vitals, PageSpeed, link health, per-URL dead links)');
+          dataSources.push('Site Performance (Core Web Vitals, PageSpeed, per-URL dead links, page weight analysis)');
         }
       }
     } catch { /* non-critical */ }

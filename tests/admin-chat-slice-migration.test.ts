@@ -12,13 +12,13 @@ describe('admin-chat-context Task 8 migration — structural checks', () => {
     expect(src).not.toMatch(/import.*listChurnSignals.*from/);
   });
 
-  it('imports getLinkCheck and getPageSpeed for supplemental per-URL detail (not getPageWeight)', () => {
-    // getLinkCheck + getPageSpeed are re-imported as supplemental direct calls to restore per-URL
-    // dead link detail and worst-page scores — siteHealth slice stores counts only.
-    // Same pattern as listBatches() supplement for approvals. getPageWeight is not needed.
+  it('imports getLinkCheck, getPageSpeed, and getPageWeight for supplemental performance detail', () => {
+    // All three re-imported as supplemental direct calls — siteHealth slice stores aggregate
+    // counts/averages only; raw snapshots hold per-URL dead links, worst-page scores, and
+    // per-page asset weight data. Same pattern as listBatches() supplement for approvals.
     expect(src).toMatch(/import.*getLinkCheck.*from/);
     expect(src).toMatch(/import.*getPageSpeed.*from/);
-    expect(src).not.toMatch(/import.*getPageWeight.*from/);
+    expect(src).toMatch(/import.*getPageWeight.*from/);
   });
 
   it('no longer imports listActivity directly', () => {

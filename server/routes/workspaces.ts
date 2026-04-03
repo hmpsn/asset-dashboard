@@ -21,7 +21,7 @@ import {
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
 import { applySuppressionsToAudit, resolvePagePath } from '../helpers.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import {
@@ -52,7 +52,6 @@ import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
-import { parseJsonFallback } from '../db/json-validation.js';
 
 const log = createLogger('workspaces');
 
@@ -366,10 +365,11 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
       ],
     });
 
-    const suggestion = parseJsonFallback<{ industry?: string; goals?: string[]; targetAudience?: string }>(
-      result.text,
-      {},
-    );
+    // parseAIJson strips markdown fences (```json ... ```) that LLMs occasionally emit
+    // even when instructed not to. parseJsonFallback does bare JSON.parse and silently
+    // returns {} on fenced output, leaving the frontend fields blank with no error shown.
+    let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
+    try { suggestion = parseAIJson(result.text); } catch { /* malformed — fall through to empty fields */ }
 
     return res.json({
       industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',
