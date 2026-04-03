@@ -1,6 +1,6 @@
 /**
  * Light-mode branded HTML email templates.
- * All emails share a common layout with hmpsn studio branding (#202945 on white).
+ * All emails share a common layout with branded styling (#202945 on white).
  * Templates support both single events and batched digests.
  */
 
@@ -51,8 +51,8 @@ function layout(opts: {
       <!-- Logo -->
       <div style="text-align:center;margin-bottom:24px;">
         ${opts.logoUrl
-          ? `<img src="${esc(opts.logoUrl)}" alt="hmpsn studio" height="22" style="height:22px;width:auto;" />`
-          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">hmpsn studio</span>`
+          ? `<img src="${esc(opts.logoUrl)}" alt="${STUDIO_NAME}" height="22" style="height:22px;width:auto;" />`
+          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">${STUDIO_NAME}</span>`
         }
       </div>
 

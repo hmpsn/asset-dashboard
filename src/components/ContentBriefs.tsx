@@ -76,7 +76,7 @@ interface ContentTopicRequest {
 const BRIEF_ROUTES = ['seo-briefs', 'content-pipeline'] as const;
 type BriefRoute = typeof BRIEF_ROUTES[number];
 
-export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
+export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
   const briefsQ = useAdminBriefsList(workspaceId);
   const requestsQ = useAdminRequestsList(workspaceId);
@@ -124,6 +124,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       // Prefer the actual primary keyword over page name
       const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';
       if (prefill) setKeyword(prefill.replace(/-/g, ' '));
+      // Clear fixContext in parent so remounts don't re-trigger
+      clearFixContext?.();
     }
   }, [fixContext]);
 
