@@ -67,12 +67,17 @@ function ChunkFallback() {
 }
 
 export interface FixContext {
+  /** Which admin route this fixContext is intended for (e.g. 'content-pipeline', 'seo-editor').
+   *  REQUIRED — components check this before reacting. Without it, stale fixContext from one
+   *  tab leaks into another. Making this required ensures TypeScript catches missing values
+   *  at every navigation call site. */
+  targetRoute: string;
   pageId?: string;
   pageSlug?: string;
   pageName?: string;
   issueCheck?: string;
   issueMessage?: string;
-  // Brief generation context from Page Intelligence
+  // Brief generation context from Page Intelligence / Content Gaps
   primaryKeyword?: string;
   searchIntent?: string;
   optimizationScore?: number;
@@ -80,6 +85,8 @@ export interface FixContext {
   recommendations?: string[];
   contentGaps?: string[];
   autoGenerate?: boolean;
+  /** Suggested page type from content gaps (e.g. 'blog', 'service', 'landing'). */
+  pageType?: string;
 }
 
 /** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */
@@ -158,6 +165,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [location.pathname, GLOBAL_TABS]);
 
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
+  const clearFixContext = useCallback(() => setFixContext(null), []);
   const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
@@ -343,8 +351,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
-    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
-    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
+    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
+    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;

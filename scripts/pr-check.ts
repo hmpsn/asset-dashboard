@@ -126,10 +126,10 @@ const CHECKS: Check[] = [
   },
   {
     name: 'Hard-coded studio name',
-    pattern: 'hmpsn\\.studio',
+    pattern: 'hmpsn[ .]studio',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: 'server/constants.ts',
-    message: 'Use the STUDIO_NAME constant from server/constants.ts.',
+    exclude: ['server/constants.ts', 'src/constants.ts'],
+    message: 'Use the STUDIO_NAME / STUDIO_URL constant from src/constants.ts (frontend) or server/constants.ts (backend).',
     severity: 'error',
   },
   {
@@ -510,6 +510,40 @@ if (shouldRunSliceCheck) {
     } else {
       console.log(`  ✓ Assembled-but-never-rendered slice fields`);
     }
+  }
+}
+
+// ─── Constants sync check ─────────────────────────────────────────────────────
+// STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and src/constants.ts.
+// They can't share a runtime module (different module resolution), so this check
+// verifies they declare identical values.
+
+{
+  const serverConst = path.join(ROOT, 'server/constants.ts');
+  const frontendConst = path.join(ROOT, 'src/constants.ts');
+  try {
+    const serverSrc = readFileSync(serverConst, 'utf-8');
+    const frontendSrc = readFileSync(frontendConst, 'utf-8');
+    const extract = (src: string, name: string) => {
+      const m = src.match(new RegExp(`export const ${name}\\s*=\\s*['"]([^'"]+)['"]`));
+      return m?.[1] ?? null;
+    };
+    const mismatches: string[] = [];
+    for (const name of ['STUDIO_NAME', 'STUDIO_URL']) {
+      const sv = extract(serverSrc, name);
+      const fv = extract(frontendSrc, name);
+      if (sv !== fv) mismatches.push(`${name}: server='${sv}' vs frontend='${fv}'`);
+    }
+    if (mismatches.length > 0) {
+      console.log(`\n  ✗ Constants out of sync (server/constants.ts vs src/constants.ts)`);
+      console.log(`    Keep STUDIO_NAME and STUDIO_URL identical in both files.`);
+      for (const m of mismatches) console.log(`      ${m}`);
+      errors++;
+    } else {
+      console.log(`  ✓ Constants in sync (STUDIO_NAME, STUDIO_URL)`);
+    }
+  } catch {
+    // If either file is missing, the import checks will catch the real problem
   }
 }
 

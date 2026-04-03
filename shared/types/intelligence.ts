@@ -202,6 +202,64 @@ export interface OperationalSlice {
   insightAcceptanceRate?: InsightAcceptanceRate | null;
 }
 
+// ── Client Intelligence API types (Phase 4C) ────────────────────────────────
+// Scrubbed, tier-gated view of WorkspaceIntelligence for client portal consumption.
+// NEVER expose: knowledgeBase, brandVoice, churnRisk, impact_score, operational slice,
+// admin-only insight types (strategy_alignment), or bridge source tags.
+
+export interface ClientInsightsSummary {
+  /** Total actionable insights (critical + warning + opportunity; positive excluded) */
+  total: number;
+  /** highPriority = critical+warning; mediumPriority = opportunity */
+  highPriority: number;
+  mediumPriority: number;
+  /** Human-readable top insight titles (max 3) */
+  topInsights: Array<{ title: string; type: string }>;
+}
+
+export interface ClientPipelineStatus {
+  briefs: { total: number; inProgress: number };
+  posts: { total: number; inProgress: number };
+  /** Pending SEO edits awaiting client approval */
+  pendingApprovals: number;
+}
+
+export interface ClientLearningHighlights {
+  /** Overall win rate across all tracked actions (0-1) */
+  overallWinRate: number;
+  /** Top performing action type (e.g. "title_update") */
+  topActionType: string | null;
+  /** Count of strong_win outcomes from weCalledIt entries (up to 5; no date filter) */
+  recentWins: number;
+}
+
+export interface ClientSiteHealthSummary {
+  /** 0-100 audit score */
+  auditScore: number | null;
+  /** Direction vs previous audit */
+  auditScoreDelta: number | null;
+  /** CWV pass rate as 0-100 integer (average of available rates; currently mobile-only until assembler populates desktop) */
+  cwvPassRatePct: number | null;
+  /** Count of dead links */
+  deadLinks: number;
+}
+
+export interface ClientIntelligence {
+  workspaceId: string;
+  assembledAt: string;
+  tier: 'free' | 'growth' | 'premium';
+
+  // All tiers
+  insightsSummary: ClientInsightsSummary | null;
+  pipelineStatus: ClientPipelineStatus | null;
+
+  // Growth+ only
+  learningHighlights?: ClientLearningHighlights | null;
+
+  // Premium only
+  siteHealthSummary?: ClientSiteHealthSummary | null;
+}
+
 // ── New supporting types (Phase 3A) ─────────────────────────────────
 
 export interface BusinessProfile {
@@ -245,6 +303,8 @@ export interface ChurnSignalSummary {
   type: string;
   severity: string;
   detectedAt: string;
+  title: string;
+  description: string;
 }
 
 export interface ROIAttribution {

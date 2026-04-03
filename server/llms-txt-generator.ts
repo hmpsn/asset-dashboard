@@ -57,6 +57,7 @@ let _upsertStmt: ReturnType<typeof db.prepare> | null = null;
 let _getOneStmt: ReturnType<typeof db.prepare> | null = null;
 let _getAllStmt: ReturnType<typeof db.prepare> | null = null;
 let _deleteStmt: ReturnType<typeof db.prepare> | null = null;
+let _cleanupOldLlmsTxtStmt: ReturnType<typeof db.prepare> | null = null;
 
 function upsertCacheStmt() {
   if (!_upsertStmt) {
@@ -88,6 +89,12 @@ function deleteCacheStmt() {
   }
   return _deleteStmt;
 }
+function cleanupOldLlmsTxtCacheStmt() {
+  if (!_cleanupOldLlmsTxtStmt) {
+    _cleanupOldLlmsTxtStmt = db.prepare(`DELETE FROM llms_txt_cache WHERE generated_at < datetime('now', ? || ' days')`);
+  }
+  return _cleanupOldLlmsTxtStmt;
+}
 
 interface CacheRow {
   id: string;
@@ -116,6 +123,11 @@ export function getSummaries(workspaceId: string) {
 export function deleteSummary(workspaceId: string, pageUrl: string): boolean {
   const result = deleteCacheStmt().run(workspaceId, pageUrl);
   return result.changes > 0;
+}
+
+export function cleanupOldLlmsTxt(maxAgeDays: number = 90): number {
+  const info = cleanupOldLlmsTxtCacheStmt().run(`-${maxAgeDays}`);
+  return info.changes;
 }
 
 // ── Freshness Tracking ──

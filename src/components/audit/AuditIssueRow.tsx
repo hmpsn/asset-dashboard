@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../../routes';
 import {
   Loader2, CheckCircle, Send, Wrench, X, Pencil,
-  MoreVertical, EyeOff, ClipboardList, Layers,
+  MoreVertical, EyeOff, ClipboardList, Layers, FileSearch,
 } from 'lucide-react';
 import type { SeoIssue, PageSeoResult } from './types';
 import { SEVERITY_CONFIG, CATEGORY_CONFIG, FIX_TAB_LABELS, getFixTab } from './types';
@@ -195,7 +195,7 @@ export function AuditIssueRow({
           if (!fixTab) return null;
           return (
             <button
-              onClick={() => navigate(adminPath(workspaceId, fixTab as Page), { state: { fixContext: { pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message } } })}
+              onClick={() => navigate(adminPath(workspaceId, fixTab as Page), { state: { fixContext: { targetRoute: fixTab, pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message } } })}
               className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center gap-0.5 transition-colors"
               title={`Open ${FIX_TAB_LABELS[fixTab] || fixTab}`}
             >
@@ -203,6 +203,16 @@ export function AuditIssueRow({
             </button>
           );
         })()}
+        {/* View Page → Page Intelligence (deep-dive into all page signals) */}
+        {workspaceId && page.pageId && (
+          <button
+            onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'), { state: { fixContext: { targetRoute: 'page-intelligence', pageId: page.pageId, pageSlug: page.slug, pageName: page.page } } })}
+            className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800/60 hover:bg-zinc-700/60 text-zinc-400 border border-zinc-700/40 flex items-center gap-0.5 transition-colors"
+            title="View in Page Intelligence"
+          >
+            <FileSearch className="w-2.5 h-2.5" /> Page
+          </button>
+        )}
         {/* Status badges (show instead of actions when done) */}
         {isFlagged && (
           <span className="text-[10px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-0.5">

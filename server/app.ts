@@ -55,6 +55,7 @@ import publicContentRoutes from './routes/public-content.js';
 import publicAnalyticsRoutes from './routes/public-analytics.js';
 import publicChatRoutes from './routes/public-chat.js';
 import publicRequestsRoutes from './routes/public-requests.js';
+import clientIntelligenceRoutes from './routes/client-intelligence.js';
 import contentRequestsRoutes from './routes/content-requests.js';
 import contentBriefsRoutes from './routes/content-briefs.js';
 import contentPostsRoutes from './routes/content-posts.js';
@@ -296,6 +297,7 @@ export function createApp(): express.Express {
   app.use(publicAuthRoutes);
   app.use(publicContentRoutes);
   app.use(publicAnalyticsRoutes);
+  app.use(clientIntelligenceRoutes);
   app.use(publicChatRoutes);
   app.use(publicRequestsRoutes);
   app.use(contentRequestsRoutes);

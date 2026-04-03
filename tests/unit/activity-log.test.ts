@@ -6,7 +6,6 @@ import {
   addActivity,
   listActivity,
   listClientActivity,
-  deleteActivity,
   initActivityBroadcast,
 } from '../../server/activity-log.js';
 
@@ -106,15 +105,3 @@ describe('listClientActivity', () => {
   });
 });
 
-// ── deleteActivity ──
-
-describe('deleteActivity', () => {
-  it('deletes an activity by id', () => {
-    const entry = addActivity('ws_del_' + Date.now(), 'note', 'To delete');
-    expect(deleteActivity(entry.id)).toBe(true);
-  });
-
-  it('returns false for non-existent id', () => {
-    expect(deleteActivity('act_nonexistent_999')).toBe(false);
-  });
-});

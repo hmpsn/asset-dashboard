@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **253 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **270 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3088,6 +3088,45 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 203. Unified Workspace Intelligence Layer — Phase 4A (Infrastructure: Data Retention + Cache Warming)
+**What it does:** Two background cron subsystems. (1) **Data retention crons** (daily, 2-min startup delay): pruning three unbounded tables — `chat_sessions` deleted after 180 days, `audit_snapshots` deleted after 365 days, `llms_txt_cache` deleted after 90 days. Each cleanup uses a lazy prepared statement (`createStmtCache()`). (2) **Intelligence cache warming cron** (every 6h, 5-min startup delay): iterates all workspaces, skips those with no activity log entries, and calls `buildWorkspaceIntelligence()` with all non-pageProfile slices. An `isRunning` guard prevents overlapping cycles if one run exceeds 6h. Startup timeouts stored at module level so `stop*()` functions cancel them cleanly before first fire.
+
+**Files:** `server/data-retention.ts` (new), `server/intelligence-crons.ts` (new), `server/chat-memory.ts`, `server/reports.ts`, `server/llms-txt-generator.ts`, `server/startup.ts`, `tests/data-retention.test.ts` (new), `tests/intelligence-crons.test.ts` (new)
+
+**Agency value:** Prevents unbounded DB growth on long-running deployments. Proactive cache warming means the first AI feature request for an active workspace is served from cache rather than a cold LLM call.
+
+**Client value:** (Indirect) Faster first-load on AI-powered features after overnight inactivity.
+
+**Mutual:** Pure infrastructure — no UI changes. All crons `.unref()`-ed and cancel cleanly on shutdown.
+
+---
+
+### 204. Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)
+**What it does:** Two sub-tasks delivered together. (1) **Admin chat intelligence slice migration**: the `assembleAdminContext()` function in `admin-chat-context.ts` now sources workspace data through `buildWorkspaceIntelligence()` slices instead of direct DB helpers. Activity → `intel.operational.recentActivity`, CWV/PageSpeed summary → `intel.siteHealth`, client health/churn signals → `intel.clientSignals`. Context size is managed through selective slice inclusion per question category (general queries union all three supplemental slices). Approvals keep direct `listBatches()` call + `intel.operational.approvalQueue` supplement. Performance keeps direct `getLinkCheck()`/`getPageSpeed()` calls for per-URL dead link detail (up to 10) and worst-page scores (top 5) — the siteHealth slice only stores counts, matching the `listBatches()` supplement pattern. Churn signals now surface human-readable `title` and `description` fields. CWV pass rate correctly converted from 0–1 decimal to percentage. (2) **businessProfile auto-populate**: the Intelligence Profile editor gains an "Auto-fill from site data" button (Sparkles icon, teal). Calls `POST /api/workspaces/:id/intelligence-profile/autofill` which fetches the `seoContext` slice (keywords, content gaps, business context — deliberately NOT `businessProfile` to avoid chicken-and-egg), prompts `gpt-4.1-mini` (temperature 0.3, 300 tokens) in JSON mode, returns `{ industry, goals, targetAudience }` pre-filled into the form. Autofill is a pure suggestion — no save/broadcast until the user clicks Save.
+
+**Files:** `server/admin-chat-context.ts`, `server/routes/workspaces.ts`, `src/components/settings/IntelligenceProfileTab.tsx`, `tests/admin-chat-slice-migration.test.ts` (new)
+
+**Agency value:** Admin chat answers client health and activity questions from the same cached intelligence layer as all other AI features — no redundant queries. The auto-populate button eliminates the blank-slate friction when onboarding a new workspace: one click extracts industry/goals/audience from the site's existing keyword strategy.
+
+**Client value:** (Indirect) Faster onboarding means the admin sets up the intelligence profile sooner, so AI features (briefs, strategy advice) are more accurate from day one.
+
+**Mutual:** All previous direct DB calls in admin chat context are now routed through the caching layer, making cold-start latency predictable and consistent with other intelligence features.
+
+---
+
+### 205. Unified Workspace Intelligence Layer — Phase 4C (Client Intelligence API + Portal Widget)
+**What it does:** Exposes a scrubbed, tier-gated view of `WorkspaceIntelligence` to the client portal. Four new components: (1) **`ClientIntelligence` shared type** (`shared/types/intelligence.ts`) — five interfaces (`ClientInsightsSummary`, `ClientPipelineStatus`, `ClientLearningHighlights`, `ClientSiteHealthSummary`, `ClientIntelligence`) that define what the client may see; admin-only fields (`knowledgeBase`, `brandVoice`, `churnRisk`, `operational`, `strategy_alignment` insight type, `impact_score`, `resolution_source`) are never included. (2) **`GET /api/public/intelligence/:workspaceId`** — server route that calls `buildWorkspaceIntelligence()`, assembles `ClientIntelligence` from appropriate slices, and applies tier gating: free gets insights summary + pipeline status; growth adds `learningHighlights`; premium adds `siteHealthSummary`. (3) **`useClientIntelligence` hook** — React Query hook with 5-minute stale time, barrel-exported from `src/hooks/client/index.ts`, using `queryKeys.client.intelligence()`. (4) **`IntelligenceSummaryCard`** client portal component — 2-column grid card: high-priority insights count (blue, all tiers), briefs in progress (blue, all tiers), action win rate (teal, Growth+ behind `TierGate`). Placed in `OverviewTab` after the `MonthlyDigest` card, wrapped in `ErrorBoundary`.
+
+**Files:** `shared/types/intelligence.ts`, `server/routes/client-intelligence.ts`, `server/app.ts`, `src/api/analytics.ts`, `src/hooks/client/useClientIntelligence.ts`, `src/hooks/client/index.ts`, `src/lib/queryKeys.ts`, `src/components/client/IntelligenceSummaryCard.tsx`, `src/components/client/OverviewTab.tsx`, `tests/client-intelligence-types.test.ts`, `tests/client-intelligence-route.test.ts`, `tests/use-client-intelligence.test.ts`, `tests/intelligence-summary-card.test.ts`
+
+**Agency value:** The intelligence layer built for admin AI features now flows through to clients — a second consumer of the same cached data at zero additional query cost. Clients can see high-level health signals in their portal without any new DB work.
+
+**Client value:** A single "Site Intelligence" card surfaces the most important signals (top insights, content in flight, win rate) in their overview — transparent proof of work without overwhelming detail. Tier gating ensures premium features remain an upgrade motivator.
+
+**Mutual:** Reuses the existing LRU-cached `buildWorkspaceIntelligence()` infrastructure. Client-facing data is scrubbed at the route layer so there's no risk of admin fields leaking.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3103,6 +3142,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**266 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**270 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **267**. Last updated: April 2026.
+Current feature count: **270**. Last updated: April 2026.
