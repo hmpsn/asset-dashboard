@@ -67,6 +67,10 @@ function ChunkFallback() {
 }
 
 export interface FixContext {
+  /** Which admin route this fixContext is intended for (e.g. 'content-pipeline', 'seo-editor').
+   *  Components must check this before reacting — fixContext persists in App state across tab
+   *  navigations, so a stale value from seo-editor can be visible when content-pipeline mounts. */
+  targetRoute?: string;
   pageId?: string;
   pageSlug?: string;
   pageName?: string;

@@ -877,7 +877,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     {chatUsage.remaining}/{chatUsage.limit} left
                   </span>
                 ) : (
-                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span>
+                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by {STUDIO_NAME}</span>
                 )}
               </div>
               <div className="flex items-center gap-1">

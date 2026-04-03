@@ -25,7 +25,7 @@ function esc(s: string): string {
 
 /**
  * Render a professional branded HTML page for a blog post, suitable for PDF export.
- * Matches the content brief export styling with print-ready layout, HMPSN Studio branding,
+ * Matches the content brief export styling with print-ready layout, ${STUDIO_NAME} branding,
  * and @page rules for clean PDF output.
  */
 export function renderPostHTML(post: GeneratedPost): string {
@@ -48,13 +48,13 @@ export function renderPostHTML(post: GeneratedPost): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(titleTag)} — HMPSN Studio</title>
+<title>${esc(titleTag)} — ${STUDIO_NAME}</title>
 <style>
   @page {
     size: letter;
     margin: 0.75in 0.75in 1in 0.75in;
     @bottom-center {
-      content: "HMPSN Studio  ·  Content Post  ·  ${esc(post.targetKeyword).replace(/'/g, "\\'")}";
+      content: "${STUDIO_NAME}  ·  Content Post  ·  ${esc(post.targetKeyword).replace(/'/g, "\\'")}";
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 9px; color: #64748b; letter-spacing: 0.5px;
     }
@@ -149,7 +149,7 @@ export function renderPostHTML(post: GeneratedPost): string {
 <body>
 <div class="print-bar no-print">
   <div style="display:flex;align-items:center;gap:12px">
-    <span class="info">HMPSN Studio &mdash; Content Post</span>
+    <span class="info">${STUDIO_NAME} &mdash; Content Post</span>
     <span class="tip">Tip: Use &ldquo;Save as PDF&rdquo; in the print dialog for best results</span>
   </div>
   <button id="print-btn">Save as PDF</button>

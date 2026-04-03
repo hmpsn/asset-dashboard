@@ -54,13 +54,13 @@ export function renderBriefHTML(brief: ContentBrief): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Content Brief: ${esc(b.targetKeyword)} — HMPSN Studio</title>
+<title>Content Brief: ${esc(b.targetKeyword)} — ${STUDIO_NAME}</title>
 <style>
   @page {
     size: letter;
     margin: 0.75in 0.75in 1in 0.75in;
     @bottom-center {
-      content: "HMPSN Studio  ·  Content Brief  ·  ${esc(b.targetKeyword).replace(/'/g, "\\'")}";
+      content: "${STUDIO_NAME}  ·  Content Brief  ·  ${esc(b.targetKeyword).replace(/'/g, "\\'")}";
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 9px; color: #64748b; letter-spacing: 0.5px;
     }
@@ -191,7 +191,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
 <body>
 <div class="print-bar no-print">
   <div style="display:flex;align-items:center;gap:12px">
-    <span class="info">HMPSN Studio &mdash; Content Brief</span>
+    <span class="info">${STUDIO_NAME} &mdash; Content Brief</span>
     <span class="tip">Tip: Use &ldquo;Save as PDF&rdquo; in the print dialog for best results</span>
   </div>
   <button id="print-btn">Save as PDF</button>

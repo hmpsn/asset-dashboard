@@ -90,9 +90,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
   }, [exportOpen]);
 
   // Auto-switch to briefs tab when arriving via "Send to Planner" navigation.
+  // Guard on targetRoute so stale fixContext from seo-editor/seo-schema navigations
+  // doesn't wrongly trigger a tab switch when the user arrives at content-pipeline.
   // clearFixContext() nulls App.tsx state so revisiting the tab doesn't re-trigger.
   useEffect(() => {
-    if (fixContext) {
+    if (fixContext?.targetRoute === 'content-pipeline') {
       setActiveTab('briefs');
       clearFixContext?.();
     }
