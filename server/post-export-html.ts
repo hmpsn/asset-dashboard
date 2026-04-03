@@ -25,7 +25,7 @@ function esc(s: string): string {
 
 /**
  * Render a professional branded HTML page for a blog post, suitable for PDF export.
- * Matches the content brief export styling with print-ready layout, ${STUDIO_NAME} branding,
+ * Matches the content brief export styling with print-ready layout, hmpsn studio branding,
  * and @page rules for clean PDF output.
  */
 export function renderPostHTML(post: GeneratedPost): string {
