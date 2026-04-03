@@ -29,15 +29,15 @@ const log = createLogger('client-intelligence');
 const ADMIN_ONLY_INSIGHT_TYPES = new Set(['strategy_alignment']);
 
 function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSummary {
-  const visible = insights.all.filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.type));
+  const visible = insights.all.filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType));
   return {
     total: visible.length,
-    highPriority: visible.filter(i => i.severity === 'critical' || i.severity === 'high').length,
-    mediumPriority: visible.filter(i => i.severity === 'medium').length,
+    highPriority: visible.filter(i => i.severity === 'critical' || i.severity === 'warning').length,
+    mediumPriority: visible.filter(i => i.severity === 'opportunity').length,
     topInsights: insights.topByImpact
-      .filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.type))
+      .filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType))
       .slice(0, 3)
-      .map(i => ({ title: i.title, type: i.type })),
+      .map(i => ({ title: i.pageTitle ?? i.insightType, type: i.insightType })),
   };
 }
 
