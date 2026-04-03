@@ -225,20 +225,15 @@ Three enhancements to the strategy recommendation cards in the client portal:
 
 These connections were identified during review and must be included in the implementation — not optional additions.
 
-### Intelligence Slice Implementations
+### Intelligence Slice Status (verified against origin/main)
 
-**`clientSignals` slice (currently stubbed — returns `undefined`)**
-- Implement `assembleClientSignals()` in `workspace-intelligence.ts`
-- Data sources: new `client_signals` table (1.1), existing `churn-signals.ts`, `roi.ts`, `activity-log.ts`, `content-requests.ts`
-- Output: churn risk level, ROI trend, engagement score, recent signal history, composite health score
-- Add `formatClientSignalsSection()` to `formatForPrompt()` so admin chat can answer "how engaged is this client?"
-- Admin chat `assembleAdminContext()` already has a `'client'` question category — once this slice is populated, it gets the data for free
+All 8 slices are fully implemented as of Phase 4A/4B/4C. `formatForPrompt()` covers all 8. Admin chat now dynamically selects slices via `buildWorkspaceIntelligence()`. `INTELLIGENCE_CACHE_UPDATED` is actively broadcast.
 
-**`pageProfile` slice (currently stubbed — returns `undefined`)**
-- Implement `assemblePageProfile()` as a direct output of the Page Intelligence + Strategy blend (2.4)
-- Strategy already writes all page keyword data to `page_keywords` during generation — this slice reads it
-- No new data collection required: same fields, exposed as an intelligence slice
-- Enables admin chat to answer per-page questions with structured data rather than ad-hoc queries
+**Two genuine gaps in `seoContext` (Brand & Voice Intelligence):**
+- `backlinkProfile` — declared optional in `SeoContextSlice`, never populated. Data available via `SeoDataProvider.getBacklinksOverview()`, 7-day file cache.
+- `serpFeatures` — declared optional in `SeoContextSlice`, never populated. Data is already fetched during strategy generation via `getDomainOrganicKeywords()` — reuse from `page_keywords` table via `parseSerpFeatures()`. No new API call needed.
+
+Wire both in `assembleSeoContext()` in `workspace-intelligence.ts`. Use `SeoDataProvider` abstraction — no direct vendor calls.
 
 ### Smart Placeholder Hook — Intelligence-First
 
@@ -252,7 +247,7 @@ The `useSmartPlaceholder` hook (3.3) must read from the existing `seoContext` in
 
 **`bridge-client-signal` flag is already defined** in `bridge-infrastructure.ts`. Group 1 implementation just needs to point at it — zero new bridge infrastructure required.
 
-**`INTELLIGENCE_CACHE_UPDATED` WebSocket event is defined but never broadcast.** Wire it during this work: when intelligence cache is invalidated, broadcast this event. Frontend React Query automatically invalidates. One connection, platform-wide benefit.
+**`INTELLIGENCE_CACHE_UPDATED` is already broadcast** (confirmed in Phase 4A). No work needed here.
 
 **Cache invalidation call sites for new mutations:**
 - New `client_signals` insert → `invalidateIntelligenceCache(workspaceId)` + `invalidateSubCachePrefix(workspaceId, 'slice:clientSignals')`
