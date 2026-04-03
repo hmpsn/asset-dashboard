@@ -28,10 +28,10 @@ export function matchPagePath(a: string, b: string): boolean {
   return normalizePath(a) === normalizePath(b);
 }
 
-/** Find a pageMap entry by path (exact match with normalization) */
+/** Find a pageMap entry by path (exact match with normalization, case-insensitive) */
 export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], path: string): T | undefined {
-  const norm = normalizePath(path);
-  return pageMap.find(p => normalizePath(p.pagePath) === norm);
+  const norm = normalizePath(path).toLowerCase();
+  return pageMap.find(p => normalizePath(p.pagePath).toLowerCase() === norm);
 }
 
 /** Resolve a Webflow page's canonical path from publishedPath or slug */
