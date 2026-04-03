@@ -798,7 +798,7 @@ export async function assembleAdminContext(
           clientParts.push(`Portal activity: ${cs.engagement.loginFrequency}`);
         if (cs.churnSignals && cs.churnSignals.length > 0) {
           const signalLines = cs.churnSignals.slice(0, 5)
-            .map(s => `  - [${s.severity}] ${s.type}: detected ${s.detectedAt?.slice(0, 10)}`);
+            .map(s => `  - [${s.severity}] ${s.title}: ${s.description}`);
           clientParts.push(`Churn signals:\n${signalLines.join('\n')}`);
         }
         if (clientParts.length > 0) {
