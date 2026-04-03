@@ -8,11 +8,16 @@ import { STUDIO_NAME } from './constants.js';
 
 // ── Shared helpers ──
 
+/** HTML-escape a string for safe interpolation into raw HTML template literals.
+ *  Do NOT wrap values that flow into layout()/itemRow() — those helpers already call esc().
+ *  Only use esc() when injecting directly into a `${...}` inside an HTML string. */
 function esc(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── Layout ──
+// NOTE: layout() escapes preheader, headline, subtitle, and footer internally.
+// Do NOT pre-escape values passed to these fields — it causes double-encoding.
 
 function layout(opts: {
   preheader?: string;
@@ -340,7 +345,7 @@ function renderRequestStatus(events: EmailEvent[], count: number, ws: string, da
 function renderRequestResponse(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.requestTitle as string) || 'Request',
-    detail: (e.data.noteContent as string)?.slice(0, 150) || `New response from ${esc(STUDIO_NAME)}`,
+    detail: (e.data.noteContent as string)?.slice(0, 150) || `New response from ${STUDIO_NAME}`,
     isLast: i === events.length - 1,
   })).join('');
 
@@ -349,7 +354,7 @@ function renderRequestResponse(events: EmailEvent[], count: number, ws: string, 
       ? `Update on "${(events[0].data.requestTitle as string) || 'your request'}" — ${ws}`
       : `${count} new responses on your requests — ${ws}`,
     html: layout({
-      preheader: `${esc(STUDIO_NAME)} responded to ${count} request${count !== 1 ? 's' : ''}`,
+      preheader: `${STUDIO_NAME} responded to ${count} request${count !== 1 ? 's' : ''}`,
       headline: count === 1 ? 'New Response on Your Request' : `${count} New Responses`,
       subtitle: ws,
       body: items,
@@ -986,7 +991,7 @@ export function renderApprovalReminder(data: {
         </div>
         ${itemRow({
           title: data.batchName,
-          detail: `Submitted ${data.staleDays} days ago · Approving lets ${esc(STUDIO_NAME)} push updates live`,
+          detail: `Submitted ${data.staleDays} days ago · Approving lets ${STUDIO_NAME} push updates live`,
           isLast: true,
         })}`,
       cta: data.dashboardUrl ? { label: 'Review Changes', url: data.dashboardUrl } : undefined,

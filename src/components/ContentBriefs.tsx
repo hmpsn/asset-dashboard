@@ -104,9 +104,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
 
-  // Capture fixContext in a ref so handleGenerate can use it even after the parent clears it.
+  // Capture fixContext in a ref so handleGenerate can read it even after clearFixContext() nulls the prop.
   // Initialize to null (not the raw prop) so the initial value also passes the targetRoute guard.
-  // Stale fixContext from seo-editor/seo-schema has no targetRoute and must never pre-populate this ref.
+  // Cleared after first generation (see handleGenerate) so subsequent manual briefs don't inherit stale page data.
   const fixContextRef = useRef<FixContext | null | undefined>(null);
   useEffect(() => {
     if (fixContext && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
@@ -344,6 +344,9 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [brief, ...(old ?? [])]);
       setKeyword('');
       setExpanded(brief.id);
+      // Clear the navigation context so subsequent manual generations don't inherit
+      // stale page analysis data (pageId, optimizationIssues, etc.) from the first brief.
+      fixContextRef.current = null;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate brief');
     } finally {
