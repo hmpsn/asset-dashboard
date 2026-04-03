@@ -3869,6 +3869,7 @@
           "status": "done"
         },
         {
+          "id": "unified-workspace-intelligence-4c",
           "title": "Unified Workspace Intelligence Layer — Phase 4C (Client Intelligence API + Portal Widget)",
           "source": "session planning 2026-04-03",
           "est": "2-3h",

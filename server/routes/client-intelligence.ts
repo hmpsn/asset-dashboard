@@ -75,14 +75,11 @@ function formatSiteHealthForClient(health: SiteHealthSlice): ClientSiteHealthSum
   const avgPassRate = definedRates.length > 0
     ? definedRates.reduce((a, b) => a + b, 0) / definedRates.length
     : null;
-  const cwvIssueCount = avgPassRate !== null
-    ? Math.round((1 - avgPassRate) * 10)
-    : null;
 
   return {
     auditScore: health.auditScore,
     auditScoreDelta: health.auditScoreDelta,
-    cwvIssueCount,
+    cwvPassRatePct: avgPassRate !== null ? Math.round(avgPassRate * 100) : null,
     deadLinks: health.deadLinks,
   };
 }

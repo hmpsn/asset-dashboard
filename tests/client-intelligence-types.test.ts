@@ -58,7 +58,7 @@ describe('ClientIntelligence type contract', () => {
     const health: ClientSiteHealthSummary = {
       auditScore: 87,
       auditScoreDelta: 3,
-      cwvIssueCount: 2,
+      cwvPassRatePct: 72,
       deadLinks: 1,
     };
     expect(health.deadLinks).toBe(1);

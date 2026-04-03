@@ -210,7 +210,7 @@ export interface OperationalSlice {
 export interface ClientInsightsSummary {
   /** Total active insights across all types */
   total: number;
-  /** Count by severity — only 'high' and 'medium' exposed to clients */
+  /** highPriority = critical+warning; mediumPriority = opportunity */
   highPriority: number;
   mediumPriority: number;
   /** Human-readable top insight titles (max 3) */
@@ -238,8 +238,8 @@ export interface ClientSiteHealthSummary {
   auditScore: number | null;
   /** Direction vs previous audit */
   auditScoreDelta: number | null;
-  /** Count of pages with CWV issues (derived from pass rate) */
-  cwvIssueCount: number | null;
+  /** CWV pass rate as 0-100 integer (mobile-only; desktop data not yet assembled) */
+  cwvPassRatePct: number | null;
   /** Count of dead links */
   deadLinks: number;
 }
