@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **253 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **269 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3101,6 +3101,19 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 204. Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)
+**What it does:** Two sub-tasks delivered together. (1) **Admin chat intelligence slice migration**: the `assembleAdminContext()` function in `admin-chat-context.ts` now sources all workspace data through `buildWorkspaceIntelligence()` instead of calling individual DB helpers directly. Activity data comes from `intel.operational.recentActivity`, performance/CWV from `intel.siteHealth`, client health/churn signals from `intel.clientSignals`. General queries dynamically assemble a union of all relevant slices with a `GENERAL_INTEL_TOKEN_BUDGET` cap to prevent token overflow. The approvals queue keeps its direct `listBatches()` call (richer than the operational summary) and supplements with `intel.operational.approvalQueue`. Churn signals now surface the human-readable `title` and `description` fields. (2) **businessProfile auto-populate**: the Intelligence Profile editor (`IntelligenceProfileTab.tsx`) gains an "Auto-fill from site data" button (Sparkles icon, teal secondary style). Clicking it calls `POST /api/workspaces/:id/intelligence-profile/autofill` which fetches the `seoContext` slice (keywords, content gaps, business context — deliberately NOT `businessProfile` to avoid chicken-and-egg), prompts `gpt-4.1-mini` in JSON mode, and returns `{ industry, goals, targetAudience }` pre-filled into the form fields.
+
+**Files:** `server/admin-chat-context.ts`, `server/routes/workspaces.ts`, `src/components/settings/IntelligenceProfileTab.tsx`, `tests/admin-chat-slice-migration.test.ts` (new)
+
+**Agency value:** Admin chat answers client health and activity questions from the same cached intelligence layer as all other AI features — no redundant queries. The auto-populate button eliminates the blank-slate friction when onboarding a new workspace: one click extracts industry/goals/audience from the site's existing keyword strategy.
+
+**Client value:** (Indirect) Faster onboarding means the admin sets up the intelligence profile sooner, so AI features (briefs, strategy advice) are more accurate from day one.
+
+**Mutual:** All previous direct DB calls in admin chat context are now routed through the caching layer, making cold-start latency predictable and consistent with other intelligence features.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3116,6 +3129,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**268 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**269 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 Current feature count: **268**. Last updated: April 2026.

@@ -3858,6 +3858,17 @@
           "status": "done"
         },
         {
+          "id": "unified-workspace-intelligence-4b",
+          "title": "Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)",
+          "source": "session planning 2026-04-03",
+          "est": "3-4h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #129. Admin chat context now sources activity/performance/client health from intelligence slices (operational, siteHealth, clientSignals) instead of direct DB helpers. Dynamic slice union for general queries with GENERAL_INTEL_TOKEN_BUDGET cap. ChurnSignalSummary title+description fields surfaced. businessProfile auto-populate: Sparkles button in IntelligenceProfileTab calls POST autofill endpoint, uses seoContext slice (not businessProfile — avoids chicken-and-egg), GPT-4.1-mini returns industry/goals/targetAudience. 8 tests.",
+          "shippedAt": "2026-04-03",
+          "status": "done"
+        },
+        {
           "id": "bridge-audit-finding-auto-resolve",
           "title": "Auto-resolve audit_finding insights when issues are fixed",
           "source": "PR #118 review flag",
