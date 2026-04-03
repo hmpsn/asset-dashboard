@@ -128,8 +128,8 @@ const CHECKS: Check[] = [
     name: 'Hard-coded studio name',
     pattern: 'hmpsn\\.studio',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: 'server/constants.ts',
-    message: 'Use the STUDIO_NAME constant from server/constants.ts.',
+    exclude: ['server/constants.ts', 'src/constants.ts'],
+    message: 'Use the STUDIO_NAME / STUDIO_URL constant from src/constants.ts (frontend) or server/constants.ts (backend).',
     severity: 'error',
   },
   {

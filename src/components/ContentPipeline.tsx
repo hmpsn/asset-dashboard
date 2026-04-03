@@ -110,7 +110,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
         <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400" style={{ borderRadius: '10px 24px 10px 24px' }}>
           {summary.briefs > 0 && <span className="flex items-center gap-1"><Clipboard className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
           {summary.posts > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><FileText className="w-3 h-3 text-amber-400" /><span className="font-medium text-zinc-300">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
-          {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-violet-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
+          {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
           {summary.cells > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-zinc-300">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-green-400 ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
         </div>
       )}
