@@ -6,6 +6,7 @@ import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
+import type { PageKeywordMap } from '../../../shared/types/workspace';
 import type { ContentPlanReviewCell } from '../../hooks/useClientData';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
@@ -52,6 +53,8 @@ interface InboxTabProps {
   contentPlanReviewCells?: ContentPlanReviewCell[];
   // Which section to show initially (for deep-linking from Overview actions)
   initialFilter?: InboxFilter;
+  // Keyword strategy page map for approval card context chips
+  pageMap?: PageKeywordMap[];
 }
 
 export function InboxTab({
@@ -62,6 +65,7 @@ export function InboxTab({
   setToast,
   contentPlanReviewCells = [],
   initialFilter,
+  pageMap,
 }: InboxTabProps) {
   const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
@@ -157,6 +161,7 @@ export function InboxTab({
             setApprovalBatches={setApprovalBatches}
             loadApprovals={loadApprovals}
             setToast={setToast}
+            pageMap={pageMap}
           />
         </div>
       )}
