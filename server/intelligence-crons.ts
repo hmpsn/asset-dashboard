@@ -18,7 +18,7 @@ async function runIntelligenceRefresh(): Promise<void> {
     try {
       const recent = listActivity(ws.id, 1);
       if (recent.length === 0) { skipped++; continue; }
-      await buildWorkspaceIntelligence(ws.id, {
+      await buildWorkspaceIntelligence(ws.id, { // bwi-all-ok — explicit slices on next line
         slices: ['seoContext', 'insights', 'learnings', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational'],
       });
       refreshed++;
