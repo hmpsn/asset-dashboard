@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { BrainCircuit, Save, Loader2 } from 'lucide-react';
-import { put } from '../../api/client';
+import { BrainCircuit, Save, Loader2, Sparkles } from 'lucide-react';
+import { put, post } from '../../api/client';
 
 interface IntelligenceProfile {
   industry?: string;
@@ -17,6 +17,8 @@ interface IntelligenceProfileTabProps {
 
 export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast, onSave }: IntelligenceProfileTabProps) {
   const [saving, setSaving] = useState(false);
+  const [autofilling, setAutofilling] = useState(false);
+  const [autofillError, setAutofillError] = useState<string | null>(null);
   const [industry, setIndustry] = useState(intelligenceProfile?.industry || '');
   const [goalsText, setGoalsText] = useState((intelligenceProfile?.goals || []).join(', '));
   const [targetAudience, setTargetAudience] = useState(intelligenceProfile?.targetAudience || '');
@@ -28,6 +30,24 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
     setGoalsText((intelligenceProfile.goals || []).join(', '));
     setTargetAudience(intelligenceProfile.targetAudience || '');
   }, [intelligenceProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAutofill = async () => {
+    setAutofilling(true);
+    setAutofillError(null);
+    try {
+      const suggestion = await post<{ industry: string; goals: string[]; targetAudience: string }>(
+        `/api/workspaces/${workspaceId}/intelligence-profile/autofill`,
+        {},
+      );
+      if (suggestion.industry) setIndustry(suggestion.industry);
+      if (suggestion.goals?.length) setGoalsText(suggestion.goals.join(', '));
+      if (suggestion.targetAudience) setTargetAudience(suggestion.targetAudience);
+    } catch {
+      setAutofillError('Auto-fill failed — try again or fill manually');
+    } finally {
+      setAutofilling(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -59,16 +79,26 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
     <div className="space-y-8">
       {/* Card */}
       <div className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
-        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-            <BrainCircuit className="w-4 h-4 text-teal-400" />
+        <div className="px-5 py-4 flex items-center justify-between border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+              <BrainCircuit className="w-4 h-4 text-teal-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-200">Business Intelligence Profile</h3>
+              <p className="text-xs text-zinc-500">
+                Strategy context — industry, goals, and target audience used to personalise AI insights
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-200">Business Intelligence Profile</h3>
-            <p className="text-xs text-zinc-500">
-              Strategy context — industry, goals, and target audience used to personalise AI insights
-            </p>
-          </div>
+          <button
+            onClick={handleAutofill}
+            disabled={autofilling || saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {autofilling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {autofilling ? 'Analysing…' : 'Auto-fill from site data'}
+          </button>
         </div>
 
         <div className="px-5 py-5 space-y-5">
@@ -107,6 +137,11 @@ export function IntelligenceProfileTab({ workspaceId, intelligenceProfile, toast
               onChange={e => setTargetAudience(e.target.value)}
             />
           </div>
+
+          {/* Autofill error */}
+          {autofillError && (
+            <p className="text-[11px] text-red-400">{autofillError}</p>
+          )}
 
           {/* Save */}
           <div className="flex justify-end pt-2 border-t border-zinc-800">

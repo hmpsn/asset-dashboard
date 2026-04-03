@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **253 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **269 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3101,6 +3101,19 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 204. Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)
+**What it does:** Two sub-tasks delivered together. (1) **Admin chat intelligence slice migration**: the `assembleAdminContext()` function in `admin-chat-context.ts` now sources workspace data through `buildWorkspaceIntelligence()` slices instead of direct DB helpers. Activity → `intel.operational.recentActivity`, CWV/PageSpeed summary → `intel.siteHealth`, client health/churn signals → `intel.clientSignals`. Context size is managed through selective slice inclusion per question category (general queries union all three supplemental slices). Approvals keep direct `listBatches()` call + `intel.operational.approvalQueue` supplement. Performance keeps direct `getLinkCheck()`/`getPageSpeed()` calls for per-URL dead link detail (up to 10) and worst-page scores (top 5) — the siteHealth slice only stores counts, matching the `listBatches()` supplement pattern. Churn signals now surface human-readable `title` and `description` fields. CWV pass rate correctly converted from 0–1 decimal to percentage. (2) **businessProfile auto-populate**: the Intelligence Profile editor gains an "Auto-fill from site data" button (Sparkles icon, teal). Calls `POST /api/workspaces/:id/intelligence-profile/autofill` which fetches the `seoContext` slice (keywords, content gaps, business context — deliberately NOT `businessProfile` to avoid chicken-and-egg), prompts `gpt-4.1-mini` (temperature 0.3, 300 tokens) in JSON mode, returns `{ industry, goals, targetAudience }` pre-filled into the form. Autofill is a pure suggestion — no save/broadcast until the user clicks Save.
+
+**Files:** `server/admin-chat-context.ts`, `server/routes/workspaces.ts`, `src/components/settings/IntelligenceProfileTab.tsx`, `tests/admin-chat-slice-migration.test.ts` (new)
+
+**Agency value:** Admin chat answers client health and activity questions from the same cached intelligence layer as all other AI features — no redundant queries. The auto-populate button eliminates the blank-slate friction when onboarding a new workspace: one click extracts industry/goals/audience from the site's existing keyword strategy.
+
+**Client value:** (Indirect) Faster onboarding means the admin sets up the intelligence profile sooner, so AI features (briefs, strategy advice) are more accurate from day one.
+
+**Mutual:** All previous direct DB calls in admin chat context are now routed through the caching layer, making cold-start latency predictable and consistent with other intelligence features.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3116,6 +3129,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**268 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**269 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **268**. Last updated: April 2026.
+Current feature count: **269**. Last updated: April 2026.

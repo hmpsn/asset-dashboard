@@ -21,7 +21,7 @@ import {
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
 import { applySuppressionsToAudit, resolvePagePath } from '../helpers.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import {
@@ -47,7 +47,7 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { clearSeoContextCache } from '../seo-context.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
@@ -325,6 +325,61 @@ router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(),
   invalidateIntelligenceCache(req.params.id);
   broadcastToWorkspace(req.params.id, 'workspace:updated', { intelligenceProfile: ws.intelligenceProfile });
   res.json({ intelligenceProfile: ws.intelligenceProfile });
+});
+
+router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspaceAccess(), async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.id);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Fetch seoContext slice for keyword/strategy context.
+    // businessProfile is intentionally NOT requested here — that's what we're generating.
+    const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const seoCtx = intel.seoContext;
+
+    const siteName = ws.name || 'this website';
+    const keywordBlock = seoCtx ? formatKeywordsForPrompt(seoCtx) : '';
+    const bizContext = seoCtx?.businessContext ?? '';
+    const contentGapTopics = seoCtx?.strategy?.contentGaps?.slice(0, 5).map(g => g.topic).join(', ') ?? '';
+
+    const contextParts: string[] = [`Site name: ${siteName}`];
+    if (keywordBlock) contextParts.push(`Target keywords:\n${keywordBlock}`);
+    if (bizContext) contextParts.push(`Business context: ${bizContext}`);
+    if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
+
+    const result = await callOpenAI({
+      model: 'gpt-4.1-mini',
+      feature: 'intelligence-profile-autofill',
+      workspaceId: ws.id,
+      temperature: 0.3,  // low temperature for consistent JSON output
+      maxTokens: 300,    // response is a small JSON object
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
+        },
+        {
+          role: 'user',
+          content: `Based on this website context, suggest a business intelligence profile:\n\n${contextParts.join('\n\n')}\n\nRespond with JSON: {"industry": "string", "goals": ["string", ...], "targetAudience": "string"}`,
+        },
+      ],
+    });
+
+    // parseAIJson strips markdown fences (```json ... ```) that LLMs occasionally emit
+    // even when instructed not to. parseJsonFallback does bare JSON.parse and silently
+    // returns {} on fenced output, leaving the frontend fields blank with no error shown.
+    let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
+    try { suggestion = parseAIJson(result.text); } catch { /* malformed — fall through to empty fields */ }
+
+    return res.json({
+      industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',
+      goals: Array.isArray(suggestion.goals) ? suggestion.goals.filter((g: unknown) => typeof g === 'string') : [],
+      targetAudience: typeof suggestion.targetAudience === 'string' ? suggestion.targetAudience : '',
+    });
+  } catch (err) {
+    log.error({ err }, 'Intelligence profile autofill failed');
+    return res.status(500).json({ error: 'Auto-fill failed — try again or fill manually' });
+  }
 });
 
 // --- Auto-generate knowledge base from website crawl ---
