@@ -1,4 +1,5 @@
 import type { ContentBrief } from './content-brief.js';
+import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="51" viewBox="0 0 1000 320">
   <g>
@@ -338,7 +339,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
   <!-- Footer -->
   <div class="footer">
     <div style="margin-bottom:8px;filter:brightness(0) saturate(100%) invert(25%) sepia(10%) saturate(500%) hue-rotate(180deg)">${LOGO_SVG.replace('width="160" height="51"', 'width="100" height="32"')}</div>
-    Prepared by <a href="https://hmpsn.studio">HMPSN Studio</a> &mdash; ${date}
+    Prepared by <a href="${STUDIO_URL}">${STUDIO_NAME}</a> &mdash; ${date}
     <div class="disclaimer">This content brief is proprietary and prepared exclusively for the intended recipient. It contains strategic recommendations based on current search data and competitive analysis. Results may vary based on implementation quality and market conditions.</div>
   </div>
 </div>
