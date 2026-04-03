@@ -19,4 +19,11 @@ describe('IntelligenceSummaryCard component contract', () => {
   it('wraps Growth+ content in TierGate', () => {
     expect(src).toMatch(/TierGate/);
   });
+
+  it('TierGate uses tier prop from workspace data, not intel.tier (prevents false downgrade on API error)', () => {
+    // tier must come from the Props interface, not intel.tier
+    expect(src).toMatch(/tier:\s*string/);  // Props definition
+    expect(src).toMatch(/tier\s*\}/);       // destructured from props
+    expect(src).not.toMatch(/intel\.tier/); // NOT sourced from the fallible API response
+  });
 });

@@ -279,7 +279,7 @@ export function OverviewTab({
 
     {/* Intelligence summary — insights, pipeline, win rate */}
     <ErrorBoundary label="Intelligence Summary">
-      <IntelligenceSummaryCard workspaceId={workspaceId} />
+      <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
 
     {/* Main content: insights + sidebar */}

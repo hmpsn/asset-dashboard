@@ -6,9 +6,11 @@ import { Skeleton } from '../ui/Skeleton.js';
 
 interface Props {
   workspaceId: string;
+  /** Tier sourced from workspace data — not the intelligence response, which may fall back to 'free' on error */
+  tier: string;
 }
 
-export function IntelligenceSummaryCard({ workspaceId }: Props) {
+export function IntelligenceSummaryCard({ workspaceId, tier }: Props) {
   const { data: intel, isLoading } = useClientIntelligence(workspaceId);
 
   if (isLoading) {
@@ -23,8 +25,6 @@ export function IntelligenceSummaryCard({ workspaceId }: Props) {
   }
 
   if (!intel) return null;
-
-  const currentTier = intel.tier ?? 'free';
 
   return (
     <SectionCard title="Site Intelligence">
@@ -53,7 +53,7 @@ export function IntelligenceSummaryCard({ workspaceId }: Props) {
 
         {/* Win rate — Growth+ only */}
         <TierGate
-          tier={currentTier}
+          tier={tier}
           required="growth"
           feature="intelligence-win-rate"
         >
