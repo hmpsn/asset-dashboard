@@ -3847,6 +3847,17 @@
           "status": "done"
         },
         {
+          "id": "unified-workspace-intelligence-4a",
+          "title": "Unified Workspace Intelligence Layer — Phase 4A (Infrastructure: Data Retention + Cache Warming)",
+          "source": "session planning 2026-04-03",
+          "est": "3-4h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #128. Data retention crons (daily): chat_sessions 180d, audit_snapshots 365d (time-based, preserves full trend history), llms_txt_cache 90d. Intelligence cache warming cron every 6h for workspaces with activity in last 30 days (7 slices, excludes pageProfile). isRunning guard prevents overlapping cycles. Startup timeouts tracked at module level for clean cancellation. 10 tests.",
+          "shippedAt": "2026-04-03",
+          "status": "done"
+        },
+        {
           "id": "bridge-audit-finding-auto-resolve",
           "title": "Auto-resolve audit_finding insights when issues are fixed",
           "source": "PR #118 review flag",

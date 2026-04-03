@@ -798,6 +798,8 @@ async function assembleClientSignals(
       type: s.type,
       severity: s.severity,
       detectedAt: s.detectedAt,
+      title: s.title,
+      description: s.description,
     }));
     // ChurnSignal.severity is 'critical' | 'warning' | 'positive' — map to churnRisk levels
     const criticalCount = signals.filter(s => s.severity === 'critical').length;
@@ -1658,7 +1660,7 @@ function formatClientSignalsSection(signals: ClientSignalsSlice, verbosity: Prom
     if (signals.churnSignals && signals.churnSignals.length > 0) {
       lines.push('Churn signals:');
       for (const s of signals.churnSignals.slice(0, 5)) {
-        lines.push(`  - [${s.severity}] ${s.type}`);
+        lines.push(`  - [${s.severity}] ${s.title}: ${s.description}`);
       }
     }
     if (signals.feedbackItems && signals.feedbackItems.length > 0) {

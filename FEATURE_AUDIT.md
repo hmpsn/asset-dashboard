@@ -3088,6 +3088,19 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 203. Unified Workspace Intelligence Layer — Phase 4A (Infrastructure: Data Retention + Cache Warming)
+**What it does:** Two background cron subsystems. (1) **Data retention crons** (daily, 2-min startup delay): pruning three unbounded tables — `chat_sessions` deleted after 180 days, `audit_snapshots` deleted after 365 days, `llms_txt_cache` deleted after 90 days. Each cleanup uses a lazy prepared statement (`createStmtCache()`). (2) **Intelligence cache warming cron** (every 6h, 5-min startup delay): iterates all workspaces, skips those with no activity log entries, and calls `buildWorkspaceIntelligence()` with all non-pageProfile slices. An `isRunning` guard prevents overlapping cycles if one run exceeds 6h. Startup timeouts stored at module level so `stop*()` functions cancel them cleanly before first fire.
+
+**Files:** `server/data-retention.ts` (new), `server/intelligence-crons.ts` (new), `server/chat-memory.ts`, `server/reports.ts`, `server/llms-txt-generator.ts`, `server/startup.ts`, `tests/data-retention.test.ts` (new), `tests/intelligence-crons.test.ts` (new)
+
+**Agency value:** Prevents unbounded DB growth on long-running deployments. Proactive cache warming means the first AI feature request for an active workspace is served from cache rather than a cold LLM call.
+
+**Client value:** (Indirect) Faster first-load on AI-powered features after overnight inactivity.
+
+**Mutual:** Pure infrastructure — no UI changes. All crons `.unref()`-ed and cancel cleanly on shutdown.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3103,6 +3116,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**266 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**268 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **267**. Last updated: April 2026.
+Current feature count: **268**. Last updated: April 2026.
