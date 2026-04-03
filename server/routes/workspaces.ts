@@ -47,7 +47,7 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { clearSeoContextCache } from '../seo-context.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
@@ -335,7 +335,6 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
 
     // Fetch seoContext slice for keyword/strategy context.
     // businessProfile is intentionally NOT requested here — that's what we're generating.
-    const { buildWorkspaceIntelligence, formatKeywordsForPrompt } = await import('../workspace-intelligence.js');
     const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
     const seoCtx = intel.seoContext;
 
@@ -353,6 +352,8 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
       model: 'gpt-4.1-mini',
       feature: 'intelligence-profile-autofill',
       workspaceId: ws.id,
+      temperature: 0.3,  // low temperature for consistent JSON output
+      maxTokens: 300,    // response is a small JSON object
       messages: [
         {
           role: 'system',

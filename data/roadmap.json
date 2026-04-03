@@ -3864,7 +3864,7 @@
           "est": "3-4h",
           "priority": "P1",
           "sprint": "F",
-          "notes": "Shipped — PR #129. Admin chat context now sources activity/performance/client health from intelligence slices (operational, siteHealth, clientSignals) instead of direct DB helpers. Dynamic slice union for general queries with GENERAL_INTEL_TOKEN_BUDGET cap. ChurnSignalSummary title+description fields surfaced. businessProfile auto-populate: Sparkles button in IntelligenceProfileTab calls POST autofill endpoint, uses seoContext slice (not businessProfile — avoids chicken-and-egg), GPT-4.1-mini returns industry/goals/targetAudience. 8 tests.",
+          "notes": "Shipped — PR #129. Admin chat context now sources activity/performance/client health from intelligence slices (operational, siteHealth, clientSignals) instead of direct DB helpers. Context size managed through selective slice inclusion per question category (not tokenBudget — admin-chat-context never calls formatForPrompt). getLinkCheck/getPageSpeed supplemental direct calls preserved for per-URL dead link detail and worst-page scores (siteHealth slice stores counts only — same pattern as listBatches() for approvals). CWV pass rate decimal fix (0-1 → %). ChurnSignalSummary title+description fields surfaced. businessProfile auto-populate: Sparkles button in IntelligenceProfileTab calls POST autofill endpoint, uses seoContext slice (not businessProfile — avoids chicken-and-egg), GPT-4.1-mini (temp 0.3, 300 tokens) returns industry/goals/targetAudience. 16 tests (8 structural + 8 behavioural classifyQuestion).",
           "shippedAt": "2026-04-03",
           "status": "done"
         },

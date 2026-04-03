@@ -73,10 +73,9 @@ describe('classifyQuestion — slice routing logic', () => {
     expect(cats.has('approvals')).toBe(true);
   });
 
-  it('general questions include operational, siteHealth, and clientSignals categories', () => {
-    // General queries fall through to the default — they should trigger the broadest slice union
+  it('general questions are classified as general category (triggers broadest slice union in assembleAdminContext)', () => {
+    // classifyQuestion returns 'general'; assembleAdminContext then unions operational+siteHealth+clientSignals
     const cats = classifyQuestion('give me a full overview of this workspace');
-    // general category triggers all three supplementary slices
     expect(cats.has('general')).toBe(true);
   });
 
