@@ -207,7 +207,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
         </Suspense>
       )}
       {activeTab === 'briefs' && (
-        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} />
+        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} clearFixContext={clearFixContext} />
       )}
       {activeTab === 'posts' && (
         <ContentManager key={`content-${workspaceId}`} workspaceId={workspaceId} />

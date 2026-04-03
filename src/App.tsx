@@ -68,15 +68,16 @@ function ChunkFallback() {
 
 export interface FixContext {
   /** Which admin route this fixContext is intended for (e.g. 'content-pipeline', 'seo-editor').
-   *  Components must check this before reacting — fixContext persists in App state across tab
-   *  navigations, so a stale value from seo-editor can be visible when content-pipeline mounts. */
-  targetRoute?: string;
+   *  REQUIRED — components check this before reacting. Without it, stale fixContext from one
+   *  tab leaks into another. Making this required ensures TypeScript catches missing values
+   *  at every navigation call site. */
+  targetRoute: string;
   pageId?: string;
   pageSlug?: string;
   pageName?: string;
   issueCheck?: string;
   issueMessage?: string;
-  // Brief generation context from Page Intelligence
+  // Brief generation context from Page Intelligence / Content Gaps
   primaryKeyword?: string;
   searchIntent?: string;
   optimizationScore?: number;
@@ -84,6 +85,8 @@ export interface FixContext {
   recommendations?: string[];
   contentGaps?: string[];
   autoGenerate?: boolean;
+  /** Suggested page type from content gaps (e.g. 'blog', 'service', 'landing'). */
+  pageType?: string;
 }
 
 /** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */

@@ -124,6 +124,8 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
       // Prefer the actual primary keyword over page name
       const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';
       if (prefill) setKeyword(prefill.replace(/-/g, ' '));
+      // Carry over page type from content gaps (e.g. 'service', 'landing')
+      if (fixContext.pageType) setPageType(fixContext.pageType);
       // Clear fixContext in parent so remounts don't re-trigger
       clearFixContext?.();
     }
