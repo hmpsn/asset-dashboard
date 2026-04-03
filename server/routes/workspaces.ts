@@ -52,6 +52,7 @@ import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
+import { parseJsonFallback } from '../db/json-validation.js';
 
 const log = createLogger('workspaces');
 
@@ -364,8 +365,10 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
       ],
     });
 
-    let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
-    try { suggestion = JSON.parse(result.text); } catch { /* fallback to empty */ }
+    const suggestion = parseJsonFallback<{ industry?: string; goals?: string[]; targetAudience?: string }>(
+      result.text,
+      {},
+    );
 
     return res.json({
       industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',

@@ -318,7 +318,7 @@ export async function assembleAdminContext(
   if (categories.has('client') || categories.has('general')) intelSlices.push('clientSignals');
   if (categories.has('approvals') && !intelSlices.includes('operational')) intelSlices.push('operational');
 
-  const intel = await buildWorkspaceIntelligence(workspaceId, {
+  const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — general queries union all categories; slices built dynamically above
     slices: intelSlices as IntelligenceSlice[],
     learningsDomain: 'all',
     ...(categories.has('general') ? { tokenBudget: GENERAL_INTEL_TOKEN_BUDGET } : {}),
