@@ -89,16 +89,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
     return () => document.removeEventListener('mousedown', handleClick);
   }, [exportOpen]);
 
-  // Auto-switch to briefs tab when arriving via "Send to Planner" navigation.
+  // Auto-switch to briefs tab when arriving via "Draft Brief" navigation.
   // Guard on targetRoute so stale fixContext from seo-editor/seo-schema navigations
   // doesn't wrongly trigger a tab switch when the user arrives at content-pipeline.
-  // clearFixContext() nulls App.tsx state so revisiting the tab doesn't re-trigger.
+  // NOTE: Do NOT call clearFixContext here — ContentBriefs needs fixContext intact
+  // when it mounts to pre-fill keyword/pageType. ContentBriefs owns the cleanup
+  // via its own clearFixContext?.() call after consuming the context.
   useEffect(() => {
     if (fixContext?.targetRoute === 'content-pipeline') {
       setActiveTab('briefs');
-      clearFixContext?.();
     }
-  }, [fixContext, clearFixContext]);
+  }, [fixContext]);
 
   const handleExport = (dataset: string, format: 'csv' | 'json') => {
     window.open(`/api/export/${workspaceId}/${dataset}?format=${format}`, '_blank');

@@ -251,10 +251,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }, [siteId]);
 
   // Auto-expand target page from fixContext.
-  // Guard on targetRoute so stale fixContext from audit/seo-editor navigations doesn't
-  // unexpectedly scroll to a page when PageIntelligence mounts for an unrelated reason.
-  // NOTE: Currently no caller sets targetRoute='page-intelligence', so this is effectively
-  // dormant. Kept as future-proofing — when a caller needs auto-expand, set that targetRoute.
+  // Caller: AuditIssueRow "Page" button sets targetRoute='page-intelligence'.
+  // Guard on targetRoute so stale fixContext from other tabs doesn't auto-expand.
+  // fixConsumed ref prevents re-triggering on subsequent renders after initial expand.
   const fixConsumed = useRef(false);
   useEffect(() => {
     if (fixContext?.pageSlug && fixContext.targetRoute === 'page-intelligence' && !fixConsumed.current && unifiedPages.length > 0) {

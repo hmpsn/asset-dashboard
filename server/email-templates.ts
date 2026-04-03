@@ -51,8 +51,8 @@ function layout(opts: {
       <!-- Logo -->
       <div style="text-align:center;margin-bottom:24px;">
         ${opts.logoUrl
-          ? `<img src="${esc(opts.logoUrl)}" alt="${STUDIO_NAME}" height="22" style="height:22px;width:auto;" />`
-          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">${STUDIO_NAME}</span>`
+          ? `<img src="${esc(opts.logoUrl)}" alt="${esc(STUDIO_NAME)}" height="22" style="height:22px;width:auto;" />`
+          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">${esc(STUDIO_NAME)}</span>`
         }
       </div>
 
@@ -80,7 +80,7 @@ function layout(opts: {
 
       <!-- Footer -->
       <div style="text-align:center;margin-top:20px;">
-        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${opts.footer || `Automated notification from ${STUDIO_NAME}`}</span>
+        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${opts.footer || `Automated notification from ${esc(STUDIO_NAME)}`}</span>
       </div>
 
     </div>
@@ -340,7 +340,7 @@ function renderRequestStatus(events: EmailEvent[], count: number, ws: string, da
 function renderRequestResponse(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
   const items = events.map((e, i) => itemRow({
     title: (e.data.requestTitle as string) || 'Request',
-    detail: (e.data.noteContent as string)?.slice(0, 150) || `New response from ${STUDIO_NAME}`,
+    detail: (e.data.noteContent as string)?.slice(0, 150) || `New response from ${esc(STUDIO_NAME)}`,
     isLast: i === events.length - 1,
   })).join('');
 
@@ -349,7 +349,7 @@ function renderRequestResponse(events: EmailEvent[], count: number, ws: string, 
       ? `Update on "${(events[0].data.requestTitle as string) || 'your request'}" — ${ws}`
       : `${count} new responses on your requests — ${ws}`,
     html: layout({
-      preheader: `${STUDIO_NAME} responded to ${count} request${count !== 1 ? 's' : ''}`,
+      preheader: `${esc(STUDIO_NAME)} responded to ${count} request${count !== 1 ? 's' : ''}`,
       headline: count === 1 ? 'New Response on Your Request' : `${count} New Responses`,
       subtitle: ws,
       body: items,
@@ -503,7 +503,7 @@ function renderTrialExpiryWarning(event: EmailEvent, logoUrl?: string) {
           ${itemRow({ title: 'Content pipeline', detail: 'Brief generation, content requests, approval workflows', isLast: true })}
         </div>
         <div style="margin-top:16px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
-          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact ${STUDIO_NAME} to discuss plans.</span>
+          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact ${esc(STUDIO_NAME)} to discuss plans.</span>
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
       footer: `You're receiving this because your Growth trial on ${esc(ws)} is ending soon`,
@@ -536,7 +536,7 @@ function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
       subtitle: `Your ${ws} dashboard is ready`,
       body: `
         <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
-          ${STUDIO_NAME} has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
+          ${esc(STUDIO_NAME)} has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
         </p>` + gettingStarted + `
         <div style="margin-top:20px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
           <span style="font-size:12px;color:#0d9488;">Questions? Just reply to this email — we're here to help.</span>
@@ -697,7 +697,7 @@ export function renderMonthlyReport(data: {
   const trialBanner = d.isTrial ? `
     <div style="margin-bottom:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;text-align:center;">
       <div style="font-size:13px;font-weight:600;color:#92400e;">Growth Trial${d.trialDaysRemaining != null ? ` · ${d.trialDaysRemaining} day${d.trialDaysRemaining !== 1 ? 's' : ''} remaining` : ''}</div>
-      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact ${STUDIO_NAME} to discuss plans and pricing.</div>
+      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact ${esc(STUDIO_NAME)} to discuss plans and pricing.</div>
     </div>` : '';
 
   return {
@@ -708,7 +708,7 @@ export function renderMonthlyReport(data: {
       subtitle: `${d.workspaceName} · ${d.monthName}`,
       body: trialBanner + scoreSection + cwvSection + trafficSection + metricsGrid + activitySection + chatSection + pendingAlert,
       cta: d.dashboardUrl ? { label: 'Open Dashboard', url: d.dashboardUrl } : undefined,
-      footer: `Automated monthly summary from ${STUDIO_NAME}`,
+      footer: `Automated monthly summary from ${esc(STUDIO_NAME)}`,
       logoUrl: deriveLogoUrl(d.dashboardUrl),
     }),
   };
@@ -986,7 +986,7 @@ export function renderApprovalReminder(data: {
         </div>
         ${itemRow({
           title: data.batchName,
-          detail: `Submitted ${data.staleDays} days ago · Approving lets ${STUDIO_NAME} push updates live`,
+          detail: `Submitted ${data.staleDays} days ago · Approving lets ${esc(STUDIO_NAME)} push updates live`,
           isLast: true,
         })}`,
       cta: data.dashboardUrl ? { label: 'Review Changes', url: data.dashboardUrl } : undefined,
