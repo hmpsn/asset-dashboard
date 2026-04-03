@@ -98,13 +98,48 @@ Three groups of improvements spanning chat/notifications, strategy/SEO tooling, 
 
 **Server:** `generateBrief()` in `server/content-brief.ts` receives this as a `strategyCardContext` object and injects it into the brief generation prompt. Calibrates competition framing (difficulty), urgency (trend), differentiation angle (competitorProof), and opportunity size (volume).
 
-**Easy win — `pageType`-specific tone guidance:** `pageType` is already passed through the pipeline but not used to calibrate the brief prompt. Wire it in the same pass:
-- `blog` → conversational, educational, long-form structure, H2/H3 hierarchy
-- `landing` → persuasive, conversion-focused, benefit-led, minimal friction
-- `service` → authoritative, trust-building, outcome-oriented, FAQ-ready
-- `location` → locally grounded, NAP-consistent, proximity signals
-- `pillar` → comprehensive, internally linked, cluster-anchoring tone
-- `product` → feature-benefit balance, objection handling, social proof hooks
+**Page-type-aware brief generation:** `pageType` is already passed through the pipeline but only used for word count. Expand to full structural, tonal, and strategic guidance per type — all wired in `generateBrief()` in the same pass as the context fix:
+
+**Tone + structure templates:**
+- `blog` → conversational, educational; hook → problem framing → H2/H3 sections → FAQ → internal links → soft CTA
+- `landing` → persuasive, conversion-focused; single hook → benefit bullets → trust signals → one CTA, no distractions
+- `service` → authoritative, trust-building; value prop → problem/solution → feature/benefit pairs → social proof → objection handling → FAQ → conversion CTA
+- `location` → locally grounded; NAP block → service area signals → proximity language → local review integration → map embed note
+- `pillar` → comprehensive, cluster-anchoring; topic overview → linked subtopics list → internal linking map → breadth over depth
+- `product` → feature-benefit balance; specs → comparison table placeholder → testimonials → pricing context → purchase CTA
+
+**Schema markup recommendations per type:**
+- `blog` → `Article` schema
+- `service` → `Service` + `LocalBusiness`; flag if currently missing (cross-reference schema validation data)
+- `landing` → `WebPage`
+- `location` → `LocalBusiness` + `GeoCoordinates`
+- `pillar` → `Article` + `BreadcrumbList`
+- `product` → `Product` + `AggregateRating`
+
+**Internal linking strategy:**
+- Use existing `page_keywords` map to suggest which pages to link to and from
+- Pillar pages: list cluster pages to anchor; service pages: link to location variants and related blog posts; blog posts: link back to relevant service/pillar pages
+
+**E-E-A-T signals per type:**
+- `service` / `product` → author credentials, certifications, review signals
+- `blog` → cited sources, publication + last-updated date
+- `location` → proximity language, local references, verified NAP
+
+**Media/asset callouts:**
+- `blog` → infographic or custom image per major section
+- `service` → process diagram or before/after
+- `location` → map embed, location photography
+- `product` → product photography, comparison table visual
+- `pillar` → summary diagram or visual table of contents
+
+**Competitor content benchmark:**
+- Pull top-ranking competitor result for the target keyword from SEMRush domain organic data (already fetched during strategy generation)
+- Include in brief: estimated word count of #1 result, key topics covered, content type (list/guide/how-to)
+- Frame as: *"Current #1 result is ~1,400 words with a strong FAQ section — target 1,800 words with deeper coverage and schema."*
+
+**Search journey stage:**
+- Derive from existing `searchIntent` field: `informational` → Awareness (TOFU), `commercial` → Consideration (MOFU), `transactional` → Decision (BOFU)
+- Include in brief as plain-language frame affecting language register, assumed reader knowledge, and CTA type
 
 ---
 
@@ -275,6 +310,75 @@ The `useSmartPlaceholder` hook (3.3) must read from the existing `seoContext` in
 | Chat + Notifications | CTA button, Signals panel, Notification slide-out fix, Chatbot shimmer | New `client_signals` table; email sending |
 | Strategy + SEO | Briefs fix, Smarter cards, SEO editor unification, PI+Strategy blend | CMS write path via existing `updateCollectionItem`; merge-upsert safety |
 | Client Portal | Brand section, Site Intelligence toggle, Smart placeholders | Auth-context-aware placeholder hook; brand voice boundary |
+
+---
+
+## Shared Contracts (must be defined before parallel implementation)
+
+These types, migrations, and flags must be committed before any parallel agent work begins. Agents read from committed code — never from each other's in-progress branches.
+
+### New TypeScript interfaces (`shared/types/`)
+
+```typescript
+// shared/types/client-signals.ts
+interface ClientSignal {
+  id: string;
+  workspaceId: string;
+  type: 'content_interest' | 'service_interest';
+  chatContext: ChatMessage[]; // last 10 messages
+  status: 'new' | 'reviewed' | 'actioned';
+  createdAt: string;
+}
+
+// shared/types/briefs.ts (extend existing)
+interface StrategyCardContext {
+  rationale?: string;
+  volume?: number;
+  difficulty?: number;
+  trendDirection?: 'rising' | 'declining' | 'stable';
+  serpFeatures?: string[];
+  competitorProof?: string;
+  impressions?: number;
+}
+
+interface PageTypeBriefConfig {
+  pageType: 'blog' | 'landing' | 'service' | 'location' | 'pillar' | 'product' | 'resource';
+  journeyStage: 'awareness' | 'consideration' | 'decision';
+  schemaType: string[];
+  structureTemplate: string[];
+  eeatSignals: string[];
+  mediaCallouts: string[];
+  competitorBenchmark?: { wordCount: number; topicsSummary: string; contentType: string };
+}
+```
+
+### New DB migrations
+
+| Table/Column | Purpose | Migration # |
+|---|---|---|
+| `client_signals` table | Store client CTA taps with chat context | next available |
+| `workspace.businessPriorities` JSON column | Admin-editable client business goals | next available |
+
+### New feature flags (`shared/types/feature-flags.ts`)
+
+| Flag | Controls |
+|---|---|
+| `smart-placeholders` | System-wide smart placeholder hook |
+| `client-brand-section` | Client portal brand visibility section |
+| `seo-editor-unified` | Merged static+CMS SEO editor |
+
+### Key file ownership map (for parallel agent dispatch)
+
+| Feature | Primary files | Must not touch |
+|---|---|---|
+| Briefs context + page-type config | `server/content-brief.ts`, `server/routes/content-briefs.ts` | `src/components/ContentBriefs.tsx` (separate agent) |
+| Smarter cards | `src/components/client/StrategyTab.tsx`, `src/components/strategy/ContentGaps.tsx` | Strategy server routes |
+| SEO editor unification | `src/components/SeoEditor.tsx`, `src/components/editor/BulkOperations.tsx`, `server/routes/webflow-seo.ts` | `server/routes/webflow.ts` (shared) |
+| PI + Strategy blend | `server/routes/keyword-strategy.ts`, `server/page-keywords.ts` | `src/components/PageIntelligence.tsx` (separate agent) |
+| Client signals + notifications | `server/routes/public-chat.ts`, `src/components/NotificationBell.tsx`, `src/components/layout/Sidebar.tsx` | `server/routes/ai.ts` (shared) |
+| Client brand section | `src/components/client/ClientDashboard.tsx`, new `src/components/client/BrandTab.tsx` | Admin settings components |
+| Smart placeholders hook | New `src/hooks/useSmartPlaceholder.ts`, `src/api/intelligence.ts` | Any component (hook only, no component changes in this task) |
+| seoContext gaps | `server/workspace-intelligence.ts` (assembleSeoContext only) | All other assembler functions |
 
 ---
 
