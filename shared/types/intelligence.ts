@@ -229,7 +229,7 @@ export interface ClientLearningHighlights {
   overallWinRate: number;
   /** Top performing action type (e.g. "title_update") */
   topActionType: string | null;
-  /** Number of proven wins in the last 90 days */
+  /** Count of strong_win outcomes from weCalledIt entries (up to 5; no date filter) */
   recentWins: number;
 }
 
