@@ -40,7 +40,7 @@ function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSumm
     highPriority: visible.filter(i => i.severity === 'critical' || i.severity === 'warning').length,
     mediumPriority: visible.filter(i => i.severity === 'opportunity').length,
     topInsights: insights.topByImpact
-      .filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType))
+      .filter(i => !ADMIN_ONLY_INSIGHT_TYPES.has(i.insightType) && i.severity !== 'positive')
       .slice(0, 3)
       .map(i => ({ title: i.pageTitle ?? i.insightType, type: i.insightType })),
   };
