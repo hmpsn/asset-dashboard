@@ -59,9 +59,13 @@ export interface WorkspaceIntelligence {
 
 export interface SeoContextSlice {
   strategy: KeywordStrategy | undefined;
+  /** Raw text — no headers. Use formatBrandVoiceForPrompt() before injecting into prompts.
+   *  formatSeoContextSection renders this with an emphatic BRAND VOICE header automatically. */
   brandVoice: string;
   businessContext: string;
   personas: AudiencePersona[];
+  /** Raw text — no headers. Use formatKnowledgeBaseForPrompt() before injecting into prompts.
+   *  formatSeoContextSection renders this with a KNOWLEDGE BASE header automatically. */
   knowledgeBase: string;
   pageKeywords?: PageKeywordMap;
   // New in 3A
@@ -106,11 +110,21 @@ export interface PageProfileSlice {
   primaryKeyword: string | null;
   searchIntent: string | null;
   optimizationScore: number | null;
+  /** Platform-wide action recommendations filtered to this page (from recommendation store). */
   recommendations: string[];
+  /** Per-page content gap topics from AI keyword analysis (getPageKeyword). */
   contentGaps: string[];
   insights: AnalyticsInsight[];
   actions: TrackedAction[];
+  /** Structural SEO issues from Webflow audit snapshot (missing tags, OG issues, etc.). */
   auditIssues: string[];
+  /** Keyword optimization issues from AI per-page keyword analysis. Distinct from auditIssues. */
+  optimizationIssues: string[];
+  /** Whether the primary keyword appears in key placement locations (from AI keyword analysis). */
+  primaryKeywordPresence: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | null;
+  competitorKeywords: string[];
+  topicCluster: string | null;
+  estimatedDifficulty: string | null;
   schemaStatus: 'valid' | 'warnings' | 'errors' | 'none';
   linkHealth: { inbound: number; outbound: number; orphan: boolean };
   seoEdits: { currentTitle: string; currentMeta: string; lastEditedAt: string | null };
@@ -261,7 +275,6 @@ export interface RankTrackingSummary {
 export interface StrategyHistory {
   revisionsCount: number;
   lastRevisedAt: string;
-  trajectory: string;
 }
 
 export interface DecayAlert {

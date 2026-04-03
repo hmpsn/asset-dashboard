@@ -126,6 +126,14 @@ export const businessProfileSchema = z.object({
   }).passthrough().optional(),
 }).passthrough();
 
+// ── Intelligence profile (strategy context: industry, goals, target audience) ──
+
+export const intelligenceProfileSchema = z.object({
+  industry: z.string().optional(),
+  goals: z.array(z.string()).optional(),
+  targetAudience: z.string().optional(),
+}).passthrough();
+
 // ── Competitor domains (simple string array) ──
 
 export const competitorDomainsSchema = z.array(z.string());

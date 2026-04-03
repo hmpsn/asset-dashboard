@@ -1089,7 +1089,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   // Phase 3B: Competitor gap analysis (uses SEMRush/DataForSEO provider)
   if (ws.liveDomain) {
     try {
-      const provider = getConfiguredProvider(ws.seoDataProvider as any);
+      const provider = getConfiguredProvider(ws.seoDataProvider);
       if (provider?.isConfigured()) {
         const competitors = ws.competitorDomains?.length
           ? ws.competitorDomains

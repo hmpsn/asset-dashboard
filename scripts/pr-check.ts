@@ -17,9 +17,11 @@
  *   - Raw fetch() in components (use typed API client)
  *   - z.array(z.unknown()) on server (use parseJsonSafeArray + typed schema)
  *   - Bare SUM() in db.prepare() strings (use COALESCE to avoid NULL aggregates)
+ *   - Assembled-but-never-rendered slice fields (warns if a slice field is in the type but not the formatter)
  */
 
 import { execSync, execFileSync } from 'child_process';
+import { readFileSync } from 'fs';
 import path from 'path';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -116,6 +118,8 @@ const CHECKS: Check[] = [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
+      'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
+      'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -160,6 +164,18 @@ const CHECKS: Check[] = [
     severity: 'warn',
   },
   {
+    name: 'as any on dynamic import results',
+    // Catches patterns like: `(h: any)`, `(m: any)`, `as any).`, `as any,`, `as any;`
+    // These hide wrong property/function names — the #1 source of silent data bugs.
+    pattern: '(\\([a-z]+:\\s*any\\)|as any[);,.])',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/json-validation.ts', 'server/middleware/'],
+    excludeLines: ['// as-any-ok'],
+    message: 'Use `import type { T } from "./module.js"` instead of `as any`. Guessed property names are the #1 bug source. Add `// as-any-ok` comment if truly unavoidable.',
+    severity: 'warn',
+  },
+  {
     name: 'Hardcoded dark hex in inline styles',
     pattern: 'style=\\{[^}]*(#0f1219|#18181b|#27272a|#303036|#52525b)',
     fileGlobs: ['*.tsx'],
@@ -179,6 +195,59 @@ const CHECKS: Check[] = [
     // Exclude correct usages: chart helpers already handle light mode
     excludeLines: ['chartDotStroke(', 'chartDotFill(', 'chartAxisColor(', 'chartGridColor('],
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
+    severity: 'warn',
+  },
+  {
+    name: 'Direct listPages() outside workspace-data',
+    pattern: 'listPages\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-data.ts', 'server/webflow-pages.ts'],
+    message: 'Use getWorkspacePages() from workspace-data.ts instead of calling listPages() directly.',
+    severity: 'error',
+  },
+  {
+    name: 'Direct buildSeoContext() call',
+    pattern: 'buildSeoContext\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/seo-context.ts', 'server/workspace-intelligence.ts'],
+    message: 'Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext().',
+    severity: 'error',
+  },
+  {
+    name: 'buildWorkspaceIntelligence() without slices (assembles all 8 slices)',
+    // Matches calls that don't specify slices — typically: buildWorkspaceIntelligence(id) or buildWorkspaceIntelligence(id, { pagePath })
+    pattern: 'buildWorkspaceIntelligence\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts'],
+    // Lines with slices: already correct; lines in route/intelligence.ts that dynamically pass slices are also fine
+    // 'slices:' catches key:value form; ' slices,' and ' slices }' catch object shorthand (const slices = [...]; { slices, pagePath })
+    excludeLines: ['slices:', ' slices,', ' slices }', ' slices)', '// bwi-all-ok'],
+    message: 'Always pass { slices: [...] } to buildWorkspaceIntelligence(). Omitting it assembles all 8 slices (expensive). Add `// bwi-all-ok` if intentional.',
+    severity: 'warn',
+  },
+  {
+    name: 'formatForPrompt with inline sections literal (use buildIntelPrompt or sections: slices)',
+    // Catches formatForPrompt( calls that pass a literal array for sections, e.g. sections: ['seoContext', 'learnings']
+    // These are dangerous because the literal can diverge from the slices array.
+    pattern: 'formatForPrompt\\(.*sections:\\s*\\[',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts', 'tests/'],
+    excludeLines: ['// bip-ok'],
+    message: 'Use buildIntelPrompt(id, slices) when only the formatted string is needed. When raw intel is also needed: const slices = [...]; formatForPrompt(intel, { sections: slices }). Add `// bip-ok` for intentional exceptions.',
+    severity: 'warn',
+  },
+  {
+    name: 'Unguarded recordAction() call',
+    pattern: 'recordAction\\s*\\(\\s*\\{',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/outcome-tracking.ts'],
+    excludeLines: ['// recordAction-ok'],
+    message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
     severity: 'warn',
   },
 ];
@@ -277,6 +346,171 @@ for (const check of CHECKS) {
 
   if (check.severity === 'error') errors++;
   else warnings++;
+}
+
+// ─── Assembled-but-never-rendered slice field check ───────────────────────────
+//
+// Warns if a field is present in a *Slice interface in shared/types/intelligence.ts
+// but not referenced in the corresponding format*Section function in
+// server/workspace-intelligence.ts. These fields are assembled at query time but
+// silently dropped at format time — they never reach the AI prompt.
+//
+// Map of slice interface name → formatter function name
+const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> = [
+  { sliceName: 'SeoContextSlice', formatterName: 'formatSeoContextSection' },
+  { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
+  { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
+  { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
+  { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
+  { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
+  { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
+  { sliceName: 'OperationalSlice', formatterName: 'formatOperationalSection' },
+];
+
+// Fields intentionally not rendered (complex nested types, metadata, or rendering handled differently)
+// Also includes fields that ARE rendered but accessed via destructuring or local variable
+// (e.g. `const { bySeverity } = insights`) which the property-access regex won't catch.
+const KNOWN_UNRENDERED_FIELDS = new Set([
+  // SeoContextSlice
+  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
+  // InsightsSlice
+  'byType', 'forPage',
+  // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
+  'bySeverity',
+  // LearningsSlice
+  'forPage', 'topWins', 'winRateByActionType',
+  // ContentPipelineSlice
+  'rewritePlaybook', 'suggestedBriefs',
+  // SiteHealthSlice
+  'aeoReadiness', 'redirectDetails',
+  // PageProfileSlice
+  // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
+  'searchIntent',
+  // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
+  'insights',
+  // ClientSignalsSlice — these are rendered but may not appear by field name
+  // OperationalSlice
+  // none
+]);
+
+function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
+  // Find the interface declaration — use brace-depth counting to handle nested object types
+  const declStart = typeFileContent.search(new RegExp(`interface ${interfaceName}\\s*\\{`));
+  if (declStart === -1) return [];
+
+  const braceStart = typeFileContent.indexOf('{', declStart);
+  if (braceStart === -1) return [];
+
+  // Walk forward counting braces to find the matching closing brace of the interface itself
+  let depth = 0;
+  let i = braceStart;
+  while (i < typeFileContent.length) {
+    if (typeFileContent[i] === '{') depth++;
+    else if (typeFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) break;
+    }
+    i++;
+  }
+  const body = typeFileContent.slice(braceStart + 1, i);
+
+  // Extract only top-level field names (depth=0 within the body, lines like `  fieldName:`)
+  // Walk the body tracking nested depth so we only extract interface-level keys
+  const fields: string[] = [];
+  let nestedDepth = 0;
+  for (const line of body.split('\n')) {
+    for (const ch of line) {
+      if (ch === '{') nestedDepth++;
+      else if (ch === '}') nestedDepth--;
+    }
+    if (nestedDepth === 0) {
+      const m = line.match(/^\s+(\w+)\??:/);
+      if (m) fields.push(m[1]);
+    }
+  }
+  return fields;
+}
+
+function extractFormatterBody(formatterFileContent: string, formatterName: string): string {
+  // Find the function body start
+  const fnStart = formatterFileContent.indexOf(`function ${formatterName}(`);
+  if (fnStart === -1) return '';
+
+  // Find the opening brace
+  const braceStart = formatterFileContent.indexOf('{', fnStart);
+  if (braceStart === -1) return '';
+
+  // Walk forward counting braces to find the closing brace
+  let depth = 0;
+  let i = braceStart;
+  while (i < formatterFileContent.length) {
+    if (formatterFileContent[i] === '{') depth++;
+    else if (formatterFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        return formatterFileContent.slice(braceStart, i + 1);
+      }
+    }
+    i++;
+  }
+  return '';
+}
+
+// Only run this check when scanning the whole codebase (--all) or when workspace-intelligence.ts changed
+const shouldRunSliceCheck = SCAN_ALL || changedFiles.some(f =>
+  f.includes('workspace-intelligence.ts') || f.includes('intelligence.ts'),
+);
+
+if (shouldRunSliceCheck) {
+  const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
+  const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
+  let typesContent = '';
+  let serverContent = '';
+  try {
+    typesContent = readFileSync(typesPath, 'utf-8');
+    serverContent = readFileSync(serverPath, 'utf-8');
+  } catch {
+    // Files not found — skip
+  }
+
+  if (typesContent && serverContent) {
+    const unrenderedFindings: string[] = [];
+
+    for (const { sliceName, formatterName } of SLICE_FORMATTER_MAP) {
+      const fields = extractInterfaceFields(typesContent, sliceName);
+      const formatterBody = extractFormatterBody(serverContent, formatterName);
+
+      if (!formatterBody) {
+        unrenderedFindings.push(`  ${sliceName}: formatter ${formatterName} not found`);
+        continue;
+      }
+
+      for (const field of fields) {
+        if (KNOWN_UNRENDERED_FIELDS.has(field)) continue;
+        // Check if the field name appears in the formatter body (as a property access)
+        if (!formatterBody.includes(`.${field}`) && !formatterBody.includes(`['${field}']`) && !formatterBody.includes(`["${field}"]`)) {
+          unrenderedFindings.push(`  ${sliceName}.${field} → not referenced in ${formatterName}`);
+        }
+      }
+    }
+
+    if (unrenderedFindings.length > 0) {
+      console.log(`\n  ⚠ Assembled-but-never-rendered slice fields`);
+      console.log(`    These fields are assembled in *Slice types but not referenced in their format*Section formatter.`);
+      console.log(`    The data is assembled at query time but never reaches the AI prompt.`);
+      console.log(`    Add to KNOWN_UNRENDERED_FIELDS if intentionally omitted.`);
+      console.log(`    Fields (${unrenderedFindings.length}):`);
+      for (const finding of unrenderedFindings.slice(0, 10)) {
+        console.log(`      ${finding}`);
+      }
+      if (unrenderedFindings.length > 10) {
+        console.log(`      ... and ${unrenderedFindings.length - 10} more`);
+      }
+      warnings++;
+    } else {
+      console.log(`  ✓ Assembled-but-never-rendered slice fields`);
+    }
+  }
 }
 
 // ─── Manual checklist ─────────────────────────────────────────────────────────

@@ -131,5 +131,10 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.analyticsAnnotations(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.client.annotations(workspaceId) });
     },
+    [WS_EVENTS.INTELLIGENCE_CACHE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+    },
   });
 }

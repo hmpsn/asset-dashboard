@@ -9,8 +9,7 @@
 
 import type { Workspace } from './workspaces.js';
 import { getWorkspace, getBrandName } from './workspaces.js';
-import { isFeatureEnabled } from './feature-flags.js';
-import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { formatLearningsForPrompt } from './workspace-learnings.js';
 import { getLatestSnapshot } from './reports.js';
 import { listBriefs } from './content-brief.js';
 import { listContentRequests } from './content-requests.js';
@@ -31,11 +30,8 @@ import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown,
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
-import {
-  buildSeoContext,
-  buildKeywordMapContext,
-  RICH_BLOCKS_PROMPT,
-} from './seo-context.js';
+import { RICH_BLOCKS_PROMPT } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -311,8 +307,17 @@ export async function assembleAdminContext(
   let pageContext: AssembledContext['pageContext'] | undefined;
 
   // ── Always include: strategy, brand voice, knowledge base, personas ──
-  const { keywordBlock, brandVoiceBlock, businessContext: bizCtx, personasBlock: personasContext, knowledgeBlock: knowledgeBase } = buildSeoContext(workspaceId);
-  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const slices = ['seoContext', 'learnings'] as const;
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices, learningsDomain: 'all' });
+  const seoCtx = intel.seoContext;
+
+  const keywordBlock = formatKeywordsForPrompt(seoCtx);
+  const strategy = seoCtx?.strategy;
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seoCtx?.brandVoice);
+  const bizCtx = seoCtx?.businessContext ?? '';
+  const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
+  const personasContext = formatPersonasForPrompt(seoCtx?.personas);
+  const knowledgeBase = formatKnowledgeBaseForPrompt(seoCtx?.knowledgeBase);
 
   if (keywordBlock || kwMapContext || bizCtx) {
     const stratParts = [keywordBlock, kwMapContext, bizCtx ? `\nBusiness: ${bizCtx}` : '', brandVoiceBlock].filter(Boolean);
@@ -371,10 +376,21 @@ export async function assembleAdminContext(
       }
       pageContext = { url: targetUrl };
 
-      // Get page-specific keyword context
-      const pageKeywords = buildSeoContext(workspaceId, targetUrl);
-      if (pageKeywords.keywordBlock) {
-        pageContext.keywordContext = pageKeywords.keywordBlock;
+      // Get page-specific keyword context from strategy pageMap
+      const normalizedPath = targetUrl.startsWith('/') ? targetUrl : targetUrl.replace(/^https?:\/\/[^/]+/, '');
+      const pageKw = strategy?.pageMap?.find(p => p.pagePath === normalizedPath)
+        ?? strategy?.pageMap?.find(p => normalizedPath.endsWith(p.pagePath) || p.pagePath.endsWith(normalizedPath));
+      if (pageKw) {
+        let pageKeywordBlock = `\n\nTHIS PAGE'S TARGET (overrides general context):`;
+        pageKeywordBlock += `\nPrimary keyword: "${pageKw.primaryKeyword}"`;
+        if (pageKw.secondaryKeywords?.length) {
+          pageKeywordBlock += `\nSecondary keywords: ${pageKw.secondaryKeywords.join(', ')}`;
+        }
+        if (pageKw.searchIntent) {
+          pageKeywordBlock += `\nSearch intent: ${pageKw.searchIntent}`;
+        }
+        pageKeywordBlock += `\nIMPORTANT: If this page's keywords reference a specific location (city, state, region), ALWAYS use THAT location. Do NOT substitute the business headquarters or a different location from the general business context. The page-level keyword is the authoritative signal for what this page targets.`;
+        pageContext.keywordContext = pageKeywordBlock;
       }
     }
   }
@@ -529,7 +545,7 @@ export async function assembleAdminContext(
           // If analyzing a specific page, pull its audit data
           if (pageContext) {
             const targetSlug = pageContext.url.replace(/^https?:\/\/[^/]+/, '');
-            const pageAudit = pages?.find((p: any) => {
+            const pageAudit = pages?.find((p) => {
               const pSlug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
               return pSlug === targetSlug || pSlug === `${targetSlug}/` || targetSlug.endsWith(pSlug);
             });
@@ -802,15 +818,12 @@ export async function assembleAdminContext(
     }
   }
 
-  // ── Inject workspace learnings if available ──
-  if (isFeatureEnabled('outcome-ai-injection')) {
-    const learnings = getWorkspaceLearnings(workspaceId);
-    if (learnings) {
-      const learningsBlock = formatLearningsForPrompt(learnings, 'all');
-      if (learningsBlock) {
-        sections.push(learningsBlock);
-        dataSources.push('Workspace Outcome Learnings');
-      }
+  // ── Inject workspace learnings from intelligence layer ──
+  if (intel.learnings?.summary) {
+    const learningsBlock = formatLearningsForPrompt(intel.learnings.summary, 'all');
+    if (learningsBlock) {
+      sections.push(learningsBlock);
+      dataSources.push('Workspace Outcome Learnings');
     }
   }
 
