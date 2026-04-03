@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import { buildWorkspaceIntelligence, formatForPrompt } from '../workspace-intelligence.js';
+import { getWorkspace } from '../workspaces.js';
 import type { IntelligenceSlice, PromptFormatOptions } from '../../shared/types/intelligence.js';
 
 const VALID_SLICES: Set<string> = new Set([
@@ -34,9 +35,14 @@ router.get('/api/debug/prompt', async (req, res) => {
 
   const { workspaceId, pagePath, verbosity, learningsDomain } = req.query as Record<string, string | undefined>;
 
+  // Auth: all /api/ routes are protected by the global APP_PASSWORD gate in app.ts.
+  // requireWorkspaceAccess() cannot be used here because workspaceId is a query param, not a route param.
+  // Workspace existence is validated explicitly below.
   if (!workspaceId) {
     return res.status(400).json({ error: 'workspaceId is required' });
   }
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   // Parse slices param — default to all slices
   const rawSlices = req.query.slices as string | undefined;
