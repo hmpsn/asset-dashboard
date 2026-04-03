@@ -72,8 +72,8 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 {workspaceId && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { plannerKeyword: gap.targetKeyword, plannerPageType: gap.suggestedPageType || 'blog' } })}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-600/20 border border-violet-500/30 text-[11px] text-violet-300 font-medium hover:bg-violet-600/40 transition-all"
+                      onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { primaryKeyword: gap.targetKeyword } } })}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                     >
                       <Layers className="w-3 h-3" /> Add to Planner
                     </button>

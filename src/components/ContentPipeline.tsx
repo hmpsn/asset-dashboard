@@ -88,6 +88,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
     return () => document.removeEventListener('mousedown', handleClick);
   }, [exportOpen]);
 
+  // Auto-switch to briefs tab when arriving via "Send to Planner" navigation
+  useEffect(() => {
+    if (fixContext) setActiveTab('briefs');
+  }, [fixContext]);
+
   const handleExport = (dataset: string, format: 'csv' | 'json') => {
     window.open(`/api/export/${workspaceId}/${dataset}?format=${format}`, '_blank');
     setExportOpen(false);
