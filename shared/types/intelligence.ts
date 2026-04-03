@@ -245,6 +245,8 @@ export interface ChurnSignalSummary {
   type: string;
   severity: string;
   detectedAt: string;
+  title: string;
+  description: string;
 }
 
 export interface ROIAttribution {

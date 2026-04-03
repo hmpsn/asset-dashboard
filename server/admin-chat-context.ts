@@ -77,6 +77,11 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   insights: [/what.*should.*work/i, /priorit/i, /quick.*win/i, /opportunit/i, /declin/i, /cannibali/i, /page.*health/i, /health.*score/i, /what.*focus/i, /biggest.*impact/i],
 };
 
+/** Token budget for intelligence context in general/multi-category admin chat queries.
+ *  The intelligence layer's §20 priority chain truncates gracefully at this limit.
+ *  TASK 8: pass this as tokenBudget when expanding slices for 'general' queries. */
+const GENERAL_INTEL_TOKEN_BUDGET = 6000;
+
 /**
  * Classify which data categories a question needs.
  * Returns a Set of relevant categories.
@@ -309,6 +314,8 @@ export async function assembleAdminContext(
 
   // ── Always include: strategy, brand voice, knowledge base, personas ──
   const slices = ['seoContext', 'learnings'] as const;
+  // For 'general' queries (Task 8): expand slices to all 7 + pass tokenBudget: GENERAL_INTEL_TOKEN_BUDGET
+  // to prevent silent overflow. Current 2-slice fetch does not need the budget.
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices, learningsDomain: 'all' });
   const seoCtx = intel.seoContext;
 
@@ -646,6 +653,10 @@ export async function assembleAdminContext(
   // Approvals
   if (categories.has('approvals') || categories.has('general') || categories.has('client')) {
     try {
+      // TASK 8 GUARD: Do NOT replace this with operational.approvalQueue — that slice only has
+      // { pending: number; oldestAge: number | null }, which loses batch names, per-batch item
+      // breakdown, and pending/approved/rejected counts. Keep this direct call and only
+      // supplement it with the slice's queue summary as an additional signal.
       const batches = listBatches(workspaceId);
       if (batches.length > 0) {
         const pendingBatches = batches.filter(b => b.items?.some(i => i.status === 'pending'));
