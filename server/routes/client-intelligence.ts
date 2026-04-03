@@ -65,7 +65,7 @@ function formatLearningsForClient(learnings: LearningsSlice): ClientLearningHigh
   return {
     overallWinRate: learnings.overallWinRate,
     topActionType: learnings.topActionTypes[0]?.type ?? null,
-    recentWins: learnings.topWins?.length ?? 0,
+    recentWins: learnings.weCalledIt?.length ?? 0,
   };
 }
 

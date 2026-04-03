@@ -57,8 +57,8 @@ export function IntelligenceSummaryCard({ workspaceId }: Props) {
           required="growth"
           feature="intelligence-win-rate"
         >
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-teal-500/5 border border-teal-500/20 col-span-2">
-            <TrendingUp className="w-4 h-4 text-teal-400 shrink-0" />
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 col-span-2">
+            <TrendingUp className="w-4 h-4 text-blue-400 shrink-0" />
             <div>
               <div className="text-lg font-semibold text-zinc-200">
                 {intel.learningHighlights
