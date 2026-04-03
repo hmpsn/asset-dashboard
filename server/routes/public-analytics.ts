@@ -51,6 +51,7 @@ import { getOrComputeInsights } from '../analytics-intelligence.js';
 import { buildClientInsights } from '../insight-narrative.js';
 import { generateMonthlyDigest } from '../monthly-digest.js';
 import type { InsightType } from '../../shared/types/analytics.js';
+import { STUDIO_NAME } from '../constants.js';
 
 // ── Analytics insights endpoints ─────────────────────────────────
 // NOTE: Literal sub-paths (/narrative, /digest) registered BEFORE /:workspaceId
@@ -242,7 +243,7 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
       } catch { /* non-critical */ }
     }
 
-    const teamName = 'hmpsn studio';
+    const teamName = STUDIO_NAME;
 
     // Pre-compute SEO context blocks for the system prompt
     const slices = ['seoContext', 'learnings'] as const;
