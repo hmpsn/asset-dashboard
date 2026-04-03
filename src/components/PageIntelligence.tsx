@@ -1157,7 +1157,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {/* ── Action bar ── */}
                   <div className="flex items-center gap-2 pt-3 mt-1 border-t border-zinc-800/60 flex-wrap">
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { targetRoute: 'seo-editor', pageSlug: page.slug, pageName: page.title } } })}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <Pencil className="w-3 h-3" /> Fix in SEO Editor

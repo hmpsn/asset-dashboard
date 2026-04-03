@@ -195,7 +195,7 @@ export function AuditIssueRow({
           if (!fixTab) return null;
           return (
             <button
-              onClick={() => navigate(adminPath(workspaceId, fixTab as Page), { state: { fixContext: { pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message } } })}
+              onClick={() => navigate(adminPath(workspaceId, fixTab as Page), { state: { fixContext: { targetRoute: fixTab, pageId: page.pageId, pageSlug: page.slug, pageName: page.page, issueCheck: issue.check, issueMessage: issue.message } } })}
               className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center gap-0.5 transition-colors"
               title={`Open ${FIX_TAB_LABELS[fixTab] || fixTab}`}
             >
