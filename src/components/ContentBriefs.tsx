@@ -99,6 +99,12 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
 
+  // Capture fixContext in a ref so handleGenerate can use it even after the parent clears it
+  const fixContextRef = useRef<FixContext | null | undefined>(fixContext);
+  useEffect(() => {
+    if (fixContext) fixContextRef.current = fixContext;
+  }, [fixContext]);
+
   // Auto-fill keyword from Page Intelligence context and optionally auto-generate
   const fixConsumed = useRef(false);
   useEffect(() => {
@@ -113,12 +119,12 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   // Auto-generate when arriving from Page Intelligence with autoGenerate flag
   const autoGenTriggered = useRef(false);
   useEffect(() => {
-    if (fixContext?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {
+    if (fixContextRef.current?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {
       autoGenTriggered.current = true;
       handleGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword, fixContext?.autoGenerate]);
+  }, [keyword]);
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
@@ -306,17 +312,17 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const brief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/generate`, {
         targetKeyword: keyword.trim(),
         businessContext: businessCtx.trim() || undefined,
-        targetPageId: fixContext?.pageId,
-        targetPageSlug: fixContext?.pageSlug,
+        targetPageId: fixContextRef.current?.pageId,
+        targetPageSlug: fixContextRef.current?.pageSlug,
         pageType: pageType || undefined,
         referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
-        pageAnalysisContext: fixContext?.optimizationIssues || fixContext?.recommendations || fixContext?.contentGaps
+        pageAnalysisContext: fixContextRef.current?.optimizationIssues || fixContextRef.current?.recommendations || fixContextRef.current?.contentGaps
           ? {
-              optimizationScore: fixContext.optimizationScore,
-              optimizationIssues: fixContext.optimizationIssues,
-              recommendations: fixContext.recommendations,
-              contentGaps: fixContext.contentGaps,
-              searchIntent: fixContext.searchIntent,
+              optimizationScore: fixContextRef.current.optimizationScore,
+              optimizationIssues: fixContextRef.current.optimizationIssues,
+              recommendations: fixContextRef.current.recommendations,
+              contentGaps: fixContextRef.current.contentGaps,
+              searchIntent: fixContextRef.current.searchIntent,
             }
           : undefined,
       });

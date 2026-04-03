@@ -81,11 +81,11 @@ export function ApprovalsTab({
 
   function findPageKeywords(pageSlug: string) {
     if (!pageMap) return null;
-    return pageMap.find(p =>
-      p.pagePath === '/' + pageSlug ||
-      p.pagePath === pageSlug ||
-      p.pagePath.toLowerCase() === ('/' + pageSlug).toLowerCase()
-    ) ?? null;
+    const slug = pageSlug.toLowerCase();
+    return pageMap.find(p => {
+      const path = p.pagePath.toLowerCase();
+      return path === '/' + slug || path === slug;
+    }) ?? null;
   }
 
   return (
