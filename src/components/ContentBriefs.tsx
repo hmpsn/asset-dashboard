@@ -104,9 +104,23 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
 
-  // Capture fixContext in a ref so handleGenerate can read it even after clearFixContext() nulls the prop.
-  // Initialize to null (not the raw prop) so the initial value also passes the targetRoute guard.
-  // Cleared after first generation (see handleGenerate) so subsequent manual briefs don't inherit stale page data.
+  // ── fixContext lifecycle (3 refs, 3 effects) ──
+  //
+  // When the user navigates here from Page Intelligence or Content Gaps, fixContext
+  // carries the page/keyword context. Three refs coordinate consumption:
+  //
+  //   fixContextRef   — snapshot of fixContext for handleGenerate to read after
+  //                     clearFixContext() nulls the prop. Cleared after first generation
+  //                     so subsequent manual briefs don't inherit stale page data.
+  //
+  //   fixConsumed     — ensures the keyword/pageType pre-fill runs exactly once per
+  //                     navigation, even if fixContext re-renders before being cleared.
+  //
+  //   autoGenTriggered — gates the auto-generate effect so it fires once after keyword
+  //                     is set, only when fixContext.autoGenerate was true.
+  //
+  // All three are guarded on BRIEF_ROUTES to ignore stale fixContext from other tabs.
+
   const fixContextRef = useRef<FixContext | null | undefined>(null);
   useEffect(() => {
     if (fixContext && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
@@ -114,24 +128,17 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, c
     }
   }, [fixContext]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-fill keyword from Page Intelligence context and optionally auto-generate.
-  // Guard on targetRoute so stale fixContext from seo-editor/seo-schema navigations
-  // doesn't pre-fill the keyword field when ContentBriefs mounts at an unrelated tab.
   const fixConsumed = useRef(false);
   useEffect(() => {
     if (fixContext && !fixConsumed.current && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
       fixConsumed.current = true;
-      // Prefer the actual primary keyword over page name
       const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';
       if (prefill) setKeyword(prefill.replace(/-/g, ' '));
-      // Carry over page type from content gaps (e.g. 'service', 'landing')
       if (fixContext.pageType) setPageType(fixContext.pageType);
-      // Clear fixContext in parent so remounts don't re-trigger
       clearFixContext?.();
     }
   }, [fixContext]);
 
-  // Auto-generate when arriving from Page Intelligence with autoGenerate flag
   const autoGenTriggered = useRef(false);
   useEffect(() => {
     if (fixContextRef.current?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {

@@ -17,6 +17,13 @@ function esc(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** Strip newlines/carriage returns from email subject lines to prevent header injection.
+ *  Email subjects are plain text (not HTML), so esc() is not needed — but newlines
+ *  in a subject string could be exploited for SMTP header injection. */
+function sanitizeSubject(s: string): string {
+  return s.replace(/[\r\n]+/g, ' ').trim();
+}
+
 // ── Layout ──
 // layout() escapes preheader, headline, subtitle, footer, and CTA label internally.
 // body is intentionally raw HTML (it contains styled divs, links, etc.).
@@ -196,48 +203,51 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
   const dashUrl = events.find(e => e.dashboardUrl)?.dashboardUrl;
   const logoUrl = deriveLogoUrl(dashUrl);
 
+  let result: { subject: string; html: string };
   switch (type) {
     case 'approval_ready':
-      return renderApprovalReady(events, count, ws, dashUrl, logoUrl);
+      result = renderApprovalReady(events, count, ws, dashUrl, logoUrl); break;
     case 'request_new':
-      return renderRequestNew(events, count, ws, dashUrl, logoUrl);
+      result = renderRequestNew(events, count, ws, dashUrl, logoUrl); break;
     case 'request_status':
-      return renderRequestStatus(events, count, ws, dashUrl, logoUrl);
+      result = renderRequestStatus(events, count, ws, dashUrl, logoUrl); break;
     case 'request_response':
-      return renderRequestResponse(events, count, ws, dashUrl, logoUrl);
+      result = renderRequestResponse(events, count, ws, dashUrl, logoUrl); break;
     case 'content_request':
-      return renderContentRequest(events, count, ws, dashUrl, logoUrl);
+      result = renderContentRequest(events, count, ws, dashUrl, logoUrl); break;
     case 'content_brief_ready':
-      return renderContentBriefReady(events, count, ws, dashUrl, logoUrl);
+      result = renderContentBriefReady(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_alert':
-      return renderAuditAlert(events, count, ws, dashUrl, logoUrl);
+      result = renderAuditAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'client_welcome':
-      return renderClientWelcome(events[0], logoUrl);
+      result = renderClientWelcome(events[0], logoUrl); break;
     case 'trial_expiry_warning':
-      return renderTrialExpiryWarning(events[0], logoUrl);
+      result = renderTrialExpiryWarning(events[0], logoUrl); break;
     case 'password_reset':
-      return renderPasswordReset(events[0], logoUrl);
+      result = renderPasswordReset(events[0], logoUrl); break;
     case 'churn_signal':
-      return renderChurnSignal(events, count, ws, dashUrl, logoUrl);
+      result = renderChurnSignal(events, count, ws, dashUrl, logoUrl); break;
     case 'payment_received':
-      return renderPaymentReceived(events, count, ws, dashUrl, logoUrl);
+      result = renderPaymentReceived(events, count, ws, dashUrl, logoUrl); break;
     case 'fixes_applied':
-      return renderFixesApplied(events, count, ws, dashUrl, logoUrl);
+      result = renderFixesApplied(events, count, ws, dashUrl, logoUrl); break;
     case 'recommendations_ready':
-      return renderRecommendationsReady(events, count, ws, dashUrl, logoUrl);
+      result = renderRecommendationsReady(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_improved':
-      return renderAuditImproved(events, count, ws, dashUrl, logoUrl);
+      result = renderAuditImproved(events, count, ws, dashUrl, logoUrl); break;
     case 'anomaly_alert':
-      return renderAnomalyAlert(events, count, ws, dashUrl, logoUrl);
+      result = renderAnomalyAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'content_published':
-      return renderContentPublished(events, count, ws, dashUrl, logoUrl);
+      result = renderContentPublished(events, count, ws, dashUrl, logoUrl); break;
     case 'feedback_new':
-      return renderFeedbackNew(events, count, ws, dashUrl, logoUrl);
+      result = renderFeedbackNew(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_complete':
-      return renderAuditComplete(events[0], logoUrl);
+      result = renderAuditComplete(events[0], logoUrl); break;
     default:
-      return { subject: 'Notification', html: '' };
+      result = { subject: 'Notification', html: '' };
   }
+  // Sanitize subject at the single exit point — strips newlines to prevent SMTP header injection.
+  return { subject: sanitizeSubject(result.subject), html: result.html };
 }
 
 // ── Individual template renderers ──
@@ -709,7 +719,7 @@ export function renderMonthlyReport(data: {
     </div>` : '';
 
   return {
-    subject: `Monthly Report — ${d.workspaceName} (${d.monthName})`,
+    subject: sanitizeSubject(`Monthly Report — ${d.workspaceName} (${d.monthName})`),
     html: layout({
       preheader: `Your ${d.monthName} summary for ${d.workspaceName}`,
       headline: 'Monthly Report',
@@ -982,7 +992,7 @@ export function renderApprovalReminder(data: {
   dashboardUrl?: string;
 }): { subject: string; html: string } {
   return {
-    subject: `Reminder: ${data.pendingCount} SEO changes awaiting your approval — ${data.workspaceName}`,
+    subject: sanitizeSubject(`Reminder: ${data.pendingCount} SEO changes awaiting your approval — ${data.workspaceName}`),
     html: layout({
       preheader: `${data.pendingCount} changes have been waiting ${data.staleDays} days`,
       headline: 'Approval Reminder',
