@@ -47,7 +47,7 @@ import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
 import type { ChurnSignal } from './churn-signals.js';
-import { listClientSignals, countNewSignals } from './client-signals-store.js';
+import { listClientSignals, countNewSignals, countAllSignals } from './client-signals-store.js';
 import type { DecayAnalysis } from './content-decay.js';
 import type { AuditSnapshot } from './reports.js';
 import type { ROIData } from './roi.js';
@@ -915,9 +915,11 @@ async function assembleClientSignals(
   try {
     const signals = listClientSignals(workspaceId);
     const newCount = countNewSignals(workspaceId);
+    // Use countAllSignals for totalCount — listClientSignals is capped at LIMIT 100
+    const totalCount = countAllSignals(workspaceId);
     intentSignals = {
       newCount,
-      totalCount: signals.length,
+      totalCount,
       recentTypes: signals.slice(0, 5).map(s => s.type),
     };
   } catch {

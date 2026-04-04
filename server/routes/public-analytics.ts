@@ -417,41 +417,42 @@ ${JSON.stringify(context, null, 2)}`;
     }
 
     // ── Intent detection ──────────────────────────────────────────────────────
-    // Match only the user's question — never the AI answer. The AI proactively
-    // mentions content strategy terms in every response, so matching `answer`
-    // would create false-positive signals on virtually every chat turn.
+    // Entire block is wrapped in try-catch — intent detection must never block
+    // the chat response. The AI answer has already been persisted at this point;
+    // losing it due to a signal DB error would be unacceptable.
     let detectedIntent: 'content_interest' | 'service_interest' | null = null;
-    if (!betaMode && sessionId && answer) {
-      const lowerQuestion = question.toLowerCase();
+    try {
+      if (!betaMode && sessionId && answer) {
+        const lowerQuestion = question.toLowerCase();
 
-      const serviceKeywords = [
-        'get in touch', 'contact', 'reach out', 'talk to someone', 'speak with',
-        'work together', 'hire', 'pricing', 'cost', 'quote', 'proposal', 'sign up',
-      ];
-      const contentKeywords = [
-        'create content', 'write a post', 'content brief', 'blog post', 'content plan',
-        'content strategy', 'recommend content', 'what should i write', 'content ideas',
-      ];
+        // Match only the user's question — never the AI answer. The AI proactively
+        // mentions content strategy terms in every response, which would flood signals.
+        const serviceKeywords = [
+          'get in touch', 'contact', 'reach out', 'talk to someone', 'speak with',
+          'work together', 'hire', 'pricing', 'cost', 'quote', 'proposal', 'sign up',
+        ];
+        const contentKeywords = [
+          'create content', 'write a post', 'content brief', 'blog post', 'content plan',
+          'content strategy', 'recommend content', 'what should i write', 'content ideas',
+        ];
 
-      if (serviceKeywords.some(kw => lowerQuestion.includes(kw))) {
-        detectedIntent = 'service_interest';
-      } else if (contentKeywords.some(kw => lowerQuestion.includes(kw))) {
-        detectedIntent = 'content_interest';
-      }
+        if (serviceKeywords.some(kw => lowerQuestion.includes(kw))) {
+          detectedIntent = 'service_interest';
+        } else if (contentKeywords.some(kw => lowerQuestion.includes(kw))) {
+          detectedIntent = 'content_interest';
+        }
 
-      // Deduplicate: suppress if a signal of this type was already created within 30 minutes
-      if (detectedIntent && hasRecentSignal(ws.id, detectedIntent, 30 * 60 * 1000)) {
-        detectedIntent = null;
-      }
+        // Deduplicate: suppress if a signal of this type was already created within 30 minutes
+        if (detectedIntent && hasRecentSignal(ws.id, detectedIntent, 30 * 60 * 1000)) {
+          detectedIntent = null;
+        }
 
-      if (detectedIntent) {
-        const session = getChatSession(ws.id, sessionId);
-        const chatContext = (session?.messages ?? []).slice(-10).map(m => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        }));
-
-        try {
+        if (detectedIntent) {
+          const session = getChatSession(ws.id, sessionId);
+          const chatContext = (session?.messages ?? []).slice(-10).map(m => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          }));
           const signal = createClientSignal({
             workspaceId: ws.id,
             workspaceName: ws.name ?? ws.id,
@@ -462,9 +463,9 @@ ${JSON.stringify(context, null, 2)}`;
           broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
           addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80));
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
-        } catch { /* non-critical — never block chat response */ }
+        }
       }
-    }
+    } catch { /* non-critical — never block chat response */ }
 
     res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   } catch (err) {
