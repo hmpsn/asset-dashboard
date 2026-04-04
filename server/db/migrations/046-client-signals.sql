@@ -1,15 +1,18 @@
--- Store client CTA taps with surrounding chat context.
--- Created when a client taps a Service Interest CTA in the chat panel.
--- chat_context is JSON: ClientSignalMessage[] (last 10 messages at time of tap).
+-- client_signals: stores signals created when the AI detects purchase/service
+-- intent in client chat. Reviewed and actioned by the admin team.
+-- chat_context is JSON: ClientSignalMessage[] (last 10 messages at time of signal creation).
 
 CREATE TABLE IF NOT EXISTS client_signals (
-  id           TEXT NOT NULL PRIMARY KEY,
-  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  type         TEXT NOT NULL CHECK(type IN ('content_interest', 'service_interest')),
-  chat_context TEXT NOT NULL DEFAULT '[]',
-  status       TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'reviewed', 'actioned')),
-  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  id              TEXT NOT NULL PRIMARY KEY,
+  workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  workspace_name  TEXT NOT NULL,
+  type            TEXT NOT NULL CHECK(type IN ('content_interest', 'service_interest')),
+  status          TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'reviewed', 'actioned')),
+  chat_context    TEXT NOT NULL DEFAULT '[]',
+  trigger_message TEXT NOT NULL DEFAULT '',
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_client_signals_workspace ON client_signals(workspace_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_client_signals_status    ON client_signals(status);
+CREATE INDEX IF NOT EXISTS idx_client_signals_status    ON client_signals(status, created_at DESC);
