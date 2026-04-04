@@ -3,6 +3,7 @@ import {
   Bell, TrendingDown, Flag, MessageSquare, ClipboardCheck, Clipboard, Layers,
 } from 'lucide-react';
 import { workspaceOverview, anomalies as anomaliesApi, churnSignals } from '../../api/misc';
+import { queryKeys } from '../../lib/queryKeys';
 
 export interface NotificationItem {
   id: string;
@@ -191,7 +192,7 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
  */
 export function useNotifications() {
   return useQuery({
-    queryKey: ['admin-notifications'] as const,
+    queryKey: queryKeys.admin.notifications(),
     queryFn: fetchNotifications,
     staleTime: POLL_INTERVAL,
     refetchInterval: POLL_INTERVAL,
