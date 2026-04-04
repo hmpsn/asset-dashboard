@@ -22,7 +22,7 @@ The following claims were verified against `git show origin/main:<path>`. Six co
 | 6 | StrategyTab.tsx lines 575, 670-673, 688, 696 | ✅ Confirmed | — |
 | 7 | workspace-intelligence.ts missing backlinkProfile/serpFeatures | ✅ Confirmed | — |
 | 8 | page-keywords.ts lines 130-176 upsertPageKeyword() | ✅ Confirmed | — |
-| 9 | PageIntelligence.tsx line 34 expects `'ai_estimate'` | ❌ Wrong | **Type is `'exact' \| 'partial_match' \| 'ai_estimate'`** — `'bulk_lookup'` written by strategy is not in this union at all. Fix: strategy should write `'exact'` (SEMRush bulk = exact keyword data) |
+| 9 | PageIntelligence.tsx line 34 local `StrategyPage` type | ❌ Wrong initially | **Type was `'exact' \| 'partial_match' \| 'ai_estimate'`** — missing `'bulk_lookup'`. Fix chosen: widen local type to import `MetricsSource` from `shared/types/keywords.ts` which includes all 4 values. Strategy continues writing `'bulk_lookup'` (semantically accurate for SEMRush bulk data). |
 | 10 | keyword-strategy.ts uses replaceAllPageKeywords() | ✅ Confirmed | — |
 | 11 | routes.ts line 23 ClientTab missing 'brand' | ✅ Confirmed | — |
 | 12 | workspace.ts lines 175-177 existing toggles | ✅ Confirmed | — |
@@ -355,8 +355,8 @@ ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT; -- JSON array of goal
 | `tests/unit/kd-framing.test.ts` | `kdFraming(0)` → "Low competition…". `kdFraming(30)` → "Low…". `kdFraming(31)` → "Moderate…". `kdFraming(60)` → "Moderate…". `kdFraming(61)` → "Competitive…". `kdFraming(80)` → "Competitive…". `kdFraming(81)` → "Highly competitive…". `kdFraming(100)` → "Highly competitive…". Boundary values 30/31 and 60/61 and 80/81 explicitly tested. `kdFraming(undefined)` → graceful fallback. |
 | `tests/unit/loading-phrases.test.ts` | Returns a non-empty string. Return value is from the defined 9-phrase list. Over 50 calls, all 9 phrases appear at least once (distribution test). No two consecutive identical phrases. All phrases end with `…`. |
 | `tests/unit/client-signals-store.test.ts` | `createClientSignal()` inserts row with correct `type`, `status: 'new'`, `chatContext`. `listClientSignals(workspaceId)` returns signals for that workspace only (isolation). `getClientSignal(id)` returns full record. `updateSignalStatus(id, 'reviewed')` persists. Signal with null chatContext gracefully handled. |
-| `tests/unit/metrics-source-enum.test.ts` | `METRICS_SOURCE.EXACT === 'exact'`. `METRICS_SOURCE.PARTIAL_MATCH === 'partial_match'`. `METRICS_SOURCE.AI_ESTIMATE === 'ai_estimate'`. Import from `shared/types/keywords.ts` — type-check that `'bulk_lookup'` is NOT assignable to `MetricsSource`. |
-| `tests/unit/page-intelligence-strategy-blend.test.ts` | Seed PI data for a page. Run strategy upsert for same page. Assert original PI fields intact (upsert didn't wipe). Assert `metricsSource` written is `'exact'` not `'bulk_lookup'`. Assert `replaceAllPageKeywords` is NOT called (spy). Assert `upsertPageKeyword` IS called per keyword. |
+| `tests/unit/metrics-source-enum.test.ts` | `METRICS_SOURCE.EXACT === 'exact'`. `METRICS_SOURCE.PARTIAL_MATCH === 'partial_match'`. `METRICS_SOURCE.BULK_LOOKUP === 'bulk_lookup'`. `METRICS_SOURCE.AI_ESTIMATE === 'ai_estimate'`. `Object.keys(METRICS_SOURCE)` has length 4. |
+| `tests/unit/page-intelligence-strategy-blend.test.ts` | Seed PI data for a page. Run strategy upsert for same page. Assert original PI fields intact (upsert didn't wipe). Assert `metricsSource` uses `METRICS_SOURCE.BULK_LOOKUP` for SEMRush bulk data. Assert `replaceAllPageKeywords` is NOT called (spy). Assert `upsertPageKeyword` IS called per keyword. |
 
 ### New Integration Tests (4 files)
 
@@ -385,7 +385,7 @@ ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT; -- JSON array of goal
 | Pattern | Detail |
 |---------|--------|
 | **ClientDashboard tab rendering** | Inline conditionals `{tab === 'x' && <ErrorBoundary label="X"><Tab .../></ErrorBoundary>}` — NOT switch/case. File: `src/components/client/ClientDashboard.tsx` |
-| **DB migration numbering** | Next available: **046** (client_signals), **047** (businessPriorities). Latest existing: `045-anomaly-scan-tracker.sql` |
+| **DB migration numbering** | Phase 0 consumed: **046** (client_signals), **047** (business_priorities). Next available: **048**. Latest existing pre-Phase 0: `045-anomaly-scan-tracker.sql` |
 | **Feature flag registration** | `FEATURE_FLAGS` const in `shared/types/feature-flags.ts`. Add key + value string; type auto-derives. `bridge-client-signal` already exists — do NOT add duplicate. New flags needed: `'smart-placeholders'`, `'client-brand-section'`, `'seo-editor-unified'` |
 | **React Query key convention** | Admin: `['admin-<resource>', workspaceId]`. Client: `['client-<resource>', workspaceId]` |
 | **Integration test setup** | `createTestContext(port)` from `tests/integration/helpers.js`. `beforeAll(ctx.startServer, 25_000)`. Pick an unused port. |
@@ -394,7 +394,7 @@ ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT; -- JSON array of goal
 | **ContentGaps location** | `src/components/strategy/ContentGaps.tsx` — NOT client/ |
 | **ChatPanel location** | `src/components/ChatPanel.tsx` — NOT client/ — shared by both admin + client |
 | **AdminInbox** | Does not exist in origin/main — create as new file |
-| **metricsSource valid values** | `'exact' \| 'partial_match' \| 'ai_estimate'` — strategy must write `'exact'` for SEMRush bulk data; `'bulk_lookup'` is NOT a valid value |
+| **metricsSource valid values** | `MetricsSource` type from `shared/types/keywords.ts` — includes `'exact'`, `'partial_match'`, `'bulk_lookup'`, `'ai_estimate'`. Strategy writes `METRICS_SOURCE.BULK_LOOKUP` for SEMRush bulk data. Always use the `METRICS_SOURCE` const, never raw string literals. |
 | **Smart placeholder intelligence** | Reads cached `seoContext` slice — no independent AI call. 5-min TTL already in place |
 | **Notification drawer direction** | Slides in from **left** over sidebar |
 
@@ -437,8 +437,8 @@ ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT; -- JSON array of goal
 
 | Rule | Regex Pattern | Glob | Level |
 |------|--------------|------|-------|
-| No raw `'bulk_lookup'` strings | `['"]bulk_lookup['"]` | `**/*.ts,**/*.tsx` | error |
-| No raw `'ai_estimate'` outside types | `['"]ai_estimate['"]` | `server/**/*.ts,src/**/*.ts` | error |
+| No raw `'bulk_lookup'` strings (use `METRICS_SOURCE.BULK_LOOKUP`) | `['"]bulk_lookup['"]` | `**/*.ts,**/*.tsx` (exclude `shared/types/keywords.ts`) | error |
+| No raw `'ai_estimate'` strings (use `METRICS_SOURCE.AI_ESTIMATE`) | `['"]ai_estimate['"]` | `server/**/*.ts,src/**/*.ts` (exclude `shared/types/keywords.ts`) | error |
 | No `replaceAllPageKeywords` in strategy routes | `replaceAllPageKeywords` | `server/routes/keyword-strategy.ts` | error |
 | No `getBacklinksOverview` outside workspace-intelligence | `getBacklinksOverview` | `server/**/*.ts` (exclude `workspace-intelligence.ts`) | error |
 
@@ -567,7 +567,7 @@ npx tsx scripts/pr-check.ts
 **Phase 2 diff review before advancing:**
 ```bash
 npx tsc --noEmit --skipLibCheck
-grep -rn "'bulk_lookup'" server/ src/ --include="*.ts" --include="*.tsx"  # should be zero
+grep -rn "'bulk_lookup'" server/ src/ --include="*.ts" --include="*.tsx" | grep -v keywords.ts  # should be zero outside keywords.ts
 grep -rn "replaceAllPageKeywords" server/routes/keyword-strategy.ts       # should be zero
 npx vitest run tests/unit/page-intelligence-strategy-blend.test.ts
 npx vitest run tests/unit/workspace-intelligence.test.ts

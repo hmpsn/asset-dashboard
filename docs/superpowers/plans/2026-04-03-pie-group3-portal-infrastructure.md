@@ -19,7 +19,7 @@
 | `shared/types/feature-flags.ts` | **Modify** | Add `'client-brand-section'` and `'smart-placeholders'` flags |
 | `shared/types/workspace.ts` | **Modify** | Add `siteIntelligenceClientView?: boolean` to `Workspace` |
 | `src/routes.ts` | **Modify** | Add `'brand'` to `ClientTab` union type |
-| `server/db/migrations/047-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
+| `server/db/migrations/048-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
 | `server/workspaces.ts` | **Modify** | Add `siteIntelligenceClientView` to `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `updateWorkspace` |
 | `src/components/settings/FeaturesTab.tsx` | **Modify** | Add Site Intelligence Client View toggle (copy `analyticsClientView` pattern exactly) |
 | `src/components/client/BrandTab.tsx` | **Create** | New client portal tab — editable business profile + read-only brand positioning |
@@ -166,7 +166,7 @@ Also add `'brand'` to the allowed tabs array in `ClientDashboard.tsx` line 152 (
 **Model:** Haiku (mechanical DB addition)
 **Depends on:** Task 1 (Workspace type must have `siteIntelligenceClientView`)
 
-- [ ] **Create `server/db/migrations/047-site-intelligence-client-view.sql`**:
+- [ ] **Create `server/db/migrations/048-site-intelligence-client-view.sql`**:
 
 ```sql
 -- Add site_intelligence_client_view column to workspaces
@@ -205,7 +205,7 @@ In the `Partial<Pick<Workspace, '...' | 'siteIntelligenceClientView'>>` union.
 ```
 
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(db): migration 047 + workspaces.ts — add siteIntelligenceClientView column and mapper`
+- [ ] Commit: `feat(db): migration 048 + workspaces.ts — add siteIntelligenceClientView column and mapper`
 
 ---
 
