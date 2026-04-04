@@ -98,7 +98,6 @@ describe('POST /api/public/signal/:workspaceId', () => {
     expect([200, 201]).toContain(res.status);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.signalId).toBeTruthy();
   });
 
   it('creates a content_interest signal from client portal', async () => {
@@ -110,7 +109,6 @@ describe('POST /api/public/signal/:workspaceId', () => {
     expect([200, 201]).toContain(res.status);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.signalId).toBeTruthy();
   });
 
   it('returns 400 for invalid signal type', async () => {

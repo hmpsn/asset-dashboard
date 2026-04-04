@@ -922,8 +922,9 @@ async function assembleClientSignals(
       totalCount,
       recentTypes: signals.slice(0, 5).map(s => s.type),
     };
-  } catch {
+  } catch (err) {
     // client_signals table may not exist on older DBs — degrade gracefully
+    log.debug({ err }, 'client_signals unavailable for intelligence assembly');
   }
 
   // Recent chat topics

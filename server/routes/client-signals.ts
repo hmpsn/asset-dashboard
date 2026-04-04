@@ -102,7 +102,7 @@ router.post(
 
       notifyTeamClientSignal(ws.id, ws.name, type, triggerMessage);
 
-      res.json({ ok: true, signalId: signal.id });
+      res.json({ ok: true });
     } catch (err) {
       log.error({ err }, 'Failed to create client signal');
       res.status(500).json({ error: 'Failed to create signal' });

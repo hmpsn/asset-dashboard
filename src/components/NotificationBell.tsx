@@ -7,6 +7,7 @@ import {
 import { adminPath, type Page } from '../routes';
 import { workspaceOverview, anomalies as anomaliesApi, churnSignals } from '../api/misc';
 import { useClientSignals } from '../hooks/admin/useClientSignals';
+import { EmptyState } from './ui/EmptyState';
 
 interface NotificationItem {
   id: string;
@@ -319,10 +320,12 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
                 })}
               </div>
             ) : (
-              <div className="px-4 py-8 text-center">
-                <Bell className="w-5 h-5 text-zinc-600 mx-auto mb-2" />
-                <div className="text-xs text-zinc-500">All clear — nothing needs attention</div>
-              </div>
+              <EmptyState
+                icon={Bell}
+                title="All clear"
+                description="Nothing needs attention right now"
+                className="py-8"
+              />
             )}
           </div>
         </div>
