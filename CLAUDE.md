@@ -281,6 +281,15 @@ git diff HEAD -- <list of shared files touched>
 ```
 Check for: duplicate imports, conflicting function definitions, missed exports, mismatched type names. Fix before starting the next batch.
 
+### 5. Dispatch prompts must declare app-level context
+When dispatching a subagent to write or modify a server route or frontend component, the prompt **must include** a brief "App-level context" section covering:
+- Which rate limiters already apply (e.g., "all /api/public/ POST routes already have `publicWriteLimiter` via `app.ts` — do NOT add it in the route file")
+- Which React Query caches already exist and their keys
+- Which WS events the component already subscribes to
+- Current conditional rendering state (e.g., "the EmptyState shows when `items.length === 0` — adding a parallel signal banner requires updating this condition too")
+
+Subagents have no awareness of code they haven't been explicitly shown. Missing context is the #1 source of "looks right in isolation, broken in context" bugs.
+
 ---
 
 ## Implementation Planning Standards

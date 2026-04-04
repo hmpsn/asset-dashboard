@@ -250,6 +250,30 @@ const CHECKS: Check[] = [
     message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
     severity: 'warn',
   },
+  {
+    name: 'Raw string literal in broadcastToWorkspace() event arg',
+    // Matches: broadcastToWorkspace(anything, 'some:event', ...) or broadcastToWorkspace(anything, "some:event", ...)
+    // Does NOT match: broadcastToWorkspace(wsId, WS_EVENTS.FOO, data) — no quote after the second comma
+    pattern: 'broadcastToWorkspace\\([^,]+,\\s*[\'"]',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/broadcast.ts'],
+    excludeLines: ['// ws-event-ok'],
+    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
+    severity: 'error',
+  },
+  {
+    name: 'Raw string literal in broadcast() event arg',
+    // Matches: broadcast('some:event', ...) or broadcast("some:event", ...)
+    // Does NOT match: broadcast(ADMIN_EVENTS.FOO, data)
+    pattern: 'broadcast\\(\\s*[\'"]',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/broadcast.ts'],
+    excludeLines: ['// ws-event-ok'],
+    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
+    severity: 'error',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

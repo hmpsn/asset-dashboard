@@ -190,6 +190,10 @@ export function createApp(): express.Express {
   app.use(fingerprintMiddleware);
 
   // --- Rate limiting for public API routes ---
+  // ⚠️  These three limiters apply AUTOMATICALLY to every /api/public/ route.
+  // Do NOT import or apply globalPublicLimiter, publicApiLimiter, or publicWriteLimiter
+  // inside individual route files — that increments the same shared bucket twice and
+  // silently halves the effective rate limit (10 req/min becomes 5, 200 becomes 100, etc.).
   app.use('/api/public/', globalPublicLimiter);
   app.use('/api/public/', publicApiLimiter);
   app.use((req, res, next) => {
