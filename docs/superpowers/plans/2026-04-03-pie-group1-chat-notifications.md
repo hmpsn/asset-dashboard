@@ -8,7 +8,22 @@
 
 **Tech Stack:** React 19, TypeScript, Express, SQLite (better-sqlite3), Vitest, @testing-library/react
 
-**Dependency:** Phase 0 plan must be merged and green on staging before this plan begins. Imports `ClientSignal`, `ClientSignalType`, `ClientSignalStatus` from `shared/types/client-signals.ts`.
+**Dependency:** Phase 0 plan must be merged and green on staging before this plan begins. Imports `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`, `ClientSignalMessage` from `shared/types/client-signals.ts`.
+
+---
+
+## Phase 0 Pre-done
+
+The following items were delivered on the Phase 0 branch and are already committed. Agents must **not** re-create or overwrite these files.
+
+| File | What was delivered |
+|------|--------------------|
+| `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalMessage`, `ClientSignalType`, `ClientSignalStatus` types |
+| `server/db/migrations/047-client-signals.sql` | `client_signals` table with all required columns, FK to `workspaces`, and composite indexes |
+| `server/db/migrations/048-business-priorities.sql` | `business_priorities` column added to `workspaces` table |
+| `server/workspaces.ts` | `businessPriorities` and `siteIntelligenceClientView` mapped (read + write) — `rowToWorkspace()` mapper already wired |
+
+Tasks 1 and 2 below are kept for reference (their content describes the contracts agents should rely on), but both steps are already complete. **Skip Task 1 and Task 2 — do not re-run them.**
 
 ---
 
@@ -16,8 +31,8 @@
 
 | Action | Path | Purpose |
 |--------|------|---------|
-| Create | `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalType`, `ClientSignalStatus` types |
-| Create | `server/db/migrations/047-client-signals.sql` | `client_signals` table DDL |
+| ~~Pre-done~~ | `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`, `ClientSignalMessage` types — shipped in Phase 0 |
+| ~~Pre-done~~ | `server/db/migrations/047-client-signals.sql` | `client_signals` table DDL — shipped in Phase 0 |
 | Create | `server/client-signals-store.ts` | DB store: `createClientSignal`, `listClientSignals`, `updateSignalStatus`, `getSignalById` |
 | Create | `server/routes/client-signals.ts` | Admin REST: GET list, PATCH status, GET single |
 | Modify | `server/app.ts` | Mount `client-signals` routes |
@@ -43,7 +58,9 @@
 
 ---
 
-## Task 1 — Shared types: `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`
+## Task 1 — ~~Shared types: `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`~~ *(Pre-done — Phase 0)*
+
+> **SKIP THIS TASK.** `shared/types/client-signals.ts` was created in Phase 0 and is already committed. The content below is preserved as a reference contract for what agents can import.
 
 **Owns:** `shared/types/client-signals.ts`
 **Must not touch:** any other file in this task
@@ -94,7 +111,9 @@ export interface ClientSignal {
 
 ---
 
-## Task 2 — DB migration: `client_signals` table
+## Task 2 — ~~DB migration: `client_signals` table~~ *(Pre-done — Phase 0)*
+
+> **SKIP THIS TASK.** `server/db/migrations/047-client-signals.sql` (migration `047`) was created in Phase 0 and is already committed. The content below is preserved as a reference for the table schema.
 
 **Owns:** `server/db/migrations/047-client-signals.sql`
 **Must not touch:** any other file in this task
@@ -1467,7 +1486,9 @@ describe('Intent detection in /api/public/search-chat/:workspaceId', () => {
 
 ---
 
-## Task 12 — NotificationBell: convert to fixed slide-out drawer
+## Task 12 — NotificationBell: refactor existing component to fixed slide-out drawer
+
+> **Note:** `src/components/NotificationBell.tsx` already EXISTS. This task refactors the existing file — do NOT create it from scratch. The current implementation uses `absolute top-full right-0` dropdown positioning which must be replaced with a fixed slide-out drawer pattern.
 
 **Owns:** `src/components/NotificationBell.tsx`
 **Must not touch:** any other file in this task
@@ -2116,13 +2137,14 @@ After all tasks are committed and CI is green on staging:
 ## Parallelization note
 
 All 14 tasks are **sequential** because:
-- Tasks 1–2 (types + migration) must precede Task 3 (store)
+- Tasks 1–2 are **pre-done (Phase 0)** — skip them; begin at Task 3
+- Task 3 (store) can start immediately (types + migration already exist)
 - Task 3 (store) must precede Task 4 (routes)
 - Task 4 (routes) must precede Task 11 (intent detection)
-- Tasks 5–6 are independent of each other and of 7–8, but both depend on Task 1
+- Tasks 5–6 are independent of each other and of 7–8, but both depend on Task 1 (pre-done)
 - Tasks 9–10 depend on Task 6 (loading phrases) and each other (ChatPanel imports ServiceInterestCTA)
 - Task 12 (NotificationBell) is fully independent of Tasks 9–11 but depends on Tasks 7–8 (WS events)
 - Task 13 (AdminInbox) depends on Tasks 7–8 (query keys + hooks)
 - Task 14 (verification) must be last
 
-Recommended execution order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14**
+Recommended execution order: **3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14**

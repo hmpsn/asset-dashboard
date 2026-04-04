@@ -19,7 +19,7 @@
 | `shared/types/content.ts` | **Phase 0 only** | StrategyCardContext, PageTypeBriefConfig committed in Phase 0 — import, do not re-add |
 | `shared/types/keywords.ts` | **Phase 0 only** | METRICS_SOURCE committed in Phase 0 — import, do not re-add |
 | `src/lib/kdFraming.ts` | Create | Shared KD plain-language framing utility |
-| `server/content-brief.ts` | Modify | Add strategyCardContext param to generateBrief(); add PAGE_TYPE_CONFIGS entries for all 7 page types; inject context block into prompt |
+| `server/content-brief.ts` | Modify | Add strategyCardContext param to generateBrief(); verify prompt field is correctly consumed by generateBrief() call — PAGE_TYPE_CONFIGS already has prompt populated for all 9 page types (DO NOT recreate); inject strategyCardBlock into prompt |
 | `server/routes/content-requests.ts` | Modify | Pass request.rationale, request.intent, request.priority as strategyCardContext to generateBrief() |
 | `server/workspace-intelligence.ts` | Modify | assembleSeoContext(): add backlinkProfile via getBacklinksOverview(); add serpFeatures via parseSerpFeatures() |
 | `server/routes/keyword-strategy.ts` | Modify | Switch replaceAllPageKeywords() → upsertPageKeywordsBatch() at both call sites |
@@ -61,6 +61,20 @@ PARALLEL BATCH A (start immediately after Phase 0 merge): Tasks 1, 4, 5, 6, 9
 PARALLEL BATCH B (after Batch A merged): Tasks 2, 7, 8, 10
 SEQUENTIAL: Task 3 (after Task 2)
 Tests: write and run after the task they cover
+
+---
+
+## Phase 0 Pre-done
+
+The following contracts are already committed on the Phase 0 branch (`claude/beautiful-yonath`). Agents must **import** these — do not redefine, recreate, or add to them.
+
+| File | What's pre-done |
+|------|----------------|
+| `shared/types/keywords.ts` | `METRICS_SOURCE` const and `MetricsSource` type exported |
+| `shared/types/content.ts` | `BriefJourneyStage`, `BriefPageType`, `StrategyCardContext`, `PageTypeBriefConfig` (with `prompt` field) exported |
+| `shared/types/workspace.ts` | `PageKeywordMap.metricsSource` is now typed as `MetricsSource` (not a bare string union) |
+| `server/content-brief.ts` | `PAGE_TYPE_CONFIGS` already has `prompt` field populated for all 9 page types (`blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`) — agents must NOT recreate or replace this object |
+| `server/page-keywords.ts` | `upsertPageKeywordsBatch` function already exists and is exported — import it, do not create it |
 
 ---
 
@@ -704,6 +718,11 @@ describe('generateBrief — strategyCardContext injection (mocked OpenAI)', () =
 });
 
 describe('generateBrief — PAGE_TYPE_CONFIGS coverage', () => {
+  // NOTE: PAGE_TYPE_CONFIGS uses the LOCAL PageTypeConfig interface (server/content-brief.ts),
+  // which has fields: wordCountTarget, wordCountRange, sectionRange, avgSectionWords,
+  // contentStyle, prompt. NOT tone/schemaTypes (those belong to shared/types/content.ts
+  // PageTypeBriefConfig — a different type). The 9 types include provider-profile,
+  // procedure-guide, pricing-page in addition to the 7 listed here.
   const PAGE_TYPES = ['blog', 'landing', 'service', 'location', 'pillar', 'product', 'resource'];
 
   it('getPageTypeConfig returns a config for every supported page type', () => {
@@ -713,10 +732,10 @@ describe('generateBrief — PAGE_TYPE_CONFIGS coverage', () => {
       expect(cfg).toBeDefined();
       expect(typeof cfg.wordCountTarget).toBe('number');
       expect(cfg.wordCountTarget).toBeGreaterThan(0);
-      expect(typeof cfg.tone).toBe('string');
-      expect(cfg.tone.length).toBeGreaterThan(0);
-      expect(Array.isArray(cfg.schemaTypes)).toBe(true);
-      expect(cfg.schemaTypes.length).toBeGreaterThan(0);
+      expect(typeof cfg.contentStyle).toBe('string');
+      expect(cfg.contentStyle.length).toBeGreaterThan(0);
+      expect(typeof cfg.prompt).toBe('string');
+      expect(cfg.prompt.length).toBeGreaterThan(0);
     }
   });
 
@@ -739,7 +758,9 @@ describe('generateBrief — PAGE_TYPE_CONFIGS coverage', () => {
 
 - [ ] Run — expect fail (buildStrategyCardBlock not exported yet).
 
-- [ ] In `server/content-brief.ts`, find the existing `PAGE_TYPE_CONFIGS` object and add or replace it with the full spec-aligned configuration. Locate the existing `PAGE_TYPE_CONFIGS` constant (it already has some entries based on the `getPageTypeConfig(context.pageType)` call in the prompt). Update/add entries for all 7 page types:
+- [ ] **PAGE_TYPE_CONFIGS is already complete — DO NOT modify or replace it.** The existing `PAGE_TYPE_CONFIGS` in `server/content-brief.ts` already has `prompt` populated for all 9 page types (`blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`). Verify the `prompt` field is already present by reading lines ~318–474 of `server/content-brief.ts`. The interface is `PageTypeConfig` (local interface, not `PageTypeBriefConfig` from shared types) — do not try to export it or reshape it.
+
+  The config block below was written before the audit confirmed it already existed. **Skip this block entirely — do not apply it:**
 
 ```typescript
 export const PAGE_TYPE_CONFIGS: Record<string, PageTypeBriefConfig> = {
@@ -884,7 +905,7 @@ The full diff at the prompt end:
   npx vitest run tests/unit/content-brief.test.ts 2>&1 | tail -20
   # Expected: all pass
   ```
-- [ ] Commit: `git add server/content-brief.ts tests/unit/content-brief.test.ts && git commit -m "feat(brief): add strategyCardContext param to generateBrief(); complete PAGE_TYPE_CONFIGS for all 7 page types"`
+- [ ] Commit: `git add server/content-brief.ts tests/unit/content-brief.test.ts && git commit -m "feat(brief): add strategyCardContext param + buildStrategyCardBlock to generateBrief()"`
 
 ---
 
