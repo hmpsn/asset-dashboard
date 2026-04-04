@@ -180,8 +180,8 @@ export type EmailEventType =
 
 function deriveLogoUrl(dashUrl?: string): string | undefined {
   // APP_URL is the authoritative platform domain where static files are served.
-  // Check it first — deriving from dashUrl risks using the marketing-site URL
-  // (hmpsn.studio) when ADMIN_URL is unset, producing a broken image link.
+  // Check it first — deriving from dashUrl risks using the marketing-site domain
+  // when ADMIN_URL is unset, producing a broken image link.
   const appUrl = process.env.APP_URL;
   if (appUrl) {
     try {

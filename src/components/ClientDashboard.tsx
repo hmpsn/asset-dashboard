@@ -953,6 +953,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     <ServiceInterestCTA
                       type={lastIntent}
                       workspaceId={workspaceId}
+                      bookingUrl={ws?.bookingUrl}
                       onAction={(type) => {
                         clearIntent();
                         if (type === 'content_interest') clientNavigate(clientPath(workspaceId, 'strategy', betaMode));
