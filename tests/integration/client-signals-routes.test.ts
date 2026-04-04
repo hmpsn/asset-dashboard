@@ -179,6 +179,75 @@ describe('PATCH /api/client-signals/:id/status — edge cases', () => {
   });
 });
 
+describe('POST /api/public/signal/:workspaceId — Zod validation edge cases', () => {
+  it('returns 400 when triggerMessage exceeds 500 characters', async () => {
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      type: 'service_interest',
+      triggerMessage: 'x'.repeat(501),
+      chatContext: [],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when chatContext has more than 10 items', async () => {
+    const items = Array.from({ length: 11 }, () => ({ role: 'user', content: 'ok' }));
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      type: 'service_interest',
+      triggerMessage: 'test',
+      chatContext: items,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when a chatContext message content exceeds 5000 characters', async () => {
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      type: 'service_interest',
+      triggerMessage: 'test',
+      chatContext: [{ role: 'user', content: 'c'.repeat(5001) }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when role is not user or assistant', async () => {
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      type: 'service_interest',
+      triggerMessage: 'test',
+      chatContext: [{ role: 'system', content: 'hello' }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when required fields are missing', async () => {
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      chatContext: [],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts exactly 500 character triggerMessage (boundary)', async () => {
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      type: 'service_interest',
+      triggerMessage: 'x'.repeat(500),
+      chatContext: [],
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+  });
+
+  it('accepts exactly 10 chatContext items (boundary)', async () => {
+    const items = Array.from({ length: 10 }, () => ({ role: 'user', content: 'ok' }));
+    const res = await postJson(`/api/public/signal/${testWsId}`, {
+      type: 'service_interest',
+      triggerMessage: 'test',
+      chatContext: items,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+  });
+});
+
 // Note: intent detection in /api/public/search-chat requires a live AI response
 // and cannot be reliably tested in CI without mocking the OpenAI call.
 // The detectedIntent logic is covered by code review:
