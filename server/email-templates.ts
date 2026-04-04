@@ -179,18 +179,20 @@ export type EmailEventType =
 // ── Template renderers ──
 
 function deriveLogoUrl(dashUrl?: string): string | undefined {
-  // Try to derive from dashboard URL first
-  if (dashUrl) {
-    try {
-      const u = new URL(dashUrl);
-      return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-    } catch { /* continue to fallback */ }
-  }
-  // Fallback: use APP_URL if available
+  // APP_URL is the authoritative platform domain where static files are served.
+  // Check it first — deriving from dashUrl risks using the marketing-site URL
+  // (hmpsn.studio) when ADMIN_URL is unset, producing a broken image link.
   const appUrl = process.env.APP_URL;
   if (appUrl) {
     try {
       const u = new URL(appUrl);
+      return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
+    } catch { /* continue to fallback */ }
+  }
+  // Fallback: derive from the dashboard URL passed by the caller
+  if (dashUrl) {
+    try {
+      const u = new URL(dashUrl);
       return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
     } catch { /* continue to fallback */ }
   }
