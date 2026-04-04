@@ -78,6 +78,11 @@ const stmts = createStmtCache(() => ({
     FROM client_signals
     WHERE workspace_id = ? AND status = 'new'
   `),
+  countAllByWorkspace: db.prepare(`
+    SELECT COALESCE(COUNT(*), 0) as count
+    FROM client_signals
+    WHERE workspace_id = ?
+  `),
   selectRecentByType: db.prepare(`
     SELECT id FROM client_signals
     WHERE workspace_id = ? AND type = ? AND created_at > ?
@@ -132,6 +137,15 @@ export function updateSignalStatus(id: string, status: ClientSignalStatus): bool
 
 export function countNewSignals(workspaceId: string): number {
   const result = stmts().countNewByWorkspace.get(workspaceId) as { count: number };
+  return result.count;
+}
+
+/**
+ * Returns the total count of all signals for a workspace across all statuses.
+ * Uses a COUNT(*) query — not capped by the LIMIT 100 on listClientSignals.
+ */
+export function countAllSignals(workspaceId: string): number {
+  const result = stmts().countAllByWorkspace.get(workspaceId) as { count: number };
   return result.count;
 }
 
