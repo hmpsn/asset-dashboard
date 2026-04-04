@@ -18,6 +18,7 @@ import {
 } from '../client-signals-store.js';
 import { getWorkspace } from '../workspaces.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
@@ -60,7 +61,7 @@ router.patch(
     const ok = updateSignalStatus(req.params.id, status);
     if (!ok) return res.status(500).json({ error: 'Update failed' });
     const updated = getSignalById(req.params.id);
-    broadcastToWorkspace(signal.workspaceId, 'client-signal:updated', { signalId: req.params.id });
+    broadcastToWorkspace(signal.workspaceId, WS_EVENTS.CLIENT_SIGNAL_UPDATED, { signalId: req.params.id });
     res.json(updated);
   },
 );
@@ -96,7 +97,7 @@ router.post(
         triggerMessage,
       });
 
-      broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
+      broadcastToWorkspace(ws.id, WS_EVENTS.CLIENT_SIGNAL_CREATED, { signalId: signal.id });
       addActivity(ws.id, 'client_signal', `Client signal: ${type}`, triggerMessage.slice(0, 80));
 
       notifyTeamClientSignal(ws.id, ws.name, type, triggerMessage);

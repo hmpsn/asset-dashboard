@@ -117,7 +117,7 @@ export function Breadcrumbs({
           </button>
         )}
         {/* Notification bell */}
-        <NotificationBell onSelectWorkspace={(wsId) => navigate(adminPath(wsId))} />
+        <NotificationBell onSelectWorkspace={(wsId) => navigate(adminPath(wsId))} workspaceId={selected?.id} />
       </div>
     </div>
   );

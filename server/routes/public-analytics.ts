@@ -54,6 +54,7 @@ import type { InsightType } from '../../shared/types/analytics.js';
 import { STUDIO_NAME } from '../constants.js';
 import { createClientSignal, hasRecentSignal } from '../client-signals-store.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 
 // ── Analytics insights endpoints ─────────────────────────────────
@@ -460,7 +461,7 @@ ${JSON.stringify(context, null, 2)}`;
             chatContext,
             triggerMessage: question.trim().slice(0, 500),
           });
-          broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
+          broadcastToWorkspace(ws.id, WS_EVENTS.CLIENT_SIGNAL_CREATED, { signalId: signal.id });
           addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80));
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         }
