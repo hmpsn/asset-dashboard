@@ -82,12 +82,22 @@ This group ships as 3 sequential PRs. Each must be merged to staging and CI-gree
 
 Tasks 2 and 3 can run in parallel. Task 1 can also run in parallel with Tasks 2 and 3. All three are independent of each other.
 
+> **✅ PR 1 Staging Verification — do these before merging PR 2:**
+> - Run a keyword strategy bulk lookup on a workspace → open PageIntelligence → confirm pages show `bulk_lookup` as metrics source (previously blank)
+> - Check that no TypeScript errors are introduced (`tsc --noEmit --skipLibCheck` clean)
+> - No UI changes in this PR — verification is type-level only
+
 **PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)**
 - Task 4: `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext — independent)
 - Task 6: `server/content-brief.ts` (buildStrategyCardBlock + strategyCardContext param — depends on Phase 0 types only)
 - Task 5: `server/routes/content-requests.ts` (StrategyCardContext threading — depends on Task 6)
 
 Tasks 4 and 6 can run in parallel. Task 5 is sequential after Task 6.
+
+> **✅ PR 2 Staging Verification — do these before merging PR 3:**
+> - Generate a content brief from a strategy card that has rationale/intent/priority set → open the brief → confirm the strategy card context block appears in the brief (look for the rationale text in the brief body)
+> - In `assembleSeoContext` output (check via admin AI chat): verify `backlinkProfile` and `serpFeatures` fields appear in the AI's context when it answers questions (ask something like "what backlink data do you have on this site?")
+> - If backlink or SERP data is unavailable for the workspace, confirm the chat still responds normally (graceful degradation, no 500 errors)
 
 **PR 3 — Tasks 7–10: UI Layer (all depend on PR 1 being merged)**
 - Task 7: `src/components/client/StrategyTab.tsx` (KD framing + predicted impact — depends on Task 1)
@@ -96,6 +106,16 @@ Tasks 4 and 6 can run in parallel. Task 5 is sequential after Task 6.
 - Task 10: `src/components/SeoEditor.tsx` (CMS filter + write-back — depends on Task 9)
 
 Tasks 7 and 8 can run in parallel (both depend only on Task 1 from PR 1). Task 9 is independent. Task 10 is sequential after Task 9.
+
+> **✅ PR 3 Staging Verification — do these before declaring Group 2 done:**
+> - Open StrategyTab on a workspace with keywords → hover a KD value → tooltip appears with plain-language label (e.g. "Low competition")
+> - Open ContentGaps → same KD tooltip behaviour
+> - StrategyTab shows a predicted impact line on at least one card (or graceful empty state if data unavailable)
+> - Open SEO Editor → confirm the page list now includes CMS collection pages (not just static pages)
+> - Toggle the CMS filter → list filters correctly
+> - Apply a meta change to a CMS page with a known collectionId → verify PATCH goes through and success state shows
+> - Apply a meta change to a CMS page with NO collectionId mapping → verify "Manual apply required" message appears (no error, no broken state)
+> - No purple anywhere in `src/components/client/` — run `npx tsx scripts/pr-check.ts`
 
 > **⚠️ PR 3 App-level context — read before dispatching any Task 7–10 agent:**
 >

@@ -61,6 +61,12 @@ This group ships as 3 sequential PRs. Each must be merged to staging and CI-gree
 
 Note: Tasks 2 and 3 can run in parallel after Task 1 is committed. Tasks 4 and 5 can run in parallel after Task 3 is committed. Task 6 runs after Task 4 is committed.
 
+> **✅ PR 1 Staging Verification — do these before merging PR 2:**
+> - Open admin Settings → Features tab for a workspace → confirm the "Site Intelligence Client View" toggle is present and saves correctly
+> - With the toggle OFF: open the client portal OverviewTab → confirm the IntelligenceSummaryCard is NOT visible
+> - With the toggle ON: open the client portal OverviewTab → confirm the IntelligenceSummaryCard IS visible
+> - Run `npx tsx scripts/pr-check.ts` → confirm the 4 new rules fire on a file that contains `replaceAllPageKeywords` and `ai_estimate` raw strings (manual smoke-test of the new rules)
+
 **PR 2 — Brand Portal** (Tasks 7–9)
 - BrandTab component (Task 7)
 - ClientDashboard Brand tab wiring (Task 8) — runs in parallel with Task 9 after Task 7
@@ -68,12 +74,28 @@ Note: Tasks 2 and 3 can run in parallel after Task 1 is committed. Tasks 4 and 5
 
 Note: Tasks 8 and 9 can run in parallel after Task 7 is committed.
 
+> **✅ PR 2 Staging Verification — do these before merging PR 3:**
+> - Open the client portal → confirm a "Brand" tab appears in the nav (gated behind `client-brand-section` flag — enable the flag first if needed)
+> - BrandTab shows: business contact fields (phone, email, address, social) as editable inputs; brand positioning section as read-only
+> - Edit a contact field and save → refresh the page → confirm the value persisted
+> - Brand positioning fields are read-only (no edit inputs, no save button)
+> - No purple in BrandTab — check source and `pr-check.ts`
+> - The Brand tab does NOT appear in the nav when the `client-brand-section` flag is OFF
+
 **PR 3 — Smart Placeholders** (Tasks 10–12)
 - useSmartPlaceholder hook (Task 10)
 - AdminChat + ChatPanel integration (Task 11) — runs in parallel with Task 12 after Task 10
 - Smart placeholder tests (Task 12) — runs in parallel with Task 11 after Task 10
 
 Note: Tasks 11 and 12 can run in parallel after Task 10 is committed.
+
+> **✅ PR 3 Staging Verification — do these before declaring Group 3 done:**
+> - Open AdminChat for a workspace that has SEO context loaded → confirm suggestion chips appear above the input (teal, not purple)
+> - Click a chip → confirm it populates the input field but does NOT auto-submit
+> - Open a workspace with no SEO context → confirm AdminChat still renders with no chips and a sensible placeholder (no crash, no empty error state)
+> - Open the client portal chat (not AdminChat) → confirm NO chips appear — chips are admin-only
+> - Enable `smart-placeholders` feature flag OFF → confirm chips are hidden in AdminChat even if the hook returns suggestions
+> - No purple in `ChatPanel.tsx` or `AdminChat.tsx` — run `pr-check.ts`
 
 > **⚠️ PR 3 App-level context — read before dispatching any Task 10–12 agent:**
 >
