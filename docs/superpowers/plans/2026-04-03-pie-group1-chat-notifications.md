@@ -46,12 +46,13 @@ This group ships as 4 sequential PRs. Each must be merged to staging and CI-gree
 > Within PR 1: Tasks 1 → 2 are strictly sequential (routes need the store). Task 3 and Task 4 both depend on Task 1 (store) and can run in parallel after Task 2 is committed — Task 3 needs the routes mounted for its integration test; Task 4 only needs the store types. In practice, run them sequentially (Task 3 → Task 4) unless parallel agents are available.
 
 **PR 2 — Admin Notification Circuit** (Tasks 5–8)
+- Task 4.5: `shared/types/intelligence.ts`, `server/workspace-intelligence.ts` (wire intent signals into ClientSignalsSlice — must run before Task 8)
 - Task 5: `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts` (constants — frontend foundation)
 - Task 6: `src/hooks/admin/useClientSignals.ts`, `src/hooks/admin/index.ts`, `src/hooks/useWsInvalidation.ts` (hooks)
 - Task 7: `src/components/NotificationBell.tsx` (drawer refactor)
 - Task 8: `src/components/admin/AdminInbox.tsx` (new component)
 
-> Within PR 2: Task 5 → Task 6 are strictly sequential (hooks need query keys + WS constants). Tasks 7 and 8 both depend on Task 6 and can run in parallel — they own separate files. In practice, run them sequentially (Task 7 → Task 8).
+> Within PR 2: Task 4.5 can run in parallel with Task 5 (separate files, no dependency). Tasks 5 → 6 are strictly sequential. Tasks 7 and 8 both depend on Task 6. Run order: 4.5 → 5 → 6 → 7 → 8 (or 4.5 ∥ 5 → 6 → 7 → 8).
 
 **PR 3 — Client CTA Circuit** (Tasks 9–11)
 - Task 9: `src/lib/loadingPhrases.ts` (new utility)
@@ -98,6 +99,8 @@ The two pre-done tasks (shared types + DB migration) are kept below as reference
 | Modify | `src/components/NotificationBell.tsx` | Convert absolute dropdown to fixed slide-out drawer from left; add Client Signals section at top |
 | Create | `src/components/admin/AdminInbox.tsx` | New admin component with Signals tab: list signals, expand to chat context, status workflow |
 | Modify | `src/hooks/admin/index.ts` | Export `useClientSignals`, `useUpdateSignalStatus` |
+| Modify | `shared/types/intelligence.ts` | Add `intentSignals` field to `ClientSignalsSlice` |
+| Modify | `server/workspace-intelligence.ts` | Wire `listClientSignals` + `countNewSignals` into `assembleClientSignals()` |
 | Create | `src/hooks/admin/useClientSignals.ts` | React Query hooks for signals |
 | Modify | `src/lib/queryKeys.ts` | Add `admin.clientSignals(wsId)` key |
 | Modify | `src/lib/wsEvents.ts` | Add `CLIENT_SIGNAL_CREATED` event constant |
@@ -954,6 +957,81 @@ export async function notifyTeamClientSignal(
 - [ ] Commit with message:
   ```
   feat: add clientSignalEmail template and notifyTeamClientSignal helper (Task 4)
+  ```
+
+---
+
+## Task 4.5 — Wire intent signals into `ClientSignalsSlice` **[HAIKU]** — intelligence engine integration
+
+**PR:** PR 2
+**Depends on:** PR 1 merged and green (`client-signals-store.ts` must be available)
+**Owns:** `shared/types/intelligence.ts`, `server/workspace-intelligence.ts`
+**Must not touch:** `server/client-signals-store.ts`, any frontend file, any other file not listed above
+
+> **Why this task exists:** `workspace-intelligence.ts` is the central intelligence engine that feeds AdminChat, AI context prompts, and the client portal intelligence summary. Any new table capturing workspace activity must be surfaced here — otherwise the AI is blind to it. The new `client_signals` table records purchase/service intent expressed in chat; this task wires it into `ClientSignalsSlice` so AdminChat can reference "this client expressed service interest 3 times this week."
+
+### Step 4.5.1 — Add `intentSignals` to `ClientSignalsSlice`
+
+- [ ] Open `shared/types/intelligence.ts`. Find `ClientSignalsSlice` (around line 173).
+
+- [ ] Add after `serviceRequests?: { pending: number; total: number };`:
+
+```typescript
+/** Intent signals detected in client chat (service_interest / content_interest) */
+intentSignals?: {
+  /** Count of unactioned (status = 'new') signals */
+  newCount: number;
+  /** Total signals created (all statuses) */
+  totalCount: number;
+  /** Signal types seen recently, most recent first (max 5) */
+  recentTypes: Array<'service_interest' | 'content_interest'>;
+};
+```
+
+### Step 4.5.2 — Wire into `assembleClientSignals()`
+
+- [ ] Open `server/workspace-intelligence.ts`. Find `assembleClientSignals` (around line 741).
+
+- [ ] Add the import at the top of the file with existing imports (never mid-file):
+```typescript
+import { listClientSignals, countNewSignals } from './client-signals-store.js';
+```
+
+- [ ] In `assembleClientSignals`, add after the `serviceRequests` block and before the `recentChatTopics` block:
+
+```typescript
+// Intent signals from client chat
+let intentSignals: ClientSignalsSlice['intentSignals'];
+try {
+  const signals = listClientSignals(workspaceId);
+  const newCount = countNewSignals(workspaceId);
+  intentSignals = {
+    newCount,
+    totalCount: signals.length,
+    recentTypes: signals.slice(0, 5).map(s => s.type),
+  };
+} catch {
+  // client_signals table may not exist on older DBs — degrade gracefully
+}
+```
+
+- [ ] In the return object at the end of `assembleClientSignals`, add `intentSignals` alongside the other fields.
+
+> Verify the return object location with `grep -n 'serviceRequests\|return {' server/workspace-intelligence.ts` — the return statement is near the end of `assembleClientSignals`.
+
+### Step 4.5.3 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 4.5.4 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: wire intent signals into ClientSignalsSlice intelligence engine (Task 4.5)
   ```
 
 ---
