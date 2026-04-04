@@ -75,6 +75,18 @@ Note: Tasks 8 and 9 can run in parallel after Task 7 is committed.
 
 Note: Tasks 11 and 12 can run in parallel after Task 10 is committed.
 
+> **⚠️ PR 3 App-level context — read before dispatching any Task 10–12 agent:**
+>
+> The following is already handled at layers the UI agents will not see. Do not re-implement any of it:
+>
+> - **`useSmartPlaceholder` must NOT make AI calls.** It reads from the `seoContext` intelligence slice already in the React Query cache. If the cache is empty or loading, return `{ chips: [], placeholder: 'Ask anything...' }` immediately. Never trigger a new network request to an AI endpoint from this hook.
+> - **Suggestion chips are admin-only — never in client-facing renders.** `ChatPanel.tsx` is used in both the admin panel and the client portal. The `suggestionChips` prop must only be passed from `AdminChat`. Never pass it from any client-facing wrapper or `ClientChatPanel`. Add a code comment above the prop definition documenting this constraint.
+> - **Color rule: teal for chips, never purple.** Chip buttons are interactive → teal (`border-teal-500/30`, `text-teal-300`, `hover:bg-teal-500/10`). Purple is admin AI only (`AdminChat` and `SeoAudit` "Flag for Client"). `ChatPanel` is also rendered in client context — never add purple to it. `pr-check.ts` flags purple in client-facing components.
+> - **Rate limiters already apply to all `/api/public/` routes.** `server/app.ts` applies `publicWriteLimiter` (10 req/min), `publicApiLimiter` (200 req/min), and `globalPublicLimiter` automatically. Do NOT import or apply any of these in route files — applying them twice shares the same in-memory bucket and silently halves the effective limit.
+> - **The `smart-placeholders` feature flag is already defined.** `shared/types/feature-flags.ts` has `'smart-placeholders': false` (Phase 0 done). The hook runs unconditionally; the component gates chip rendering on `useFeatureFlag('smart-placeholders')`. Do not re-add the flag definition.
+> - **Bug found during review → fix in current PR.** CLAUDE.md mandates: if code review returns a Critical or Important issue, fix it before merging. Never carry a known bug into the next PR.
+> - **Dispatch prompts must declare app-level context (CLAUDE.md §5).** Before dispatching each subagent, explicitly list: which rate limiters apply to routes it calls, which React Query caches its mutations invalidate, which WS events it broadcasts, and what UI conditional state it affects. "The agent can figure it out" has caused production bugs in prior phases.
+
 ---
 
 ## File Map
@@ -1074,6 +1086,18 @@ describe('BrandTab', () => {
 
 > DEDUPLICATION NOTE: ChatPanel.tsx currently has NO chips concept. Do not add chips rendering here — that belongs to Task 11. This task creates the hook only.
 
+> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
+>
+> 1. **No AI calls. Ever.** `useSmartPlaceholder` reads from the existing React Query cache only (`seoContext` intelligence slice). If the cache is empty, loading, or errored, return `{ chips: [], placeholder: 'Ask anything...' }` immediately without triggering any network request to an AI or analytics endpoint.
+>
+> 2. **Client context gets placeholder only — no chips.** When `context === 'client'`, return `{ chips: [], placeholder: ghostText }`. Chips are admin-only. Never populate the `chips` array in a client context, even if the cache has data.
+>
+> 3. **Feature flag gates rendering, not the hook.** The hook always runs and always returns data. The `smart-placeholders` flag is the caller's responsibility to check before rendering chips. Do not add `useFeatureFlag` inside this hook — keep it pure and testable.
+>
+> 4. **Use the existing intelligence query key from `src/lib/queryKeys.ts`.** Do not hardcode a new string key. A mismatched query key silently reads from the wrong cache slot and returns stale or empty data without any error.
+>
+> 5. **Return type must be typed, not `any`.** Export a `SmartPlaceholderResult` interface (`{ chips: string[]; placeholder: string }`) from the hook file. Import it in Task 11 — do not inline the type there.
+
 - [ ] Read `src/hooks/admin/useWorkspaceIntelligence.ts` for query pattern
 - [ ] Read `server/seo-context.ts` lines 17–55 to understand `SeoContext` shape
 - [ ] Read `src/lib/queryKeys.ts` lines 82–90 for intelligence query key
@@ -1239,6 +1263,18 @@ export function useSmartPlaceholder(
 - server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
 
 > DEDUPLICATION NOTE: ChatPanel currently has no `suggestionChips` prop. This task adds it as a new optional prop — pure addition. AdminChat currently derives `placeholder` from a simple chatMode ternary (line 121) with no hook. Both are clean additions.
+
+> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
+>
+> 1. **Never render chips in a client-facing context.** `ChatPanel` is used in both admin and client portal. `suggestionChips` must ONLY be passed from `AdminChat`. Add this exact comment above the prop in the interface: `/** Admin context only — never pass in client-facing renders (client portal chat, public ChatPanel wrappers). */`
+>
+> 2. **Color rule: teal chips only — never purple in `ChatPanel.tsx`.** Chip buttons are interactive → teal (`border-teal-500/30`, `text-teal-300`, `hover:bg-teal-500/10`). This file is also rendered in the client portal; purple is admin-AI-only and must never appear here. `pr-check.ts` flags purple across `src/components/`.
+>
+> 3. **`onChipClick` populates input — it does NOT auto-submit.** Clicking a chip fills `input` with the chip text. The user still presses Enter or the send button. Do not call `onSend` or trigger submission inside `onChipClick`. Unexpected auto-submit on chip click is a UX defect.
+>
+> 4. **Existing `placeholder?` prop continues to work.** `useSmartPlaceholder` returns a `placeholder` string that `AdminChat` passes to `ChatPanel` via the existing `placeholder` prop. Do not remove the prop or hard-code the placeholder inside `ChatPanel`. The hook output flows through the caller, not through an internal hook inside `ChatPanel`.
+>
+> 5. **Import `SmartPlaceholderResult` type from Task 10.** Use the exported interface — do not inline a local type definition. Typed contracts between Task 10 and Task 11 prevent silent shape mismatches that only surface at runtime.
 
 - [ ] Read `src/components/AdminChat.tsx` lines 118–135 (existing placeholder logic)
 - [ ] Read `src/components/ChatPanel.tsx` lines 1–60 (props interface)

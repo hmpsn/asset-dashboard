@@ -97,6 +97,17 @@ Tasks 4 and 6 can run in parallel. Task 5 is sequential after Task 6.
 
 Tasks 7 and 8 can run in parallel (both depend only on Task 1 from PR 1). Task 9 is independent. Task 10 is sequential after Task 9.
 
+> **⚠️ PR 3 App-level context — read before dispatching any Task 7–10 agent:**
+>
+> The following is already handled at layers the UI agents will not see. Do not re-implement any of it:
+>
+> - **Color rule: teal for interactive, blue for data (never both).** StrategyTab and ContentGaps display metrics (blue: clicks, impressions, sessions) and action controls (teal: filters, toggles). `kdFraming` tooltip labels are informational → use neutral or blue tones, not teal. Never use `violet`, `indigo`, or purple in any file under `src/components/client/`. `pr-check.ts` will flag purple in client-facing files.
+> - **WS event constants are in `server/ws-events.ts`.** If any mutation triggers a broadcast, use `WS_EVENTS.*` or `ADMIN_EVENTS.*` constants — never raw string literals. `pr-check.ts` flags string literals in broadcast calls as warnings.
+> - **SeoEditor CMS write-back routes through the existing `updateCollectionItem()` path.** The `PATCH /api/webflow/collection-items/:siteId/:collectionId/:itemId` endpoint already exists in `server/routes/webflow.ts`. Do NOT create a new endpoint — route the CMS apply action through the existing path.
+> - **`manualApplyRequired` is a derived UI state — not a DB field.** When a CMS collection page has no `collectionId` mapping, derive this flag from data at render time. No server-side changes needed; no new DB column.
+> - **Bug found during review → fix in current PR.** CLAUDE.md mandates: if code review returns a Critical or Important issue, fix it before merging. Never carry a known bug into the next PR.
+> - **Dispatch prompts must declare app-level context (CLAUDE.md §5).** Before dispatching each subagent, explicitly list: which rate limiters apply to any routes it calls, which React Query caches its mutations invalidate, which WS events its mutations broadcast, and what UI conditional state it affects. "The agent can figure it out" is not acceptable and has caused production bugs in prior phases.
+
 ---
 
 ## Phase 0 Pre-done
@@ -1417,6 +1428,20 @@ npx vitest run tests/unit/useSeoEditor.test.ts 2>&1 | tail -10
 **Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/hooks/admin/useSeoEditor.ts` (owned by Task 9, must be committed first), any other file.
 
 > **Dependency note:** Task 9 (`src/hooks/admin/useSeoEditor.ts`) must be committed before this task starts.
+
+> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
+>
+> 1. **Use `<SectionCard>` for all card containers.** Never hand-roll card markup. `SeoEditor.tsx` must use `<SectionCard>` from `src/components/ui/` for every major section. See CLAUDE.md: "Never hand-roll card markup — use `<SectionCard>`".
+>
+> 2. **`manualApplyRequired` is UI-only — derived from `collectionId` absence.** When a CMS page has no `collectionId` in the page data returned from the all-pages endpoint, render a "Manual apply required" badge. Do NOT add a DB column, API field, or server-side change — this is pure client-side derivation.
+>
+> 3. **Color rule: teal for the active filter toggle, blue for data counts.** The Static / CMS page type filter is an interactive control → teal active state. The count badge shown next to each filter option is informational → blue. Never use purple anywhere in this component.
+>
+> 4. **CMS write-back goes through the existing `updateCollectionItem()` path.** The endpoint `PATCH /api/webflow/collection-items/:siteId/:collectionId/:itemId` already exists. Call it via the existing API client function — do not create a new endpoint or API helper.
+>
+> 5. **WS events: use constants.** If any mutation triggers a `broadcastToWorkspace()` call, use `WS_EVENTS.*` — never raw strings. `pr-check.ts` flags raw broadcast strings as warnings.
+>
+> 6. **After any mutation, invalidate the correct React Query cache.** SEO editor updates must invalidate the `admin-webflow-pages` or `admin-webflow-all-pages` query key (whichever Task 9 uses) so the list refreshes without a page reload.
 
 - [ ] Write failing integration test — `tests/integration/seo-editor-unified.test.ts`:
 

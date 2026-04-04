@@ -132,7 +132,10 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
                 description="Nothing needs attention right now"
                 className="py-8"
               />
-            ) : null}
+            ) : (
+              // Signals exist (shown above) but no other notifications
+              <p className="px-4 py-3 text-[11px] text-zinc-600 italic">No other notifications</p>
+            )}
           </div>
         </div>
       )}
