@@ -293,7 +293,7 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto">
-            {items.length > 0 || newSignalCount > 0 ? (
+            {items.length > 0 ? (
               <div className="divide-y divide-zinc-800/50">
                 {items.map(item => {
                   const Icon = item.icon;

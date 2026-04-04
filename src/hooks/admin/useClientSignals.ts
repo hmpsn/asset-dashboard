@@ -39,7 +39,7 @@ export function useCreateClientSignal(workspaceId: string | undefined) {
       triggerMessage: string;
       chatContext: Array<{ role: 'user' | 'assistant'; content: string }>;
     }) =>
-      post<{ ok: boolean; signalId: string }>(`/api/public/signal/${workspaceId}`, body),
+      post<{ ok: boolean }>(`/api/public/signal/${workspaceId}`, body),
     onSuccess: () => {
       if (workspaceId) {
         qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
