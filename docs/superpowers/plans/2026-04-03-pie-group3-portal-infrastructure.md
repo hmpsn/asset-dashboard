@@ -16,9 +16,9 @@
 
 | File | Create / Modify | Purpose |
 |------|-----------------|---------|
-| `shared/types/feature-flags.ts` | **Modify** | Add `'client-brand-section'` and `'smart-placeholders'` flags |
-| `shared/types/workspace.ts` | **Modify** | Add `siteIntelligenceClientView?: boolean` to `Workspace` |
-| `src/routes.ts` | **Modify** | Add `'brand'` to `ClientTab` union type |
+| `shared/types/feature-flags.ts` | **Verify (Phase 0 done)** | Flags `'client-brand-section'` and `'smart-placeholders'` already added in Phase 0 |
+| `shared/types/workspace.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView?: boolean` already added in Phase 0 |
+| `src/routes.ts` | **Verify (Phase 0 done)** | `'brand'` already added to `ClientTab` union in Phase 0 |
 | `server/db/migrations/049-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
 | `server/workspaces.ts` | **Modify** | Add `siteIntelligenceClientView` to `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `updateWorkspace` |
 | `src/components/settings/FeaturesTab.tsx` | **Modify** | Add Site Intelligence Client View toggle (copy `analyticsClientView` pattern exactly) |
@@ -69,41 +69,34 @@ Task 1 ────────────────────────�
 
 ## Tasks
 
-### Task 1 — Shared Contracts: Feature Flags, Workspace Type, ClientTab Union
+### Task 1 — Pre-flight: Verify Phase 0 Contracts
 
-**Model:** Haiku (mechanical additions to existing files)
+**Model:** Haiku (read-only verification — Phase 0 already merged these)
 
-- [ ] Read `shared/types/feature-flags.ts` to confirm current flag list
-- [ ] Read `shared/types/workspace.ts` to confirm `Workspace` interface end
-- [ ] Read `src/routes.ts` to confirm current `ClientTab` type
+> ⚠️ **DO NOT EDIT these files** — all changes below were committed in Phase 0. This task is verification only.
 
-- [ ] **Edit `shared/types/feature-flags.ts`** — add two new flags:
+- [ ] Verify `shared/types/feature-flags.ts` contains `'client-brand-section': false` and `'smart-placeholders': false`
+  ```bash
+  grep -n "client-brand-section\|smart-placeholders" shared/types/feature-flags.ts
+  # Expected: both present
+  ```
 
-```typescript
-// After 'bridge-client-signal':
-'client-brand-section': false,  // Client portal Brand tab
-'smart-placeholders': false,    // Smart placeholder chips in admin + ghost text in client chat
-```
+- [ ] Verify `shared/types/workspace.ts` contains `siteIntelligenceClientView?: boolean`
+  ```bash
+  grep -n "siteIntelligenceClientView" shared/types/workspace.ts
+  # Expected: field present
+  ```
 
-The full diff for `FEATURE_FLAGS` adds these two entries before `} as const;`.
+- [ ] Verify `src/routes.ts` contains `'brand'` in `ClientTab` union
+  ```bash
+  grep -n "'brand'" src/routes.ts
+  # Expected: present in ClientTab
+  ```
 
-- [ ] **Edit `shared/types/workspace.ts`** — add `siteIntelligenceClientView` to `Workspace` interface, immediately after `analyticsClientView`:
+- [ ] If any of the above greps return nothing, **STOP** — Phase 0 was not merged. Do not proceed.
 
-```typescript
-analyticsClientView?: boolean;
-siteIntelligenceClientView?: boolean;  // Show Site Intelligence summary card on OverviewTab (default true)
-```
-
-- [ ] **Edit `src/routes.ts`** — add `'brand'` to `ClientTab`:
-
-```typescript
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
-```
-
-Also add `'brand'` to the allowed tabs array in `ClientDashboard.tsx` line 152 (`if (t && ['overview',...,'brand'].includes(t))`).
-
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect 0 errors (types only, no consumers yet)
-- [ ] Commit: `feat(types): add client-brand-section + smart-placeholders flags, siteIntelligenceClientView field, brand ClientTab`
+- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect 0 errors
+- [ ] No commit needed — this is verification only.
 
 ---
 
@@ -664,18 +657,22 @@ export function BrandTab({
 import { BrandTab } from './client/BrandTab';
 ```
 
-- [ ] **Edit `src/components/ClientDashboard.tsx`** — add `isFeatureEnabled` import if not already present (check existing imports first):
+- [ ] **Edit `src/components/ClientDashboard.tsx`** — add `useFeatureFlag` import if not already present (check existing imports first):
 
 ```typescript
-import { isFeatureEnabled } from '../lib/feature-flags';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 ```
 
-> Note: Check whether `isFeatureEnabled` is imported from `'../lib/feature-flags'` or another path before adding.
+- [ ] **Edit `src/components/ClientDashboard.tsx`** — add flag hook near the top of the component (alongside existing hooks):
+
+```typescript
+const brandEnabled = useFeatureFlag('client-brand-section');
+```
 
 - [ ] **Edit `src/components/ClientDashboard.tsx`** — add Brand tab to NAV array, after the ROI entry:
 
 ```typescript
-    ...(isFeatureEnabled('client-brand-section') ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
+    ...(brandEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
 ```
 
 Also add `Building2` to the lucide-react import block.
@@ -690,7 +687,7 @@ Also add `Building2` to the lucide-react import block.
 
 ```tsx
         {/* ════════════ BRAND TAB ════════════ */}
-        {tab === 'brand' && isFeatureEnabled('client-brand-section') && (
+        {tab === 'brand' && brandEnabled && (
           <ErrorBoundary label="Brand">
             <BrandTab
               workspaceId={workspaceId}
@@ -744,7 +741,7 @@ Also add `Building2` to the lucide-react import block.
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { isFeatureEnabled } from '../lib/feature-flags';
+import { useFeatureFlag } from './useFeatureFlag';
 import { intelligenceApi } from '../api/intelligence';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -818,7 +815,7 @@ export function useSmartPlaceholder(
   fieldKey: string,
   { workspaceId, isAdminContext }: UseSmartPlaceholderOptions,
 ): SmartPlaceholderResult {
-  const flagEnabled = isFeatureEnabled('smart-placeholders');
+  const flagEnabled = useFeatureFlag('smart-placeholders');
 
   // Fetch seoContext slice — reads from 5-min TTL cache on server
   // Only fetch when flag is on and we have a workspaceId
@@ -1100,9 +1097,9 @@ import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 
-// Mock feature flags
-vi.mock('../../src/lib/feature-flags', () => ({
-  isFeatureEnabled: vi.fn(),
+// Mock feature flag hook
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: vi.fn(),
 }));
 
 // Mock intelligence API
@@ -1112,11 +1109,11 @@ vi.mock('../../src/api/intelligence', () => ({
   },
 }));
 
-import { isFeatureEnabled } from '../../src/lib/feature-flags';
+import { useFeatureFlag } from '../../src/hooks/useFeatureFlag';
 import { intelligenceApi } from '../../src/api/intelligence';
 import { useSmartPlaceholder } from '../../src/hooks/useSmartPlaceholder';
 
-const mockIsFeatureEnabled = vi.mocked(isFeatureEnabled);
+const mockUseFeatureFlag = vi.mocked(useFeatureFlag);
 const mockGetIntelligence = vi.mocked(intelligenceApi.getIntelligence);
 
 function createWrapper() {
@@ -1146,7 +1143,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('flag off → returns generic placeholder, no suggestions', async () => {
-    mockIsFeatureEnabled.mockReturnValue(false);
+    mockUseFeatureFlag.mockReturnValue(false);
     const { result } = renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
@@ -1156,7 +1153,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('flag on + admin context → returns suggestions (array with length > 0)', async () => {
-    mockIsFeatureEnabled.mockReturnValue(true);
+    mockUseFeatureFlag.mockReturnValue(true);
     const { result, rerender } = renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
@@ -1172,7 +1169,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('flag on + client context → returns placeholder only, no suggestions', async () => {
-    mockIsFeatureEnabled.mockReturnValue(true);
+    mockUseFeatureFlag.mockReturnValue(true);
     const { result } = renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: false }),
       { wrapper: createWrapper() }
@@ -1182,7 +1179,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('thin workspace (no seoContext) → industry-based placeholder when industry present', async () => {
-    mockIsFeatureEnabled.mockReturnValue(true);
+    mockUseFeatureFlag.mockReturnValue(true);
     mockGetIntelligence.mockResolvedValue({
       seoContext: { brandVoiceBlock: '', personasBlock: '', businessContext: '', keywordBlock: '', knowledgeBlock: '', fullContext: '', strategy: undefined },
       intelligenceProfile: { industry: 'ecommerce' },
@@ -1197,7 +1194,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('does NOT call getIntelligence when flag is off', () => {
-    mockIsFeatureEnabled.mockReturnValue(false);
+    mockUseFeatureFlag.mockReturnValue(false);
     renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }

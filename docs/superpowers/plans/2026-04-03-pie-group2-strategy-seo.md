@@ -4,7 +4,7 @@
 
 **Goal:** Fix the briefs pipeline context dropout, add page-type-aware brief generation, ship smarter recommendation cards (predicted impact / status tracking / plain-language KD), unify the SEO editor to include CMS pages with write-back, fix the Page Intelligence empty state after strategy runs, and wire backlinkProfile + serpFeatures into the intelligence engine.
 
-**Architecture:** Six independent improvements that share no runtime coupling but all touch strategy/SEO data. The briefs fix threads StrategyCardContext through content-requests.ts → content-brief.ts. Smarter cards are purely client-side additions to StrategyTab + ContentGaps. SEO editor switches to the existing all-pages endpoint and routes CMS writes through the existing updateCollectionItem() path in approvals.ts. Page Intelligence fix standardizes metricsSource and switches strategy from replaceAllPageKeywords() to upsertPageKeyword(). Intelligence wiring adds two data calls to assembleSeoContext().
+**Architecture:** Six independent improvements that share no runtime coupling but all touch strategy/SEO data. The briefs fix threads StrategyCardContext through content-requests.ts → content-brief.ts. Smarter cards are purely client-side additions to StrategyTab + ContentGaps. SEO editor switches to the existing all-pages endpoint and routes CMS writes through the existing updateCollectionItem() path in approvals.ts. Page Intelligence fix standardizes metricsSource and switches strategy from replaceAllPageKeywords() to upsertPageKeywordsBatch() (transactional, additive). Intelligence wiring adds two data calls to assembleSeoContext().
 
 **Tech Stack:** React 19, TypeScript, Express, SQLite, Vitest, @testing-library/react
 
