@@ -250,6 +250,36 @@ const CHECKS: Check[] = [
     message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
     severity: 'warn',
   },
+  {
+    name: 'Raw string literal in broadcastToWorkspace() event arg',
+    // Matches: broadcastToWorkspace(anything, 'some:event', ...) or broadcastToWorkspace(anything, "some:event", ...)
+    // Does NOT match: broadcastToWorkspace(wsId, WS_EVENTS.FOO, data) — no quote after the second comma
+    pattern: 'broadcastToWorkspace\\([^,]+,\\s*[\'"]',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/broadcast.ts'],
+    excludeLines: ['// ws-event-ok'],
+    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
+    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
+    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    severity: 'warn',
+  },
+  {
+    name: 'Raw string literal in broadcast() event arg',
+    // Matches standalone broadcast('event') but NOT _broadcast('event') or _broadcastToWorkspace('event').
+    // Uses (^|[^a-zA-Z_]) to require broadcast() is not preceded by a letter/underscore,
+    // excluding private wrappers like websocket.ts's _broadcast() which use string literals.
+    // Note: grep -E does not support lookbehind, so we use a character class exclusion instead.
+    pattern: '(^|[^a-zA-Z_])broadcast\\(\\s*[\'"]',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/broadcast.ts'],
+    excludeLines: ['// ws-event-ok'],
+    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
+    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
+    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

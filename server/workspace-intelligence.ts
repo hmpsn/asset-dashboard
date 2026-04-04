@@ -47,7 +47,8 @@ import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
 import type { ChurnSignal } from './churn-signals.js';
-import { listClientSignals, countNewSignals, countAllSignals } from './client-signals-store.js';
+// client-signals-store uses dynamic import inside try-catch (like other subsystems)
+// to degrade gracefully if the module or table is unavailable on older DBs.
 import type { DecayAnalysis } from './content-decay.js';
 import type { AuditSnapshot } from './reports.js';
 import type { ROIData } from './roi.js';
@@ -913,6 +914,7 @@ async function assembleClientSignals(
   // Intent signals from client chat
   let intentSignals: ClientSignalsSlice['intentSignals'];
   try {
+    const { listClientSignals, countNewSignals, countAllSignals } = await import('./client-signals-store.js');
     const signals = listClientSignals(workspaceId);
     const newCount = countNewSignals(workspaceId);
     // Use countAllSignals for totalCount — listClientSignals is capped at LIMIT 100
@@ -922,8 +924,9 @@ async function assembleClientSignals(
       totalCount,
       recentTypes: signals.slice(0, 5).map(s => s.type),
     };
-  } catch {
+  } catch (err) {
     // client_signals table may not exist on older DBs — degrade gracefully
+    log.debug({ err }, 'client_signals unavailable for intelligence assembly');
   }
 
 
@@ -988,6 +991,7 @@ async function assembleClientSignals(
     compositeHealthScore,
     feedbackItems,
     serviceRequests,
+    intentSignals,
   };
 }
 

@@ -61,6 +61,16 @@ This group ships as 4 sequential PRs. Each must be merged to staging and CI-gree
 
 > Within PR 3: Tasks 9 → 10 → 11 are strictly sequential. ServiceInterestCTA must be committed before ChatPanel imports it can pass `tsc`.
 
+> **⚠️ PR 3 App-level context — read before dispatching any Task 10 or 11 agent:**
+>
+> The following is already handled at layers the CTA agent will not see. Do not re-implement any of it:
+>
+> - **Rate limiting is at the app level.** `server/app.ts` applies `publicWriteLimiter` (10 req/min per IP:path) to ALL `POST /api/public/` routes automatically. Do NOT import or apply `publicWriteLimiter` inside any route file or component — applying it a second time shares the same in-memory bucket and halves the effective limit to 5 req/min.
+> - **The signal endpoint returns `{ ok: true }` only.** `POST /api/public/signal/:workspaceId` returns `{ ok: true }`. There is no `signalId` in the response. Do not expect or destructure a `signalId`.
+> - **No server-side dedup on explicit CTA clicks.** The public endpoint has no `hasRecentSignal` guard — that guard is only on auto-detected signals in `public-analytics.ts`. Two rapid CTA clicks will create two signals. Dedup is the CTA component's responsibility: disable the button after click, show confirmation state, do not re-enable.
+> - **WS event constants are in `server/ws-events.ts`.** If any broadcast call is needed, use `WS_EVENTS.*` or `ADMIN_EVENTS.*` constants — never raw string literals. `pr-check.ts` will flag string literals as warnings.
+> - **Existing contract tests cover the server API.** `tests/integration/client-cta-contracts.test.ts` (21 tests) documents all server-side contracts for this component. Read that file before implementing Task 10 — it is the executable spec for what the CTA must send and what responses it must handle.
+
 **PR 4 — Final Verification** (Task 12)
 - Task 12: Full test suite + build + pr-check verification (no file changes)
 
@@ -1899,6 +1909,18 @@ export function pickPhrase(exclude?: string): string {
 **Must not touch:** `src/components/ChatPanel.tsx` (owned by Task 11), `src/lib/loadingPhrases.ts` (owned by Task 9), any other file not listed
 
 > **ORDER:** This task must be committed BEFORE Task 11 (ChatPanel wiring). ChatPanel imports this file — if it doesn't exist when Task 11 runs `tsc`, the build fails.
+
+> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
+>
+> These requirements are already verified by `tests/integration/client-cta-contracts.test.ts`. Read that file before implementing — it is the executable spec. Key contracts:
+>
+> 1. **Handle 429.** The signal endpoint rate-limits at 10 req/min per IP. After 10 clicks, `fetch` returns 429 with a `Retry-After` header. The component must handle this gracefully — show a "Please try again in a moment" message rather than silently swallowing the error or leaving the button disabled forever.
+>
+> 2. **Dedup is the component's job.** The server does NOT dedup explicit CTA clicks — two rapid clicks create two signals. Disable the button immediately on click (before the fetch resolves) to prevent double-submission. Once in `confirmed` state, never re-enable. This is the complete dedup strategy.
+>
+> 3. **Response shape is `{ ok: true }` only.** Do not destructure `signalId`, `id`, or any other field from the response. The server returns exactly `{ ok: true }`.
+>
+> 4. **Color rule: teal only.** `service_interest` and `content_interest` CTAs are both teal (`teal-600/10`, `teal-500/20`, `teal-300`). Never purple — purple is admin-only. `pr-check.ts` will flag `purple-` in any file under `src/components/client/`.
 
 ### Step 10.1 — Write failing component test first
 

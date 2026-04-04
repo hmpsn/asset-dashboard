@@ -3,6 +3,10 @@
  */
 import { Router } from 'express';
 import { verifyToken } from '../auth.js';
+import { validate, z } from '../middleware/validate.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('public-analytics');
 
 const router = Router();
 
@@ -54,6 +58,7 @@ import type { InsightType } from '../../shared/types/analytics.js';
 import { STUDIO_NAME } from '../constants.js';
 import { createClientSignal, hasRecentSignal } from '../client-signals-store.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 
 // ── Analytics insights endpoints ─────────────────────────────────
@@ -68,8 +73,8 @@ router.get('/api/public/insights/:workspaceId/narrative', (req, res) => {
     const insights = buildClientInsights(ws.id);
     res.json({ insights });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to build client insights');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -81,8 +86,8 @@ router.get('/api/public/insights/:workspaceId/digest', async (req, res) => {
     const digest = await generateMonthlyDigest(ws);
     res.json(digest);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to generate monthly digest');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -99,8 +104,8 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
     const insights = await getOrComputeInsights(ws.id, type, { force });
     res.json(insights);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to compute insights');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -113,8 +118,8 @@ router.get('/api/public/search-overview/:workspaceId', async (req, res) => {
     const overview = await fetchSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days, dr);
     res.json(overview);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch search overview');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -126,8 +131,8 @@ router.get('/api/public/performance-trend/:workspaceId', async (req, res) => {
     const trend = await fetchPerformanceTrend(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch performance trend');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -138,7 +143,8 @@ router.get('/api/public/search-devices/:workspaceId', async (req, res) => {
   try {
     res.json(await fetchSearchDevices(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch search devices');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -150,7 +156,8 @@ router.get('/api/public/search-countries/:workspaceId', async (req, res) => {
   try {
     res.json(await fetchSearchCountries(ws.webflowSiteId, ws.gscPropertyUrl, days, limit, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch search countries');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -161,7 +168,8 @@ router.get('/api/public/search-types/:workspaceId', async (req, res) => {
   try {
     res.json(await fetchSearchTypes(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch search types');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -172,28 +180,34 @@ router.get('/api/public/search-comparison/:workspaceId', async (req, res) => {
   try {
     res.json(await fetchSearchComparison(ws.webflowSiteId, ws.gscPropertyUrl, days, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch search comparison');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
+const chatSchema = z.object({
+  question: z.string().max(5000),
+  sessionId: z.string().max(100).optional(),
+  betaMode: z.boolean().optional(),
+  context: z.record(z.unknown()).optional(),
+});
+
+router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(400).json({ error: 'Workspace not configured' });
   const { question, context, sessionId, betaMode } = req.body;
   if (!question) return res.status(400).json({ error: 'question required' });
 
-  // Rate limit check for free tier (skip in beta mode — no monetization friction)
+  // Rate limit check — always enforced (betaMode is cosmetic, not a rate-limit bypass)
   const tier = ws.tier || 'free';
-  if (!betaMode) {
-    const rl = checkChatRateLimit(ws.id, tier, sessionId);
-    if (!rl.allowed) {
-      return res.status(429).json({
-        error: 'Chat limit reached',
-        message: `You've used all ${rl.limit} free conversations this month. Upgrade to Growth for unlimited chat.`,
-        used: rl.used,
-        limit: rl.limit,
-      });
-    }
+  const rl = checkChatRateLimit(ws.id, tier, sessionId);
+  if (!rl.allowed) {
+    return res.status(429).json({
+      error: 'Chat limit reached',
+      message: `You've used all ${rl.limit} free conversations this month. Upgrade to Growth for unlimited chat.`,
+      used: rl.used,
+      limit: rl.limit,
+    });
   }
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(400).json({ error: 'AI not configured' });
@@ -460,7 +474,7 @@ ${JSON.stringify(context, null, 2)}`;
             chatContext,
             triggerMessage: question.trim().slice(0, 500),
           });
-          broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
+          broadcastToWorkspace(ws.id, WS_EVENTS.CLIENT_SIGNAL_CREATED, { signalId: signal.id });
           addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80));
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         }
@@ -469,8 +483,8 @@ ${JSON.stringify(context, null, 2)}`;
 
     res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to process search chat');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -483,8 +497,8 @@ router.get('/api/public/analytics-overview/:workspaceId', async (req, res) => {
     const overview = await getGA4Overview(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(overview);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 overview');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -496,8 +510,8 @@ router.get('/api/public/analytics-trend/:workspaceId', async (req, res) => {
     const trend = await getGA4DailyTrend(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 trend');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -509,8 +523,8 @@ router.get('/api/public/analytics-top-pages/:workspaceId', async (req, res) => {
     const pages = await getGA4TopPages(ws.ga4PropertyId, days, 200, parseDateRange(req.query));
     res.json(pages);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 top pages');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -522,8 +536,8 @@ router.get('/api/public/analytics-sources/:workspaceId', async (req, res) => {
     const sources = await getGA4TopSources(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
     res.json(sources);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 sources');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -535,8 +549,8 @@ router.get('/api/public/analytics-devices/:workspaceId', async (req, res) => {
     const devices = await getGA4DeviceBreakdown(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(devices);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 devices');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -548,8 +562,8 @@ router.get('/api/public/analytics-countries/:workspaceId', async (req, res) => {
     const countries = await getGA4Countries(ws.ga4PropertyId, days, 10, parseDateRange(req.query));
     res.json(countries);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 countries');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -560,7 +574,8 @@ router.get('/api/public/analytics-comparison/:workspaceId', async (req, res) => 
   try {
     res.json(await getGA4PeriodComparison(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch GA4 comparison');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -571,7 +586,8 @@ router.get('/api/public/analytics-new-vs-returning/:workspaceId', async (req, re
   try {
     res.json(await getGA4NewVsReturning(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch GA4 new vs returning');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -584,8 +600,8 @@ router.get('/api/public/analytics-events/:workspaceId', async (req, res) => {
     const events = await getGA4KeyEvents(ws.ga4PropertyId, days, 20, parseDateRange(req.query));
     res.json(events);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 events');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -599,8 +615,8 @@ router.get('/api/public/analytics-event-trend/:workspaceId', async (req, res) =>
     const trend = await getGA4EventTrend(ws.ga4PropertyId, eventName, days, parseDateRange(req.query));
     res.json(trend);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 event trend');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -612,8 +628,8 @@ router.get('/api/public/analytics-conversions/:workspaceId', async (req, res) =>
     const conversions = await getGA4Conversions(ws.ga4PropertyId, days, parseDateRange(req.query));
     res.json(conversions);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 conversions');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -628,8 +644,8 @@ router.get('/api/public/analytics-event-explorer/:workspaceId', async (req, res)
     const data = await getGA4EventsByPage(ws.ga4PropertyId, days, { eventName, pagePath }, parseDateRange(req.query));
     res.json(data);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    log.error({ err }, 'Failed to fetch GA4 event explorer');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -643,7 +659,8 @@ router.get('/api/public/analytics-landing-pages/:workspaceId', async (req, res) 
   try {
     res.json(await getGA4LandingPages(ws.ga4PropertyId, days, limit, organicOnly, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch GA4 landing pages');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -654,7 +671,8 @@ router.get('/api/public/analytics-organic/:workspaceId', async (req, res) => {
   try {
     res.json(await getGA4OrganicOverview(ws.ga4PropertyId, days, parseDateRange(req.query)));
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    log.error({ err }, 'Failed to fetch GA4 organic overview');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

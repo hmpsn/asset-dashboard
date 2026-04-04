@@ -18,6 +18,7 @@ import {
 } from '../client-signals-store.js';
 import { getWorkspace } from '../workspaces.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
@@ -26,6 +27,8 @@ const log = createLogger('client-signals-routes');
 const router = Router();
 
 // ── Admin: get single signal (literal sub-path registered BEFORE /:workspaceId) ─
+// Admin-only (global APP_PASSWORD gate). Workspace isolation is enforced by the list
+// endpoint — signal IDs are only discoverable through workspace-scoped queries.
 
 router.get('/api/client-signals/detail/:id', (req, res) => {
   const signal = getSignalById(req.params.id);
@@ -50,6 +53,8 @@ const updateStatusSchema = z.object({
   status: z.enum(['new', 'reviewed', 'actioned']),
 });
 
+// Status transitions are intentionally unrestricted — admins can move signals
+// forward (new → reviewed → actioned) or backward to undo mistakes.
 router.patch(
   '/api/client-signals/:id/status',
   validate(updateStatusSchema),
@@ -60,7 +65,7 @@ router.patch(
     const ok = updateSignalStatus(req.params.id, status);
     if (!ok) return res.status(500).json({ error: 'Update failed' });
     const updated = getSignalById(req.params.id);
-    broadcastToWorkspace(signal.workspaceId, 'client-signal:updated', { signalId: req.params.id });
+    broadcastToWorkspace(signal.workspaceId, WS_EVENTS.CLIENT_SIGNAL_UPDATED, { signalId: req.params.id });
     res.json(updated);
   },
 );
@@ -96,12 +101,12 @@ router.post(
         triggerMessage,
       });
 
-      broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
+      broadcastToWorkspace(ws.id, WS_EVENTS.CLIENT_SIGNAL_CREATED, { signalId: signal.id });
       addActivity(ws.id, 'client_signal', `Client signal: ${type}`, triggerMessage.slice(0, 80));
 
       notifyTeamClientSignal(ws.id, ws.name, type, triggerMessage);
 
-      res.json({ ok: true, signalId: signal.id });
+      res.json({ ok: true });
     } catch (err) {
       log.error({ err }, 'Failed to create client signal');
       res.status(500).json({ error: 'Failed to create signal' });
