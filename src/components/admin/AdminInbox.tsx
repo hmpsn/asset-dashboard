@@ -49,13 +49,7 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
       {/* Header row */}
       <button
         className="w-full flex items-start gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors text-left"
-        onClick={() => {
-          setExpanded(p => !p);
-          // Mark as reviewed on first open
-          if (!expanded && signal.status === 'new') {
-            handleStatus('reviewed');
-          }
-        }}
+        onClick={() => setExpanded(p => !p)}
       >
         <div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
           <MessageSquare className="w-3 h-3 text-teal-400" />

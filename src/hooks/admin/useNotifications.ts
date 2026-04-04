@@ -24,6 +24,7 @@ interface WorkspaceSummary {
   contentRequests?: { pending: number };
   workOrders?: { pending: number };
   contentPlan?: { review: number };
+  clientSignals?: { new: number };
 }
 
 interface AnomalySummary {
@@ -151,6 +152,18 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
         workspaceId: ws.id,
         workspaceName: ws.name,
         tab: 'content-pipeline',
+      });
+    }
+    if ((ws.clientSignals?.new || 0) > 0) {
+      notifications.push({
+        id: `signals-${ws.id}`,
+        label: `${ws.clientSignals!.new} new client signal${ws.clientSignals!.new > 1 ? 's' : ''}`,
+        sub: ws.name,
+        color: 'text-teal-400',
+        icon: MessageSquare,
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        tab: 'requests',
       });
     }
   }

@@ -217,7 +217,7 @@ export function Sidebar({
 
       {/* Bottom: icon-only utility bar */}
       <div className="px-3 py-2.5 border-t border-zinc-800 flex items-center justify-center gap-1">
-        <NotificationBell onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))} workspaceId={selected?.id} />
+        <NotificationBell onSelectWorkspace={(workspaceId) => navigate(adminPath(workspaceId))} />
         <button
           onClick={() => navigate('/revenue')}
           title="Revenue"

@@ -139,10 +139,13 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
+      // Also refresh the notification bell — signals.new count lives in workspace overview
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
     [WS_EVENTS.CLIENT_SIGNAL_UPDATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
   });
 }

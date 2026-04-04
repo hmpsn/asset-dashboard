@@ -33,6 +33,7 @@ import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-in
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
+import { listClientSignals } from '../client-signals-store.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -126,6 +127,12 @@ router.get('/api/workspace-overview', (_req, res) => {
       churnWarning = signals.filter(s => s.severity === 'warning').length;
     } catch { /* non-critical */ }
 
+    // Client signals (new = unreviewed)
+    let clientSignalsNew = 0;
+    try {
+      clientSignalsNew = listClientSignals(ws.id).filter(s => s.status === 'new').length;
+    } catch { /* non-critical */ }
+
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
     const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
@@ -148,6 +155,7 @@ router.get('/api/workspace-overview', (_req, res) => {
       workOrders: { pending: pendingWorkOrders, total: workOrders.length },
       contentPlan: { review: reviewCells },
       churnSignals: { critical: churnCritical, warning: churnWarning },
+      clientSignals: { new: clientSignalsNew },
       pageStates,
     };
   });

@@ -1,23 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, MessageSquare, AlertTriangle, X } from 'lucide-react';
+import { Bell, AlertTriangle, X } from 'lucide-react';
 import { adminPath, type Page } from '../routes';
-import { useClientSignals } from '../hooks/admin/useClientSignals';
 import { useNotifications } from '../hooks/admin/useNotifications';
 import { EmptyState } from './ui/EmptyState';
 
 interface NotificationBellProps {
   onSelectWorkspace: (workspaceId: string) => void;
-  /** Optional: when provided, shows new client signal count badge in the drawer */
-  workspaceId?: string;
 }
 
-export function NotificationBell({ onSelectWorkspace, workspaceId }: NotificationBellProps) {
+export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const { data: items = [] } = useNotifications();
-  const { data: clientSignals } = useClientSignals(workspaceId);
-  const newSignalCount = (clientSignals ?? []).filter(s => s.status === 'new').length;
 
   // Keyboard close (Escape)
   useEffect(() => {
@@ -42,7 +37,7 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
         }`}
       >
         <Bell className="w-4 h-4" />
-        {(hasItems || newSignalCount > 0) && (
+        {hasItems && (
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0f1219]" />
         )}
       </button>
@@ -81,24 +76,9 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
             </div>
           </div>
 
-          {/* Client Signals section (shown when workspaceId provided and signals exist) */}
-          {newSignalCount > 0 && (
-            <div className="px-4 py-2.5 border-b border-zinc-800 bg-amber-500/5 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
-                <span className="text-[11px] font-medium text-zinc-200">
-                  {newSignalCount} new client signal{newSignalCount > 1 ? 's' : ''}
-                </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400/80 border border-amber-500/20 ml-auto tabular-nums">
-                  {newSignalCount}
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto">
-            {items.length > 0 ? (
+            {hasItems ? (
               <div className="divide-y divide-zinc-800/50">
                 {items.map(item => {
                   const Icon = item.icon;
@@ -124,17 +104,13 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
                   );
                 })}
               </div>
-            ) : newSignalCount === 0 ? (
-              // Only show "All clear" when there are truly no signals either
+            ) : (
               <EmptyState
                 icon={Bell}
                 title="All clear"
                 description="Nothing needs attention right now"
                 className="py-8"
               />
-            ) : (
-              // Signals exist (shown above) but no other notifications
-              <p className="px-4 py-3 text-[11px] text-zinc-600 italic">No other notifications</p>
             )}
           </div>
         </div>
