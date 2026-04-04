@@ -241,7 +241,7 @@ invalidateIntelligenceCache(workspaceId);
 | File | Finding |
 |------|---------|
 | `server/routes/keyword-strategy.ts` | Writes `metricsSource: 'bulk_lookup'` |
-| `src/components/PageIntelligence.tsx` line 34 | Valid type is `'exact' \| 'partial_match' \| 'ai_estimate'` — **`'bulk_lookup'` is not a valid value** |
+| `src/components/PageIntelligence.tsx` line 34 | Local type was `'exact' \| 'partial_match' \| 'ai_estimate'` — missing `'bulk_lookup'`. **Fixed:** widened to import `MetricsSource` from `shared/types/keywords.ts` (all 4 values). |
 | `server/page-keywords.ts` lines 130–176 | `upsertPageKeyword()` exists — unused by strategy |
 | `server/routes/keyword-strategy.ts` | `replaceAllPageKeywords()` confirmed at lines 1745 + 1928 |
 

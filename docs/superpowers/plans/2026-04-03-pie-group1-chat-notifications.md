@@ -1444,7 +1444,7 @@ res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
 
 - [ ] Run:
   ```bash
-  grep -n 'getChatSession' /Users/joshuahampson/CascadeProjects/asset-dashboard/.claude/worktrees/beautiful-yonath/server/routes/public-analytics.ts
+  grep -n 'getChatSession' server/routes/public-analytics.ts
   ```
   If present: no action needed. If absent, add the import at the top of the file with existing imports.
 
