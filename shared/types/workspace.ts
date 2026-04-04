@@ -1,4 +1,5 @@
 // ── Workspace domain types ──────────────────────────────────────
+import type { MetricsSource } from './keywords.ts';
 
 export interface EventGroup {
   id: string;
@@ -33,7 +34,7 @@ export interface PageKeywordMap {
   difficulty?: number;
   cpc?: number;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  metricsSource?: 'exact' | 'partial_match' | 'bulk_lookup';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   // Persisted page analysis (generated via keyword analysis, feeds into AI rewrites)
   optimizationIssues?: string[];
