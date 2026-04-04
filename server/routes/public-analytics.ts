@@ -52,6 +52,8 @@ import { buildClientInsights } from '../insight-narrative.js';
 import { generateMonthlyDigest } from '../monthly-digest.js';
 import type { InsightType } from '../../shared/types/analytics.js';
 import { STUDIO_NAME } from '../constants.js';
+import { createClientSignal } from '../client-signals-store.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 
 // ── Analytics insights endpoints ─────────────────────────────────
 // NOTE: Literal sub-paths (/narrative, /digest) registered BEFORE /:workspaceId
@@ -413,7 +415,49 @@ ${JSON.stringify(context, null, 2)}`;
       }
     }
 
-    res.json({ answer, sessionId: sessionId || undefined });
+    // ── Intent detection ──────────────────────────────────────────────────────
+    let detectedIntent: 'content_interest' | 'service_interest' | null = null;
+    if (!betaMode && sessionId && answer) {
+      const lowerAnswer = answer.toLowerCase();
+      const lowerQuestion = question.toLowerCase();
+      const combined = `${lowerQuestion} ${lowerAnswer}`;
+
+      const serviceKeywords = [
+        'get in touch', 'contact', 'reach out', 'talk to someone', 'speak with',
+        'work together', 'hire', 'pricing', 'cost', 'quote', 'proposal', 'sign up',
+      ];
+      const contentKeywords = [
+        'create content', 'write a post', 'content brief', 'blog post', 'content plan',
+        'content strategy', 'recommend content', 'what should i write', 'content ideas',
+      ];
+
+      if (serviceKeywords.some(kw => lowerQuestion.includes(kw))) {
+        detectedIntent = 'service_interest';
+      } else if (contentKeywords.some(kw => combined.includes(kw))) {
+        detectedIntent = 'content_interest';
+      }
+
+      if (detectedIntent) {
+        const session = getChatSession(ws.id, sessionId);
+        const chatContext = (session?.messages ?? []).slice(-10).map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+
+        try {
+          const signal = createClientSignal({
+            workspaceId: ws.id,
+            workspaceName: ws.name ?? ws.id,
+            type: detectedIntent,
+            chatContext,
+            triggerMessage: question.trim().slice(0, 500),
+          });
+          broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
+        } catch { /* non-critical — never block chat response */ }
+      }
+    }
+
+    res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: msg });
