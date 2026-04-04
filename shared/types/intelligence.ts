@@ -184,6 +184,15 @@ export interface ClientSignalsSlice {
   compositeHealthScore?: number | null;
   feedbackItems?: Array<{ id: string; type: string; status: string; createdAt: string }>;
   serviceRequests?: { pending: number; total: number };
+  /** Intent signals detected in client chat (service_interest / content_interest) */
+  intentSignals?: {
+    /** Count of unactioned (status = 'new') signals */
+    newCount: number;
+    /** Total signals created (all statuses) */
+    totalCount: number;
+    /** Signal types seen recently, most recent first (max 5) */
+    recentTypes: Array<'service_interest' | 'content_interest'>;
+  };
 }
 
 export interface OperationalSlice {
