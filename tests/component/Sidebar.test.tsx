@@ -10,9 +10,12 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-// NotificationBell uses useClientSignals (React Query) — stub it out for Sidebar tests
+// NotificationBell uses React Query hooks — stub them out for Sidebar tests
 vi.mock('../../src/hooks/admin/useClientSignals', () => ({
   useClientSignals: () => ({ data: [], isLoading: false }),
+}));
+vi.mock('../../src/hooks/admin/useNotifications', () => ({
+  useNotifications: () => ({ data: [], isLoading: false }),
 }));
 
 const WORKSPACES: Workspace[] = [

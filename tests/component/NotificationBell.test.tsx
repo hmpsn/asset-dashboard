@@ -2,11 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-// Mock the API modules
-vi.mock('../../src/api/misc', () => ({
-  workspaceOverview: { list: vi.fn().mockResolvedValue([]) },
-  anomalies: { listAll: vi.fn().mockResolvedValue([]) },
-  churnSignals: { list: vi.fn().mockResolvedValue([]) },
+// Mock useNotifications (React Query hook that replaced inline fetchNotifications)
+vi.mock('../../src/hooks/admin/useNotifications', () => ({
+  useNotifications: vi.fn().mockReturnValue({ data: [], isLoading: false }),
 }));
 
 // Mock useClientSignals to return test data
