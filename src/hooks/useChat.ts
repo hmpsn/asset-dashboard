@@ -51,6 +51,8 @@ export interface ChatState {
   roiValue: number | null;
   proactiveInsight: string | null;
   proactiveInsightLoading: boolean;
+  /** Intent detected from the most recent AI response — drives CTA rendering */
+  lastIntent: 'content_interest' | 'service_interest' | null;
 }
 
 export interface ChatActions {
@@ -65,6 +67,8 @@ export interface ChatActions {
   setChatUsage: React.Dispatch<React.SetStateAction<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>>;
   setProactiveInsight: React.Dispatch<React.SetStateAction<string | null>>;
   setProactiveInsightLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Clear lastIntent — call after CTA is actioned so it doesn't re-appear on next render */
+  clearIntent: () => void;
   askAi: (question: string) => Promise<void>;
   buildChatContext: () => Record<string, unknown>;
 }
@@ -85,6 +89,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [chatUsage, setChatUsage] = useState<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string } | null>(null);
   const [roiValue, setRoiValue] = useState<number | null>(null);
+  const [lastIntent, setLastIntent] = useState<'content_interest' | 'service_interest' | null>(null);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
@@ -173,9 +178,9 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     setChatLoading(true);
     try {
       const context = buildChatContext();
-      let data: { answer?: string; error?: string };
+      let data: { answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null };
       try {
-        data = await post<{ answer?: string; error?: string }>(`/api/public/search-chat/${ws.id}`, { question: question.trim(), context, sessionId: chatSessionId, betaMode });
+        data = await post<{ answer?: string; error?: string; detectedIntent?: 'content_interest' | 'service_interest' | null }>(`/api/public/search-chat/${ws.id}`, { question: question.trim(), context, sessionId: chatSessionId, betaMode });
       } catch (err) {
         if (err instanceof ApiError && err.status === 429) {
           const roiMsg = roiValue && roiValue > 0
@@ -189,6 +194,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
         throw err;
       }
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
+      if (data.detectedIntent) setLastIntent(data.detectedIntent);
       if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
     } catch (err) {
       console.error('useChat operation failed:', err);
@@ -379,6 +385,8 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
     showChatHistory, setShowChatHistory,
     chatUsage, setChatUsage,
     roiValue,
+    lastIntent,
+    clearIntent: () => setLastIntent(null),
     proactiveInsight, setProactiveInsight,
     proactiveInsightLoading, setProactiveInsightLoading,
     askAi,
