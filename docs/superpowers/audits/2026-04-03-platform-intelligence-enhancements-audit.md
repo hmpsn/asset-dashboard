@@ -4,7 +4,7 @@
 **Spec:** `docs/superpowers/specs/2026-04-03-platform-intelligence-enhancements-design.md`
 **Audit method:** 5 parallel Explore agents scanning origin/main + live file verification of all 18 specific claims
 **Total findings:** 38 discrete change sites across 27 files
-**Next DB migrations:** 046 (client_signals), 047 (businessPriorities)
+**Next DB migrations:** 047 (client_signals), 048 (business_priorities). Note: 046 already exists on main (intelligence_profile column).
 
 ---
 

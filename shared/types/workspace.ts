@@ -244,7 +244,11 @@ export interface Workspace {
     foundedDate?: string;         // ISO date or year
     numberOfEmployees?: string;   // e.g. "10-50"
   };
-  /** Admin-editable client business goals, e.g. ['Grow patient appointments by 25% in Q3']. */
+  /**
+   * Admin-set strategic goals for AI context, e.g. ['Grow patient appointments by 25% in Q3'].
+   * Distinct from the `client_business_priorities` DB table (public-portal.ts), which stores
+   * priorities submitted by the client via the portal questionnaire.
+   */
   businessPriorities?: string[];
   // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
   scoringConfig?: Partial<Record<string, { primary_metric: string; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
