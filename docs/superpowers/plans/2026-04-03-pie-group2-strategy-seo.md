@@ -46,21 +46,44 @@
 ```
 [Phase 0 merged] ← gate: nothing in this plan starts before this
     ↓
-Task 1: src/lib/kdFraming.ts (no dependencies — start immediately)
-Task 2: server/content-brief.ts (depends on Phase 0 types)
-Task 3: server/routes/content-requests.ts (depends on Task 2)
-Task 4: server/workspace-intelligence.ts (independent — start immediately)
-Task 5: server/routes/keyword-strategy.ts (depends on Phase 0 METRICS_SOURCE)
-Task 6: src/components/PageIntelligence.tsx (depends on Phase 0 MetricsSource)
-Task 7: src/components/client/StrategyTab.tsx (depends on Task 1 kdFraming)
-Task 8: src/components/strategy/ContentGaps.tsx (depends on Task 1 kdFraming)
-Task 9: src/hooks/admin/useSeoEditor.ts (independent — start immediately)
-Task 10: src/components/SeoEditor.tsx (depends on Task 9)
+Task 1:  src/lib/kdFraming.ts (no dependencies — start immediately)
+Task 4:  server/content-brief.ts (depends on Phase 0 types — buildStrategyCardBlock + strategyCardContext param)
+Task 5:  server/routes/content-requests.ts (depends on Task 4)
+Task 6:  server/workspace-intelligence.ts (independent — start immediately)
+Task 7:  server/routes/keyword-strategy.ts (depends on Phase 0 METRICS_SOURCE)
+Task 8:  src/components/PageIntelligence.tsx (depends on Phase 0 MetricsSource)
+Task 9:  src/components/client/StrategyTab.tsx (depends on Task 1 kdFraming)
+Task 10: src/components/strategy/ContentGaps.tsx (depends on Task 1 kdFraming)
+Task 11: src/hooks/admin/useSeoEditor.ts (independent — start immediately)
+Task 12: src/components/SeoEditor.tsx (depends on Task 11)
 
-PARALLEL BATCH A (start immediately after Phase 0 merge): Tasks 1, 4, 5, 6, 9
-PARALLEL BATCH B (after Batch A merged): Tasks 2, 7, 8, 10
-SEQUENTIAL: Task 3 (after Task 2)
+PARALLEL BATCH A (start immediately after Phase 0 merge): Tasks 1, 6, 7, 8, 11
+PARALLEL BATCH B (after Batch A merged): Tasks 4, 9, 10, 12
+SEQUENTIAL: Task 5 (after Task 4)
 Tests: write and run after the task they cover
+```
+
+---
+
+## PR Structure
+
+This group ships as 3 sequential PRs. Each must be merged to staging and CI-green before the next starts.
+
+**PR A — Utilities + Keyword Backend** (Tasks 1, 7, 8)
+- `src/lib/kdFraming.ts` (new utility)
+- `server/routes/keyword-strategy.ts` (metricsSource + upsertPageKeywordsBatch)
+- `src/components/PageIntelligence.tsx` (MetricsSource type update)
+
+**PR B — Intelligence Wiring** (Tasks 6, 5)
+- `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext)
+- `server/routes/content-requests.ts` (StrategyCardContext threading — requires Task 4 which is included here)
+- `server/content-brief.ts` (buildStrategyCardBlock + strategyCardContext param — Task 4)
+
+**PR C — UI Layer** (Tasks 9, 10, 11, 12)
+- `src/components/client/StrategyTab.tsx` (KD framing + predicted impact)
+- `src/components/strategy/ContentGaps.tsx` (KD framing)
+- `src/hooks/admin/useSeoEditor.ts` (all-pages endpoint)
+- `src/components/SeoEditor.tsx` (CMS filter + write-back)
 
 ---
 
@@ -75,6 +98,29 @@ The following contracts are already committed on the Phase 0 branch (`claude/bea
 | `shared/types/workspace.ts` | `PageKeywordMap.metricsSource` is now typed as `MetricsSource` (not a bare string union) |
 | `server/content-brief.ts` | `PAGE_TYPE_CONFIGS` already has `prompt` field populated for all 9 page types (`blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`) — agents must NOT recreate or replace this object |
 | `server/page-keywords.ts` | `upsertPageKeywordsBatch` function already exists and is exported — import it, do not create it |
+
+---
+
+## Deduplication Audit Findings
+
+> Run this audit before dispatching agents. These findings shape task scope.
+
+**1. `assembleSeoContext()` does NOT currently pull backlink or SERP data.**
+Current enrichment blocks in `assembleSeoContext()` are: rank tracking, business profile (from `intelligenceProfile`), strategy history, and live page map. There is no existing `backlinkProfile` or `serpFeatures` block. Task 6 is purely additive — it adds two new try/catch blocks before `return base;`. No existing logic needs to be replaced or extended.
+
+**2. No `kdFraming` utility exists anywhere in `src/lib/`.**
+The directory contains: `character-validation.ts`, `lazyWithRetry.ts`, `pathUtils.ts`, `queryClient.ts`, `queryKeys.ts`, `utils.ts`, `wsEvents.ts`. Task 1 creates a genuinely new file.
+
+**3. `PAGE_TYPE_CONFIGS` already has all 9 page types.**
+Confirmed in `server/content-brief.ts` lines 318–474: `blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`. Each has a `prompt` field. Task 4 must NOT recreate or export this object — it only adds `buildStrategyCardBlock` and threads `strategyCardContext` into `generateBrief()`.
+
+**4. `upsertPageKeywordsBatch` signature:** `upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywordMap[]): void` — wraps a `db.transaction()` internally.
+
+**5. `keyword-strategy.ts` still uses raw string literals.**
+Lines ~1267, ~1280, ~1320 cast to `Record<string, unknown>` and assign `metricsSource = 'exact'`, `'partial_match'`, `'bulk_lookup'` as raw strings. Does NOT import `METRICS_SOURCE` from shared types. Task 7 replaces these.
+
+**6. `PageIntelligence.tsx` still has the old string literal union.**
+The local `StrategyPage` interface at line ~43 has `metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'`. Does NOT import `MetricsSource`. Task 8 fixes this — and `'bulk_lookup'` is missing from the union, which is why strategy-run pages show no metrics source in the UI.
 
 ---
 
@@ -105,7 +151,10 @@ If either grep returns nothing, stop — Phase 0 has not been merged. Do not pro
 
 ### Task 1 — Create src/lib/kdFraming.ts
 
+**Model: [HAIKU]** — mechanical utility with a lookup table, no judgment required.
+
 **File owner:** `src/lib/kdFraming.ts` (create)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
 
 - [ ] Write failing test first — `tests/unit/kd-framing.test.ts`:
 
@@ -227,9 +276,14 @@ export function kdTooltip(kd: number | undefined): string {
 
 ### Task 6 — Wire backlinkProfile + serpFeatures into assembleSeoContext()
 
-**File owner:** `server/workspace-intelligence.ts` (modify)
+**Model: [SONNET]** — intelligence assembly with judgment on data shaping and graceful degradation.
 
-- [ ] Read current `assembleSeoContext()` return statement to find the `return base;` line (confirmed at line ~285 in origin/main).
+**File owner:** `server/workspace-intelligence.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
+
+> **Deduplication note:** `assembleSeoContext()` does NOT currently have backlink or SERP enrichment. This task adds two new try/catch blocks before the `return base;` statement. The existing rank tracking, business profile, strategy history, and page map blocks are unchanged. No existing logic is replaced.
+
+- [ ] Read current `assembleSeoContext()` return statement to find the `return base;` line (confirmed at line ~293 in current HEAD).
 - [ ] Write failing test additions to `tests/unit/workspace-intelligence.test.ts`:
 
 ```typescript
@@ -444,7 +498,12 @@ describe('assembleSeoContext — backlinkProfile + serpFeatures', () => {
 
 ### Task 7 — Switch replaceAllPageKeywords → upsertPageKeywordsBatch in keyword-strategy routes
 
+**Model: [HAIKU]** — mechanical const replacement at known call sites, no judgment required.
+
 **File owner:** `server/routes/keyword-strategy.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
+
+> **Audit note:** `keyword-strategy.ts` still assigns `metricsSource` as raw string literals via `(pm as Record<string, unknown>).metricsSource = 'exact'` etc. (lines ~1267, ~1280, ~1320). `METRICS_SOURCE` from `shared/types/keywords.ts` is NOT currently imported. This task fixes both: switches to `upsertPageKeywordsBatch` AND replaces the raw string literals with `METRICS_SOURCE.*` references.
 
 - [ ] Write failing test first — `tests/unit/page-intelligence-strategy-blend.test.ts`:
 
@@ -562,6 +621,29 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
   import { upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
   ```
 
+- [ ] Add import for `METRICS_SOURCE` from shared types (with existing imports at top of file):
+  ```typescript
+  import { METRICS_SOURCE } from '../../shared/types/keywords.js';
+  ```
+
+- [ ] Replace the three raw string literal assignments. Find each cast pattern:
+  ```typescript
+  // BEFORE (line ~1267):
+  (pm as Record<string, unknown>).metricsSource = 'exact';
+  // AFTER:
+  pm.metricsSource = METRICS_SOURCE.EXACT;
+
+  // BEFORE (line ~1280):
+  (pm as Record<string, unknown>).metricsSource = 'partial_match';
+  // AFTER:
+  pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
+
+  // BEFORE (line ~1320):
+  (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
+  // AFTER:
+  pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
+  ```
+
 - [ ] Find the first call site (around line 1745):
   ```typescript
   replaceAllPageKeywords(ws.id, pageMap);
@@ -591,7 +673,12 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
 
 ### Task 8 — Fix PageIntelligence.tsx metricsSource to accept bulk_lookup
 
+**Model: [HAIKU]** — single type import swap, no logic changes.
+
 **File owner:** `src/components/PageIntelligence.tsx` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
+
+> **Audit note:** The local `StrategyPage` interface has `metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'` — missing `'bulk_lookup'`. This is why pages updated by a strategy run show no metrics source in the UI. The fix is a single type import swap.
 
 - [ ] Read lines 25–60 of `src/components/PageIntelligence.tsx` to locate the local `StrategyPage` interface (confirmed at line 25).
 - [ ] Find the local `StrategyPage` interface and its `metricsSource` field:
@@ -610,13 +697,44 @@ describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', 
   metricsSource?: MetricsSource;
   ```
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Commit: `git add src/components/PageIntelligence.tsx && git commit -m "fix(page-intelligence): use MetricsSource type — accept bulk_lookup from strategy runs"`
+- [ ] Run `npx vitest run tests/unit/page-intelligence-metricsSource.test.ts` — see test spec below. Write the test file first:
+
+```typescript
+// tests/unit/page-intelligence-metricsSource.test.ts
+import { describe, it, expect } from 'vitest';
+
+/**
+ * Structural test: verifies that PageIntelligence.tsx imports MetricsSource
+ * from shared/types and does NOT contain the old string literal union.
+ *
+ * This is a source-level assertion, not a runtime test.
+ */
+describe('PageIntelligence metricsSource — type contract', () => {
+  it('imports MetricsSource from shared/types/keywords', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/components/PageIntelligence.tsx', 'utf-8');
+    expect(src).toContain("from '../../shared/types/keywords.js'");
+    expect(src).toContain('MetricsSource');
+  });
+
+  it('does NOT contain the old string literal union for metricsSource', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/components/PageIntelligence.tsx', 'utf-8');
+    expect(src).not.toContain("'exact' | 'partial_match' | 'ai_estimate'");
+  });
+});
+```
+
+- [ ] Commit: `git add src/components/PageIntelligence.tsx tests/unit/page-intelligence-metricsSource.test.ts && git commit -m "fix(page-intelligence): use MetricsSource type — accept bulk_lookup from strategy runs"`
 
 ---
 
 ### Task 11 — Switch useSeoEditor to all-pages endpoint
 
+**Model: [HAIKU]** — hook endpoint URL update and signature change, no logic.
+
 **File owner:** `src/hooks/admin/useSeoEditor.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/SeoEditor.tsx` (owned by Task 12).
 
 - [ ] Read `src/hooks/admin/useSeoEditor.ts` (confirmed hook fetches `/api/webflow/pages/${siteId}`).
 - [ ] Update the PageMeta interface to include `source` field (returned by all-pages endpoint):
@@ -660,25 +778,61 @@ interface PageMeta {
   }
   ```
 
-- [ ] Find the call site in `src/components/SeoEditor.tsx` where `useSeoEditor(siteId)` is called and update to pass `workspaceId`:
-  ```typescript
-  // BEFORE:
-  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
-  // AFTER:
-  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
-  ```
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Commit: `git add src/hooks/admin/useSeoEditor.ts src/components/SeoEditor.tsx && git commit -m "feat(seo-editor): switch to all-pages endpoint — include CMS pages from sitemap discovery"`
+- [ ] Write test file and run:
+
+```typescript
+// tests/unit/useSeoEditor.test.ts
+import { describe, it, expect } from 'vitest';
+
+/**
+ * Structural test: verifies that useSeoEditor uses all-pages endpoint
+ * and accepts workspaceId parameter.
+ */
+describe('useSeoEditor — endpoint contract', () => {
+  it('uses all-pages endpoint (not legacy pages endpoint)', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+    expect(src).toContain('all-pages');
+    expect(src).not.toMatch(/`\/api\/webflow\/pages\/\$\{siteId\}`/);
+  });
+
+  it('hook signature accepts workspaceId parameter', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+    expect(src).toContain('workspaceId');
+  });
+
+  it('query enabled flag guards on siteId', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+    expect(src).toContain('!!siteId');
+  });
+});
+```
+
+```bash
+npx vitest run tests/unit/useSeoEditor.test.ts 2>&1 | tail -10
+# Expected: all pass
+```
+
+- [ ] Note: SeoEditor.tsx call-site update (`useSeoEditor(siteId, workspaceId)`) is owned by Task 12 — do NOT touch SeoEditor.tsx in this task.
+- [ ] Commit: `git add src/hooks/admin/useSeoEditor.ts tests/unit/useSeoEditor.test.ts && git commit -m "feat(seo-editor): switch hook to all-pages endpoint — include CMS pages from sitemap discovery"`
 
 ---
 
 ## Parallel Batch B — Feature Implementation
 
-> Run after Batch A is merged. Tasks 4, 5, 9, 10, 12 can run concurrently.
+> Run after Batch A is merged. Tasks 4, 9, 10, 12 can run concurrently. Task 5 runs after Task 4.
 
 ### Task 4 — Add strategyCardContext to generateBrief() + PAGE_TYPE_CONFIGS
 
+**Model: [HAIKU]** — verification only for PAGE_TYPE_CONFIGS (already complete); mechanical field threading for strategyCardContext.
+
 **File owner:** `server/content-brief.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
+
+> **Audit note:** `PAGE_TYPE_CONFIGS` is already complete with all 9 page types and `prompt` fields at lines 318–474 of `server/content-brief.ts`. Do NOT recreate, export, or reshape it. The `PageTypeConfig` interface is local (not the same as `PageTypeBriefConfig` from `shared/types/content.ts`). This task only adds `buildStrategyCardBlock` and threads `strategyCardContext` into `generateBrief()`.
 
 - [ ] Write failing test additions to `tests/unit/content-brief.test.ts`:
 
@@ -763,85 +917,8 @@ describe('generateBrief — PAGE_TYPE_CONFIGS coverage', () => {
   The config block below was written before the audit confirmed it already existed. **Skip this block entirely — do not apply it:**
 
 ```typescript
-export const PAGE_TYPE_CONFIGS: Record<string, PageTypeBriefConfig> = {
-  blog: {
-    tone: 'Conversational and educational. First-person examples welcome. Accessible to a general audience.',
-    structure: 'Hook → problem framing → H2/H3 sections → FAQ → internal links → soft CTA',
-    schemaTypes: ['Article'],
-    wordCountTarget: 1800,
-    wordCountRange: '1400–2200',
-    avgSectionWords: 280,
-    sectionRange: '5–7',
-    contentStyle: 'Educational depth with a conversational voice. Use examples, stats, and practical takeaways. Avoid jargon.',
-    prompt: 'PAGE TYPE: Blog Post — write for an educational, discovery-oriented reader. Structure as: hook (why this matters) → problem framing → multiple H2 sections with H3 breakdowns → FAQ section addressing People Also Ask questions → internal link suggestions → soft CTA. Use schema: Article.',
-  },
-  landing: {
-    tone: 'Persuasive and benefit-focused. Concise. Every sentence earns its place.',
-    structure: 'Hook → benefit bullets → trust signals → one primary CTA',
-    schemaTypes: ['WebPage'],
-    wordCountTarget: 750,
-    wordCountRange: '600–900',
-    avgSectionWords: 120,
-    sectionRange: '4–6',
-    contentStyle: 'Conversion-optimized. Lead with the primary benefit. Reduce friction. One clear CTA.',
-    prompt: 'PAGE TYPE: Landing Page — write for a conversion-focused reader. Structure as: hook (primary benefit in 1-2 sentences) → 3-5 benefit bullets → trust signals (social proof, credentials) → one clear CTA. No bloated intro. Use schema: WebPage.',
-  },
-  service: {
-    tone: 'Authoritative and outcome-focused. Professional but approachable.',
-    structure: 'Value prop → problem/solution → feature/benefit pairs → social proof → objection handling → FAQ → CTA',
-    schemaTypes: ['Service', 'LocalBusiness'],
-    wordCountTarget: 1400,
-    wordCountRange: '1100–1800',
-    avgSectionWords: 200,
-    sectionRange: '5–7',
-    contentStyle: 'Positions the service as the clear solution. Answers "why us" before the visitor asks. Uses case-specific proof.',
-    prompt: 'PAGE TYPE: Service Page — write for a consideration-stage buyer evaluating options. Structure as: value proposition → problem/solution framing → feature/benefit pairs (not features alone) → social proof (testimonials, results) → objection handling → FAQ → CTA. Use schema: Service + LocalBusiness.',
-  },
-  location: {
-    tone: 'Locally grounded and community-aware. Natural local language, not keyword-stuffed.',
-    structure: 'NAP block → service area signals → proximity language → local review → map embed note',
-    schemaTypes: ['LocalBusiness', 'GeoCoordinates'],
-    wordCountTarget: 1000,
-    wordCountRange: '800–1200',
-    avgSectionWords: 180,
-    sectionRange: '4–6',
-    contentStyle: 'Hyper-local. Mentions specific neighborhoods, landmarks, or service area signals. Avoids generic filler.',
-    prompt: 'PAGE TYPE: Location Page — write for a local search visitor. Include: NAP block (Name, Address, Phone), service area signals with specific city/neighborhood references, proximity language ("serving [city] and surrounding areas"), local social proof (reviews from local customers), and note for a map embed. Use schema: LocalBusiness + GeoCoordinates.',
-  },
-  pillar: {
-    tone: 'Comprehensive and authoritative. The definitive resource on this topic.',
-    structure: 'Topic overview → linked subtopics → internal linking map',
-    schemaTypes: ['Article', 'BreadcrumbList'],
-    wordCountTarget: 3500,
-    wordCountRange: '3000–5000',
-    avgSectionWords: 450,
-    sectionRange: '7–10',
-    contentStyle: 'Encyclopedic depth. Each H2 is a standalone subtopic that links to a cluster page. Internal link density is higher than a typical post.',
-    prompt: 'PAGE TYPE: Pillar Page — write for a reader seeking the complete guide on this topic. Structure as: topic overview (what is it, why does it matter) → comprehensive H2 sections each covering a distinct subtopic → explicit internal link suggestions to cluster pages on the site → BreadcrumbList note. Use schema: Article + BreadcrumbList.',
-  },
-  product: {
-    tone: 'Feature-benefit driven. Specific and honest. No puffery.',
-    structure: 'Specs → comparison table → testimonials → pricing context → CTA',
-    schemaTypes: ['Product', 'AggregateRating'],
-    wordCountTarget: 1200,
-    wordCountRange: '900–1500',
-    avgSectionWords: 190,
-    sectionRange: '5–7',
-    contentStyle: 'Leads with the specific benefit of each feature. Uses comparison tables. Social proof with specifics (star ratings, verified buyers).',
-    prompt: 'PAGE TYPE: Product Page — write for a decision-stage buyer. Structure as: product specs with benefit framing → comparison table (this product vs. alternatives or tiers) → testimonials with specifics → pricing context (value framing) → CTA. Use schema: Product + AggregateRating.',
-  },
-  resource: {
-    tone: 'Educational depth. Treat same as a pillar page — comprehensive and authoritative.',
-    structure: 'Topic overview → linked subtopics → internal linking map',
-    schemaTypes: ['Article', 'BreadcrumbList'],
-    wordCountTarget: 3000,
-    wordCountRange: '2500–4000',
-    avgSectionWords: 400,
-    sectionRange: '6–9',
-    contentStyle: 'Reference-grade depth. Emphasizes utility — the reader should bookmark this. Cite sources. Tables and lists over prose where it helps.',
-    prompt: 'PAGE TYPE: Resource Guide — write for a reader seeking a reference they will bookmark and return to. Same depth as a pillar page. Use tables, lists, and visual aids where applicable. Link generously to related resources on the site. Use schema: Article + BreadcrumbList.',
-  },
-};
+// SKIP — PAGE_TYPE_CONFIGS already exists in server/content-brief.ts with all 9 types.
+// Do NOT recreate, export, or replace it.
 ```
 
 - [ ] Add the exported `buildStrategyCardBlock` helper immediately after the `PAGE_TYPE_CONFIGS` constant:
@@ -911,7 +988,10 @@ The full diff at the prompt end:
 
 ### Task 5 — Thread strategyCardContext through content-requests.ts
 
+**Model: [HAIKU]** — mechanical field threading from request object into generateBrief() call.
+
 **File owner:** `server/routes/content-requests.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `server/content-brief.ts` (owned by Task 4, must be merged first).
 
 - [ ] Write failing test addition to `tests/integration/content-requests-routes.test.ts`. Add a new describe block after the existing tests:
 
@@ -1005,7 +1085,10 @@ const brief = await generateBrief(req.params.workspaceId, request.targetKeyword,
 
 ### Task 9 — Smarter recommendation cards in StrategyTab
 
+**Model: [SONNET]** — component logic with design judgment on status badge colors and predicted impact rendering.
+
 **File owner:** `src/components/client/StrategyTab.tsx` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/strategy/ContentGaps.tsx` (owned by Task 10), any other file.
 
 - [ ] Read the current `kdColor` function at line 44 (confirmed: `kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400'`).
 - [ ] Add import for kdFraming at top of file with existing imports:
@@ -1124,14 +1207,57 @@ return (
 );
 ```
 
+- [ ] Write test file and run:
+
+```typescript
+// tests/unit/kd-framing-strategyTab.test.ts
+import { describe, it, expect } from 'vitest';
+import { kdFraming, kdTooltip } from '../../src/lib/kdFraming.js';
+
+/**
+ * Verifies kdFraming output for values used in StrategyTab rendering.
+ */
+describe('kdFraming — StrategyTab integration values', () => {
+  it('KD 10 → low competition label', () => {
+    expect(kdFraming(10)).toBe('Low competition — strong odds');
+  });
+
+  it('KD 45 → moderate competition label', () => {
+    expect(kdFraming(45)).toBe('Moderate competition — achievable with a strong post');
+  });
+
+  it('KD 70 → competitive label', () => {
+    expect(kdFraming(70)).toBe('Competitive — requires authority and depth');
+  });
+
+  it('KD 90 → highly competitive label', () => {
+    expect(kdFraming(90)).toBe('Highly competitive — long-term play');
+  });
+
+  it('kdTooltip for KD 45 contains both number and label', () => {
+    const tip = kdTooltip(45);
+    expect(tip).toContain('45');
+    expect(tip).toContain('Moderate competition');
+  });
+});
+```
+
+```bash
+npx vitest run tests/unit/kd-framing-strategyTab.test.ts 2>&1 | tail -10
+# Expected: all pass
+```
+
 - [ ] Run `npx tsc --noEmit --skipLibCheck` and `npx vite build` — expect zero errors.
-- [ ] Commit: `git add src/components/client/StrategyTab.tsx && git commit -m "feat(strategy-tab): add predicted impact, plain-language KD tooltips, spec-aligned status badge colors"`
+- [ ] Commit: `git add src/components/client/StrategyTab.tsx tests/unit/kd-framing-strategyTab.test.ts && git commit -m "feat(strategy-tab): add predicted impact, plain-language KD tooltips, spec-aligned status badge colors"`
 
 ---
 
 ### Task 10 — Add KD framing + predicted impact to ContentGaps
 
+**Model: [SONNET]** — component logic with judgment on impact estimation rendering at the content gap level.
+
 **File owner:** `src/components/strategy/ContentGaps.tsx` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/client/StrategyTab.tsx` (owned by Task 9), any other file.
 
 - [ ] Add imports at top:
   ```typescript
@@ -1210,14 +1336,61 @@ function predictedImpact(volume?: number, position?: number): number | undefined
 })()}
 ```
 
+- [ ] Write test file and run:
+
+```typescript
+// tests/unit/kd-framing-contentGaps.test.ts
+import { describe, it, expect } from 'vitest';
+import { kdFraming, kdTooltip } from '../../src/lib/kdFraming.js';
+
+/**
+ * Verifies kdFraming output for values used in ContentGaps rendering.
+ */
+describe('kdFraming — ContentGaps integration values', () => {
+  it('KD 0 → low competition label', () => {
+    expect(kdFraming(0)).toBe('Low competition — strong odds');
+  });
+
+  it('KD 55 → moderate competition label', () => {
+    expect(kdFraming(55)).toBe('Moderate competition — achievable with a strong post');
+  });
+
+  it('KD 75 → competitive label', () => {
+    expect(kdFraming(75)).toBe('Competitive — requires authority and depth');
+  });
+
+  it('KD 95 → highly competitive label', () => {
+    expect(kdFraming(95)).toBe('Highly competitive — long-term play');
+  });
+
+  it('undefined KD → kdFraming returns undefined (gap card omits label)', () => {
+    expect(kdFraming(undefined)).toBeUndefined();
+  });
+
+  it('kdTooltip for KD 75 contains both number and label', () => {
+    const tip = kdTooltip(75);
+    expect(tip).toContain('75');
+    expect(tip).toContain('Competitive');
+  });
+});
+```
+
+```bash
+npx vitest run tests/unit/kd-framing-contentGaps.test.ts 2>&1 | tail -10
+# Expected: all pass
+```
+
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Commit: `git add src/components/strategy/ContentGaps.tsx && git commit -m "feat(content-gaps): add KD framing tooltip and predicted impact line"`
+- [ ] Commit: `git add src/components/strategy/ContentGaps.tsx tests/unit/kd-framing-contentGaps.test.ts && git commit -m "feat(content-gaps): add KD framing tooltip and predicted impact line"`
 
 ---
 
 ### Task 12 — SEO Editor CMS page filter + CMS write-back
 
+**Model: [SONNET]** — complex component with filter state management, conditional rendering, and CMS write-back path.
+
 **File owner:** `src/components/SeoEditor.tsx` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/hooks/admin/useSeoEditor.ts` (owned by Task 11, must be merged first), any other file.
 
 - [ ] Write failing integration test — `tests/integration/seo-editor-unified.test.ts`:
 
@@ -1302,6 +1475,14 @@ describe('SEO Editor — approvals CMS write path', () => {
 ```
 
 - [ ] Run — expect partial pass (all-pages auth check pass, approvals test depends on approval schema accepting collectionId — already confirmed at line 66 of approvals.ts).
+
+- [ ] Update `useSeoEditor` call site — find the line `useSeoEditor(siteId)` in `SeoEditor.tsx` and update to pass `workspaceId`:
+  ```typescript
+  // BEFORE:
+  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
+  // AFTER:
+  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
+  ```
 
 - [ ] In `src/components/SeoEditor.tsx`, add a CMS filter toggle UI above the pages list. Find the existing `search` state and add a `showCmsOnly` state:
 

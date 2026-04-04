@@ -12,6 +12,56 @@
 
 ---
 
+## Phase 1 Deduplication Audit Findings
+
+> Completed 2026-04-03. Results incorporated into task notes below.
+
+**Q1 — Does any existing file already store or query client intent/signals?**
+No. `server/workspace-intelligence.ts` has a `clientSignals` slice (`assembleClientSignals`, line 741) but it reads *aggregate* signals — churn signals, engagement metrics, approval patterns, ROI. It does NOT read from the `client_signals` table. The new `server/client-signals-store.ts` is genuinely new work.
+
+**Q2 — Does `workspace-intelligence.ts` already have a `clientSignals` slice that reads from `client_signals` table?**
+The slice exists (line 192: `case 'clientSignals'`) but reads from `churn-signals.ts` and other aggregate sources — not from the `client_signals` table. The store (`client-signals-store.ts`) has not been built yet. Task 3 is not duplicating anything.
+
+**Q3 — Do existing admin hooks already handle signal-like data that `useClientSignals` would duplicate?**
+`useIntelligenceSignals` and `useWorkspaceIntelligence` exist but handle workspace intelligence context (the `ClientSignalsSlice` assembled by `workspace-intelligence.ts`). They do NOT query the `client_signals` table. `useClientSignals` (Task 8) is not a duplicate.
+
+**Q4 — What WS event constants already exist? Is `CLIENT_SIGNAL_CREATED` already defined?**
+`src/lib/wsEvents.ts` defines `INTELLIGENCE_SIGNALS_UPDATED` and `INTELLIGENCE_CACHE_UPDATED` but no `CLIENT_SIGNAL_CREATED` or `CLIENT_SIGNAL_UPDATED`. Task 7 additions are safe.
+
+**Q5 — Does `src/lib/queryKeys.ts` already have signal-related keys?**
+`queryKeys.admin.intelligenceSignals` exists (line 58) but targets the intelligence context endpoint. No `clientSignals` key exists. Task 7 addition is safe and does not conflict.
+
+---
+
+## PR Structure
+
+This group ships as 3 sequential PRs. Each must be merged to staging and CI-green before the next starts.
+
+**PR A — Signal Backend** (Tasks 3, 4, 5, 11)
+- `server/client-signals-store.ts` (new)
+- `server/routes/client-signals.ts` (new)
+- `server/app.ts` (mount new route)
+- Email template addition (`server/email-templates.ts`, `server/email.ts`)
+- Signal detection in `server/routes/public-analytics.ts`
+
+**PR B — Admin UI** (Tasks 7, 8, 12, 13)
+- `src/lib/queryKeys.ts` — add `clientSignals` key
+- `src/lib/wsEvents.ts` — add WS event constants
+- `src/hooks/admin/useClientSignals.ts` — new React Query hooks
+- `src/hooks/admin/index.ts` — export new hooks
+- `src/hooks/useWsInvalidation.ts` — add handlers
+- `src/components/NotificationBell.tsx` — drawer refactor
+- `src/components/admin/AdminInbox.tsx` — new component
+
+**PR C — Client CTA** (Tasks 6, 10, 9)
+- `src/lib/loadingPhrases.ts` (new)
+- `src/components/client/ServiceInterestCTA.tsx` (new — must come before ChatPanel wiring)
+- `src/components/ChatPanel.tsx` — loading phrases + CTA trigger
+
+> Note: PR C task order is Task 6 → Task 10 → Task 9. ServiceInterestCTA must be committed before ChatPanel imports it.
+
+---
+
 ## Phase 0 Pre-done
 
 The following items were delivered on the Phase 0 branch and are already committed. Agents must **not** re-create or overwrite these files.
@@ -155,7 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_client_signals_status
 
 ---
 
-## Task 3 — DB store: `server/client-signals-store.ts`
+## Task 3 — DB store: `server/client-signals-store.ts` **[HAIKU]** — mechanical DB layer
 
 **Owns:** `server/client-signals-store.ts`
 **Must not touch:** any other file in this task
@@ -413,7 +463,7 @@ export function countNewSignals(workspaceId: string): number {
 
 ---
 
-## Task 4 — API routes: `server/routes/client-signals.ts` + mount in app.ts
+## Task 4 — API routes: `server/routes/client-signals.ts` + mount in app.ts **[HAIKU]** — mechanical route scaffolding
 
 **Owns:** `server/routes/client-signals.ts`, `server/app.ts`
 **Must not touch:** any file not listed above
@@ -703,10 +753,14 @@ export default router;
 
 ---
 
-## Task 5 — Email: `clientSignalEmail()` template + `notifyTeamClientSignal()` helper
+## Task 5 — Email: `clientSignalEmail()` template + `notifyTeamClientSignal()` helper **[HAIKU]** — mechanical template addition
 
 **Owns:** `server/email-templates.ts`, `server/email.ts`
 **Must not touch:** any other file in this task
+
+> **Dedup note:** `notifyTeamChurnSignal` is already defined in `server/email.ts` — import its pattern as a reference. Do not re-implement it; add `notifyTeamClientSignal` as a new sibling export.
+
+> **Test note:** Email template output should be spot-checked manually (render the HTML in a browser). No unit test is needed for this task — the template is a pure string function with no branching logic beyond `esc()` calls.
 
 ### Step 5.1 — Add `clientSignalEmail()` to email-templates.ts
 
@@ -783,7 +837,7 @@ export async function notifyTeamClientSignal(
 
 ---
 
-## Task 6 — Loading phrases utility
+## Task 6 — Loading phrases utility **[HAIKU]** — mechanical utility
 
 **Owns:** `src/lib/loadingPhrases.ts`
 **Must not touch:** any other file in this task
@@ -891,10 +945,14 @@ export function pickPhrase(exclude?: string): string {
 
 ---
 
-## Task 7 — Frontend query key + WS event constant
+## Task 7 — Frontend query key + WS event constant **[HAIKU]** — mechanical constant additions
 
 **Owns:** `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts`
 **Must not touch:** any other file in this task
+
+> **Dedup note (Phase 1 audit):** `queryKeys.admin.intelligenceSignals` already exists at line 58 of `src/lib/queryKeys.ts` — it is for the workspace intelligence context endpoint, NOT the `client_signals` table. Add `clientSignals` as a new distinct key. `WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED` and `INTELLIGENCE_CACHE_UPDATED` already exist — add `CLIENT_SIGNAL_CREATED` and `CLIENT_SIGNAL_UPDATED` as new entries, do not modify existing ones.
+
+> **Test note:** After committing, run `npx vitest run tests/unit/queryKeys.test.ts` if that file exists. If it does not exist yet, verify the new keys do not conflict by running `npx tsc --noEmit --skipLibCheck`.
 
 ### Step 7.1 — Add query key
 
@@ -932,10 +990,14 @@ export function pickPhrase(exclude?: string): string {
 
 ---
 
-## Task 8 — React Query hooks: `useClientSignals`, `useUpdateSignalStatus`
+## Task 8 — React Query hooks: `useClientSignals`, `useUpdateSignalStatus` **[SONNET]** — React Query hook with invalidation logic
 
-**Owns:** `src/hooks/admin/useClientSignals.ts`, `src/hooks/admin/index.ts`
-**Must not touch:** any other file in this task
+**Owns:** `src/hooks/admin/useClientSignals.ts`, `src/hooks/admin/index.ts`, `src/hooks/useWsInvalidation.ts`
+**Must not touch:** `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts` (owned by Task 7), `src/components/` (owned by Tasks 12, 13)
+
+> **Dedup note (Phase 1 audit):** `useIntelligenceSignals` and `useWorkspaceIntelligence` in `src/hooks/admin/index.ts` handle workspace intelligence context — a different data source. `useClientSignals` (this task) is not a duplicate.
+
+> **Test note:** Create `tests/unit/useClientSignals.test.ts` with a mock React Query setup (use `renderHook` from `@testing-library/react`). Test that `useClientSignals` calls the correct endpoint and that `useUpdateSignalStatus` invalidates `queryKeys.admin.clientSignals(wsId)` on success.
 
 ### Step 8.1 — Create the hooks file
 
@@ -1038,10 +1100,14 @@ export function useCreateClientSignal(workspaceId: string | undefined) {
 
 ---
 
-## Task 9 — Loading phrases in ChatPanel
+## Task 9 — Loading phrases + ServiceInterestCTA wiring in ChatPanel **[SONNET]** — component logic + conditional rendering
+
+> **ORDER DEPENDENCY:** Task 10 (ServiceInterestCTA) must be committed BEFORE this task begins. ChatPanel imports `ServiceInterestCTA` from `./client/ServiceInterestCTA` — that file must exist on disk before Task 9's TypeScript check can pass.
 
 **Owns:** `src/components/ChatPanel.tsx`
-**Must not touch:** any other file in this task
+**Must not touch:** `src/components/client/ServiceInterestCTA.tsx` (owned by Task 10), any other file not listed
+
+> **Test note:** ChatPanel is tested via Task 13's integration test (which exercises the full admin inbox + signal workflow). No standalone ChatPanel unit test is needed for this task.
 
 ### Step 9.1 — Read the current file
 
@@ -1165,10 +1231,12 @@ import { ServiceInterestCTA } from './client/ServiceInterestCTA';
 
 ---
 
-## Task 10 — `ServiceInterestCTA` component
+## Task 10 — `ServiceInterestCTA` component **[SONNET]** — new component with state + design
+
+> **ORDER:** This task must be committed BEFORE Task 9 (ChatPanel wiring). ChatPanel imports this file — if it doesn't exist when Task 9 runs `tsc`, the build fails.
 
 **Owns:** `src/components/client/ServiceInterestCTA.tsx`
-**Must not touch:** any other file in this task
+**Must not touch:** `src/components/ChatPanel.tsx` (owned by Task 9), any other file not listed
 
 ### Step 10.1 — Write failing component test first
 
@@ -1354,10 +1422,10 @@ export function ServiceInterestCTA({ type, workspaceId: _workspaceId, onAction }
 
 ---
 
-## Task 11 — Intent detection in `public-analytics.ts` chat route
+## Task 11 — Intent detection in `public-analytics.ts` chat route **[SONNET]** — NLP-adjacent logic in chat handler
 
 **Owns:** `server/routes/public-analytics.ts`
-**Must not touch:** any other file in this task
+**Must not touch:** `server/client-signals-store.ts` (owned by Task 3), `server/email.ts` (owned by Task 5), any other file not listed
 
 ### Step 11.1 — Read the chat route
 
@@ -1486,12 +1554,12 @@ describe('Intent detection in /api/public/search-chat/:workspaceId', () => {
 
 ---
 
-## Task 12 — NotificationBell: refactor existing component to fixed slide-out drawer
+## Task 12 — NotificationBell: refactor existing component to fixed slide-out drawer **[SONNET]** — component refactor with drawer pattern
 
 > **Note:** `src/components/NotificationBell.tsx` already EXISTS. This task refactors the existing file — do NOT create it from scratch. The current implementation uses `absolute top-full right-0` dropdown positioning which must be replaced with a fixed slide-out drawer pattern.
 
 **Owns:** `src/components/NotificationBell.tsx`
-**Must not touch:** any other file in this task
+**Must not touch:** `src/hooks/admin/useClientSignals.ts` (owned by Task 8), `src/lib/wsEvents.ts` (owned by Task 7), any other file not listed
 
 ### Step 12.1 — Write failing component test first
 
@@ -1737,10 +1805,10 @@ describe('NotificationBell — drawer conversion', () => {
 
 ---
 
-## Task 13 — AdminInbox component with Signals tab
+## Task 13 — AdminInbox component with Signals tab **[SONNET]** — complex admin UI component
 
 **Owns:** `src/components/admin/AdminInbox.tsx`
-**Must not touch:** any other file in this task
+**Must not touch:** `src/hooks/admin/useClientSignals.ts` (owned by Task 8), `src/components/NotificationBell.tsx` (owned by Task 12), any other file not listed
 
 ### Step 13.1 — Write failing integration test first
 
@@ -2064,7 +2132,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
 
 ---
 
-## Task 14 — Full test suite + build verification
+## Task 14 — Full test suite + build verification **[HAIKU]** — mechanical verification
 
 **Owns:** Nothing new — verification only
 **Must not touch:** any file
@@ -2142,9 +2210,31 @@ All 14 tasks are **sequential** because:
 - Task 3 (store) must precede Task 4 (routes)
 - Task 4 (routes) must precede Task 11 (intent detection)
 - Tasks 5–6 are independent of each other and of 7–8, but both depend on Task 1 (pre-done)
-- Tasks 9–10 depend on Task 6 (loading phrases) and each other (ChatPanel imports ServiceInterestCTA)
+- **Task 10 (ServiceInterestCTA) must precede Task 9 (ChatPanel wiring)** — ChatPanel imports `ServiceInterestCTA`; the file must exist before `tsc` can pass. PR C order: Task 6 → Task 10 → Task 9.
 - Task 12 (NotificationBell) is fully independent of Tasks 9–11 but depends on Tasks 7–8 (WS events)
 - Task 13 (AdminInbox) depends on Tasks 7–8 (query keys + hooks)
 - Task 14 (verification) must be last
+
+### Dependency graph
+
+```
+Phase 0 (pre-done)
+  └─ Task 3 (store)
+      └─ Task 4 (routes + app.ts)
+          └─ Task 11 (intent detection in public-analytics.ts)
+
+Task 5 (email) ──── independent within PR A (after Task 3 commits)
+
+Task 6 (loadingPhrases)
+  └─ Task 10 (ServiceInterestCTA)   ← must commit before Task 9
+      └─ Task 9 (ChatPanel wiring)
+
+Task 7 (query key + WS events)
+  └─ Task 8 (hooks + WS invalidation)
+      ├─ Task 12 (NotificationBell drawer)
+      └─ Task 13 (AdminInbox)
+
+Task 14 (verification) ─ last
+```
 
 Recommended execution order: **3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14**

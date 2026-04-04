@@ -12,6 +12,71 @@
 
 ---
 
+## Deduplication Findings
+
+> Pre-implementation audit completed 2026-04-03. Read before implementing Tasks 6, 8, 10.
+
+### 1. workspace-intelligence.ts businessProfile (seoContext base slice)
+
+`server/workspace-intelligence.ts` assembles a `businessProfile` field (lines 269–277) from `workspace.intelligenceProfile` — it contains `{ industry, goals, targetAudience }`. This is **admin-facing strategic context** used to populate AI prompts (adminChat, strategy generation). It is NOT the same as BrandTab's contact-info business profile (`phone`, `email`, `address`, `openingHours`, `socialProfiles`). **No overlap with BrandTab.**
+
+- BrandTab sources data from `GET /api/public/business-priorities/:workspaceId` (already exists, Phase 0) and the workspace's `businessProfile` contact-info field (served via the client workspace endpoint).
+- BrandTab must NOT call any intelligence endpoint — it reads portal-safe workspace data only.
+
+### 2. IntelligenceProfileTab.tsx — NO duplication with BrandTab
+
+`src/components/settings/IntelligenceProfileTab.tsx` is an **admin-only** settings tab that edits `intelligenceProfile.industry`, `intelligenceProfile.goals`, and `intelligenceProfile.targetAudience`. These fields feed the AI context engine and are never shown to clients.
+
+BrandTab shows contact and presence fields (`phone`, `email`, `address`, `openingHours`, `socialProfiles`, `foundedDate`, `numberOfEmployees`) — entirely different data shape and audience. No deduplication needed.
+
+### 3. OverviewTab — NO current businessProfile or BrandTab content
+
+`src/components/client/OverviewTab.tsx` renders performance metrics, insights, and activity. It does not reference `siteIntelligenceClientView`, `businessProfile`, or any business identity fields. Task 12 adds the `siteIntelligenceClientView` gate; Tasks 6–7 add the separate BrandTab. No overlap.
+
+### 4. ChatPanel.tsx — NO existing chip concept
+
+`src/components/ChatPanel.tsx` props interface (lines 10–55): `messages`, `loading`, `input`, `onInputChange`, `onSend`, `placeholder?`, `accent?: 'teal' | 'purple'`. **No chips prop exists.** Task 10 adds `suggestionChips?: string[]` and `onChipClick?: (chip: string) => void` as new optional props — this is a pure addition, not a replacement.
+
+### 5. AdminChat.tsx — NO existing placeholder hook or chips
+
+`src/components/AdminChat.tsx` derives `placeholder` via a simple ternary on `chatMode` (line 121). No `useSmartPlaceholder`, no chips. Task 10 is a clean addition.
+
+### 6. businessPriorities hooks
+
+`businessPriorities` is consumed via `src/api/misc.ts` (exported as `businessPriorities`) and used in `StrategyTab.tsx`. No hook reads it directly from workspace state. The portal endpoints (GET/POST `/api/public/business-priorities/:workspaceId`) are Phase 0 done. BrandTab's save path uses `PATCH /api/public/workspaces/:workspaceId/business-profile` (a separate endpoint for contact-info updates).
+
+---
+
+## PR Structure
+
+This group ships as 3 sequential PRs. Each must be merged to staging and CI-green before the next starts.
+
+**PR A — Infrastructure** (Tasks 1, 2, 3, 4, 5, 12)
+- Verification baseline (Task 1)
+- pr-check rules (Task 2)
+- Migration 049: site_intelligence_client_view column (Task 3)
+- FeaturesTab toggle for siteIntelligenceClientView (Task 4)
+- Integration test for toggle (Task 5)
+- OverviewTab Site Intelligence gate (Task 12)
+
+Note: Tasks 4 and 5 can run in parallel after Task 3 is committed. Task 12 runs after Task 4 is committed (depends on toggle being in place).
+
+**PR B — Brand Portal** (Tasks 6, 7, 9)
+- BrandTab component (Task 6)
+- ClientDashboard Brand tab wiring (Task 7)
+- BrandTab component tests (Task 9)
+
+Note: Tasks 7 and 9 can run in parallel after Task 6 is committed.
+
+**PR C — Smart Placeholders** (Tasks 8, 10, 11)
+- useSmartPlaceholder hook (Task 8)
+- AdminChat + ChatPanel integration (Task 10)
+- Smart placeholder tests (Task 11)
+
+Note: Tasks 10 and 11 can run in parallel after Task 8 is committed.
+
+---
+
 ## File Map
 
 | File | Create / Modify | Purpose |
@@ -93,6 +158,14 @@ The following items were completed as part of Phase 0 work (committed before thi
 
 **Model:** Haiku (read-only verification — Phase 0 already merged these)
 
+**Files you OWN:**
+- None — this is verification only. Do not create or modify any file.
+
+**Files you must NOT touch:**
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+
 > ⚠️ **DO NOT EDIT these files** — all changes below were committed in Phase 0. This task is verification only.
 
 - [ ] Verify `shared/types/feature-flags.ts` contains `'client-brand-section': false` and `'smart-placeholders': false`
@@ -123,6 +196,14 @@ The following items were completed as part of Phase 0 work (committed before thi
 ### Task 2 — pr-check.ts: 4 New Enforcement Rules
 
 **Model:** Haiku (mechanical, self-contained)
+
+**Files you OWN:**
+- scripts/pr-check.ts
+
+**Files you must NOT touch:**
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
 
 **No dependencies** — can run in parallel with Task 1.
 
@@ -179,6 +260,14 @@ The following items were completed as part of Phase 0 work (committed before thi
 **Model:** Haiku (mechanical DB addition)
 **Depends on:** Task 1 (Workspace type must have `siteIntelligenceClientView`)
 
+**Files you OWN:**
+- server/db/migrations/049-site-intelligence-client-view.sql (create)
+
+**Files you must NOT touch:**
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+
 > **Note:** `server/workspaces.ts` mapper edits are **already done** (Phase 0). Only the migration SQL file needs to be created — the mapper already reads/writes `site_intelligence_client_view` and `business_priorities`, but the DB column doesn't exist yet.
 
 - [ ] **Create `server/db/migrations/049-site-intelligence-client-view.sql`**:
@@ -205,6 +294,14 @@ ALTER TABLE workspaces ADD COLUMN site_intelligence_client_view INTEGER;
 
 **Model:** Sonnet (UI component, must copy toggle pattern precisely)
 **Depends on:** Tasks 1 + 3
+
+**Files you OWN:**
+- src/components/settings/FeaturesTab.tsx
+
+**Files you must NOT touch:**
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
 
 - [ ] Read `src/components/settings/FeaturesTab.tsx` lines 1–30 (imports)
 - [ ] Read `src/components/settings/FeaturesTab.tsx` lines 100–200 (existing toggle pattern for reference)
@@ -266,6 +363,15 @@ import {
 **Model:** Sonnet
 **Depends on:** Tasks 1 + 3
 
+**Files you OWN:**
+- tests/integration/feature-toggle-site-intelligence.test.ts (create)
+
+**Files you must NOT touch:**
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+- src/components/settings/FeaturesTab.tsx (Task 4 owns it)
+
 - [ ] **Create `tests/integration/feature-toggle-site-intelligence.test.ts`**:
 
 ```typescript
@@ -322,6 +428,17 @@ describe('siteIntelligenceClientView toggle', () => {
 
 **Model:** Sonnet (new UI component, design system compliance required)
 **Depends on:** Task 1
+
+**Files you OWN:**
+- src/components/client/BrandTab.tsx (create)
+
+**Files you must NOT touch:**
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+- src/components/ClientDashboard.tsx (Task 7 owns it)
+
+> DEDUPLICATION NOTE: BrandTab shows client-facing contact and presence data (`phone`, `email`, `address`, `openingHours`, `socialProfiles`). This is entirely distinct from `IntelligenceProfileTab.tsx` (admin-only: `industry`, `goals`, `targetAudience` for AI context). BrandTab must NOT call any intelligence endpoint — data comes from the portal workspace endpoint only.
 
 - [ ] Read `src/components/ui/` to verify available primitives (SectionCard, EmptyState, etc.)
 - [ ] Read `shared/types/workspace.ts` lines 228–260 (businessProfile fields)
@@ -646,6 +763,15 @@ export function BrandTab({
 **Model:** Sonnet
 **Depends on:** Tasks 1 + 6
 
+**Files you OWN:**
+- src/components/ClientDashboard.tsx
+
+**Files you must NOT touch:**
+- src/components/client/BrandTab.tsx (Task 6 owns it — import only, do not edit)
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+
 - [ ] Read `src/components/ClientDashboard.tsx` lines 145–160 (tab parsing)
 - [ ] Read `src/components/ClientDashboard.tsx` lines 625–645 (NAV array)
 - [ ] Read `src/components/ClientDashboard.tsx` lines 828–870 (tab render blocks)
@@ -723,6 +849,18 @@ Also add `Building2` to the lucide-react import block.
 
 **Model:** Sonnet (new hook, reads seoContext slice — no AI calls)
 **Depends on:** Task 1
+
+**Files you OWN:**
+- src/hooks/useSmartPlaceholder.ts (create)
+
+**Files you must NOT touch:**
+- src/components/AdminChat.tsx (Task 10 owns it)
+- src/components/ChatPanel.tsx (Task 10 owns it)
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+
+> DEDUPLICATION NOTE: ChatPanel.tsx currently has NO chips concept. Do not add chips rendering here — that belongs to Task 10. This task creates the hook only.
 
 - [ ] Read `src/hooks/admin/useWorkspaceIntelligence.ts` for query pattern
 - [ ] Read `server/seo-context.ts` lines 17–55 to understand `SeoContext` shape
@@ -875,6 +1013,16 @@ export function useSmartPlaceholder(
 **Model:** Sonnet
 **Depends on:** Task 6
 
+**Files you OWN:**
+- tests/component/BrandTab.test.tsx (create)
+
+**Files you must NOT touch:**
+- src/components/client/BrandTab.tsx (Task 6 owns it — import only, do not edit)
+- src/components/ClientDashboard.tsx (Task 7 owns it)
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+
 - [ ] **Create `tests/component/BrandTab.test.tsx`**:
 
 ```tsx
@@ -998,6 +1146,18 @@ describe('BrandTab', () => {
 **Model:** Sonnet
 **Depends on:** Task 8
 
+**Files you OWN:**
+- src/components/AdminChat.tsx
+- src/components/ChatPanel.tsx
+
+**Files you must NOT touch:**
+- src/hooks/useSmartPlaceholder.ts (Task 8 owns it — import only, do not edit)
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+
+> DEDUPLICATION NOTE: ChatPanel currently has no `suggestionChips` prop. This task adds it as a new optional prop — pure addition. AdminChat currently derives `placeholder` from a simple chatMode ternary (line 121) with no hook. Both are clean additions.
+
 - [ ] Read `src/components/AdminChat.tsx` lines 118–135 (existing placeholder logic)
 - [ ] Read `src/components/ChatPanel.tsx` lines 1–60 (props interface)
 
@@ -1086,6 +1246,18 @@ In the `<ChatPanel>` JSX, add after `placeholder={placeholder}`:
 
 **Model:** Sonnet
 **Depends on:** Tasks 8 + 10
+
+**Files you OWN:**
+- tests/unit/smart-placeholder.test.ts (create)
+- tests/component/SmartPlaceholder.test.tsx (create)
+
+**Files you must NOT touch:**
+- src/hooks/useSmartPlaceholder.ts (Task 8 owns it — import only)
+- src/components/AdminChat.tsx (Task 10 owns it — import only)
+- src/components/ChatPanel.tsx (Task 10 owns it — import only)
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
 
 - [ ] **Create `tests/unit/smart-placeholder.test.ts`**:
 
@@ -1305,6 +1477,16 @@ describe('ChatPanel — smart placeholder behavior', () => {
 
 **Model:** Haiku (single conditional wrap — mechanical)
 **Depends on:** Tasks 1 + 3 + 4
+**PR assignment:** PR A — must run AFTER Task 4 (FeaturesTab toggle) is committed. The toggle must exist before this gate is meaningful.
+
+**Files you OWN:**
+- src/components/client/OverviewTab.tsx
+
+**Files you must NOT touch:**
+- src/components/settings/FeaturesTab.tsx (Task 4 owns it)
+- server/workspaces.ts (Phase 0 — mapper already complete)
+- shared/types/ (Phase 0 — do not modify any type files)
+- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
 
 The `IntelligenceSummaryCard` in `OverviewTab.tsx` at line ~282 needs to be gated by `ws.siteIntelligenceClientView !== false`.
 
@@ -1437,20 +1619,42 @@ After deploying to staging (`asset-dashboard-staging.onrender.com`):
 
 ## PR Merge Instructions
 
-This is **PR 4 of 4** in the Platform Intelligence Enhancements series.
+This group ships as **3 sequential PRs (PR A, PR B, PR C)** — the final PRs in the Platform Intelligence Enhancements series (formerly described as "PR 4 of 4", now split for reviewability).
 
-### Before Merging
+### PR A (Tasks 1, 2, 3, 4, 5, 12) — Infrastructure
 
-1. Confirm PR 3 is merged and green on `staging`
-2. Run full verification sequence above — zero errors
-3. Deploy to staging and complete manual QA checklist
-4. Invoke `superpowers:requesting-code-review` for final review pass
+1. Confirm PIE Group 2 / PR 3 is merged and green on `staging`
+2. Run full verification sequence — zero errors
+3. Deploy to staging and verify Site Intelligence toggle and OverviewTab gate
+4. Invoke `superpowers:requesting-code-review` before merging
 
-### Merge Order
+### PR B (Tasks 6, 7, 9) — Brand Portal
+
+1. Confirm PR A is merged and green on `staging`
+2. Enable `client-brand-section` flag in staging env to verify BrandTab
+3. Run full verification sequence — zero errors
+4. Invoke `superpowers:requesting-code-review` before merging
+
+### PR C (Tasks 8, 10, 11) — Smart Placeholders
+
+1. Confirm PR B is merged and green on `staging`
+2. Enable `smart-placeholders` flag in staging env to verify chips in AdminChat
+3. Run full verification sequence — zero errors
+4. Invoke `superpowers:requesting-code-review` before merging
+
+### Merge Order (all PRs)
 
 ```
-PR 4 branch → staging
-  ↓ (verify on staging, check logs, confirm no regressions)
+PR A branch → staging
+  ↓ (verify, then merge)
+staging → main
+
+PR B branch → staging
+  ↓ (verify, then merge)
+staging → main
+
+PR C branch → staging
+  ↓ (verify, then merge)
 staging → main
 ```
 
