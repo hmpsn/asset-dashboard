@@ -2,12 +2,13 @@ import nodemailer from 'nodemailer';
 import { queueEmail, registerSendFn, restoreQueue } from './email-queue.js';
 import type { EmailEvent } from './email-templates.js';
 import { createLogger } from './logger.js';
+import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 
 const log = createLogger('email');
 
 // Configure via env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
-// SMTP_FROM_NAME — display name for outgoing emails (e.g. "hmpsn studio")
+// SMTP_FROM_NAME — display name for outgoing emails (uses STUDIO_NAME constant as default)
 // NOTIFICATION_EMAIL — where team gets notified (your inbox)
 
 interface EmailConfig {
@@ -362,9 +363,9 @@ export async function notifyTeamClientSignal(
 ): Promise<void> {
   const to = getNotificationEmail();
   if (!to || !isEmailConfigured()) return;
-  const adminUrl = process.env.ADMIN_URL || 'https://hmpsn.studio';
+  const adminUrl = process.env.ADMIN_URL || STUDIO_URL;
   const { clientSignalEmail } = await import('./email-templates.js');
   const html = clientSignalEmail({ workspaceName, signalType, triggerMessage, adminUrl });
-  const subject = `[hmpsn.studio] Client signal from ${workspaceName}`;
+  const subject = `[${STUDIO_NAME}] Client signal from ${workspaceName}`;
   await sendEmail(to, subject, html);
 }
