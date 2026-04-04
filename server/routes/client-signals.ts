@@ -73,7 +73,7 @@ const createSignalSchema = z.object({
   chatContext: z.array(
     z.object({
       role: z.enum(['user', 'assistant']),
-      content: z.string(),
+      content: z.string().max(5000),
     }),
   ).max(10),
 });
