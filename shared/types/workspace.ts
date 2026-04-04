@@ -175,6 +175,8 @@ export interface Workspace {
   clientPortalEnabled?: boolean;
   seoClientView?: boolean;
   analyticsClientView?: boolean;
+  /** When false, the Site Intelligence module is hidden from this workspace's client dashboard. Default true (null treated as true). */
+  siteIntelligenceClientView?: boolean | null;
   autoReports?: boolean;
   autoReportFrequency?: 'weekly' | 'monthly';
   // Branding
@@ -242,6 +244,8 @@ export interface Workspace {
     foundedDate?: string;         // ISO date or year
     numberOfEmployees?: string;   // e.g. "10-50"
   };
+  /** Admin-editable client business goals, e.g. ['Grow patient appointments by 25% in Q3']. */
+  businessPriorities?: string[];
   // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
   scoringConfig?: Partial<Record<string, { primary_metric: string; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
   folder: string;
