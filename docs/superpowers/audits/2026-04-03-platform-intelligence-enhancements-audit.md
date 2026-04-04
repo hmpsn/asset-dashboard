@@ -72,7 +72,7 @@ The following claims were verified against `git show origin/main:<path>`. Six co
 |------|------|--------|
 | `src/components/ChatPanel.tsx` | Message render loop | Inject `<ServiceInterestCTA>` below AI response when signal detected |
 | `server/routes/public-analytics.ts` | Line 176 — POST chat endpoint | Add signal detection + `client_signals` DB insert + broadcast |
-| `server/db/migrations/046-client-signals.sql` | New migration | `client_signals` table (see schema below) |
+| `server/db/migrations/047-client-signals.sql` | New migration | `client_signals` table (see schema below) |
 | `shared/types/client-signals.ts` | New types file | `ClientSignal` interface + `ClientSignalType` union |
 | `src/components/client/ServiceInterestCTA.tsx` | New component | Stylized CTA button, two variants |
 | `src/hooks/client/useServiceInterest.ts` | New hook | Mutation to POST signal |
@@ -385,7 +385,7 @@ ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT; -- JSON array of goal
 | Pattern | Detail |
 |---------|--------|
 | **ClientDashboard tab rendering** | Inline conditionals `{tab === 'x' && <ErrorBoundary label="X"><Tab .../></ErrorBoundary>}` — NOT switch/case. File: `src/components/client/ClientDashboard.tsx` |
-| **DB migration numbering** | Phase 0 consumed: **046** (client_signals), **047** (business_priorities). Next available: **048**. Latest existing pre-Phase 0: `045-anomaly-scan-tracker.sql` |
+| **DB migration numbering** | origin/main has **046** (intelligence_profile). Phase 0 adds **047** (client_signals), **048** (business_priorities). Next available: **049**. |
 | **Feature flag registration** | `FEATURE_FLAGS` const in `shared/types/feature-flags.ts`. Add key + value string; type auto-derives. `bridge-client-signal` already exists — do NOT add duplicate. New flags needed: `'smart-placeholders'`, `'client-brand-section'`, `'seo-editor-unified'` |
 | **React Query key convention** | Admin: `['admin-<resource>', workspaceId]`. Client: `['client-<resource>', workspaceId]` |
 | **Integration test setup** | `createTestContext(port)` from `tests/integration/helpers.js`. `beforeAll(ctx.startServer, 25_000)`. Pick an unused port. |
@@ -476,8 +476,8 @@ ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT; -- JSON array of goal
 | `shared/types/keywords.ts` | Extend — add `METRICS_SOURCE` const + `MetricsSource` type |
 | `shared/types/workspace.ts` | Extend — add `siteIntelligenceClientView?: boolean \| null`, `ClientTab: \| 'brand'` |
 | `shared/types/feature-flags.ts` | Extend — add `'smart-placeholders'`, `'client-brand-section'`, `'seo-editor-unified'` |
-| `server/db/migrations/046-client-signals.sql` | New migration |
-| `server/db/migrations/047-business-priorities.sql` | New migration |
+| `server/db/migrations/047-client-signals.sql` | New migration |
+| `server/db/migrations/048-business-priorities.sql` | New migration |
 
 ### Before merging
 

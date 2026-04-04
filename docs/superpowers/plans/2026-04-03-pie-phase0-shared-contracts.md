@@ -22,8 +22,8 @@
 | Modify | `shared/types/workspace.ts` | Add `siteIntelligenceClientView` + `businessPriorities` to `Workspace` |
 | Modify | `src/routes.ts` | Add `'brand'` to `ClientTab` union |
 | Modify | `shared/types/feature-flags.ts` | Add 3 new feature flags |
-| Create | `server/db/migrations/046-client-signals.sql` | `client_signals` table |
-| Create | `server/db/migrations/047-business-priorities.sql` | `businessPriorities` column on `workspaces` |
+| Create | `server/db/migrations/047-client-signals.sql` | `client_signals` table |
+| Create | `server/db/migrations/048-business-priorities.sql` | `businessPriorities` column on `workspaces` |
 | Create | `tests/unit/metrics-source-enum.test.ts` | Verify METRICS_SOURCE const values |
 
 ---
@@ -410,7 +410,7 @@ git commit -m "feat(flags): add smart-placeholders, client-brand-section, seo-ed
 ### Task 7: Migration 046 — `client_signals` table
 
 **Files:**
-- Create: `server/db/migrations/046-client-signals.sql`
+- Create: `server/db/migrations/047-client-signals.sql`
 
 - [ ] **Step 1: Create the migration file**
 
@@ -445,7 +445,7 @@ Expected: all tests pass (migration applied; no schema conflicts).
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/046-client-signals.sql
+git add server/db/migrations/047-client-signals.sql
 git commit -m "feat(db): add client_signals table (migration 046)"
 ```
 
@@ -454,7 +454,7 @@ git commit -m "feat(db): add client_signals table (migration 046)"
 ### Task 8: Migration 047 — `businessPriorities` column
 
 **Files:**
-- Create: `server/db/migrations/047-business-priorities.sql`
+- Create: `server/db/migrations/048-business-priorities.sql`
 
 - [ ] **Step 1: Create the migration file**
 
@@ -476,7 +476,7 @@ Expected: full suite passes.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/047-business-priorities.sql
+git add server/db/migrations/048-business-priorities.sql
 git commit -m "feat(db): add businessPriorities column to workspaces (migration 047)"
 ```
 

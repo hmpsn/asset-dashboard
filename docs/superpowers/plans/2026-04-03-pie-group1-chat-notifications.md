@@ -17,7 +17,7 @@
 | Action | Path | Purpose |
 |--------|------|---------|
 | Create | `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalType`, `ClientSignalStatus` types |
-| Create | `server/db/migrations/046-client-signals.sql` | `client_signals` table DDL |
+| Create | `server/db/migrations/047-client-signals.sql` | `client_signals` table DDL |
 | Create | `server/client-signals-store.ts` | DB store: `createClientSignal`, `listClientSignals`, `updateSignalStatus`, `getSignalById` |
 | Create | `server/routes/client-signals.ts` | Admin REST: GET list, PATCH status, GET single |
 | Modify | `server/app.ts` | Mount `client-signals` routes |
@@ -96,12 +96,12 @@ export interface ClientSignal {
 
 ## Task 2 — DB migration: `client_signals` table
 
-**Owns:** `server/db/migrations/046-client-signals.sql`
+**Owns:** `server/db/migrations/047-client-signals.sql`
 **Must not touch:** any other file in this task
 
 ### Step 2.1 — Write the migration
 
-- [ ] Create `server/db/migrations/046-client-signals.sql`:
+- [ ] Create `server/db/migrations/047-client-signals.sql`:
 
 ```sql
 -- client_signals: stores signals created when the AI detects purchase/service
@@ -132,7 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_client_signals_status
   ```bash
   npx tsx -e "import('./server/db/index.ts').then(m => m.runMigrations()).then(() => { console.log('MIGRATION OK'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })"
   ```
-  Expected output contains: `MIGRATION OK` or `Applying migration: 046-client-signals.sql`
+  Expected output contains: `MIGRATION OK` or `Applying migration: 047-client-signals.sql`
 
 ---
 
