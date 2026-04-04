@@ -56,6 +56,7 @@ Every completed task must include:
 | Conflicts with existing patterns | Flag conflict, recommend pattern-consistent approach. |
 | Unsure if something exists | Search first, then proceed. |
 | Pre-existing lint errors | Check Known Issues below. If listed, ignore. If new, fix only if caused by your changes. |
+| Bug found during review (any origin) | Fix it in the current PR. Never defer a fixable bug — whether it's from your changes, pre-existing, or out-of-scope. Compounding unfixed bugs is worse than a slightly larger diff. If the fix is genuinely risky or large, flag it explicitly and offer to fix it. |
 
 ---
 
@@ -307,4 +308,5 @@ Work is not done until ALL pass:
 - [ ] No `violet` or `indigo` in `src/components/`
 - [ ] `npx tsx scripts/pr-check.ts` — zero errors
 - [ ] If subagents were used: invoke `scaled-code-review` skill for parallel batch output (10+ files), or `superpowers:requesting-code-review` for single-task output. Fix Critical/Important issues before proceeding.
+- [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
