@@ -11,12 +11,12 @@ describe('loadingPhrases', () => {
     expect(LOADING_PHRASES.every(p => p.endsWith('…'))).toBe(true);
   });
 
-  it('all 9 phrases are reachable over 50 random picks', () => {
+  it('all 9 phrases are reachable over 500 random picks', () => {
     const seen = new Set<string>();
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 500; i++) {
       seen.add(pickPhrase());
     }
-    // All 9 should appear at least once in 50 tries
+    // 500 uniform picks from 9 options: P(missing any one) ≈ (8/9)^500 < 10^-24 — not flaky
     expect(seen.size).toBe(9);
   });
 

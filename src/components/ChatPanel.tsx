@@ -27,6 +27,8 @@ interface ChatPanelProps {
   lastIntent?: 'content_interest' | 'service_interest' | null;
   /** Called when the user acts on the CTA */
   onCTAAction?: (type: 'content_interest' | 'service_interest') => void;
+  /** Workspace ID — required for service_interest CTA signal POST */
+  workspaceId?: string;
 }
 
 const ACCENT = {
@@ -60,6 +62,7 @@ export function ChatPanel({
   emptyExtra,
   lastIntent,
   onCTAAction,
+  workspaceId,
 }: ChatPanelProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const a = ACCENT[accent];
@@ -70,17 +73,22 @@ export function ChatPanel({
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (loading) {
+    if (!loading) {
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      setPhrase('');
+      phraseRef.current = '';
+      return;
+    }
+    // Rotate through phrases every 4s while loading — no consecutive repeats
+    const scheduleRotation = () => {
       loadingTimerRef.current = setTimeout(() => {
         const next = pickPhrase(phraseRef.current);
         phraseRef.current = next;
         setPhrase(next);
+        scheduleRotation();
       }, 4000);
-    } else {
-      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-      setPhrase('');
-      phraseRef.current = '';
-    }
+    };
+    scheduleRotation();
     return () => {
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     };
@@ -162,7 +170,7 @@ export function ChatPanel({
             {!loading && lastIntent && onCTAAction && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
               <ServiceInterestCTA
                 type={lastIntent}
-                workspaceId={undefined}
+                workspaceId={workspaceId}
                 onAction={onCTAAction}
               />
             )}
