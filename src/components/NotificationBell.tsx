@@ -124,14 +124,15 @@ export function NotificationBell({ onSelectWorkspace, workspaceId }: Notificatio
                   );
                 })}
               </div>
-            ) : (
+            ) : newSignalCount === 0 ? (
+              // Only show "All clear" when there are truly no signals either
               <EmptyState
                 icon={Bell}
                 title="All clear"
                 description="Nothing needs attention right now"
                 className="py-8"
               />
-            )}
+            ) : null}
           </div>
         </div>
       )}

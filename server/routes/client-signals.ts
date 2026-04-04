@@ -10,7 +10,6 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
-import { publicWriteLimiter } from '../middleware.js';
 import {
   listClientSignals,
   getSignalById,
@@ -86,7 +85,6 @@ const createSignalSchema = z.object({
 
 router.post(
   '/api/public/signal/:workspaceId',
-  publicWriteLimiter,
   validate(createSignalSchema),
   async (req, res) => {
     const ws = getWorkspace(req.params.workspaceId);
