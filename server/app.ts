@@ -99,6 +99,7 @@ import outcomesRouter from './routes/outcomes.js';
 import intelligenceRouter from './routes/intelligence.js';
 import debugRouter from './routes/debug.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
+import clientSignalsRouter from './routes/client-signals.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -343,6 +344,7 @@ export function createApp(): express.Express {
   app.use(intelligenceRouter);
   app.use(debugRouter);
   app.use(suggestedBriefsRouter);
+  app.use(clientSignalsRouter);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);
