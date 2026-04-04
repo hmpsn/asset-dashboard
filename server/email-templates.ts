@@ -1012,3 +1012,33 @@ export function renderApprovalReminder(data: {
     }),
   };
 }
+
+// ── Client Signal ──
+
+export function clientSignalEmail(opts: {
+  workspaceName: string;
+  signalType: string;
+  triggerMessage: string;
+  adminUrl: string;
+}): string {
+  const typeLabel = opts.signalType === 'service_interest' ? 'Service Interest' : 'Content Interest';
+  const body = `
+    <p class="text-primary" style="margin:0 0 12px;font-size:14px;color:#202945;">
+      A client at <strong>${esc(opts.workspaceName)}</strong> expressed <strong>${esc(typeLabel)}</strong> in their chat session.
+    </p>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+      <div class="text-muted" style="font-size:11px;font-weight:600;letter-spacing:0.5px;color:#9ca3af;text-transform:uppercase;margin-bottom:6px;">Client message</div>
+      <div class="text-primary" style="font-size:13px;color:#374151;line-height:1.5;">${esc(opts.triggerMessage)}</div>
+    </div>
+    <p class="text-secondary" style="margin:0;font-size:13px;color:#6b7280;">
+      Review the full conversation and update the signal status in your admin inbox.
+    </p>
+  `;
+  return layout({
+    preheader: `Client signal from ${opts.workspaceName}: ${typeLabel}`,
+    headline: `Client signal: ${typeLabel}`,
+    subtitle: opts.workspaceName,
+    body,
+    cta: { label: 'View in Admin Inbox', url: opts.adminUrl },
+  });
+}

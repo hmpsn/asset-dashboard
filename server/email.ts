@@ -354,3 +354,17 @@ export function notifyTeamChurnSignal(opts: {
     signalTitle: opts.signalTitle, signalDescription: opts.signalDescription, severity: opts.severity,
   }));
 }
+
+export async function notifyTeamClientSignal(
+  workspaceName: string,
+  signalType: string,
+  triggerMessage: string,
+): Promise<void> {
+  const to = getNotificationEmail();
+  if (!to || !isEmailConfigured()) return;
+  const adminUrl = process.env.ADMIN_URL || 'https://hmpsn.studio';
+  const { clientSignalEmail } = await import('./email-templates.js');
+  const html = clientSignalEmail({ workspaceName, signalType, triggerMessage, adminUrl });
+  const subject = `[hmpsn.studio] Client signal from ${workspaceName}`;
+  await sendEmail(to, subject, html);
+}
