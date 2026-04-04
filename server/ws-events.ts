@@ -84,6 +84,7 @@ export const ADMIN_EVENTS = {
   REQUEST_DELETED: 'request:deleted',
   REQUEST_BATCH_CREATED: 'request:batch_created',
   REQUEST_BULK_UPDATED: 'request:bulk_updated',
+  QUEUE_UPDATE: 'queue:update',
 } as const;
 
 export type AdminEventName = typeof ADMIN_EVENTS[keyof typeof ADMIN_EVENTS];
