@@ -16,6 +16,7 @@ import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import type { FixContext } from '../App';
+import type { MetricsSource } from '../../shared/types/keywords.js';
 
 // ── Types ──
 
@@ -40,7 +41,7 @@ interface StrategyPage {
   volume?: number;
   difficulty?: number;
   cpc?: number;
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   optimizationScore?: number;
