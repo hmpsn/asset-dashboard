@@ -54,7 +54,7 @@ This group ships as 3 sequential PRs. Each must be merged to staging and CI-gree
 **PR 1 — Infrastructure** (Tasks 1–6)
 - Verification baseline (Task 1)
 - pr-check rules (Task 2) — runs in parallel with Task 3
-- Migration 049: site_intelligence_client_view column (Task 3) — runs in parallel with Task 2
+- Migration 051: site_intelligence_client_view column (Task 3) — runs in parallel with Task 2
 - FeaturesTab toggle for siteIntelligenceClientView (Task 4) — needs Task 3
 - Integration test for toggle (Task 5) — runs in parallel with Task 4 after Task 3
 - OverviewTab Site Intelligence gate (Task 6) — needs Tasks 3 + 4
@@ -118,7 +118,7 @@ Note: Tasks 11 and 12 can run in parallel after Task 10 is committed.
 | `shared/types/feature-flags.ts` | **Verify (Phase 0 done)** | Flags `'client-brand-section'` and `'smart-placeholders'` already added in Phase 0 |
 | `shared/types/workspace.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView?: boolean` already added in Phase 0 |
 | `src/routes.ts` | **Verify (Phase 0 done)** | `'brand'` already added to `ClientTab` union in Phase 0 |
-| `server/db/migrations/049-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
+| `server/db/migrations/051-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
 | `server/workspaces.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView` and `businessPriorities` mapper already added — `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `columnMap` all updated |
 | `server/routes/public-portal.ts` | **Verify (Phase 0 done)** | GET/POST `/api/public/business-priorities/:workspaceId` endpoints already exist |
 | `src/components/client/OverviewTab.tsx` | **Modify** | Gate IntelligenceSummaryCard on siteIntelligenceClientView toggle |
@@ -143,7 +143,7 @@ Task 1 (Phase 0 verification) ────────────────�
                                                                                                              │
 Task 1 ──► Task 2 (pr-check rules) ─────────────────────────────────────────────────────────────────────────┤  (parallel with Task 3)
                                                                                                              │
-Task 1 ──► Task 3 (migration 049) ──► Task 4 (FeaturesTab toggle) ──► Task 6 (OverviewTab gate)            │  PR 1
+Task 1 ──► Task 3 (migration 051) ──► Task 4 (FeaturesTab toggle) ──► Task 6 (OverviewTab gate)            │  PR 1
                               └──────► Task 5 (integration test)                                             │
                                                                                                              │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -186,7 +186,9 @@ The following items were completed as part of Phase 0 work (committed before thi
 | GET `/api/public/business-priorities/:workspaceId` | `server/routes/public-portal.ts` | Done |
 | POST `/api/public/business-priorities/:workspaceId` | `server/routes/public-portal.ts` | Done |
 
-> **Only migration 049 is still missing.** `server/workspaces.ts` already reads and writes both `site_intelligence_client_view` and `business_priorities` columns, but the `ALTER TABLE` migration that actually adds `site_intelligence_client_view` to the DB has not been created yet. Task 3 covers this.
+> **Only migration 051 is still missing.** `server/workspaces.ts` already reads and writes both `site_intelligence_client_view` and `business_priorities` columns, but the `ALTER TABLE` migration that actually adds `site_intelligence_client_view` to the DB has not been created yet. Task 3 covers this.
+>
+> **Why 051?** This plan was originally written against migration 049. Since then, `049-client-signals-v2.sql` and `050-studio-config.sql` were both shipped to staging. The next available number is **051**. Do NOT create 049 — it already exists.
 
 ---
 
@@ -297,7 +299,7 @@ The following items were completed as part of Phase 0 work (committed before thi
 
 ---
 
-### Task 3 — Migration 049: siteIntelligenceClientView Column
+### Task 3 — Migration 051: siteIntelligenceClientView Column
 
 **Model:** Haiku (mechanical DB addition)
 
@@ -306,7 +308,7 @@ The following items were completed as part of Phase 0 work (committed before thi
 **Depends on:** Task 1
 
 **Files you OWN:**
-- server/db/migrations/049-site-intelligence-client-view.sql (create)
+- server/db/migrations/051-site-intelligence-client-view.sql (create)
 
 **Files you must NOT touch:**
 - server/workspaces.ts (Phase 0 — mapper already complete)
@@ -315,7 +317,7 @@ The following items were completed as part of Phase 0 work (committed before thi
 
 > **Note:** `server/workspaces.ts` mapper edits are **already done** (Phase 0). Only the migration SQL file needs to be created — the mapper already reads/writes `site_intelligence_client_view` and `business_priorities`, but the DB column doesn't exist yet.
 
-- [ ] **Create `server/db/migrations/049-site-intelligence-client-view.sql`**:
+- [ ] **Create `server/db/migrations/051-site-intelligence-client-view.sql`**:
 
 ```sql
 -- Add site_intelligence_client_view column to workspaces
@@ -331,7 +333,7 @@ ALTER TABLE workspaces ADD COLUMN site_intelligence_client_view INTEGER;
 > ```
 
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(db): migration 049 — add site_intelligence_client_view column to workspaces`
+- [ ] Commit: `feat(db): migration 051 — add site_intelligence_client_view column to workspaces`
 
 ---
 

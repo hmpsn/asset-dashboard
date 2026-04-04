@@ -22,7 +22,8 @@
 | `server/content-brief.ts` | Modify | Add strategyCardContext param to generateBrief(); verify prompt field is correctly consumed by generateBrief() call — PAGE_TYPE_CONFIGS already has prompt populated for all 9 page types (DO NOT recreate); inject strategyCardBlock into prompt |
 | `server/routes/content-requests.ts` | Modify | Pass request.rationale, request.intent, request.priority as strategyCardContext to generateBrief() |
 | `server/workspace-intelligence.ts` | Modify | assembleSeoContext(): add backlinkProfile via getBacklinksOverview(); add serpFeatures via parseSerpFeatures() |
-| `server/routes/keyword-strategy.ts` | Modify | Switch replaceAllPageKeywords() → upsertPageKeywordsBatch() at both call sites |
+| `server/page-keywords.ts` | **Modify first** | Fix upsertStmt() COALESCE guard before switching call sites — see ⚠️ Keyword Safety note below |
+| `server/routes/keyword-strategy.ts` | Modify | Switch replaceAllPageKeywords() → upsertPageKeywordsBatch() at both call sites — only after page-keywords.ts COALESCE fix is committed and test passes |
 | `src/components/PageIntelligence.tsx` | Modify | Replace local StrategyPage.metricsSource union with MetricsSource from shared/types/keywords.ts |
 | `src/components/client/StrategyTab.tsx` | Modify | Add predicted impact line; update status badges per spec; add KD tooltip using kdFraming |
 | `src/components/strategy/ContentGaps.tsx` | Modify | Add KD tooltip using kdFraming; add predicted impact line |
@@ -77,15 +78,16 @@ This group ships as 3 sequential PRs. Each must be merged to staging and CI-gree
 
 **PR 1 — Tasks 1–3: Foundational Utilities + Type Fixes (no UI)**
 - Task 1: `src/lib/kdFraming.ts` (new utility — no deps)
-- Task 2: `server/routes/keyword-strategy.ts` (metricsSource + upsertPageKeywordsBatch — independent server fix)
+- Task 2: `server/page-keywords.ts` + `server/routes/keyword-strategy.ts` (COALESCE fix first, then call site switch — see ⚠️ Keyword Safety below)
 - Task 3: `src/components/PageIntelligence.tsx` (MetricsSource type update — needs Phase 0 types only)
 
-Tasks 2 and 3 can run in parallel. Task 1 can also run in parallel with Tasks 2 and 3. All three are independent of each other.
+Tasks 1 and 3 can run in parallel. Task 2 is **sequential-internal**: fix `page-keywords.ts` first, write the test, then switch the call sites in `keyword-strategy.ts`. Do NOT combine them into a single edit.
 
 > **✅ PR 1 Staging Verification — do these before merging PR 2:**
-> - Run a keyword strategy bulk lookup on a workspace → open PageIntelligence → confirm pages show `bulk_lookup` as metrics source (previously blank)
+> - Run a keyword strategy on a workspace that already has Page Intelligence data (optimization scores present) → regenerate strategy → open PageIntelligence → confirm optimization scores and recommendations are **still present** (not wiped)
+> - Run a keyword strategy bulk lookup → open PageIntelligence → confirm pages show `bulk_lookup` as metrics source (previously blank)
 > - Check that no TypeScript errors are introduced (`tsc --noEmit --skipLibCheck` clean)
-> - No UI changes in this PR — verification is type-level only
+> - No UI changes in this PR — verification is data-integrity + type-level only
 
 **PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)**
 - Task 4: `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext — independent)
@@ -141,6 +143,62 @@ The following contracts are already committed on the Phase 0 branch (`claude/bea
 | `shared/types/workspace.ts` | `PageKeywordMap.metricsSource` is now typed as `MetricsSource` (not a bare string union) |
 | `server/content-brief.ts` | `PAGE_TYPE_CONFIGS` already has `prompt` field populated for all 9 page types (`blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`) — agents must NOT recreate or replace this object |
 | `server/page-keywords.ts` | `upsertPageKeywordsBatch` function already exists and is exported — import it, do not create it |
+
+---
+
+## ⚠️ Keyword Safety — Read Before Implementing Task 2
+
+**The `replaceAllPageKeywords` → `upsertPageKeywordsBatch` switch is NOT safe without a prerequisite fix.**
+
+### Root cause (audited 2026-04-04)
+
+`upsertStmt()` in `server/page-keywords.ts` has `ON CONFLICT DO UPDATE SET` that unconditionally overwrites **every** column, including all Page Intelligence (PI) fields:
+
+```sql
+optimization_score = excluded.optimization_score,
+analysis_generated_at = excluded.analysis_generated_at,
+optimization_issues = excluded.optimization_issues,
+recommendations = excluded.recommendations,
+content_gaps = excluded.content_gaps,
+primary_keyword_presence = excluded.primary_keyword_presence,
+long_tail_keywords = excluded.long_tail_keywords,
+competitor_keywords = excluded.competitor_keywords,
+```
+
+`modelToParams()` maps `PageKeywordMap` → SQL params with `optimization_score: m.optimizationScore ?? null`. Strategy pageMap entries never carry PI fields, so they come in as `null`. The upsert then sets all PI columns to `null`, destroying Page Intelligence data — just through overwrite instead of `DELETE + INSERT`.
+
+**Simply swapping the call site function name does not fix the bug.**
+
+### Required fix: COALESCE for PI columns
+
+In `server/page-keywords.ts`, change the 8 PI columns in the `ON CONFLICT DO UPDATE SET` clause to use COALESCE (preserve existing value when incoming is null):
+
+```sql
+optimization_score = COALESCE(excluded.optimization_score, page_keywords.optimization_score),
+analysis_generated_at = COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at),
+optimization_issues = COALESCE(excluded.optimization_issues, page_keywords.optimization_issues),
+recommendations = COALESCE(excluded.recommendations, page_keywords.recommendations),
+content_gaps = COALESCE(excluded.content_gaps, page_keywords.content_gaps),
+primary_keyword_presence = COALESCE(excluded.primary_keyword_presence, page_keywords.primary_keyword_presence),
+long_tail_keywords = COALESCE(excluded.long_tail_keywords, page_keywords.long_tail_keywords),
+competitor_keywords = COALESCE(excluded.competitor_keywords, page_keywords.competitor_keywords),
+```
+
+All other columns (keyword data, GSC, SEMRush) keep `= excluded.*` — they should be overwritten.
+
+### Correct Task 2 sequence (non-negotiable)
+
+1. **Fix `server/page-keywords.ts`** — apply COALESCE to the 8 PI columns above
+2. **Write `tests/unit/page-intelligence-strategy-blend.test.ts` first** — assert: (a) inserting a row with PI data, then upserting keyword-only data for the same path, preserves PI fields; (b) `replaceAllPageKeywords` is NOT called from strategy routes after the switch
+3. **Run the test** — must pass before proceeding
+4. **Switch the two call sites** in `server/routes/keyword-strategy.ts` (lines ~1745 and ~1928): `replaceAllPageKeywords` → `upsertPageKeywordsBatch`
+5. **Run the full test suite** — `npx vitest run`
+
+Do NOT skip step 1. Do NOT do step 4 before step 3. The test is the safety net.
+
+### Why the existing `clearAnalysisFields()` still works
+
+`clearAnalysisFields()` explicitly sets all PI columns to `null` via a dedicated UPDATE statement. COALESCE in the upsert does not interfere — explicit clears use a separate code path.
 
 ---
 
