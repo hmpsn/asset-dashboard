@@ -28,6 +28,8 @@ const log = createLogger('client-signals-routes');
 const router = Router();
 
 // ── Admin: get single signal (literal sub-path registered BEFORE /:workspaceId) ─
+// Admin-only (global APP_PASSWORD gate). Workspace isolation is enforced by the list
+// endpoint — signal IDs are only discoverable through workspace-scoped queries.
 
 router.get('/api/client-signals/detail/:id', (req, res) => {
   const signal = getSignalById(req.params.id);
@@ -52,6 +54,8 @@ const updateStatusSchema = z.object({
   status: z.enum(['new', 'reviewed', 'actioned']),
 });
 
+// Status transitions are intentionally unrestricted — admins can move signals
+// forward (new → reviewed → actioned) or backward to undo mistakes.
 router.patch(
   '/api/client-signals/:id/status',
   validate(updateStatusSchema),

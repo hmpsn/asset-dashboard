@@ -44,6 +44,7 @@ describe('Admin signals inbox workflow', () => {
     const listRes = await api(`/api/client-signals/${testWsId}`);
     expect(listRes.status).toBe(200);
     const listBody = await listRes.json();
+    expect(listBody.length).toBeGreaterThan(0);
     expect(listBody.some((s: { id: string }) => s.id === signal.id)).toBe(true);
 
     // Verify chatContext is included

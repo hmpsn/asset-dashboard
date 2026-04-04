@@ -110,6 +110,8 @@ function SignalCard({ signal, workspaceId }: { signal: ClientSignal; workspaceId
           )}
 
           {/* Status actions */}
+          {/* Status workflow: new → reviewed → actioned. Backward transitions (e.g. actioned → reviewed)
+              are intentionally allowed so admins can undo accidental status changes. */}
           <div className="flex items-center gap-2 pt-1">
             <span className="text-[10px] text-zinc-500">Mark as:</span>
             {(['reviewed', 'actioned'] as ClientSignalStatus[]).map(s => (

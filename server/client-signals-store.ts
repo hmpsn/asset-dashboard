@@ -34,8 +34,8 @@ function rowToSignal(row: ClientSignalRow): ClientSignal {
     id: row.id,
     workspaceId: row.workspace_id,
     workspaceName: row.workspace_name,
-    type: row.type as ClientSignalType,
-    status: row.status as ClientSignalStatus,
+    type: z.enum(['content_interest', 'service_interest']).catch('content_interest').parse(row.type),
+    status: z.enum(['new', 'reviewed', 'actioned']).catch('new').parse(row.status),
     chatContext: parseJsonSafeArray(row.chat_context, chatMessageSchema, {
       table: 'client_signals',
       field: 'chat_context',
