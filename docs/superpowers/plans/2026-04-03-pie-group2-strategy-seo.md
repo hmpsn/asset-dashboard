@@ -46,20 +46,26 @@
 ```
 [Phase 0 merged] ← gate: nothing in this plan starts before this
     ↓
+── PR 1 (all parallel) ──────────────────────────────────────────────
 Task 1:  src/lib/kdFraming.ts (no dependencies — start immediately)
-Task 4:  server/content-brief.ts (depends on Phase 0 types — buildStrategyCardBlock + strategyCardContext param)
-Task 5:  server/routes/content-requests.ts (depends on Task 4)
-Task 6:  server/workspace-intelligence.ts (independent — start immediately)
-Task 7:  server/routes/keyword-strategy.ts (depends on Phase 0 METRICS_SOURCE)
-Task 8:  src/components/PageIntelligence.tsx (depends on Phase 0 MetricsSource)
-Task 9:  src/components/client/StrategyTab.tsx (depends on Task 1 kdFraming)
-Task 10: src/components/strategy/ContentGaps.tsx (depends on Task 1 kdFraming)
-Task 11: src/hooks/admin/useSeoEditor.ts (independent — start immediately)
-Task 12: src/components/SeoEditor.tsx (depends on Task 11)
+Task 2:  server/routes/keyword-strategy.ts (depends on Phase 0 METRICS_SOURCE — start immediately)
+Task 3:  src/components/PageIntelligence.tsx (depends on Phase 0 MetricsSource — start immediately)
 
-PARALLEL BATCH A (start immediately after Phase 0 merge): Tasks 1, 6, 7, 8, 11
-PARALLEL BATCH B (after Batch A merged): Tasks 4, 9, 10, 12
-SEQUENTIAL: Task 5 (after Task 4)
+── PR 2 (4 + 6 parallel, then 5 sequential) ─────────────────────────
+Task 4:  server/workspace-intelligence.ts (independent — start immediately)
+Task 6:  server/content-brief.ts (depends on Phase 0 types — start immediately)
+Task 5:  server/routes/content-requests.ts (depends on Task 6 — starts after Task 6 commits)
+
+NOTE: Task 5 < Task 6 numerically but executes AFTER Task 6. Within PR 2, the
+execution order is: {Task 4 ∥ Task 6} → Task 5. Numbers reflect global dependency
+rank across all PRs, not local execution order within PR 2.
+
+── PR 3 (7 + 8 parallel; 9 → 10 sequential) ─────────────────────────
+Task 7:  src/components/client/StrategyTab.tsx (depends on Task 1 kdFraming — PR 1 must be merged)
+Task 8:  src/components/strategy/ContentGaps.tsx (depends on Task 1 kdFraming — PR 1 must be merged)
+Task 9:  src/hooks/admin/useSeoEditor.ts (independent — start immediately in PR 3)
+Task 10: src/components/SeoEditor.tsx (depends on Task 9)
+
 Tests: write and run after the task they cover
 ```
 
@@ -69,21 +75,27 @@ Tests: write and run after the task they cover
 
 This group ships as 3 sequential PRs. Each must be merged to staging and CI-green before the next starts.
 
-**PR A — Utilities + Keyword Backend** (Tasks 1, 7, 8)
-- `src/lib/kdFraming.ts` (new utility)
-- `server/routes/keyword-strategy.ts` (metricsSource + upsertPageKeywordsBatch)
-- `src/components/PageIntelligence.tsx` (MetricsSource type update)
+**PR 1 — Tasks 1–3: Foundational Utilities + Type Fixes (no UI)**
+- Task 1: `src/lib/kdFraming.ts` (new utility — no deps)
+- Task 2: `server/routes/keyword-strategy.ts` (metricsSource + upsertPageKeywordsBatch — independent server fix)
+- Task 3: `src/components/PageIntelligence.tsx` (MetricsSource type update — needs Phase 0 types only)
 
-**PR B — Intelligence Wiring** (Tasks 6, 5)
-- `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext)
-- `server/routes/content-requests.ts` (StrategyCardContext threading — requires Task 4 which is included here)
-- `server/content-brief.ts` (buildStrategyCardBlock + strategyCardContext param — Task 4)
+Tasks 2 and 3 can run in parallel. Task 1 can also run in parallel with Tasks 2 and 3. All three are independent of each other.
 
-**PR C — UI Layer** (Tasks 9, 10, 11, 12)
-- `src/components/client/StrategyTab.tsx` (KD framing + predicted impact)
-- `src/components/strategy/ContentGaps.tsx` (KD framing)
-- `src/hooks/admin/useSeoEditor.ts` (all-pages endpoint)
-- `src/components/SeoEditor.tsx` (CMS filter + write-back)
+**PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)**
+- Task 4: `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext — independent)
+- Task 6: `server/content-brief.ts` (buildStrategyCardBlock + strategyCardContext param — depends on Phase 0 types only)
+- Task 5: `server/routes/content-requests.ts` (StrategyCardContext threading — depends on Task 6)
+
+Tasks 4 and 6 can run in parallel. Task 5 is sequential after Task 6.
+
+**PR 3 — Tasks 7–10: UI Layer (all depend on PR 1 being merged)**
+- Task 7: `src/components/client/StrategyTab.tsx` (KD framing + predicted impact — depends on Task 1)
+- Task 8: `src/components/strategy/ContentGaps.tsx` (KD framing — depends on Task 1)
+- Task 9: `src/hooks/admin/useSeoEditor.ts` (all-pages endpoint — independent)
+- Task 10: `src/components/SeoEditor.tsx` (CMS filter + write-back — depends on Task 9)
+
+Tasks 7 and 8 can run in parallel (both depend only on Task 1 from PR 1). Task 9 is independent. Task 10 is sequential after Task 9.
 
 ---
 
@@ -106,21 +118,21 @@ The following contracts are already committed on the Phase 0 branch (`claude/bea
 > Run this audit before dispatching agents. These findings shape task scope.
 
 **1. `assembleSeoContext()` does NOT currently pull backlink or SERP data.**
-Current enrichment blocks in `assembleSeoContext()` are: rank tracking, business profile (from `intelligenceProfile`), strategy history, and live page map. There is no existing `backlinkProfile` or `serpFeatures` block. Task 6 is purely additive — it adds two new try/catch blocks before `return base;`. No existing logic needs to be replaced or extended.
+Current enrichment blocks in `assembleSeoContext()` are: rank tracking, business profile (from `intelligenceProfile`), strategy history, and live page map. There is no existing `backlinkProfile` or `serpFeatures` block. Task 4 is purely additive — it adds two new try/catch blocks before `return base;`. No existing logic needs to be replaced or extended.
 
 **2. No `kdFraming` utility exists anywhere in `src/lib/`.**
 The directory contains: `character-validation.ts`, `lazyWithRetry.ts`, `pathUtils.ts`, `queryClient.ts`, `queryKeys.ts`, `utils.ts`, `wsEvents.ts`. Task 1 creates a genuinely new file.
 
 **3. `PAGE_TYPE_CONFIGS` already has all 9 page types.**
-Confirmed in `server/content-brief.ts` lines 318–474: `blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`. Each has a `prompt` field. Task 4 must NOT recreate or export this object — it only adds `buildStrategyCardBlock` and threads `strategyCardContext` into `generateBrief()`.
+Confirmed in `server/content-brief.ts` lines 318–474: `blog`, `landing`, `service`, `location`, `product`, `pillar`, `resource`, `provider-profile`, `procedure-guide`, `pricing-page`. Each has a `prompt` field. Task 6 must NOT recreate or export this object — it only adds `buildStrategyCardBlock` and threads `strategyCardContext` into `generateBrief()`.
 
 **4. `upsertPageKeywordsBatch` signature:** `upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywordMap[]): void` — wraps a `db.transaction()` internally.
 
 **5. `keyword-strategy.ts` still uses raw string literals.**
-Lines ~1267, ~1280, ~1320 cast to `Record<string, unknown>` and assign `metricsSource = 'exact'`, `'partial_match'`, `'bulk_lookup'` as raw strings. Does NOT import `METRICS_SOURCE` from shared types. Task 7 replaces these.
+Lines ~1267, ~1280, ~1320 cast to `Record<string, unknown>` and assign `metricsSource = 'exact'`, `'partial_match'`, `'bulk_lookup'` as raw strings. Does NOT import `METRICS_SOURCE` from shared types. Task 2 replaces these.
 
 **6. `PageIntelligence.tsx` still has the old string literal union.**
-The local `StrategyPage` interface at line ~43 has `metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'`. Does NOT import `MetricsSource`. Task 8 fixes this — and `'bulk_lookup'` is missing from the union, which is why strategy-run pages show no metrics source in the UI.
+The local `StrategyPage` interface at line ~43 has `metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'`. Does NOT import `MetricsSource`. Task 3 fixes this — and `'bulk_lookup'` is missing from the union, which is why strategy-run pages show no metrics source in the UI.
 
 ---
 
@@ -141,13 +153,13 @@ If either grep returns nothing, stop — Phase 0 has not been merged. Do not pro
 
 ---
 
-> **Navigation note:** Section headers below use their original batch-task labels. The Dependency Graph above shows the correct execution order. Use file/function names — not task numbers — when dispatching agents.
+> **Navigation note:** Tasks are numbered in true dependency order. The Dependency Graph above shows which tasks can run in parallel within each PR. Use file/function names — not task numbers — when dispatching agents.
 
 ---
 
-## Parallel Batch A — Independent Backend + Frontend Primitives
+## PR 1 — Tasks 1–3: Foundational Utilities + Type Fixes
 
-> These tasks have no inter-dependencies. Start all of them immediately after Phase 0 is confirmed above.
+> Tasks 1, 2, and 3 are all independent of each other and can run in parallel. All start immediately after Phase 0 is confirmed above.
 
 ### Task 1 — Create src/lib/kdFraming.ts
 
@@ -274,7 +286,244 @@ export function kdTooltip(kd: number | undefined): string {
 
 ---
 
-### Task 6 — Wire backlinkProfile + serpFeatures into assembleSeoContext()
+### Task 2 — Switch replaceAllPageKeywords → upsertPageKeywordsBatch in keyword-strategy routes
+
+**Model: [HAIKU]** — mechanical const replacement at known call sites, no judgment required.
+
+**File owner:** `server/routes/keyword-strategy.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
+
+> **Audit note:** `keyword-strategy.ts` still assigns `metricsSource` as raw string literals via `(pm as Record<string, unknown>).metricsSource = 'exact'` etc. (lines ~1267, ~1280, ~1320). `METRICS_SOURCE` from `shared/types/keywords.ts` is NOT currently imported. This task fixes both: switches to `upsertPageKeywordsBatch` AND replaces the raw string literals with `METRICS_SOURCE.*` references.
+
+- [ ] Write failing test first — `tests/unit/page-intelligence-strategy-blend.test.ts`:
+
+```typescript
+// tests/unit/page-intelligence-strategy-blend.test.ts
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import db from '../../server/db/index.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import {
+  upsertPageKeyword,
+  getPageKeyword,
+  listPageKeywords,
+} from '../../server/page-keywords.js';
+
+// Spy on replaceAllPageKeywords to ensure it is NOT called
+const replaceAllSpy = vi.fn();
+vi.mock('../../server/page-keywords.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/page-keywords.js')>();
+  return {
+    ...actual,
+    replaceAllPageKeywords: replaceAllSpy,
+  };
+});
+
+let wsId = '';
+
+beforeAll(() => {
+  const ws = createWorkspace('PI Strategy Blend Test');
+  wsId = ws.id;
+});
+
+afterAll(() => {
+  deleteWorkspace(wsId);
+  vi.restoreAllMocks();
+});
+
+describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', () => {
+  it('preserves existing Page Intelligence fields after upsert', () => {
+    // Seed a page with full PI analysis data
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/seo',
+      pageTitle: 'SEO Services',
+      primaryKeyword: 'seo services',
+      secondaryKeywords: ['local seo', 'technical seo'],
+      optimizationScore: 87,
+      optimizationIssues: ['Missing FAQ schema', 'Meta description too short'],
+      recommendations: ['Add FAQ section', 'Extend meta to 150+ chars'],
+      contentGaps: ['local business schema', 'review signals'],
+      analysisGeneratedAt: '2026-04-01T10:00:00Z',
+    });
+
+    // Simulate strategy run upserting the same page with keyword data
+    upsertPageKeyword(wsId, {
+      pagePath: '/services/seo',
+      pageTitle: 'SEO Services',
+      primaryKeyword: 'seo services',
+      secondaryKeywords: ['local seo', 'technical seo'],
+      metricsSource: 'bulk_lookup',
+      volume: 1200,
+      difficulty: 45,
+      currentPosition: 8,
+    });
+
+    const result = getPageKeyword(wsId, '/services/seo');
+    expect(result).toBeDefined();
+    // PI fields must survive the strategy upsert
+    expect(result!.optimizationScore).toBe(87);
+    expect(result!.optimizationIssues).toContain('Missing FAQ schema');
+    expect(result!.recommendations).toContain('Add FAQ section');
+    expect(result!.analysisGeneratedAt).toBe('2026-04-01T10:00:00Z');
+    // Strategy fields also present
+    expect(result!.metricsSource).toBe('bulk_lookup');
+    expect(result!.volume).toBe(1200);
+  });
+
+  it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {
+    const result = getPageKeyword(wsId, '/services/seo');
+    expect(result!.metricsSource).toBe('bulk_lookup');
+    // Verify it's a valid MetricsSource value
+    const validValues = ['exact', 'partial_match', 'ai_estimate', 'bulk_lookup'];
+    expect(validValues).toContain(result!.metricsSource);
+  });
+
+  it('replaceAllPageKeywords is NOT called when strategy upserts pages', () => {
+    // This test passes once keyword-strategy.ts is switched to upsertPageKeywordsBatch
+    expect(replaceAllSpy).not.toHaveBeenCalled();
+  });
+
+  it('multiple pages upserted via batch all appear in listPageKeywords', () => {
+    const pages = [
+      { pagePath: '/services/ppc', pageTitle: 'PPC Services', primaryKeyword: 'ppc', secondaryKeywords: [], metricsSource: 'bulk_lookup' as const },
+      { pagePath: '/services/content', pageTitle: 'Content Services', primaryKeyword: 'content marketing', secondaryKeywords: [], metricsSource: 'bulk_lookup' as const },
+    ];
+    for (const p of pages) upsertPageKeyword(wsId, p);
+    const all = listPageKeywords(wsId);
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.some(p => p.pagePath === '/services/ppc')).toBe(true);
+    expect(all.some(p => p.pagePath === '/services/content')).toBe(true);
+  });
+});
+```
+
+- [ ] Run — expect fail:
+  ```bash
+  npx vitest run tests/unit/page-intelligence-strategy-blend.test.ts 2>&1 | tail -10
+  # Expected: FAIL on replaceAllPageKeywords NOT called assertion
+  ```
+
+- [ ] In `server/routes/keyword-strategy.ts`, find line 40 import:
+  ```typescript
+  import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
+  ```
+  Replace with:
+  ```typescript
+  import { upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
+  ```
+
+- [ ] Add import for `METRICS_SOURCE` from shared types (with existing imports at top of file):
+  ```typescript
+  import { METRICS_SOURCE } from '../../shared/types/keywords.js';
+  ```
+
+- [ ] Replace the three raw string literal assignments. Find each cast pattern:
+  ```typescript
+  // BEFORE (line ~1267):
+  (pm as Record<string, unknown>).metricsSource = 'exact';
+  // AFTER:
+  pm.metricsSource = METRICS_SOURCE.EXACT;
+
+  // BEFORE (line ~1280):
+  (pm as Record<string, unknown>).metricsSource = 'partial_match';
+  // AFTER:
+  pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
+
+  // BEFORE (line ~1320):
+  (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
+  // AFTER:
+  pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
+  ```
+
+- [ ] Find the first call site (around line 1745):
+  ```typescript
+  replaceAllPageKeywords(ws.id, pageMap);
+  ```
+  Replace with:
+  ```typescript
+  upsertPageKeywordsBatch(ws.id, pageMap);
+  ```
+
+- [ ] Find the second call site (around line 1928, inside the PATCH route):
+  ```typescript
+  replaceAllPageKeywords(ws.id, req.body.pageMap);
+  ```
+  Replace with:
+  ```typescript
+  upsertPageKeywordsBatch(ws.id, req.body.pageMap);
+  ```
+
+- [ ] Run test:
+  ```bash
+  npx vitest run tests/unit/page-intelligence-strategy-blend.test.ts 2>&1 | tail -10
+  # Expected: all pass
+  ```
+- [ ] Commit: `git add server/routes/keyword-strategy.ts tests/unit/page-intelligence-strategy-blend.test.ts && git commit -m "fix(strategy): switch replaceAllPageKeywords to upsertPageKeywordsBatch — preserve Page Intelligence data"`
+
+---
+
+### Task 3 — Fix PageIntelligence.tsx metricsSource to accept bulk_lookup
+
+**Model: [HAIKU]** — single type import swap, no logic changes.
+
+**File owner:** `src/components/PageIntelligence.tsx` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
+
+> **Audit note:** The local `StrategyPage` interface has `metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'` — missing `'bulk_lookup'`. This is why pages updated by a strategy run show no metrics source in the UI. The fix is a single type import swap.
+
+- [ ] Read lines 25–60 of `src/components/PageIntelligence.tsx` to locate the local `StrategyPage` interface (confirmed at line 25).
+- [ ] Find the local `StrategyPage` interface and its `metricsSource` field:
+  ```typescript
+  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  ```
+- [ ] Add import at top of file with existing imports:
+  ```typescript
+  import type { MetricsSource } from '../../shared/types/keywords.js';
+  ```
+- [ ] Replace the `metricsSource` field in the local `StrategyPage` interface:
+  ```typescript
+  // BEFORE:
+  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  // AFTER:
+  metricsSource?: MetricsSource;
+  ```
+- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
+- [ ] Run `npx vitest run tests/unit/page-intelligence-metricsSource.test.ts` — see test spec below. Write the test file first:
+
+```typescript
+// tests/unit/page-intelligence-metricsSource.test.ts
+import { describe, it, expect } from 'vitest';
+
+/**
+ * Structural test: verifies that PageIntelligence.tsx imports MetricsSource
+ * from shared/types and does NOT contain the old string literal union.
+ *
+ * This is a source-level assertion, not a runtime test.
+ */
+describe('PageIntelligence metricsSource — type contract', () => {
+  it('imports MetricsSource from shared/types/keywords', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/components/PageIntelligence.tsx', 'utf-8');
+    expect(src).toContain("from '../../shared/types/keywords.js'");
+    expect(src).toContain('MetricsSource');
+  });
+
+  it('does NOT contain the old string literal union for metricsSource', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/components/PageIntelligence.tsx', 'utf-8');
+    expect(src).not.toContain("'exact' | 'partial_match' | 'ai_estimate'");
+  });
+});
+```
+
+- [ ] Commit: `git add src/components/PageIntelligence.tsx tests/unit/page-intelligence-metricsSource.test.ts && git commit -m "fix(page-intelligence): use MetricsSource type — accept bulk_lookup from strategy runs"`
+
+---
+
+## PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)
+
+> Tasks 4 and 6 can run in parallel immediately after Phase 0 merge (both depend only on Phase 0 types, not on PR 1). Task 5 is sequential after Task 6.
+
+### Task 4 — Wire backlinkProfile + serpFeatures into assembleSeoContext()
 
 **Model: [SONNET]** — intelligence assembly with judgment on data shaping and graceful degradation.
 
@@ -496,336 +745,7 @@ describe('assembleSeoContext — backlinkProfile + serpFeatures', () => {
 
 ---
 
-### Task 7 — Switch replaceAllPageKeywords → upsertPageKeywordsBatch in keyword-strategy routes
-
-**Model: [HAIKU]** — mechanical const replacement at known call sites, no judgment required.
-
-**File owner:** `server/routes/keyword-strategy.ts` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
-
-> **Audit note:** `keyword-strategy.ts` still assigns `metricsSource` as raw string literals via `(pm as Record<string, unknown>).metricsSource = 'exact'` etc. (lines ~1267, ~1280, ~1320). `METRICS_SOURCE` from `shared/types/keywords.ts` is NOT currently imported. This task fixes both: switches to `upsertPageKeywordsBatch` AND replaces the raw string literals with `METRICS_SOURCE.*` references.
-
-- [ ] Write failing test first — `tests/unit/page-intelligence-strategy-blend.test.ts`:
-
-```typescript
-// tests/unit/page-intelligence-strategy-blend.test.ts
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import db from '../../server/db/index.js';
-import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import {
-  upsertPageKeyword,
-  getPageKeyword,
-  listPageKeywords,
-} from '../../server/page-keywords.js';
-
-// Spy on replaceAllPageKeywords to ensure it is NOT called
-const replaceAllSpy = vi.fn();
-vi.mock('../../server/page-keywords.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/page-keywords.js')>();
-  return {
-    ...actual,
-    replaceAllPageKeywords: replaceAllSpy,
-  };
-});
-
-let wsId = '';
-
-beforeAll(() => {
-  const ws = createWorkspace('PI Strategy Blend Test');
-  wsId = ws.id;
-});
-
-afterAll(() => {
-  deleteWorkspace(wsId);
-  vi.restoreAllMocks();
-});
-
-describe('Page Intelligence strategy blend — upsertPageKeywordsBatch safety', () => {
-  it('preserves existing Page Intelligence fields after upsert', () => {
-    // Seed a page with full PI analysis data
-    upsertPageKeyword(wsId, {
-      pagePath: '/services/seo',
-      pageTitle: 'SEO Services',
-      primaryKeyword: 'seo services',
-      secondaryKeywords: ['local seo', 'technical seo'],
-      optimizationScore: 87,
-      optimizationIssues: ['Missing FAQ schema', 'Meta description too short'],
-      recommendations: ['Add FAQ section', 'Extend meta to 150+ chars'],
-      contentGaps: ['local business schema', 'review signals'],
-      analysisGeneratedAt: '2026-04-01T10:00:00Z',
-    });
-
-    // Simulate strategy run upserting the same page with keyword data
-    upsertPageKeyword(wsId, {
-      pagePath: '/services/seo',
-      pageTitle: 'SEO Services',
-      primaryKeyword: 'seo services',
-      secondaryKeywords: ['local seo', 'technical seo'],
-      metricsSource: 'bulk_lookup',
-      volume: 1200,
-      difficulty: 45,
-      currentPosition: 8,
-    });
-
-    const result = getPageKeyword(wsId, '/services/seo');
-    expect(result).toBeDefined();
-    // PI fields must survive the strategy upsert
-    expect(result!.optimizationScore).toBe(87);
-    expect(result!.optimizationIssues).toContain('Missing FAQ schema');
-    expect(result!.recommendations).toContain('Add FAQ section');
-    expect(result!.analysisGeneratedAt).toBe('2026-04-01T10:00:00Z');
-    // Strategy fields also present
-    expect(result!.metricsSource).toBe('bulk_lookup');
-    expect(result!.volume).toBe(1200);
-  });
-
-  it('metricsSource written by strategy is bulk_lookup (valid MetricsSource)', () => {
-    const result = getPageKeyword(wsId, '/services/seo');
-    expect(result!.metricsSource).toBe('bulk_lookup');
-    // Verify it's a valid MetricsSource value
-    const validValues = ['exact', 'partial_match', 'ai_estimate', 'bulk_lookup'];
-    expect(validValues).toContain(result!.metricsSource);
-  });
-
-  it('replaceAllPageKeywords is NOT called when strategy upserts pages', () => {
-    // This test passes once keyword-strategy.ts is switched to upsertPageKeywordsBatch
-    expect(replaceAllSpy).not.toHaveBeenCalled();
-  });
-
-  it('multiple pages upserted via batch all appear in listPageKeywords', () => {
-    const pages = [
-      { pagePath: '/services/ppc', pageTitle: 'PPC Services', primaryKeyword: 'ppc', secondaryKeywords: [], metricsSource: 'bulk_lookup' as const },
-      { pagePath: '/services/content', pageTitle: 'Content Services', primaryKeyword: 'content marketing', secondaryKeywords: [], metricsSource: 'bulk_lookup' as const },
-    ];
-    for (const p of pages) upsertPageKeyword(wsId, p);
-    const all = listPageKeywords(wsId);
-    expect(all.length).toBeGreaterThan(0);
-    expect(all.some(p => p.pagePath === '/services/ppc')).toBe(true);
-    expect(all.some(p => p.pagePath === '/services/content')).toBe(true);
-  });
-});
-```
-
-- [ ] Run — expect fail:
-  ```bash
-  npx vitest run tests/unit/page-intelligence-strategy-blend.test.ts 2>&1 | tail -10
-  # Expected: FAIL on replaceAllPageKeywords NOT called assertion
-  ```
-
-- [ ] In `server/routes/keyword-strategy.ts`, find line 40 import:
-  ```typescript
-  import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
-  ```
-  Replace with:
-  ```typescript
-  import { upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
-  ```
-
-- [ ] Add import for `METRICS_SOURCE` from shared types (with existing imports at top of file):
-  ```typescript
-  import { METRICS_SOURCE } from '../../shared/types/keywords.js';
-  ```
-
-- [ ] Replace the three raw string literal assignments. Find each cast pattern:
-  ```typescript
-  // BEFORE (line ~1267):
-  (pm as Record<string, unknown>).metricsSource = 'exact';
-  // AFTER:
-  pm.metricsSource = METRICS_SOURCE.EXACT;
-
-  // BEFORE (line ~1280):
-  (pm as Record<string, unknown>).metricsSource = 'partial_match';
-  // AFTER:
-  pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
-
-  // BEFORE (line ~1320):
-  (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
-  // AFTER:
-  pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
-  ```
-
-- [ ] Find the first call site (around line 1745):
-  ```typescript
-  replaceAllPageKeywords(ws.id, pageMap);
-  ```
-  Replace with:
-  ```typescript
-  upsertPageKeywordsBatch(ws.id, pageMap);
-  ```
-
-- [ ] Find the second call site (around line 1928, inside the PATCH route):
-  ```typescript
-  replaceAllPageKeywords(ws.id, req.body.pageMap);
-  ```
-  Replace with:
-  ```typescript
-  upsertPageKeywordsBatch(ws.id, req.body.pageMap);
-  ```
-
-- [ ] Run test:
-  ```bash
-  npx vitest run tests/unit/page-intelligence-strategy-blend.test.ts 2>&1 | tail -10
-  # Expected: all pass
-  ```
-- [ ] Commit: `git add server/routes/keyword-strategy.ts tests/unit/page-intelligence-strategy-blend.test.ts && git commit -m "fix(strategy): switch replaceAllPageKeywords to upsertPageKeywordsBatch — preserve Page Intelligence data"`
-
----
-
-### Task 8 — Fix PageIntelligence.tsx metricsSource to accept bulk_lookup
-
-**Model: [HAIKU]** — single type import swap, no logic changes.
-
-**File owner:** `src/components/PageIntelligence.tsx` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
-
-> **Audit note:** The local `StrategyPage` interface has `metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'` — missing `'bulk_lookup'`. This is why pages updated by a strategy run show no metrics source in the UI. The fix is a single type import swap.
-
-- [ ] Read lines 25–60 of `src/components/PageIntelligence.tsx` to locate the local `StrategyPage` interface (confirmed at line 25).
-- [ ] Find the local `StrategyPage` interface and its `metricsSource` field:
-  ```typescript
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
-  ```
-- [ ] Add import at top of file with existing imports:
-  ```typescript
-  import type { MetricsSource } from '../../shared/types/keywords.js';
-  ```
-- [ ] Replace the `metricsSource` field in the local `StrategyPage` interface:
-  ```typescript
-  // BEFORE:
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
-  // AFTER:
-  metricsSource?: MetricsSource;
-  ```
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Run `npx vitest run tests/unit/page-intelligence-metricsSource.test.ts` — see test spec below. Write the test file first:
-
-```typescript
-// tests/unit/page-intelligence-metricsSource.test.ts
-import { describe, it, expect } from 'vitest';
-
-/**
- * Structural test: verifies that PageIntelligence.tsx imports MetricsSource
- * from shared/types and does NOT contain the old string literal union.
- *
- * This is a source-level assertion, not a runtime test.
- */
-describe('PageIntelligence metricsSource — type contract', () => {
-  it('imports MetricsSource from shared/types/keywords', async () => {
-    const fs = await import('fs');
-    const src = fs.readFileSync('src/components/PageIntelligence.tsx', 'utf-8');
-    expect(src).toContain("from '../../shared/types/keywords.js'");
-    expect(src).toContain('MetricsSource');
-  });
-
-  it('does NOT contain the old string literal union for metricsSource', async () => {
-    const fs = await import('fs');
-    const src = fs.readFileSync('src/components/PageIntelligence.tsx', 'utf-8');
-    expect(src).not.toContain("'exact' | 'partial_match' | 'ai_estimate'");
-  });
-});
-```
-
-- [ ] Commit: `git add src/components/PageIntelligence.tsx tests/unit/page-intelligence-metricsSource.test.ts && git commit -m "fix(page-intelligence): use MetricsSource type — accept bulk_lookup from strategy runs"`
-
----
-
-### Task 11 — Switch useSeoEditor to all-pages endpoint
-
-**Model: [HAIKU]** — hook endpoint URL update and signature change, no logic.
-
-**File owner:** `src/hooks/admin/useSeoEditor.ts` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/SeoEditor.tsx` (owned by Task 12).
-
-- [ ] Read `src/hooks/admin/useSeoEditor.ts` (confirmed hook fetches `/api/webflow/pages/${siteId}`).
-- [ ] Update the PageMeta interface to include `source` field (returned by all-pages endpoint):
-
-```typescript
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  publishedPath?: string | null;
-  seo?: { title?: string | null; description?: string | null };
-  openGraph?: { title?: string | null; description?: string | null; titleCopied?: boolean; descriptionCopied?: boolean };
-  /** 'static' = Webflow static page, 'cms' = CMS collection item discovered via sitemap */
-  source?: 'static' | 'cms';
-  /** For CMS items only — the Webflow collection ID needed for SEO write-back */
-  collectionId?: string;
-}
-```
-
-- [ ] Change the queryFn fetch URL:
-  ```typescript
-  // BEFORE:
-  const response = await get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
-  // AFTER:
-  const response = await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`);
-  ```
-  Note: The all-pages endpoint requires `workspaceId` as a query param for `requireWorkspaceAccessFromQuery()`. Update the hook signature to accept `workspaceId` and append it:
-  ```typescript
-  export function useSeoEditor(siteId: string, workspaceId?: string) {
-    return useQuery({
-      queryKey: queryKeys.admin.seoEditor(siteId),
-      queryFn: async (): Promise<PageMeta[]> => {
-        const qs = workspaceId ? `?workspaceId=${workspaceId}` : '';
-        const response = await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}${qs}`);
-        return Array.isArray(response) ? response : [];
-      },
-      staleTime: STALE_TIMES.FAST,
-      enabled: !!siteId,
-      retry: 1,
-    });
-  }
-  ```
-
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Write test file and run:
-
-```typescript
-// tests/unit/useSeoEditor.test.ts
-import { describe, it, expect } from 'vitest';
-
-/**
- * Structural test: verifies that useSeoEditor uses all-pages endpoint
- * and accepts workspaceId parameter.
- */
-describe('useSeoEditor — endpoint contract', () => {
-  it('uses all-pages endpoint (not legacy pages endpoint)', async () => {
-    const fs = await import('fs');
-    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
-    expect(src).toContain('all-pages');
-    expect(src).not.toMatch(/`\/api\/webflow\/pages\/\$\{siteId\}`/);
-  });
-
-  it('hook signature accepts workspaceId parameter', async () => {
-    const fs = await import('fs');
-    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
-    expect(src).toContain('workspaceId');
-  });
-
-  it('query enabled flag guards on siteId', async () => {
-    const fs = await import('fs');
-    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
-    expect(src).toContain('!!siteId');
-  });
-});
-```
-
-```bash
-npx vitest run tests/unit/useSeoEditor.test.ts 2>&1 | tail -10
-# Expected: all pass
-```
-
-- [ ] Note: SeoEditor.tsx call-site update (`useSeoEditor(siteId, workspaceId)`) is owned by Task 12 — do NOT touch SeoEditor.tsx in this task.
-- [ ] Commit: `git add src/hooks/admin/useSeoEditor.ts tests/unit/useSeoEditor.test.ts && git commit -m "feat(seo-editor): switch hook to all-pages endpoint — include CMS pages from sitemap discovery"`
-
----
-
-## Parallel Batch B — Feature Implementation
-
-> Run after Batch A is merged. Tasks 4, 9, 10, 12 can run concurrently. Task 5 runs after Task 4.
-
-### Task 4 — Add strategyCardContext to generateBrief() + PAGE_TYPE_CONFIGS
+### Task 6 — Add strategyCardContext to generateBrief() + PAGE_TYPE_CONFIGS
 
 **Model: [HAIKU]** — verification only for PAGE_TYPE_CONFIGS (already complete); mechanical field threading for strategyCardContext.
 
@@ -833,6 +753,8 @@ npx vitest run tests/unit/useSeoEditor.test.ts 2>&1 | tail -10
 **Must NOT touch:** `shared/types/` (Phase 0 pre-done), any other file.
 
 > **Audit note:** `PAGE_TYPE_CONFIGS` is already complete with all 9 page types and `prompt` fields at lines 318–474 of `server/content-brief.ts`. Do NOT recreate, export, or reshape it. The `PageTypeConfig` interface is local (not the same as `PageTypeBriefConfig` from `shared/types/content.ts`). This task only adds `buildStrategyCardBlock` and threads `strategyCardContext` into `generateBrief()`.
+
+> **Dependency note:** Task 5 (`content-requests.ts`) depends on this task. Task 6 must be committed before Task 5 starts.
 
 - [ ] Write failing test additions to `tests/unit/content-brief.test.ts`:
 
@@ -991,7 +913,9 @@ The full diff at the prompt end:
 **Model: [HAIKU]** — mechanical field threading from request object into generateBrief() call.
 
 **File owner:** `server/routes/content-requests.ts` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `server/content-brief.ts` (owned by Task 4, must be merged first).
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `server/content-brief.ts` (owned by Task 6, must be committed first).
+
+> **Dependency note:** Task 6 (`server/content-brief.ts`) must be committed before this task starts — Task 5 imports `buildStrategyCardBlock` indirectly by calling `generateBrief()` with the new `strategyCardContext` param.
 
 - [ ] Write failing test addition to `tests/integration/content-requests-routes.test.ts`. Add a new describe block after the existing tests:
 
@@ -1083,12 +1007,18 @@ const brief = await generateBrief(req.params.workspaceId, request.targetKeyword,
 
 ---
 
-### Task 9 — Smarter recommendation cards in StrategyTab
+## PR 3 — Tasks 7–10: UI Layer
+
+> PR 1 must be merged before PR 3 starts (Tasks 7 and 8 depend on Task 1 kdFraming). Tasks 7 and 8 can run in parallel. Task 9 is independent and can run in parallel with Tasks 7 and 8. Task 10 is sequential after Task 9.
+
+### Task 7 — Smarter recommendation cards in StrategyTab
 
 **Model: [SONNET]** — component logic with design judgment on status badge colors and predicted impact rendering.
 
 **File owner:** `src/components/client/StrategyTab.tsx` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/strategy/ContentGaps.tsx` (owned by Task 10), any other file.
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/strategy/ContentGaps.tsx` (owned by Task 8), any other file.
+
+> **Dependency note:** Task 1 (`src/lib/kdFraming.ts`) must be committed (PR 1 merged) before this task starts.
 
 - [ ] Read the current `kdColor` function at line 44 (confirmed: `kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400'`).
 - [ ] Add import for kdFraming at top of file with existing imports:
@@ -1252,12 +1182,14 @@ npx vitest run tests/unit/kd-framing-strategyTab.test.ts 2>&1 | tail -10
 
 ---
 
-### Task 10 — Add KD framing + predicted impact to ContentGaps
+### Task 8 — Add KD framing + predicted impact to ContentGaps
 
 **Model: [SONNET]** — component logic with judgment on impact estimation rendering at the content gap level.
 
 **File owner:** `src/components/strategy/ContentGaps.tsx` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/client/StrategyTab.tsx` (owned by Task 9), any other file.
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/client/StrategyTab.tsx` (owned by Task 7), any other file.
+
+> **Dependency note:** Task 1 (`src/lib/kdFraming.ts`) must be committed (PR 1 merged) before this task starts.
 
 - [ ] Add imports at top:
   ```typescript
@@ -1385,12 +1317,106 @@ npx vitest run tests/unit/kd-framing-contentGaps.test.ts 2>&1 | tail -10
 
 ---
 
-### Task 12 — SEO Editor CMS page filter + CMS write-back
+### Task 9 — Switch useSeoEditor to all-pages endpoint
+
+**Model: [HAIKU]** — hook endpoint URL update and signature change, no logic.
+
+**File owner:** `src/hooks/admin/useSeoEditor.ts` (modify)
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/components/SeoEditor.tsx` (owned by Task 10).
+
+- [ ] Read `src/hooks/admin/useSeoEditor.ts` (confirmed hook fetches `/api/webflow/pages/${siteId}`).
+- [ ] Update the PageMeta interface to include `source` field (returned by all-pages endpoint):
+
+```typescript
+interface PageMeta {
+  id: string;
+  title: string;
+  slug: string;
+  publishedPath?: string | null;
+  seo?: { title?: string | null; description?: string | null };
+  openGraph?: { title?: string | null; description?: string | null; titleCopied?: boolean; descriptionCopied?: boolean };
+  /** 'static' = Webflow static page, 'cms' = CMS collection item discovered via sitemap */
+  source?: 'static' | 'cms';
+  /** For CMS items only — the Webflow collection ID needed for SEO write-back */
+  collectionId?: string;
+}
+```
+
+- [ ] Change the queryFn fetch URL:
+  ```typescript
+  // BEFORE:
+  const response = await get<PageMeta[]>(`/api/webflow/pages/${siteId}`);
+  // AFTER:
+  const response = await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}`);
+  ```
+  Note: The all-pages endpoint requires `workspaceId` as a query param for `requireWorkspaceAccessFromQuery()`. Update the hook signature to accept `workspaceId` and append it:
+  ```typescript
+  export function useSeoEditor(siteId: string, workspaceId?: string) {
+    return useQuery({
+      queryKey: queryKeys.admin.seoEditor(siteId),
+      queryFn: async (): Promise<PageMeta[]> => {
+        const qs = workspaceId ? `?workspaceId=${workspaceId}` : '';
+        const response = await get<PageMeta[]>(`/api/webflow/all-pages/${siteId}${qs}`);
+        return Array.isArray(response) ? response : [];
+      },
+      staleTime: STALE_TIMES.FAST,
+      enabled: !!siteId,
+      retry: 1,
+    });
+  }
+  ```
+
+- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
+- [ ] Write test file and run:
+
+```typescript
+// tests/unit/useSeoEditor.test.ts
+import { describe, it, expect } from 'vitest';
+
+/**
+ * Structural test: verifies that useSeoEditor uses all-pages endpoint
+ * and accepts workspaceId parameter.
+ */
+describe('useSeoEditor — endpoint contract', () => {
+  it('uses all-pages endpoint (not legacy pages endpoint)', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+    expect(src).toContain('all-pages');
+    expect(src).not.toMatch(/`\/api\/webflow\/pages\/\$\{siteId\}`/);
+  });
+
+  it('hook signature accepts workspaceId parameter', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+    expect(src).toContain('workspaceId');
+  });
+
+  it('query enabled flag guards on siteId', async () => {
+    const fs = await import('fs');
+    const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+    expect(src).toContain('!!siteId');
+  });
+});
+```
+
+```bash
+npx vitest run tests/unit/useSeoEditor.test.ts 2>&1 | tail -10
+# Expected: all pass
+```
+
+- [ ] Note: SeoEditor.tsx call-site update (`useSeoEditor(siteId, workspaceId)`) is owned by Task 10 — do NOT touch SeoEditor.tsx in this task.
+- [ ] Commit: `git add src/hooks/admin/useSeoEditor.ts tests/unit/useSeoEditor.test.ts && git commit -m "feat(seo-editor): switch hook to all-pages endpoint — include CMS pages from sitemap discovery"`
+
+---
+
+### Task 10 — SEO Editor CMS page filter + CMS write-back
 
 **Model: [SONNET]** — complex component with filter state management, conditional rendering, and CMS write-back path.
 
 **File owner:** `src/components/SeoEditor.tsx` (modify)
-**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/hooks/admin/useSeoEditor.ts` (owned by Task 11, must be merged first), any other file.
+**Must NOT touch:** `shared/types/` (Phase 0 pre-done), `src/hooks/admin/useSeoEditor.ts` (owned by Task 9, must be committed first), any other file.
+
+> **Dependency note:** Task 9 (`src/hooks/admin/useSeoEditor.ts`) must be committed before this task starts.
 
 - [ ] Write failing integration test — `tests/integration/seo-editor-unified.test.ts`:
 
