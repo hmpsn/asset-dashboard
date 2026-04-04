@@ -4,6 +4,7 @@
 
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 
 const log = createLogger('outcome-crons');
 
@@ -28,9 +29,28 @@ export function startOutcomeCrons() {
   if (measureInterval) return; // already started
 
   const runMeasure = async () => {
+    // Collect affected workspace IDs BEFORE measurement (measurement consumes them).
+    // Isolated try/catch so a transient DB error here doesn't skip measurement.
+    let affectedWsIds: string[] = [];
+    try {
+      const { getPendingActions } = await import('./outcome-tracking.js');
+      const pending = getPendingActions();
+      affectedWsIds = [...new Set(pending.map(a => a.workspaceId))];
+    } catch (err) {
+      log.warn({ err }, 'Could not collect pending action workspace IDs — cache invalidation will be skipped');
+    }
+
     try {
       const { measurePendingOutcomes } = await import('./outcome-measurement.js');
       await measurePendingOutcomes();
+
+      // Only invalidate workspaces that had pending measurements
+      for (const wsId of affectedWsIds) {
+        invalidateIntelligenceCache(wsId);
+      }
+      if (affectedWsIds.length > 0) {
+        log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for measured workspaces');
+      }
     } catch (err) {
       log.error({ err }, 'Failed to measure pending outcomes');
     }
@@ -38,8 +58,17 @@ export function startOutcomeCrons() {
 
   const runLearnings = async () => {
     try {
-      const { recomputeAllWorkspaceLearnings } = await import('./workspace-learnings.js');
+      const { recomputeAllWorkspaceLearnings, getWorkspaceIdsWithOutcomes } = await import('./workspace-learnings.js');
       await recomputeAllWorkspaceLearnings();
+
+      // Only invalidate workspaces that have outcome data (same set learnings processes)
+      const affectedWsIds = getWorkspaceIdsWithOutcomes();
+      for (const wsId of affectedWsIds) {
+        invalidateIntelligenceCache(wsId);
+      }
+      if (affectedWsIds.length > 0) {
+        log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for learnings workspaces');
+      }
     } catch (err) {
       log.error({ err }, 'Failed to compute workspace learnings');
     }

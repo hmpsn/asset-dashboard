@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock all subsystem dependencies
 vi.mock('../../server/seo-context.js', () => ({
   buildSeoContext: vi.fn(),
+  getRawBrandVoice: vi.fn(() => ''),
+  getRawKnowledge: vi.fn(() => ''),
 }));
 vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: vi.fn(),

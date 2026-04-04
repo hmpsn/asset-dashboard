@@ -8,7 +8,21 @@ describe('case-insensitive page path matching in admin-chat-context and helpers'
   const adminChatSrc = readFileSync(adminChatContextPath, 'utf-8');
   const helpersSrc = readFileSync(helpersPath, 'utf-8');
 
-  describe('admin-chat-context.ts page slug matching', () => {
+  describe('admin-chat-context.ts pageMap find (strategy keyword lookup)', () => {
+    it('uses .toLowerCase() on pagePath in primary pageMap find()', () => {
+      expect(adminChatSrc).toMatch(/pagePath\.toLowerCase\(\)\s*===\s*normalizedPath\.toLowerCase\(\)/);
+    });
+
+    it('uses .toLowerCase() in the fallback endsWith() checks too', () => {
+      expect(adminChatSrc).toMatch(/normalizedPath\.toLowerCase\(\)\.endsWith\(p\.pagePath\.toLowerCase\(\)\)/);
+    });
+
+    it('no longer has bare === comparison without toLowerCase', () => {
+      expect(adminChatSrc).not.toMatch(/p\.pagePath\s*===\s*normalizedPath[^.]/);
+    });
+  });
+
+  describe('admin-chat-context.ts page slug matching (page context lookup)', () => {
     it('uses .toLowerCase() on pSlug in equality comparison', () => {
       expect(adminChatSrc).toMatch(/pSlug\.toLowerCase\(\)\s*===\s*targetSlug\.toLowerCase\(\)/);
     });
@@ -19,12 +33,6 @@ describe('case-insensitive page path matching in admin-chat-context and helpers'
 
     it('uses .toLowerCase() in the endsWith() check', () => {
       expect(adminChatSrc).toMatch(/targetSlug\.toLowerCase\(\)\.endsWith\(pSlug\.toLowerCase\(\)\)/);
-    });
-
-    it('no longer has bare === comparison without toLowerCase', () => {
-      // This should not match the fixed code pattern
-      const fixedPattern = /return\s+pSlug\.toLowerCase\(\)\s*===\s*targetSlug\.toLowerCase\(\)/;
-      expect(adminChatSrc).toMatch(fixedPattern);
     });
   });
 

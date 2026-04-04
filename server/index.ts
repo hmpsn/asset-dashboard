@@ -9,6 +9,8 @@ import db from './db/index.js';
 import { createApp } from './app.js';
 import { initWebSocket } from './websocket.js';
 import { startSchedulers } from './startup.js';
+import { stopDataRetentionCrons } from './data-retention.js';
+import { stopIntelligenceCrons } from './intelligence-crons.js';
 import { listWorkspaces } from './workspaces.js';
 import { isStripeConfigured } from './stripe.js';
 import { DATA_BASE } from './data-dir.js';
@@ -56,6 +58,10 @@ function gracefulShutdown(signal: string) {
 
   // 1. Mark health endpoint as 503 so load balancer stops routing traffic
   setShuttingDown();
+
+  // 1a. Cancel background cron timers so they cannot fire after db.close()
+  stopDataRetentionCrons();
+  stopIntelligenceCrons();
 
   // 2. Mark any in-progress jobs as interrupted in SQLite before shutdown
   const activeJobs = listJobs().filter(j => j.status === 'pending' || j.status === 'running');

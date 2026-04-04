@@ -33,8 +33,8 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
-import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { clearSeoContextCache } from '../seo-context.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
 import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
@@ -649,7 +649,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (businessContext) {
       businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
     }
-    const { knowledgeBlock: kbBlock, personasBlock: persBlock } = buildSeoContext(ws.id);
+    const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const strategySeo = strategyIntel.seoContext;
+    const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
+    const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
     if (kbBlock) {
       businessSection += kbBlock + '\n';
     }
@@ -1789,7 +1792,7 @@ Rules:
     incrementUsage(ws.id, 'strategy_generations');
 
     try {
-      if (!getActionBySource('strategy', ws.id)) recordAction({
+      if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
         workspaceId: ws.id,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',

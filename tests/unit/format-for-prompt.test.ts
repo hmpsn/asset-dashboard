@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { formatForPrompt } from '../../server/workspace-intelligence.js';
 import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
+import { RICH_INTELLIGENCE, RICH_SEO_CONTEXT } from '../fixtures/rich-intelligence.js';
 
 const baseIntelligence: WorkspaceIntelligence = {
   version: 1,
@@ -79,5 +80,16 @@ describe('formatForPrompt', () => {
   it('defaults to standard verbosity', () => {
     const result = formatForPrompt(richIntelligence);
     expect(result).toContain('warning');
+  });
+
+  it('includes persona pain points at standard verbosity', () => {
+    const result = formatForPrompt(RICH_INTELLIGENCE, { verbosity: 'standard', sections: ['seoContext'] });
+    expect(result).toContain('Proving SEO ROI');
+  });
+
+  it('includes site keyword names (not just count)', () => {
+    const result = formatForPrompt(RICH_INTELLIGENCE, { verbosity: 'standard', sections: ['seoContext'] });
+    expect(result).toContain('enterprise seo');
+    expect(result).not.toMatch(/\d+ site keywords/);
   });
 });

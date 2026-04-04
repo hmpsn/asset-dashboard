@@ -252,6 +252,12 @@ export interface Workspace {
   businessPriorities?: string[];
   // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
   scoringConfig?: Partial<Record<string, { primary_metric: string; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
+  /** Structured business intelligence profile (industry, goals, target audience). Separate from businessProfile (contact info). */
+  intelligenceProfile?: {
+    industry?: string;
+    goals?: string[];
+    targetAudience?: string;
+  };
   folder: string;
   createdAt: string;
 }

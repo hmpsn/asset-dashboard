@@ -14,7 +14,7 @@ import {
 const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
 import { RenderMarkdown } from './client/helpers';
-import { STUDIO_NAME } from '../constants';
+import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -329,7 +329,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           window.history.replaceState({}, '', url.toString());
         }
       })
-      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? 'This dashboard is currently unavailable. Please contact hmpsn studio for access.' : 'Failed to load dashboard'); setLoading(false); });
+      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? `This dashboard is currently unavailable. Please contact ${STUDIO_NAME} for access.` : 'Failed to load dashboard'); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]); // large init effect — only re-runs on workspace change; missing deps are stable useState setters
 
@@ -391,7 +391,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex flex-col items-center mb-6">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-7 opacity-60 mb-4" />
+            <img src="/logo.svg" alt={STUDIO_NAME} className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
               <Lock className="w-6 h-6 text-teal-400" />
             </div>
@@ -650,7 +650,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+            <img src="/logo.svg" alt={STUDIO_NAME} className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <div className="flex items-center gap-2">
@@ -855,7 +855,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={strategyData?.pageMap} />
         )}
 
 
@@ -877,7 +877,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     {chatUsage.remaining}/{chatUsage.limit} left
                   </span>
                 ) : (
-                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span>
+                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by {STUDIO_NAME}</span>
                 )}
               </div>
               <div className="flex items-center gap-1">
@@ -1266,8 +1266,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-[11px] text-zinc-700">Powered by hmpsn studio</span>
-          <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
+          <span className="text-[11px] text-zinc-700">Powered by {STUDIO_NAME}</span>
+          <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">{STUDIO_NAME}</a>
         </div>
       </footer>
     </div>

@@ -21,6 +21,7 @@ interface Props {
   workspaceId: string;
   onRequestCountChange?: (count: number) => void;
   fixContext?: FixContext | null;
+  clearFixContext?: () => void;
 }
 
 const TABS = [
@@ -57,7 +58,7 @@ interface DecaySummary {
   avgDeclinePct: number;
 }
 
-export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext }: Props) {
+export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
   const [activeTab, setActiveTab] = useState<PipelineTab>('briefs');
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -88,6 +89,18 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
     return () => document.removeEventListener('mousedown', handleClick);
   }, [exportOpen]);
 
+  // Auto-switch to briefs tab when arriving via "Draft Brief" navigation.
+  // Guard on targetRoute so stale fixContext from seo-editor/seo-schema navigations
+  // doesn't wrongly trigger a tab switch when the user arrives at content-pipeline.
+  // NOTE: Do NOT call clearFixContext here — ContentBriefs needs fixContext intact
+  // when it mounts to pre-fill keyword/pageType. ContentBriefs owns the cleanup
+  // via its own clearFixContext?.() call after consuming the context.
+  useEffect(() => {
+    if (fixContext?.targetRoute === 'content-pipeline') {
+      setActiveTab('briefs');
+    }
+  }, [fixContext]);
+
   const handleExport = (dataset: string, format: 'csv' | 'json') => {
     window.open(`/api/export/${workspaceId}/${dataset}?format=${format}`, '_blank');
     setExportOpen(false);
@@ -105,7 +118,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
         <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400" style={{ borderRadius: '10px 24px 10px 24px' }}>
           {summary.briefs > 0 && <span className="flex items-center gap-1"><Clipboard className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
           {summary.posts > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><FileText className="w-3 h-3 text-amber-400" /><span className="font-medium text-zinc-300">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
-          {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-violet-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
+          {summary.matrices > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><Layers className="w-3 h-3 text-teal-400" /><span className="font-medium text-zinc-300">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
           {summary.cells > 0 && <><span className="text-zinc-700">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-zinc-300">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-green-400 ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
         </div>
       )}
@@ -195,7 +208,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext 
         </Suspense>
       )}
       {activeTab === 'briefs' && (
-        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} />
+        <ContentBriefs key={`briefs-${workspaceId}`} workspaceId={workspaceId} onRequestCountChange={onRequestCountChange} fixContext={fixContext} clearFixContext={clearFixContext} />
       )}
       {activeTab === 'posts' && (
         <ContentManager key={`content-${workspaceId}`} workspaceId={workspaceId} />

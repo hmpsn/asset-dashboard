@@ -8,7 +8,7 @@ import { FeatureFlag } from '../ui/FeatureFlag';
 import { TierGate } from '../ui/TierGate';
 import { useClientOutcomeWins } from '../../hooks/client/useClientOutcomes';
 import type { Tier } from '../ui/TierGate';
-import type { WeCalledItEntry, DeltaSummary, DeltaDirection } from '../../../shared/types/outcome-tracking';
+import type { OutcomeWinEntry, DeltaSummary, DeltaDirection } from '../../../shared/types/outcome-tracking';
 
 // --- Helpers -----------------------------------------------------------
 
@@ -36,8 +36,8 @@ function formatMonth(isoDate: string): string {
 }
 
 // Groups entries by calendar month of detectedAt
-function groupByMonth(entries: WeCalledItEntry[]): Map<string, WeCalledItEntry[]> {
-  const groups = new Map<string, WeCalledItEntry[]>();
+function groupByMonth(entries: OutcomeWinEntry[]): Map<string, OutcomeWinEntry[]> {
+  const groups = new Map<string, OutcomeWinEntry[]>();
   for (const entry of entries) {
     const key = formatMonth(entry.detectedAt);
     if (!groups.has(key)) groups.set(key, []);
@@ -48,7 +48,7 @@ function groupByMonth(entries: WeCalledItEntry[]): Map<string, WeCalledItEntry[]
 
 // --- Win card ----------------------------------------------------------
 
-function WinCard({ entry }: { entry: WeCalledItEntry }) {
+function WinCard({ entry }: { entry: OutcomeWinEntry }) {
   const pageLabel = entry.targetKeyword
     ? `"${entry.targetKeyword}"`
     : entry.pageUrl
@@ -89,9 +89,9 @@ function WinCard({ entry }: { entry: WeCalledItEntry }) {
 // --- Tiered views ------------------------------------------------------
 
 /** Growth: top 1 win per month */
-function GrowthWins({ wins }: { wins: WeCalledItEntry[] }) {
+function GrowthWins({ wins }: { wins: OutcomeWinEntry[] }) {
   const byMonth = groupByMonth(wins);
-  const topPerMonth: WeCalledItEntry[] = [];
+  const topPerMonth: OutcomeWinEntry[] = [];
 
   for (const [, entries] of byMonth) {
     // Pick the win with the highest positive delta percent
@@ -126,7 +126,7 @@ function GrowthWins({ wins }: { wins: WeCalledItEntry[] }) {
 }
 
 /** Premium: all wins grouped by month */
-function PremiumWins({ wins }: { wins: WeCalledItEntry[] }) {
+function PremiumWins({ wins }: { wins: OutcomeWinEntry[] }) {
   const byMonth = groupByMonth(wins);
 
   if (wins.length === 0) {

@@ -41,7 +41,8 @@ import {
   fetchSearchTypes,
   fetchSearchComparison,
 } from '../analytics-data.js';
-import { buildSeoContext, buildKeywordMapContext, RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { RICH_BLOCKS_PROMPT } from '../seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt, formatPageMapForPrompt } from '../workspace-intelligence.js';
 import { listTemplates } from '../content-templates.js';
 import { listMatrices } from '../content-matrices.js';
 import { incrementUsage } from '../usage-tracking.js';
@@ -89,7 +90,7 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
   try {
     const type = req.query.type as InsightType | undefined;
     // Only allow force recompute for authenticated admin users
-    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token;
+    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token; // as-any-ok: cookie-parser types not in Express.Request
     const payload = token ? verifyToken(token) : null;
     const force = req.query.force === 'true' && (payload?.role === 'admin' || payload?.role === 'owner');
     const insights = await getOrComputeInsights(ws.id, type, { force });
@@ -245,8 +246,9 @@ router.post('/api/public/search-chat/:workspaceId', async (req, res) => {
     const teamName = STUDIO_NAME;
 
     // Pre-compute SEO context blocks for the system prompt
-    const seoCtx = buildSeoContext(ws.id);
-    const seoContextBlock = seoCtx.fullContext + buildKeywordMapContext(ws.id);
+    const slices = ['seoContext', 'learnings'] as const;
+    const intel = await buildWorkspaceIntelligence(ws.id, { slices });
+    const seoContextBlock = formatForPrompt(intel, { verbosity: 'detailed', sections: slices }) + formatPageMapForPrompt(intel.seoContext);
 
     // Content plan context (templates + matrices) — fetched server-side
     let contentPlanSection = '';
