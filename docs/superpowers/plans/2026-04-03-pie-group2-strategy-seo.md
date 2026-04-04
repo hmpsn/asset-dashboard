@@ -61,10 +61,6 @@ PARALLEL BATCH A (start immediately after Phase 0 merge): Tasks 1, 4, 5, 6, 9
 PARALLEL BATCH B (after Batch A merged): Tasks 2, 7, 8, 10
 SEQUENTIAL: Task 3 (after Task 2)
 Tests: write and run after the task they cover
-```
-PARALLEL BATCH B (after Batch A merged): Tasks 4, 5, 9, 10, 12
-Tests: write and run after the task they cover
-```
 
 ---
 

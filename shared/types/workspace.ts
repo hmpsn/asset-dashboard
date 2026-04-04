@@ -175,8 +175,8 @@ export interface Workspace {
   clientPortalEnabled?: boolean;
   seoClientView?: boolean;
   analyticsClientView?: boolean;
-  /** When false, the Site Intelligence module is hidden from this workspace's client dashboard. Default true (null treated as true). */
-  siteIntelligenceClientView?: boolean | null;
+  /** When false, the Site Intelligence module is hidden from this workspace's client dashboard. Default true (undefined treated as true). */
+  siteIntelligenceClientView?: boolean;
   autoReports?: boolean;
   autoReportFrequency?: 'weekly' | 'monthly';
   // Branding

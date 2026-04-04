@@ -245,11 +245,14 @@ invalidateIntelligenceCache(workspaceId);
 | `server/page-keywords.ts` lines 130–176 | `upsertPageKeyword()` exists — unused by strategy |
 | `server/routes/keyword-strategy.ts` | `replaceAllPageKeywords()` confirmed at lines 1745 + 1928 |
 
-**Fix:**
-1. Strategy should write `metricsSource: METRICS_SOURCE.EXACT` (`'exact'`) — SEMRush bulk lookup is exact data
-2. Add `METRICS_SOURCE` const to `shared/types/keywords.ts`: `{ EXACT: 'exact', PARTIAL_MATCH: 'partial_match', AI_ESTIMATE: 'ai_estimate' }`
-3. Switch strategy from `replaceAllPageKeywords()` → `upsertPageKeyword()` per keyword (merge-upsert, never destroys existing PI data)
-4. Verify: seed PI data → run strategy → assert PI fields intact
+**Fix (chosen approach — widen the type, not change the source value):**
+1. `METRICS_SOURCE` const in `shared/types/keywords.ts` includes `BULK_LOOKUP: 'bulk_lookup'` as a 4th value — strategy correctly describes its data source
+2. `PageIntelligence.tsx` local `StrategyPage` type is widened to import `MetricsSource` from `shared/types/keywords.ts`, replacing the hardcoded `'exact' | 'partial_match' | 'ai_estimate'` union
+3. Strategy continues writing `metricsSource: 'bulk_lookup'` — this is accurate (bulk domain organic lookup)
+4. Switch strategy from `replaceAllPageKeywords()` → `upsertPageKeyword()` per keyword (merge-upsert, never destroys existing PI data)
+5. Verify: seed PI data → run strategy → assert PI fields intact
+
+> **Note:** The audit initially proposed strategy should write `'exact'` instead of `'bulk_lookup'`. After implementation review, approach 2 (widen the type) was chosen as more semantically accurate — SEMRush bulk lookup data is not the same as an exact keyword match.
 
 **Safety contract from spec:**
 - Upsert is additive only: never overwrite a non-null field with null

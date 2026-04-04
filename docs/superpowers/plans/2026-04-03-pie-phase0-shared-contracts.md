@@ -115,8 +115,8 @@ describe('METRICS_SOURCE', () => {
     expect(METRICS_SOURCE.AI_ESTIMATE).toBe('ai_estimate');
   });
 
-  it('is frozen (as const)', () => {
-    expect(Object.isFrozen(METRICS_SOURCE)).toBe(true);
+  it('has exactly 4 keys', () => {
+    expect(Object.keys(METRICS_SOURCE)).toHaveLength(4);
   });
 });
 ```
