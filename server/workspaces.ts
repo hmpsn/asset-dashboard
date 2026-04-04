@@ -157,7 +157,9 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     const ip = parseJsonSafe(row.intelligence_profile, intelligenceProfileSchema, null, { workspaceId: row.id, field: 'intelligence_profile', table: 'workspaces' });
     if (ip) ws.intelligenceProfile = ip;
   }
-  if (row.site_intelligence_client_view !== null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
+  // Use loose != null (not !==) so undefined (column not yet in DB before migration 049) is also excluded,
+  // preserving the "undefined = enabled by default" intent until migration 049 lands in Group 3.
+  if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
   return ws;
 }
