@@ -99,9 +99,7 @@ router.post(
       broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
       addActivity(ws.id, 'client_signal', `Client signal: ${type}`, triggerMessage.slice(0, 80));
 
-      notifyTeamClientSignal(ws.name, type, triggerMessage).catch((err: unknown) => {
-        log.warn({ err }, 'Failed to send client signal email');
-      });
+      notifyTeamClientSignal(ws.id, ws.name, type, triggerMessage);
 
       res.json({ ok: true, signalId: signal.id });
     } catch (err) {

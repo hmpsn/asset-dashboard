@@ -356,16 +356,18 @@ export function notifyTeamChurnSignal(opts: {
   }));
 }
 
-export async function notifyTeamClientSignal(
+export function notifyTeamClientSignal(
+  workspaceId: string,
   workspaceName: string,
   signalType: string,
   triggerMessage: string,
-): Promise<void> {
+): void {
+  if (!isEmailConfigured()) return;
   const to = getNotificationEmail();
-  if (!to || !isEmailConfigured()) return;
+  if (!to) return;
   const adminUrl = process.env.ADMIN_URL || STUDIO_URL;
-  const { clientSignalEmail } = await import('./email-templates.js');
-  const html = clientSignalEmail({ workspaceName, signalType, triggerMessage, adminUrl });
-  const subject = `[${STUDIO_NAME}] Client signal from ${workspaceName}`;
-  await sendEmail(to, subject, html);
+  queueEmail(makeEvent('client_signal', to, workspaceId, workspaceName, adminUrl, {
+    signalType,
+    triggerMessage,
+  }));
 }

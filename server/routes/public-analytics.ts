@@ -52,8 +52,9 @@ import { buildClientInsights } from '../insight-narrative.js';
 import { generateMonthlyDigest } from '../monthly-digest.js';
 import type { InsightType } from '../../shared/types/analytics.js';
 import { STUDIO_NAME } from '../constants.js';
-import { createClientSignal } from '../client-signals-store.js';
+import { createClientSignal, hasRecentSignal } from '../client-signals-store.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { notifyTeamClientSignal } from '../email.js';
 
 // ── Analytics insights endpoints ─────────────────────────────────
 // NOTE: Literal sub-paths (/narrative, /digest) registered BEFORE /:workspaceId
@@ -416,11 +417,12 @@ ${JSON.stringify(context, null, 2)}`;
     }
 
     // ── Intent detection ──────────────────────────────────────────────────────
+    // Match only the user's question — never the AI answer. The AI proactively
+    // mentions content strategy terms in every response, so matching `answer`
+    // would create false-positive signals on virtually every chat turn.
     let detectedIntent: 'content_interest' | 'service_interest' | null = null;
     if (!betaMode && sessionId && answer) {
-      const lowerAnswer = answer.toLowerCase();
       const lowerQuestion = question.toLowerCase();
-      const combined = `${lowerQuestion} ${lowerAnswer}`;
 
       const serviceKeywords = [
         'get in touch', 'contact', 'reach out', 'talk to someone', 'speak with',
@@ -433,8 +435,13 @@ ${JSON.stringify(context, null, 2)}`;
 
       if (serviceKeywords.some(kw => lowerQuestion.includes(kw))) {
         detectedIntent = 'service_interest';
-      } else if (contentKeywords.some(kw => combined.includes(kw))) {
+      } else if (contentKeywords.some(kw => lowerQuestion.includes(kw))) {
         detectedIntent = 'content_interest';
+      }
+
+      // Deduplicate: suppress if a signal of this type was already created within 30 minutes
+      if (detectedIntent && hasRecentSignal(ws.id, detectedIntent, 30 * 60 * 1000)) {
+        detectedIntent = null;
       }
 
       if (detectedIntent) {
@@ -453,6 +460,8 @@ ${JSON.stringify(context, null, 2)}`;
             triggerMessage: question.trim().slice(0, 500),
           });
           broadcastToWorkspace(ws.id, 'client-signal:created', { signalId: signal.id });
+          addActivity(ws.id, 'client_signal', `Client signal: ${detectedIntent}`, question.trim().slice(0, 80));
+          notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         } catch { /* non-critical — never block chat response */ }
       }
     }

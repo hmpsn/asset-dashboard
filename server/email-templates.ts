@@ -173,7 +173,8 @@ export type EmailEventType =
   | 'anomaly_alert'
   | 'content_published'
   | 'feedback_new'
-  | 'audit_complete';
+  | 'audit_complete'
+  | 'client_signal';
 
 // ── Template renderers ──
 
@@ -243,6 +244,8 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderFeedbackNew(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_complete':
       result = renderAuditComplete(events[0], logoUrl); break;
+    case 'client_signal':
+      result = renderClientSignal(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -1041,4 +1044,27 @@ export function clientSignalEmail(opts: {
     body,
     cta: { label: 'View in Admin Inbox', url: opts.adminUrl },
   });
+}
+
+function renderClientSignal(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const adminUrl = dashUrl ?? '';
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.signalType as string) === 'service_interest' ? 'Service Interest' : 'Content Interest',
+    detail: (e.data.triggerMessage as string) ?? '',
+    badge: { label: (e.data.signalType as string) === 'service_interest' ? 'Service' : 'Content', color: '#0f766e', bg: '#f0fdfa' },
+    isLast: i === events.length - 1,
+  }));
+  const subject = count === 1
+    ? `Client signal from ${ws}`
+    : `${count} client signals from ${ws}`;
+  const body = `
+    <p style="margin:0 0 12px;font-size:14px;color:#202945;">
+      ${count === 1 ? 'A client' : `${count} client signals`} at <strong>${esc(ws)}</strong> expressed purchase or service intent.
+    </p>
+    ${items.join('')}
+  `;
+  return {
+    subject,
+    html: layout({ preheader: subject, headline: subject, subtitle: ws, body, cta: { label: 'View in Admin Inbox', url: adminUrl }, logoUrl }),
+  };
 }

@@ -78,6 +78,11 @@ const stmts = createStmtCache(() => ({
     FROM client_signals
     WHERE workspace_id = ? AND status = 'new'
   `),
+  selectRecentByType: db.prepare(`
+    SELECT id FROM client_signals
+    WHERE workspace_id = ? AND type = ? AND created_at > ?
+    LIMIT 1
+  `),
 }));
 
 export interface CreateClientSignalInput {
@@ -128,4 +133,15 @@ export function updateSignalStatus(id: string, status: ClientSignalStatus): bool
 export function countNewSignals(workspaceId: string): number {
   const result = stmts().countNewByWorkspace.get(workspaceId) as { count: number };
   return result.count;
+}
+
+/**
+ * Returns true if a signal of the given type was created for this workspace
+ * within the last `withinMs` milliseconds. Used to suppress duplicate signals
+ * during an active chat session.
+ */
+export function hasRecentSignal(workspaceId: string, type: ClientSignalType, withinMs: number): boolean {
+  const cutoff = new Date(Date.now() - withinMs).toISOString();
+  const row = stmts().selectRecentByType.get(workspaceId, type, cutoff) as { id: string } | undefined;
+  return !!row;
 }
