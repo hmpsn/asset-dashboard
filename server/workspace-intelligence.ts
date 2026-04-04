@@ -929,6 +929,7 @@ async function assembleClientSignals(
     log.debug({ err }, 'client_signals unavailable for intelligence assembly');
   }
 
+
   // Recent chat topics
   let recentChatTopics: string[] = [];
   try {
