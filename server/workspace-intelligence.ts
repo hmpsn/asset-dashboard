@@ -297,10 +297,13 @@ async function assembleSeoContext(
   // ~16 callers that don't need backlink data (briefs, rewrites, audits, etc.)
   if (opts?.enrichWithBacklinks) {
     try {
-      const { getConfiguredProvider } = await import('./seo-data-provider.js');
+      const { getBacklinksProvider } = await import('./seo-data-provider.js');
       const domain = workspace?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
       if (domain) {
-        const provider = getConfiguredProvider();
+        // Pass workspace.seoDataProvider so provider selection respects the per-workspace
+        // preference and falls back to a capable provider if backlinks are disabled on the
+        // primary (e.g. DataForSEO without a backlinks subscription).
+        const provider = getBacklinksProvider(workspace?.seoDataProvider);
         if (provider?.isConfigured()) {
           const overview = await provider.getBacklinksOverview(domain, workspaceId);
           if (overview) {
