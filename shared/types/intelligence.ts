@@ -294,6 +294,8 @@ export interface SerpFeatures {
   featuredSnippets: number;
   peopleAlsoAsk: number;
   localPack: boolean;
+  /** Pages where a video carousel is present for the primary keyword. */
+  videoCarousel: number;
 }
 
 export interface EngagementMetrics {

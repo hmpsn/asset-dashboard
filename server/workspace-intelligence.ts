@@ -330,6 +330,7 @@ async function assembleSeoContext(
         featuredSnippets: allFeatures.filter(f => f === 'featured_snippet').length,
         peopleAlsoAsk: allFeatures.filter(f => f === 'people_also_ask').length,
         localPack: allFeatures.some(f => f === 'local_pack'),
+        videoCarousel: allFeatures.filter(f => f === 'video').length,
       };
       base.serpFeatures = serpFeatures;
     }
@@ -1455,7 +1456,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   // Backlink profile — at standard+ verbosity (only present when enrichWithBacklinks opt-in was set)
   if (ctx.backlinkProfile && verbosity !== 'compact') {
     const bp = ctx.backlinkProfile;
-    lines.push(`Backlinks: ${bp.totalBacklinks.toLocaleString()} total, ${bp.referringDomains} referring domains`);
+    lines.push(`Backlinks: ${bp.totalBacklinks.toLocaleString()} total, ${bp.referringDomains.toLocaleString()} referring domains`);
   }
 
   // SERP features — aggregated from per-page data; at standard+ verbosity
@@ -1464,6 +1465,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     const parts: string[] = [];
     if (sf.featuredSnippets > 0) parts.push(`${sf.featuredSnippets} featured snippet opportunit${sf.featuredSnippets === 1 ? 'y' : 'ies'}`);
     if (sf.peopleAlsoAsk > 0) parts.push(`${sf.peopleAlsoAsk} People Also Ask opportunit${sf.peopleAlsoAsk === 1 ? 'y' : 'ies'}`);
+    if (sf.videoCarousel > 0) parts.push(`${sf.videoCarousel} video carousel opportunit${sf.videoCarousel === 1 ? 'y' : 'ies'}`);
     if (sf.localPack) parts.push('local pack present');
     if (parts.length > 0) lines.push(`SERP features: ${parts.join(', ')}`);
   }

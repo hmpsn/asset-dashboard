@@ -124,12 +124,13 @@ describe('formatForPrompt', () => {
       ...baseIntelligence,
       seoContext: {
         ...RICH_SEO_CONTEXT,
-        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false },
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false, videoCarousel: 2 },
       },
     };
     const result = formatForPrompt(intel, { verbosity: 'standard' });
     expect(result).toContain('featured snippet');
     expect(result).toContain('People Also Ask');
+    expect(result).toContain('video carousel');
   });
 
   it('omits serpFeatures in compact mode', () => {
@@ -137,7 +138,7 @@ describe('formatForPrompt', () => {
       ...baseIntelligence,
       seoContext: {
         ...RICH_SEO_CONTEXT,
-        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false },
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false, videoCarousel: 0 },
       },
     };
     const result = formatForPrompt(intel, { verbosity: 'compact' });
