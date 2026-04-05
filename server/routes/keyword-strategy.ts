@@ -1275,7 +1275,10 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           if (serp.paa) features.push('people_also_ask');
           if (serp.video) features.push('video');
           if (serp.localPack) features.push('local_pack');
-          if (features.length > 0) pm.serpFeatures = features;
+          // Always write serpFeatures for exact matches (even empty) so COALESCE overwrites
+          // stale features if SEMRush data changed. Pages with no exact match are left
+          // undefined → null → COALESCE keeps previous value (correct for unmatched pages).
+          pm.serpFeatures = features;
         } else {
           // Try word-overlap match (requires >=80% word overlap and at least 2 words)
           const partial = semrushDomainData.find(k => {

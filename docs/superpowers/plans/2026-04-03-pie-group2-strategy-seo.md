@@ -1266,8 +1266,34 @@ npx vitest run tests/unit/kd-framing-strategyTab.test.ts 2>&1 | tail -10
 # Expected: all pass
 ```
 
+- [ ] **Add SERP feature chips per strategy card.** Each `PageKeywordMap` entry now carries `serpFeatures?: string[]` from migration 051. Surface these as small chips on the strategy card so the user can see which pages have snippet/PAA/local pack opportunities at a glance.
+
+  Find the per-page card render in the strategy list (the map over `strategy.pageMap`). After the volume/KD line, add:
+
+  ```tsx
+  {page.serpFeatures && page.serpFeatures.length > 0 && (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {page.serpFeatures.map(feat => {
+        const label: Record<string, string> = {
+          featured_snippet: '⬜ Snippet',
+          people_also_ask: '❓ PAA',
+          video: '▶ Video',
+          local_pack: '📍 Local',
+        };
+        return (
+          <span key={feat} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            {label[feat] ?? feat}
+          </span>
+        );
+      })}
+    </div>
+  )}
+  ```
+
+  > **Color rule:** SERP chips are data/informational (not actionable), so blue (`bg-blue-500/10 text-blue-400`) is correct per the Three Laws. Never teal for read-only data.
+
 - [ ] Run `npx tsc --noEmit --skipLibCheck` and `npx vite build` — expect zero errors.
-- [ ] Commit: `git add src/components/client/StrategyTab.tsx tests/unit/kd-framing-strategyTab.test.ts && git commit -m "feat(strategy-tab): add predicted impact, plain-language KD tooltips, spec-aligned status badge colors"`
+- [ ] Commit: `git add src/components/client/StrategyTab.tsx tests/unit/kd-framing-strategyTab.test.ts && git commit -m "feat(strategy-tab): add predicted impact, KD tooltips, status badge colors, SERP feature chips"`
 
 ---
 
@@ -1401,8 +1427,10 @@ npx vitest run tests/unit/kd-framing-contentGaps.test.ts 2>&1 | tail -10
 # Expected: all pass
 ```
 
+- [ ] **Add SERP feature chips per content gap.** `ContentGap.serpFeatures` is already populated during strategy generation (existing field, not new). Render chips in the gap card alongside volume/KD — same pattern as Task 7 SERP chips. Use the same blue chip style (`bg-blue-500/10 text-blue-400 border-blue-500/20`). Only render when `gap.serpFeatures?.length > 0`.
+
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Commit: `git add src/components/strategy/ContentGaps.tsx tests/unit/kd-framing-contentGaps.test.ts && git commit -m "feat(content-gaps): add KD framing tooltip and predicted impact line"`
+- [ ] Commit: `git add src/components/strategy/ContentGaps.tsx tests/unit/kd-framing-contentGaps.test.ts && git commit -m "feat(content-gaps): add KD framing tooltip, predicted impact line, SERP feature chips"`
 
 ---
 
