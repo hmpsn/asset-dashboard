@@ -36,6 +36,12 @@ export interface IntelligenceOptions {
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   /** Token budget hint for downstream prompt formatting */
   tokenBudget?: number;
+  /**
+   * Opt-in: fetch backlink profile from the configured SEO data provider.
+   * OFF by default — the provider call adds network latency and costs credits.
+   * Only enable for callers that actually surface backlink data (e.g. admin AI chat).
+   */
+  enrichWithBacklinks?: boolean;
 }
 
 // ── Core return type ────────────────────────────────────────────────────
@@ -280,13 +286,16 @@ export interface BusinessProfile {
 export interface BacklinkProfile {
   totalBacklinks: number;
   referringDomains: number;
-  trend: 'growing' | 'stable' | 'declining';
+  /** Omitted when trend cannot be computed from available API data. */
+  trend?: 'growing' | 'stable' | 'declining';
 }
 
 export interface SerpFeatures {
   featuredSnippets: number;
   peopleAlsoAsk: number;
   localPack: boolean;
+  /** Pages where a video carousel is present for the primary keyword. */
+  videoCarousel: number;
 }
 
 export interface EngagementMetrics {

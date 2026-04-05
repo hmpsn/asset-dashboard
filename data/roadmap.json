@@ -3921,6 +3921,39 @@
           "sprint": "E",
           "notes": "Bridge #10 applies +10 anomaly boost to matching insights but never reverses it when anomalies age out or are dismissed. Boosted scores remain inflated permanently. Needs a decay or reversal mechanism (e.g., remove boost when no recent anomalies match, or time-decay the boost).",
           "status": "pending"
+        },
+        {
+          "id": "pie-group2-strategy-card-context",
+          "title": "Strategy Card Context — AI-Aware Per-Page SEO Metadata",
+          "source": "PIE Group 2 (docs/superpowers/plans/2026-04-03-pie-group2-strategy-seo.md)",
+          "est": "2h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #137. strategyCardContext block added to keyword strategy generation: each page in pageMap carries cardContext.pageType, pageTypeLabel, strategicPriority, priorityReason from getPageTypeConfig(). Injected into content brief prompts via buildStrategyCardBlock(). Exports getPageTypeConfig() for downstream consumption. Feature #206.",
+          "status": "done",
+          "shippedAt": "2026-04-04"
+        },
+        {
+          "id": "pie-group2-backlink-intel-context",
+          "title": "Backlink Profile in Admin AI Intelligence Context",
+          "source": "PIE Group 2 (docs/superpowers/plans/2026-04-03-pie-group2-strategy-seo.md)",
+          "est": "2h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #137. backlinkProfile field added to SeoContextSlice; opt-in via enrichWithBacklinks flag in IntelligenceOptions. Admin chat sets flag to give AI advisor real backlink data (total backlinks, referring domains). Cache key includes :bl suffix to prevent bleed between enriched/non-enriched entries. Provider respects workspace.seoDataProvider preference via getBacklinksProvider() with capability-disabled fallback. Cron does NOT pre-warm this key (different slice combinations prevent cache hit). Feature #207.",
+          "status": "done",
+          "shippedAt": "2026-04-04"
+        },
+        {
+          "id": "pie-group2-serp-features-pipeline",
+          "title": "SERP Features Pipeline — Capture, Store, Aggregate, Brief Directives",
+          "source": "PIE Group 2 (docs/superpowers/plans/2026-04-03-pie-group2-strategy-seo.md)",
+          "est": "3h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #137. Four-stage pipeline: (1) Capture: hasSerpOpportunity() parses SEMRush Fk codes during strategy generation → writes serp_features TEXT column (migration 051) per page. Exact matches always write (even []) to prevent COALESCE stale-data bug. (2) Aggregate: assembleSeoContext() computes workspace-level SerpFeatures (featuredSnippets, peopleAlsoAsk, localPack count). (3) Prompt: formatSeoContextSection() renders SERP features at standard/verbose verbosity. (4) Brief directives: generateBrief() injects per-feature structural directives into prompt (40-60w direct answer for featured snippet, 4-6 Q&A FAQ for PAA, video embed for video, NAP+LocalBusiness for local pack). Feature #208.",
+          "status": "done",
+          "shippedAt": "2026-04-04"
         }
       ]
     }

@@ -54,7 +54,7 @@ This group ships as 3 sequential PRs. Each must be merged to staging and CI-gree
 **PR 1 — Infrastructure** (Tasks 1–6)
 - Verification baseline (Task 1)
 - pr-check rules (Task 2) — runs in parallel with Task 3
-- Migration 051: site_intelligence_client_view column (Task 3) — runs in parallel with Task 2
+- Migration 052: site_intelligence_client_view column (Task 3) — runs in parallel with Task 2
 - FeaturesTab toggle for siteIntelligenceClientView (Task 4) — needs Task 3
 - Integration test for toggle (Task 5) — runs in parallel with Task 4 after Task 3
 - OverviewTab Site Intelligence gate (Task 6) — needs Tasks 3 + 4
@@ -118,7 +118,7 @@ Note: Tasks 11 and 12 can run in parallel after Task 10 is committed.
 | `shared/types/feature-flags.ts` | **Verify (Phase 0 done)** | Flags `'client-brand-section'` and `'smart-placeholders'` already added in Phase 0 |
 | `shared/types/workspace.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView?: boolean` already added in Phase 0 |
 | `src/routes.ts` | **Verify (Phase 0 done)** | `'brand'` already added to `ClientTab` union in Phase 0 |
-| `server/db/migrations/051-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
+| `server/db/migrations/052-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
 | `server/workspaces.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView` and `businessPriorities` mapper already added — `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `columnMap` all updated |
 | `server/routes/public-portal.ts` | **Verify (Phase 0 done)** | GET/POST `/api/public/business-priorities/:workspaceId` endpoints already exist |
 | `src/components/client/OverviewTab.tsx` | **Modify** | Gate IntelligenceSummaryCard on siteIntelligenceClientView toggle |
@@ -143,7 +143,7 @@ Task 1 (Phase 0 verification) ────────────────�
                                                                                                              │
 Task 1 ──► Task 2 (pr-check rules) ─────────────────────────────────────────────────────────────────────────┤  (parallel with Task 3)
                                                                                                              │
-Task 1 ──► Task 3 (migration 051) ──► Task 4 (FeaturesTab toggle) ──► Task 6 (OverviewTab gate)            │  PR 1
+Task 1 ──► Task 3 (migration 052) ──► Task 4 (FeaturesTab toggle) ──► Task 6 (OverviewTab gate)            │  PR 1
                               └──────► Task 5 (integration test)                                             │
                                                                                                              │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -186,9 +186,9 @@ The following items were completed as part of Phase 0 work (committed before thi
 | GET `/api/public/business-priorities/:workspaceId` | `server/routes/public-portal.ts` | Done |
 | POST `/api/public/business-priorities/:workspaceId` | `server/routes/public-portal.ts` | Done |
 
-> **Only migration 051 is still missing.** `server/workspaces.ts` already reads and writes both `site_intelligence_client_view` and `business_priorities` columns, but the `ALTER TABLE` migration that actually adds `site_intelligence_client_view` to the DB has not been created yet. Task 3 covers this.
+> **Only migration 052 is still missing.** `server/workspaces.ts` already reads and writes both `site_intelligence_client_view` and `business_priorities` columns, but the `ALTER TABLE` migration that actually adds `site_intelligence_client_view` to the DB has not been created yet. Task 3 covers this.
 >
-> **Why 051?** This plan was originally written against migration 049. Since then, `049-client-signals-v2.sql` and `050-studio-config.sql` were both shipped to staging. The next available number is **051**. Do NOT create 049 — it already exists.
+> **Why 052?** This plan was originally written against migration 049. Since then, migrations 049 through 051 have all shipped (`049-client-signals-v2.sql`, `050-studio-config.sql`, `051-page-keywords-serp-features.sql`). The next available number is **052**. Do NOT create 049–051 — they already exist.
 
 ---
 
@@ -308,16 +308,16 @@ The following items were completed as part of Phase 0 work (committed before thi
 **Depends on:** Task 1
 
 **Files you OWN:**
-- server/db/migrations/051-site-intelligence-client-view.sql (create)
+- server/db/migrations/052-site-intelligence-client-view.sql (create)
 
 **Files you must NOT touch:**
 - server/workspaces.ts (Phase 0 — mapper already complete)
 - shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+- server/db/migrations/047-* through 051-* (do not touch existing migrations)
 
 > **Note:** `server/workspaces.ts` mapper edits are **already done** (Phase 0). Only the migration SQL file needs to be created — the mapper already reads/writes `site_intelligence_client_view` and `business_priorities`, but the DB column doesn't exist yet.
 
-- [ ] **Create `server/db/migrations/051-site-intelligence-client-view.sql`**:
+- [ ] **Create `server/db/migrations/052-site-intelligence-client-view.sql`**:
 
 ```sql
 -- Add site_intelligence_client_view column to workspaces
@@ -333,7 +333,7 @@ ALTER TABLE workspaces ADD COLUMN site_intelligence_client_view INTEGER;
 > ```
 
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(db): migration 051 — add site_intelligence_client_view column to workspaces`
+- [ ] Commit: `feat(db): migration 052 — add site_intelligence_client_view column to workspaces`
 
 ---
 
@@ -1673,5 +1673,135 @@ grep -r "purple-" src/components/client/ --include="*.tsx" --include="*.ts"
 grep -r "hmpsn\.studio" src/components/client/ --include="*.tsx"
 # Expected: 0 matches
 ```
+
+---
+
+## PR 4 — SERP Intelligence (Tier 2 Expansion)
+
+> Ship after PR 3 is merged and CI-green on staging. All tasks in this PR are independent and can run in parallel.
+
+**Goal:** Turn the SERP feature signals unlocked in Group 2 PR 2 into active platform intelligence — insights that surface in the insight panel, schema suggestions that fire automatically, and smarter meta rewrites that are aware of featured snippet opportunities.
+
+**Context:** `page_keywords.serp_features` (migration 051) stores per-page SERP feature flags (`featured_snippet`, `people_also_ask`, `video`, `local_pack`) captured from SEMRush during strategy generation. `seoContext.serpFeatures` aggregates these workspace-wide. Content briefs already consume `matchedPage.serpFeatures` for SERP-aware directives (done in Group 2 PR 2). This PR wires the same data into the insights engine, schema suggester, and SEO editor.
+
+---
+
+### Task 13 — `serp_feature_opportunity` Insight Type
+
+**Model:** Sonnet (new insight type requires all 4 registration steps)
+
+**PR assignment:** PR 4 — can run in parallel with Tasks 14 and 15.
+
+**Files you OWN:**
+- shared/types/analytics.ts (add InsightType + InsightDataMap entry)
+- server/schemas/serp-feature-opportunity.ts (create Zod schema)
+- server/insight-bridges/ (create bridge file)
+- src/components/insights/ (add renderer case)
+
+**Files you must NOT touch:**
+- server/page-keywords.ts (data already stored — read only)
+- server/workspace-intelligence.ts (aggregation already done — read only)
+
+**Registration — all 4 required in the same commit (CLAUDE.md §New insight type registration):**
+
+- [ ] Add `'serp_feature_opportunity'` to `InsightType` union in `shared/types/analytics.ts`
+- [ ] Add `SerpFeatureOpportunityData` interface to `shared/types/analytics.ts`:
+  ```typescript
+  export interface SerpFeatureOpportunityData {
+    pagePath: string;
+    keyword: string;
+    features: string[]; // ['featured_snippet', 'people_also_ask', ...]
+    missingSchema: string[]; // schema types that would help target these features
+    actionableDirective: string; // human-readable recommendation
+  }
+  ```
+- [ ] Add `serp_feature_opportunity: SerpFeatureOpportunityData` to `InsightDataMap`
+- [ ] Create `server/schemas/serp-feature-opportunity.ts` with Zod schema matching `SerpFeatureOpportunityData`
+- [ ] Create bridge: scan `listPageKeywords(workspaceId)` for pages with `serpFeatures?.length > 0`; for each page with `people_also_ask` and no `FAQPage` schema, generate an insight with `severity: 'opportunity'`, `impactScore` derived from `volume ?? 5`; for each page with `featured_snippet` and no structured content schema, generate insight; use `upsertInsight()` with `bridgeSource: 'serp-features'`
+- [ ] Add renderer case in the insights panel component for `serp_feature_opportunity` — show feature tags (chip-style), actionable directive, link to page
+- [ ] Add unit test: bridge fires for page with `people_also_ask` + no schema; bridge skips page with no serpFeatures
+- [ ] Commit: `feat(insights): serp_feature_opportunity insight type — surfaces PAA/snippet opportunities per page`
+
+---
+
+### Task 14 — Schema Suggester: SERP-Aware Auto-Suggestions
+
+**Model:** Sonnet (reads existing schema suggester patterns, adds SERP signal integration)
+
+**PR assignment:** PR 4 — can run in parallel with Tasks 13 and 15.
+
+**Files you OWN:**
+- server/seo-schema-suggester.ts (or wherever the schema suggestion logic lives — grep first)
+
+**Files you must NOT touch:**
+- server/page-keywords.ts (read only)
+- shared/types/analytics.ts (Task 13 owns this)
+
+- [ ] Read the existing schema suggester to find the suggestion-generation function
+- [ ] Import `listPageKeywords` and check `serpFeatures` for the target page
+- [ ] When `people_also_ask` is present → push `FAQPage` schema suggestion if not already present
+- [ ] When `featured_snippet` is present → push `HowTo` or `Article` schema suggestion (prefer HowTo for how-to intent, Article otherwise)
+- [ ] When `local_pack` is present → push `LocalBusiness` schema suggestion
+- [ ] Add unit test: page with PAA → FAQPage suggested; page with no serpFeatures → no SERP-driven suggestions added
+- [ ] Commit: `feat(schema): auto-suggest FAQPage/HowTo schema from SERP feature signals`
+
+---
+
+### Task 15 — SEO Edits: Featured Snippet-Aware Meta Rewrites
+
+**Model:** Sonnet (prompt injection into existing rewrite flow)
+
+**PR assignment:** PR 4 — can run in parallel with Tasks 13 and 14.
+
+**Files you OWN:**
+- server/routes/webflow-seo.ts (the meta/title rewrite prompt section)
+
+**Files you must NOT touch:**
+- server/page-keywords.ts (read only)
+- server/workspace-intelligence.ts (read only)
+
+- [ ] In the rewrite path that generates meta/title suggestions, load the page's `serpFeatures` from `getPageKeyword(workspaceId, pagePath)` (already available from `page-keywords.ts`)
+- [ ] When `featured_snippet` → inject into prompt: "FEATURED SNIPPET OPPORTUNITY: Write the meta description as a direct, declarative answer to the search query in 40-60 words. The meta description should be optimized for snippet extraction."
+- [ ] When `people_also_ask` → inject: "PEOPLE ALSO ASK: This keyword has PAA boxes. Consider a title that frames the page as an authoritative answer (e.g. 'What Is X? / How to X / X: Complete Guide')."
+- [ ] Inject only when `serpFeatures` is non-empty — no-op for pages without SERP data
+- [ ] Add integration test: rewrite for page with featured_snippet signal → prompt contains snippet directive
+- [ ] Commit: `feat(seo-edits): inject SERP feature context into meta/title rewrite prompts`
+
+---
+
+### PR 4 — Dependency Graph
+
+```
+[After PR 3 merged] ──► Task 13 (serp_feature_opportunity insight) ─┐
+                    ──► Task 14 (schema suggester SERP signals)    ──┤  (all parallel)
+                    ──► Task 15 (SEO edits SERP context)           ──┘
+```
+
+All three tasks are fully independent. Dispatch as a single parallel batch.
+
+---
+
+### PR 4 Staging Verification
+
+- [ ] Run strategy generation for a workspace with SEMRush configured → confirm `page_keywords.serp_features` is populated (check via `/api/debug/intelligence?workspaceId=...`)
+- [ ] Open the Insights panel → confirm `serp_feature_opportunity` insights appear for pages with PAA/featured snippet signals
+- [ ] Open Schema Suggestions for a page with `people_also_ask` → confirm FAQPage is in the suggestion list
+- [ ] Open SEO Editor for a page with `featured_snippet` → trigger a meta rewrite → confirm the generated meta description is structured as a direct answer (not generic)
+- [ ] Run `npx tsc --noEmit --skipLibCheck` → 0 errors
+- [ ] Run `npx vitest run` → all tests pass
+
+---
+
+## Future Ideation — Post-Group 3 (Flag for Group 4 Planning)
+
+> These items are not scoped into any current group. Review and prioritize during Group 4 kickoff.
+
+**PAA question harvesting for FAQ brief sections** — The `questionKeywords` field on `ContentGap` already stores related questions captured from SEMRush. When a brief's target keyword has `people_also_ask` signals, pull the matching questions from the content gap and inject them as pre-populated FAQ items in the brief outline. Currently the brief only knows PAA is present; this would give it the actual questions. Requires: matching content gap `questionKeywords` to the brief's target keyword during `generateBrief()`.
+
+**Content matrix SERP-aware cell suggestions** — When building a content matrix, cells targeting keywords with PAA signals could be flagged as "FAQ format recommended" and cells with featured snippet opportunities flagged as "definition/list format recommended." This gives writers per-cell format guidance without leaving the matrix view.
+
+**Featured snippet ownership tracking** — Extend rank tracking to detect whether the site currently owns a featured snippet for tracked keywords (SEMRush `serpFeatures` on domain organic keywords already returns this data). Surface ownership changes ("You won the featured snippet for X" / "Competitor stole the snippet for Y") as `serp_feature_change` insights. Requires: comparing current vs. previous `serpFeatures` for each keyword on rank tracking refresh.
+
+**Schema deployment + SERP feature correlation** — After deploying FAQPage schema on a page that had PAA signals, track whether PAA box appearances increase. Feed this back into the learnings engine as a `schema_serp_win` outcome type. Long-term payoff: the platform learns which schema deployments actually move the needle for each workspace's domain.
 
 ---

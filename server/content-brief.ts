@@ -16,7 +16,7 @@ import { getInsights } from './analytics-insights-store.js';
 import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
-import type { ContentBrief } from '../shared/types/content.ts';
+import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
@@ -473,8 +473,24 @@ const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
   },
 };
 
+/**
+ * Builds the strategy card context block injected into the generateBrief prompt.
+ * Exported for unit testing.
+ */
+export function buildStrategyCardBlock(ctx: StrategyCardContext | undefined): string {
+  if (!ctx) return '';
+  const lines: string[] = ['\n\nSTRATEGY CARD CONTEXT (from the content gap that triggered this brief):'];
+  if (ctx.rationale) lines.push(`- Strategic rationale: ${ctx.rationale}`);
+  if (ctx.intent) lines.push(`- Search intent: ${ctx.intent}`);
+  if (ctx.priority) lines.push(`- Priority: ${ctx.priority}`);
+  if (ctx.journeyStage) lines.push(`- Journey stage: ${ctx.journeyStage} — tailor depth, CTA, and tone to this stage`);
+  if (lines.length === 1) return ''; // no fields added
+  lines.push('Use this context to align the brief with the client\'s stated strategy. The rationale explains WHY this page is needed — reference it in the executive summary.');
+  return lines.join('\n');
+}
+
 // Helper to get config for a page type, with blog as default
-function getPageTypeConfig(pageType?: string): PageTypeConfig {
+export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   if (pageType && PAGE_TYPE_CONFIGS[pageType]) return PAGE_TYPE_CONFIGS[pageType];
   return PAGE_TYPE_CONFIGS.blog;
 }
@@ -761,6 +777,8 @@ export async function generateBrief(
       contentGaps?: string[];
       searchIntent?: string;
     };
+    /** Strategy card context threaded from the content request. */
+    strategyCardContext?: StrategyCardContext;
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -846,6 +864,30 @@ export async function generateBrief(
     if (pac.recommendations?.length) parts.push(`Recommendations from page analysis:\n${pac.recommendations.map(r => `- ${r}`).join('\n')}`);
     if (parts.length > 0) {
       pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
+    }
+  }
+
+  // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
+  // SEMRush flags which SERP features are present for the primary keyword; we translate
+  // those signals into concrete structural directives for the brief writer.
+  let serpFeaturesDirectiveBlock = '';
+  if (matchedPage?.serpFeatures?.length) {
+    const feats = matchedPage.serpFeatures;
+    const directives: string[] = [];
+    if (feats.includes('featured_snippet')) {
+      directives.push('FEATURED SNIPPET OPPORTUNITY: Structure a clear, concise definition or numbered step list in the first 100 words. The opening paragraph should directly answer the target query in 40-60 words.');
+    }
+    if (feats.includes('people_also_ask')) {
+      directives.push('PEOPLE ALSO ASK OPPORTUNITY: Include a dedicated FAQ section with 4-6 concise Q&A pairs. Questions should directly address what users ask about this topic.');
+    }
+    if (feats.includes('video')) {
+      directives.push('VIDEO CAROUSEL OPPORTUNITY: Recommend embedding a relevant video or note that a video component will improve SERP visibility for this keyword.');
+    }
+    if (feats.includes('local_pack')) {
+      directives.push('LOCAL PACK OPPORTUNITY: Include location-specific content, NAP details, and recommend LocalBusiness schema markup.');
+    }
+    if (directives.length > 0) {
+      serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (SEMRush data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;
     }
   }
 
@@ -951,6 +993,9 @@ The outline sections MUST match the following template sections in order. You ma
     }
   } catch { /* intelligence layer not ready — skip */ }
 
+  // Strategy card context from content request
+  const strategyCardBlock = buildStrategyCardBlock(context.strategyCardContext);
+
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
@@ -959,7 +1004,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${intelligenceBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}
 
 Generate a content brief in the following JSON format:
 {
