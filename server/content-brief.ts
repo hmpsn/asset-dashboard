@@ -867,6 +867,30 @@ export async function generateBrief(
     }
   }
 
+  // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
+  // SEMRush flags which SERP features are present for the primary keyword; we translate
+  // those signals into concrete structural directives for the brief writer.
+  let serpFeaturesDirectiveBlock = '';
+  if (matchedPage?.serpFeatures?.length) {
+    const feats = matchedPage.serpFeatures;
+    const directives: string[] = [];
+    if (feats.includes('featured_snippet')) {
+      directives.push('FEATURED SNIPPET OPPORTUNITY: Structure a clear, concise definition or numbered step list in the first 100 words. The opening paragraph should directly answer the target query in 40-60 words.');
+    }
+    if (feats.includes('people_also_ask')) {
+      directives.push('PEOPLE ALSO ASK OPPORTUNITY: Include a dedicated FAQ section with 4-6 concise Q&A pairs. Questions should directly address what users ask about this topic.');
+    }
+    if (feats.includes('video')) {
+      directives.push('VIDEO CAROUSEL OPPORTUNITY: Recommend embedding a relevant video or note that a video component will improve SERP visibility for this keyword.');
+    }
+    if (feats.includes('local_pack')) {
+      directives.push('LOCAL PACK OPPORTUNITY: Include location-specific content, NAP details, and recommend LocalBusiness schema markup.');
+    }
+    if (directives.length > 0) {
+      serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (SEMRush data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;
+    }
+  }
+
   // Reference URL context (competitor/inspiration pages)
   const referenceBlock = context.scrapedReferences?.length
     ? buildReferenceContext(context.scrapedReferences)
@@ -980,7 +1004,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}
 
 Generate a content brief in the following JSON format:
 {

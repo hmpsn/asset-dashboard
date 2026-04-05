@@ -2143,7 +2143,10 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
   const slices = [...(opts?.slices ?? ALL_SLICES)].sort().join(',');
   const page = opts?.pagePath ?? '';
   const domain = opts?.learningsDomain ?? 'all';
-  return `intelligence:${workspaceId}:${slices}:${page}:${domain}`;
+  // enrichWithBacklinks makes a network call that changes the result — must be part of the key
+  // so that callers with backlinks enabled don't hit a cron-warmed cache missing that data.
+  const backlinks = opts?.enrichWithBacklinks ? ':bl' : '';
+  return `intelligence:${workspaceId}:${slices}:${page}:${domain}${backlinks}`;
 }
 
 /** Invalidate all cached intelligence for a workspace */

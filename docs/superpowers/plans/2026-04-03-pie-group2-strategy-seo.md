@@ -89,16 +89,16 @@ Tasks 1 and 3 can run in parallel. Task 2 is **sequential-internal**: fix `page-
 > - Check that no TypeScript errors are introduced (`tsc --noEmit --skipLibCheck` clean)
 > - No UI changes in this PR — verification is data-integrity + type-level only
 
-**PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)**
-- Task 4: `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext — independent)
-- Task 6: `server/content-brief.ts` (buildStrategyCardBlock + strategyCardContext param — depends on Phase 0 types only)
-- Task 5: `server/routes/content-requests.ts` (StrategyCardContext threading — depends on Task 6)
-
-Tasks 4 and 6 can run in parallel. Task 5 is sequential after Task 6.
+**PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)** ✅ SHIPPED
+- Task 4: `server/workspace-intelligence.ts` — ✅ Done. backlinkProfile + serpFeatures wired into assembleSeoContext(). Additional commits added: backlinks now opt-in (`enrichWithBacklinks` flag), cache key includes backlinks flag, cron pre-warms backlink-enriched cache, admin chat passes `enrichWithBacklinks: true`.
+- Task 6: `server/content-brief.ts` — ✅ Done. buildStrategyCardBlock + strategyCardContext param. Additional commit: `matchedPage.serpFeatures` injected as SERP feature directives block into brief prompt.
+- Task 5: `server/routes/content-requests.ts` — ✅ Done. StrategyCardContext threaded through to generateBrief().
+- Extra (beyond plan scope): migration 051 adds `serp_features TEXT` to `page_keywords`; `PageKeywordMap.serpFeatures` typed; strategy generation now captures SERP feature flags per page from SEMRush domain data.
 
 > **✅ PR 2 Staging Verification — do these before merging PR 3:**
 > - Generate a content brief from a strategy card that has rationale/intent/priority set → open the brief → confirm the strategy card context block appears in the brief (look for the rationale text in the brief body)
-> - In `assembleSeoContext` output (check via admin AI chat): verify `backlinkProfile` and `serpFeatures` fields appear in the AI's context when it answers questions (ask something like "what backlink data do you have on this site?")
+> - Generate a brief for a keyword that SEMRush has SERP features for → confirm the brief prompt includes SERP feature directives (e.g. "PEOPLE ALSO ASK OPPORTUNITY")
+> - In `assembleSeoContext` output (check via admin AI chat): ask "what backlink data do you have on this site?" → confirm backlink data appears (from SEMRush if configured)
 > - If backlink or SERP data is unavailable for the workspace, confirm the chat still responds normally (graceful degradation, no 500 errors)
 
 **PR 3 — Tasks 7–10: UI Layer (all depend on PR 1 being merged)**
