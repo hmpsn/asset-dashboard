@@ -118,4 +118,29 @@ describe('formatForPrompt', () => {
     const result = formatForPrompt(intel, { verbosity: 'compact' });
     expect(result).not.toContain('Backlinks:');
   });
+
+  it('includes serpFeatures in standard mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'standard' });
+    expect(result).toContain('featured snippet');
+    expect(result).toContain('People Also Ask');
+  });
+
+  it('omits serpFeatures in compact mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'compact' });
+    expect(result).not.toContain('SERP features:');
+  });
 });

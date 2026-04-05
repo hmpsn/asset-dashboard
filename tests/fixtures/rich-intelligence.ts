@@ -75,6 +75,11 @@ export const RICH_SEO_CONTEXT: SeoContextSlice = {
     referringDomains: 210,
     // trend omitted — BacklinksOverview API doesn't provide it
   },
+  serpFeatures: {
+    featuredSnippets: 3,
+    peopleAlsoAsk: 5,
+    localPack: false,
+  },
 };
 
 export const RICH_INSIGHTS: InsightsSlice = {

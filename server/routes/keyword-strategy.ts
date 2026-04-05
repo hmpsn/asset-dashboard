@@ -1267,6 +1267,15 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           pm.difficulty = match.difficulty;
           pm.cpc = match.cpc;
           pm.metricsSource = METRICS_SOURCE.EXACT;
+          // Capture SERP features for this page's primary keyword — stored per-page and
+          // later aggregated into workspace-level SerpFeatures counts in assembleSeoContext()
+          const serp = hasSerpOpportunity(match.serpFeatures);
+          const features: string[] = [];
+          if (serp.featuredSnippet) features.push('featured_snippet');
+          if (serp.paa) features.push('people_also_ask');
+          if (serp.video) features.push('video');
+          if (serp.localPack) features.push('local_pack');
+          if (features.length > 0) pm.serpFeatures = features;
         } else {
           // Try word-overlap match (requires >=80% word overlap and at least 2 words)
           const partial = semrushDomainData.find(k => {

@@ -47,6 +47,7 @@ interface PageKeywordRow {
   monthly_volume: number | null;
   topic_cluster: string | null;
   search_intent_confidence: number | null;
+  serp_features: string | null;
 }
 
 function rowToModel(r: PageKeywordRow): PageKeywordMap {
@@ -81,6 +82,7 @@ function rowToModel(r: PageKeywordRow): PageKeywordMap {
   if (r.monthly_volume != null) m.monthlyVolume = r.monthly_volume;
   if (r.topic_cluster) m.topicCluster = r.topic_cluster;
   if (r.search_intent_confidence != null) m.searchIntentConfidence = r.search_intent_confidence;
+  if (r.serp_features) m.serpFeatures = parseJsonSafeArray(r.serp_features, z.string(), { table: 'page_keywords', field: 'serp_features' });
   return m;
 }
 
@@ -116,6 +118,7 @@ function modelToParams(workspaceId: string, m: PageKeywordMap) {
     monthly_volume: m.monthlyVolume ?? null,
     topic_cluster: m.topicCluster ?? null,
     search_intent_confidence: m.searchIntentConfidence ?? null,
+    serp_features: m.serpFeatures ? JSON.stringify(m.serpFeatures) : null,
   };
 }
 
@@ -143,14 +146,16 @@ function upsertStmt() {
         gsc_keywords, volume, difficulty, cpc, secondary_metrics, metrics_source, validated,
         optimization_score, analysis_generated_at, optimization_issues, recommendations,
         content_gaps, primary_keyword_presence, long_tail_keywords, competitor_keywords,
-        estimated_difficulty, keyword_difficulty, monthly_volume, topic_cluster, search_intent_confidence
+        estimated_difficulty, keyword_difficulty, monthly_volume, topic_cluster, search_intent_confidence,
+        serp_features
       ) VALUES (
         @workspace_id, @page_path, @page_title, @primary_keyword, @secondary_keywords,
         @search_intent, @current_position, @previous_position, @impressions, @clicks,
         @gsc_keywords, @volume, @difficulty, @cpc, @secondary_metrics, @metrics_source, @validated,
         @optimization_score, @analysis_generated_at, @optimization_issues, @recommendations,
         @content_gaps, @primary_keyword_presence, @long_tail_keywords, @competitor_keywords,
-        @estimated_difficulty, @keyword_difficulty, @monthly_volume, @topic_cluster, @search_intent_confidence
+        @estimated_difficulty, @keyword_difficulty, @monthly_volume, @topic_cluster, @search_intent_confidence,
+        @serp_features
       )
       ON CONFLICT(workspace_id, page_path) DO UPDATE SET
         page_title = excluded.page_title,
@@ -180,7 +185,8 @@ function upsertStmt() {
         keyword_difficulty = COALESCE(excluded.keyword_difficulty, page_keywords.keyword_difficulty),
         monthly_volume = COALESCE(excluded.monthly_volume, page_keywords.monthly_volume),
         topic_cluster = COALESCE(excluded.topic_cluster, page_keywords.topic_cluster),
-        search_intent_confidence = COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence)
+        search_intent_confidence = COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence),
+        serp_features = COALESCE(excluded.serp_features, page_keywords.serp_features)
     `);
   }
   return _upsert;
