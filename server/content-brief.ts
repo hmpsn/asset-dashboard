@@ -16,7 +16,7 @@ import { getInsights } from './analytics-insights-store.js';
 import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
-import type { ContentBrief } from '../shared/types/content.ts';
+import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
@@ -473,8 +473,24 @@ const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
   },
 };
 
+/**
+ * Builds the strategy card context block injected into the generateBrief prompt.
+ * Exported for unit testing.
+ */
+export function buildStrategyCardBlock(ctx: StrategyCardContext | undefined): string {
+  if (!ctx) return '';
+  const lines: string[] = ['\n\nSTRATEGY CARD CONTEXT (from the content gap that triggered this brief):'];
+  if (ctx.rationale) lines.push(`- Strategic rationale: ${ctx.rationale}`);
+  if (ctx.intent) lines.push(`- Search intent: ${ctx.intent}`);
+  if (ctx.priority) lines.push(`- Priority: ${ctx.priority}`);
+  if (ctx.journeyStage) lines.push(`- Journey stage: ${ctx.journeyStage} — tailor depth, CTA, and tone to this stage`);
+  if (lines.length === 1) return ''; // no fields added
+  lines.push('Use this context to align the brief with the client\'s stated strategy. The rationale explains WHY this page is needed — reference it in the executive summary.');
+  return lines.join('\n');
+}
+
 // Helper to get config for a page type, with blog as default
-function getPageTypeConfig(pageType?: string): PageTypeConfig {
+export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   if (pageType && PAGE_TYPE_CONFIGS[pageType]) return PAGE_TYPE_CONFIGS[pageType];
   return PAGE_TYPE_CONFIGS.blog;
 }
@@ -761,6 +777,8 @@ export async function generateBrief(
       contentGaps?: string[];
       searchIntent?: string;
     };
+    /** Strategy card context threaded from the content request. */
+    strategyCardContext?: StrategyCardContext;
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -951,6 +969,9 @@ The outline sections MUST match the following template sections in order. You ma
     }
   } catch { /* intelligence layer not ready — skip */ }
 
+  // Strategy card context from content request
+  const strategyCardBlock = buildStrategyCardBlock(context.strategyCardContext);
+
   const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
@@ -959,7 +980,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${intelligenceBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}
 
 Generate a content brief in the following JSON format:
 {
