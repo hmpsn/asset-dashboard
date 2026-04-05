@@ -4,10 +4,12 @@
  * Replaces the keywordStrategy.pageMap JSON array with indexed SQLite rows.
  * Each row = one page's keyword assignment + analysis data for a workspace.
  */
+import { z } from 'zod';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
 import { normalizePath } from './helpers.js';
 import { createLogger } from './logger.js';
+import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 
 const log = createLogger('page-keywords');
 
@@ -51,28 +53,28 @@ function rowToModel(r: PageKeywordRow): PageKeywordMap {
     pagePath: r.page_path,
     pageTitle: r.page_title,
     primaryKeyword: r.primary_keyword,
-    secondaryKeywords: JSON.parse(r.secondary_keywords || '[]'),
+    secondaryKeywords: parseJsonSafeArray(r.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
     searchIntent: r.search_intent ?? undefined,
   };
   if (r.current_position != null) m.currentPosition = r.current_position;
   if (r.previous_position != null) m.previousPosition = r.previous_position;
   if (r.impressions != null) m.impressions = r.impressions;
   if (r.clicks != null) m.clicks = r.clicks;
-  if (r.gsc_keywords) m.gscKeywords = JSON.parse(r.gsc_keywords);
+  if (r.gsc_keywords) m.gscKeywords = parseJsonFallback(r.gsc_keywords, []);
   if (r.volume != null) m.volume = r.volume;
   if (r.difficulty != null) m.difficulty = r.difficulty;
   if (r.cpc != null) m.cpc = r.cpc;
-  if (r.secondary_metrics) m.secondaryMetrics = JSON.parse(r.secondary_metrics);
+  if (r.secondary_metrics) m.secondaryMetrics = parseJsonFallback(r.secondary_metrics, undefined);
   if (r.metrics_source) m.metricsSource = r.metrics_source as 'exact' | 'partial_match' | 'bulk_lookup';
   if (r.validated != null) m.validated = !!r.validated;
   if (r.optimization_score != null) m.optimizationScore = r.optimization_score;
   if (r.analysis_generated_at) m.analysisGeneratedAt = r.analysis_generated_at;
-  if (r.optimization_issues) m.optimizationIssues = JSON.parse(r.optimization_issues);
-  if (r.recommendations) m.recommendations = JSON.parse(r.recommendations);
-  if (r.content_gaps) m.contentGaps = JSON.parse(r.content_gaps);
-  if (r.primary_keyword_presence) m.primaryKeywordPresence = JSON.parse(r.primary_keyword_presence);
-  if (r.long_tail_keywords) m.longTailKeywords = JSON.parse(r.long_tail_keywords);
-  if (r.competitor_keywords) m.competitorKeywords = JSON.parse(r.competitor_keywords);
+  if (r.optimization_issues) m.optimizationIssues = parseJsonSafeArray(r.optimization_issues, z.string(), { table: 'page_keywords', field: 'optimization_issues' });
+  if (r.recommendations) m.recommendations = parseJsonSafeArray(r.recommendations, z.string(), { table: 'page_keywords', field: 'recommendations' });
+  if (r.content_gaps) m.contentGaps = parseJsonSafeArray(r.content_gaps, z.string(), { table: 'page_keywords', field: 'content_gaps' });
+  if (r.primary_keyword_presence) m.primaryKeywordPresence = parseJsonFallback(r.primary_keyword_presence, undefined);
+  if (r.long_tail_keywords) m.longTailKeywords = parseJsonSafeArray(r.long_tail_keywords, z.string(), { table: 'page_keywords', field: 'long_tail_keywords' });
+  if (r.competitor_keywords) m.competitorKeywords = parseJsonSafeArray(r.competitor_keywords, z.string(), { table: 'page_keywords', field: 'competitor_keywords' });
   if (r.estimated_difficulty) m.estimatedDifficulty = r.estimated_difficulty;
   if (r.keyword_difficulty != null) m.keywordDifficulty = r.keyword_difficulty;
   if (r.monthly_volume != null) m.monthlyVolume = r.monthly_volume;
@@ -359,7 +361,7 @@ export function migrateFromJsonBlob(): void {
     }
 
     try {
-      const strategy = JSON.parse(row.keyword_strategy);
+      const strategy = parseJsonFallback<Record<string, unknown> | null>(row.keyword_strategy, null);
       const pageMap = strategy?.pageMap;
       if (!Array.isArray(pageMap) || pageMap.length === 0) continue;
 
