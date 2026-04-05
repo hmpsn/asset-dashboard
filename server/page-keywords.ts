@@ -173,11 +173,11 @@ function upsertStmt() {
         primary_keyword_presence = COALESCE(excluded.primary_keyword_presence, page_keywords.primary_keyword_presence),
         long_tail_keywords = COALESCE(excluded.long_tail_keywords, page_keywords.long_tail_keywords),
         competitor_keywords = COALESCE(excluded.competitor_keywords, page_keywords.competitor_keywords),
-        estimated_difficulty = excluded.estimated_difficulty,
-        keyword_difficulty = excluded.keyword_difficulty,
-        monthly_volume = excluded.monthly_volume,
-        topic_cluster = excluded.topic_cluster,
-        search_intent_confidence = excluded.search_intent_confidence
+        estimated_difficulty = COALESCE(excluded.estimated_difficulty, page_keywords.estimated_difficulty),
+        keyword_difficulty = COALESCE(excluded.keyword_difficulty, page_keywords.keyword_difficulty),
+        monthly_volume = COALESCE(excluded.monthly_volume, page_keywords.monthly_volume),
+        topic_cluster = COALESCE(excluded.topic_cluster, page_keywords.topic_cluster),
+        search_intent_confidence = COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence)
     `);
   }
   return _upsert;
@@ -263,6 +263,31 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
     for (const entry of entries) {
       stmt.run(modelToParams(workspaceId, entry));
     }
+  });
+  run();
+}
+
+/**
+ * Upsert new page keyword entries AND delete any stale rows no longer in the batch.
+ * Preserves Page Intelligence analysis fields on surviving rows (via COALESCE in upsertStmt).
+ * Use this for strategy generation/updates where the incoming batch is the complete desired set.
+ */
+export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKeywordMap[]): void {
+  const run = db.transaction(() => {
+    const stmt = upsertStmt();
+    for (const entry of entries) {
+      stmt.run(modelToParams(workspaceId, entry));
+    }
+    if (entries.length === 0) {
+      // Empty batch — delete all rows for this workspace
+      deleteAllStmt().run(workspaceId);
+      return;
+    }
+    const normalizedPaths = entries.map(e => normalizePath(e.pagePath));
+    const placeholders = normalizedPaths.map(() => '?').join(', ');
+    db.prepare(
+      `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
+    ).run(workspaceId, ...normalizedPaths);
   });
   run();
 }

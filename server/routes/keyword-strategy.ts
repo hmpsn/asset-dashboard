@@ -37,7 +37,7 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
-import { upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
+import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -1742,8 +1742,8 @@ Rules:
     const pageMap = strategy.pageMap || [];
     // Snapshot previous page map BEFORE replacing (needed for strategy diff)
     const prevPageMapForHistory = listPageKeywords(ws.id);
-    // Save pageMap to dedicated table (replaces all existing entries)
-    upsertPageKeywordsBatch(ws.id, pageMap);
+    // Save pageMap to dedicated table (upserts new entries + deletes stale ones, preserves PI data)
+    upsertAndCleanPageKeywords(ws.id, pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
@@ -1926,7 +1926,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   // If pageMap is being updated, save to dedicated table
   if (req.body.pageMap) {
-    upsertPageKeywordsBatch(ws.id, req.body.pageMap);
+    upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
