@@ -21,6 +21,7 @@ import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
+import type { StrategyCardContext, BriefJourneyStage } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
   discoverSitemapUrls,
@@ -40,6 +41,16 @@ const updateContentRequestSchema = z.object({
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
 });
+
+// --- Helper: Derive journey stage from intent ---
+function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
+  if (!intent) return undefined;
+  const lower = intent.toLowerCase();
+  if (lower === 'informational') return 'awareness';
+  if (lower === 'commercial') return 'consideration';
+  if (lower === 'transactional') return 'decision';
+  return undefined;
+}
 
 // --- Internal Content Request Management ---
 router.get('/api/content-requests/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -205,6 +216,15 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
 
     // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
     const existingPages = await getAllSitePages(ws);
+
+    // Thread strategy card context from request fields
+    const strategyCardContext: StrategyCardContext = {
+      rationale: request.rationale,
+      intent: request.intent,
+      priority: request.priority,
+      journeyStage: deriveJourneyStage(request.intent),
+    };
+
     const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
@@ -213,6 +233,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       semrushRelated,
       pageType: request.pageType || 'blog',
       ga4PagePerformance,
+      strategyCardContext,
     });
 
     // Link brief to request and update status
