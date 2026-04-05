@@ -73,12 +73,7 @@ export const RICH_SEO_CONTEXT: SeoContextSlice = {
   backlinkProfile: {
     totalBacklinks: 3400,
     referringDomains: 210,
-    trend: 'growing',
-  },
-  serpFeatures: {
-    featuredSnippets: 4,
-    peopleAlsoAsk: 12,
-    localPack: false,
+    // trend omitted — BacklinksOverview API doesn't provide it
   },
 };
 

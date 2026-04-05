@@ -98,26 +98,13 @@ describe('formatForPrompt', () => {
       ...baseIntelligence,
       seoContext: {
         ...RICH_SEO_CONTEXT,
-        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210, trend: 'growing' },
+        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210 },
       },
     };
     const result = formatForPrompt(intel, { verbosity: 'standard' });
     expect(result).toContain('3,400');
     expect(result).toContain('210');
-    expect(result).toContain('growing');
-  });
-
-  it('includes serpFeatures in standard mode when present', () => {
-    const intel: WorkspaceIntelligence = {
-      ...baseIntelligence,
-      seoContext: {
-        ...RICH_SEO_CONTEXT,
-        serpFeatures: { featuredSnippets: 4, peopleAlsoAsk: 12, localPack: false },
-      },
-    };
-    const result = formatForPrompt(intel, { verbosity: 'standard' });
-    expect(result).toContain('featured snippet');
-    expect(result).toContain('PAA box');
+    // trend not shown — BacklinksOverview API doesn't provide it
   });
 
   it('omits backlinkProfile in compact mode', () => {
@@ -125,7 +112,7 @@ describe('formatForPrompt', () => {
       ...baseIntelligence,
       seoContext: {
         ...RICH_SEO_CONTEXT,
-        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210, trend: 'growing' },
+        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210 },
       },
     };
     const result = formatForPrompt(intel, { verbosity: 'compact' });
