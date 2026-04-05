@@ -1180,6 +1180,7 @@ Rules:
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
+${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing: ${competitorDomains.map(d => d.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')).join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 
     log.info(`Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
