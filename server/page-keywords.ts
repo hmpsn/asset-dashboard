@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
+import type { MetricsSource } from '../shared/types/keywords.js';
 import { normalizePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
@@ -65,7 +66,7 @@ function rowToModel(r: PageKeywordRow): PageKeywordMap {
   if (r.difficulty != null) m.difficulty = r.difficulty;
   if (r.cpc != null) m.cpc = r.cpc;
   if (r.secondary_metrics) m.secondaryMetrics = parseJsonFallback(r.secondary_metrics, undefined);
-  if (r.metrics_source) m.metricsSource = r.metrics_source as 'exact' | 'partial_match' | 'bulk_lookup';
+  if (r.metrics_source) m.metricsSource = r.metrics_source as MetricsSource;
   if (r.validated != null) m.validated = !!r.validated;
   if (r.optimization_score != null) m.optimizationScore = r.optimization_score;
   if (r.analysis_generated_at) m.analysisGeneratedAt = r.analysis_generated_at;
