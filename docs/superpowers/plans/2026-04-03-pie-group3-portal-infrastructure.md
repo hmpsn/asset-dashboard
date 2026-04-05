@@ -1805,3 +1805,17 @@ All three tasks are fully independent. Dispatch as a single parallel batch.
 **Schema deployment + SERP feature correlation** — After deploying FAQPage schema on a page that had PAA signals, track whether PAA box appearances increase. Feed this back into the learnings engine as a `schema_serp_win` outcome type. Long-term payoff: the platform learns which schema deployments actually move the needle for each workspace's domain.
 
 ---
+
+## Deferred Cleanup Items — From PR #137 Code Review
+
+> These were flagged as informational/non-blocking during the PR #137 review passes. Not bugs, but worth addressing in a polish pass. Review and fold into the appropriate Group 4 or tech-debt sprint.
+
+**Content gap enrichment fields missing from `strategyCardContext`** — `StrategyCardContext` has fields for `volume`, `difficulty`, `trendDirection`, `serpFeatures`, `competitorProof`, and `impressions` but the route handler only populates `rationale`, `intent`, `priority`, and `journeyStage`. The enrichment data lives on `ContentGap` but is not transferred to `ContentTopicRequest` at creation time. Fix: when a content request is created from a content gap (`source='strategy'`), copy the gap's `volume`, `difficulty`, `trendDirection`, and `serpFeatures` onto the request and persist them. This is a design-limitation fix, not a bug — the `buildStrategyCardBlock` already handles these fields; they just need to be stored. Dependency: content_gaps normalization (roadmap item #365) would make this a trivial join rather than a denormalization.
+
+**SERP directives duplicating content gap `serpTargeting` in briefs** — `serpFeaturesDirectiveBlock` in `server/content-brief.ts` and the `serpTargeting` field from content gaps both produce SERP guidance when a keyword appears in both `pageMap` and `contentGaps`. Not incorrect, but adds ~100-200 tokens of redundant text per brief. Fix: in `generateBrief()`, check if `matchedGap?.serpTargeting` is already populated before injecting `serpFeaturesDirectiveBlock`; if both are present, either skip the directive block or merge them to avoid repetition.
+
+**Competitor brand name extraction regex imprecise for ccTLDs** — `server/routes/keyword-strategy.ts` uses `.replace(/\.[^.]+$/, '')` to strip TLD from competitor domains. Produces `competitor.co` instead of `competitor` for `competitor.co.uk`. Only affects AI prompt text so impact is low, but for precise brand filtering consider stripping the last two segments when the second-to-last is a known ccSLD (`.co`, `.com`, `.org`, `.net` before `.uk`, `.au`, `.nz`, etc.).
+
+**Stale SERP features on partial-match strategy reruns** — If a subsequent strategy run finds only a partial keyword match (not exact) for a page that previously had an exact match, the `serpFeatures` value from the old run persists via COALESCE. This is intentional by design (partial matches don't invalidate the data), but means stale SERP feature data can persist indefinitely for pages that drop off the exact-match list. Low-risk for now, but could surface as confusion ("Why does this page show featured_snippet opportunity when the keyword changed?"). Mitigation: add a `serp_features_updated_at` column and show data age in the UI, or document in the strategy generation log.
+
+---
