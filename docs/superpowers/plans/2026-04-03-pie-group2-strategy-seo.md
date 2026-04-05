@@ -89,16 +89,16 @@ Tasks 1 and 3 can run in parallel. Task 2 is **sequential-internal**: fix `page-
 > - Check that no TypeScript errors are introduced (`tsc --noEmit --skipLibCheck` clean)
 > - No UI changes in this PR — verification is data-integrity + type-level only
 
-**PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)**
-- Task 4: `server/workspace-intelligence.ts` (backlink profile + SERP features in assembleSeoContext — independent)
-- Task 6: `server/content-brief.ts` (buildStrategyCardBlock + strategyCardContext param — depends on Phase 0 types only)
-- Task 5: `server/routes/content-requests.ts` (StrategyCardContext threading — depends on Task 6)
-
-Tasks 4 and 6 can run in parallel. Task 5 is sequential after Task 6.
+**PR 2 — Tasks 4–6: Intelligence + Brief Wiring (server layer)** ✅ SHIPPED
+- Task 4: `server/workspace-intelligence.ts` — ✅ Done. backlinkProfile + serpFeatures wired into assembleSeoContext(). Additional commits added: backlinks now opt-in (`enrichWithBacklinks` flag), cache key includes backlinks flag, cron pre-warms backlink-enriched cache, admin chat passes `enrichWithBacklinks: true`.
+- Task 6: `server/content-brief.ts` — ✅ Done. buildStrategyCardBlock + strategyCardContext param. Additional commit: `matchedPage.serpFeatures` injected as SERP feature directives block into brief prompt.
+- Task 5: `server/routes/content-requests.ts` — ✅ Done. StrategyCardContext threaded through to generateBrief().
+- Extra (beyond plan scope): migration 051 adds `serp_features TEXT` to `page_keywords`; `PageKeywordMap.serpFeatures` typed; strategy generation now captures SERP feature flags per page from SEMRush domain data.
 
 > **✅ PR 2 Staging Verification — do these before merging PR 3:**
 > - Generate a content brief from a strategy card that has rationale/intent/priority set → open the brief → confirm the strategy card context block appears in the brief (look for the rationale text in the brief body)
-> - In `assembleSeoContext` output (check via admin AI chat): verify `backlinkProfile` and `serpFeatures` fields appear in the AI's context when it answers questions (ask something like "what backlink data do you have on this site?")
+> - Generate a brief for a keyword that SEMRush has SERP features for → confirm the brief prompt includes SERP feature directives (e.g. "PEOPLE ALSO ASK OPPORTUNITY")
+> - In `assembleSeoContext` output (check via admin AI chat): ask "what backlink data do you have on this site?" → confirm backlink data appears (from SEMRush if configured)
 > - If backlink or SERP data is unavailable for the workspace, confirm the chat still responds normally (graceful degradation, no 500 errors)
 
 **PR 3 — Tasks 7–10: UI Layer (all depend on PR 1 being merged)**
@@ -1266,8 +1266,34 @@ npx vitest run tests/unit/kd-framing-strategyTab.test.ts 2>&1 | tail -10
 # Expected: all pass
 ```
 
+- [ ] **Add SERP feature chips per strategy card.** Each `PageKeywordMap` entry now carries `serpFeatures?: string[]` from migration 051. Surface these as small chips on the strategy card so the user can see which pages have snippet/PAA/local pack opportunities at a glance.
+
+  Find the per-page card render in the strategy list (the map over `strategy.pageMap`). After the volume/KD line, add:
+
+  ```tsx
+  {page.serpFeatures && page.serpFeatures.length > 0 && (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {page.serpFeatures.map(feat => {
+        const label: Record<string, string> = {
+          featured_snippet: '⬜ Snippet',
+          people_also_ask: '❓ PAA',
+          video: '▶ Video',
+          local_pack: '📍 Local',
+        };
+        return (
+          <span key={feat} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            {label[feat] ?? feat}
+          </span>
+        );
+      })}
+    </div>
+  )}
+  ```
+
+  > **Color rule:** SERP chips are data/informational (not actionable), so blue (`bg-blue-500/10 text-blue-400`) is correct per the Three Laws. Never teal for read-only data.
+
 - [ ] Run `npx tsc --noEmit --skipLibCheck` and `npx vite build` — expect zero errors.
-- [ ] Commit: `git add src/components/client/StrategyTab.tsx tests/unit/kd-framing-strategyTab.test.ts && git commit -m "feat(strategy-tab): add predicted impact, plain-language KD tooltips, spec-aligned status badge colors"`
+- [ ] Commit: `git add src/components/client/StrategyTab.tsx tests/unit/kd-framing-strategyTab.test.ts && git commit -m "feat(strategy-tab): add predicted impact, KD tooltips, status badge colors, SERP feature chips"`
 
 ---
 
@@ -1401,8 +1427,10 @@ npx vitest run tests/unit/kd-framing-contentGaps.test.ts 2>&1 | tail -10
 # Expected: all pass
 ```
 
+- [ ] **Add SERP feature chips per content gap.** `ContentGap.serpFeatures` is already populated during strategy generation (existing field, not new). Render chips in the gap card alongside volume/KD — same pattern as Task 7 SERP chips. Use the same blue chip style (`bg-blue-500/10 text-blue-400 border-blue-500/20`). Only render when `gap.serpFeatures?.length > 0`.
+
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — expect zero errors.
-- [ ] Commit: `git add src/components/strategy/ContentGaps.tsx tests/unit/kd-framing-contentGaps.test.ts && git commit -m "feat(content-gaps): add KD framing tooltip and predicted impact line"`
+- [ ] Commit: `git add src/components/strategy/ContentGaps.tsx tests/unit/kd-framing-contentGaps.test.ts && git commit -m "feat(content-gaps): add KD framing tooltip, predicted impact line, SERP feature chips"`
 
 ---
 

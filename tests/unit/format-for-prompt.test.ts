@@ -92,4 +92,55 @@ describe('formatForPrompt', () => {
     expect(result).toContain('enterprise seo');
     expect(result).not.toMatch(/\d+ site keywords/);
   });
+
+  it('includes backlinkProfile in standard mode when present', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210 },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'standard' });
+    expect(result).toContain('3,400');
+    expect(result).toContain('210');
+    // trend not shown — BacklinksOverview API doesn't provide it
+  });
+
+  it('omits backlinkProfile in compact mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210 },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'compact' });
+    expect(result).not.toContain('Backlinks:');
+  });
+
+  it('includes serpFeatures in standard mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'standard' });
+    expect(result).toContain('featured snippet');
+    expect(result).toContain('People Also Ask');
+  });
+
+  it('omits serpFeatures in compact mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'compact' });
+    expect(result).not.toContain('SERP features:');
+  });
 });

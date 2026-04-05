@@ -1180,6 +1180,7 @@ Rules:
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
+${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing: ${competitorDomains.map(d => d.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')).join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 
     log.info(`Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
@@ -1266,6 +1267,18 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           pm.difficulty = match.difficulty;
           pm.cpc = match.cpc;
           pm.metricsSource = METRICS_SOURCE.EXACT;
+          // Capture SERP features for this page's primary keyword — stored per-page and
+          // later aggregated into workspace-level SerpFeatures counts in assembleSeoContext()
+          const serp = hasSerpOpportunity(match.serpFeatures);
+          const features: string[] = [];
+          if (serp.featuredSnippet) features.push('featured_snippet');
+          if (serp.paa) features.push('people_also_ask');
+          if (serp.video) features.push('video');
+          if (serp.localPack) features.push('local_pack');
+          // Always write serpFeatures for exact matches (even empty) so COALESCE overwrites
+          // stale features if SEMRush data changed. Pages with no exact match are left
+          // undefined → null → COALESCE keeps previous value (correct for unmatched pages).
+          pm.serpFeatures = features;
         } else {
           // Try word-overlap match (requires >=80% word overlap and at least 2 words)
           const partial = semrushDomainData.find(k => {

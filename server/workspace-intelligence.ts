@@ -37,6 +37,7 @@ import type {
   ROIAttribution,
   WeCalledItEntry,
   ContentPipelineSummary,
+  SerpFeatures,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
@@ -289,6 +290,46 @@ async function assembleSeoContext(
     }
   } catch {
     // Strategy history table may not exist
+  }
+
+  // Backlink profile — opt-in only (network call, costs SEMRush credits)
+  // Gate with opts.enrichWithBacklinks to avoid hitting the hot-path for the
+  // ~16 callers that don't need backlink data (briefs, rewrites, audits, etc.)
+  if (opts?.enrichWithBacklinks) {
+    try {
+      const { getConfiguredProvider } = await import('./seo-data-provider.js');
+      const domain = workspace?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
+      if (domain) {
+        const provider = getConfiguredProvider();
+        if (provider?.isConfigured()) {
+          const overview = await provider.getBacklinksOverview(domain, workspaceId);
+          if (overview) {
+            base.backlinkProfile = {
+              totalBacklinks: overview.totalBacklinks,
+              referringDomains: overview.referringDomains,
+              // trend not computable from BacklinksOverview — omitted
+            };
+          }
+        }
+      }
+    } catch {
+      // Backlink data is optional — omit silently
+    }
+  }
+
+  // SERP features — aggregate from per-page serpFeatures stored in page_keywords.
+  // No external API call needed — this data is captured during strategy generation
+  // and stored in the serp_features column (migration 051).
+  if (livePageMap.length > 0) {
+    const allFeatures = livePageMap.flatMap(p => p.serpFeatures ?? []);
+    if (allFeatures.length > 0) {
+      const serpFeatures: SerpFeatures = {
+        featuredSnippets: allFeatures.filter(f => f === 'featured_snippet').length,
+        peopleAlsoAsk: allFeatures.filter(f => f === 'people_also_ask').length,
+        localPack: allFeatures.some(f => f === 'local_pack'),
+      };
+      base.serpFeatures = serpFeatures;
+    }
   }
 
   return base;
@@ -1408,6 +1449,22 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
   }
 
+  // Backlink profile — at standard+ verbosity (only present when enrichWithBacklinks opt-in was set)
+  if (ctx.backlinkProfile && verbosity !== 'compact') {
+    const bp = ctx.backlinkProfile;
+    lines.push(`Backlinks: ${bp.totalBacklinks.toLocaleString()} total, ${bp.referringDomains} referring domains`);
+  }
+
+  // SERP features — aggregated from per-page data; at standard+ verbosity
+  if (ctx.serpFeatures && verbosity !== 'compact') {
+    const sf = ctx.serpFeatures;
+    const parts: string[] = [];
+    if (sf.featuredSnippets > 0) parts.push(`${sf.featuredSnippets} featured snippet opportunit${sf.featuredSnippets === 1 ? 'y' : 'ies'}`);
+    if (sf.peopleAlsoAsk > 0) parts.push(`${sf.peopleAlsoAsk} People Also Ask opportunit${sf.peopleAlsoAsk === 1 ? 'y' : 'ies'}`);
+    if (sf.localPack) parts.push('local pack present');
+    if (parts.length > 0) lines.push(`SERP features: ${parts.join(', ')}`);
+  }
+
   // Site keywords — always include when present; compact shows fewer
   if (ctx.strategy?.siteKeywords?.length) {
     const kw = verbosity === 'compact'
@@ -2086,7 +2143,10 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
   const slices = [...(opts?.slices ?? ALL_SLICES)].sort().join(',');
   const page = opts?.pagePath ?? '';
   const domain = opts?.learningsDomain ?? 'all';
-  return `intelligence:${workspaceId}:${slices}:${page}:${domain}`;
+  // enrichWithBacklinks makes a network call that changes the result — must be part of the key
+  // so that callers with backlinks enabled don't hit a cron-warmed cache missing that data.
+  const backlinks = opts?.enrichWithBacklinks ? ':bl' : '';
+  return `intelligence:${workspaceId}:${slices}:${page}:${domain}${backlinks}`;
 }
 
 /** Invalidate all cached intelligence for a workspace */

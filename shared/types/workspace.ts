@@ -51,6 +51,9 @@ export interface PageKeywordMap {
   monthlyVolume?: number;
   topicCluster?: string;
   searchIntentConfidence?: number;
+  /** SERP features present for the primary keyword (e.g. featured_snippet, people_also_ask, local_pack).
+   *  Captured from SEMRush domain organic data during strategy generation. */
+  serpFeatures?: string[];
 }
 
 export interface KeywordGapItem {

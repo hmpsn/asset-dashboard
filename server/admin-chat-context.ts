@@ -323,6 +323,7 @@ export async function assembleAdminContext(
   const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — slices built dynamically above; general queries union operational+siteHealth+clientSignals
     slices: intelSlices as IntelligenceSlice[],
     learningsDomain: 'all',
+    enrichWithBacklinks: true, // admin AI advisor benefits from backlink data; cron pre-warms this cache key
   });
   const seoCtx = intel.seoContext;
 

@@ -24,6 +24,7 @@ async function runIntelligenceRefresh(): Promise<void> {
         if (!hasRecentActivity(ws.id, 30)) { skipped++; continue; }
         await buildWorkspaceIntelligence(ws.id, { // bwi-all-ok — explicit slices on next line
           slices: ['seoContext', 'insights', 'learnings', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational'],
+          enrichWithBacklinks: true, // pre-warm the backlink-enriched cache so admin chat sessions are cache-warm
         });
         refreshed++;
       } catch (err) {
