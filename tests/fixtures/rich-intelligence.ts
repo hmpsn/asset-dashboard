@@ -70,6 +70,16 @@ export const RICH_SEO_CONTEXT: SeoContextSlice = {
     revisionsCount: 3,
     lastRevisedAt: '2026-03-10T00:00:00Z',
   },
+  backlinkProfile: {
+    totalBacklinks: 3400,
+    referringDomains: 210,
+    trend: 'growing',
+  },
+  serpFeatures: {
+    featuredSnippets: 4,
+    peopleAlsoAsk: 12,
+    localPack: false,
+  },
 };
 
 export const RICH_INSIGHTS: InsightsSlice = {

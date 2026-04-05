@@ -291,6 +291,52 @@ async function assembleSeoContext(
     // Strategy history table may not exist
   }
 
+  // Backlink profile — from configured SEO data provider
+  try {
+    const { getConfiguredProvider } = await import('./seo-data-provider.js');
+    const { getWorkspace: getWsForBacklinks } = await import('./workspaces.js');
+    const wsForBacklinks = getWsForBacklinks(workspaceId);
+    const domain = wsForBacklinks?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
+    if (domain) {
+      const provider = getConfiguredProvider();
+      if (provider?.isConfigured()) {
+        const overview = await provider.getBacklinksOverview(domain, workspaceId);
+        if (overview) {
+          base.backlinkProfile = {
+            totalBacklinks: overview.totalBacklinks,
+            referringDomains: overview.referringDomains,
+            trend: 'stable',
+          };
+        }
+      }
+    }
+  } catch {
+    // Backlink data is optional — omit silently
+  }
+
+  // SERP features — aggregated from page_keywords.serpFeatures column (no new API call)
+  try {
+    const { listPageKeywords: listPkForSerp } = await import('./page-keywords.js');
+    const pageKws = listPkForSerp(workspaceId);
+    let featuredSnippets = 0;
+    let peopleAlsoAsk = 0;
+    let localPackFound = false;
+    for (const pk of pageKws) {
+      const features: string[] = Array.isArray(pk.serpFeatures) ? pk.serpFeatures : [];
+      for (const f of features) {
+        const lower = f.toLowerCase();
+        if (lower.includes('featured_snippet') || lower.includes('featured snippet')) featuredSnippets++;
+        if (lower.includes('people_also_ask') || lower.includes('people also ask')) peopleAlsoAsk++;
+        if (lower.includes('local_pack') || lower.includes('local pack')) localPackFound = true;
+      }
+    }
+    if (featuredSnippets > 0 || peopleAlsoAsk > 0 || localPackFound) {
+      base.serpFeatures = { featuredSnippets, peopleAlsoAsk, localPack: localPackFound };
+    }
+  } catch {
+    // SERP features are optional — omit silently
+  }
+
   return base;
 }
 
@@ -1406,6 +1452,22 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.rankTracking && verbosity !== 'compact') {
     const rt = ctx.rankTracking;
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
+  }
+
+  // Backlink profile — at standard+ verbosity
+  if (ctx.backlinkProfile && verbosity !== 'compact') {
+    const bp = ctx.backlinkProfile;
+    lines.push(`Backlinks: ${bp.totalBacklinks.toLocaleString()} total, ${bp.referringDomains} referring domains (trend: ${bp.trend})`);
+  }
+
+  // SERP features — at standard+ verbosity
+  if (ctx.serpFeatures && verbosity !== 'compact') {
+    const sf = ctx.serpFeatures;
+    const parts: string[] = [];
+    if (sf.featuredSnippets > 0) parts.push(`${sf.featuredSnippets} featured snippet${sf.featuredSnippets > 1 ? 's' : ''}`);
+    if (sf.peopleAlsoAsk > 0) parts.push(`${sf.peopleAlsoAsk} PAA box${sf.peopleAlsoAsk > 1 ? 'es' : ''}`);
+    if (sf.localPack) parts.push('local pack');
+    if (parts.length > 0) lines.push(`SERP features across pages: ${parts.join(', ')}`);
   }
 
   // Site keywords — always include when present; compact shows fewer
