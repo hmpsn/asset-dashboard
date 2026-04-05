@@ -37,13 +37,14 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
-import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
+import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
+import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
@@ -1264,7 +1265,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           pm.volume = match.volume;
           pm.difficulty = match.difficulty;
           pm.cpc = match.cpc;
-          (pm as Record<string, unknown>).metricsSource = 'exact';
+          pm.metricsSource = METRICS_SOURCE.EXACT;
         } else {
           // Try word-overlap match (requires >=80% word overlap and at least 2 words)
           const partial = semrushDomainData.find(k => {
@@ -1277,7 +1278,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             pm.volume = partial.volume;
             pm.difficulty = partial.difficulty;
             pm.cpc = partial.cpc;
-            (pm as Record<string, unknown>).metricsSource = 'partial_match';
+            pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
           }
         }
         // Enrich secondary keywords
@@ -1317,7 +1318,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
                 pm.volume = m.volume;
                 pm.difficulty = m.difficulty;
                 pm.cpc = m.cpc;
-                (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
+                pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
               }
             }
           }
@@ -1741,8 +1742,8 @@ Rules:
     const pageMap = strategy.pageMap || [];
     // Snapshot previous page map BEFORE replacing (needed for strategy diff)
     const prevPageMapForHistory = listPageKeywords(ws.id);
-    // Save pageMap to dedicated table (replaces all existing entries)
-    replaceAllPageKeywords(ws.id, pageMap);
+    // Save pageMap to dedicated table (upserts new entries + deletes stale ones, preserves PI data)
+    upsertAndCleanPageKeywords(ws.id, pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
@@ -1925,7 +1926,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   // If pageMap is being updated, save to dedicated table
   if (req.body.pageMap) {
-    replaceAllPageKeywords(ws.id, req.body.pageMap);
+    upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);

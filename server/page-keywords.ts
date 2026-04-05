@@ -4,10 +4,13 @@
  * Replaces the keywordStrategy.pageMap JSON array with indexed SQLite rows.
  * Each row = one page's keyword assignment + analysis data for a workspace.
  */
+import { z } from 'zod';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
+import type { MetricsSource } from '../shared/types/keywords.js';
 import { normalizePath } from './helpers.js';
 import { createLogger } from './logger.js';
+import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 
 const log = createLogger('page-keywords');
 
@@ -51,28 +54,28 @@ function rowToModel(r: PageKeywordRow): PageKeywordMap {
     pagePath: r.page_path,
     pageTitle: r.page_title,
     primaryKeyword: r.primary_keyword,
-    secondaryKeywords: JSON.parse(r.secondary_keywords || '[]'),
+    secondaryKeywords: parseJsonSafeArray(r.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
     searchIntent: r.search_intent ?? undefined,
   };
   if (r.current_position != null) m.currentPosition = r.current_position;
   if (r.previous_position != null) m.previousPosition = r.previous_position;
   if (r.impressions != null) m.impressions = r.impressions;
   if (r.clicks != null) m.clicks = r.clicks;
-  if (r.gsc_keywords) m.gscKeywords = JSON.parse(r.gsc_keywords);
+  if (r.gsc_keywords) m.gscKeywords = parseJsonFallback(r.gsc_keywords, []);
   if (r.volume != null) m.volume = r.volume;
   if (r.difficulty != null) m.difficulty = r.difficulty;
   if (r.cpc != null) m.cpc = r.cpc;
-  if (r.secondary_metrics) m.secondaryMetrics = JSON.parse(r.secondary_metrics);
-  if (r.metrics_source) m.metricsSource = r.metrics_source as 'exact' | 'partial_match' | 'bulk_lookup';
+  if (r.secondary_metrics) m.secondaryMetrics = parseJsonFallback(r.secondary_metrics, undefined);
+  if (r.metrics_source) m.metricsSource = r.metrics_source as MetricsSource;
   if (r.validated != null) m.validated = !!r.validated;
   if (r.optimization_score != null) m.optimizationScore = r.optimization_score;
   if (r.analysis_generated_at) m.analysisGeneratedAt = r.analysis_generated_at;
-  if (r.optimization_issues) m.optimizationIssues = JSON.parse(r.optimization_issues);
-  if (r.recommendations) m.recommendations = JSON.parse(r.recommendations);
-  if (r.content_gaps) m.contentGaps = JSON.parse(r.content_gaps);
-  if (r.primary_keyword_presence) m.primaryKeywordPresence = JSON.parse(r.primary_keyword_presence);
-  if (r.long_tail_keywords) m.longTailKeywords = JSON.parse(r.long_tail_keywords);
-  if (r.competitor_keywords) m.competitorKeywords = JSON.parse(r.competitor_keywords);
+  if (r.optimization_issues) m.optimizationIssues = parseJsonSafeArray(r.optimization_issues, z.string(), { table: 'page_keywords', field: 'optimization_issues' });
+  if (r.recommendations) m.recommendations = parseJsonSafeArray(r.recommendations, z.string(), { table: 'page_keywords', field: 'recommendations' });
+  if (r.content_gaps) m.contentGaps = parseJsonSafeArray(r.content_gaps, z.string(), { table: 'page_keywords', field: 'content_gaps' });
+  if (r.primary_keyword_presence) m.primaryKeywordPresence = parseJsonFallback(r.primary_keyword_presence, undefined);
+  if (r.long_tail_keywords) m.longTailKeywords = parseJsonSafeArray(r.long_tail_keywords, z.string(), { table: 'page_keywords', field: 'long_tail_keywords' });
+  if (r.competitor_keywords) m.competitorKeywords = parseJsonSafeArray(r.competitor_keywords, z.string(), { table: 'page_keywords', field: 'competitor_keywords' });
   if (r.estimated_difficulty) m.estimatedDifficulty = r.estimated_difficulty;
   if (r.keyword_difficulty != null) m.keywordDifficulty = r.keyword_difficulty;
   if (r.monthly_volume != null) m.monthlyVolume = r.monthly_volume;
@@ -165,19 +168,19 @@ function upsertStmt() {
         secondary_metrics = excluded.secondary_metrics,
         metrics_source = excluded.metrics_source,
         validated = excluded.validated,
-        optimization_score = excluded.optimization_score,
-        analysis_generated_at = excluded.analysis_generated_at,
-        optimization_issues = excluded.optimization_issues,
-        recommendations = excluded.recommendations,
-        content_gaps = excluded.content_gaps,
-        primary_keyword_presence = excluded.primary_keyword_presence,
-        long_tail_keywords = excluded.long_tail_keywords,
-        competitor_keywords = excluded.competitor_keywords,
-        estimated_difficulty = excluded.estimated_difficulty,
-        keyword_difficulty = excluded.keyword_difficulty,
-        monthly_volume = excluded.monthly_volume,
-        topic_cluster = excluded.topic_cluster,
-        search_intent_confidence = excluded.search_intent_confidence
+        optimization_score = COALESCE(excluded.optimization_score, page_keywords.optimization_score),
+        analysis_generated_at = COALESCE(excluded.analysis_generated_at, page_keywords.analysis_generated_at),
+        optimization_issues = COALESCE(excluded.optimization_issues, page_keywords.optimization_issues),
+        recommendations = COALESCE(excluded.recommendations, page_keywords.recommendations),
+        content_gaps = COALESCE(excluded.content_gaps, page_keywords.content_gaps),
+        primary_keyword_presence = COALESCE(excluded.primary_keyword_presence, page_keywords.primary_keyword_presence),
+        long_tail_keywords = COALESCE(excluded.long_tail_keywords, page_keywords.long_tail_keywords),
+        competitor_keywords = COALESCE(excluded.competitor_keywords, page_keywords.competitor_keywords),
+        estimated_difficulty = COALESCE(excluded.estimated_difficulty, page_keywords.estimated_difficulty),
+        keyword_difficulty = COALESCE(excluded.keyword_difficulty, page_keywords.keyword_difficulty),
+        monthly_volume = COALESCE(excluded.monthly_volume, page_keywords.monthly_volume),
+        topic_cluster = COALESCE(excluded.topic_cluster, page_keywords.topic_cluster),
+        search_intent_confidence = COALESCE(excluded.search_intent_confidence, page_keywords.search_intent_confidence)
     `);
   }
   return _upsert;
@@ -267,6 +270,31 @@ export function upsertPageKeywordsBatch(workspaceId: string, entries: PageKeywor
   run();
 }
 
+/**
+ * Upsert new page keyword entries AND delete any stale rows no longer in the batch.
+ * Preserves Page Intelligence analysis fields on surviving rows (via COALESCE in upsertStmt).
+ * Use this for strategy generation/updates where the incoming batch is the complete desired set.
+ */
+export function upsertAndCleanPageKeywords(workspaceId: string, entries: PageKeywordMap[]): void {
+  const run = db.transaction(() => {
+    const stmt = upsertStmt();
+    for (const entry of entries) {
+      stmt.run(modelToParams(workspaceId, entry));
+    }
+    if (entries.length === 0) {
+      // Empty batch — delete all rows for this workspace
+      deleteAllStmt().run(workspaceId);
+      return;
+    }
+    const normalizedPaths = entries.map(e => normalizePath(e.pagePath));
+    const placeholders = normalizedPaths.map(() => '?').join(', ');
+    db.prepare(
+      `DELETE FROM page_keywords WHERE workspace_id = ? AND page_path NOT IN (${placeholders})`
+    ).run(workspaceId, ...normalizedPaths);
+  });
+  run();
+}
+
 /** Replace all page keywords for a workspace (delete + insert in transaction). */
 export function replaceAllPageKeywords(workspaceId: string, entries: PageKeywordMap[]): void {
   const run = db.transaction(() => {
@@ -334,7 +362,7 @@ export function migrateFromJsonBlob(): void {
     }
 
     try {
-      const strategy = JSON.parse(row.keyword_strategy);
+      const strategy = parseJsonFallback<Record<string, unknown> | null>(row.keyword_strategy, null);
       const pageMap = strategy?.pageMap;
       if (!Array.isArray(pageMap) || pageMap.length === 0) continue;
 
