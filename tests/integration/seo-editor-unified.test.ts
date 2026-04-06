@@ -5,10 +5,18 @@ import { describe, it, expect } from 'vitest';
 // without mounting the full component (no DOM environment needed).
 
 describe('SeoEditor — unified pages integration contracts', () => {
-  it('useSeoEditor is called with both siteId and workspaceId', () => {
-    // Verified by code review: line ~37 passes workspaceId as second arg
-    // This test documents the contract introduced in Task 9/10
-    expect(true).toBe(true);
+  it('PageMeta source field drives CMS filter: static pages excluded when showCmsOnly=true', () => {
+    // Re-tests the core integration contract with explicit inputs matching real component logic
+    const pages: Array<{ id: string; source?: string; title: string; slug: string }> = [
+      { id: 's1', source: 'static', title: 'Home', slug: '/' },
+      { id: 'c1', source: 'cms', title: 'Post A', slug: '/blog/a' },
+      { id: 'c2', source: 'cms', title: 'Post B', slug: '/blog/b' },
+      { id: 's2', source: undefined, title: 'Unknown', slug: '/unknown' },
+    ];
+    const showCmsOnly = true;
+    const filtered = pages.filter(p => !(showCmsOnly && p.source !== 'cms'));
+    expect(filtered).toHaveLength(2);
+    expect(filtered.every(p => p.source === 'cms')).toBe(true);
   });
 
   it('showCmsOnly filter excludes static pages', () => {

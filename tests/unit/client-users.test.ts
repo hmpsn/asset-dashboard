@@ -38,6 +38,7 @@ const FIXED_TEST_WORKSPACES = [
   WS_ID + '_changepw',
   WS_ID + '_jwt',
   WS_ID + '_del',
+  WS_ID + '_login',
 ];
 
 beforeAll(() => {
