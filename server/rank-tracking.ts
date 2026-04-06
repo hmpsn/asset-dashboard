@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 
 export interface RankSnapshot {
@@ -52,7 +53,7 @@ const stmts = createStmtCache(() => ({
 
 function readConfig(workspaceId: string): { trackedKeywords: TrackedKeyword[] } {
   const row = stmts().getConfig.get(workspaceId) as ConfigRow | undefined;
-  return row ? { trackedKeywords: JSON.parse(row.tracked_keywords) } : { trackedKeywords: [] };
+  return row ? { trackedKeywords: parseJsonFallback<TrackedKeyword[]>(row.tracked_keywords, []) } : { trackedKeywords: [] };
 }
 
 function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyword[] }) {

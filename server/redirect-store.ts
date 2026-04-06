@@ -4,6 +4,7 @@
  */
 import type { RedirectScanResult } from './redirect-scanner.js';
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('redirect-store');
@@ -49,7 +50,7 @@ function rowToSnapshot(row: RedirectRow): RedirectSnapshot {
     id: row.id,
     siteId: row.site_id,
     createdAt: row.created_at,
-    result: JSON.parse(row.result),
+    result: parseJsonFallback(row.result, {}),
   };
 }
 

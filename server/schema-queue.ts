@@ -6,6 +6,7 @@
  * `pending_schemas` table. On publish, the schema is ready to apply.
  */
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getMatrix, getSchemaTypesForTemplate } from './content-matrices.js';
 import { getWorkspace } from './workspaces.js';
@@ -43,7 +44,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM pending_schemas WHERE cell_id = ? AND status = 'pending' LIMIT 1`,
   ),
   updateStatus: db.prepare(
-    `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id`,
+    `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id`, // status-ok: simple pending→applied/stale lifecycle, validateTransition planned in Batch 2
   ),
   markStaleByCellId: db.prepare(
     `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND status = 'pending'`,
@@ -55,7 +56,7 @@ const stmts = createStmtCache(() => ({
 let _getTemplate: ((workspaceId: string, templateId: string) => ContentTemplate | undefined) | null = null;
 async function loadGetTemplate(): Promise<typeof _getTemplate> {
   if (!_getTemplate) {
-    const mod = await import('./content-templates.js');
+    const mod = await import('./content-templates.js'); // dynamic-import-ok: breaks circular dep with content-matrices
     _getTemplate = mod.getTemplate;
   }
   return _getTemplate;
@@ -239,7 +240,7 @@ export function listPendingSchemas(workspaceId: string): {
 }[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as PendingSchemaRow[];
   return rows.map(row => {
-    const schema = JSON.parse(row.schema_json) as Record<string, unknown>;
+    const schema = parseJsonFallback<Record<string, unknown>>(row.schema_json, {});
     const graph = (schema['@graph'] as Record<string, unknown>[]) || [];
     const types = graph.map(n => String(n['@type'] || '')).filter(Boolean);
     const webPage = graph.find(n => n['@type'] === 'WebPage');

@@ -4,6 +4,7 @@
  * Covers: PageWeight, PageSpeed, LinkChecker, InternalLinks, CompetitorCompare.
  */
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 // ── Prepared statements (lazy) ──
 
@@ -77,7 +78,7 @@ function load<T>(sub: string, siteId: string): Snapshot<T> | null {
   return {
     siteId: row.site_id,
     createdAt: row.created_at,
-    result: JSON.parse(row.result),
+    result: parseJsonFallback(row.result, {}),
   };
 }
 
@@ -157,7 +158,7 @@ export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: s
 
   for (const row of rows) {
     try {
-      const data = JSON.parse(row.result);
+      const data = parseJsonFallback(row.result, {});
       const snapMyUrl = normalize(data?.mySite?.url || '');
       if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
         if (!latest || row.created_at > latest.createdAt) {
@@ -174,7 +175,7 @@ export function listCompetitorCompares(): Array<{ key: string; createdAt: string
   const rows = listBySubStmt().all('competitor') as PerfRow[];
   return rows.map(row => {
     try {
-      const data = JSON.parse(row.result);
+      const data = parseJsonFallback(row.result, {});
       return {
         key: row.site_id,
         createdAt: row.created_at,

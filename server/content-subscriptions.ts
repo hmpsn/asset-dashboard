@@ -7,6 +7,7 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
 import type { ContentSubscription, ContentSubPlan } from '../shared/types/content.js';
@@ -81,7 +82,7 @@ function rowToSub(row: SubRow): ContentSubscription {
     currentPeriodEnd: row.current_period_end ?? undefined,
     postsDeliveredThisPeriod: row.posts_delivered_this_period,
     topicSource: row.topic_source as ContentSubscription['topicSource'],
-    preferredPageTypes: row.preferred_page_types ? JSON.parse(row.preferred_page_types) : undefined,
+    preferredPageTypes: parseJsonFallback(row.preferred_page_types, undefined),
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -6,6 +6,7 @@
 import bcrypt from 'bcryptjs';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 export type { UserRole, InternalUser as User, SafeInternalUser as SafeUser } from '../shared/types/users.ts';
 import type { UserRole, InternalUser as User, SafeInternalUser as SafeUser } from '../shared/types/users.ts';
@@ -34,7 +35,7 @@ function rowToUser(row: UserRow): User {
     name: row.name,
     passwordHash: row.password_hash,
     role: row.role as UserRole,
-    workspaceIds: JSON.parse(row.workspace_ids),
+    workspaceIds: parseJsonFallback<string[]>(row.workspace_ids, []),
     avatarUrl: row.avatar_url ?? undefined,
     lastLoginAt: row.last_login_at ?? undefined,
     createdAt: row.created_at,
