@@ -323,7 +323,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
         if (getActionBySource('approval', item.id)) continue;
-        const action = recordAction({
+        const action = recordAction({ // recordAction-ok — workspaceId is from route param, always valid
           workspaceId: req.params.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'approval',
