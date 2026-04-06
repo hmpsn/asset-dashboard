@@ -545,6 +545,15 @@
           "priority": "P2",
           "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).",
           "status": "pending"
+        },
+        {
+          "id": 535,
+          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
+          "source": "PR #138 review / manual testing",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.",
+          "status": "pending"
         }
       ]
     },

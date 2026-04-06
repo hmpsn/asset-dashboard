@@ -499,7 +499,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   // ── Bulk AI Rewrite — calls the same single-page aiRewrite for each selected page ──
   const bulkAiRewrite = async (field: 'title' | 'description' | 'both') => {
-    const selectedIds = Array.from(approvalSelected).filter(id => pages.some(p => p.id === id));
+    const selectedIds = filterWritableIds(Array.from(approvalSelected), pages);
     if (selectedIds.length === 0) return;
     setBulkField(field === 'both' ? 'title' : field);
     setBulkMode('rewriting');
