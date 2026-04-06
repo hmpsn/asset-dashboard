@@ -3205,16 +3205,16 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
-### 277. SEO Editor Unified Pages
-**What it does:** The SEO Editor now fetches from `/api/webflow/all-pages` which returns both static and CMS pages in a single response. A CMS-only filter toggle (teal active state) lets users isolate CMS pages. CMS pages missing a `collectionId` display an amber "Manual apply required" badge to indicate they cannot be auto-applied via the Webflow API. The `collectionId` field is threaded through into approval batch items so downstream application logic can route CMS vs. static pages correctly.
+### 277. SEO Editor CMS Write Guards & Static-Only Endpoint
+**What it does:** The SEO Editor fetches from `/api/webflow/pages/:siteId` (static pages only). CMS collection items are edited through the separate CMS Editor which fetches real item IDs from the CMS Items API. Defense-in-depth guards (`filterWritableIds`, `filterWritableItems`, `filterPagesNeedingFix`, `countMissingField`) ensure that any CMS pages with synthetic `cms-*` IDs are excluded from all Webflow write operations — bulk AI rewrite, pattern apply, bulk fix, approval submission, and individual save. Server-side guards at the PUT and bulk endpoints provide a second layer of protection.
 
-**Files:** `src/components/SeoEditor.tsx`, `src/hooks/admin/useSeoEditor.ts`
+**Files:** `src/components/SeoEditor.tsx`, `src/hooks/admin/useSeoEditor.ts`, `src/hooks/admin/seoEditorFilters.ts`, `server/routes/webflow.ts`, `server/routes/webflow-seo.ts`, `server/routes/approvals.ts`
 
-**Agency value:** Single editor view covers the full site — no switching between static and CMS page workflows. The manual-apply badge surfaces actionability gaps before the editor submits changes, preventing silent failures on CMS pages.
+**Agency value:** Clean separation: SeoEditor handles static Webflow pages (auto-apply via API), CMS Editor handles collection items (real CMS item IDs). No silent 404s from passing synthetic IDs to Webflow. Defense-in-depth means a single guard failure won't corrupt data.
 
-**Client value:** Approvals submitted through the client portal correctly represent all site pages, including CMS collections. No hidden pages that clients might wonder about.
+**Client value:** Approvals submitted through SeoEditor correctly target only pages that can be auto-applied. No confusing failures when approved changes can't be written.
 
-**Mutual:** Eliminates a class of "why didn't my changes apply?" support issues caused by missing collectionIds. Unified fetch reduces page-load complexity and keeps the editor in sync with the actual Webflow site structure.
+**Mutual:** Eliminates the "why didn't my changes apply?" class of issues by preventing unwritable pages from entering the write path at all.
 
 ---
 

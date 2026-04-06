@@ -121,6 +121,7 @@ describe('isSyntheticCmsId', () => {
 
   it('no static test fixtures are synthetic', () => {
     const staticPages = ALL_PAGES.filter(p => p.source !== 'cms');
+    expect(staticPages.length).toBeGreaterThan(0);
     expect(staticPages.every(p => !isSyntheticCmsId(p.id))).toBe(true);
   });
 });
@@ -130,6 +131,7 @@ describe('isSyntheticCmsId', () => {
 describe('filterWritablePages', () => {
   it('excludes all CMS pages', () => {
     const result = filterWritablePages(ALL_PAGES);
+    expect(result.length).toBeGreaterThan(0);
     expect(result.every(p => p.source !== 'cms')).toBe(true);
     expect(result.some(p => p.id.startsWith('cms-'))).toBe(false);
   });
@@ -164,6 +166,7 @@ describe('filterWritableItems (applyBulkRewrite pre-filter)', () => {
 
   it('excludes items whose page is CMS', () => {
     const result = filterWritableItems(previewItems, ALL_PAGES);
+    expect(result.length).toBeGreaterThan(0);
     expect(result.some(i => i.pageId.startsWith('cms-'))).toBe(false);
   });
 
@@ -226,6 +229,7 @@ describe('filterWritableIds (previewPattern selection filter)', () => {
 describe('filterPagesNeedingFix (handleBulkFix input)', () => {
   it('excludes CMS pages even when they are missing the field', () => {
     const titleFix = filterPagesNeedingFix(ALL_PAGES, 'title');
+    expect(titleFix.length).toBeGreaterThan(0);
     expect(titleFix.some(p => p.source === 'cms')).toBe(false);
     // cmsMissingTitle and cmsMissingBoth are missing titles but are CMS — must be excluded
     expect(titleFix.map(p => p.id)).not.toContain(cmsMissingTitle.id);
