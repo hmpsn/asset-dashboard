@@ -566,13 +566,16 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!workspaceId) return;
     const page = pages.find(p => p.id === pageId);
     const edit = edits[pageId];
-    if (!page || !edit) return;
-    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string; collectionId?: string }> = [];
+    // CMS pages (sitemap-discovered or template pages) cannot be written via the approvals
+    // API — sitemap pages have synthetic IDs, template pages' collectionId is a page-level
+    // attribute, not a CMS item ID. Exclude them entirely from the approval workflow.
+    if (!page || !edit || page.source === 'cms') return;
+    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
     if (edit.seoTitle !== (page.seo?.title || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle, collectionId: page.collectionId });
+      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
     }
     if (edit.seoDescription !== (page.seo?.description || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription, collectionId: page.collectionId });
+      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription });
     }
     if (items.length === 0) return;
     setSendingPage(prev => new Set(prev).add(pageId));
@@ -589,8 +592,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
     try {
-      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string; collectionId?: string }> = [];
-      for (const pageId of approvalSelected) {
+      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
+      // filterWritableIds excludes CMS pages (source === 'cms') — these cannot be written
+      // via the approvals API. collectionId is intentionally omitted: on Webflow template
+      // pages it means "renders this collection", not "this is a collection item ID".
+      // Passing it would mis-route items into updateCollectionItem(collectionId, pageId)
+      // where pageId ≠ itemId → 404.
+      for (const pageId of filterWritableIds(Array.from(approvalSelected), pages)) {
         const page = pages.find(p => p.id === pageId);
         const edit = edits[pageId];
         if (!page || !edit) continue;
@@ -599,7 +607,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           items.push({
             pageId, pageTitle: page.title, pageSlug: page.slug,
             field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle,
-            collectionId: page.collectionId,
           });
         }
         // Include description if changed from original
@@ -607,7 +614,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           items.push({
             pageId, pageTitle: page.title, pageSlug: page.slug,
             field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription,
-            collectionId: page.collectionId,
           });
         }
       }
