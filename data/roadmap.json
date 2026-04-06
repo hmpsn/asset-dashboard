@@ -3978,6 +3978,26 @@
           "notes": "Shipped — PR #137. Four-stage pipeline: (1) Capture: hasSerpOpportunity() parses SEMRush Fk codes during strategy generation → writes serp_features TEXT column (migration 051) per page. Exact matches always write (even []) to prevent COALESCE stale-data bug. (2) Aggregate: assembleSeoContext() computes workspace-level SerpFeatures (featuredSnippets, peopleAlsoAsk, localPack count). (3) Prompt: formatSeoContextSection() renders SERP features at standard/verbose verbosity. (4) Brief directives: generateBrief() injects per-feature structural directives into prompt (40-60w direct answer for featured snippet, 4-6 Q&A FAQ for PAA, video embed for video, NAP+LocalBusiness for local pack). Feature #208.",
           "status": "done",
           "shippedAt": "2026-04-04"
+        },
+        {
+          "id": "strategy-zero-volume-display-fix",
+          "title": "Strategy cards: handle below-threshold volume gracefully",
+          "source": "Session 2026-04-06 — visual inconsistency on local/niche keywords",
+          "est": "1-2h",
+          "priority": "P2",
+          "sprint": "A",
+          "status": "pending",
+          "notes": "SEMRush and DataForSEO round sub-threshold search volume to 0 rather than reporting the real number. Cards currently display '0/mo' which implies zero demand — but 0 can coexist with real GSC impressions, competitor rankings, and a high-priority AI rationale, creating a contradiction that undermines trust. Fix: (1) Display '<10/mo' instead of '0/mo' when volume === 0 in both StrategyTab.tsx and ContentGaps.tsx — this is the accurate meaning (below threshold, not actually zero). (2) Predicted impact line currently returns null when volume=0 (impact = 0 * 0.103 = 0, fails the < 10 guard). When volume is 0 but gap.impressions > 0, use impressions as a fallback signal: show '~{impressions} existing impr — opportunity confirmed via GSC' instead of hiding the line entirely. Touches: src/components/client/StrategyTab.tsx, src/components/strategy/ContentGaps.tsx."
+        },
+        {
+          "id": "seo-provider-hybrid-capability-routing",
+          "title": "Hybrid SEO provider: DataForSEO primary with SEMRush capability fallback",
+          "source": "Session 2026-04-06 — follow-up to provider abstraction (PR #137)",
+          "est": "3-5h",
+          "priority": "P2",
+          "sprint": "D",
+          "status": "pending",
+          "notes": "When DataForSEO is selected as seoDataProvider, all keyword/domain intelligence should route through it. Capabilities DataForSEO does not natively support (backlinks, SERP feature codes) should automatically fall back to SEMRush if both providers are configured. Current state: getBacklinksProvider() already does this reactively for backlinks — DataForSEO marks the capability disabled after a 403, then falls back. What's missing: (1) Proactive capability declarations — DataForSEO registers unsupported capabilities at init rather than waiting for a failure. (2) SERP features fallback — hasSerpOpportunity() currently parses SEMRush-specific Fk codes; needs a getSerPFeaturesProvider() path so DataForSEO workspaces can still capture SERP signals via SEMRush fallback. (3) Generalize getBacklinksProvider() into getCapableProvider(capability) to handle both cases and any future gaps cleanly. (4) Workspace settings UI — show which provider is serving which data type (e.g. 'Keywords: DataForSEO | Backlinks: SEMRush (fallback)') so admins have visibility. Architecture: seo-data-provider.ts already has the capability flag system (markCapabilityDisabled / isCapabilityDisabled) — this feature expands it from reactive-only to proactive + generalized."
         }
       ]
     }

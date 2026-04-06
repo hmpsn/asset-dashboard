@@ -1,23 +1,20 @@
 // tests/unit/useSeoEditor.test.ts
 // Contract tests for src/hooks/admin/useSeoEditor.ts
-// These are structural tests — they guard the endpoint migration and PageMeta interface
-// without requiring a full DOM environment to mount the hook.
+// SeoEditor uses the static pages endpoint (/api/webflow/pages/).
+// CMS collection items are edited through the separate CmsEditor component
+// which fetches real item IDs from the CMS Items API.
 
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 
 describe('useSeoEditor — endpoint contract', () => {
-  const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8'); // readFile-ok — intentional endpoint migration guard
+  const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8'); // readFile-ok — intentional endpoint guard
 
-  it('uses all-pages endpoint (migration guard — must not regress to /pages/)', () => {
-    expect(src).toContain('all-pages');
-    // Negative guard: the legacy endpoint must not be re-introduced
-    expect(src).not.toMatch(/`\/api\/webflow\/pages\/\$\{siteId\}`/);
-  });
-
-  it('hook accepts optional workspaceId parameter', () => {
-    // workspaceId is optional — must appear as a parameter
-    expect(src).toMatch(/useSeoEditor\s*\(\s*siteId.*workspaceId/);
+  it('uses static pages endpoint (CMS items handled by CmsEditor)', () => {
+    expect(src).toMatch(/\/api\/webflow\/pages\//);
+    // Must NOT use all-pages — that returns sitemap CMS pages with synthetic IDs
+    // that cannot be written back to Webflow. CMS editing lives in CmsEditor.
+    expect(src).not.toContain('all-pages');
   });
 
   it('PageMeta declares source field for CMS/static discrimination', () => {
