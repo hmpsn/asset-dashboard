@@ -45,22 +45,6 @@ interface StrategyTabProps {
 const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 
-function estimatedCTR(position?: number): number | undefined {
-  if (!position || position < 1) return undefined;
-  if (position <= 1) return 0.279;
-  if (position <= 2) return 0.149;
-  if (position <= 3) return 0.103;
-  if (position <= 5) return 0.062;
-  if (position <= 10) return 0.022;
-  return undefined;
-}
-
-function predictedImpact(volume?: number, position?: number): number | undefined {
-  if (!volume || volume <= 0) return undefined;
-  const ctr = estimatedCTR(position);
-  if (ctr === undefined) return undefined;
-  return Math.round(volume * ctr);
-}
 
 export interface KeywordFeedback {
   keyword: string;
@@ -624,16 +608,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             </span>
                           )}
                           {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
-                          {(() => {
-                            const impact = predictedImpact(gap.volume, gap.currentPosition);
-                            if (impact === undefined) return null;
-                            return (
-                              <span className="text-[10px] text-blue-400/70 flex items-center gap-0.5">
-                                <TrendingUp className="w-2.5 h-2.5" />
-                                ~{fmtNum(impact)}/mo est. clicks
-                              </span>
-                            );
-                          })()}
+                          {gap.volume != null && gap.volume > 0 && (
+                            // Content gaps have no current position — assume rank #3 CTR (0.103) as baseline
+                            <span className="text-[10px] text-blue-400/70 flex items-center gap-0.5">
+                              <TrendingUp className="w-2.5 h-2.5" />
+                              ~{fmtNum(Math.round(gap.volume * 0.103))}/mo est. clicks
+                            </span>
+                          )}
                         </div>
                       )}
                       {/* Trend + SERP + Competitor badges */}
