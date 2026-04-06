@@ -48,9 +48,10 @@ export function cleanSeedData(workspaceId?: string): void {
     }
   } else {
     // Full cleanup — truncate all seed tables (use sparingly)
+    // Match all fixture ID prefixes: test-, batch-, item-, req-, brief-, post-
     for (const table of SEED_TABLES) {
       try {
-        db.prepare(`DELETE FROM ${table} WHERE id LIKE 'test-%'`).run();
+        db.prepare(`DELETE FROM ${table} WHERE id LIKE 'test-%' OR id LIKE 'batch-%' OR id LIKE 'item-%' OR id LIKE 'req-%' OR id LIKE 'brief-%' OR id LIKE 'post-%'`).run();
       } catch {
         // Silently skip tables that don't match
       }

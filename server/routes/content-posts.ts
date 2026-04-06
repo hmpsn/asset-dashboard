@@ -38,6 +38,7 @@ import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { buildIntelPrompt } from '../workspace-intelligence.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('content-posts');
 
@@ -128,10 +129,35 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requir
   }
 });
 
+const updatePostSchema = z.object({
+  title: z.string().max(500).optional(),
+  metaDescription: z.string().max(500).optional(),
+  introduction: z.string().optional(),
+  sections: z.array(z.object({
+    index: z.number(),
+    heading: z.string(),
+    content: z.string(),
+    wordCount: z.number(),
+    targetWordCount: z.number().optional(),
+    keywords: z.array(z.string()).optional(),
+    status: z.enum(['pending', 'generating', 'complete']).optional(),
+  })).optional(),
+  conclusion: z.string().optional(),
+  seoTitle: z.string().max(200).optional(),
+  seoMetaDescription: z.string().max(500).optional(),
+  status: z.enum(['generating', 'draft', 'review', 'approved']).optional(),
+  voiceScore: z.number().min(0).max(100).optional(),
+  voiceFeedback: z.string().optional(),
+  webflowItemId: z.string().optional(),
+  webflowCollectionId: z.string().optional(),
+  publishedAt: z.string().optional(),
+  publishedSlug: z.string().optional(),
+}).strict();
+
 // Update post fields (inline editing of title, sections, status, etc.)
 // If status is changed to 'approved' and workspace has auto-publish configured,
 // triggers publish-to-webflow in the background.
-router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res, next) => {
+router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), validate(updatePostSchema), (req, res, next) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
   // Snapshot before content-changing edits (not status-only changes)

@@ -45,12 +45,19 @@ interface RedirectRow {
   result: string;
 }
 
+const EMPTY_REDIRECT_RESULT: RedirectScanResult = {
+  chains: [],
+  pageStatuses: [],
+  summary: { totalPages: 0, healthy: 0, redirecting: 0, notFound: 0, errors: 0, chainsDetected: 0, longestChain: 0 },
+  scannedAt: new Date(0).toISOString(),
+};
+
 function rowToSnapshot(row: RedirectRow): RedirectSnapshot {
   return {
     id: row.id,
     siteId: row.site_id,
     createdAt: row.created_at,
-    result: parseJsonFallback(row.result, {}),
+    result: parseJsonFallback(row.result, EMPTY_REDIRECT_RESULT),
   };
 }
 
