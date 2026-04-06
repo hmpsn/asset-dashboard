@@ -368,7 +368,7 @@ export function PageEditRow({
             <button
               onClick={() => onSave?.(page.id)}
               disabled={!edit.dirty || isSaving || !onSave}
-              title={!onSave && isCmsPage ? 'CMS pages — use Send to Client or Approvals to apply changes' : undefined}
+              title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
