@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { FileText, Sparkles, BarChart3, Eye, Swords, TrendingUp, TrendingDown, Minus, Award, MessageCircleQuestion } from 'lucide-react';
+import { FileText, Sparkles, BarChart3, Eye, Swords, TrendingUp, TrendingDown, Minus, MessageCircleQuestion } from 'lucide-react';
 import { adminPath } from '../../routes';
+import { kdFraming, kdTooltip } from '../../lib/kdFraming.js';
 
 interface ContentGap {
   topic: string;
@@ -21,6 +22,23 @@ interface ContentGap {
 
 const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+
+function estimatedCTR(position?: number): number | undefined {
+  if (!position || position < 1) return undefined;
+  if (position <= 1) return 0.279;
+  if (position <= 2) return 0.149;
+  if (position <= 3) return 0.103;
+  if (position <= 5) return 0.062;
+  if (position <= 10) return 0.022;
+  return undefined;
+}
+
+function predictedImpact(volume?: number, position?: number): number | undefined {
+  if (!volume || volume <= 0) return undefined;
+  const ctr = estimatedCTR(position);
+  if (ctr === undefined) return undefined;
+  return Math.round(volume * ctr);
+}
 
 export interface ContentGapsProps {
   contentGaps: ContentGap[];
@@ -66,8 +84,30 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</span>
                   {gap.volume != null && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
-                  {gap.difficulty != null && gap.difficulty > 0 && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
+                  {gap.difficulty != null && gap.difficulty > 0 && (
+                    <span
+                      className={`text-[10px] font-medium ${kdColor(gap.difficulty)} cursor-help`}
+                      title={kdTooltip(gap.difficulty)}
+                    >
+                      KD {gap.difficulty}
+                    </span>
+                  )}
+                  {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
+                    <span className="text-[10px] text-zinc-500 leading-none">
+                      {kdFraming(gap.difficulty)}
+                    </span>
+                  )}
                   {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} impr</span>}
+                  {gap.volume && gap.volume > 0 && (() => {
+                    const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
+                    if (impact < 10) return null;
+                    return (
+                      <span className="text-[10px] text-blue-400/70 flex items-center gap-0.5">
+                        <TrendingUp className="w-2.5 h-2.5" />
+                        ~{fmtNum(impact)}/mo est. clicks at rank #3
+                      </span>
+                    );
+                  })()}
                 </div>
                 {workspaceId && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -97,11 +137,29 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
                   <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
                 )}
-                {gap.serpFeatures?.includes('featured_snippet') && (
-                  <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-medium"><Award className="w-3 h-3" />Featured Snippet</span>
-                )}
-                {gap.serpFeatures?.includes('people_also_ask') && (
-                  <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium"><MessageCircleQuestion className="w-3 h-3" />PAA</span>
+                {gap.serpFeatures && gap.serpFeatures.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {gap.serpFeatures.includes('featured_snippet') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        ⬜ Snippet
+                      </span>
+                    )}
+                    {gap.serpFeatures.includes('people_also_ask') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        ❓ PAA
+                      </span>
+                    )}
+                    {gap.serpFeatures.includes('video') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        ▶ Video
+                      </span>
+                    )}
+                    {gap.serpFeatures.includes('local_pack') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        📍 Local
+                      </span>
+                    )}
+                  </div>
                 )}
                 {gap.competitorProof && (
                   <span className="flex items-center gap-0.5 text-[10px] text-orange-400 font-medium"><Swords className="w-3 h-3" />{gap.competitorProof}</span>
