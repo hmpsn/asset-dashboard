@@ -194,7 +194,7 @@ export function useChat(deps: ChatDeps): ChatState & ChatActions {
         throw err;
       }
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
-      if (data.detectedIntent) setLastIntent(data.detectedIntent);
+      setLastIntent(data.detectedIntent || null);
       if (ws) getOptional<{ allowed: boolean; used: number; limit: number; remaining: number; tier: string }>(`/api/public/chat-usage/${ws.id}`).then(d => { if (d) setChatUsage(d); }).catch((err) => { console.error('useChat operation failed:', err); });
     } catch (err) {
       console.error('useChat operation failed:', err);
