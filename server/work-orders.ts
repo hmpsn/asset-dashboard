@@ -1,6 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { validateTransition, WORK_ORDER_TRANSITIONS } from './state-machines.js';
 
 // --- Types ---
 
@@ -123,6 +124,11 @@ export function updateWorkOrder(
 ): WorkOrder | null {
   const order = getWorkOrder(workspaceId, orderId);
   if (!order) return null;
+
+  // Validate status transition if status is being changed
+  if (updates.status !== undefined && updates.status !== order.status) {
+    validateTransition('work_order', WORK_ORDER_TRANSITIONS, order.status, updates.status);
+  }
 
   if (updates.status !== undefined) order.status = updates.status;
   if (updates.assignedTo !== undefined) order.assignedTo = updates.assignedTo;

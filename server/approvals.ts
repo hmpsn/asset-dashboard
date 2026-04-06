@@ -7,6 +7,7 @@ import type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
 import { parseJsonFallback } from './db/json-validation.js';
 import { approvalItemSchema } from './schemas/approval-schemas.js';
 import { createLogger } from './logger.js';
+import { validateTransition, APPROVAL_ITEM_TRANSITIONS } from './state-machines.js';
 
 const log = createLogger('approvals');
 
@@ -130,6 +131,11 @@ export function updateItem(
   if (!batch) return null;
   const item = batch.items.find(i => i.id === itemId);
   if (!item) return null;
+
+  // Validate status transition if status is being changed
+  if (update.status !== undefined && update.status !== item.status) {
+    validateTransition('approval_item', APPROVAL_ITEM_TRANSITIONS, item.status, update.status);
+  }
 
   // Filter out undefined values to prevent overwriting existing fields (e.g. status)
   const defined = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));

@@ -44,7 +44,15 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
   if (assignedTo !== undefined) updates.assignedTo = assignedTo;
   if (notes !== undefined) updates.notes = notes;
   if (status === 'completed') updates.completedAt = new Date().toISOString();
-  const order = updateWorkOrder(wsId, req.params.orderId, updates as Parameters<typeof updateWorkOrder>[2]);
+  let order;
+  try {
+    order = updateWorkOrder(wsId, req.params.orderId, updates as Parameters<typeof updateWorkOrder>[2]);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
   if (!order) return res.status(404).json({ error: 'Work order not found' });
 
   // When work order is completed, update page states + log activity + email client

@@ -8,6 +8,7 @@ import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { postSectionSchema, reviewChecklistSchema } from './schemas/content-schemas.js';
+import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 
 const log = createLogger('content-posts-db');
 
@@ -254,6 +255,12 @@ export function savePost(workspaceId: string, post: GeneratedPost): void {
 export function updatePostField(workspaceId: string, postId: string, updates: Partial<Omit<GeneratedPost, 'id' | 'workspaceId' | 'createdAt'>>): GeneratedPost | null {
   const post = getPost(workspaceId, postId);
   if (!post) return null;
+
+  // Validate status transition if status is being changed
+  if (updates.status !== undefined && updates.status !== post.status) {
+    validateTransition('post', POST_STATUS_TRANSITIONS, post.status, updates.status);
+  }
+
   Object.assign(post, updates, { updatedAt: new Date().toISOString() });
   stmts().update.run(postToParams(post));
   return post;

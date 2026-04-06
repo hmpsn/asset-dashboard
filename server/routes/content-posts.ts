@@ -144,7 +144,15 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     }
   }
 
-  const updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
+  let updated;
+  try {
+    updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 
   // Auto-publish on approval if workspace has publishTarget and post isn't already published

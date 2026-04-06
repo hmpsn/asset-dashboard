@@ -179,7 +179,15 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
   if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
   const { status, clientValue, clientNote } = req.body;
-  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
+  let batch;
+  try {
+    batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
   if (!batch) return res.status(404).json({ error: 'Item not found' });
   // Sync PageEditState when client approves or rejects
   if (status === 'approved' || status === 'rejected') {
