@@ -53,13 +53,19 @@ describe('SeoEditor — unified pages integration contracts', () => {
     expect(needsManual(pageWithCollectionId)).toBe(true);
   });
 
-  it('approval items include collectionId when present', () => {
-    const page = { id: 'p1', title: 'Blog', slug: '/blog', collectionId: 'col-abc', seo: { title: 'Old', description: '' } };
-    const edit = { seoTitle: 'New Title', seoDescription: '', dirty: true };
-    const items: Array<{ pageId: string; collectionId?: string; field: string }> = [];
+  it('approval items do NOT include collectionId — SeoEditor omits it intentionally', () => {
+    // collectionId on a Webflow page means "this page is a template for this collection",
+    // NOT "this is a CMS item ID". Passing it mis-routes items into updateCollectionItem
+    // where item.pageId (a Webflow page ID) is used as a CMS item ID → 404.
+    // SeoEditor.sendForApproval omits collectionId so all items route to updatePageSeo.
+    const page = { id: 'p1', title: 'Blog', slug: '/blog', source: 'static' as const, collectionId: 'col-abc', seo: { title: 'Old', description: '' } };
+    const edit = { seoTitle: 'New Title', seoDescription: '' };
+    // Simulate the actual sendForApproval item shape — no collectionId field
+    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
     if (edit.seoTitle !== (page.seo?.title || '')) {
-      items.push({ pageId: page.id, collectionId: page.collectionId, field: 'seoTitle' });
+      items.push({ pageId: page.id, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
     }
-    expect(items[0].collectionId).toBe('col-abc');
+    expect(items[0].pageId).toBe('p1');
+    expect('collectionId' in items[0]).toBe(false);
   });
 });
