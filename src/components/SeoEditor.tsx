@@ -10,7 +10,7 @@ import { workspaces } from '../api';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
-import { StatusBadge, LoadingState } from './ui';
+import { StatusBadge, LoadingState, EmptyState } from './ui';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
@@ -89,6 +89,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+
+  // Clear approval selection when CMS filter toggles — prevents hidden pages from being silently submitted
+  useEffect(() => {
+    setApprovalSelected(new Set());
+  }, [showCmsOnly]);
 
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
@@ -826,7 +831,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         </button>
         {showCmsOnly && (
           <span className="text-[11px] text-zinc-500">
-            {filteredPages.filter(p => p.source === 'cms').length} CMS pages
+            {filteredPages.length} CMS pages
           </span>
         )}
       </div>
@@ -872,6 +877,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
       {/* Page list */}
       <div className="space-y-2">
+        {showCmsOnly && filteredPages.length === 0 && (
+          <EmptyState
+            title="No CMS pages found"
+            description="No CMS collection pages were discovered via sitemap. Static pages are hidden while this filter is active."
+          />
+        )}
         {filteredPages.map(page => (
           <div key={page.id}>
             {page.source === 'cms' && !page.collectionId && (
@@ -892,7 +903,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
               onSendToClient={sendPageToClient}
               onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
-              onUpdateField={updateField} onSave={savePage} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
+              onUpdateField={updateField} onSave={page.source === 'cms' ? undefined : savePage} isCmsPage={page.source === 'cms'} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
               onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
               onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
               onClearTracking={workspaceId ? async (pageId) => {

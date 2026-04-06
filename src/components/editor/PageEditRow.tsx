@@ -58,7 +58,8 @@ export interface PageEditRowProps {
   onToggleExpand: (id: string) => void;
   onToggleApprovalSelect: (id: string) => void;
   onUpdateField: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
-  onSave: (pageId: string) => void;
+  onSave?: (pageId: string) => void;
+  isCmsPage?: boolean;
   onSaveDraft?: (pageId: string) => void;
   onAiRewrite: (pageId: string, field: 'title' | 'description' | 'both') => void;
   onSelectVariation: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
@@ -76,7 +77,7 @@ export function PageEditRow({
   page, edit, expanded, isSaving, isSaved, isAiLoading, isDraftSaving, isDraftSaved, isSelected,
   pageRecs, pageState, variations, showApprovalCheckbox,
   isSendingToClient, isSentToClient, hasChanges, onSendToClient,
-  onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, onSaveDraft,
+  onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, isCmsPage, onSaveDraft,
   onAiRewrite, onSelectVariation, onClearVariations, onClearTracking, errorState,
   showPreview, onTogglePreview, onAnalyzePage, hasAnalysis, isAnalyzing,
 }: PageEditRowProps) {
@@ -365,8 +366,9 @@ export function PageEditRow({
               </button>
             )}
             <button
-              onClick={() => onSave(page.id)}
-              disabled={!edit.dirty || isSaving}
+              onClick={() => onSave?.(page.id)}
+              disabled={!edit.dirty || isSaving || !onSave}
+              title={!onSave && isCmsPage ? 'CMS pages — use Send to Client or Approvals to apply changes' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
