@@ -15,12 +15,6 @@ export interface PageMeta {
   slug: string;
   publishedPath?: string | null;
   seo?: { title?: string | null; description?: string | null };
-  openGraph?: {
-    title?: string | null;
-    description?: string | null;
-    titleCopied?: boolean;
-    descriptionCopied?: boolean;
-  };
   /** 'static' = Webflow static page. 'cms' = CMS collection item from sitemap discovery. */
   source?: 'static' | 'cms';
   /** For CMS items — the Webflow collection ID needed for SEO write-back via the approvals API. */

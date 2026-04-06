@@ -618,6 +618,7 @@ const manualChecks = [
   'No route removals without updating Sidebar, Breadcrumbs, CommandPalette, routes.ts',
   'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
   'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
+  'Cross-cutting constraint (e.g. "never send X to API Y") — grep for ALL call sites before writing fix #1, guard them all in one commit. Never patch one site at a time as they are discovered.',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);

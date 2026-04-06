@@ -256,6 +256,13 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   for (const item of approved) {
     try {
+      // Guard: synthetic CMS IDs (format 'cms-*') come from sitemap discovery and are
+      // not real Webflow page or collection-item IDs. Attempting to write them via the
+      // Webflow API produces a silent 404. Fail fast with a clear message so the
+      // approval record correctly reflects 'not applied' rather than a phantom success.
+      if (item.pageId.startsWith('cms-')) {
+        throw new Error('CMS pages discovered via sitemap must be updated directly in Webflow — synthetic page ID cannot be written via the API');
+      }
       const value = item.clientValue || item.proposedValue;
       if (item.field === 'schema') {
         // Schema item — publish JSON-LD to page via schema publisher
