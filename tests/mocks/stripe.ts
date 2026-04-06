@@ -187,7 +187,15 @@ export function resetStripeMocks(): void {
  */
 export function setupStripeMocks(): void {
   vi.mock('stripe', () => {
-    const StripeMock = vi.fn(() => mockStripeInstance);
+    // Must use a class (not arrow fn) so `new Stripe(...)` works as a constructor.
+    class StripeMock {
+      checkout = mockStripeInstance.checkout;
+      billingPortal = mockStripeInstance.billingPortal;
+      subscriptions = mockStripeInstance.subscriptions;
+      customers = mockStripeInstance.customers;
+      paymentIntents = mockStripeInstance.paymentIntents;
+      webhooks = mockStripeInstance.webhooks;
+    }
     return { default: StripeMock, Stripe: StripeMock };
   });
 }
