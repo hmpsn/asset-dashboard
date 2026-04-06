@@ -460,7 +460,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const previewPattern = () => {
     if (!patternText.trim()) return;
     const maxLen = bulkField === 'description' ? 160 : 60;
-    const preview = Array.from(approvalSelected).map(pageId => {
+    // Exclude CMS pages upfront — their synthetic IDs are rejected by the Webflow API on apply
+    const preview = Array.from(approvalSelected).filter(pageId =>
+      pages.find(p => p.id === pageId)?.source !== 'cms'
+    ).map(pageId => {
       const page = pages.find(p => p.id === pageId);
       const edit = edits[pageId];
       if (!page || !edit) return null;
@@ -537,21 +540,24 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const applyBulkRewrite = async () => {
+    // Pre-filter to only static pages — CMS pages have synthetic IDs the Webflow API rejects.
+    // Filtering here (not inside the loop) ensures total/progress counts are accurate.
+    const staticItems = bulkPreview.filter(item =>
+      pages.find(pg => pg.id === item.pageId)?.source !== 'cms'
+    );
     setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: bulkPreview.length });
+    setBulkProgress({ done: 0, total: staticItems.length });
     try {
-      // Push each previewed value directly to Webflow
-      for (const item of bulkPreview) {
+      for (const item of staticItems) {
         const page = pages.find(pg => pg.id === item.pageId);
         if (!page) continue;
-        if (page.source === 'cms') continue; // CMS pages have synthetic IDs — Webflow API rejects them
         const seoFields = bulkField === 'title'
           ? { seo: { title: item.newValue, description: edits[page.id]?.seoDescription || page.seo?.description || '' } }
           : { seo: { title: edits[page.id]?.seoTitle || page.seo?.title || '', description: item.newValue } };
         await put(`/api/webflow/pages/${page.id}/seo`, { siteId, ...seoFields, openGraph: seoFields.seo });
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
-      setBulkResults(`Applied ${bulkPreview.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
+      setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
       queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
     } catch { setBulkResults('Apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
@@ -888,10 +894,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         )}
         {filteredPages.map(page => (
           <div key={page.id}>
-            {page.source === 'cms' && !page.collectionId && (
+            {page.source === 'cms' && (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/8 border border-amber-500/20 rounded text-[11px] text-amber-400/80 mb-1">
                 <AlertCircle className="w-3 h-3" />
-                Manual apply required — CMS collection ID unavailable
+                Manual apply required — CMS pages must be updated directly in Webflow
               </div>
             )}
             <PageEditRow

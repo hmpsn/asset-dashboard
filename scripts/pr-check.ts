@@ -374,7 +374,10 @@ for (const check of CHECKS) {
       exts.some(ext => f.endsWith(ext)) &&
       !isExcluded(f, check.exclude) &&
       (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-      !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) &&
+      // When a check declares an explicit pathFilter, allow files from otherwise-excluded dirs
+      // that match it (e.g. pathFilter:'tests/' targets the excluded 'tests' dir intentionally).
+      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
+       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
       !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
     );
     for (const file of relevant) {
