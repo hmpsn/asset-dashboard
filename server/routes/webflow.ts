@@ -138,7 +138,7 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
 
     // Discover CMS pages from sitemap
     try {
-      const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+      // Reuse outer `ws` — same lookup, no need to re-query listWorkspaces()
       let baseUrl = '';
       if (ws?.liveDomain) {
         baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;

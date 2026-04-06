@@ -42,16 +42,15 @@ describe('SeoEditor — unified pages integration contracts', () => {
     expect(filtered).toHaveLength(2);
   });
 
-  it('CMS page without collectionId triggers manual apply warning', () => {
-    const page = { source: 'cms', collectionId: undefined };
-    const needsManual = page.source === 'cms' && !page.collectionId;
-    expect(needsManual).toBe(true);
-  });
-
-  it('CMS page with collectionId does not trigger manual apply', () => {
-    const page = { source: 'cms', collectionId: 'col-123' };
-    const needsManual = page.source === 'cms' && !page.collectionId;
-    expect(needsManual).toBe(false);
+  it('ALL CMS pages trigger the manual apply banner regardless of collectionId', () => {
+    // SeoEditor.tsx shows the banner for page.source === 'cms' unconditionally.
+    // Sitemap-discovered CMS pages never have a real collectionId, so collectionId
+    // cannot gate this UI — the condition is always true for CMS pages.
+    const pageWithoutCollectionId = { source: 'cms', collectionId: undefined };
+    const pageWithCollectionId = { source: 'cms', collectionId: 'col-123' };
+    const needsManual = (p: { source: string }) => p.source === 'cms';
+    expect(needsManual(pageWithoutCollectionId)).toBe(true);
+    expect(needsManual(pageWithCollectionId)).toBe(true);
   });
 
   it('approval items include collectionId when present', () => {

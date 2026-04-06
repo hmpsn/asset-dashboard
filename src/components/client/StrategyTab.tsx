@@ -791,7 +791,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {gap.volume != null && gap.volume > 0 && <span className="text-[11px] text-zinc-500">{gap.volume.toLocaleString()}</span>}
                           {gap.difficulty != null && gap.difficulty > 0 && (
-                            <span className={`text-[11px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                            <span className={`text-[11px] font-medium ${kdColor(gap.difficulty)}`}>
                               KD {gap.difficulty}
                             </span>
                           )}
@@ -952,7 +952,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             <div className="flex items-center gap-1.5">
                               {page.searchIntent && <span className="text-[10px] text-zinc-500 uppercase">{page.searchIntent}</span>}
                               {page.difficulty != null && page.difficulty > 0 && (
-                                <span className={`text-[10px] ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                                <span className={`text-[10px] ${kdColor(page.difficulty)}`}>
                                   KD {page.difficulty}
                                 </span>
                               )}
