@@ -280,6 +280,33 @@ const CHECKS: Check[] = [
     // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
     severity: 'warn',
   },
+  {
+    // Catches always-true placeholder test assertions committed as real tests.
+    // These pass regardless of whether the contract they claim to test is actually correct,
+    // providing false confidence. Root cause from G2 PR3: seo-editor-unified.test.ts.
+    name: 'Placeholder test assertion — expect(true).toBe(true)',
+    pattern: 'expect\\(true\\)\\.toBe\\(true\\)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'tests/',
+    message: 'expect(true).toBe(true) always passes and documents nothing. Replace with a real assertion that can actually fail.',
+    severity: 'error',
+  },
+  {
+    // Catches tests that read source files as strings to assert string patterns (source-sniffing).
+    // These break on refactors that preserve semantics (variable renames, helper extraction),
+    // producing false-positive failures and masking real regressions.
+    // Root cause from G2 PR3: useSeoEditor.test.ts used fs.readFileSync to assert
+    // template literal fragments — fragile against any syntax-preserving refactor.
+    // Add // readFile-ok on the readFileSync line for intentional migration guards
+    // (e.g. asserting a deprecated endpoint is no longer referenced in the file).
+    name: 'Source-sniffing in tests (readFileSync on .ts/.tsx source)',
+    pattern: 'readFileSync\\(.*\\.(ts|tsx)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'tests/',
+    excludeLines: ['// readFile-ok'],
+    message: 'Test behavior via imports and mocks, not source-file string matching. Add // readFile-ok on the line if this is an intentional endpoint migration guard.',
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -587,6 +614,7 @@ const manualChecks = [
   'Feature flag added if this is a multi-phase feature',
   'No route removals without updating Sidebar, Breadcrumbs, CommandPalette, routes.ts',
   'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
+  'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);

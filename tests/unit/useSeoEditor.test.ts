@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 
 describe('useSeoEditor — endpoint contract', () => {
-  const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8');
+  const src = fs.readFileSync('src/hooks/admin/useSeoEditor.ts', 'utf-8'); // readFile-ok — intentional endpoint migration guard
 
   it('uses all-pages endpoint (migration guard — must not regress to /pages/)', () => {
     expect(src).toContain('all-pages');

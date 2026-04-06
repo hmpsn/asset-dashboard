@@ -187,7 +187,7 @@ export function PageEditRow({
                 <button
                   onClick={() => onAnalyzePage(page.id)}
                   disabled={isAnalyzing}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-violet-600/80 hover:bg-violet-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
                   title={hasAnalysis ? 'Re-analyze page (update recommendations)' : 'Run page analysis to generate optimization recommendations'}
                 >
                   {isAnalyzing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Search className="w-2.5 h-2.5" />}
