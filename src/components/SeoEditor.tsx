@@ -34,7 +34,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const queryClient = useQueryClient();
   
   // React Query hook replaces manual data fetching
-  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
+  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
   
   // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
@@ -62,6 +62,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkFixing, setBulkFixing] = useState(false);
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [showCmsOnly, setShowCmsOnly] = useState(false);
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
@@ -554,12 +555,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     const page = pages.find(p => p.id === pageId);
     const edit = edits[pageId];
     if (!page || !edit) return;
-    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
+    const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string; collectionId?: string }> = [];
     if (edit.seoTitle !== (page.seo?.title || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
+      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle, collectionId: page.collectionId });
     }
     if (edit.seoDescription !== (page.seo?.description || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription });
+      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription, collectionId: page.collectionId });
     }
     if (items.length === 0) return;
     setSendingPage(prev => new Set(prev).add(pageId));
@@ -576,7 +577,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
     try {
-      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
+      const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string; collectionId?: string }> = [];
       for (const pageId of approvalSelected) {
         const page = pages.find(p => p.id === pageId);
         const edit = edits[pageId];
@@ -586,6 +587,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           items.push({
             pageId, pageTitle: page.title, pageSlug: page.slug,
             field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle,
+            collectionId: page.collectionId,
           });
         }
         // Include description if changed from original
@@ -593,6 +595,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           items.push({
             pageId, pageTitle: page.title, pageSlug: page.slug,
             field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription,
+            collectionId: page.collectionId,
           });
         }
       }
@@ -633,6 +636,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const filteredPages = pages.filter(p => {
+    if (showCmsOnly && p.source !== 'cms') return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return p.title.toLowerCase().includes(q) || (p.slug || '').toLowerCase().includes(q);
@@ -808,6 +812,25 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         </div>
       )}
 
+      {/* CMS filter toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowCmsOnly(prev => !prev)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+            showCmsOnly
+              ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+              : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          CMS pages only
+        </button>
+        {showCmsOnly && (
+          <span className="text-[11px] text-zinc-500">
+            {filteredPages.filter(p => p.source === 'cms').length} CMS pages
+          </span>
+        )}
+      </div>
+
       {/* Search */}
       <input
         type="text"
@@ -850,34 +873,42 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {/* Page list */}
       <div className="space-y-2">
         {filteredPages.map(page => (
-          <PageEditRow
-            key={page.id} page={page} edit={edits[page.id]}
-            expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
-            isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
-            isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
-            isSelected={approvalSelected.has(page.id)}
-            pageRecs={recsLoaded ? recsForPage(page.slug) : []}
-            pageState={getState(page.id)} variations={variations[page.id]}
-            showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
-            isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
-            onSendToClient={sendPageToClient}
-            onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
-            onUpdateField={updateField} onSave={savePage} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
-            onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
-            onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
-            onClearTracking={workspaceId ? async (pageId) => {
-              try {
-                await workspaces.deletePageState(workspaceId, pageId);
-                refreshStates();
-              } catch (err) { console.error('SeoEditor operation failed:', err); }
-            } : undefined}
-            errorState={errorStates[page.id] || null}
-            showPreview={previewExpanded.has(page.id)}
-            onTogglePreview={togglePreview}
-            onAnalyzePage={workspaceId ? analyzePage : undefined}
-            hasAnalysis={analyzedPages.has(page.id)}
-            isAnalyzing={analyzing.has(page.id)}
-          />
+          <div key={page.id}>
+            {page.source === 'cms' && !page.collectionId && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/8 border border-amber-500/20 rounded text-[11px] text-amber-400/80 mb-1">
+                <AlertCircle className="w-3 h-3" />
+                Manual apply required — CMS collection ID unavailable
+              </div>
+            )}
+            <PageEditRow
+              page={page} edit={edits[page.id]}
+              expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
+              isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
+              isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
+              isSelected={approvalSelected.has(page.id)}
+              pageRecs={recsLoaded ? recsForPage(page.slug) : []}
+              pageState={getState(page.id)} variations={variations[page.id]}
+              showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
+              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
+              onSendToClient={sendPageToClient}
+              onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
+              onUpdateField={updateField} onSave={savePage} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
+              onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
+              onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
+              onClearTracking={workspaceId ? async (pageId) => {
+                try {
+                  await workspaces.deletePageState(workspaceId, pageId);
+                  refreshStates();
+                } catch (err) { console.error('SeoEditor operation failed:', err); }
+              } : undefined}
+              errorState={errorStates[page.id] || null}
+              showPreview={previewExpanded.has(page.id)}
+              onTogglePreview={togglePreview}
+              onAnalyzePage={workspaceId ? analyzePage : undefined}
+              hasAnalysis={analyzedPages.has(page.id)}
+              isAnalyzing={analyzing.has(page.id)}
+            />
+          </div>
         ))}
       </div>
     </div>
