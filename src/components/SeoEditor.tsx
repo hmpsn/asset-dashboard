@@ -407,6 +407,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   const handleBulkFix = async (field: 'title' | 'description') => {
     const pagesNeedingFix = pages.filter(p => {
+      if (p.source === 'cms') return false; // CMS pages have synthetic IDs — Webflow API rejects them
       if (field === 'title') return !p.seo?.title;
       return !p.seo?.description;
     });
@@ -543,6 +544,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       for (const item of bulkPreview) {
         const page = pages.find(pg => pg.id === item.pageId);
         if (!page) continue;
+        if (page.source === 'cms') continue; // CMS pages have synthetic IDs — Webflow API rejects them
         const seoFields = bulkField === 'title'
           ? { seo: { title: item.newValue, description: edits[page.id]?.seoDescription || page.seo?.description || '' } }
           : { seo: { title: edits[page.id]?.seoTitle || page.seo?.title || '', description: item.newValue } };
@@ -660,8 +662,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     );
   }
 
-  const missingTitles = pages.filter(p => !p.seo?.title).length;
-  const missingDescs = pages.filter(p => !p.seo?.description).length;
+  // CMS pages have synthetic IDs that Webflow API rejects — exclude from actionable counts
+  const missingTitles = pages.filter(p => p.source !== 'cms' && !p.seo?.title).length;
+  const missingDescs = pages.filter(p => p.source !== 'cms' && !p.seo?.description).length;
 
   return (
     <div className="space-y-8">

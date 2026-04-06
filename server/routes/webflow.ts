@@ -126,13 +126,14 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
     const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
 
     // Build result from static pages
-    const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms' }> = published.map(p => ({
+    const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms'; collectionId?: string }> = published.map(p => ({
       id: p.id,
       title: p.title,
       slug: p.slug || '',
       publishedPath: p.publishedPath,
       seo: p.seo ? { title: p.seo.title || undefined, description: p.seo.description || undefined } : undefined,
       source: 'static' as const,
+      collectionId: p.collectionId ?? undefined,
     }));
 
     // Discover CMS pages from sitemap
