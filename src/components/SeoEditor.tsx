@@ -10,6 +10,13 @@ import { workspaces } from '../api';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
+import {
+  filterWritablePages,
+  filterWritableItems,
+  filterWritableIds,
+  filterPagesNeedingFix,
+  countMissingField,
+} from '../hooks/admin/seoEditorFilters';
 import { StatusBadge, LoadingState, EmptyState } from './ui';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
@@ -406,11 +413,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const handleBulkFix = async (field: 'title' | 'description') => {
-    const pagesNeedingFix = pages.filter(p => {
-      if (p.source === 'cms') return false; // CMS pages have synthetic IDs — Webflow API rejects them
-      if (field === 'title') return !p.seo?.title;
-      return !p.seo?.description;
-    });
+    const pagesNeedingFix = filterPagesNeedingFix(pages, field);
     if (pagesNeedingFix.length === 0) {
       setBulkResults(`All pages already have ${field === 'title' ? 'SEO titles' : 'meta descriptions'}.`);
       setTimeout(() => setBulkResults(null), 3000);
@@ -461,9 +464,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!patternText.trim()) return;
     const maxLen = bulkField === 'description' ? 160 : 60;
     // Exclude CMS pages upfront — their synthetic IDs are rejected by the Webflow API on apply
-    const preview = Array.from(approvalSelected).filter(pageId =>
-      pages.find(p => p.id === pageId)?.source !== 'cms'
-    ).map(pageId => {
+    const preview = filterWritableIds(Array.from(approvalSelected), pages).map(pageId => {
       const page = pages.find(p => p.id === pageId);
       const edit = edits[pageId];
       if (!page || !edit) return null;
@@ -542,9 +543,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const applyBulkRewrite = async () => {
     // Pre-filter to only static pages — CMS pages have synthetic IDs the Webflow API rejects.
     // Filtering here (not inside the loop) ensures total/progress counts are accurate.
-    const staticItems = bulkPreview.filter(item =>
-      pages.find(pg => pg.id === item.pageId)?.source !== 'cms'
-    );
+    const staticItems = filterWritableItems(bulkPreview, pages);
     setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: staticItems.length });
     try {
@@ -669,8 +668,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   }
 
   // CMS pages have synthetic IDs that Webflow API rejects — exclude from actionable counts
-  const missingTitles = pages.filter(p => p.source !== 'cms' && !p.seo?.title).length;
-  const missingDescs = pages.filter(p => p.source !== 'cms' && !p.seo?.description).length;
+  const missingTitles = countMissingField(pages, 'title');
+  const missingDescs = countMissingField(pages, 'description');
 
   return (
     <div className="space-y-8">

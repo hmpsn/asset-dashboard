@@ -376,7 +376,9 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
 
 // --- Bulk AI SEO Fix ---
 router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
+  const { pages: rawPages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
+  // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
+  const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
   if (!pages?.length) return res.status(400).json({ error: 'pages required' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -500,12 +502,14 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
 // --- Bulk Pattern Apply (instant text transforms, no AI) ---
 router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pages, field, action, text: patternText } = req.body as {
+  const { pages: rawPages, field, action, text: patternText } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentValue: string }>;
     field: 'title' | 'description';
     action: 'append' | 'prepend' | 'replace';
     text: string;
   };
+  // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
+  const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
   if (!pages?.length || !field || !action || !patternText) {
     return res.status(400).json({ error: 'pages, field, action, text required' });
   }

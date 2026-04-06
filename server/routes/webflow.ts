@@ -173,6 +173,12 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
 });
 
 router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
+  // Reject synthetic CMS IDs at the API boundary — these are not real Webflow page IDs
+  // and the Webflow API returns 404 for them. Guard here so no frontend call site can
+  // inadvertently send them through regardless of whether it remembered to filter.
+  if (req.params.pageId.startsWith('cms-')) {
+    return res.status(400).json({ error: 'Cannot update SEO for CMS pages via this endpoint — update directly in Webflow' });
+  }
   try {
     const { siteId, seo, openGraph, title } = req.body;
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;
