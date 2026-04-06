@@ -98,14 +98,12 @@ describe('free tier — fields present', () => {
   it('insightsSummary has the correct shape', async () => {
     const body = await fetchIntelligence(freeWsId);
     const summary = body.insightsSummary as Record<string, unknown> | null;
-    // May be null if no insights; if present, must have correct fields
-    if (summary !== null) {
-      expect(summary).toHaveProperty('total');
-      expect(summary).toHaveProperty('highPriority');
-      expect(summary).toHaveProperty('mediumPriority');
-      expect(summary).toHaveProperty('topInsights');
-      expect(Array.isArray(summary.topInsights)).toBe(true);
-    }
+    expect(summary).not.toBeNull();
+    expect(summary).toHaveProperty('total');
+    expect(summary).toHaveProperty('highPriority');
+    expect(summary).toHaveProperty('mediumPriority');
+    expect(summary).toHaveProperty('topInsights');
+    expect(Array.isArray(summary!.topInsights)).toBe(true);
   });
 
   it('response includes pipelineStatus', async () => {
@@ -116,11 +114,10 @@ describe('free tier — fields present', () => {
   it('pipelineStatus has the correct shape', async () => {
     const body = await fetchIntelligence(freeWsId);
     const pipeline = body.pipelineStatus as Record<string, unknown> | null;
-    if (pipeline !== null) {
-      expect(pipeline).toHaveProperty('briefs');
-      expect(pipeline).toHaveProperty('posts');
-      expect(pipeline).toHaveProperty('pendingApprovals');
-    }
+    expect(pipeline).not.toBeNull();
+    expect(pipeline).toHaveProperty('briefs');
+    expect(pipeline).toHaveProperty('posts');
+    expect(pipeline).toHaveProperty('pendingApprovals');
   });
 });
 
@@ -167,11 +164,10 @@ describe('growth tier — fields present', () => {
   it('learningHighlights has the correct shape when present', async () => {
     const body = await fetchIntelligence(growthWsId);
     const highlights = body.learningHighlights as Record<string, unknown> | null;
-    if (highlights !== null) {
-      expect(highlights).toHaveProperty('overallWinRate');
-      expect(highlights).toHaveProperty('topActionType');
-      expect(highlights).toHaveProperty('recentWins');
-    }
+    expect(highlights).not.toBeNull();
+    expect(highlights).toHaveProperty('overallWinRate');
+    expect(highlights).toHaveProperty('topActionType');
+    expect(highlights).toHaveProperty('recentWins');
   });
 });
 
@@ -218,12 +214,11 @@ describe('premium tier — fields present', () => {
   it('siteHealthSummary has the correct shape when present', async () => {
     const body = await fetchIntelligence(premiumWsId);
     const health = body.siteHealthSummary as Record<string, unknown> | null;
-    if (health !== null) {
-      expect(health).toHaveProperty('auditScore');
-      expect(health).toHaveProperty('auditScoreDelta');
-      expect(health).toHaveProperty('cwvPassRatePct');
-      expect(health).toHaveProperty('deadLinks');
-    }
+    expect(health).not.toBeNull();
+    expect(health).toHaveProperty('auditScore');
+    expect(health).toHaveProperty('auditScoreDelta');
+    expect(health).toHaveProperty('cwvPassRatePct');
+    expect(health).toHaveProperty('deadLinks');
   });
 });
 
@@ -233,29 +228,28 @@ describe('admin-only insight scrubbing — strategy_alignment never in response'
   it('free tier: strategy_alignment type does not appear in insightsSummary.topInsights', async () => {
     const body = await fetchIntelligence(freeWsId);
     const summary = body.insightsSummary as Record<string, unknown> | null;
-    if (summary && Array.isArray(summary.topInsights)) {
-      expect(summary.topInsights.length).toBeGreaterThanOrEqual(0);
-      const types = (summary.topInsights as Array<{ type: string }>).map(i => i.type);
-      expect(types).not.toContain('strategy_alignment');
-    }
+    expect(summary).not.toBeNull();
+    expect(Array.isArray(summary!.topInsights)).toBe(true);
+    const types = (summary!.topInsights as Array<{ type: string }>).map(i => i.type);
+    expect(types).not.toContain('strategy_alignment');
   });
 
   it('growth tier: strategy_alignment type does not appear in insightsSummary.topInsights', async () => {
     const body = await fetchIntelligence(growthWsId);
     const summary = body.insightsSummary as Record<string, unknown> | null;
-    if (summary && Array.isArray(summary.topInsights)) {
-      const types = (summary.topInsights as Array<{ type: string }>).map(i => i.type);
-      expect(types).not.toContain('strategy_alignment');
-    }
+    expect(summary).not.toBeNull();
+    expect(Array.isArray(summary!.topInsights)).toBe(true);
+    const types = (summary!.topInsights as Array<{ type: string }>).map(i => i.type);
+    expect(types).not.toContain('strategy_alignment');
   });
 
   it('premium tier: strategy_alignment type does not appear in insightsSummary.topInsights', async () => {
     const body = await fetchIntelligence(premiumWsId);
     const summary = body.insightsSummary as Record<string, unknown> | null;
-    if (summary && Array.isArray(summary.topInsights)) {
-      const types = (summary.topInsights as Array<{ type: string }>).map(i => i.type);
-      expect(types).not.toContain('strategy_alignment');
-    }
+    expect(summary).not.toBeNull();
+    expect(Array.isArray(summary!.topInsights)).toBe(true);
+    const types = (summary!.topInsights as Array<{ type: string }>).map(i => i.type);
+    expect(types).not.toContain('strategy_alignment');
   });
 
   it('free tier: strategy_alignment insight is excluded from total count', async () => {
@@ -264,12 +258,12 @@ describe('admin-only insight scrubbing — strategy_alignment never in response'
     // only non-admin insights — which for a fresh workspace is 0.
     const body = await fetchIntelligence(freeWsId);
     const summary = body.insightsSummary as Record<string, unknown> | null;
-    if (summary !== null) {
-      // strategy_alignment is the only insight in this workspace; if scrubbing
-      // works correctly the count must not include it.
-      const topInsights = summary.topInsights as Array<{ type: string }>;
-      expect(topInsights.every(i => i.type !== 'strategy_alignment')).toBe(true);
-    }
+    expect(summary).not.toBeNull();
+    // strategy_alignment is the only insight in this workspace; if scrubbing
+    // works correctly the count must not include it.
+    const topInsights = summary!.topInsights as Array<{ type: string }>;
+    const stratTypes = topInsights.filter(i => i.type === 'strategy_alignment');
+    expect(stratTypes).toHaveLength(0);
   });
 });
 
@@ -340,12 +334,13 @@ describe('sensitive fields scrubbed — never in any tier response', () => {
     // topInsights items must only contain { title, type } — no impact_score
     const body = await fetchIntelligence(premiumWsId);
     const summary = body.insightsSummary as Record<string, unknown> | null;
-    if (summary && Array.isArray(summary.topInsights) && summary.topInsights.length > 0) {
-      for (const item of summary.topInsights as Array<Record<string, unknown>>) {
-        expect(item).not.toHaveProperty('impact_score');
-        expect(item).not.toHaveProperty('impactScore');
-        expect(Object.keys(item).sort()).toEqual(['title', 'type'].sort());
-      }
+    expect(summary).not.toBeNull();
+    expect(Array.isArray(summary!.topInsights)).toBe(true);
+    // Even if empty, the structure test above validates shape; here we check field leakage
+    for (const item of summary!.topInsights as Array<Record<string, unknown>>) {
+      expect(item).not.toHaveProperty('impact_score');
+      expect(item).not.toHaveProperty('impactScore');
+      expect(Object.keys(item).sort()).toEqual(['title', 'type'].sort());
     }
   });
 });

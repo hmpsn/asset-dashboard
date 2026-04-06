@@ -666,10 +666,11 @@ describe('contract: SiteHealthSlice field population', () => {
     const result = await getSlice<SiteHealthSlice>('siteHealth');
 
     // anomalyCount and anomalyTypes: returned by assembler even if 0/[]
-    // (assembler sets defaults before try/catch)
-    expect(result.anomalyCount !== undefined || result.anomalyCount === undefined).toBe(true);
+    expect(result.anomalyCount).toBeDefined();
+    expect(typeof result.anomalyCount).toBe('number');
     // seoChangeVelocity is set from the return object unconditionally
-    expect(typeof result.seoChangeVelocity === 'number' || result.seoChangeVelocity === undefined).toBe(true);
+    expect(result.seoChangeVelocity).toBeDefined();
+    expect(typeof result.seoChangeVelocity).toBe('number');
   });
 });
 
@@ -851,7 +852,8 @@ describe('contract: OperationalSlice field population', () => {
     const result = await getSlice<OperationalSlice>('operational');
 
     // These are always set in the assembler return statement
-    expect(result.timeSaved !== undefined || result.timeSaved === undefined).toBe(true); // timeSaved can be null
+    // timeSaved can be null but must be present in the response
+    expect('timeSaved' in result).toBe(true);
     expect(result.approvalQueue).toBeDefined();
     expect(result.recommendationQueue).toBeDefined();
     expect(result.actionBacklog).toBeDefined();

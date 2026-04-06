@@ -46,6 +46,8 @@ const log = createLogger('approvals');
 function derivePageStatus(batch: import('../../shared/types/approvals').ApprovalBatch, pageId: string): 'in-review' | 'approved' | 'rejected' {
   const pageItems = batch.items.filter(i => i.pageId === pageId);
   const statuses = pageItems.map(i => i.status);
+  // Guard: .every() on empty returns true vacuously — default to in-review
+  if (statuses.length === 0) return 'in-review';
   if (statuses.every(s => s === 'approved' || s === 'applied')) return 'approved';
   if (statuses.every(s => s === 'rejected')) return 'rejected';
   // Mix of pending/approved/rejected → still in review
@@ -172,7 +174,7 @@ router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAut
   res.json(batch);
 });
 
-router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res) => {
+router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res, next) => {
   // Only include fields that were actually sent — passing undefined would overwrite existing values
   const update: Partial<Pick<import('../../shared/types/approvals').ApprovalItem, 'status' | 'clientValue' | 'clientNote'>> = {};
   if (req.body.status !== undefined) update.status = req.body.status;
@@ -186,7 +188,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
-    throw err;
+    return next(err);
   }
   if (!batch) return res.status(404).json({ error: 'Item not found' });
   // Sync PageEditState when client approves or rejects

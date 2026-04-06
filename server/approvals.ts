@@ -148,7 +148,9 @@ export function updateItem(
 /** Recalculate batch status from item statuses and persist. */
 function recalcBatchStatus(batch: ApprovalBatch): void {
   const statuses = batch.items.map(i => i.status);
-  if (statuses.every(s => s === 'applied')) batch.status = 'applied';
+  // Guard: .every() on empty array returns true vacuously — keep batch pending
+  if (statuses.length === 0) { batch.status = 'pending'; }
+  else if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   else if (statuses.every(s => s === 'approved' || s === 'applied')) batch.status = 'approved';
   else if (statuses.every(s => s === 'rejected')) batch.status = 'rejected';
   else if (statuses.some(s => s === 'approved' || s === 'rejected' || s === 'applied')) batch.status = 'partial';
@@ -169,6 +171,11 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
 
   for (const item of batch.items) {
     if (itemIds.includes(item.id)) {
+      // Only approved items may transition to applied
+      if (item.status !== 'approved') {
+        log.warn({ batchId, itemId: item.id, status: item.status }, 'markBatchApplied: skipping non-approved item');
+        continue;
+      }
       item.status = 'applied';
       item.updatedAt = new Date().toISOString();
     }

@@ -303,7 +303,6 @@ describe('approval state flow — concurrent batch isolation', () => {
   let itemIdsA: string[];
   let itemIdsB: string[];
   let cleanupA: () => void;
-  let cleanupB: () => void;
 
   beforeAll(() => {
     // Seed batch A
@@ -325,11 +324,6 @@ describe('approval state flow — concurrent batch isolation', () => {
     );
     batchIdB = batchB.id;
     itemIdsB = batchB.items.map(i => i.id);
-
-    // cleanupB only needs to clean the extra batch; cleanupA handles the workspace row
-    cleanupB = () => {
-      // Batch B rows cleaned up when cleanupA removes workspace rows
-    };
   });
 
   afterAll(() => {

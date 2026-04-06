@@ -131,7 +131,7 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requir
 // Update post fields (inline editing of title, sections, status, etc.)
 // If status is changed to 'approved' and workspace has auto-publish configured,
 // triggers publish-to-webflow in the background.
-router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res, next) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
   // Snapshot before content-changing edits (not status-only changes)
@@ -151,7 +151,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
-    throw err;
+    return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 

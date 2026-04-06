@@ -63,7 +63,7 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
   res.json(request);
 });
 
-router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res) => {
+router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
   const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
   let updated;
   try {
@@ -72,7 +72,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
-    throw err;
+    return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   // Send email when brief is sent to client review
