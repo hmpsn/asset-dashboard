@@ -286,7 +286,8 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         const fields = item.field === 'seoTitle'
           ? { seo: { title: value } }
           : { seo: { description: value } };
-        await updatePageSeo(item.pageId, fields, token);
+        const seoResult = await updatePageSeo(item.pageId, fields, token);
+        if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
       }
       appliedIds.push(item.id);
       results.push({ itemId: item.id, pageId: item.pageId, success: true });

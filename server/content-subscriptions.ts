@@ -62,7 +62,6 @@ const stmts = createStmtCache(() => ({
   selectActive: db.prepare(
     "SELECT * FROM content_subscriptions WHERE status IN ('active', 'past_due') ORDER BY created_at DESC",
   ),
-  update: db.prepare(''), // placeholder — built dynamically
   deleteById: db.prepare(
     'DELETE FROM content_subscriptions WHERE id = ?',
   ),
@@ -149,9 +148,7 @@ export function listContentSubscriptions(workspaceId: string): ContentSubscripti
 }
 
 export function listActiveContentSubscriptions(): ContentSubscription[] {
-  const rows = db.prepare(
-    "SELECT * FROM content_subscriptions WHERE status IN ('active', 'past_due') ORDER BY created_at DESC",
-  ).all() as SubRow[];
+  const rows = stmts().selectActive.all() as SubRow[];
   return rows.map(rowToSub);
 }
 

@@ -38,9 +38,11 @@ export function cleanSeedData(workspaceId?: string): void {
     // Targeted cleanup — only delete rows for a specific workspace
     for (const table of SEED_TABLES) {
       try {
-        db.prepare(`DELETE FROM ${table} WHERE workspace_id = ?`).run(workspaceId);
+        // workspaces table uses `id` as the PK, not `workspace_id`
+        const col = table === 'workspaces' ? 'id' : 'workspace_id';
+        db.prepare(`DELETE FROM ${table} WHERE ${col} = ?`).run(workspaceId);
       } catch {
-        // Table may not have workspace_id column (e.g., users)
+        // Table may not have the expected column
         // Silently skip — individual fixture cleanup handles these
       }
     }

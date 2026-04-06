@@ -392,14 +392,16 @@ function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
-  const excludeList = check.exclude ? (Array.isArray(check.exclude) ? check.exclude : [check.exclude]) : [];
-  const excludeFlag = excludeList.map(e => `--exclude="${path.basename(e)}"`).join(' ');
   try {
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
-    const lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    // Post-filter by check.exclude using full path matching (grep --exclude only matches basenames)
+    if (check.exclude) {
+      lines = lines.filter(line => !isExcluded(line, check.exclude));
+    }
     return applyExcludeLines(lines, check.excludeLines);
   } catch {
     return [];
