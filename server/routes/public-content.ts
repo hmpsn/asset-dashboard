@@ -148,11 +148,19 @@ router.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
 });
 
 // Client declines a recommended topic
-router.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) => {
+router.post('/api/public/content-request/:workspaceId/:id/decline', (req, res, next) => {
   const reason = sanitizeString(req.body.reason, 1000);
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-    status: 'declined', declineReason: reason,
-  });
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+      status: 'declined', declineReason: reason,
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_declined', `${actor?.name || 'Client'} declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id }, actor);
@@ -161,8 +169,16 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', (req, res) =
 });
 
 // Client approves a brief
-router.post('/api/public/content-request/:workspaceId/:id/approve', (req, res) => {
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
+router.post('/api/public/content-request/:workspaceId/:id/approve', (req, res, next) => {
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
@@ -171,11 +187,19 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', (req, res) =
 });
 
 // Client requests changes on a brief
-router.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, res) => {
+router.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, res, next) => {
   const feedback = sanitizeString(req.body.feedback, 2000);
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-    status: 'changes_requested', clientFeedback: feedback,
-  });
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, {
+      status: 'changes_requested', clientFeedback: feedback,
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
