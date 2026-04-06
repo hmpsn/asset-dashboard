@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **270 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **277 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3166,6 +3166,58 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 274. KD Difficulty Framing
+**What it does:** Assigns a human-readable difficulty label ("Easy", "Moderate", "Hard", "Very Hard") and descriptive tooltip ("KD 45/100 — Moderate competition…") to every keyword row in StrategyTab and ContentGaps. Labels are derived from the SEMRush KD score via `kdFraming(kd)` and `kdTooltip(kd)` utilities in `src/lib/kdFraming.ts`. Tooltip renders on hover so the row stays compact while the detail is always available.
+
+**Files:** `src/lib/kdFraming.ts`, `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** Instantly communicates keyword difficulty in plain language — "Hard" is scannable at a glance vs. reading a raw number. Speeds up keyword curation during client strategy sessions.
+
+**Client value:** Clients can evaluate keyword difficulty without knowing SEO scoring scales. Labels reduce confusion and support self-service strategy review in the client portal.
+
+**Mutual:** Removes the "what does 67 mean?" question from every strategy call. Shared vocabulary between agency and client around keyword effort.
+
+---
+
+### 275. Predicted Organic Impact
+**What it does:** Calculates and displays the estimated monthly organic clicks for each keyword row using the formula `volume × CTR(position)`, where CTR is derived from the Backlinko position curve. Shown inline below each keyword row in StrategyTab and ContentGaps. ContentGaps uses a position-3 floor (CTR 0.103) for unranked keywords. Gives a concrete traffic upside estimate alongside difficulty and volume.
+
+**Files:** `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** Converts raw keyword volume into a projected outcome ("rank for this → ~420 clicks/mo"), making ROI conversations concrete. Prioritization becomes data-driven rather than intuition-based.
+
+**Client value:** Clients see why a specific keyword is worth pursuing — not just that it has volume, but what winning it is estimated to deliver. Supports upgrade conversations ("this keyword cluster is worth ~3,000 clicks/mo").
+
+**Mutual:** Bridges the gap between keyword research and business outcomes. A single number that resonates in strategy reviews and justifies content investment.
+
+---
+
+### 276. SERP Feature Chips (Blue, All 4 Types)
+**What it does:** Renders inline badge chips on keyword rows for all four SERP feature opportunity types: featured snippet, People Also Ask (PAA), local pack, and video carousel. Chips are color-corrected to blue (data law — read-only informational data) replacing prior yellow/cyan variants. Appears in StrategyTab and ContentGaps wherever the keyword's SERP feature flags are present.
+
+**Files:** `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** At-a-glance identification of high-value SERP real estate opportunities. A keyword with a featured snippet chip is an immediate priority for structured content — no cross-referencing required.
+
+**Client value:** Clients can see which keywords give them a shot at featured placements. Makes abstract "SERP features" tangible with small, recognizable chips on the strategy view.
+
+**Mutual:** Correct blue color enforces the Three Laws of Color design system. All four chip types now present (prior implementation was incomplete) — no opportunity type goes unrepresented.
+
+---
+
+### 277. SEO Editor Unified Pages
+**What it does:** The SEO Editor now fetches from `/api/webflow/all-pages` which returns both static and CMS pages in a single response. A CMS-only filter toggle (teal active state) lets users isolate CMS pages. CMS pages missing a `collectionId` display an amber "Manual apply required" badge to indicate they cannot be auto-applied via the Webflow API. The `collectionId` field is threaded through into approval batch items so downstream application logic can route CMS vs. static pages correctly.
+
+**Files:** `src/components/SeoEditor.tsx`, `src/hooks/admin/useSeoEditor.ts`
+
+**Agency value:** Single editor view covers the full site — no switching between static and CMS page workflows. The manual-apply badge surfaces actionability gaps before the editor submits changes, preventing silent failures on CMS pages.
+
+**Client value:** Approvals submitted through the client portal correctly represent all site pages, including CMS collections. No hidden pages that clients might wonder about.
+
+**Mutual:** Eliminates a class of "why didn't my changes apply?" support issues caused by missing collectionIds. Unified fetch reduces page-load complexity and keeps the editor in sync with the actual Webflow site structure.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3181,6 +3233,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**273 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**277 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
 Current feature count: **273**. Last updated: April 2026.
