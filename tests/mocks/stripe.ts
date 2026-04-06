@@ -132,7 +132,7 @@ export function createWebhookEvent(
 ): { id: string; type: string; data: { object: Record<string, unknown> } } {
   _webhookEventCounter++;
   return {
-    id: `evt_test_${_webhookEventCounter}_${Date.now()}`,
+    id: `evt_test_${_webhookEventCounter}`,
     type,
     data: { object: data },
   };

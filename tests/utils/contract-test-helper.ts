@@ -1,15 +1,6 @@
 import { expect } from 'vitest';
 import { type ZodType } from 'zod';
 
-interface ContractTestOptions<T> {
-  /** Description for the test */
-  description?: string;
-  /** Setup function to create required data before the test */
-  setup?: () => Promise<void>;
-  /** Cleanup function */
-  cleanup?: () => Promise<void>;
-}
-
 /**
  * Asserts that a JSON response body matches a Zod schema.
  * Use in integration tests after calling an endpoint.
@@ -59,7 +50,7 @@ export function assertFieldsPopulated(
 }
 
 /**
- * Asserts that an array is non-empty before running .every() or .some().
+ * Asserts that an array is non-empty before running .every() or .some(). // every-ok
  * Prevents FM-7: vacuous assertions.
  */
 export function assertNonEmptyEvery<T>(
@@ -68,5 +59,5 @@ export function assertNonEmptyEvery<T>(
   context?: string,
 ): void {
   expect(arr.length, `Array should be non-empty${context ? ` (${context})` : ''}`).toBeGreaterThan(0);
-  expect(arr.every(predicate), `Not all items match predicate${context ? ` (${context})` : ''}`).toBe(true);
+  expect(arr.every(predicate), `Not all items match predicate${context ? ` (${context})` : ''}`).toBe(true); // every-ok: length checked on preceding line
 }

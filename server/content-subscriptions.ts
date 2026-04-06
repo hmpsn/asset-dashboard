@@ -82,7 +82,7 @@ function rowToSub(row: SubRow): ContentSubscription {
     currentPeriodEnd: row.current_period_end ?? undefined,
     postsDeliveredThisPeriod: row.posts_delivered_this_period,
     topicSource: row.topic_source as ContentSubscription['topicSource'],
-    preferredPageTypes: parseJsonFallback(row.preferred_page_types, undefined),
+    preferredPageTypes: parseJsonFallback<string[] | undefined>(row.preferred_page_types, undefined),
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -808,71 +808,58 @@ The pr-check rule already enforces this for new files.
 
 ### 8.1 PR Workflow
 
-Each session produces **one PR** that merges to `staging`. The pattern:
+Work is consolidated into **4 PRs** (down from 10) so each PR is self-contained — no
+temporary annotations or suppressions that depend on a future PR to resolve.
 
-1. **Build** — write tests + any prerequisite code changes (e.g., JSON.parse migration)
-2. **Verify** — `npx tsc --noEmit --skipLibCheck && npx vite build && npx vitest run`
-3. **PR** — one PR per session, merge to `staging`, verify on staging deploy
-4. **Gate** — session N+1 does not start until session N's PR is merged and CI green
+1. **Build** — write tests + any prerequisite code changes within the PR scope
+2. **Verify** — `npx tsc --noEmit --skipLibCheck && npx vite build && npx vitest run && npx tsx scripts/pr-check.ts`
+3. **Review** — scaled code review for each PR (10+ files)
+4. **PR** — merge to `staging`, verify on staging deploy
+5. **Gate** — PR N+1 does not start until PR N is merged and CI green
 
-Exception: Session 1 (Infrastructure) may produce 2 PRs if the JSON.parse migration is large enough to warrant separation:
-- PR 1a: Shared mocks, utilities, fixtures, pr-check rules, global-setup.ts update
-- PR 1b: JSON.parse migration (92 calls across 35 files)
+**PR 1 (Infrastructure):** Mocks, utilities, fixtures, pr-check rules, JSON.parse migration — **already shipped** (PR #141).
+
+**PR 2 (External Writes + Journeys):** Batches 1 + 1.5. Mock-based failure tests for all external write paths, plus end-to-end journey tests that exercise full workflows. Ships together because journey tests depend on patterns established by Batch 1.
+
+**PR 3 (State Machines + Contracts):** Batches 2 + 3. State machine `validateTransition()` guards AND their tests in the same PR — no `status-ok` annotations needed. Contract tests validate cross-layer type shapes. Ships together because state machine guards are preconditions for contract tests (contract tests assert that invalid transitions return errors, not silent success).
+
+**PR 4 (Auth, AI, Data Integrity, Remaining):** Batches 4 + 5 + 6 + 7 + 7.5 + 8. Auth/security, AI quality, JSON safety, migration preservation, client-facing correctness, and remaining coverage gaps. These batches are independent of each other (all depend only on PR 1 infrastructure) so they can be written in parallel within one PR.
 
 ### 8.2 Model Assignments
 
 | Model | Task Type | Rationale |
 |-------|-----------|-----------|
-| **Haiku** | JSON.parse migration (92 mechanical replacements), pr-check rule additions, seed fixture data generation | Repetitive find-and-replace with clear patterns. No judgment needed. |
-| **Sonnet** | Individual test files (Batches 1–8), mock factory implementations, state machine utility | Standard test logic: setup → act → assert. Needs to read source modules and construct correct mocks, but patterns are established after first file in each batch. |
-| **Opus** | Session orchestration, journey tests (Batch 1.5), contract tests (Batch 3), review passes | Cross-system reasoning, multi-module coordination, judgment about what constitutes correct behavior. Journey tests require understanding 3+ modules interacting. |
+| **Sonnet** | Individual test files (Batches 1–8), state machine guard implementations | Standard test logic: setup → act → assert. Needs to read source modules and construct correct mocks, but patterns are established after first file in each batch. |
+| **Opus** | PR orchestration, journey tests (Batch 1.5), contract tests (Batch 3), review passes | Cross-system reasoning, multi-module coordination, judgment about what constitutes correct behavior. Journey tests require understanding 3+ modules interacting. |
 
-### 8.3 Parallelization by Session
+> **Note:** Session 1 (Infrastructure) is complete — mocks, fixtures, utils, pr-check rules, and JSON.parse migration shipped in PR #141.
 
-#### Session 1: Infrastructure (mostly parallel)
+### 8.3 Parallelization by PR
 
-```
-Sequential first:
-  └─ Commit shared type contracts (any new test utility types) ← everything depends on this
+#### PR 1: Infrastructure — COMPLETE
 
-Then parallel:
-  ├─ [Haiku] JSON.parse migration — 35 files, mechanical
-  ├─ [Sonnet] tests/mocks/webflow.ts
-  ├─ [Sonnet] tests/mocks/stripe.ts
-  ├─ [Sonnet] tests/mocks/openai.ts + anthropic.ts
-  ├─ [Sonnet] tests/mocks/google.ts + semrush.ts
-  ├─ [Sonnet] tests/utils/state-machine-helper.ts + contract-test-helper.ts
-  └─ [Sonnet] tests/fixtures/workspace-seed.ts + approval-seed.ts + auth-seed.ts + content-seed.ts + strategy-seed.ts
+Shipped as PR #141. Includes: 6 mock factories, 5 seed fixtures, 2 test utilities,
+`global-setup.ts` update, 5 pr-check rules, JSON.parse migration (17 server files).
 
-Sequential after:
-  └─ [Sonnet] Update tests/global-setup.ts, add pr-check rules (touches shared files)
-  └─ [Opus] Review pass: run tsc, vitest, pr-check, verify no conflicts
-```
+#### PR 2: External Writes + Journeys (Batches 1 + 1.5)
 
-**File ownership:** Each agent owns its output file(s). No shared files touched in parallel. `global-setup.ts` and `pr-check.ts` are sequential-only.
-
-#### Session 2: Batch 1 — External Write Failures (parallel after mock commit)
-
-**Prerequisite:** Session 1 mocks committed and merged.
+**Phase A — Batch 1 (fully parallel):**
 
 ```
 Parallel (each test file is independent):
-  ├─ [Sonnet] #1  webflow-seo-writes.test.ts         (owns: this file only)
-  ├─ [Sonnet] #2  webflow-schema-writes.test.ts       (owns: this file only)
-  ├─ [Sonnet] #3  webflow-cms-writes.test.ts          (owns: this file only)
-  ├─ [Sonnet] #4  approval-execution.test.ts          (owns: this file only)
-  ├─ [Sonnet] #5  content-publish-writes.test.ts      (owns: this file only)
-  ├─ [Sonnet] #6  stripe-checkout-flow.test.ts        (owns: this file only)
-  ├─ [Sonnet] #7  stripe-webhooks.test.ts             (owns: this file only)
-  └─ [Sonnet] #7b stripe-webhook-idempotency.test.ts  (owns: this file only)
+  ├─ [Sonnet] #1  webflow-seo-writes.test.ts
+  ├─ [Sonnet] #2  webflow-schema-writes.test.ts
+  ├─ [Sonnet] #3  webflow-cms-writes.test.ts
+  ├─ [Sonnet] #4  approval-execution.test.ts
+  ├─ [Sonnet] #5  content-publish-writes.test.ts
+  ├─ [Sonnet] #6  stripe-checkout-flow.test.ts
+  ├─ [Sonnet] #7  stripe-webhooks.test.ts
+  └─ [Sonnet] #7b stripe-webhook-idempotency.test.ts
 
-Sequential after:
-  └─ [Opus] Review pass: check for duplicate imports, conflicting mocks, run full suite
+Checkpoint: tsc + vitest + diff review
 ```
 
-**Why fully parallel:** Each test file imports from `tests/mocks/` (read-only) and tests a single route file. No shared state. No file conflicts.
-
-#### Session 3: Batch 1.5 — Journey Tests (limited parallelism)
+**Phase B — Batch 1.5 (limited parallelism, after Phase A checkpoint):**
 
 ```
 Parallel (independent journeys):
@@ -880,29 +867,33 @@ Parallel (independent journeys):
   ├─ [Opus] J2  journey-content-publish.test.ts
   └─ [Opus] J5  journey-schema-publish.test.ts
 
-Sequential (depend on approval flow patterns from J1/J2):
+Then parallel (read J1/J2 patterns first):
   ├─ [Opus] J3  journey-approval-to-webflow.test.ts
   └─ [Opus] J4  journey-strategy-to-client.test.ts
 
-Sequential after:
-  └─ [Opus] Review pass
+Checkpoint: full suite + scaled code review → PR
 ```
 
-**Why Opus:** Journey tests require understanding 3-5 modules interacting. The test must trace data from producer through middleware to consumer across system boundaries. This is judgment work, not pattern work.
+**Why together:** Journey tests validate the same write paths that Batch 1 mocks. Having both in one PR means the journey tests immediately exercise the mock infrastructure, catching any gaps before merge.
 
-#### Session 4: Batch 2 — State Machines (parallel)
+#### PR 3: State Machines + Contracts (Batches 2 + 3)
+
+**Phase A — Batch 2: State Machine Guards (parallel):**
 
 ```
-Parallel:
+Sequential first:
+  └─ [Sonnet] Implement validateTransition() functions for all 9+ entities
+      (removes all status-ok annotations, replaces with real guards)
+
+Then parallel:
   ├─ [Sonnet] #8   state-machines.test.ts (unit — uses state-machine-helper.ts)
   ├─ [Sonnet] #9   approval-state-flow.test.ts (integration)
   └─ [Sonnet] #10  content-lifecycle.test.ts (integration)
 
-Sequential after:
-  └─ [Opus] Review pass
+Checkpoint: tsc + vitest + diff review
 ```
 
-#### Session 5: Batch 3 — Contracts (parallel)
+**Phase B — Batch 3: Contracts (parallel, after Phase A checkpoint):**
 
 ```
 Parallel:
@@ -913,80 +904,107 @@ Parallel:
   ├─ [Sonnet] #17  approval-batch-status.test.ts
   └─ [Sonnet] #18  websocket-event-shapes.test.ts
 
-Sequential after:
-  └─ [Opus] Review pass
+Checkpoint: full suite + scaled code review → PR
 ```
 
-#### Session 6: Batch 4 — Auth & Security (partially parallel)
+**Why together:** Contract tests that assert "invalid transition returns 400" need the `validateTransition()` guards to exist. Shipping both in one PR means no temporary suppressions.
+
+#### PR 4: Auth, AI, Data Integrity, Remaining (Batches 4–8)
+
+All batches in this PR are independent of each other — they only depend on PR 1 infrastructure. This allows maximum parallelism.
+
+**Phase A — All batches in parallel:**
 
 ```
-Parallel:
+Parallel (organized by batch, each test file owns only itself):
+
+  Batch 4 — Auth & Security:
   ├─ [Sonnet] #19  client-auth-full.test.ts
   ├─ [Sonnet] #20  admin-auth-guard.test.ts
   ├─ [Sonnet] #21  rate-limiting.test.ts
-  └─ [Sonnet] #22  workspace-access-control.test.ts
+  ├─ [Sonnet] #22  workspace-access-control.test.ts
+  ├─ [Opus]   #22b tier-gate-enforcement.test.ts
+  └─ [Sonnet] #22c cross-workspace-isolation.test.ts
 
-Sequential (depends on auth patterns from above):
-  ├─ [Opus] #22b  tier-gate-enforcement.test.ts (needs to enumerate all gated endpoints)
-  └─ [Sonnet] #22c  cross-workspace-isolation.test.ts
+  Batch 5 — AI & Strategy Quality:
+  ├─ [Sonnet] #23  strategy-generation.test.ts
+  ├─ [Sonnet] #24  seo-audit-generation.test.ts
+  ├─ [Sonnet] #25  brief-scoring.test.ts
+  ├─ [Opus]   #26  content-brief-generation.test.ts
+  └─ [Sonnet] #27  ai-token-tracking.test.ts
 
-Sequential after:
-  └─ [Opus] Review pass
+  Batch 6 — Data Integrity:
+  ├─ [Sonnet] #28  json-column-corruption.test.ts
+  ├─ [Sonnet] #29  parseJsonSafe-validation.test.ts
+  ├─ [Sonnet] #30  migration-data-preservation.test.ts
+  ├─ [Sonnet] #31  coalesce-sum-aggregates.test.ts
+  └─ [Sonnet] #31b db-transaction-atomicity.test.ts
+
+  Batch 7 + 7.5 — Client-Facing Correctness:
+  ├─ [Sonnet] #32  client-dashboard-data.test.ts
+  ├─ [Sonnet] #33  client-insights-rendering.test.ts
+  ├─ [Sonnet] #34  client-activity-log.test.ts
+  ├─ [Sonnet] #35  client-signals-flow.test.ts
+  ├─ [Sonnet] #36  seo-score-display.test.ts
+  ├─ [Sonnet] #36b client-copywriting-display.test.ts
+  ├─ [Opus]   S1   webflow-id-semantics.test.ts
+  ├─ [Sonnet] S2   brand-keyword-filter-wiring.test.ts
+  └─ [Sonnet] S3   schema-site-template-merge.test.ts
+
+  Batch 8 — Remaining Coverage:
+  ├─ [Sonnet] #37  redirect-store-crud.test.ts
+  ├─ [Sonnet] #38  analytics-annotations.test.ts
+  ├─ [Sonnet] #39  gsc-data-freshness.test.ts
+  ├─ [Sonnet] #40  seo-suggestions-lifecycle.test.ts
+  ├─ [Sonnet] #41  performance-store-upsert.test.ts
+  └─ [Sonnet] #42  rank-tracking-snapshots.test.ts
+
+Checkpoint: full suite + scaled code review → PR
 ```
 
-#### Sessions 7–10: Batches 5–8 (parallel within each)
-
-Same pattern: all test files within a batch run in parallel (each owns only its file), followed by an Opus review pass. Specific notes:
-
-- **Session 7 (Batch 5):** #23-27 all parallel. Sonnet for all except #26 (content-brief-generation, Opus — complex pipeline).
-- **Session 8 (Batch 6):** #28-31b all parallel. Sonnet for all. JSON.parse migration already done in Session 1.
-- **Session 9 (Batch 7 + 7.5):** #32-36b + S1-S3 all parallel. S1 (webflow-id-semantics) uses Opus.
-- **Session 10 (Batch 8):** #37-42 all parallel. Sonnet for all.
+**Why together:** These batches share no file dependencies. Each test file owns only itself and reads from shared mocks/fixtures (read-only). Combining them reduces PR overhead and review cycles. The scaled code review handles the larger diff size.
 
 ### 8.4 Dependency Graph
 
 ```
-Session 1: Infrastructure ─────────────────────────────────────────────┐
-    │                                                                   │
-    ├── PR 1a: mocks + utils + fixtures + pr-check + global-setup      │
-    └── PR 1b: JSON.parse migration (35 files)                         │
-         │                                                              │
-         ▼                                                              │
-Session 2: Batch 1 (external writes) ──── requires: mocks committed    │
-         │                                                              │
-         ▼                                                              │
-Session 3: Batch 1.5 (journeys) ────────── requires: mocks + Batch 1   │
-         │                                  patterns established        │
-         ▼                                                              │
-Session 4: Batch 2 (state machines) ────── requires: state-machine      │
-         │                                  helper from Session 1       │
-         ▼                                                              │
-Session 5: Batch 3 (contracts) ─────────── requires: contract-test      │
-         │                                  helper from Session 1       │
-         ▼                                                              │
-Session 6: Batch 4 (auth + tier gates) ── requires: auth-seed from S1  │
-         │                                                              │
-         ├── Sessions 7-10 can partially interleave ◄──────────────────┘
-         ▼
-Sessions 7–10: Batches 5–8 (independent of each other, all need S1)
+PR 1: Infrastructure ──── COMPLETE (PR #141)
+    │
+    ├── Mocks, fixtures, utils, pr-check rules, JSON.parse migration
+    │
+    ▼
+PR 2: External Writes + Journeys ──── requires: PR 1 mocks
+    │
+    │   Phase A: Batch 1 (8 parallel Sonnet agents)
+    │   Phase B: Batch 1.5 (3+2 Opus agents, after Phase A checkpoint)
+    │
+    ▼
+PR 3: State Machines + Contracts ──── requires: PR 1 helpers
+    │
+    │   Phase A: Batch 2 — implement validateTransition() + tests
+    │   Phase B: Batch 3 — contract tests (after Phase A checkpoint)
+    │
+    ▼
+PR 4: Auth, AI, Data, Remaining ──── requires: PR 1 infrastructure only
+    │
+    │   All batches (4–8) in parallel — no inter-batch dependencies
+    │   ~35 test files across 6 batches
+    │
+    ▼
+    DONE: ~305 tests across 54 test files
 ```
 
-**Key constraint:** Sessions 2-6 are strictly sequential because each builds on patterns and fixtures established by the previous. Sessions 7-10 are independent and could theoretically run in parallel across different worktrees, but that's logistically complex — sequential is fine given the reduced size of each.
+**Key constraint:** PRs 2-4 are strictly sequential because each PR's review findings may surface issues that affect later work. Within each PR, phases run sequentially (checkpoint between phases), but test files within a phase run in parallel.
 
-### 8.5 Per-Session Effort Estimate
+**Self-contained principle:** Every PR resolves its own issues completely. No temporary annotations, no `status-ok` suppressions that depend on a future PR, no placeholder tests. If a guard function is needed, it ships in the same PR as the tests that exercise it.
 
-| Session | Parallel Agents | Sequential Work | Limiting Factor |
-|---------|----------------|-----------------|-----------------|
-| 1 | 7 (mocks + fixtures + migration) | global-setup, pr-check, review | JSON.parse migration scope |
-| 2 | 8 test files | Review pass | Largest batch by file count |
-| 3 | 3 + 2 sequential | Review pass | Journey test complexity (Opus) |
-| 4 | 3 test files | Review pass | Small batch |
-| 5 | 6 test files | Review pass | Medium batch |
-| 6 | 4 + 2 sequential | Review pass | Tier-gate enumeration |
-| 7 | 5 test files | Review pass | AI mock complexity |
-| 8 | 5 test files | Review pass | Migration test setup |
-| 9 | 9 test files | Review pass | Largest by count |
-| 10 | 6 test files | Review pass | Smallest effort |
+### 8.5 Per-PR Effort Estimate
+
+| PR | Phases | Parallel Agents | Est. Tests | Limiting Factor |
+|----|--------|----------------|-----------|-----------------|
+| 1 | 1 | 7 | 0 (infra only) | **COMPLETE** — PR #141 |
+| 2 | A + B | 8 + 5 | ~90 | Journey test complexity (Opus), 2 checkpoints |
+| 3 | A + B | 3 + 6 | ~65 | validateTransition() implementation before tests |
+| 4 | 1 | ~35 | ~150 | Largest PR by file count; all batches independent |
 
 ---
 
@@ -1034,18 +1052,13 @@ Like│                   │                   │Like
 | `tests/unit/competitor-brand-filter.test.ts` | 23 tests for brand keyword filtering (exists, not in original count) |
 | `vite.config.ts` | Test config: jsdom env, setup files, include patterns |
 
-## Appendix C: Implementation Schedule
+## Appendix C: Implementation Schedule (4 PRs)
 
-| Session | Batch | Est. Tests | Model Mix | PR Count | Focus |
-|---------|-------|-----------|-----------|----------|-------|
-| 1 | Infrastructure | 0 | Haiku + Sonnet | 1-2 | Mocks, utils, fixtures, pr-check, JSON.parse migration (35 files) |
-| 2 | Batch 1 (1-7b) | ~55 | Sonnet (8 parallel) | 1 | External write failure paths + webhook idempotency |
-| 3 | Batch 1.5 (J1-J5) | ~35 | Opus (3+2) | 1 | User journey workflows (pay→upgrade, content→publish, approval→Webflow) |
-| 4 | Batch 2 (8-10) | ~30 | Sonnet (3 parallel) | 1 | State machine guards (rebalanced: 3 real-bug machines) |
-| 5 | Batch 3 (13-18) | ~35 | Sonnet (6 parallel) | 1 | Cross-layer contracts |
-| 6 | Batch 4 (19-22c) | ~40 | Sonnet + Opus | 1 | Auth, security, tier-gate enforcement, cross-workspace isolation |
-| 7 | Batch 5 (23-27) | ~25 | Sonnet + Opus | 1 | AI & strategy quality |
-| 8 | Batch 6 (28-31b) | ~35 | Sonnet (5 parallel) | 1 | Data integrity (JSON safety + migration preservation) |
-| 9 | Batch 7+7.5 (32-S3) | ~30 | Sonnet + Opus | 1 | Client-facing correctness + semantic ID/brand filter wiring |
-| 10 | Batch 8 (37-42) | ~20 | Sonnet (6 parallel) | 1 | Remaining coverage gaps |
+| PR | Batches | Est. Tests | Model Mix | Focus |
+|----|---------|-----------|-----------|-------|
+| 1 | Infrastructure | 0 | Sonnet | **COMPLETE** — mocks, utils, fixtures, pr-check, JSON.parse migration |
+| 2 | 1 + 1.5 | ~90 | Sonnet (8) + Opus (5) | External write failures + journey workflows |
+| 3 | 2 + 3 | ~65 | Sonnet (9) + Opus (review) | State machine guards + cross-layer contracts |
+| 4 | 4 + 5 + 6 + 7 + 7.5 + 8 | ~150 | Sonnet (~30) + Opus (3) | Auth, AI quality, data integrity, client correctness, remaining |
+| **Total** | | **~305** | | **54 test files across 4 PRs** |
 | **Total** | | **~305** | | **10-11** | |

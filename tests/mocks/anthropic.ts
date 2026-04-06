@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 
 interface CapturedCall {
   feature: string;
-  messages: unknown[];
+  messages: { role: string; content: string }[];
   model?: string;
   system?: string;
 }

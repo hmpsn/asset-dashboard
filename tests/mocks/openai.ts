@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 
 interface CapturedCall {
   feature: string;
-  messages: unknown[];
+  messages: { role: string; content: string }[];
   model?: string;
 }
 
@@ -106,9 +106,6 @@ export function setupOpenAIMocks(): void {
     getUsageByDay: vi.fn(() => []),
     getUsageByFeature: vi.fn(() => []),
     getTimeSaved: vi.fn(() => ({ totalMinutesSaved: 0, totalHoursSaved: 0, operationCount: 0, byFeature: {} })),
-    parseAIJson: vi.fn((raw: string) => {
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      return JSON.parse(cleaned);
-    }),
+    parseAIJson: vi.fn((raw: string) => JSON.parse(raw)),
   }));
 }

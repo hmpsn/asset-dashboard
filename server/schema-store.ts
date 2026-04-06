@@ -197,8 +197,8 @@ export function getSiteTemplate(siteId: string): SchemaSiteTemplate | null {
   return {
     siteId: row.site_id,
     workspaceId: row.workspace_id,
-    organizationNode: parseJsonFallback(row.organization_node, null),
-    websiteNode: parseJsonFallback(row.website_node, null),
+    organizationNode: parseJsonFallback<Record<string, unknown>>(row.organization_node, {}),
+    websiteNode: parseJsonFallback<Record<string, unknown>>(row.website_node, {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -13,7 +13,7 @@ import { runMigrations } from '../server/db/index.js';
 const SEED_TABLES = [
   'workspaces',
   'approval_batches',
-  'users',
+  'client_users',
   'requests',
   'content_topic_requests',
   'content_briefs',
@@ -22,6 +22,8 @@ const SEED_TABLES = [
   'tracked_actions',
   'analytics_annotations',
 ] as const;
+// Note: `users` table is NOT included — its IDs use `usr_` prefix (not `test-`)
+// and it has no `workspace_id` column. Cleanup is handled by per-fixture cleanup() closures.
 
 export function setup() {
   runMigrations();

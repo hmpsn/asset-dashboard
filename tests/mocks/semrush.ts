@@ -5,6 +5,10 @@
  * and returns CSV-formatted responses. This mock intercepts fetch calls by URL
  * pattern and returns either CSV or error responses.
  *
+ * WARNING: Cannot be active simultaneously with setupGoogleMocks() — both
+ * spy on globalThis.fetch. Use only one per test file, or build a shared
+ * fetch router if both are needed.
+ *
  * Usage:
  *   beforeEach(() => setupSEMRushMocks());
  *   afterEach(() => resetSEMRushMocks());

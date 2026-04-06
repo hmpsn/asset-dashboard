@@ -4,6 +4,10 @@
  * Uses vi.spyOn(globalThis, 'fetch') with a URL-matching router so multiple
  * mock rules can coexist (e.g. GSC success + OAuth refresh in the same test).
  *
+ * WARNING: Cannot be active simultaneously with setupSEMRushMocks() — both
+ * spy on globalThis.fetch. Use only one per test file, or build a shared
+ * fetch router if both are needed.
+ *
  * Usage:
  *   beforeEach(() => setupGoogleMocks());
  *   afterEach(() => resetGoogleMocks());

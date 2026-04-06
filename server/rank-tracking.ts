@@ -65,7 +65,7 @@ function writeConfig(workspaceId: string, config: { trackedKeywords: TrackedKeyw
 
 function readSnapshots(workspaceId: string): RankSnapshot[] {
   const rows = stmts().getSnapshots.all(workspaceId) as SnapshotRow[];
-  return rows.map(r => ({ date: r.date, queries: JSON.parse(r.queries) }));
+  return rows.map(r => ({ date: r.date, queries: parseJsonFallback<RankSnapshot['queries']>(r.queries, []) }));
 }
 
 // --- Public API ---
