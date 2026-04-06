@@ -24,6 +24,11 @@ async function runIntelligenceRefresh(): Promise<void> {
         if (!hasRecentActivity(ws.id, 30)) { skipped++; continue; }
         await buildWorkspaceIntelligence(ws.id, { // bwi-all-ok — explicit slices on next line
           slices: ['seoContext', 'insights', 'learnings', 'contentPipeline', 'siteHealth', 'clientSignals', 'operational'],
+          // enrichWithBacklinks intentionally omitted — backlinks require a live API call and the
+          // cron's full-slice cache key (intelligence:ws:all7::all) will never match the subset
+          // key admin chat uses. Pre-warming with :bl would burn SEMRush credits every 6h with
+          // no consumer ever hitting that cache entry. Admin chat makes one live call on the
+          // first message of each 6h window; the LRU handles subsequent messages in the session.
         });
         refreshed++;
       } catch (err) {

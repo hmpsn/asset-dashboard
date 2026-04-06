@@ -36,6 +36,12 @@ export interface IntelligenceOptions {
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   /** Token budget hint for downstream prompt formatting */
   tokenBudget?: number;
+  /**
+   * Opt-in: fetch backlink profile from the configured SEO data provider.
+   * OFF by default — the provider call adds network latency and costs credits.
+   * Only enable for callers that actually surface backlink data (e.g. admin AI chat).
+   */
+  enrichWithBacklinks?: boolean;
 }
 
 // ── Core return type ────────────────────────────────────────────────────
@@ -184,6 +190,15 @@ export interface ClientSignalsSlice {
   compositeHealthScore?: number | null;
   feedbackItems?: Array<{ id: string; type: string; status: string; createdAt: string }>;
   serviceRequests?: { pending: number; total: number };
+  /** Intent signals detected in client chat (service_interest / content_interest) */
+  intentSignals?: {
+    /** Count of unactioned (status = 'new') signals */
+    newCount: number;
+    /** Total signals created (all statuses) */
+    totalCount: number;
+    /** Signal types seen recently, most recent first (max 5) */
+    recentTypes: Array<'service_interest' | 'content_interest'>;
+  };
 }
 
 export interface OperationalSlice {
@@ -271,13 +286,16 @@ export interface BusinessProfile {
 export interface BacklinkProfile {
   totalBacklinks: number;
   referringDomains: number;
-  trend: 'growing' | 'stable' | 'declining';
+  /** Omitted when trend cannot be computed from available API data. */
+  trend?: 'growing' | 'stable' | 'declining';
 }
 
 export interface SerpFeatures {
   featuredSnippets: number;
   peopleAlsoAsk: number;
   localPack: boolean;
+  /** Pages where a video carousel is present for the primary keyword. */
+  videoCarousel: number;
 }
 
 export interface EngagementMetrics {

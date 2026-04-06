@@ -256,6 +256,13 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   for (const item of approved) {
     try {
+      // Guard: synthetic CMS IDs (format 'cms-*') come from sitemap discovery and are
+      // not real Webflow page or collection-item IDs. Attempting to write them via the
+      // Webflow API produces a silent 404. Fail fast with a clear message so the
+      // approval record correctly reflects 'not applied' rather than a phantom success.
+      if (item.pageId.startsWith('cms-')) {
+        throw new Error('CMS pages discovered via sitemap must be updated directly in Webflow — synthetic page ID cannot be written via the API');
+      }
       const value = item.clientValue || item.proposedValue;
       if (item.field === 'schema') {
         // Schema item — publish JSON-LD to page via schema publisher
@@ -264,14 +271,18 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {
-        // CMS item — update via collection API (updates draft)
+        // CMS item approval (from CmsEditor) — pageId here is a CMS item ID from the
+        // CMS Items API, not a Webflow page ID. collectionId is the collection it belongs to.
+        // This branch must NOT be triggered from SeoEditor: SeoEditor's pageId is a Webflow
+        // page ID, and a page's collectionId means "renders this collection" — not "is an
+        // item in this collection". SeoEditor omits collectionId from approval items to
+        // ensure static pages always fall through to updatePageSeo below.
         const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
         if (!result.success) throw new Error(result.error || 'CMS update failed');
-        // Publish the CMS item so draft changes go live
         const pubResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
         if (!pubResult.success) log.warn(`CMS publish warning for ${item.pageId}: ${pubResult.error}`);
       } else {
-        // Static page — update via page SEO API
+        // Static page — update via page SEO API (SeoEditor approval flow)
         const fields = item.field === 'seoTitle'
           ? { seo: { title: value } }
           : { seo: { description: value } };
@@ -312,7 +323,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
         if (getActionBySource('approval', item.id)) continue;
-        const action = recordAction({
+        const action = recordAction({ // recordAction-ok — workspaceId is from route param, always valid
           workspaceId: req.params.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'approval',

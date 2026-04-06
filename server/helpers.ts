@@ -23,15 +23,15 @@ export function normalizePath(p: string): string {
   return s.length > 1 && s.endsWith('/') ? s.slice(0, -1) : s;
 }
 
-/** Exact path match with trailing-slash normalization */
+/** Exact path match with trailing-slash normalization (case-insensitive) */
 export function matchPagePath(a: string, b: string): boolean {
-  return normalizePath(a) === normalizePath(b);
+  return normalizePath(a).toLowerCase() === normalizePath(b).toLowerCase();
 }
 
-/** Find a pageMap entry by path (exact match with normalization) */
+/** Find a pageMap entry by path (exact match with normalization, case-insensitive) */
 export function findPageMapEntry<T extends { pagePath: string }>(pageMap: T[], path: string): T | undefined {
-  const norm = normalizePath(path);
-  return pageMap.find(p => normalizePath(p.pagePath) === norm);
+  const norm = normalizePath(path).toLowerCase();
+  return pageMap.find(p => normalizePath(p.pagePath).toLowerCase() === norm);
 }
 
 /** Resolve a Webflow page's canonical path from publishedPath or slug */

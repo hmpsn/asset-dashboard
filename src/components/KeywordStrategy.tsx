@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { MetricsSource } from '../shared/types/keywords.js';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   AlertCircle, Sparkles, Briefcase,
@@ -36,7 +37,7 @@ interface PageKeywordMap {
   volume?: number;
   difficulty?: number;
   cpc?: number;
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
 }

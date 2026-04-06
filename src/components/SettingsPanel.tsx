@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { useToast } from './Toast';
 import {
   Check, Search, Loader2, LogIn, LogOut, Globe, ExternalLink, Unplug,
-  Shield, Key, Mail, CreditCard, Wifi, WifiOff, HardDrive, Trash2, RefreshCw,
+  Shield, Key, Mail, CreditCard, Wifi, WifiOff, HardDrive, Trash2, RefreshCw, CalendarDays,
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
 import { FeatureFlagSettings } from './FeatureFlagSettings';
-import { get, post, getOptional, getSafe } from '../api/client';
+import { get, post, patch, getOptional, getSafe } from '../api/client';
 
 interface Workspace {
   id: string;
@@ -62,6 +62,8 @@ export function SettingsPanel() {
   const [storage, setStorage] = useState<StorageReport | null>(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [pruning, setPruning] = useState<string | null>(null);
+  const [bookingUrl, setBookingUrl] = useState('');
+  const [bookingSaving, setBookingSaving] = useState(false);
 
   const loadStorage = async () => {
     setStorageLoading(true);
@@ -90,6 +92,7 @@ export function SettingsPanel() {
 
   useEffect(() => {
     getSafe<Workspace[]>('/api/workspaces', []).then(setWorkspaces).catch((err) => { console.error('SettingsPanel operation failed:', err); });
+    get<{ bookingUrl: string }>('/api/studio-config').then(d => setBookingUrl(d.bookingUrl || '')).catch(() => {});
     get<{ connected: boolean; configured: boolean }>('/api/google/status').then(s => {
       setGoogleStatus(s);
       if (s.connected) loadGscSites();
@@ -302,7 +305,7 @@ export function SettingsPanel() {
                 {storage.breakdown.slice(0, 6).map((d, i) => {
                   const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
                   if (pct < 0.5) return null;
-                  const colors = ['bg-amber-500', 'bg-teal-500', 'bg-blue-500', 'bg-violet-500', 'bg-rose-500', 'bg-emerald-500'];
+                  const colors = ['bg-amber-500', 'bg-teal-500', 'bg-blue-500', 'bg-purple-500', 'bg-rose-500', 'bg-emerald-500'];
                   return <div key={d.name} className={`h-full ${colors[i % colors.length]} transition-all`} style={{ width: `${pct}%` }} title={`${d.label}: ${formatBytes(d.bytes)}`} />;
                 })}
               </div>
@@ -312,7 +315,7 @@ export function SettingsPanel() {
             <div className="space-y-1">
               {storage.breakdown.map((d, i) => {
                 const pct = storage.totalBytes > 0 ? (d.bytes / storage.totalBytes) * 100 : 0;
-                const colors = ['text-amber-400', 'text-teal-400', 'text-blue-400', 'text-violet-400', 'text-rose-400', 'text-emerald-400'];
+                const colors = ['text-amber-400', 'text-teal-400', 'text-blue-400', 'text-purple-400', 'text-rose-400', 'text-emerald-400'];
                 return (
                   <div key={d.name} className="flex items-center gap-2 py-1">
                     <span className={`w-1.5 h-1.5 rounded-full ${colors[i % colors.length].replace('text-', 'bg-')}`} />
@@ -364,7 +367,7 @@ export function SettingsPanel() {
                   disabled={!!pruning}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-left"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                  <Trash2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                   <div className="flex-1">
                     <span className="text-xs text-zinc-300">Prune audit snapshots</span>
                     <span className="text-[11px] text-zinc-500 ml-1.5">Keep last 20 per site</span>
@@ -405,6 +408,50 @@ export function SettingsPanel() {
         ) : (
           <div className="px-5 py-4 text-xs text-zinc-500">Unable to load storage stats</div>
         )}
+      </section>
+
+      {/* Studio Config — Booking URL */}
+      <section className="bg-zinc-900 overflow-hidden border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+            <CalendarDays className="w-4 h-4 text-teal-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-200">Booking Link</h3>
+            <p className="text-[11px] text-zinc-500 mt-0.5">Shown as a "Book a call" button in the client AI chat when service interest is detected.</p>
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={bookingUrl}
+              onChange={e => setBookingUrl(e.target.value)}
+              placeholder="https://cal.com/yourname or https://calendly.com/yourname"
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+            />
+            <button
+              onClick={async () => {
+                setBookingSaving(true);
+                try {
+                  await patch('/api/studio-config', { bookingUrl });
+                  toast(bookingUrl ? 'Booking link saved' : 'Booking link cleared');
+                } catch { toast('Failed to save'); }
+                finally { setBookingSaving(false); }
+              }}
+              disabled={bookingSaving}
+              className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-xs text-white transition-colors flex items-center gap-1.5"
+            >
+              {bookingSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              Save
+            </button>
+          </div>
+          {bookingUrl && (
+            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-teal-400 hover:text-teal-300 transition-colors">
+              <ExternalLink className="w-3 h-3" /> Preview link
+            </a>
+          )}
+        </div>
       </section>
 
       {/* Feature Flags */}

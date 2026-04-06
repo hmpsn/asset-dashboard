@@ -120,6 +120,8 @@ const CHECKS: Check[] = [
       'server/schema-plan.ts', 'server/schema-suggester.ts', 'server/seo-audit.ts',
       'server/performance-store.ts', 'server/rank-tracking.ts', 'server/aeo-page-review.ts',
       'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
+      'server/processor.ts', // file-based metadata JSON, not DB columns
+      'server/websocket.ts', // WebSocket message parsing, not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -250,6 +252,63 @@ const CHECKS: Check[] = [
     message: 'recordAction() must be gated by `if (workspaceId)`. Add `// recordAction-ok` if verified safe.',
     severity: 'warn',
   },
+  {
+    name: 'Raw string literal in broadcastToWorkspace() event arg',
+    // Matches: broadcastToWorkspace(anything, 'some:event', ...) or broadcastToWorkspace(anything, "some:event", ...)
+    // Does NOT match: broadcastToWorkspace(wsId, WS_EVENTS.FOO, data) — no quote after the second comma
+    pattern: 'broadcastToWorkspace\\([^,]+,\\s*[\'"]',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/broadcast.ts'],
+    excludeLines: ['// ws-event-ok'],
+    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
+    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
+    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    severity: 'warn',
+  },
+  {
+    name: 'Raw string literal in broadcast() event arg',
+    // Matches standalone broadcast('event') but NOT _broadcast('event') or _broadcastToWorkspace('event').
+    // Uses (^|[^a-zA-Z_]) to require broadcast() is not preceded by a letter/underscore,
+    // excluding private wrappers like websocket.ts's _broadcast() which use string literals.
+    // Note: grep -E does not support lookbehind, so we use a character class exclusion instead.
+    pattern: '(^|[^a-zA-Z_])broadcast\\(\\s*[\'"]',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/broadcast.ts'],
+    excludeLines: ['// ws-event-ok'],
+    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
+    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
+    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    severity: 'warn',
+  },
+  {
+    // Catches always-true placeholder test assertions committed as real tests.
+    // These pass regardless of whether the contract they claim to test is actually correct,
+    // providing false confidence. Root cause from G2 PR3: seo-editor-unified.test.ts.
+    name: 'Placeholder test assertion — expect(true).toBe(true)',
+    pattern: 'expect\\(true\\)\\.toBe\\(true\\)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'tests/',
+    message: 'expect(true).toBe(true) always passes and documents nothing. Replace with a real assertion that can actually fail.',
+    severity: 'error',
+  },
+  {
+    // Catches tests that read source files as strings to assert string patterns (source-sniffing).
+    // These break on refactors that preserve semantics (variable renames, helper extraction),
+    // producing false-positive failures and masking real regressions.
+    // Root cause from G2 PR3: useSeoEditor.test.ts used fs.readFileSync to assert
+    // template literal fragments — fragile against any syntax-preserving refactor.
+    // Add // readFile-ok on the readFileSync line for intentional migration guards
+    // (e.g. asserting a deprecated endpoint is no longer referenced in the file).
+    name: 'Source-sniffing in tests (readFileSync on .ts/.tsx source)',
+    pattern: 'readFileSync\\(.*\\.(ts|tsx)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'tests/',
+    excludeLines: ['// readFile-ok'],
+    message: 'Test behavior via imports and mocks, not source-file string matching. Add // readFile-ok on the line if this is an intentional endpoint migration guard.',
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -317,7 +376,10 @@ for (const check of CHECKS) {
       exts.some(ext => f.endsWith(ext)) &&
       !isExcluded(f, check.exclude) &&
       (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-      !EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) &&
+      // When a check declares an explicit pathFilter, allow files from otherwise-excluded dirs
+      // that match it (e.g. pathFilter:'tests/' targets the excluded 'tests' dir intentionally).
+      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
+       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
       !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
     );
     for (const file of relevant) {
@@ -557,6 +619,8 @@ const manualChecks = [
   'Feature flag added if this is a multi-phase feature',
   'No route removals without updating Sidebar, Breadcrumbs, CommandPalette, routes.ts',
   'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
+  'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
+  'Cross-cutting constraint (e.g. "never send X to API Y") — grep for ALL call sites before writing fix #1, guard them all in one commit. Never patch one site at a time as they are discovered.',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);

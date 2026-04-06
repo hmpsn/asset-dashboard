@@ -2,12 +2,13 @@ import nodemailer from 'nodemailer';
 import { queueEmail, registerSendFn, restoreQueue } from './email-queue.js';
 import type { EmailEvent } from './email-templates.js';
 import { createLogger } from './logger.js';
+import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 
 const log = createLogger('email');
 
 // Configure via env vars:
 // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
-// SMTP_FROM_NAME — display name for outgoing emails (e.g. "hmpsn studio")
+// SMTP_FROM_NAME — display name for outgoing emails (uses STUDIO_NAME constant as default)
 // NOTIFICATION_EMAIL — where team gets notified (your inbox)
 
 interface EmailConfig {
@@ -352,5 +353,21 @@ export function notifyTeamChurnSignal(opts: {
   if (!to || !isEmailConfigured()) return;
   queueEmail(makeEvent('churn_signal', to, opts.workspaceId, opts.workspaceName, undefined, {
     signalTitle: opts.signalTitle, signalDescription: opts.signalDescription, severity: opts.severity,
+  }));
+}
+
+export function notifyTeamClientSignal(
+  workspaceId: string,
+  workspaceName: string,
+  signalType: string,
+  triggerMessage: string,
+): void {
+  if (!isEmailConfigured()) return;
+  const to = getNotificationEmail();
+  if (!to) return;
+  const adminUrl = process.env.ADMIN_URL || STUDIO_URL;
+  queueEmail(makeEvent('client_signal', to, workspaceId, workspaceName, adminUrl, {
+    signalType,
+    triggerMessage,
   }));
 }

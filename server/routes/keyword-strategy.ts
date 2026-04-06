@@ -37,18 +37,20 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
-import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
+import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
+import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -772,7 +774,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         clientKeywordsAdded++;
       }
     }
-    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)`);
+    // Filter branded competitor keywords from the pool BEFORE feeding to AI
+    const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
+    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
@@ -1179,6 +1183,7 @@ Rules:
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
+${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing any of these brand tokens: ${[...new Set(competitorDomains.flatMap(d => extractBrandTokens(d)))].join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 
     log.info(`Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
@@ -1208,12 +1213,21 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
     }
 
+    // Post-generation hard filter: remove any content gaps containing competitor brand names.
+    // The AI prompt tells it not to suggest these, but LLMs don't always comply.
+    // This filter is the real defense — the prompt is the soft guardrail.
+    const rawContentGaps = masterData.contentGaps || [];
+    const { filtered: cleanContentGaps, removed: brandedGaps } = filterBrandedContentGaps(rawContentGaps, competitorDomains);
+    if (brandedGaps.length > 0) {
+      log.info(`Stripped ${brandedGaps.length} branded content gaps despite prompt instruction: ${brandedGaps.map((g: { targetKeyword: string }) => g.targetKeyword).join(', ')}`);
+    }
+
     // Assemble final strategy: batch pageMap + master site-level data
     strategy = {
       siteKeywords: masterData.siteKeywords || [],
       pageMap: allPageMappings,
       opportunities: masterData.opportunities || [],
-      contentGaps: masterData.contentGaps || [],
+      contentGaps: cleanContentGaps,
       quickWins: masterData.quickWins || [],
     };
     log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
@@ -1264,7 +1278,19 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           pm.volume = match.volume;
           pm.difficulty = match.difficulty;
           pm.cpc = match.cpc;
-          (pm as Record<string, unknown>).metricsSource = 'exact';
+          pm.metricsSource = METRICS_SOURCE.EXACT;
+          // Capture SERP features for this page's primary keyword — stored per-page and
+          // later aggregated into workspace-level SerpFeatures counts in assembleSeoContext()
+          const serp = hasSerpOpportunity(match.serpFeatures);
+          const features: string[] = [];
+          if (serp.featuredSnippet) features.push('featured_snippet');
+          if (serp.paa) features.push('people_also_ask');
+          if (serp.video) features.push('video');
+          if (serp.localPack) features.push('local_pack');
+          // Always write serpFeatures for exact matches (even empty) so COALESCE overwrites
+          // stale features if SEMRush data changed. Pages with no exact match are left
+          // undefined → null → COALESCE keeps previous value (correct for unmatched pages).
+          pm.serpFeatures = features;
         } else {
           // Try word-overlap match (requires >=80% word overlap and at least 2 words)
           const partial = semrushDomainData.find(k => {
@@ -1277,7 +1303,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             pm.volume = partial.volume;
             pm.difficulty = partial.difficulty;
             pm.cpc = partial.cpc;
-            (pm as Record<string, unknown>).metricsSource = 'partial_match';
+            pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
           }
         }
         // Enrich secondary keywords
@@ -1317,7 +1343,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
                 pm.volume = m.volume;
                 pm.difficulty = m.difficulty;
                 pm.cpc = m.cpc;
-                (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
+                pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
               }
             }
           }
@@ -1741,8 +1767,8 @@ Rules:
     const pageMap = strategy.pageMap || [];
     // Snapshot previous page map BEFORE replacing (needed for strategy diff)
     const prevPageMapForHistory = listPageKeywords(ws.id);
-    // Save pageMap to dedicated table (replaces all existing entries)
-    replaceAllPageKeywords(ws.id, pageMap);
+    // Save pageMap to dedicated table (upserts new entries + deletes stale ones, preserves PI data)
+    upsertAndCleanPageKeywords(ws.id, pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
@@ -1925,7 +1951,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   // If pageMap is being updated, save to dedicated table
   if (req.body.pageMap) {
-    replaceAllPageKeywords(ws.id, req.body.pageMap);
+    upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);

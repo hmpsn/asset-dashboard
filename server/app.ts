@@ -99,6 +99,7 @@ import outcomesRouter from './routes/outcomes.js';
 import intelligenceRouter from './routes/intelligence.js';
 import debugRouter from './routes/debug.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
+import clientSignalsRouter from './routes/client-signals.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -189,6 +190,10 @@ export function createApp(): express.Express {
   app.use(fingerprintMiddleware);
 
   // --- Rate limiting for public API routes ---
+  // ⚠️  These three limiters apply AUTOMATICALLY to every /api/public/ route.
+  // Do NOT import or apply globalPublicLimiter, publicApiLimiter, or publicWriteLimiter
+  // inside individual route files — that increments the same shared bucket twice and
+  // silently halves the effective rate limit (10 req/min becomes 5, 200 becomes 100, etc.).
   app.use('/api/public/', globalPublicLimiter);
   app.use('/api/public/', publicApiLimiter);
   app.use((req, res, next) => {
@@ -343,6 +348,7 @@ export function createApp(): express.Express {
   app.use(intelligenceRouter);
   app.use(debugRouter);
   app.use(suggestedBriefsRouter);
+  app.use(clientSignalsRouter);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

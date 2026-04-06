@@ -323,6 +323,7 @@ export async function assembleAdminContext(
   const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — slices built dynamically above; general queries union operational+siteHealth+clientSignals
     slices: intelSlices as IntelligenceSlice[],
     learningsDomain: 'all',
+    enrichWithBacklinks: true, // admin AI advisor benefits from backlink data; one live call per cache window (LRU caches within session)
   });
   const seoCtx = intel.seoContext;
 
@@ -562,7 +563,7 @@ export async function assembleAdminContext(
             const targetSlug = pageContext.url.replace(/^https?:\/\/[^/]+/, '');
             const pageAudit = pages?.find((p) => {
               const pSlug = p.slug?.startsWith('/') ? p.slug : `/${p.slug}`;
-              return pSlug === targetSlug || pSlug === `${targetSlug}/` || targetSlug.endsWith(pSlug);
+              return pSlug.toLowerCase() === targetSlug.toLowerCase() || pSlug.toLowerCase() === `${targetSlug}/`.toLowerCase() || targetSlug.toLowerCase().endsWith(pSlug.toLowerCase());
             });
             if (pageAudit) {
               pageContext.auditIssues = pageAudit.issues;

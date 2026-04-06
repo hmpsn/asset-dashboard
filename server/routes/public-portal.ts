@@ -19,6 +19,7 @@ import { parseJsonFallback } from '../db/json-validation.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import { getBookingUrl } from '../studio-config.js';
 
 const log = createLogger('public-portal');
 
@@ -67,6 +68,8 @@ router.get('/api/public/workspace/:id', (req, res) => {
     onboardingCompleted: ws.onboardingCompleted ?? false,
     // Auth mode
     hasClientUsers: hasClientUsers(req.params.id),
+    // Studio-level settings exposed to client portal
+    bookingUrl: getBookingUrl() ?? null,
   });
 });
 

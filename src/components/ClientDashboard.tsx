@@ -39,6 +39,7 @@ import { useClientAuth } from '../hooks/useClientAuth';
 import TurnstileWidget from './TurnstileWidget';
 import { useClientData } from '../hooks/useClientData';
 import { useChat } from '../hooks/useChat';
+import { ServiceInterestCTA } from './client/ServiceInterestCTA';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
 import {
@@ -140,6 +141,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     showChatHistory, setShowChatHistory,
     chatUsage,
     roiValue,
+    lastIntent, clearIntent,
     proactiveInsight, proactiveInsightLoading,
     askAi,
   } = useChat(chatDeps);
@@ -882,7 +884,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
               </div>
               <div className="flex items-center gap-1">
                 {chatMessages.length > 0 && (
-                  <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); setShowChatHistory(false); }}
+                  <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); clearIntent(); setShowChatHistory(false); }}
                     title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
                 )}
                 <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { getSafe<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>(`/api/public/chat-sessions/${ws.id}?channel=client`, []).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch((err) => { console.error('ClientDashboard operation failed:', err); }); } }}
@@ -945,6 +947,18 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-teal-400 animate-spin" /></div>
                       <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5"><div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} /></div></div>
                     </div>
+                  )}
+                  {/* CTA — shown after last assistant message when intent is detected */}
+                  {!chatLoading && lastIntent && chatMessages.length > 0 && chatMessages[chatMessages.length - 1].role === 'assistant' && (
+                    <ServiceInterestCTA
+                      type={lastIntent}
+                      workspaceId={workspaceId}
+                      bookingUrl={ws?.bookingUrl}
+                      onAction={(type) => {
+                        clearIntent();
+                        if (type === 'content_interest') clientNavigate(clientPath(workspaceId, 'strategy', betaMode));
+                      }}
+                    />
                   )}
                   {/* Show quick questions as follow-ups after proactive greeting */}
                   {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && !chatLoading && (

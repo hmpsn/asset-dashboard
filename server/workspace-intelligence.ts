@@ -37,6 +37,7 @@ import type {
   ROIAttribution,
   WeCalledItEntry,
   ContentPipelineSummary,
+  SerpFeatures,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
 import type { TrackedAction } from '../shared/types/outcome-tracking.js';
@@ -47,6 +48,8 @@ import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
 import type { ChurnSignal } from './churn-signals.js';
+// client-signals-store uses dynamic import inside try-catch (like other subsystems)
+// to degrade gracefully if the module or table is unavailable on older DBs.
 import type { DecayAnalysis } from './content-decay.js';
 import type { AuditSnapshot } from './reports.js';
 import type { ROIData } from './roi.js';
@@ -287,6 +290,50 @@ async function assembleSeoContext(
     }
   } catch {
     // Strategy history table may not exist
+  }
+
+  // Backlink profile — opt-in only (network call, costs SEMRush credits)
+  // Gate with opts.enrichWithBacklinks to avoid hitting the hot-path for the
+  // ~16 callers that don't need backlink data (briefs, rewrites, audits, etc.)
+  if (opts?.enrichWithBacklinks) {
+    try {
+      const { getBacklinksProvider } = await import('./seo-data-provider.js');
+      const domain = workspace?.liveDomain?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';
+      if (domain) {
+        // Pass workspace.seoDataProvider so provider selection respects the per-workspace
+        // preference and falls back to a capable provider if backlinks are disabled on the
+        // primary (e.g. DataForSEO without a backlinks subscription).
+        const provider = getBacklinksProvider(workspace?.seoDataProvider);
+        if (provider?.isConfigured()) {
+          const overview = await provider.getBacklinksOverview(domain, workspaceId);
+          if (overview) {
+            base.backlinkProfile = {
+              totalBacklinks: overview.totalBacklinks,
+              referringDomains: overview.referringDomains,
+              // trend not computable from BacklinksOverview — omitted
+            };
+          }
+        }
+      }
+    } catch {
+      // Backlink data is optional — omit silently
+    }
+  }
+
+  // SERP features — aggregate from per-page serpFeatures stored in page_keywords.
+  // No external API call needed — this data is captured during strategy generation
+  // and stored in the serp_features column (migration 051).
+  if (livePageMap.length > 0) {
+    const allFeatures = livePageMap.flatMap(p => p.serpFeatures ?? []);
+    if (allFeatures.length > 0) {
+      const serpFeatures: SerpFeatures = {
+        featuredSnippets: allFeatures.filter(f => f === 'featured_snippet').length,
+        peopleAlsoAsk: allFeatures.filter(f => f === 'people_also_ask').length,
+        localPack: allFeatures.some(f => f === 'local_pack'),
+        videoCarousel: allFeatures.filter(f => f === 'video').length,
+      };
+      base.serpFeatures = serpFeatures;
+    }
   }
 
   return base;
@@ -909,6 +956,25 @@ async function assembleClientSignals(
     // Requests optional
   }
 
+  // Intent signals from client chat
+  let intentSignals: ClientSignalsSlice['intentSignals'];
+  try {
+    const { listClientSignals, countNewSignals, countAllSignals } = await import('./client-signals-store.js');
+    const signals = listClientSignals(workspaceId);
+    const newCount = countNewSignals(workspaceId);
+    // Use countAllSignals for totalCount — listClientSignals is capped at LIMIT 100
+    const totalCount = countAllSignals(workspaceId);
+    intentSignals = {
+      newCount,
+      totalCount,
+      recentTypes: signals.slice(0, 5).map(s => s.type),
+    };
+  } catch (err) {
+    // client_signals table may not exist on older DBs — degrade gracefully
+    log.debug({ err }, 'client_signals unavailable for intelligence assembly');
+  }
+
+
   // Recent chat topics
   let recentChatTopics: string[] = [];
   try {
@@ -970,6 +1036,7 @@ async function assembleClientSignals(
     compositeHealthScore,
     feedbackItems,
     serviceRequests,
+    intentSignals,
   };
 }
 
@@ -1384,6 +1451,23 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.rankTracking && verbosity !== 'compact') {
     const rt = ctx.rankTracking;
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
+  }
+
+  // Backlink profile — at standard+ verbosity (only present when enrichWithBacklinks opt-in was set)
+  if (ctx.backlinkProfile && verbosity !== 'compact') {
+    const bp = ctx.backlinkProfile;
+    lines.push(`Backlinks: ${bp.totalBacklinks.toLocaleString()} total, ${bp.referringDomains.toLocaleString()} referring domains`);
+  }
+
+  // SERP features — aggregated from per-page data; at standard+ verbosity
+  if (ctx.serpFeatures && verbosity !== 'compact') {
+    const sf = ctx.serpFeatures;
+    const parts: string[] = [];
+    if (sf.featuredSnippets > 0) parts.push(`${sf.featuredSnippets} featured snippet opportunit${sf.featuredSnippets === 1 ? 'y' : 'ies'}`);
+    if (sf.peopleAlsoAsk > 0) parts.push(`${sf.peopleAlsoAsk} People Also Ask opportunit${sf.peopleAlsoAsk === 1 ? 'y' : 'ies'}`);
+    if (sf.videoCarousel > 0) parts.push(`${sf.videoCarousel} video carousel opportunit${sf.videoCarousel === 1 ? 'y' : 'ies'}`);
+    if (sf.localPack) parts.push('local pack present');
+    if (parts.length > 0) lines.push(`SERP features: ${parts.join(', ')}`);
   }
 
   // Site keywords — always include when present; compact shows fewer
@@ -2064,7 +2148,10 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
   const slices = [...(opts?.slices ?? ALL_SLICES)].sort().join(',');
   const page = opts?.pagePath ?? '';
   const domain = opts?.learningsDomain ?? 'all';
-  return `intelligence:${workspaceId}:${slices}:${page}:${domain}`;
+  // enrichWithBacklinks makes a network call that changes the result — must be part of the key
+  // so that callers with backlinks enabled don't hit a cron-warmed cache missing that data.
+  const backlinks = opts?.enrichWithBacklinks ? ':bl' : '';
+  return `intelligence:${workspaceId}:${slices}:${page}:${domain}${backlinks}`;
 }
 
 /** Invalidate all cached intelligence for a workspace */

@@ -286,3 +286,65 @@ export interface ContentMatrix {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Brief generation planning types ─────────────────────────────
+
+/** Journey stage derived from search intent for page-type prompt tuning. */
+export type BriefJourneyStage = 'awareness' | 'consideration' | 'decision';
+
+/** Page types supported by the brief generation engine. */
+export type BriefPageType =
+  | 'blog'
+  | 'landing'
+  | 'service'
+  | 'location'
+  | 'pillar'
+  | 'product'
+  | 'resource';
+
+/**
+ * Strategy card metadata threaded from a content request into generateBrief().
+ * Captures all context visible on a recommendation card so the brief
+ * reflects strategic reasoning, not just the keyword.
+ */
+export interface StrategyCardContext {
+  rationale?: string;
+  volume?: number;
+  difficulty?: number;
+  trendDirection?: 'rising' | 'declining' | 'stable';
+  /** e.g. ['featured_snippet', 'people_also_ask'] */
+  serpFeatures?: string[];
+  competitorProof?: string;
+  impressions?: number;
+  /** Search intent from the strategy gap (informational / commercial / transactional). */
+  intent?: string;
+  /** Priority from the strategy gap (high / medium / low). */
+  priority?: string;
+  /** Journey stage derived from intent — set by the route layer, not the client. */
+  journeyStage?: BriefJourneyStage;
+}
+
+/**
+ * Tone + structure configuration per page type.
+ * PAGE_TYPE_CONFIGS in server/content-brief.ts maps BriefPageType → PageTypeBriefConfig.
+ */
+export interface PageTypeBriefConfig {
+  /** Prose description of the recommended tone (injected into prompt). */
+  tone: string;
+  /** Recommended outline structure summary (injected into prompt). */
+  structure: string;
+  /** Schema.org types recommended for this page type, e.g. ['Article', 'BreadcrumbList']. */
+  schemaTypes: string[];
+  /** Target word count for this page type. */
+  wordCountTarget: number;
+  /** Word count range string shown in prompt, e.g. "1400–2200". */
+  wordCountRange: string;
+  /** Average words per section (used in per-section wordCount prompt values). */
+  avgSectionWords: number;
+  /** Recommended number of H2 sections, e.g. "6–8". */
+  sectionRange: string;
+  /** Full content style guidance injected into the prompt. */
+  contentStyle: string;
+  /** Full page-type instruction block injected verbatim into the generateBrief() prompt. */
+  prompt: string;
+}

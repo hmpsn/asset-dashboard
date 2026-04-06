@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **270 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **277 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3127,6 +3127,97 @@ When the user asks to update this document with recent features, follow this pro
 
 ---
 
+### 206. Strategy Card Context — AI-Aware Per-Page SEO Metadata
+**What it does:** Adds a `strategyCardContext` block to the keyword strategy object assembled during strategy generation. Each page in `pageMap` now carries a `cardContext` object with `pageType` (home/service/blog/etc.), `pageTypeLabel`, `strategicPriority` (high/medium/low), and `priorityReason` — derived from `getPageTypeConfig()`. This metadata is injected into content brief prompts via `buildStrategyCardBlock()` so the AI understands the page's role in the site architecture when generating guidance. Also exports `getPageTypeConfig()` from `server/routes/keyword-strategy.ts` for downstream consumption.
+
+**Files:** `server/routes/keyword-strategy.ts`, `shared/types/workspace.ts`, `server/content-brief.ts`
+
+**Agency value:** Content briefs now understand whether they're writing for a homepage, a service page, a blog post, or a hub page — producing appropriately structured guidance instead of generic advice. No extra API calls; context derives from existing page classification logic.
+
+**Client value:** Briefs that actually fit the page type. A service page brief emphasizes conversion CTAs; a blog post brief emphasizes depth and internal linking; a homepage brief emphasizes authority and brand positioning.
+
+**Mutual:** Higher-quality AI output from the same inputs — briefs require fewer rounds of edits.
+
+---
+
+### 207. Backlink Profile in Admin AI Intelligence Context
+**What it does:** Adds an opt-in `backlinkProfile` field to the `SeoContextSlice` in the unified workspace intelligence layer. When `enrichWithBacklinks: true` is passed to `buildWorkspaceIntelligence()`, the system fetches a backlinks overview (total backlinks, referring domains) from the configured SEO data provider (SEMRush or DataForSEO) and includes it in the assembled context. The admin AI chat sets this flag, giving the advisor backlink data when answering questions about link building, authority, and competitive positioning. Cache key includes `:bl` suffix to prevent bleed between enriched and non-enriched cache entries. Provider selection respects the per-workspace `seoDataProvider` preference via `getBacklinksProvider()`, with automatic fallback when a provider's backlinks capability is disabled.
+
+**Files:** `server/workspace-intelligence.ts`, `server/intelligence-cache.ts`, `shared/types/intelligence.ts`, `server/admin-chat-context.ts`
+
+**Agency value:** The AI advisor can now speak to backlink strategy with real data — "You have 142 referring domains; competitors typically have 300+" — instead of generic advice. Data is fetched once per 6h cache window; subsequent admin chat messages in the same session reuse the LRU-cached result at zero API cost.
+
+**Client value:** Indirectly — the admin AI advisor gives better backlink and authority recommendations, which translates to better link-building strategies for the client.
+
+**Mutual:** One API call per cache window serves the entire admin chat session for that workspace.
+
+---
+
+### 208. SERP Features Pipeline — Capture, Store, Aggregate, and Brief Directives
+**What it does:** End-to-end pipeline that captures SERP feature data from SEMRush during keyword strategy generation, stores it per-page in SQLite, aggregates it to workspace-level for AI context, and injects actionable directives into content briefs. Four stages: (1) **Capture** — `hasSerpOpportunity()` in `server/semrush.ts` parses SEMRush `Fk` codes into `{ featuredSnippet, paa, video, localPack }` booleans; strategy generation writes an array of present features (`featured_snippet`, `people_also_ask`, `video`, `local_pack`) to a new `serp_features TEXT` column (migration 051) in the `page_keywords` table. Exact-match pages always write (even empty array) to prevent COALESCE from preserving stale values. (2) **Aggregate** — `assembleSeoContext()` in the intelligence layer computes workspace-level `SerpFeatures` (`featuredSnippets: N`, `peopleAlsoAsk: N`, `localPack: bool`) from all live page entries. (3) **Prompt** — `formatSeoContextSection()` renders SERP features as a human-readable line in AI context at standard/verbose verbosity (hidden at compact). (4) **Brief directives** — `generateBrief()` in `server/content-brief.ts` checks the matched page's `serpFeatures` and prepends per-feature directives to the brief prompt: featured snippet → 40-60 word direct-answer opening; PAA → 4-6 Q&A FAQ section; video → embed recommendation; local pack → NAP + LocalBusiness schema suggestion.
+
+**Files:** `server/db/migrations/051-page-keywords-serp-features.sql`, `shared/types/workspace.ts`, `server/page-keywords.ts`, `server/routes/keyword-strategy.ts`, `server/workspace-intelligence.ts`, `shared/types/intelligence.ts`, `server/content-brief.ts`, `tests/fixtures/rich-intelligence.ts`, `tests/unit/format-for-prompt.test.ts`
+
+**Agency value:** Briefs automatically target the SERP features the keyword already shows — no manual research needed. A keyword with a featured snippet opportunity gets a brief that tells the writer to put a direct answer in the first 100 words; a PAA keyword gets a FAQ section directive. Results compound: better brief structure → higher chance of winning the SERP feature → better visibility for the client.
+
+**Client value:** More content wins SERP features (featured snippets, PAA boxes) without extra work — the system structures the brief to target them. Visible in the brief itself so clients can see why the structure is the way it is.
+
+**Mutual:** Zero additional API calls — data is a byproduct of the existing strategy generation flow. The brief directive adds concrete, measurable value (a brief optimized for a featured snippet is qualitatively different from one that isn't).
+
+---
+
+### 274. KD Difficulty Framing
+**What it does:** Assigns a human-readable difficulty label ("Easy", "Moderate", "Hard", "Very Hard") and descriptive tooltip ("KD 45/100 — Moderate competition…") to every keyword row in StrategyTab and ContentGaps. Labels are derived from the SEMRush KD score via `kdFraming(kd)` and `kdTooltip(kd)` utilities in `src/lib/kdFraming.ts`. Tooltip renders on hover so the row stays compact while the detail is always available.
+
+**Files:** `src/lib/kdFraming.ts`, `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** Instantly communicates keyword difficulty in plain language — "Hard" is scannable at a glance vs. reading a raw number. Speeds up keyword curation during client strategy sessions.
+
+**Client value:** Clients can evaluate keyword difficulty without knowing SEO scoring scales. Labels reduce confusion and support self-service strategy review in the client portal.
+
+**Mutual:** Removes the "what does 67 mean?" question from every strategy call. Shared vocabulary between agency and client around keyword effort.
+
+---
+
+### 275. Predicted Organic Impact
+**What it does:** Calculates and displays the estimated monthly organic clicks for each keyword row using the formula `volume × CTR(position)`, where CTR is derived from the Backlinko position curve. Shown inline below each keyword row in StrategyTab and ContentGaps. ContentGaps uses a position-3 floor (CTR 0.103) for unranked keywords. Gives a concrete traffic upside estimate alongside difficulty and volume.
+
+**Files:** `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** Converts raw keyword volume into a projected outcome ("rank for this → ~420 clicks/mo"), making ROI conversations concrete. Prioritization becomes data-driven rather than intuition-based.
+
+**Client value:** Clients see why a specific keyword is worth pursuing — not just that it has volume, but what winning it is estimated to deliver. Supports upgrade conversations ("this keyword cluster is worth ~3,000 clicks/mo").
+
+**Mutual:** Bridges the gap between keyword research and business outcomes. A single number that resonates in strategy reviews and justifies content investment.
+
+---
+
+### 276. SERP Feature Chips (Blue, All 4 Types)
+**What it does:** Renders inline badge chips on keyword rows for all four SERP feature opportunity types: featured snippet, People Also Ask (PAA), local pack, and video carousel. Chips are color-corrected to blue (data law — read-only informational data) replacing prior yellow/cyan variants. Appears in StrategyTab and ContentGaps wherever the keyword's SERP feature flags are present.
+
+**Files:** `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** At-a-glance identification of high-value SERP real estate opportunities. A keyword with a featured snippet chip is an immediate priority for structured content — no cross-referencing required.
+
+**Client value:** Clients can see which keywords give them a shot at featured placements. Makes abstract "SERP features" tangible with small, recognizable chips on the strategy view.
+
+**Mutual:** Correct blue color enforces the Three Laws of Color design system. All four chip types now present (prior implementation was incomplete) — no opportunity type goes unrepresented.
+
+---
+
+### 277. SEO Editor CMS Write Guards & Static-Only Endpoint
+**What it does:** The SEO Editor fetches from `/api/webflow/pages/:siteId` (static pages only). CMS collection items are edited through the separate CMS Editor which fetches real item IDs from the CMS Items API. Defense-in-depth guards (`filterWritableIds`, `filterWritableItems`, `filterPagesNeedingFix`, `countMissingField`) ensure that any CMS pages with synthetic `cms-*` IDs are excluded from all Webflow write operations — bulk AI rewrite, pattern apply, bulk fix, approval submission, and individual save. Server-side guards at the PUT and bulk endpoints provide a second layer of protection.
+
+**Files:** `src/components/SeoEditor.tsx`, `src/hooks/admin/useSeoEditor.ts`, `src/hooks/admin/seoEditorFilters.ts`, `server/routes/webflow.ts`, `server/routes/webflow-seo.ts`, `server/routes/approvals.ts`
+
+**Agency value:** Clean separation: SeoEditor handles static Webflow pages (auto-apply via API), CMS Editor handles collection items (real CMS item IDs). No silent 404s from passing synthetic IDs to Webflow. Defense-in-depth means a single guard failure won't corrupt data.
+
+**Client value:** Approvals submitted through SeoEditor correctly target only pages that can be auto-applied. No confusing failures when approved changes can't be written.
+
+**Mutual:** Eliminates the "why didn't my changes apply?" class of issues by preventing unwritable pages from entering the write path at all.
+
+---
+
 ## Platform Summary
 
 | Category | Feature Count | Primary Value Driver |
@@ -3142,6 +3233,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**270 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**277 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **270**. Last updated: April 2026.
+Current feature count: **277**. Last updated: April 2026.

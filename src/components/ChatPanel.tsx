@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Loader2, MessageSquare } from 'lucide-react';
 import { RenderMarkdown } from './client/helpers';
+import { pickPhrase } from '../lib/loadingPhrases';
+import { ServiceInterestCTA } from './client/ServiceInterestCTA';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -21,6 +23,12 @@ interface ChatPanelProps {
   inputPrefix?: React.ReactNode;
   /** Extra content rendered in the empty state below quick questions */
   emptyExtra?: React.ReactNode;
+  /** Detected intent from the last AI response (for CTA rendering) */
+  lastIntent?: 'content_interest' | 'service_interest' | null;
+  /** Called when the user acts on the CTA */
+  onCTAAction?: (type: 'content_interest' | 'service_interest') => void;
+  /** Workspace ID — required for service_interest CTA signal POST */
+  workspaceId?: string;
 }
 
 const ACCENT = {
@@ -52,9 +60,39 @@ export function ChatPanel({
   disabled = false,
   inputPrefix,
   emptyExtra,
+  lastIntent,
+  onCTAAction,
+  workspaceId,
 }: ChatPanelProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const a = ACCENT[accent];
+
+  // Western loading phrase — appears after 4s of continuous loading
+  const [phrase, setPhrase] = useState<string>('');
+  const phraseRef = useRef<string>('');
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!loading) {
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      setPhrase('');
+      phraseRef.current = '';
+      return;
+    }
+    // Rotate through phrases every 4s while loading — no consecutive repeats
+    const scheduleRotation = () => {
+      loadingTimerRef.current = setTimeout(() => {
+        const next = pickPhrase(phraseRef.current);
+        phraseRef.current = next;
+        setPhrase(next);
+        scheduleRotation();
+      }, 4000);
+    };
+    scheduleRotation();
+    return () => {
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    };
+  }, [loading]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,20 +145,36 @@ export function ChatPanel({
                 </div>
               </div>
             ))}
+
+            {/* Loading indicator — bouncing dots for first 4s, Western phrase thereafter */}
             {loading && (
               <div className="flex gap-3">
                 <div className={`w-6 h-6 rounded-lg ${a.icon} flex items-center justify-center`}>
                   <Loader2 className={`w-3 h-3 ${a.iconText} animate-spin`} />
                 </div>
-                <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5 min-w-[56px]">
+                  {phrase ? (
+                    <span className="text-[11px] text-zinc-400 animate-pulse">{phrase}</span>
+                  ) : (
+                    <div className="flex gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+
+            {/* CTA — shown after last assistant message when intent is detected */}
+            {!loading && lastIntent && onCTAAction && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
+              <ServiceInterestCTA
+                type={lastIntent}
+                workspaceId={workspaceId}
+                onAction={onCTAAction}
+              />
+            )}
+
             <div ref={endRef} />
           </div>
         )}

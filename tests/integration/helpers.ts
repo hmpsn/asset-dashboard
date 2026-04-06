@@ -71,7 +71,9 @@ export function createTestContext(port: number): TestContext {
       env: {
         ...process.env,
         PORT: String(port),
-        NODE_ENV: 'development',
+        // Use 'test' so the server skips file watchers (chokidar) that exhaust
+        // open file descriptor limits when multiple test servers run concurrently.
+        NODE_ENV: 'test',
         APP_PASSWORD: '',
       },
       stdio: 'pipe',

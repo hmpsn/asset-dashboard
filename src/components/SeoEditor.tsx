@@ -10,7 +10,14 @@ import { workspaces } from '../api';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
-import { StatusBadge, LoadingState } from './ui';
+import {
+  filterWritablePages,
+  filterWritableItems,
+  filterWritableIds,
+  filterPagesNeedingFix,
+  countMissingField,
+} from '../hooks/admin/seoEditorFilters';
+import { StatusBadge, LoadingState, EmptyState } from './ui';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
@@ -34,7 +41,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const queryClient = useQueryClient();
   
   // React Query hook replaces manual data fetching
-  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId);
+  const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
   
   // Session persistence: restore edits/variations/expanded from sessionStorage (survives tab switches + refresh)
   const restoredFromCache = useRef(false);
@@ -62,6 +69,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [bulkFixing, setBulkFixing] = useState(false);
   const [bulkResults, setBulkResults] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [showCmsOnly, setShowCmsOnly] = useState(false);
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
   const [sendingApproval, setSendingApproval] = useState(false);
@@ -88,6 +96,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+
+  // Clear approval selection when CMS filter toggles — prevents hidden pages from being silently submitted
+  useEffect(() => {
+    setApprovalSelected(new Set());
+  }, [showCmsOnly]);
 
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
@@ -400,10 +413,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const handleBulkFix = async (field: 'title' | 'description') => {
-    const pagesNeedingFix = pages.filter(p => {
-      if (field === 'title') return !p.seo?.title;
-      return !p.seo?.description;
-    });
+    const pagesNeedingFix = filterPagesNeedingFix(pages, field);
     if (pagesNeedingFix.length === 0) {
       setBulkResults(`All pages already have ${field === 'title' ? 'SEO titles' : 'meta descriptions'}.`);
       setTimeout(() => setBulkResults(null), 3000);
@@ -453,7 +463,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const previewPattern = () => {
     if (!patternText.trim()) return;
     const maxLen = bulkField === 'description' ? 160 : 60;
-    const preview = Array.from(approvalSelected).map(pageId => {
+    // Exclude CMS pages upfront — their synthetic IDs are rejected by the Webflow API on apply
+    const preview = filterWritableIds(Array.from(approvalSelected), pages).map(pageId => {
       const page = pages.find(p => p.id === pageId);
       const edit = edits[pageId];
       if (!page || !edit) return null;
@@ -488,7 +499,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   // ── Bulk AI Rewrite — calls the same single-page aiRewrite for each selected page ──
   const bulkAiRewrite = async (field: 'title' | 'description' | 'both') => {
-    const selectedIds = Array.from(approvalSelected).filter(id => pages.some(p => p.id === id));
+    const selectedIds = filterWritableIds(Array.from(approvalSelected), pages);
     if (selectedIds.length === 0) return;
     setBulkField(field === 'both' ? 'title' : field);
     setBulkMode('rewriting');
@@ -530,11 +541,13 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const applyBulkRewrite = async () => {
+    // Pre-filter to only static pages — CMS pages have synthetic IDs the Webflow API rejects.
+    // Filtering here (not inside the loop) ensures total/progress counts are accurate.
+    const staticItems = filterWritableItems(bulkPreview, pages);
     setBulkMode('rewriting');
-    setBulkProgress({ done: 0, total: bulkPreview.length });
+    setBulkProgress({ done: 0, total: staticItems.length });
     try {
-      // Push each previewed value directly to Webflow
-      for (const item of bulkPreview) {
+      for (const item of staticItems) {
         const page = pages.find(pg => pg.id === item.pageId);
         if (!page) continue;
         const seoFields = bulkField === 'title'
@@ -543,7 +556,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         await put(`/api/webflow/pages/${page.id}/seo`, { siteId, ...seoFields, openGraph: seoFields.seo });
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
-      setBulkResults(`Applied ${bulkPreview.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
+      setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
       queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
     } catch { setBulkResults('Apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
@@ -553,7 +566,10 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     if (!workspaceId) return;
     const page = pages.find(p => p.id === pageId);
     const edit = edits[pageId];
-    if (!page || !edit) return;
+    // CMS pages (sitemap-discovered or template pages) cannot be written via the approvals
+    // API — sitemap pages have synthetic IDs, template pages' collectionId is a page-level
+    // attribute, not a CMS item ID. Exclude them entirely from the approval workflow.
+    if (!page || !edit || page.source === 'cms') return;
     const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
     if (edit.seoTitle !== (page.seo?.title || '')) {
       items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
@@ -577,7 +593,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setSendingApproval(true);
     try {
       const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
-      for (const pageId of approvalSelected) {
+      // filterWritableIds excludes CMS pages (source === 'cms') — these cannot be written
+      // via the approvals API. collectionId is intentionally omitted: on Webflow template
+      // pages it means "renders this collection", not "this is a collection item ID".
+      // Passing it would mis-route items into updateCollectionItem(collectionId, pageId)
+      // where pageId ≠ itemId → 404.
+      for (const pageId of filterWritableIds(Array.from(approvalSelected), pages)) {
         const page = pages.find(p => p.id === pageId);
         const edit = edits[pageId];
         if (!page || !edit) continue;
@@ -633,6 +654,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const filteredPages = pages.filter(p => {
+    if (showCmsOnly && p.source !== 'cms') return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return p.title.toLowerCase().includes(q) || (p.slug || '').toLowerCase().includes(q);
@@ -651,8 +673,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     );
   }
 
-  const missingTitles = pages.filter(p => !p.seo?.title).length;
-  const missingDescs = pages.filter(p => !p.seo?.description).length;
+  // CMS pages have synthetic IDs that Webflow API rejects — exclude from actionable counts
+  const missingTitles = countMissingField(pages, 'title');
+  const missingDescs = countMissingField(pages, 'description');
 
   return (
     <div className="space-y-8">
@@ -808,6 +831,25 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         </div>
       )}
 
+      {/* CMS filter toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowCmsOnly(prev => !prev)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+            showCmsOnly
+              ? 'bg-teal-600/20 border-teal-500/40 text-teal-300'
+              : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          CMS pages only
+        </button>
+        {showCmsOnly && (
+          <span className="text-[11px] text-zinc-500">
+            {filteredPages.length} CMS pages
+          </span>
+        )}
+      </div>
+
       {/* Search */}
       <input
         type="text"
@@ -849,35 +891,49 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
       {/* Page list */}
       <div className="space-y-2">
-        {filteredPages.map(page => (
-          <PageEditRow
-            key={page.id} page={page} edit={edits[page.id]}
-            expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
-            isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
-            isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
-            isSelected={approvalSelected.has(page.id)}
-            pageRecs={recsLoaded ? recsForPage(page.slug) : []}
-            pageState={getState(page.id)} variations={variations[page.id]}
-            showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
-            isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
-            onSendToClient={sendPageToClient}
-            onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
-            onUpdateField={updateField} onSave={savePage} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
-            onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
-            onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
-            onClearTracking={workspaceId ? async (pageId) => {
-              try {
-                await workspaces.deletePageState(workspaceId, pageId);
-                refreshStates();
-              } catch (err) { console.error('SeoEditor operation failed:', err); }
-            } : undefined}
-            errorState={errorStates[page.id] || null}
-            showPreview={previewExpanded.has(page.id)}
-            onTogglePreview={togglePreview}
-            onAnalyzePage={workspaceId ? analyzePage : undefined}
-            hasAnalysis={analyzedPages.has(page.id)}
-            isAnalyzing={analyzing.has(page.id)}
+        {showCmsOnly && filteredPages.length === 0 && (
+          <EmptyState
+            title="No CMS pages found"
+            description="No CMS collection pages were discovered via sitemap. Static pages are hidden while this filter is active."
           />
+        )}
+        {filteredPages.map(page => (
+          <div key={page.id}>
+            {page.source === 'cms' && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-500/8 border border-amber-500/20 rounded text-[11px] text-amber-400/80 mb-1">
+                <AlertCircle className="w-3 h-3" />
+                Manual apply required — CMS pages must be updated directly in Webflow
+              </div>
+            )}
+            <PageEditRow
+              page={page} edit={edits[page.id]}
+              expanded={expanded.has(page.id)} isSaving={saving.has(page.id)}
+              isSaved={saved.has(page.id)} isAiLoading={aiLoading[page.id]}
+              isDraftSaving={draftSaving.has(page.id)} isDraftSaved={draftSaved.has(page.id)}
+              isSelected={approvalSelected.has(page.id)}
+              pageRecs={recsLoaded ? recsForPage(page.slug) : []}
+              pageState={getState(page.id)} variations={variations[page.id]}
+              showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
+              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
+              onSendToClient={sendPageToClient}
+              onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
+              onUpdateField={updateField} onSave={page.source === 'cms' ? undefined : savePage} isCmsPage={page.source === 'cms'} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
+              onSelectVariation={(pageId, field, value) => updateField(pageId, field, value)}
+              onClearVariations={(pageId) => setVariations(prev => { const n = { ...prev }; delete n[pageId]; return n; })}
+              onClearTracking={workspaceId ? async (pageId) => {
+                try {
+                  await workspaces.deletePageState(workspaceId, pageId);
+                  refreshStates();
+                } catch (err) { console.error('SeoEditor operation failed:', err); }
+              } : undefined}
+              errorState={errorStates[page.id] || null}
+              showPreview={previewExpanded.has(page.id)}
+              onTogglePreview={togglePreview}
+              onAnalyzePage={workspaceId ? analyzePage : undefined}
+              hasAnalysis={analyzedPages.has(page.id)}
+              isAnalyzing={analyzing.has(page.id)}
+            />
+          </div>
         ))}
       </div>
     </div>

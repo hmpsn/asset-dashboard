@@ -23,9 +23,10 @@ export type {
 
 import type { EventDisplayConfig } from '../../../shared/types/workspace.ts';
 import type { GA4Overview } from '../../../shared/types/analytics.ts';
+import type { MetricsSource } from '../../../shared/types/keywords.js';
 
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
-export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; contentPricing?: ContentPricing | null; tier?: 'free' | 'growth' | 'premium'; baseTier?: 'free' | 'growth' | 'premium'; isTrial?: boolean; trialDaysRemaining?: number; trialEndsAt?: string | null; stripeEnabled?: boolean; onboardingEnabled?: boolean; onboardingCompleted?: boolean; brandLogoUrl?: string; brandAccentColor?: string; }
+export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; contentPricing?: ContentPricing | null; tier?: 'free' | 'growth' | 'premium'; baseTier?: 'free' | 'growth' | 'premium'; isTrial?: boolean; trialDaysRemaining?: number; trialEndsAt?: string | null; stripeEnabled?: boolean; onboardingEnabled?: boolean; onboardingCompleted?: boolean; brandLogoUrl?: string; brandAccentColor?: string; bookingUrl?: string | null; }
 export interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 export interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; affectedPages?: string[]; }
 export interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; noindex?: boolean; }
@@ -74,7 +75,7 @@ export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'stra
 export interface ClientKeywordStrategy {
   siteKeywords: string[];
   siteKeywordMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; metricsSource?: 'exact' | 'partial_match' | 'ai_estimate'; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
+  pageMap: { pagePath: string; pageTitle?: string; primaryKeyword: string; secondaryKeywords?: string[]; searchIntent?: string; currentPosition?: number; impressions?: number; clicks?: number; volume?: number; difficulty?: number; metricsSource?: MetricsSource; validated?: boolean; gscKeywords?: { query: string; clicks: number; impressions: number; position: number }[] }[];
   opportunities: string[];
   contentGaps?: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; volume?: number; difficulty?: number; impressions?: number; competitorProof?: string; trendDirection?: 'rising' | 'declining' | 'stable'; serpFeatures?: string[]; questionKeywords?: string[] }[];
   quickWins?: { pagePath: string; action: string; estimatedImpact: string; rationale: string }[];
