@@ -607,6 +607,11 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                               KD {gap.difficulty}
                             </span>
                           )}
+                          {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
+                            <span className="text-[10px] text-zinc-500 leading-none">
+                              {kdFraming(gap.difficulty)}
+                            </span>
+                          )}
                           {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
                           {gap.volume != null && gap.volume > 0 && (
                             // Content gaps have no current position — assume rank #3 CTR (0.103) as baseline
