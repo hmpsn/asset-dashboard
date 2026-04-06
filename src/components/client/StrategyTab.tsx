@@ -636,7 +636,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
                           <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
                         )}
-                        {gap.serpFeatures && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => {
+                        {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => {
                           const labels: Record<string, string> = {
                             featured_snippet: '⬜ Snippet',
                             people_also_ask: '❓ PAA',

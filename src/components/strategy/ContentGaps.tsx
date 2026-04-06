@@ -121,7 +121,7 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
                   <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
                 )}
-                {gap.serpFeatures && gap.serpFeatures.length > 0 && (
+                {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {gap.serpFeatures.includes('featured_snippet') && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
