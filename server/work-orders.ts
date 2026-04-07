@@ -38,7 +38,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`, // status-ok: validateTransition planned in Batch 2
+    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`, // status-ok: validateTransition guard in updateWorkOrder()
   ),
 }));
 

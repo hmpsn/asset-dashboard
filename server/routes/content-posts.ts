@@ -152,6 +152,14 @@ const updatePostSchema = z.object({
   webflowCollectionId: z.string().optional(),
   publishedAt: z.string().optional(),
   publishedSlug: z.string().optional(),
+  reviewChecklist: z.object({
+    factual_accuracy: z.boolean(),
+    brand_voice: z.boolean(),
+    internal_links: z.boolean(),
+    no_hallucinations: z.boolean(),
+    meta_optimized: z.boolean(),
+    word_count_target: z.boolean(),
+  }).optional(),
 }).strict();
 
 // Update post fields (inline editing of title, sections, status, etc.)
