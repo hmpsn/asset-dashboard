@@ -27,7 +27,7 @@ const log = createLogger('insight-enrichment');
 const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
 
 /** GA4/GSC placeholder values that should be treated as empty (no real title). */
-const GA_PLACEHOLDER_RE = /^\(not set\)$/i;
+const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
 
 /** Title-case a single word, uppercasing known acronyms. */
 function titleCaseWord(word: string): string {

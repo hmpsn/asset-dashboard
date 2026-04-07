@@ -16,7 +16,7 @@ import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.j
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Known acronyms that should be fully uppercased — mirrors server/insight-enrichment.ts. */
+/** Known acronyms that should be fully uppercased — same set as server/insight-enrichment.ts. */
 const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
 
 function titleCaseWord(word: string): string {
@@ -25,8 +25,8 @@ function titleCaseWord(word: string): string {
     : word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-/** GA4/GSC placeholder values that should be treated as missing. */
-const GA_PLACEHOLDER_RE = /^\(not set\)$/i;
+/** GA4/GSC placeholder values that should be treated as missing (no real title). */
+const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
 
 /**
  * Converts a URL slug to a readable title.
