@@ -24,6 +24,12 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 - [ ] **New activity type?**: If adding a new `ActivityType`, add it to the union in `activity-log.ts`. If clients should see it, add to `CLIENT_VISIBLE_TYPES` in `listClientActivity()`
 - [ ] **New event name?**: Register it in `server/ws-events.ts`
 
+## During Implementation — Testing
+
+- [ ] **Write tests alongside code**: New routes need integration tests (use `createTestContext()` from `tests/integration/helpers.ts`). New state transitions need guard tests. New shared type fields need contract tests asserting endpoint response shape.
+- [ ] **Use test infrastructure**: Mock factories in `tests/mocks/` (webflow, stripe, openai, anthropic, google, semrush). Seed fixtures in `tests/fixtures/` (workspace-seed, auth-seed, content-seed, approval-seed). Never hand-roll mocks when a factory exists.
+- [ ] **Run full test suite**: `npx vitest run` passes — not just new tests. Existing contract tests catch regressions from your changes.
+
 ## During Implementation — Frontend Side
 
 - [ ] **Client dashboard handler**: `ClientDashboard.tsx` `useWorkspaceEvents()` has a handler for the event that refetches relevant data

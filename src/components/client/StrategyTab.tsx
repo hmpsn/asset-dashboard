@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
   TrendingUp, TrendingDown, Minus, ChevronDown, Shield, BookOpen, Layers,
-  MessageCircle, BarChart3, Eye, AlertTriangle, Award, MessageCircleQuestion,
+  MessageCircle, BarChart3, Eye, AlertTriangle,
   ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase,
 } from 'lucide-react';
 import { TierGate, EmptyState, type Tier } from '../ui';
@@ -11,6 +11,7 @@ import { useBetaMode } from './BetaContext';
 import { PageKeywordMapContent } from './PageKeywordMapContent';
 import { STUDIO_NAME } from '../../constants';
 import { post, keywordFeedback as kwFeedbackApi, businessPriorities as bizPrioritiesApi, trackedKeywords as trackedKwApi } from '../../api';
+import { kdFraming, kdTooltip } from '../../lib/kdFraming.js';
 
 export interface PricingModalState {
   serviceType: 'brief_only' | 'full_post';
@@ -41,8 +42,9 @@ interface StrategyTabProps {
   onContentRequested?: () => void;
 }
 
-const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400';
+const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+
 
 export interface KeywordFeedback {
   keyword: string;
@@ -597,8 +599,30 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                       {((gap.volume != null && gap.volume > 0) || (gap.difficulty != null && gap.difficulty > 0) || (gap.impressions != null && gap.impressions > 0)) && (
                         <div className="flex items-center gap-3 mb-1.5">
                           {gap.volume != null && gap.volume > 0 && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
-                          {gap.difficulty != null && gap.difficulty > 0 && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
+                          {gap.difficulty != null && gap.difficulty > 0 && (
+                            <span
+                              className={`text-[10px] font-medium ${kdColor(gap.difficulty)} cursor-help`}
+                              title={kdTooltip(gap.difficulty)}
+                            >
+                              KD {gap.difficulty}
+                            </span>
+                          )}
+                          {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
+                            <span className="text-[10px] text-zinc-500 leading-none">
+                              {kdFraming(gap.difficulty)}
+                            </span>
+                          )}
                           {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
+                          {gap.volume != null && gap.volume > 0 && (() => {
+                            const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
+                            if (impact < 10) return null;
+                            return (
+                              <span className="text-[10px] text-blue-400/70 flex items-center gap-0.5">
+                                <TrendingUp className="w-2.5 h-2.5" />
+                                ~{fmtNum(impact)}/mo est. clicks at rank #3
+                              </span>
+                            );
+                          })()}
                         </div>
                       )}
                       {/* Trend + SERP + Competitor badges */}
@@ -612,12 +636,19 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
                           <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
                         )}
-                        {gap.serpFeatures?.includes('featured_snippet') && (
-                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-medium"><Award className="w-3 h-3" />Featured Snippet</span>
-                        )}
-                        {gap.serpFeatures?.includes('people_also_ask') && (
-                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium"><MessageCircleQuestion className="w-3 h-3" />PAA</span>
-                        )}
+                        {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => {
+                          const labels: Record<string, string> = {
+                            featured_snippet: '⬜ Snippet',
+                            people_also_ask: '❓ PAA',
+                            video: '▶ Video',
+                            local_pack: '📍 Local',
+                          };
+                          return (
+                            <span key={feat} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              {labels[feat] ?? feat}
+                            </span>
+                          );
+                        })}
                         {gap.competitorProof && (
                           <span className="text-[10px] text-orange-400 font-medium">{gap.competitorProof}</span>
                         )}
@@ -668,10 +699,36 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         {!betaMode && (alreadyRequested ? (
                           (() => {
                             const s = matchingReq?.status;
-                            if (s === 'delivered' || s === 'published') return <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> {s === 'published' ? 'Published' : 'Delivered'} ✓</span>;
-                            if (s === 'approved' || s === 'in_progress') return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><Sparkles className="w-3.5 h-3.5" /> In Progress</span>;
-                            if (s === 'brief_generated' || s === 'client_review') return <span className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 flex-shrink-0"><FileText className="w-3.5 h-3.5" /> In Review</span>;
-                            return <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> Brief Ordered</span>;
+                            if (s === 'published') return (
+                              <span className="flex items-center gap-1 text-[11px] text-green-400 bg-green-500/10 px-2.5 py-1.5 rounded-lg border border-green-500/20 flex-shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Published
+                              </span>
+                            );
+                            if (s === 'delivered') return (
+                              <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> In Production
+                              </span>
+                            );
+                            if (s === 'approved' || s === 'in_progress') return (
+                              <span className="flex items-center gap-1 text-[11px] text-teal-400 bg-teal-500/10 px-2.5 py-1.5 rounded-lg border border-teal-500/20 flex-shrink-0">
+                                <Sparkles className="w-3.5 h-3.5" /> In Production
+                              </span>
+                            );
+                            if (s === 'brief_generated' || s === 'client_review') return (
+                              <span className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 flex-shrink-0">
+                                <FileText className="w-3.5 h-3.5" /> Brief Requested
+                              </span>
+                            );
+                            if (s === 'tracking') return (
+                              <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0">
+                                <BarChart3 className="w-3.5 h-3.5" /> Tracking
+                              </span>
+                            );
+                            return (
+                              <span className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 flex-shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Brief Ordered
+                              </span>
+                            );
                           })()
                         ) : planStatus ? (
                           <button
@@ -734,7 +791,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {gap.volume != null && gap.volume > 0 && <span className="text-[11px] text-zinc-500">{gap.volume.toLocaleString()}</span>}
                           {gap.difficulty != null && gap.difficulty > 0 && (
-                            <span className={`text-[11px] font-medium ${gap.difficulty <= 30 ? 'text-green-400' : gap.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                            <span className={`text-[11px] font-medium ${kdColor(gap.difficulty)}`}>
                               KD {gap.difficulty}
                             </span>
                           )}
@@ -895,7 +952,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             <div className="flex items-center gap-1.5">
                               {page.searchIntent && <span className="text-[10px] text-zinc-500 uppercase">{page.searchIntent}</span>}
                               {page.difficulty != null && page.difficulty > 0 && (
-                                <span className={`text-[10px] ${page.difficulty <= 30 ? 'text-green-400' : page.difficulty <= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+                                <span className={`text-[10px] ${kdColor(page.difficulty)}`}>
                                   KD {page.difficulty}
                                 </span>
                               )}

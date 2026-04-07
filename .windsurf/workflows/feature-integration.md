@@ -122,7 +122,17 @@ When a feature produces data changes that should update the UI immediately:
 4. **Client**: Add handler in `ClientDashboard.tsx` `useWorkspaceEvents()` or in the relevant tab component
 5. **Existing pattern**: Activity logging auto-broadcasts via `initActivityBroadcast`; anomaly detection via `initAnomalyBroadcast`
 
-## 7. Feature Documentation & Memory Updates
+## 7. Integration Testing
+
+When a feature adds cross-tool integrations, write tests for the integration points:
+
+- [ ] **State transitions**: If adding status fields to approvals, content requests, work orders, or subscriptions, add transition guard tests using `validateTransition()` from `server/state-machines.ts`. Test both valid and invalid transitions.
+- [ ] **Contract tests**: New fields in `shared/types/` that flow through an endpoint must have an integration test calling the real endpoint and asserting the field is present with the correct type. Use `createTestContext()` for HTTP-level tests.
+- [ ] **Broadcast + handler pairs**: If a feature broadcasts WS events, verify matching frontend handlers exist. The static analysis test in `tests/integration/broadcast-handler-pairs.test.ts` catches this automatically — run it.
+- [ ] **External API error paths**: If integrating Webflow/Stripe/Google/SEMRush, use mock factories from `tests/mocks/` to test both success and error responses. Assert that failures are recorded as `failed`/`error`, not silently treated as success (FM-2 pattern).
+- [ ] **Cross-workspace isolation**: If adding workspace-scoped data, verify data from workspace A never appears in workspace B queries — both at the DB module level and the HTTP endpoint level.
+
+## 8. Feature Documentation & Memory Updates
 
 When adding or significantly modifying a feature:
 

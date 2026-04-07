@@ -3,6 +3,7 @@ import {
   Sparkles, Activity, FileText, Search,
 } from 'lucide-react';
 import { MonthlyDigest } from './MonthlyDigest';
+import { IntelligenceSummaryCard } from './IntelligenceSummaryCard';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
 import { StatCard, MetricRing } from '../ui';
@@ -274,6 +275,11 @@ export function OverviewTab({
     {/* Monthly performance digest */}
     <ErrorBoundary label="Monthly Digest">
       <MonthlyDigest workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
+
+    {/* Intelligence summary — insights, pipeline, win rate */}
+    <ErrorBoundary label="Intelligence Summary">
+      <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
 
     {/* Main content: insights + sidebar */}

@@ -4,27 +4,45 @@
 
 **Goal:** Populate all 8 intelligence slices with real data, expand `formatForPrompt()` to format all slices, implement `tokenBudget` truncation, and wire 7 bridges — making `buildWorkspaceIntelligence()` return a complete picture of every workspace.
 
-**Architecture:** Phase 3A is purely additive — no behavior changes to existing callers. The intelligence layer's `assembleSlice()` switch statement currently stubs 5 slices as "not yet implemented." Each task below replaces one stub with a real assembler that imports data from existing stores. `formatForPrompt()` gets 5 new section formatters + 4 bug fixes. Seven bridges get wired to their trigger points so data flows automatically.
+**Architecture:** Phase 3A is purely additive — no behavior changes to existing callers. The intelligence layer's `assembleSlice()` switch statement currently stubs 3 slices as "not yet implemented." Each remaining task below replaces one stub with a real assembler that imports data from existing stores. `formatForPrompt()` gets 5 new section formatters + 4 bug fixes. Three read-time bridges get wired to their trigger points so data flows automatically.
 
 **Tech Stack:** TypeScript (strict), SQLite (better-sqlite3), Express, Pino logging, LRU cache, feature flags, WebSocket broadcast
+
+---
+
+## ⚠️ Bridge Authoring Rules (mandatory for all bridge tasks)
+
+Tasks 1-2 were completed during the bridge infrastructure hardening phase (PR #118). The code examples in Tasks 1-2 below are **obsolete** — do NOT follow them. All bridge work (including Task 7) must follow these rules from CLAUDE.md:
+
+1. **`bridgeSource`**: Pass `bridgeSource: '<bridge_flag>'` to `upsertInsight()` when creating bridge insights. When re-upserting an existing insight (e.g., score adjustments), pass `bridgeSource: insight.bridgeSource` to preserve the original value.
+2. **Score adjustments**: Use `applyScoreAdjustment()` from `server/insight-score-adjustments.ts`. Never use raw `Math.min/max` arithmetic on scores — they don't compose across bridges.
+3. **Auto-broadcast**: Return `{ modified: N }` from bridge callbacks. Never manually import/call `broadcastToWorkspace` inside a bridge — `executeBridge` handles it automatically when `modified > 0`.
+4. **Resolution respect**: Never call `resolveInsight()` inside a bridge callback unless the bridge's explicit purpose is resolution management.
+5. **Explicit field enumeration**: Never use `...insight` spread on `upsertInsight()` — enumerate fields explicitly to avoid passing unexpected properties.
+
+**Canonical examples** (follow these, not the Task 2 code blocks):
+- Bridge #1: `server/outcome-tracking.ts:277-349`
+- Bridge #10: `server/anomaly-detection.ts:598-653`
+- Bridges #12, #15: `server/scheduled-audits.ts:141-207`
 
 ---
 
 ## Dependency Graph
 
 ```
-Task 1 (Types)
-    ├──→ Task 2 (Bridges #1, #10, #12, #15) ──→ Task 7 (Bridge #8, #9, #14)
-    ├──→ Task 3 (siteHealth assembler)
-    ├──→ Task 4 (contentPipeline assembler)
+Task 1 (Types) ✅ DONE
+    ├──→ Task 2 (Bridges #1, #10, #12, #15) ✅ DONE
+    │         └──→ Task 7 (Bridge #8, #9, #14)
+    ├──→ Task 3 (siteHealth assembler) ✅ DONE
+    ├──→ Task 4 (contentPipeline assembler) — base done, 3A-expansion fields remain
     ├──→ Task 5 (clientSignals assembler)
     ├──→ Task 6 (operational assembler)
-    ├──→ Task 8 (pageProfile assembler) — after Tasks 3-6 (cross-references)
+    ├──→ Task 8 (pageProfile assembler) — after Tasks 5-6 (cross-references)
     ├──→ Task 9 (seoContext enrichment)
     ├──→ Task 10 (learnings enrichment)
     └──→ Task 11 (WebSocket wiring) — independent
          Task 12 (Scheduler invalidation) — independent
-         Task 13 (formatForPrompt expansion) — after Tasks 3-10
+         Task 13 (formatForPrompt expansion) — after Tasks 5-10
               └──→ Task 14 (tokenBudget) — after Task 13
                     └──→ Task 15 (Integration test + bridge runtime tests + quality gate)
                           ├──→ Task 16 (Mini builder extraction verification)
@@ -35,9 +53,10 @@ Task 1 (Types)
 
 | Batch | Tasks | Prerequisite |
 |-------|-------|-------------|
-| **Batch 0** | Task 1 (types) | None |
-| **Batch 1** | Tasks 2, 3, 4, 5, 6, 9, 10, 11, 12 (all parallel) | Task 1 committed |
-| **Batch 2** | Tasks 7, 8 | Batch 1 committed |
+| ~~**Batch 0**~~ | ~~Task 1 (types)~~ | ✅ DONE |
+| ~~**Batch 1a**~~ | ~~Tasks 2, 3~~ | ✅ DONE (hardening + earlier PRs) |
+| **Batch 1b** | Tasks 4, 5, 6, 9, 10, 11, 12 (all parallel) | None — prerequisites are committed |
+| **Batch 2** | Tasks 7, 8 | Batch 1b committed |
 | **Batch 3** | Task 13 (formatForPrompt) | Batch 2 committed |
 | **Batch 4** | Task 14 (tokenBudget) | Task 13 committed |
 | **Batch 5** | Tasks 15, 16, 17 (integration test + bridge runtime + mini builder + pr-check guards) | Task 14 committed |
@@ -46,10 +65,12 @@ Task 1 (Types)
 
 | Task | Model | Rationale |
 |------|-------|-----------|
-| Task 1 (types) | **Sonnet** | Type definitions require careful cross-referencing with spec |
-| Task 2 (bridges) | **Sonnet** | Bridge wiring requires understanding trigger context |
-| Tasks 3-6 (assemblers) | **Sonnet** | Each assembler imports from 5-14 modules, needs judgment on error handling |
-| Task 7 (read-time bridges) | **Sonnet** | Enrichment logic requires domain understanding |
+| ~~Task 1 (types)~~ | ~~Sonnet~~ | ✅ DONE |
+| ~~Task 2 (bridges)~~ | ~~Sonnet~~ | ✅ DONE |
+| ~~Task 3 (siteHealth)~~ | ~~Sonnet~~ | ✅ DONE |
+| Task 4 (contentPipeline expansion) | **Sonnet** | Base assembler done; 6 expansion fields need data source wiring |
+| Tasks 5-6 (clientSignals, operational) | **Sonnet** | Each assembler imports from 5-14 modules, needs judgment on error handling |
+| Task 7 (read-time bridges) | **Sonnet** | Enrichment logic requires domain understanding; must follow Bridge Authoring Rules |
 | Task 8 (pageProfile) | **Sonnet** | Most complex assembler — cross-references 4 other slices |
 | Tasks 9-10 (enrichments) | **Sonnet** | Existing code modification, moderate complexity |
 | Tasks 11-12 (WS + scheduler) | **Haiku** | Mechanical wiring — add import + function call |
@@ -59,18 +80,15 @@ Task 1 (Types)
 | Task 16 (mini builder verification) | **Haiku** | Mechanical verification — read source, check imports |
 | Task 17 (pr-check guards) | **Haiku** | Mechanical — add grep patterns to existing script |
 
-## PR Strategy (3 PRs)
+## PR Strategy (2 remaining PRs)
 
 | PR | Tasks | Gate | Review Focus |
 |----|-------|------|-------------|
-| **PR 1: Foundation** | 1 (types), 2 (bridge wiring) | Types compile, bridges pass grep tests | Compare every type field against spec §3 (lines 107-238). Verify bridge trigger points match real function signatures. |
-| **PR 2: Assemblers** | 3-6 (4 assemblers), 7 (read-time bridges), 8 (pageProfile), 9-10 (enrichments), 11-12 (WS + scheduler) | `/api/intelligence/:wsId` returns all 8 slices, values match underlying stores | Data correctness per slice. Error handling: no silent catches, per-slice try/catch wrapper, 5s timeout on async. |
+| ~~**PR 1: Foundation**~~ | ~~1 (types), 2 (bridge wiring)~~ | ✅ MERGED (PR #118 + bridge hardening) | N/A |
+| **PR 2: Assemblers** | 4 (expansion), 5-6 (2 assemblers), 7 (read-time bridges), 8 (pageProfile), 9-10 (enrichments), 11-12 (WS + scheduler) | `/api/intelligence/:wsId` returns all 8 slices, values match underlying stores | Data correctness per slice. Error handling: no silent catches, per-slice try/catch wrapper, 5s timeout on async. |
 | **PR 3: Formatting + Integration** | 13 (formatForPrompt), 14 (tokenBudget), 15 (integration + bridge runtime tests), 16 (mini builder verification), 17 (pr-check guards) | Full test suite green, `pr-check` zero errors | formatForPrompt output at all 3 verbosities. tokenBudget truncation order. Persona bug fix. Bridge runtime side effects verified. |
 
-**Why 3 PRs:**
-- PR 1 is the contract everything else depends on — type mismatches caught here cost nothing. Type mismatches caught after 9 assembler tasks cost 9× the effort.
-- PR 2 is the bulk of the work but assembler bugs are isolated to their slice — they don't cascade.
-- PR 3 is consumer-facing output where formatting bugs silently degrade AI quality.
+**Note:** PR 1 (Tasks 1-3) was completed across PR #118 (bridge infrastructure hardening) and earlier Phase 2 work. Types, bridge wiring for #1/#10/#12/#15, and siteHealth assembler are all merged to main. Task 4's base assembler is merged but expansion fields remain.
 
 ---
 
@@ -78,11 +96,11 @@ Task 1 (Types)
 
 | File | Owner Task(s) | Notes |
 |------|---------------|-------|
-| `shared/types/intelligence.ts` | Task 1 | Shared contract — commit FIRST |
-| `server/workspace-intelligence.ts` | Tasks 3-6, 8-10 (sequential within file) | Core assembler — each task adds one case |
-| `server/outcome-tracking.ts` | Task 2 | Bridge #1 wiring |
-| `server/anomaly-detection.ts` | Task 2 (bridge #10), Task 12 (scheduler) | Sequential |
-| `server/scheduled-audits.ts` | Task 2 (bridges #12, #15) | Bridge wiring |
+| ~~`shared/types/intelligence.ts`~~ | ~~Task 1~~ | ✅ DONE |
+| `server/workspace-intelligence.ts` | Tasks 5-6, 8-10 (sequential within file) | Core assembler — each task adds one case |
+| ~~`server/outcome-tracking.ts`~~ | ~~Task 2~~ | ✅ DONE (Bridge #1 wired + hardened) |
+| `server/anomaly-detection.ts` | Task 12 (scheduler) | Bridge #10 done; only scheduler invalidation remains |
+| ~~`server/scheduled-audits.ts`~~ | ~~Task 2~~ | ✅ DONE (Bridges #12, #15 wired + hardened) |
 | `server/content-decay.ts` | Task 7 (bridge #8) | Read-time enrichment |
 | `server/keyword-recommendations.ts` | Task 7 (bridge #9) | Read-time enrichment |
 | `server/outcome-crons.ts` | Task 7 (bridge #14), Task 12 (scheduler) | Sequential |
@@ -97,7 +115,12 @@ Task 1 (Types)
 
 ---
 
-### Task 1: Expand Shared Types (`shared/types/intelligence.ts`)
+### Task 1: Expand Shared Types (`shared/types/intelligence.ts`) — ✅ DONE
+
+> **Completed:** All 15+ supporting types and slice interface expansions merged to main. See `shared/types/intelligence.ts`.
+> Tests: `tests/intelligence-types.test.ts` (8 tests passing).
+>
+> **No action needed.** The code below is preserved for reference only.
 
 **Files:**
 - Modify: `shared/types/intelligence.ts`
@@ -534,7 +557,16 @@ fields per spec §3/§10. All new fields are optional — zero breaking changes.
 
 ---
 
-### Task 2: Wire Unwired Phase 2 Bridges (#1, #10, #12, #15)
+### Task 2: Wire Unwired Phase 2 Bridges (#1, #10, #12, #15) — ✅ DONE
+
+> **Completed:** All 4 bridges wired and hardened via PR #118 (bridge infrastructure hardening).
+> - Bridge #1 (outcome→reweight): `server/outcome-tracking.ts` — uses `applyScoreAdjustment()`, auto-broadcast
+> - Bridge #10 (anomaly→boost): `server/anomaly-detection.ts` — uses `applyScoreAdjustment()`, auto-broadcast
+> - Bridge #12 (audit→page_health): `server/scheduled-audits.ts` — uses `bridgeSource`, auto-broadcast
+> - Bridge #15 (audit→site_health): `server/scheduled-audits.ts` — uses `bridgeSource`, auto-broadcast
+> Tests: `tests/bridge-wiring.test.ts` (10 tests passing).
+>
+> **⚠️ CODE EXAMPLES BELOW ARE OBSOLETE.** They show the pre-hardening patterns (raw `Math.min/max`, manual broadcast, `...insight` spread). Do NOT follow them for Task 7 or any future bridge work. Follow the Bridge Authoring Rules section above instead.
 
 **Files:**
 - Modify: `server/outcome-tracking.ts` (Bridge #1)
@@ -849,7 +881,17 @@ const arch = await Promise.race([
 
 ---
 
-### Task 3: Implement `siteHealth` Slice Assembler
+### Task 3: Implement `siteHealth` Slice Assembler — ✅ DONE
+
+> **Completed:** Full implementation at `server/workspace-intelligence.ts:265-452`.
+> Pulls from 8 data sources: audit snapshots, dead links, PageSpeed/CWV, redirect chains,
+> orphan pages, schema validation, anomaly count, SEO change velocity.
+> Tests: `tests/assemble-site-health.test.ts` (3 tests passing).
+>
+> **Known gap:** `aeoReadiness` field is not yet populated (no `aeo-page-review.ts` module exists yet).
+> This can be added as a follow-up when AEO review functionality is built.
+>
+> **No action needed.** The code below is preserved for reference only.
 
 **Files:**
 - Modify: `server/workspace-intelligence.ts`
@@ -1231,7 +1273,14 @@ CWV pass rate, anomaly counts, and SEO change velocity from 9 data sources."
 
 ---
 
-### Task 4: Implement `contentPipeline` Slice Assembler
+### Task 4: Implement `contentPipeline` Slice Assembler — BASE DONE, EXPANSION REMAINING
+
+> **Base assembler exists:** `assembleContentPipeline()` at `server/workspace-intelligence.ts:232-263`.
+> Pulls from `workspace-data.ts` (getContentPipelineSummary) and `content-brief.ts` (coverage gaps).
+>
+> **Remaining work:** Wire the 6 expansion fields listed below into the existing assembler.
+> Each is an independent data source import with a try/catch — follow the same pattern
+> as the existing `coverageGaps` block.
 
 **Files:**
 - Modify: `server/workspace-intelligence.ts`

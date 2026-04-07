@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **253 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **277 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3049,6 +3049,173 @@ When the user asks to update this document with recent features, follow this pro
 
 **Mutual:** Closed intelligence loops. Every mutation propagates its effects without manual orchestration. Agency sees less stale data; system becomes self-maintaining.
 
+### 200. Unified Workspace Intelligence Layer — Phase 3A Batch 1b (Slice Assemblers + Bridges + Invalidation)
+**What it does:** Implements 8 full intelligence slice assemblers (seoContext enrichment, learnings enrichment, contentPipeline, siteHealth, clientSignals, operational, pageProfile) with compositeHealthScore computation (40% churn + 30% ROI + 30% engagement, weight-normalized). Read-time bridges: Bridge #8 (repeat-decay detection via outcome history), Bridge #9 (keyword score adjustment by KD-range win rates), Bridge #14 (cache invalidation wired to schedulers/anomaly-detection/churn-signals). WebSocket `INTELLIGENCE_CACHE_UPDATED` event broadcasts on invalidation → frontend React Query auto-refresh. All slices use per-slice try/catch isolation for graceful degradation.
+
+**Files:** `server/workspace-intelligence.ts` (8 slice assemblers, LRU cache invalidation with broadcast), `shared/types/intelligence.ts` (slice type contracts), `server/content-decay.ts` (Bridge #8 repeat-decay + `isRepeatDecay`/`priority` on DecayingPage), `server/keyword-recommendations.ts` (Bridge #9 score adjustment), `server/churn-signals.ts` (conditional cache invalidation), `server/outcome-crons.ts` (Bridge #14 invalidation wiring), `server/scheduled-audits.ts` (invalidation after audit), `server/anomaly-detection.ts` (conditional invalidation on new anomalies), `src/hooks/useWsInvalidation.ts` (INTELLIGENCE_CACHE_UPDATED handler), 9 test files
+
+**Agency value:** `/api/intelligence/:wsId` returns complete workspace context in a single call — all 8 slices with cross-system enrichment. AI advisors, strategy tools, and dashboards get unified data without ad-hoc fetching. compositeHealthScore gives at-a-glance client health assessment. Automatic cache invalidation keeps data fresh after audits, outcome measurements, learnings recomputation, and churn signal detection.
+
+**Client value:** (Indirect — Phase 3B+ will consume slices in client-facing views.) Richer, cross-referenced intelligence data drives better AI recommendations and strategy suggestions.
+
+**Mutual:** Intelligence layer is now fully populated. Every workspace mutation that affects intelligence data automatically invalidates the cache and notifies connected frontends. Foundation for `formatForPrompt()` token-budget-aware AI context injection.
+
+---
+
+### 201. Unified Workspace Intelligence Layer — Phase 3A Batch 1c (Prompt Formatting + Token Budget + Quality Gates)
+**What it does:** Completes Phase 3A with prompt-layer infrastructure and regression protection. (1) **`formatForPrompt()` expansion**: 5 new slice formatters (contentPipeline, siteHealth, clientSignals, operational, pageProfile) each with compact/standard/detailed verbosity. Fixed pre-existing gaps: personas at all verbosity levels, knowledgeBase at standard+, businessProfile at standard+, WeCalledIt proven predictions at standard+. (2) **`applyTokenBudget()` truncation**: §20 priority chain — drop operational → truncate insights to 5 → drop clientSignals → summarize learnings → never drop seoContext. Token estimation ~4 chars/token. Section filtering via `opts.sections` Set. (3) **Regression guards in `scripts/pr-check.ts`**: three new warn-severity rules — no direct `listPages()` outside workspace-data.ts, no direct `buildSeoContext()` outside grandfathered callers, `recordAction()` must be gated by `workspaceId`. (4) **120+ new tests**: format-for-prompt (34), token-budget (8), intelligence-integration (5), mini-builder-extraction (6), enrich-seo-context (3), scheduler-invalidation (4), ws-intelligence-cache (1). (5) **Bridge #9 fix**: `winRateByDifficultyRange` was dead code via `as any` cast on `byKdRange` — fixed to correct field and proper bucket keys (`'0-20'` through `'81-100'`). (6) **Isolated `getPendingActions()` error path**: split try/catch in outcome-crons so transient DB errors don't silently skip measurement.
+
+**Files:** `server/workspace-intelligence.ts` (formatForPrompt + applyTokenBudget), `scripts/pr-check.ts` (3 regression guards), `server/keyword-recommendations.ts` (Bridge #9 fix), `server/outcome-crons.ts` (isolated error paths), `tests/format-for-prompt.test.ts`, `tests/token-budget.test.ts`, `tests/intelligence-integration.test.ts`, `tests/mini-builder-extraction.test.ts`, `tests/enrich-seo-context.test.ts`, `tests/scheduler-invalidation.test.ts`, `tests/ws-intelligence-cache.test.ts`
+
+**Agency value:** AI advisors now receive token-budget-aware, priority-ordered context from all 8 intelligence slices. The system never drops seoContext under token pressure — operational data is truncated first. pr-check guards enforce the migration path for Phase 3B.
+
+**Client value:** (Indirect) Richer, prioritized AI context drives better recommendations and strategy suggestions with no token waste.
+
+**Mutual:** Completes Phase 3A. Foundation for Phase 3B mini-builder retirement — all callers can now migrate from `buildSeoContext()` to `buildWorkspaceIntelligence()` with full prompt formatting support.
+
+---
+
+### 202. Unified Workspace Intelligence Layer — Phase 3B (Mini-Builder Retirement + Advanced Slices)
+**What it does:** Completes the intelligence layer migration. (1) **Mini-builder retirement**: all 25 `buildSeoContext()` callers and 6 `buildPageAnalysisContext()` callers migrated to `buildWorkspaceIntelligence()` with explicit slice selection. (2) **BusinessProfile editor**: structured `industry`, `goals`, `targetAudience` fields added to workspace settings and wired into `SeoContextSlice`. (3) **ContentGaps bridge**: strategy layer populates `PageProfileSlice.contentGaps` automatically on strategy update. (4) **N+1 elimination**: `seo-audit.ts` and `webflow-seo.ts` bulk-fix/bulk-rewrite loops hoist workspace-level slices before per-page loops — from N full DB assemblies to 1 + N in-memory `pageMap.find()` lookups (critical for 300-page clients). (5) **strategyHistory SQL fix**: wrong column names silently killed the entire `stmts()` prepared statement cache, breaking keyword feedback, content gap votes, and schema error counts across all workspaces. (6) **Format fidelity**: 7 previously-assembled but never-rendered fields now appear in prompt formatters (rankTracking, businessProfile, strategyHistory, decayAlerts, cannibalizationWarnings, anomalyCount/types, timeSaved, roiAttribution, weCalledIt). (7) **pr-check guard upgrade**: `buildSeoContext` and `listPages` rules promoted from `warn` to `error`; stale exclusions removed. (8) **25+ new contract tests**.
+
+**Files:** `server/seo-audit.ts`, `server/routes/webflow-seo.ts`, `server/routes/rewrite-chat.ts`, `server/workspace-intelligence.ts`, `server/analytics-intelligence.ts`, `server/content-brief.ts`, `server/internal-links.ts`, `server/aeo-page-review.ts`, `server/content-posts-ai.ts`, `server/content-decay.ts`, `server/keyword-recommendations.ts`, `server/admin-chat-context.ts`, `server/routes/jobs.ts`, `server/routes/webflow-alt-text.ts`, `server/routes/google.ts`, `server/routes/public-analytics.ts`, `server/routes/content-posts.ts`, `server/routes/webflow-keywords.ts`, `server/routes/keyword-strategy.ts`, `server/routes/intelligence.ts`, `shared/types/intelligence.ts`, `scripts/pr-check.ts`, `tests/batch2-caller-contracts.test.ts`
+
+**Agency value:** Every AI prompt draws from the unified intelligence layer — consistent context, no stale mini-builder data, no redundant DB calls. N+1 fix makes bulk SEO viable for 300-page clients. Critical silent bug was wiping keyword feedback and content gaps across all workspaces.
+
+**Client value:** (Indirect) Faster SEO audit and bulk-fix operations. Content gap suggestions and keyword feedback now populate correctly after the SQL fix.
+
+**Mutual:** Closes the mini-builder era. All future AI features build on `buildWorkspaceIntelligence()`. pr-check enforces this as a hard error.
+
+---
+
+### 203. Unified Workspace Intelligence Layer — Phase 4A (Infrastructure: Data Retention + Cache Warming)
+**What it does:** Two background cron subsystems. (1) **Data retention crons** (daily, 2-min startup delay): pruning three unbounded tables — `chat_sessions` deleted after 180 days, `audit_snapshots` deleted after 365 days, `llms_txt_cache` deleted after 90 days. Each cleanup uses a lazy prepared statement (`createStmtCache()`). (2) **Intelligence cache warming cron** (every 6h, 5-min startup delay): iterates all workspaces, skips those with no activity log entries, and calls `buildWorkspaceIntelligence()` with all non-pageProfile slices. An `isRunning` guard prevents overlapping cycles if one run exceeds 6h. Startup timeouts stored at module level so `stop*()` functions cancel them cleanly before first fire.
+
+**Files:** `server/data-retention.ts` (new), `server/intelligence-crons.ts` (new), `server/chat-memory.ts`, `server/reports.ts`, `server/llms-txt-generator.ts`, `server/startup.ts`, `tests/data-retention.test.ts` (new), `tests/intelligence-crons.test.ts` (new)
+
+**Agency value:** Prevents unbounded DB growth on long-running deployments. Proactive cache warming means the first AI feature request for an active workspace is served from cache rather than a cold LLM call.
+
+**Client value:** (Indirect) Faster first-load on AI-powered features after overnight inactivity.
+
+**Mutual:** Pure infrastructure — no UI changes. All crons `.unref()`-ed and cancel cleanly on shutdown.
+
+---
+
+### 204. Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)
+**What it does:** Two sub-tasks delivered together. (1) **Admin chat intelligence slice migration**: the `assembleAdminContext()` function in `admin-chat-context.ts` now sources workspace data through `buildWorkspaceIntelligence()` slices instead of direct DB helpers. Activity → `intel.operational.recentActivity`, CWV/PageSpeed summary → `intel.siteHealth`, client health/churn signals → `intel.clientSignals`. Context size is managed through selective slice inclusion per question category (general queries union all three supplemental slices). Approvals keep direct `listBatches()` call + `intel.operational.approvalQueue` supplement. Performance keeps direct `getLinkCheck()`/`getPageSpeed()` calls for per-URL dead link detail (up to 10) and worst-page scores (top 5) — the siteHealth slice only stores counts, matching the `listBatches()` supplement pattern. Churn signals now surface human-readable `title` and `description` fields. CWV pass rate correctly converted from 0–1 decimal to percentage. (2) **businessProfile auto-populate**: the Intelligence Profile editor gains an "Auto-fill from site data" button (Sparkles icon, teal). Calls `POST /api/workspaces/:id/intelligence-profile/autofill` which fetches the `seoContext` slice (keywords, content gaps, business context — deliberately NOT `businessProfile` to avoid chicken-and-egg), prompts `gpt-4.1-mini` (temperature 0.3, 300 tokens) in JSON mode, returns `{ industry, goals, targetAudience }` pre-filled into the form. Autofill is a pure suggestion — no save/broadcast until the user clicks Save.
+
+**Files:** `server/admin-chat-context.ts`, `server/routes/workspaces.ts`, `src/components/settings/IntelligenceProfileTab.tsx`, `tests/admin-chat-slice-migration.test.ts` (new)
+
+**Agency value:** Admin chat answers client health and activity questions from the same cached intelligence layer as all other AI features — no redundant queries. The auto-populate button eliminates the blank-slate friction when onboarding a new workspace: one click extracts industry/goals/audience from the site's existing keyword strategy.
+
+**Client value:** (Indirect) Faster onboarding means the admin sets up the intelligence profile sooner, so AI features (briefs, strategy advice) are more accurate from day one.
+
+**Mutual:** All previous direct DB calls in admin chat context are now routed through the caching layer, making cold-start latency predictable and consistent with other intelligence features.
+
+---
+
+### 205. Unified Workspace Intelligence Layer — Phase 4C (Client Intelligence API + Portal Widget)
+**What it does:** Exposes a scrubbed, tier-gated view of `WorkspaceIntelligence` to the client portal. Four new components: (1) **`ClientIntelligence` shared type** (`shared/types/intelligence.ts`) — five interfaces (`ClientInsightsSummary`, `ClientPipelineStatus`, `ClientLearningHighlights`, `ClientSiteHealthSummary`, `ClientIntelligence`) that define what the client may see; admin-only fields (`knowledgeBase`, `brandVoice`, `churnRisk`, `operational`, `strategy_alignment` insight type, `impact_score`, `resolution_source`) are never included. (2) **`GET /api/public/intelligence/:workspaceId`** — server route that calls `buildWorkspaceIntelligence()`, assembles `ClientIntelligence` from appropriate slices, and applies tier gating: free gets insights summary + pipeline status; growth adds `learningHighlights`; premium adds `siteHealthSummary`. (3) **`useClientIntelligence` hook** — React Query hook with 5-minute stale time, barrel-exported from `src/hooks/client/index.ts`, using `queryKeys.client.intelligence()`. (4) **`IntelligenceSummaryCard`** client portal component — 2-column grid card: high-priority insights count (blue, all tiers), briefs in progress (blue, all tiers), action win rate (teal, Growth+ behind `TierGate`). Placed in `OverviewTab` after the `MonthlyDigest` card, wrapped in `ErrorBoundary`.
+
+**Files:** `shared/types/intelligence.ts`, `server/routes/client-intelligence.ts`, `server/app.ts`, `src/api/analytics.ts`, `src/hooks/client/useClientIntelligence.ts`, `src/hooks/client/index.ts`, `src/lib/queryKeys.ts`, `src/components/client/IntelligenceSummaryCard.tsx`, `src/components/client/OverviewTab.tsx`, `tests/client-intelligence-types.test.ts`, `tests/client-intelligence-route.test.ts`, `tests/use-client-intelligence.test.ts`, `tests/intelligence-summary-card.test.ts`
+
+**Agency value:** The intelligence layer built for admin AI features now flows through to clients — a second consumer of the same cached data at zero additional query cost. Clients can see high-level health signals in their portal without any new DB work.
+
+**Client value:** A single "Site Intelligence" card surfaces the most important signals (top insights, content in flight, win rate) in their overview — transparent proof of work without overwhelming detail. Tier gating ensures premium features remain an upgrade motivator.
+
+**Mutual:** Reuses the existing LRU-cached `buildWorkspaceIntelligence()` infrastructure. Client-facing data is scrubbed at the route layer so there's no risk of admin fields leaking.
+
+---
+
+### 206. Strategy Card Context — AI-Aware Per-Page SEO Metadata
+**What it does:** Adds a `strategyCardContext` block to the keyword strategy object assembled during strategy generation. Each page in `pageMap` now carries a `cardContext` object with `pageType` (home/service/blog/etc.), `pageTypeLabel`, `strategicPriority` (high/medium/low), and `priorityReason` — derived from `getPageTypeConfig()`. This metadata is injected into content brief prompts via `buildStrategyCardBlock()` so the AI understands the page's role in the site architecture when generating guidance. Also exports `getPageTypeConfig()` from `server/routes/keyword-strategy.ts` for downstream consumption.
+
+**Files:** `server/routes/keyword-strategy.ts`, `shared/types/workspace.ts`, `server/content-brief.ts`
+
+**Agency value:** Content briefs now understand whether they're writing for a homepage, a service page, a blog post, or a hub page — producing appropriately structured guidance instead of generic advice. No extra API calls; context derives from existing page classification logic.
+
+**Client value:** Briefs that actually fit the page type. A service page brief emphasizes conversion CTAs; a blog post brief emphasizes depth and internal linking; a homepage brief emphasizes authority and brand positioning.
+
+**Mutual:** Higher-quality AI output from the same inputs — briefs require fewer rounds of edits.
+
+---
+
+### 207. Backlink Profile in Admin AI Intelligence Context
+**What it does:** Adds an opt-in `backlinkProfile` field to the `SeoContextSlice` in the unified workspace intelligence layer. When `enrichWithBacklinks: true` is passed to `buildWorkspaceIntelligence()`, the system fetches a backlinks overview (total backlinks, referring domains) from the configured SEO data provider (SEMRush or DataForSEO) and includes it in the assembled context. The admin AI chat sets this flag, giving the advisor backlink data when answering questions about link building, authority, and competitive positioning. Cache key includes `:bl` suffix to prevent bleed between enriched and non-enriched cache entries. Provider selection respects the per-workspace `seoDataProvider` preference via `getBacklinksProvider()`, with automatic fallback when a provider's backlinks capability is disabled.
+
+**Files:** `server/workspace-intelligence.ts`, `server/intelligence-cache.ts`, `shared/types/intelligence.ts`, `server/admin-chat-context.ts`
+
+**Agency value:** The AI advisor can now speak to backlink strategy with real data — "You have 142 referring domains; competitors typically have 300+" — instead of generic advice. Data is fetched once per 6h cache window; subsequent admin chat messages in the same session reuse the LRU-cached result at zero API cost.
+
+**Client value:** Indirectly — the admin AI advisor gives better backlink and authority recommendations, which translates to better link-building strategies for the client.
+
+**Mutual:** One API call per cache window serves the entire admin chat session for that workspace.
+
+---
+
+### 208. SERP Features Pipeline — Capture, Store, Aggregate, and Brief Directives
+**What it does:** End-to-end pipeline that captures SERP feature data from SEMRush during keyword strategy generation, stores it per-page in SQLite, aggregates it to workspace-level for AI context, and injects actionable directives into content briefs. Four stages: (1) **Capture** — `hasSerpOpportunity()` in `server/semrush.ts` parses SEMRush `Fk` codes into `{ featuredSnippet, paa, video, localPack }` booleans; strategy generation writes an array of present features (`featured_snippet`, `people_also_ask`, `video`, `local_pack`) to a new `serp_features TEXT` column (migration 051) in the `page_keywords` table. Exact-match pages always write (even empty array) to prevent COALESCE from preserving stale values. (2) **Aggregate** — `assembleSeoContext()` in the intelligence layer computes workspace-level `SerpFeatures` (`featuredSnippets: N`, `peopleAlsoAsk: N`, `localPack: bool`) from all live page entries. (3) **Prompt** — `formatSeoContextSection()` renders SERP features as a human-readable line in AI context at standard/verbose verbosity (hidden at compact). (4) **Brief directives** — `generateBrief()` in `server/content-brief.ts` checks the matched page's `serpFeatures` and prepends per-feature directives to the brief prompt: featured snippet → 40-60 word direct-answer opening; PAA → 4-6 Q&A FAQ section; video → embed recommendation; local pack → NAP + LocalBusiness schema suggestion.
+
+**Files:** `server/db/migrations/051-page-keywords-serp-features.sql`, `shared/types/workspace.ts`, `server/page-keywords.ts`, `server/routes/keyword-strategy.ts`, `server/workspace-intelligence.ts`, `shared/types/intelligence.ts`, `server/content-brief.ts`, `tests/fixtures/rich-intelligence.ts`, `tests/unit/format-for-prompt.test.ts`
+
+**Agency value:** Briefs automatically target the SERP features the keyword already shows — no manual research needed. A keyword with a featured snippet opportunity gets a brief that tells the writer to put a direct answer in the first 100 words; a PAA keyword gets a FAQ section directive. Results compound: better brief structure → higher chance of winning the SERP feature → better visibility for the client.
+
+**Client value:** More content wins SERP features (featured snippets, PAA boxes) without extra work — the system structures the brief to target them. Visible in the brief itself so clients can see why the structure is the way it is.
+
+**Mutual:** Zero additional API calls — data is a byproduct of the existing strategy generation flow. The brief directive adds concrete, measurable value (a brief optimized for a featured snippet is qualitatively different from one that isn't).
+
+---
+
+### 274. KD Difficulty Framing
+**What it does:** Assigns a human-readable difficulty label ("Easy", "Moderate", "Hard", "Very Hard") and descriptive tooltip ("KD 45/100 — Moderate competition…") to every keyword row in StrategyTab and ContentGaps. Labels are derived from the SEMRush KD score via `kdFraming(kd)` and `kdTooltip(kd)` utilities in `src/lib/kdFraming.ts`. Tooltip renders on hover so the row stays compact while the detail is always available.
+
+**Files:** `src/lib/kdFraming.ts`, `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** Instantly communicates keyword difficulty in plain language — "Hard" is scannable at a glance vs. reading a raw number. Speeds up keyword curation during client strategy sessions.
+
+**Client value:** Clients can evaluate keyword difficulty without knowing SEO scoring scales. Labels reduce confusion and support self-service strategy review in the client portal.
+
+**Mutual:** Removes the "what does 67 mean?" question from every strategy call. Shared vocabulary between agency and client around keyword effort.
+
+---
+
+### 275. Predicted Organic Impact
+**What it does:** Calculates and displays the estimated monthly organic clicks for each keyword row using the formula `volume × CTR(position)`, where CTR is derived from the Backlinko position curve. Shown inline below each keyword row in StrategyTab and ContentGaps. ContentGaps uses a position-3 floor (CTR 0.103) for unranked keywords. Gives a concrete traffic upside estimate alongside difficulty and volume.
+
+**Files:** `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** Converts raw keyword volume into a projected outcome ("rank for this → ~420 clicks/mo"), making ROI conversations concrete. Prioritization becomes data-driven rather than intuition-based.
+
+**Client value:** Clients see why a specific keyword is worth pursuing — not just that it has volume, but what winning it is estimated to deliver. Supports upgrade conversations ("this keyword cluster is worth ~3,000 clicks/mo").
+
+**Mutual:** Bridges the gap between keyword research and business outcomes. A single number that resonates in strategy reviews and justifies content investment.
+
+---
+
+### 276. SERP Feature Chips (Blue, All 4 Types)
+**What it does:** Renders inline badge chips on keyword rows for all four SERP feature opportunity types: featured snippet, People Also Ask (PAA), local pack, and video carousel. Chips are color-corrected to blue (data law — read-only informational data) replacing prior yellow/cyan variants. Appears in StrategyTab and ContentGaps wherever the keyword's SERP feature flags are present.
+
+**Files:** `src/components/StrategyTab.tsx`, `src/components/ContentGaps.tsx`
+
+**Agency value:** At-a-glance identification of high-value SERP real estate opportunities. A keyword with a featured snippet chip is an immediate priority for structured content — no cross-referencing required.
+
+**Client value:** Clients can see which keywords give them a shot at featured placements. Makes abstract "SERP features" tangible with small, recognizable chips on the strategy view.
+
+**Mutual:** Correct blue color enforces the Three Laws of Color design system. All four chip types now present (prior implementation was incomplete) — no opportunity type goes unrepresented.
+
+---
+
+### 277. SEO Editor CMS Write Guards & Static-Only Endpoint
+**What it does:** The SEO Editor fetches from `/api/webflow/pages/:siteId` (static pages only). CMS collection items are edited through the separate CMS Editor which fetches real item IDs from the CMS Items API. Defense-in-depth guards (`filterWritableIds`, `filterWritableItems`, `filterPagesNeedingFix`, `countMissingField`) ensure that any CMS pages with synthetic `cms-*` IDs are excluded from all Webflow write operations — bulk AI rewrite, pattern apply, bulk fix, approval submission, and individual save. Server-side guards at the PUT and bulk endpoints provide a second layer of protection.
+
+**Files:** `src/components/SeoEditor.tsx`, `src/hooks/admin/useSeoEditor.ts`, `src/hooks/admin/seoEditorFilters.ts`, `server/routes/webflow.ts`, `server/routes/webflow-seo.ts`, `server/routes/approvals.ts`
+
+**Agency value:** Clean separation: SeoEditor handles static Webflow pages (auto-apply via API), CMS Editor handles collection items (real CMS item IDs). No silent 404s from passing synthetic IDs to Webflow. Defense-in-depth means a single guard failure won't corrupt data.
+
+**Client value:** Approvals submitted through SeoEditor correctly target only pages that can be auto-applied. No confusing failures when approved changes can't be written.
+
+**Mutual:** Eliminates the "why didn't my changes apply?" class of issues by preventing unwritable pages from entering the write path at all.
+
 ---
 
 ## Platform Summary
@@ -3066,6 +3233,6 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**264 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**277 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **264**. Last updated: March 2026.
+Current feature count: **277**. Last updated: April 2026.

@@ -18,7 +18,7 @@ import {
   eventDisplayConfigSchema, eventGroupSchema,
   keywordStrategySchema,
   contentPricingSchema, portalContactSchema, auditSuppressionSchema,
-  publishTargetSchema, businessProfileSchema, audiencePersonaSchema,
+  publishTargetSchema, businessProfileSchema, audiencePersonaSchema, intelligenceProfileSchema,
 } from './schemas/workspace-schemas.js';
 import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { z } from 'zod';
@@ -82,6 +82,9 @@ interface WorkspaceRow {
   business_profile: string | null;
   seo_data_provider: string | null;
   scoring_config: string | null;
+  intelligence_profile: string | null;
+  site_intelligence_client_view: number | null;
+  business_priorities: string | null;
   created_at: string;
 }
 
@@ -152,6 +155,14 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     if (bp) ws.businessProfile = bp;
   }
   if (row.scoring_config) ws.scoringConfig = parseJsonSafe(row.scoring_config, scoringConfigOverrideSchema, {}, { workspaceId: row.id, field: 'scoring_config', table: 'workspaces' });
+  if (row.intelligence_profile) {
+    const ip = parseJsonSafe(row.intelligence_profile, intelligenceProfileSchema, null, { workspaceId: row.id, field: 'intelligence_profile', table: 'workspaces' });
+    if (ip) ws.intelligenceProfile = ip;
+  }
+  // Use loose != null (not !==) so undefined (column not yet in DB before migration 049) is also excluded,
+  // preserving the "undefined = enabled by default" intent until migration 049 lands in Group 3.
+  if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
+  if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
   return ws;
 }
 
@@ -346,6 +357,9 @@ function workspaceToParams(ws: Workspace) {
     publish_target: ws.publishTarget ? JSON.stringify(ws.publishTarget) : null,
     seo_data_provider: ws.seoDataProvider || null,
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
+    intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
+    site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
+    business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     created_at: ws.createdAt,
   };
 }
@@ -408,7 +422,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'siteIntelligenceClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -437,7 +451,8 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     onboardingEnabled: 'onboarding_enabled', onboardingCompleted: 'onboarding_completed',
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
-    businessProfile: 'business_profile',
+    businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
+    siteIntelligenceClientView: 'site_intelligence_client_view', businessPriorities: 'business_priorities',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));

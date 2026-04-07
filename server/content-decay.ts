@@ -8,9 +8,10 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages } from './search-console.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext, buildPageAnalysisContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 const log = createLogger('content-decay');
 
@@ -30,6 +31,8 @@ export interface DecayingPage {
   positionChange: number;
   severity: 'critical' | 'warning' | 'watch';
   refreshRecommendation?: string;
+  isRepeatDecay?: boolean;
+  priority?: string;
 }
 
 export interface DecayAnalysis {
@@ -78,8 +81,8 @@ export function loadDecayAnalysis(workspaceId: string): DecayAnalysis | null {
     workspaceId: row.workspace_id,
     analyzedAt: row.analyzed_at,
     totalPages: row.total_pages,
-    decayingPages: JSON.parse(row.decaying_pages),
-    summary: JSON.parse(row.summary),
+    decayingPages: parseJsonFallback(row.decaying_pages, []),
+    summary: parseJsonFallback(row.summary, { critical: 0, warning: 0, watch: 0, totalDecaying: 0, avgDeclinePct: 0 }),
   };
 }
 
@@ -150,7 +153,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
       clickDecline <= -50 ? 'critical' :
       clickDecline <= -30 ? 'warning' : 'watch';
 
-    decayingPages.push({
+    const decayingPage: DecayingPage = {
       page: pagePath,
       currentClicks: current.clicks,
       previousClicks: prev.clicks,
@@ -162,7 +165,30 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
       previousPosition: Math.round(prev.position * 10) / 10,
       positionChange: Math.round(positionChange * 10) / 10,
       severity,
-    });
+    };
+
+    // ── Bridge #8: Check for repeat_decay ─────────────────────────────
+    // If a prior content_refresh action for this page scored 'loss', tag as repeat_decay
+    try {
+      const { getActionsByPage, getOutcomesForAction } = await import('./outcome-tracking.js');
+      const priorActions = getActionsByPage(ws.id, pagePath);
+      const refreshActions = priorActions.filter(a => a.actionType === 'content_refreshed');
+      if (refreshActions.length > 0) {
+        for (const action of refreshActions) {
+          const outcomes = getOutcomesForAction(action.id);
+          const hasLoss = outcomes.some(o => o.score === 'loss');
+          if (hasLoss) {
+            decayingPage.isRepeatDecay = true;
+            decayingPage.priority = 'high';
+            break;
+          }
+        }
+      }
+    } catch {
+      // Non-critical — outcome tracking may not have data for this page
+    }
+
+    decayingPages.push(decayingPage);
   }
 
   // Sort by decline severity
@@ -199,8 +225,9 @@ export async function generateRefreshRecommendation(
   ws: Workspace,
   page: DecayingPage,
 ): Promise<string> {
-  const { fullContext } = buildSeoContext(ws.id, page.page);
-  const pageAnalysis = buildPageAnalysisContext(ws.id, page.page);
+  const slices = ['seoContext', 'learnings', 'pageProfile'] as const;
+  const intel = await buildWorkspaceIntelligence(ws.id, { slices, pagePath: page.page });
+  const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
   const prompt = `You are an SEO content strategist. A page on this site is experiencing content decay — declining search performance.
 
@@ -209,7 +236,7 @@ Click decline: ${page.clickDeclinePct}% (from ${page.previousClicks} to ${page.c
 Impression change: ${page.impressionChangePct}%
 Position change: ${page.positionChange > 0 ? '+' : ''}${page.positionChange} (now ${page.currentPosition})
 
-${fullContext ? `SEO Context:\n${fullContext}\n` : ''}${pageAnalysis}
+${fullContext ? `SEO Context:\n${fullContext}\n` : ''}
 
 Provide a concise, actionable content refresh plan (3-5 bullet points). Focus on:
 1. What's likely causing the decline (algorithm changes, fresher competitors, outdated info)

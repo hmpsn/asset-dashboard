@@ -84,6 +84,16 @@ function listSessionsByChannelStmt() {
   return _listSessionsByChannel;
 }
 
+let _cleanupOldSessions: ReturnType<typeof db.prepare> | null = null;
+function cleanupOldSessionsStmt() {
+  if (!_cleanupOldSessions) {
+    _cleanupOldSessions = db.prepare(`
+      DELETE FROM chat_sessions WHERE updated_at < datetime('now', ? || ' days')
+    `);
+  }
+  return _cleanupOldSessions;
+}
+
 interface ChatRow {
   id: string;
   workspace_id: string;
@@ -109,6 +119,11 @@ function rowToSession(row: ChatRow): ChatSession {
 }
 
 // ── CRUD ──
+
+export function cleanupOldChatSessions(maxAgeDays: number = 180): number {
+  const info = cleanupOldSessionsStmt().run(`-${maxAgeDays}`);
+  return info.changes;
+}
 
 export function getSession(workspaceId: string, sessionId: string): ChatSession | null {
   const row = getSessionStmt().get(sessionId, workspaceId) as ChatRow | undefined;

@@ -1,5 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 // --- Types ---
 
@@ -35,7 +36,7 @@ function rowToRecord(row: PaymentRow): PaymentRecord {
     currency: row.currency,
     status: row.status as PaymentRecord['status'],
     contentRequestId: row.content_request_id ?? undefined,
-    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    metadata: parseJsonFallback(row.metadata, undefined),
     createdAt: row.created_at,
     paidAt: row.paid_at ?? undefined,
   };

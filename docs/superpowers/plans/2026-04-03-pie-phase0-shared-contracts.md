@@ -22,8 +22,8 @@
 | Modify | `shared/types/workspace.ts` | Add `siteIntelligenceClientView` + `businessPriorities` to `Workspace` |
 | Modify | `src/routes.ts` | Add `'brand'` to `ClientTab` union |
 | Modify | `shared/types/feature-flags.ts` | Add 3 new feature flags |
-| Create | `server/db/migrations/046-client-signals.sql` | `client_signals` table |
-| Create | `server/db/migrations/047-business-priorities.sql` | `businessPriorities` column on `workspaces` |
+| Create | `server/db/migrations/047-client-signals.sql` | `client_signals` table |
+| Create | `server/db/migrations/048-business-priorities.sql` | `businessPriorities` column on `workspaces` |
 | Create | `tests/unit/metrics-source-enum.test.ts` | Verify METRICS_SOURCE const values |
 
 ---
@@ -115,8 +115,8 @@ describe('METRICS_SOURCE', () => {
     expect(METRICS_SOURCE.AI_ESTIMATE).toBe('ai_estimate');
   });
 
-  it('is frozen (as const)', () => {
-    expect(Object.isFrozen(METRICS_SOURCE)).toBe(true);
+  it('has exactly 4 keys', () => {
+    expect(Object.keys(METRICS_SOURCE)).toHaveLength(4);
   });
 });
 ```
@@ -407,10 +407,10 @@ git commit -m "feat(flags): add smart-placeholders, client-brand-section, seo-ed
 
 ---
 
-### Task 7: Migration 046 — `client_signals` table
+### Task 7: Migration 047 — `client_signals` table
 
 **Files:**
-- Create: `server/db/migrations/046-client-signals.sql`
+- Create: `server/db/migrations/047-client-signals.sql`
 
 - [ ] **Step 1: Create the migration file**
 
@@ -420,16 +420,19 @@ git commit -m "feat(flags): add smart-placeholders, client-brand-section, seo-ed
 -- chatContext is JSON: ClientSignalMessage[] (last 10 messages at time of tap).
 
 CREATE TABLE IF NOT EXISTS client_signals (
-  id          TEXT NOT NULL PRIMARY KEY,
-  workspaceId TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  type        TEXT NOT NULL CHECK(type IN ('content_interest', 'service_interest')),
-  chatContext TEXT NOT NULL DEFAULT '[]',
-  status      TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'reviewed', 'actioned')),
-  createdAt   TEXT NOT NULL DEFAULT (datetime('now'))
+  id              TEXT NOT NULL PRIMARY KEY,
+  workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  workspace_name  TEXT NOT NULL,
+  type            TEXT NOT NULL CHECK(type IN ('content_interest', 'service_interest')),
+  status          TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'reviewed', 'actioned')),
+  chat_context    TEXT NOT NULL DEFAULT '[]',
+  trigger_message TEXT NOT NULL DEFAULT '',
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_client_signals_workspace ON client_signals(workspaceId, createdAt DESC);
-CREATE INDEX IF NOT EXISTS idx_client_signals_status    ON client_signals(status);
+CREATE INDEX IF NOT EXISTS idx_client_signals_workspace ON client_signals(workspace_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_client_signals_status    ON client_signals(status, created_at DESC);
 ```
 
 - [ ] **Step 2: Verify migration applies cleanly**
@@ -445,16 +448,16 @@ Expected: all tests pass (migration applied; no schema conflicts).
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/046-client-signals.sql
-git commit -m "feat(db): add client_signals table (migration 046)"
+git add server/db/migrations/047-client-signals.sql
+git commit -m "feat(db): add client_signals table (migration 047)"
 ```
 
 ---
 
-### Task 8: Migration 047 — `businessPriorities` column
+### Task 8: Migration 048 — `business_priorities` column
 
 **Files:**
-- Create: `server/db/migrations/047-business-priorities.sql`
+- Create: `server/db/migrations/048-business-priorities.sql`
 
 - [ ] **Step 1: Create the migration file**
 
@@ -462,7 +465,7 @@ git commit -m "feat(db): add client_signals table (migration 046)"
 -- Add client-editable business priorities JSON column to workspaces.
 -- Stores an array of goal strings, e.g. ["Grow patient appointments by 25% in Q3"].
 
-ALTER TABLE workspaces ADD COLUMN businessPriorities TEXT;
+ALTER TABLE workspaces ADD COLUMN business_priorities TEXT;
 ```
 
 - [ ] **Step 2: Verify migration applies**
@@ -476,8 +479,8 @@ Expected: full suite passes.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/047-business-priorities.sql
-git commit -m "feat(db): add businessPriorities column to workspaces (migration 047)"
+git add server/db/migrations/048-business-priorities.sql
+git commit -m "feat(db): add business_priorities column to workspaces (migration 048)"
 ```
 
 ---

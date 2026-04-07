@@ -46,6 +46,8 @@ const log = createLogger('approvals');
 function derivePageStatus(batch: import('../../shared/types/approvals').ApprovalBatch, pageId: string): 'in-review' | 'approved' | 'rejected' {
   const pageItems = batch.items.filter(i => i.pageId === pageId);
   const statuses = pageItems.map(i => i.status);
+  // Guard: .every() on empty returns true vacuously — default to in-review
+  if (statuses.length === 0) return 'in-review';
   if (statuses.every(s => s === 'approved' || s === 'applied')) return 'approved';
   if (statuses.every(s => s === 'rejected')) return 'rejected';
   // Mix of pending/approved/rejected → still in review
@@ -172,14 +174,22 @@ router.get('/api/public/approvals/:workspaceId/:batchId', requireClientPortalAut
   res.json(batch);
 });
 
-router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res) => {
+router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClientPortalAuth(), validate(updateItemSchema), (req, res, next) => {
   // Only include fields that were actually sent — passing undefined would overwrite existing values
   const update: Partial<Pick<import('../../shared/types/approvals').ApprovalItem, 'status' | 'clientValue' | 'clientNote'>> = {};
   if (req.body.status !== undefined) update.status = req.body.status;
   if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
   if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
   const { status, clientValue, clientNote } = req.body;
-  const batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
+  let batch;
+  try {
+    batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!batch) return res.status(404).json({ error: 'Item not found' });
   // Sync PageEditState when client approves or rejects
   if (status === 'approved' || status === 'rejected') {
@@ -256,6 +266,13 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
 
   for (const item of approved) {
     try {
+      // Guard: synthetic CMS IDs (format 'cms-*') come from sitemap discovery and are
+      // not real Webflow page or collection-item IDs. Attempting to write them via the
+      // Webflow API produces a silent 404. Fail fast with a clear message so the
+      // approval record correctly reflects 'not applied' rather than a phantom success.
+      if (item.pageId.startsWith('cms-')) {
+        throw new Error('CMS pages discovered via sitemap must be updated directly in Webflow — synthetic page ID cannot be written via the API');
+      }
       const value = item.clientValue || item.proposedValue;
       if (item.field === 'schema') {
         // Schema item — publish JSON-LD to page via schema publisher
@@ -264,18 +281,23 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
         const result = await publishSchemaToPage(ws.webflowSiteId, item.pageId, schema, token);
         if (!result.success) throw new Error(result.error || 'Schema publish failed');
       } else if (item.collectionId) {
-        // CMS item — update via collection API (updates draft)
+        // CMS item approval (from CmsEditor) — pageId here is a CMS item ID from the
+        // CMS Items API, not a Webflow page ID. collectionId is the collection it belongs to.
+        // This branch must NOT be triggered from SeoEditor: SeoEditor's pageId is a Webflow
+        // page ID, and a page's collectionId means "renders this collection" — not "is an
+        // item in this collection". SeoEditor omits collectionId from approval items to
+        // ensure static pages always fall through to updatePageSeo below.
         const result = await updateCollectionItem(item.collectionId, item.pageId, { [item.field]: value }, token);
         if (!result.success) throw new Error(result.error || 'CMS update failed');
-        // Publish the CMS item so draft changes go live
         const pubResult = await publishCollectionItems(item.collectionId, [item.pageId], token);
         if (!pubResult.success) log.warn(`CMS publish warning for ${item.pageId}: ${pubResult.error}`);
       } else {
-        // Static page — update via page SEO API
+        // Static page — update via page SEO API (SeoEditor approval flow)
         const fields = item.field === 'seoTitle'
           ? { seo: { title: value } }
           : { seo: { description: value } };
-        await updatePageSeo(item.pageId, fields, token);
+        const seoResult = await updatePageSeo(item.pageId, fields, token);
+        if (!seoResult.success) throw new Error(seoResult.error || 'SEO update failed');
       }
       appliedIds.push(item.id);
       results.push({ itemId: item.id, pageId: item.pageId, success: true });
@@ -312,7 +334,7 @@ router.post('/api/public/approvals/:workspaceId/:batchId/apply', requireClientPo
     for (const item of approved.filter(i => appliedIds.includes(i.id))) {
       if (item.field === 'seoTitle' || item.field === 'seoDescription') {
         if (getActionBySource('approval', item.id)) continue;
-        const action = recordAction({
+        const action = recordAction({ // recordAction-ok — workspaceId is from route param, always valid
           workspaceId: req.params.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'approval',

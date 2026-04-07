@@ -30,7 +30,6 @@ export interface SerpData {
 }
 
 const SCRAPE_TIMEOUT = 8000;
-const USER_AGENT = STUDIO_BOT_UA;
 
 /**
  * Scrape a single URL and extract structured content.
@@ -43,7 +42,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedPage | null> {
 
     const res = await fetch(url, {
       headers: {
-        'User-Agent': USER_AGENT,
+        'User-Agent': STUDIO_BOT_UA,
         'Accept': 'text/html,application/xhtml+xml',
       },
       signal: controller.signal,

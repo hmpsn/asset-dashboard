@@ -21,6 +21,7 @@ import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
+import type { StrategyCardContext, BriefJourneyStage } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
   discoverSitemapUrls,
@@ -35,11 +36,21 @@ import { validate, z } from '../middleware/validate.js';
 const log = createLogger('content-requests');
 
 const updateContentRequestSchema = z.object({
-  status: z.string().optional(),
+  status: z.enum(['pending_payment', 'requested', 'brief_generated', 'client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published', 'declined']).optional(),
   internalNote: z.string().max(5000).optional(),
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
 });
+
+// --- Helper: Derive journey stage from intent ---
+function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
+  if (!intent) return undefined;
+  const lower = intent.toLowerCase();
+  if (lower === 'informational') return 'awareness';
+  if (lower === 'commercial') return 'consideration';
+  if (lower === 'transactional') return 'decision';
+  return undefined;
+}
 
 // --- Internal Content Request Management ---
 router.get('/api/content-requests/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -52,9 +63,17 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
   res.json(request);
 });
 
-router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res) => {
+router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
   const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   // Send email when brief is sent to client review
   if (status === 'client_review') {
@@ -205,6 +224,15 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
 
     // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
     const existingPages = await getAllSitePages(ws);
+
+    // Thread strategy card context from request fields
+    const strategyCardContext: StrategyCardContext = {
+      rationale: request.rationale,
+      intent: request.intent,
+      priority: request.priority,
+      journeyStage: deriveJourneyStage(request.intent),
+    };
+
     const brief = await generateBrief(req.params.workspaceId, request.targetKeyword, {
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
@@ -213,6 +241,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       semrushRelated,
       pageType: request.pageType || 'blog',
       ga4PagePerformance,
+      strategyCardContext,
     });
 
     // Link brief to request and update status

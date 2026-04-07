@@ -6,6 +6,7 @@
  */
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type {
   ContentTemplate,
   ContentPageType,
@@ -81,15 +82,15 @@ function rowToTemplate(row: TemplateRow): ContentTemplate {
     name: row.name,
     description: row.description ?? undefined,
     pageType: row.page_type as ContentPageType,
-    variables: JSON.parse(row.variables) as TemplateVariable[],
-    sections: JSON.parse(row.sections) as TemplateSection[],
+    variables: parseJsonFallback<TemplateVariable[]>(row.variables, []),
+    sections: parseJsonFallback<TemplateSection[]>(row.sections, []),
     urlPattern: row.url_pattern,
     keywordPattern: row.keyword_pattern,
     titlePattern: row.title_pattern ?? undefined,
     metaDescPattern: row.meta_desc_pattern ?? undefined,
-    cmsFieldMap: row.cms_field_map ? JSON.parse(row.cms_field_map) as Record<string, string> : undefined,
+    cmsFieldMap: parseJsonFallback<Record<string, string> | undefined>(row.cms_field_map, undefined),
     toneAndStyle: row.tone_and_style ?? undefined,
-    schemaTypes: row.schema_types ? JSON.parse(row.schema_types) as string[] : undefined,
+    schemaTypes: parseJsonFallback<string[] | undefined>(row.schema_types, undefined),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

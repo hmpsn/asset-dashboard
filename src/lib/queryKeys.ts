@@ -82,6 +82,8 @@ export const queryKeys = {
     intelligence: (wsId: string, slices?: string[], pagePath?: string, learningsDomain?: string) =>
       ['admin-intelligence', wsId, pagePath ?? '', learningsDomain ?? 'all', ...(slices ? [...slices].sort() : [])] as const,
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
+    clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
+    notifications: () => ['admin-notifications'] as const,
   },
 
   // ── Client ────────────────────────────────────────────────────────
@@ -115,6 +117,7 @@ export const queryKeys = {
     monthlyDigest: (wsId: string) => ['client-monthly-digest', wsId] as const,
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
+    intelligence: (wsId: string) => ['client-intelligence', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

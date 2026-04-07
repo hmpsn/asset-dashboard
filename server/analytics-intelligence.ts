@@ -32,6 +32,7 @@ import { runFeedbackLoops } from './insight-feedback.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
+import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
 import { createLogger } from './logger.js';
 
 // ── Shared types for computation results ─────────────────────────
@@ -379,41 +380,6 @@ interface GapInput {
  * Score and classify competitor keyword gaps.
  * Enriches with our existing GSC position when available.
  */
-/**
- * Extract brand-like tokens from a domain for branded query detection.
- * "competitor-site.com" → ["competitor", "site", "competitorsite"]
- * "acme.co" → ["acme"]
- */
-function extractBrandTokens(domain: string): string[] {
-  // Strip TLD and www
-  const base = domain.replace(/^www\./, '').replace(/\.(com|co|io|ai|org|net|dev|app)$/i, '');
-  const tokens: string[] = [];
-  // Split on dots and hyphens
-  const parts = base.split(/[.\-]/);
-  for (const p of parts) {
-    if (p.length >= 3) tokens.push(p.toLowerCase());
-  }
-  // Also add the joined form (e.g., "competitorsite" from "competitor-site")
-  if (parts.length > 1) tokens.push(parts.join('').toLowerCase());
-  return tokens;
-}
-
-/** Check if a keyword is likely a branded search for a competitor.
- * Uses word-boundary matching to avoid false positives from short tokens
- * that are also common industry terms (e.g. "seo" from seo.com).
- */
-function isBrandedQuery(keyword: string, competitorBrandTokens: string[]): boolean {
-  const lower = keyword.toLowerCase();
-  return competitorBrandTokens.some(token => {
-    // Short tokens (< 5 chars) are too likely to match common words
-    // e.g. "seo" from seo.com, "web" from web.io, "hub" from hub.io
-    if (token.length < 5) return false;
-    // Word-boundary match to avoid substring false positives
-    const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-    return regex.test(lower);
-  });
-}
-
 export function computeCompetitorGapInsights(
   gapData: GapInput[],
   ourQueryData: QueryPageRow[],
@@ -1089,7 +1055,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   // Phase 3B: Competitor gap analysis (uses SEMRush/DataForSEO provider)
   if (ws.liveDomain) {
     try {
-      const provider = getConfiguredProvider(ws.seoDataProvider as any);
+      const provider = getConfiguredProvider(ws.seoDataProvider);
       if (provider?.isConfigured()) {
         const competitors = ws.competitorDomains?.length
           ? ws.competitorDomains

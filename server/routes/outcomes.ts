@@ -29,7 +29,7 @@ import type {
   OutcomeScorecard,
   TopWin,
   WorkspaceOutcomeOverview,
-  WeCalledItEntry,
+  OutcomeWinEntry,
   LearningsTrend,
   TrackedAction,
   ActionOutcome,
@@ -403,8 +403,8 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
 router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), (req, res) => {
   try {
     const wins = getTopWinsForWorkspace(req.params.workspaceId, 10);
-    // Transform to WeCalledItEntry shape for client view
-    const entries: WeCalledItEntry[] = wins.map(w => ({
+    // Transform to OutcomeWinEntry shape for client view
+    const entries: OutcomeWinEntry[] = wins.map(w => ({
       actionId: w.actionId,
       actionType: w.actionType,
       pageUrl: w.pageUrl,

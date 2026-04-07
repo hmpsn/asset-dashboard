@@ -6,6 +6,7 @@ import { TierGate, EmptyState, LoadingState, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
 import type { ApprovalBatch, ApprovalItem } from './types';
+import type { PageKeywordMap } from '../../../shared/types/workspace.js';
 import { patch, post } from '../../api/client';
 
 interface ApprovalsTabProps {
@@ -17,11 +18,12 @@ interface ApprovalsTabProps {
   setApprovalBatches: React.Dispatch<React.SetStateAction<ApprovalBatch[]>>;
   loadApprovals: (wsId: string) => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+  pageMap?: PageKeywordMap[];
 }
 
 export function ApprovalsTab({
   workspaceId, approvalBatches, approvalsLoading, pendingApprovals,
-  effectiveTier, setApprovalBatches, loadApprovals, setToast,
+  effectiveTier, setApprovalBatches, loadApprovals, setToast, pageMap,
 }: ApprovalsTabProps) {
   const [applyingBatch, setApplyingBatch] = useState<string | null>(null);
   const [editingApproval, setEditingApproval] = useState<string | null>(null);
@@ -76,6 +78,16 @@ export function ApprovalsTab({
     } catch { setToast({ message: 'Failed to apply changes. Please try again.', type: 'error' }); }
     setApplyingBatch(null);
   };
+
+  function findPageKeywords(pageSlug: string) {
+    if (!pageMap || !pageSlug) return null;
+    const slug = pageSlug.toLowerCase();
+    // Exact match first (top-level pages), then suffix match for nested paths (/services/seo → slug 'seo')
+    return pageMap.find(p => {
+      const path = p.pagePath.toLowerCase();
+      return path === '/' + slug || path === slug;
+    }) ?? pageMap.find(p => p.pagePath.toLowerCase().endsWith('/' + slug)) ?? null;
+  }
 
   return (
     <div className="space-y-6">
@@ -202,12 +214,29 @@ export function ApprovalsTab({
 
                             return (
                               <div key={item.id} className="px-5 py-3 ml-4 border-l-2 border-zinc-800">
-                                <div className="flex items-center gap-2 mb-2">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <span className="text-[11px] font-medium text-zinc-400">{fieldLabel}</span>
                                   <span className={`text-[11px] px-1.5 py-0.5 rounded border ${statusColors[item.status || 'pending']}`}>{item.status || 'pending'}</span>
                                   {isSchema && schemaTypes.length > 0 && schemaTypes.map(t => (
                                     <span key={t} className="text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-300">{t}</span>
                                   ))}
+                                  {(item.field === 'seoTitle' || item.field === 'seoDescription') && (() => {
+                                    const kw = findPageKeywords(item.pageSlug);
+                                    if (!kw) return null;
+                                    return (
+                                      <>
+                                        <span className="text-[10px] text-zinc-500 ml-auto">targeting:</span>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300 font-medium">
+                                          {kw.primaryKeyword}
+                                        </span>
+                                        {kw.secondaryKeywords?.slice(0, 2).map(kw2 => (
+                                          <span key={kw2} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-600/50 text-zinc-400">
+                                            {kw2}
+                                          </span>
+                                        ))}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Reason / context from audit */}

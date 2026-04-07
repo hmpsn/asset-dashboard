@@ -7,6 +7,7 @@ import type { ApprovalItem, ApprovalBatch } from '../shared/types/approvals.ts';
 import { parseJsonFallback } from './db/json-validation.js';
 import { approvalItemSchema } from './schemas/approval-schemas.js';
 import { createLogger } from './logger.js';
+import { validateTransition, APPROVAL_ITEM_TRANSITIONS } from './state-machines.js';
 
 const log = createLogger('approvals');
 
@@ -131,6 +132,11 @@ export function updateItem(
   const item = batch.items.find(i => i.id === itemId);
   if (!item) return null;
 
+  // Validate status transition if status is being changed
+  if (update.status !== undefined && update.status !== item.status) {
+    validateTransition('approval_item', APPROVAL_ITEM_TRANSITIONS, item.status, update.status);
+  }
+
   // Filter out undefined values to prevent overwriting existing fields (e.g. status)
   const defined = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
   Object.assign(item, defined, { updatedAt: new Date().toISOString() });
@@ -142,7 +148,9 @@ export function updateItem(
 /** Recalculate batch status from item statuses and persist. */
 function recalcBatchStatus(batch: ApprovalBatch): void {
   const statuses = batch.items.map(i => i.status);
-  if (statuses.every(s => s === 'applied')) batch.status = 'applied';
+  // Guard: .every() on empty array returns true vacuously — keep batch pending
+  if (statuses.length === 0) { batch.status = 'pending'; }
+  else if (statuses.every(s => s === 'applied')) batch.status = 'applied';
   else if (statuses.every(s => s === 'approved' || s === 'applied')) batch.status = 'approved';
   else if (statuses.every(s => s === 'rejected')) batch.status = 'rejected';
   else if (statuses.some(s => s === 'approved' || s === 'rejected' || s === 'applied')) batch.status = 'partial';
@@ -163,6 +171,11 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
 
   for (const item of batch.items) {
     if (itemIds.includes(item.id)) {
+      // Only approved items may transition to applied
+      if (item.status !== 'approved') {
+        log.warn({ batchId, itemId: item.id, status: item.status }, 'markBatchApplied: skipping non-approved item');
+        continue;
+      }
       item.status = 'applied';
       item.updatedAt = new Date().toISOString();
     }
