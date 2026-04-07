@@ -3,7 +3,7 @@
 // Feature-flagged: 'client-brand-section'
 // Design rules: no purple, teal for CTAs, SectionCard for all panels.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Globe, ChevronRight, Sparkles } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
@@ -31,6 +31,14 @@ export function BrandTab({
 
   // Local form state — initialised from props
   const [form, setForm] = useState<BusinessProfile>(() => businessProfile ?? {});
+
+  // Re-sync form when prop changes externally (e.g. admin edits via WebSocket) but only
+  // when not in edit mode — avoids clobbering in-progress edits
+  useEffect(() => {
+    if (!editing) {
+      setForm(businessProfile ?? {});
+    }
+  }, [businessProfile, editing]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -134,11 +142,11 @@ export function BrandTab({
                   <span className="text-zinc-300">{businessProfile.openingHours}</span>
                 </div>
               )}
-              {businessProfile?.socialProfiles && businessProfile.socialProfiles.length > 0 && (
+              {businessProfile?.socialProfiles && businessProfile.socialProfiles.filter(u => u.trim()).length > 0 && (
                 <div className="flex items-start gap-3 text-sm">
                   <Globe className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    {businessProfile.socialProfiles.map((url, i) => (
+                    {businessProfile.socialProfiles.filter(u => u.trim()).map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                         className="block text-teal-400 hover:text-teal-300 truncate text-xs transition-colors">
                         {url}

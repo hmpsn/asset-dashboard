@@ -153,7 +153,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const tab: ClientTab = (() => {
     const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
-    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review','brand'].includes(t)) return t as ClientTab;
+    if (t === 'brand') return brandTabEnabled ? 'brand' as ClientTab : 'overview';
+    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review'].includes(t)) return t as ClientTab;
     return 'overview';
   })();
   const setTab = (t: ClientTab) => {
