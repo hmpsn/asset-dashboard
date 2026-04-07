@@ -132,7 +132,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     }
   }, [strategy]);
 
-  const generateStrategy = async () => {
+  const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
     setGenerating(true);
     setError(null);
     setProgressStep('');
@@ -144,6 +144,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
         body: JSON.stringify({
+          mode: strategyMode,
           businessContext: businessContext.trim() || undefined,
           semrushMode: semrushAvailable ? semrushMode : 'none',
           competitorDomains: compList,
@@ -276,19 +277,31 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               : 'AI-powered keyword mapping for your entire site'}
           </p>
         </div>
-        <button
-          onClick={generateStrategy}
-          disabled={generating}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
-        >
-          {generating ? (
-            <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
-          ) : strategy ? (
-            <><RefreshCw className="w-3 h-3" /> Regenerate</>
-          ) : (
-            <><Sparkles className="w-3 h-3" /> Generate Strategy</>
+        <div className="flex items-center gap-2">
+          {strategy && (
+            <button
+              onClick={() => generateStrategy('incremental')}
+              disabled={generating}
+              title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
+              className="px-3 py-1.5 rounded-lg text-xs border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors disabled:opacity-50"
+            >
+              Update changed pages
+            </button>
           )}
-        </button>
+          <button
+            onClick={() => generateStrategy('full')}
+            disabled={generating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+          >
+            {generating ? (
+              <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
+            ) : strategy ? (
+              <><RefreshCw className="w-3 h-3" /> Regenerate</>
+            ) : (
+              <><Sparkles className="w-3 h-3" /> Generate Strategy</>
+            )}
+          </button>
+        </div>
       </div>
 
       {!strategy && !generating && (
