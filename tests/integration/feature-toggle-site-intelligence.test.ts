@@ -72,7 +72,7 @@ describe('siteIntelligenceClientView toggle', () => {
     expect(ws.siteIntelligenceClientView).toBe(false);
   });
 
-  it('public workspace endpoint omits siteIntelligenceClientView when default (null)', async () => {
+  it('public workspace endpoint returns true for siteIntelligenceClientView when default (null)', async () => {
     // Create a fresh workspace with no toggle set
     const newRes = await postJson('/api/workspaces', { name: 'SI Default Test' });
     const { id } = await newRes.json();
@@ -80,7 +80,7 @@ describe('siteIntelligenceClientView toggle', () => {
     const res = await api(`/api/public/workspace/${id}`);
     expect(res.status).toBe(200);
     const ws = await res.json();
-    // NULL in DB → undefined in response (frontend treats as enabled)
-    expect(ws.siteIntelligenceClientView).toBeUndefined();
+    // NULL in DB → true (default ON, normalized like analyticsClientView)
+    expect(ws.siteIntelligenceClientView).toBe(true);
   });
 });

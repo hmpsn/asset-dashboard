@@ -45,7 +45,7 @@ router.get('/api/public/workspace/:id', (req, res) => {
     clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
     seoClientView: !!ws.seoClientView,
     analyticsClientView: ws.analyticsClientView != null ? !!ws.analyticsClientView : true,
-    siteIntelligenceClientView: ws.siteIntelligenceClientView,
+    siteIntelligenceClientView: ws.siteIntelligenceClientView != null ? !!ws.siteIntelligenceClientView : true,
     // Business profile — safe to expose to client portal
     businessProfile: ws.businessProfile || null,
     autoReports: !!ws.autoReports,
@@ -527,7 +527,10 @@ router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusin
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const ws = updateWorkspace(wsId, { businessProfile: req.body });
+  const existing = getWorkspace(wsId);
+  if (!existing) return res.status(404).json({ error: 'Workspace not found' });
+  const mergedProfile = { ...(existing.businessProfile ?? {}), ...req.body };
+  const ws = updateWorkspace(wsId, { businessProfile: mergedProfile });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   broadcastToWorkspace(wsId, 'workspace:updated', { businessProfile: ws.businessProfile });
