@@ -691,6 +691,15 @@
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
         {
+          "id": 535,
+          "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
+          "source": "PIE Group 3 code review",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "5 public-portal mutation endpoints have no addActivity() call: POST /onboarding/:id, POST /keyword-feedback (single + bulk), POST /business-priorities, POST /content-gap-vote. Admin has zero visibility into client portal engagement. The business-profile PATCH was fixed in PR #146; the rest need the same treatment. Quick — import exists, just add the calls with appropriate ActivityType values.",
+          "status": "pending"
+        },
+        {
           "id": 532,
           "title": "Fix anomaly-detection recordScanTime FK constraint failure",
           "source": "Staging deploy 2026-03-31",
