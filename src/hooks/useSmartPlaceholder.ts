@@ -78,7 +78,6 @@ function buildAdminSuggestions(
 }
 
 export function useSmartPlaceholder(
-  fieldKey: string,
   { workspaceId, isAdminContext }: UseSmartPlaceholderOptions,
 ): SmartPlaceholderResult {
   const flagEnabled = useFeatureFlag('smart-placeholders');
@@ -109,7 +108,7 @@ export function useSmartPlaceholder(
     if (isAdminContext) {
       // Admin: contextual placeholder + suggestion chips
       const placeholder = seoCtx.businessContext
-        ? `Ask about ${seoCtx.businessContext.slice(0, 40)}...`
+        ? `Ask about ${seoCtx.businessContext.trim().slice(0, 40)}...`
         : 'Ask about this workspace...';
 
       const suggestions = buildAdminSuggestions(
@@ -127,5 +126,5 @@ export function useSmartPlaceholder(
 
       return { placeholder };
     }
-  }, [flagEnabled, intel, isAdminContext, fieldKey]);
+  }, [flagEnabled, intel, isAdminContext]);
 }

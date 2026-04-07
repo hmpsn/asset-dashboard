@@ -173,7 +173,7 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               </div>
             </div>
             <button onClick={async () => {
-              const val = !(ws?.siteIntelligenceClientView !== false);
+              const val = ws?.siteIntelligenceClientView === false;
               await patchWorkspace({ siteIntelligenceClientView: val });
               toast(val ? 'Site Intelligence summary enabled for client' : 'Site Intelligence summary hidden from client');
             }}

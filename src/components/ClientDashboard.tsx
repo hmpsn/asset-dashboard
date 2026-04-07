@@ -42,7 +42,6 @@ import { useChat } from '../hooks/useChat';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
-import { useQueryClient } from '@tanstack/react-query';
 import { BrandTab } from './client/BrandTab';
 import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
@@ -57,7 +56,6 @@ const MODULE_TODAY = new Date().toISOString().split('T')[0];
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
   const brandTabEnabled = useFeatureFlag('client-brand-section');
-  const queryClient = useQueryClient();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -1027,12 +1025,9 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {tab === 'brand' && brandTabEnabled && (
           <ErrorBoundary label="Brand">
             <BrandTab
-              workspaceId={workspaceId}
-              workspaceName={ws?.name ?? ''}
               businessProfile={ws?.businessProfile ?? undefined}
               onSaveBusinessProfile={async (profile) => {
                 await patch(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
-                queryClient.invalidateQueries({ queryKey: ['client-workspace', workspaceId] });
               }}
             />
           </ErrorBoundary>

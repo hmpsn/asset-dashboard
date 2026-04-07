@@ -119,7 +119,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
     }).catch((err) => { console.error('AdminChat operation failed:', err); });
   };
 
-  const { placeholder: smartPlaceholder, suggestions } = useSmartPlaceholder('admin-chat', {
+  const { placeholder: smartPlaceholder, suggestions } = useSmartPlaceholder({
     workspaceId,
     isAdminContext: true,
   });

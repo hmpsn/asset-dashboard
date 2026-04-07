@@ -8,26 +8,9 @@ import { Building2, Phone, Mail, MapPin, Globe, ChevronRight, Sparkles } from 'l
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorBoundary } from '../ErrorBoundary';
-
-interface BusinessProfile {
-  phone?: string;
-  email?: string;
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-    country?: string;
-  };
-  socialProfiles?: string[];
-  openingHours?: string;
-  foundedDate?: string;
-  numberOfEmployees?: string;
-}
+import type { BusinessProfile } from './types';
 
 interface BrandTabProps {
-  workspaceId: string;
-  workspaceName: string;
   businessProfile?: BusinessProfile;
   /** Plain-language brand voice summary (NOT the full brand voice doc). */
   brandVoiceSummary?: string;
@@ -37,8 +20,6 @@ interface BrandTabProps {
 }
 
 export function BrandTab({
-  workspaceId,
-  workspaceName,
   businessProfile,
   brandVoiceSummary,
   industry,
@@ -46,15 +27,19 @@ export function BrandTab({
 }: BrandTabProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Local form state — initialised from props
   const [form, setForm] = useState<BusinessProfile>(() => businessProfile ?? {});
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSaveBusinessProfile(form);
       setEditing(false);
+    } catch {
+      setSaveError('Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -256,6 +241,9 @@ export function BrandTab({
                 </div>
               </div>
 
+              {saveError && (
+                <p className="text-xs text-red-400">{saveError}</p>
+              )}
               <div className="flex items-center gap-3 pt-1">
                 <button
                   onClick={handleSave}

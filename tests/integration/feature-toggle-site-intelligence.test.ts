@@ -49,7 +49,6 @@ describe('siteIntelligenceClientView toggle', () => {
   });
 
   it('PATCH siteIntelligenceClientView true returns 200 and persists', async () => {
-    // First set to false (already done above, but re-set for test isolation)
     await patchJson(`/api/workspaces/${workspaceId}`, { siteIntelligenceClientView: false });
 
     const res = await patchJson(`/api/workspaces/${workspaceId}`, {
@@ -60,5 +59,28 @@ describe('siteIntelligenceClientView toggle', () => {
     const getRes = await api(`/api/workspaces/${workspaceId}`);
     const ws = await getRes.json();
     expect(ws.siteIntelligenceClientView).toBe(true);
+  });
+
+  it('public workspace endpoint reflects siteIntelligenceClientView false', async () => {
+    // Set to false via admin route
+    await patchJson(`/api/workspaces/${workspaceId}`, { siteIntelligenceClientView: false });
+
+    // Client reads from the public endpoint — this is the actual gate used by OverviewTab
+    const res = await api(`/api/public/workspace/${workspaceId}`);
+    expect(res.status).toBe(200);
+    const ws = await res.json();
+    expect(ws.siteIntelligenceClientView).toBe(false);
+  });
+
+  it('public workspace endpoint omits siteIntelligenceClientView when default (null)', async () => {
+    // Create a fresh workspace with no toggle set
+    const newRes = await postJson('/api/workspaces', { name: 'SI Default Test' });
+    const { id } = await newRes.json();
+
+    const res = await api(`/api/public/workspace/${id}`);
+    expect(res.status).toBe(200);
+    const ws = await res.json();
+    // NULL in DB → undefined in response (frontend treats as enabled)
+    expect(ws.siteIntelligenceClientView).toBeUndefined();
   });
 });

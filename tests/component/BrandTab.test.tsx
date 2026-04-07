@@ -15,8 +15,6 @@ const mockBusinessProfile = {
 function renderBrandTab(overrides?: Partial<React.ComponentProps<typeof BrandTab>>) {
   return render(
     <BrandTab
-      workspaceId="ws-test"
-      workspaceName="Test Co"
       businessProfile={mockBusinessProfile}
       brandVoiceSummary="We communicate with clarity and warmth, helping small businesses feel supported."
       onSaveBusinessProfile={mockSave}
@@ -92,5 +90,17 @@ describe('BrandTab', () => {
     const { container } = renderBrandTab();
     const html = container.innerHTML;
     expect(html).not.toMatch(/purple-/);
+  });
+
+  it('shows error message and stays in edit mode when save fails', async () => {
+    mockSave.mockRejectedValueOnce(new Error('Network error'));
+    renderBrandTab();
+    fireEvent.click(screen.getByText('Edit'));
+    fireEvent.click(screen.getByText('Save Changes'));
+    await waitFor(() => {
+      expect(screen.getByText('Failed to save. Please try again.')).toBeInTheDocument();
+    });
+    // Edit mode should remain open — user's changes are preserved
+    expect(screen.getByDisplayValue('+1 (555) 123-4567')).toBeInTheDocument();
   });
 });

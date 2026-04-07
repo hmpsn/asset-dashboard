@@ -1,6 +1,6 @@
 // tests/unit/smart-placeholder.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 
@@ -53,7 +53,7 @@ describe('useSmartPlaceholder', () => {
   it('flag off → returns generic placeholder, no suggestions', () => {
     mockUseFeatureFlag.mockReturnValue(false);
     const { result } = renderHook(
-      () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
     );
     expect(result.current.placeholder).toBe('Ask about this workspace...');
@@ -63,27 +63,54 @@ describe('useSmartPlaceholder', () => {
   it('flag off + client context → generic client placeholder', () => {
     mockUseFeatureFlag.mockReturnValue(false);
     const { result } = renderHook(
-      () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: false }),
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: false }),
       { wrapper: createWrapper() }
     );
     expect(result.current.placeholder).toBe('Ask a question about your site...');
     expect(result.current.suggestions).toBeUndefined();
   });
 
-  it('flag on + client context → no suggestions (always)', () => {
+  it('flag on + client context → no API call and no suggestions', () => {
     mockUseFeatureFlag.mockReturnValue(true);
     const { result } = renderHook(
-      () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: false }),
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: false }),
       { wrapper: createWrapper() }
     );
-    // Client context must never expose suggestion chips
+    // Query is gated on isAdminContext — never fires for client
+    expect(mockGetIntelligence).not.toHaveBeenCalled();
     expect(result.current.suggestions).toBeUndefined();
+  });
+
+  it('flag on + admin context + rich intel → suggestions array and contextual placeholder', async () => {
+    mockUseFeatureFlag.mockReturnValue(true);
+    const { result } = renderHook(
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: true }),
+      { wrapper: createWrapper() }
+    );
+    await waitFor(() => {
+      expect(result.current.suggestions).toBeDefined();
+    });
+    expect(result.current.suggestions!.length).toBeGreaterThan(0);
+    expect(result.current.suggestions!.length).toBeLessThanOrEqual(3);
+    expect(result.current.placeholder).toContain('Ask about');
+  });
+
+  it('suggestions include brand voice chip when brandVoice is present', async () => {
+    mockUseFeatureFlag.mockReturnValue(true);
+    const { result } = renderHook(
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: true }),
+      { wrapper: createWrapper() }
+    );
+    await waitFor(() => {
+      expect(result.current.suggestions).toBeDefined();
+    });
+    expect(result.current.suggestions!.some(s => /brand voice/i.test(s))).toBe(true);
   });
 
   it('does NOT call getIntelligence when flag is off', () => {
     mockUseFeatureFlag.mockReturnValue(false);
     renderHook(
-      () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
     );
     expect(mockGetIntelligence).not.toHaveBeenCalled();
@@ -92,7 +119,7 @@ describe('useSmartPlaceholder', () => {
   it('does NOT call getIntelligence when workspaceId is empty', () => {
     mockUseFeatureFlag.mockReturnValue(true);
     renderHook(
-      () => useSmartPlaceholder('field', { workspaceId: '', isAdminContext: true }),
+      () => useSmartPlaceholder({ workspaceId: '', isAdminContext: true }),
       { wrapper: createWrapper() }
     );
     expect(mockGetIntelligence).not.toHaveBeenCalled();
@@ -101,7 +128,7 @@ describe('useSmartPlaceholder', () => {
   it('placeholder is always a non-empty string', () => {
     mockUseFeatureFlag.mockReturnValue(false);
     const { result } = renderHook(
-      () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
+      () => useSmartPlaceholder({ workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
     );
     expect(typeof result.current.placeholder).toBe('string');
