@@ -281,7 +281,6 @@ export function OverviewTab({
       {/* Left column (3/5) — Insights feed */}
       <div className="lg:col-span-3 space-y-8">
         {/* Unified insights feed (server-computed + locally-generated) */}
-        {ws.siteIntelligenceClientView !== false && (
         <ErrorBoundary label="Insights Digest">
           <InsightsDigest
             overview={overview}
@@ -299,9 +298,9 @@ export function OverviewTab({
             isEventPinned={isEventPinned}
             workspaceId={workspaceId}
             contentPlanSummary={contentPlanSummary}
+            siteIntelligenceEnabled={ws.siteIntelligenceClientView !== false}
           />
         </ErrorBoundary>
-        )}
 
         {/* Empty state with setup guidance */}
         {!overview && !audit && !ga4Overview && (
