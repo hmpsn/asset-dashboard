@@ -24,7 +24,7 @@ export function cleanSlugToTitle(url: string | null): string {
   if (!url) return 'Unknown Page';
 
   // Root path = homepage
-  if (url === '/' || url === '') return 'Home';
+  if (url === '/') return 'Home';
 
   try {
     const parsed = new URL(url);
