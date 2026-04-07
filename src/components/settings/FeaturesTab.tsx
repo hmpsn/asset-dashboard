@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   BarChart3, Loader2, Mail, Image as ImageIcon, DollarSign, Sparkles,
-  Users, Shield, SlidersHorizontal,
+  Users, Shield, SlidersHorizontal, Brain,
 } from 'lucide-react';
 import { post } from '../../api/client';
 
@@ -159,6 +159,28 @@ export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: Features
               }`}>
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
                 ws?.analyticsClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </button>
+          </label>
+          {/* Site Intelligence Client View */}
+          <label className="flex items-center justify-between cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <Brain className="w-4 h-4 text-zinc-500" />
+              <div>
+                <div className="text-xs font-medium text-zinc-200">Site Intelligence Summary</div>
+                <div className="text-[11px] text-zinc-500">Show the AI-powered insights summary card to the client on their Overview tab</div>
+              </div>
+            </div>
+            <button onClick={async () => {
+              const val = !(ws?.siteIntelligenceClientView !== false);
+              await patchWorkspace({ siteIntelligenceClientView: val });
+              toast(val ? 'Site Intelligence summary enabled for client' : 'Site Intelligence summary hidden from client');
+            }}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                ws?.siteIntelligenceClientView !== false ? 'bg-teal-500' : 'bg-zinc-700'
+              }`}>
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                ws?.siteIntelligenceClientView !== false ? 'translate-x-4' : 'translate-x-0.5'
               }`} />
             </button>
           </label>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { get, post, getOptional, getSafe } from '../api/client';
+import { get, post, patch, getOptional, getSafe } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { clientPath } from '../routes';
@@ -9,7 +9,7 @@ import {
   Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X,
   CheckCircle2, LineChart, Lock, Trophy, Check, Layers,
-  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
+  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail, Building2,
 } from 'lucide-react';
 const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
@@ -41,6 +41,9 @@ import { useClientData } from '../hooks/useClientData';
 import { useChat } from '../hooks/useChat';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useQueryClient } from '@tanstack/react-query';
+import { BrandTab } from './client/BrandTab';
 import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
   type WorkspaceInfo,
@@ -53,6 +56,8 @@ const MODULE_DEFAULT_START = new Date(Date.now() - 28 * 86400000).toISOString().
 const MODULE_TODAY = new Date().toISOString().split('T')[0];
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
+  const brandTabEnabled = useFeatureFlag('client-brand-section');
+  const queryClient = useQueryClient();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -149,7 +154,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const tab: ClientTab = (() => {
     const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
-    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review'].includes(t)) return t as ClientTab;
+    if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review','brand'].includes(t)) return t as ClientTab;
     return 'overview';
   })();
   const setTab = (t: ClientTab) => {
@@ -639,6 +644,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ...(isPaid ? [{ id: 'schema-review' as ClientTab, label: 'Schema', icon: Shield, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
+    ...(brandTabEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
   ];
 
   return (
@@ -1014,6 +1020,23 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {tab === 'schema-review' && (
           <ErrorBoundary label="Schema Review">
             <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} />
+          </ErrorBoundary>
+        )}
+
+        {/* ════════════ BRAND TAB ════════════ */}
+        {tab === 'brand' && brandTabEnabled && (
+          <ErrorBoundary label="Brand">
+            <BrandTab
+              workspaceId={workspaceId}
+              workspaceName={ws?.name ?? ''}
+              businessProfile={(ws as Record<string, unknown>)?.businessProfile as Parameters<typeof BrandTab>[0]['businessProfile']}
+              brandVoiceSummary={(ws as Record<string, unknown>)?.brandVoiceSummary as string | undefined}
+              industry={((ws as Record<string, unknown>)?.intelligenceProfile as { industry?: string } | undefined)?.industry}
+              onSaveBusinessProfile={async (profile) => {
+                await patch(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                queryClient.invalidateQueries({ queryKey: ['client-workspace', workspaceId] });
+              }}
+            />
           </ErrorBoundary>
         )}
 
