@@ -16,7 +16,7 @@ import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.j
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Known acronyms that should be fully uppercased — same set as server/insight-enrichment.ts. */
+/** Known acronyms that should be fully uppercased — mirrors server/insight-enrichment.ts. */
 const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
 
 function titleCaseWord(word: string): string {
@@ -50,11 +50,12 @@ export function cleanSlugToTitle(url: string | null): string {
       .join(' ')
       .trim() || 'Home';
   } catch {
-    // Not a valid URL — try treating the string as a slug directly
-    const cleaned = url.replace(/^\/+|\/+$/g, '');
-    if (!cleaned) return 'Home';
-    return cleaned
-      .replace(/[-_/]/g, ' ')
+    // Not a valid URL — treat as a path and take the last segment (mirrors server behavior)
+    const segments = url.replace(/\/$/, '').split('/').filter(Boolean);
+    if (segments.length === 0) return 'Home';
+    const slug = segments[segments.length - 1];
+    return slug
+      .replace(/[-_]/g, ' ')
       .split(' ')
       .map(titleCaseWord)
       .join(' ')
