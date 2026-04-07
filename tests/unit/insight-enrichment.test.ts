@@ -24,6 +24,28 @@ describe('insight-enrichment', () => {
     });
   });
 
+  describe('resolvePageTitle — GA4 placeholder filtering', () => {
+    it('falls back to slug title when titleMap value is "(Not set)"', () => {
+      const titleMap = new Map([['/blog/my-post', '(Not set)']]);
+      expect(resolvePageTitle('/blog/my-post', titleMap)).toBe('My Post');
+    });
+
+    it('falls back to slug title when titleMap value is "(not set)" (lowercase)', () => {
+      const titleMap = new Map([['/about', '(not set)']]);
+      expect(resolvePageTitle('/about', titleMap)).toBe('About');
+    });
+
+    it('returns Home for root path when title is "(Not set)"', () => {
+      const titleMap = new Map([['/', '(Not set)']]);
+      expect(resolvePageTitle('/', titleMap)).toBe('Home');
+    });
+
+    it('uses real title when available', () => {
+      const titleMap = new Map([['/blog/my-post', 'My Great Post']]);
+      expect(resolvePageTitle('/blog/my-post', titleMap)).toBe('My Great Post');
+    });
+  });
+
   describe('classifyDomain', () => {
     it('classifies GSC-only insight types as search', () => {
       expect(classifyDomain('ranking_mover')).toBe('search');
