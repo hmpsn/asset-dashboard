@@ -6,6 +6,7 @@ import { Router } from 'express';
 const router = Router();
 
 import { validate, z } from '../middleware/validate.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';
@@ -44,6 +45,9 @@ router.get('/api/public/workspace/:id', (req, res) => {
     clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
     seoClientView: !!ws.seoClientView,
     analyticsClientView: ws.analyticsClientView != null ? !!ws.analyticsClientView : true,
+    siteIntelligenceClientView: ws.siteIntelligenceClientView,
+    // Business profile — safe to expose to client portal
+    businessProfile: ws.businessProfile || null,
     autoReports: !!ws.autoReports,
     // Branding
     brandLogoUrl: ws.brandLogoUrl || '',
@@ -526,6 +530,7 @@ router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusin
   const ws = updateWorkspace(wsId, { businessProfile: req.body });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
+  broadcastToWorkspace(wsId, 'workspace:updated', { businessProfile: ws.businessProfile });
   log.info(`Client updated business profile for workspace ${wsId}`);
   res.json({ businessProfile: ws.businessProfile });
 });

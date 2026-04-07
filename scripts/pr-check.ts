@@ -193,7 +193,7 @@ const CHECKS: Check[] = [
     name: 'Raw ai_estimate string in server or src files',
     pattern: "'ai_estimate'",
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['shared/types/'],
+    exclude: ['shared/types/workspace.ts', 'shared/types/keywords.ts'],
     message: "The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal.",
     severity: 'warn',
   },

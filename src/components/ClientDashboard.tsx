@@ -1029,9 +1029,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             <BrandTab
               workspaceId={workspaceId}
               workspaceName={ws?.name ?? ''}
-              businessProfile={(ws as Record<string, unknown>)?.businessProfile as Parameters<typeof BrandTab>[0]['businessProfile']}
-              brandVoiceSummary={(ws as Record<string, unknown>)?.brandVoiceSummary as string | undefined}
-              industry={((ws as Record<string, unknown>)?.intelligenceProfile as { industry?: string } | undefined)?.industry}
+              businessProfile={ws?.businessProfile ?? undefined}
               onSaveBusinessProfile={async (profile) => {
                 await patch(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
                 queryClient.invalidateQueries({ queryKey: ['client-workspace', workspaceId] });
