@@ -60,7 +60,11 @@ export type ActivityType =
   | 'learnings_updated'
   | 'schema_plan_deleted'
   | 'note'
-  | 'client_profile_updated';
+  | 'client_profile_updated'
+  | 'client_onboarding_submitted'
+  | 'client_keyword_feedback'
+  | 'client_priorities_updated'
+  | 'client_content_gap_vote';
 
 export interface ActivityEntry {
   id: string;
