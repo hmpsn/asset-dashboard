@@ -29,6 +29,10 @@ interface ChatPanelProps {
   onCTAAction?: (type: 'content_interest' | 'service_interest') => void;
   /** Workspace ID — required for service_interest CTA signal POST */
   workspaceId?: string;
+  /** Suggestion chips shown above the input. Admin context only — never render in client-facing views. */
+  suggestionChips?: string[];
+  /** Called when user clicks a suggestion chip — prefills and submits */
+  onChipClick?: (chip: string) => void;
 }
 
 const ACCENT = {
@@ -63,6 +67,8 @@ export function ChatPanel({
   lastIntent,
   onCTAAction,
   workspaceId,
+  suggestionChips,
+  onChipClick,
 }: ChatPanelProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const a = ACCENT[accent];
@@ -182,6 +188,21 @@ export function ChatPanel({
 
       {/* Input prefix (e.g. usage limit banner) */}
       {inputPrefix}
+
+      {/* Suggestion chips — admin context only, never in client view */}
+      {suggestionChips && suggestionChips.length > 0 && (
+        <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+          {suggestionChips.map((chip, i) => (
+            <button
+              key={i}
+              onClick={() => onChipClick?.(chip)}
+              className="text-[10px] px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input bar — pinned at bottom */}
       <div className="px-4 py-3 border-t border-zinc-800 flex gap-2 flex-shrink-0">

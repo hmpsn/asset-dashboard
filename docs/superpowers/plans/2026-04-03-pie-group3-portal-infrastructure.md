@@ -12,116 +12,15 @@
 
 ---
 
-## Deduplication Findings
-
-> Pre-implementation audit completed 2026-04-03. Read before implementing Tasks 7, 8, 11.
-
-### 1. workspace-intelligence.ts businessProfile (seoContext base slice)
-
-`server/workspace-intelligence.ts` assembles a `businessProfile` field (lines 269–277) from `workspace.intelligenceProfile` — it contains `{ industry, goals, targetAudience }`. This is **admin-facing strategic context** used to populate AI prompts (adminChat, strategy generation). It is NOT the same as BrandTab's contact-info business profile (`phone`, `email`, `address`, `openingHours`, `socialProfiles`). **No overlap with BrandTab.**
-
-- BrandTab sources data from `GET /api/public/business-priorities/:workspaceId` (already exists, Phase 0) and the workspace's `businessProfile` contact-info field (served via the client workspace endpoint).
-- BrandTab must NOT call any intelligence endpoint — it reads portal-safe workspace data only.
-
-### 2. IntelligenceProfileTab.tsx — NO duplication with BrandTab
-
-`src/components/settings/IntelligenceProfileTab.tsx` is an **admin-only** settings tab that edits `intelligenceProfile.industry`, `intelligenceProfile.goals`, and `intelligenceProfile.targetAudience`. These fields feed the AI context engine and are never shown to clients.
-
-BrandTab shows contact and presence fields (`phone`, `email`, `address`, `openingHours`, `socialProfiles`, `foundedDate`, `numberOfEmployees`) — entirely different data shape and audience. No deduplication needed.
-
-### 3. OverviewTab — NO current businessProfile or BrandTab content
-
-`src/components/client/OverviewTab.tsx` renders performance metrics, insights, and activity. It does not reference `siteIntelligenceClientView`, `businessProfile`, or any business identity fields. Task 6 adds the `siteIntelligenceClientView` gate; Tasks 7–8 add the separate BrandTab. No overlap.
-
-### 4. ChatPanel.tsx — NO existing chip concept
-
-`src/components/ChatPanel.tsx` props interface (lines 10–55): `messages`, `loading`, `input`, `onInputChange`, `onSend`, `placeholder?`, `accent?: 'teal' | 'purple'`. **No chips prop exists.** Task 11 adds `suggestionChips?: string[]` and `onChipClick?: (chip: string) => void` as new optional props — this is a pure addition, not a replacement.
-
-### 5. AdminChat.tsx — NO existing placeholder hook or chips
-
-`src/components/AdminChat.tsx` derives `placeholder` via a simple ternary on `chatMode` (line 121). No `useSmartPlaceholder`, no chips. Task 11 is a clean addition.
-
-### 6. businessPriorities hooks
-
-`businessPriorities` is consumed via `src/api/misc.ts` (exported as `businessPriorities`) and used in `StrategyTab.tsx`. No hook reads it directly from workspace state. The portal endpoints (GET/POST `/api/public/business-priorities/:workspaceId`) are Phase 0 done. BrandTab's save path uses `PATCH /api/public/workspaces/:workspaceId/business-profile` (a separate endpoint for contact-info updates).
-
----
-
-## PR Structure
-
-This group ships as 3 sequential PRs. Each must be merged to staging and CI-green before the next starts.
-
-**PR 1 — Infrastructure** (Tasks 1–6)
-- Verification baseline (Task 1)
-- pr-check rules (Task 2) — runs in parallel with Task 3
-- Migration 052: site_intelligence_client_view column (Task 3) — runs in parallel with Task 2
-- FeaturesTab toggle for siteIntelligenceClientView (Task 4) — needs Task 3
-- Integration test for toggle (Task 5) — runs in parallel with Task 4 after Task 3
-- OverviewTab Site Intelligence gate (Task 6) — needs Tasks 3 + 4
-
-Note: Tasks 2 and 3 can run in parallel after Task 1 is committed. Tasks 4 and 5 can run in parallel after Task 3 is committed. Task 6 runs after Task 4 is committed.
-
-> **✅ PR 1 Staging Verification — do these before merging PR 2:**
-> - Open admin Settings → Features tab for a workspace → confirm the "Site Intelligence Client View" toggle is present and saves correctly
-> - With the toggle OFF: open the client portal OverviewTab → confirm the IntelligenceSummaryCard is NOT visible
-> - With the toggle ON: open the client portal OverviewTab → confirm the IntelligenceSummaryCard IS visible
-> - Run `npx tsx scripts/pr-check.ts` → confirm the 4 new rules fire on a file that contains `replaceAllPageKeywords` and `ai_estimate` raw strings (manual smoke-test of the new rules)
-
-**PR 2 — Brand Portal** (Tasks 7–9)
-- BrandTab component (Task 7)
-- ClientDashboard Brand tab wiring (Task 8) — runs in parallel with Task 9 after Task 7
-- BrandTab component tests (Task 9) — runs in parallel with Task 8 after Task 7
-
-Note: Tasks 8 and 9 can run in parallel after Task 7 is committed.
-
-> **✅ PR 2 Staging Verification — do these before merging PR 3:**
-> - Open the client portal → confirm a "Brand" tab appears in the nav (gated behind `client-brand-section` flag — enable the flag first if needed)
-> - BrandTab shows: business contact fields (phone, email, address, social) as editable inputs; brand positioning section as read-only
-> - Edit a contact field and save → refresh the page → confirm the value persisted
-> - Brand positioning fields are read-only (no edit inputs, no save button)
-> - No purple in BrandTab — check source and `pr-check.ts`
-> - The Brand tab does NOT appear in the nav when the `client-brand-section` flag is OFF
-
-**PR 3 — Smart Placeholders** (Tasks 10–12)
-- useSmartPlaceholder hook (Task 10)
-- AdminChat + ChatPanel integration (Task 11) — runs in parallel with Task 12 after Task 10
-- Smart placeholder tests (Task 12) — runs in parallel with Task 11 after Task 10
-
-Note: Tasks 11 and 12 can run in parallel after Task 10 is committed.
-
-> **✅ PR 3 Staging Verification — do these before declaring Group 3 done:**
-> - Open AdminChat for a workspace that has SEO context loaded → confirm suggestion chips appear above the input (teal, not purple)
-> - Click a chip → confirm it populates the input field but does NOT auto-submit
-> - Open a workspace with no SEO context → confirm AdminChat still renders with no chips and a sensible placeholder (no crash, no empty error state)
-> - Open the client portal chat (not AdminChat) → confirm NO chips appear — chips are admin-only
-> - Enable `smart-placeholders` feature flag OFF → confirm chips are hidden in AdminChat even if the hook returns suggestions
-> - No purple in `ChatPanel.tsx` or `AdminChat.tsx` — run `pr-check.ts`
-
-> **⚠️ PR 3 App-level context — read before dispatching any Task 10–12 agent:**
->
-> The following is already handled at layers the UI agents will not see. Do not re-implement any of it:
->
-> - **`useSmartPlaceholder` must NOT make AI calls.** It reads from the `seoContext` intelligence slice already in the React Query cache. If the cache is empty or loading, return `{ chips: [], placeholder: 'Ask anything...' }` immediately. Never trigger a new network request to an AI endpoint from this hook.
-> - **Suggestion chips are admin-only — never in client-facing renders.** `ChatPanel.tsx` is used in both the admin panel and the client portal. The `suggestionChips` prop must only be passed from `AdminChat`. Never pass it from any client-facing wrapper or `ClientChatPanel`. Add a code comment above the prop definition documenting this constraint.
-> - **Color rule: teal for chips, never purple.** Chip buttons are interactive → teal (`border-teal-500/30`, `text-teal-300`, `hover:bg-teal-500/10`). Purple is admin AI only (`AdminChat` and `SeoAudit` "Flag for Client"). `ChatPanel` is also rendered in client context — never add purple to it. `pr-check.ts` flags purple in client-facing components.
-> - **Rate limiters already apply to all `/api/public/` routes.** `server/app.ts` applies `publicWriteLimiter` (10 req/min), `publicApiLimiter` (200 req/min), and `globalPublicLimiter` automatically. Do NOT import or apply any of these in route files — applying them twice shares the same in-memory bucket and silently halves the effective limit.
-> - **The `smart-placeholders` feature flag is already defined.** `shared/types/feature-flags.ts` has `'smart-placeholders': false` (Phase 0 done). The hook runs unconditionally; the component gates chip rendering on `useFeatureFlag('smart-placeholders')`. Do not re-add the flag definition.
-> - **Bug found during review → fix in current PR.** CLAUDE.md mandates: if code review returns a Critical or Important issue, fix it before merging. Never carry a known bug into the next PR.
-> - **Dispatch prompts must declare app-level context (CLAUDE.md §5).** Before dispatching each subagent, explicitly list: which rate limiters apply to routes it calls, which React Query caches its mutations invalidate, which WS events it broadcasts, and what UI conditional state it affects. "The agent can figure it out" has caused production bugs in prior phases.
-
----
-
 ## File Map
 
 | File | Create / Modify | Purpose |
 |------|-----------------|---------|
-| `shared/types/feature-flags.ts` | **Verify (Phase 0 done)** | Flags `'client-brand-section'` and `'smart-placeholders'` already added in Phase 0 |
-| `shared/types/workspace.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView?: boolean` already added in Phase 0 |
-| `src/routes.ts` | **Verify (Phase 0 done)** | `'brand'` already added to `ClientTab` union in Phase 0 |
-| `server/db/migrations/052-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
-| `server/workspaces.ts` | **Verify (Phase 0 done)** | `siteIntelligenceClientView` and `businessPriorities` mapper already added — `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `columnMap` all updated |
-| `server/routes/public-portal.ts` | **Verify (Phase 0 done)** | GET/POST `/api/public/business-priorities/:workspaceId` endpoints already exist |
-| `src/components/client/OverviewTab.tsx` | **Modify** | Gate IntelligenceSummaryCard on siteIntelligenceClientView toggle |
+| `shared/types/feature-flags.ts` | **Modify** | Add `'client-brand-section'` and `'smart-placeholders'` flags |
+| `shared/types/workspace.ts` | **Modify** | Add `siteIntelligenceClientView?: boolean` to `Workspace` |
+| `src/routes.ts` | **Modify** | Add `'brand'` to `ClientTab` union type |
+| `server/db/migrations/047-site-intelligence-client-view.sql` | **Create** | Add `site_intelligence_client_view` column to `workspaces` table |
+| `server/workspaces.ts` | **Modify** | Add `siteIntelligenceClientView` to `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `updateWorkspace` |
 | `src/components/settings/FeaturesTab.tsx` | **Modify** | Add Site Intelligence Client View toggle (copy `analyticsClientView` pattern exactly) |
 | `src/components/client/BrandTab.tsx` | **Create** | New client portal tab — editable business profile + read-only brand positioning |
 | `src/components/ClientDashboard.tsx` | **Modify** | Add `'brand'` to NAV array (feature-flagged); add `{tab === 'brand' && ...}` render block |
@@ -139,99 +38,45 @@ Note: Tasks 11 and 12 can run in parallel after Task 10 is committed.
 ## Dependency Graph
 
 ```
-Task 1 (Phase 0 verification) ──────────────────────────────────────────────────────────────────────────────┐
-                                                                                                             │
-Task 1 ──► Task 2 (pr-check rules) ─────────────────────────────────────────────────────────────────────────┤  (parallel with Task 3)
-                                                                                                             │
-Task 1 ──► Task 3 (migration 052) ──► Task 4 (FeaturesTab toggle) ──► Task 6 (OverviewTab gate)            │  PR 1
-                              └──────► Task 5 (integration test)                                             │
-                                                                                                             │
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                                                                                                             │
-[After PR 1 merged] ──► Task 7 (BrandTab component) ──► Task 8 (ClientDashboard wiring)                    │  PR 2
-                                               └──────► Task 9 (BrandTab component tests)                   │
-                                                                                                             │
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                                                                                                             │
-[After PR 2 merged] ──► Task 10 (useSmartPlaceholder hook) ──► Task 11 (AdminChat + ChatPanel integration)  │  PR 3
-                                                    └──────────► Task 12 (smart placeholder tests)           │
+[DONE] Task 1 (Phase 0 shipped) ──────────┐
+                                           │
+  Batch 1 (parallel, no deps):            │
+    Task 2 (pr-check rules)                │
+    Task 3 (migration 048 + workspaces.ts) │
+    Task 6 (BrandTab component)            │
+    Task 8 (useSmartPlaceholder hook)      │
+                                           │
+  Batch 2 (parallel, after Batch 1):       │
+    Task 4 (FeaturesTab toggle) ← Task 3   │
+    Task 7 (ClientDashboard wiring) ← Task 6
+    Task 10 (AdminChat + ChatPanel) ← Task 8
+    Task 12 (OverviewTab SI gate) ← Task 3 │
+                                           │
+  Batch 3 (parallel, after Batch 2):       │
+    Task 5 (integration test) ← Task 3     │
+    Task 9 (BrandTab test) ← Task 6        │
+    Task 11 (SmartPlaceholder tests) ← Task 8+10
 ```
 
-**Sequential constraints:**
-- Task 1 must complete before Tasks 2, 3
-- Task 3 must complete before Tasks 4 and 5
-- Task 4 must complete before Task 6
-- Task 7 must complete before Tasks 8 and 9
-- Task 10 must complete before Tasks 11 and 12
-
-**Parallel opportunities within each PR:**
-- PR 1: Tasks 2 and 3 can run in parallel after Task 1. Tasks 4 and 5 can run in parallel after Task 3.
-- PR 2: Tasks 8 and 9 can run in parallel after Task 7.
-- PR 3: Tasks 11 and 12 can run in parallel after Task 10.
-
----
-
-## Phase 0 Pre-done
-
-The following items were completed as part of Phase 0 work (committed before this plan was written). Implementers **must not re-implement** these — Task 1 verifies them, and Tasks 3+ assume they exist.
-
-| Item | File | Status |
-|------|------|--------|
-| `'smart-placeholders': false` flag defined | `shared/types/feature-flags.ts` | Done |
-| `'client-brand-section': false` flag defined | `shared/types/feature-flags.ts` | Done |
-| `'brand'` added to `ClientTab` union | `src/routes.ts` | Done |
-| `siteIntelligenceClientView?: boolean` typed | `shared/types/workspace.ts` | Done |
-| `businessPriorities?: string[]` typed | `shared/types/workspace.ts` | Done |
-| `siteIntelligenceClientView` + `businessPriorities` mapped in `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, `columnMap` | `server/workspaces.ts` | Done |
-| GET `/api/public/business-priorities/:workspaceId` | `server/routes/public-portal.ts` | Done |
-| POST `/api/public/business-priorities/:workspaceId` | `server/routes/public-portal.ts` | Done |
-
-> **Only migration 052 is still missing.** `server/workspaces.ts` already reads and writes both `site_intelligence_client_view` and `business_priorities` columns, but the `ALTER TABLE` migration that actually adds `site_intelligence_client_view` to the DB has not been created yet. Task 3 covers this.
->
-> **Why 052?** This plan was originally written against migration 049. Since then, migrations 049 through 051 have all shipped (`049-client-signals-v2.sql`, `050-studio-config.sql`, `051-page-keywords-serp-features.sql`). The next available number is **052**. Do NOT create 049–051 — they already exist.
+**Since Task 1 is complete, the revised execution plan is:**
+- **Batch 1:** Tasks 2, 3, 6, 8 (all independent — run in parallel)
+- **Batch 2:** Tasks 4, 7, 10, 12 (each depends on its Batch 1 parent — run in parallel after Batch 1 merges)
+- **Batch 3:** Tasks 5, 9, 11 (tests — run in parallel after Batch 2 merges)
 
 ---
 
 ## Tasks
 
-### Task 1 — Pre-flight: Verify Phase 0 Contracts
+### Task 1 — COMPLETED BY PHASE 0 (skip)
 
-**Model:** Haiku (read-only verification — Phase 0 already merged these)
+**Status:** All shared contracts were committed in Phase 0. The following already exist on `main`:
+- `'client-brand-section'` and `'smart-placeholders'` flags in `shared/types/feature-flags.ts`
+- `siteIntelligenceClientView` field in `shared/types/workspace.ts`
+- `'brand'` in `ClientTab` union in `src/routes.ts`
 
-**PR assignment:** PR 1 — must run first, no dependencies.
+**Remaining from original Task 1:** The `ClientDashboard.tsx` allowed-tabs-array edit has been folded into Task 7.
 
-**Files you OWN:**
-- None — this is verification only. Do not create or modify any file.
-
-**Files you must NOT touch:**
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-
-> ⚠️ **DO NOT EDIT these files** — all changes below were committed in Phase 0. This task is verification only.
-
-- [ ] Verify `shared/types/feature-flags.ts` contains `'client-brand-section': false` and `'smart-placeholders': false`
-  ```bash
-  grep -n "client-brand-section\|smart-placeholders" shared/types/feature-flags.ts
-  # Expected: both present
-  ```
-
-- [ ] Verify `shared/types/workspace.ts` contains `siteIntelligenceClientView?: boolean`
-  ```bash
-  grep -n "siteIntelligenceClientView" shared/types/workspace.ts
-  # Expected: field present
-  ```
-
-- [ ] Verify `src/routes.ts` contains `'brand'` in `ClientTab` union
-  ```bash
-  grep -n "'brand'" src/routes.ts
-  # Expected: present in ClientTab
-  ```
-
-- [ ] If any of the above greps return nothing, **STOP** — Phase 0 was not merged. Do not proceed.
-
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect 0 errors
-- [ ] No commit needed — this is verification only.
+No action needed. Proceed directly to Tasks 2, 3, 6, and 8.
 
 ---
 
@@ -239,17 +84,7 @@ The following items were completed as part of Phase 0 work (committed before thi
 
 **Model:** Haiku (mechanical, self-contained)
 
-**PR assignment:** PR 1 — can run in parallel with Task 3 after Task 1.
-
-**Files you OWN:**
-- scripts/pr-check.ts
-
-**Files you must NOT touch:**
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-
-**No dependencies on Tasks 3–12** — can run in parallel with Task 3 after Task 1 completes.
+**No dependencies** — can run in parallel with Task 1.
 
 - [ ] Read `scripts/pr-check.ts` lines 83–100 to confirm `Check` type structure
 - [ ] Read `scripts/pr-check.ts` lines 240–265 to find insertion point (end of `CHECKS` array, before the closing `];`)
@@ -299,25 +134,12 @@ The following items were completed as part of Phase 0 work (committed before thi
 
 ---
 
-### Task 3 — Migration 051: siteIntelligenceClientView Column
+### Task 3 — Migration + workspaces.ts: siteIntelligenceClientView Column
 
 **Model:** Haiku (mechanical DB addition)
+**Depends on:** Task 1 (Workspace type must have `siteIntelligenceClientView`)
 
-**PR assignment:** PR 1 — can run in parallel with Task 2 after Task 1. Must complete before Tasks 4 and 5.
-
-**Depends on:** Task 1
-
-**Files you OWN:**
-- server/db/migrations/052-site-intelligence-client-view.sql (create)
-
-**Files you must NOT touch:**
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* through 051-* (do not touch existing migrations)
-
-> **Note:** `server/workspaces.ts` mapper edits are **already done** (Phase 0). Only the migration SQL file needs to be created — the mapper already reads/writes `site_intelligence_client_view` and `business_priorities`, but the DB column doesn't exist yet.
-
-- [ ] **Create `server/db/migrations/052-site-intelligence-client-view.sql`**:
+- [ ] **Create `server/db/migrations/048-site-intelligence-client-view.sql`**:
 
 ```sql
 -- Add site_intelligence_client_view column to workspaces
@@ -326,33 +148,44 @@ The following items were completed as part of Phase 0 work (committed before thi
 ALTER TABLE workspaces ADD COLUMN site_intelligence_client_view INTEGER;
 ```
 
-> **DO NOT edit `server/workspaces.ts`** — `WorkspaceRow`, `rowToWorkspace`, `workspaceToParams`, and `columnMap` were all updated in Phase 0. Verify with:
-> ```bash
-> grep -n "site_intelligence_client_view\|siteIntelligenceClientView" server/workspaces.ts
-> # Expected: 3+ matches confirming mapper is present
-> ```
+- [ ] Read `server/workspaces.ts` lines 44–103 (WorkspaceRow interface + rowToWorkspace)
+- [ ] **Edit `server/workspaces.ts`** — add to `WorkspaceRow` interface after `analytics_client_view`:
+
+```typescript
+  site_intelligence_client_view: number;
+```
+
+- [ ] **Edit `server/workspaces.ts`** — add to `rowToWorkspace` after the `analyticsClientView` line:
+
+```typescript
+  if (row.site_intelligence_client_view !== null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
+```
+
+- [ ] **Edit `server/workspaces.ts`** — add to `workspaceToParams` after `analytics_client_view` entry:
+
+```typescript
+    site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
+```
+
+- [ ] **Edit `server/workspaces.ts`** — add `siteIntelligenceClientView` to `updateWorkspace` Pick type:
+
+In the `Partial<Pick<Workspace, '...' | 'siteIntelligenceClientView'>>` union.
+
+- [ ] **Edit `server/workspaces.ts`** — add to `columnMap` in `updateWorkspace`:
+
+```typescript
+    siteIntelligenceClientView: 'site_intelligence_client_view',
+```
 
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(db): migration 052 — add site_intelligence_client_view column to workspaces`
+- [ ] Commit: `feat(db): migration 048 + workspaces.ts — add siteIntelligenceClientView column and mapper`
 
 ---
 
 ### Task 4 — FeaturesTab: Site Intelligence Client View Toggle
 
 **Model:** Sonnet (UI component, must copy toggle pattern precisely)
-
-**PR assignment:** PR 1 — runs after Task 3. Can run in parallel with Task 5.
-
 **Depends on:** Tasks 1 + 3
-
-**Files you OWN:**
-- src/components/settings/FeaturesTab.tsx
-
-**Files you must NOT touch:**
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-- src/components/client/OverviewTab.tsx (Task 6 owns it)
 
 - [ ] Read `src/components/settings/FeaturesTab.tsx` lines 1–30 (imports)
 - [ ] Read `src/components/settings/FeaturesTab.tsx` lines 100–200 (existing toggle pattern for reference)
@@ -412,19 +245,7 @@ import {
 ### Task 5 — Integration Test: siteIntelligenceClientView Toggle
 
 **Model:** Sonnet
-
-**PR assignment:** PR 1 — runs after Task 3. Can run in parallel with Task 4.
-
 **Depends on:** Tasks 1 + 3
-
-**Files you OWN:**
-- tests/integration/feature-toggle-site-intelligence.test.ts (create)
-
-**Files you must NOT touch:**
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-- src/components/settings/FeaturesTab.tsx (Task 4 owns it)
 
 - [ ] **Create `tests/integration/feature-toggle-site-intelligence.test.ts`**:
 
@@ -478,73 +299,10 @@ describe('siteIntelligenceClientView toggle', () => {
 
 ---
 
-### Task 6 — OverviewTab: Site Intelligence Gate
-
-**Model:** Haiku (single conditional wrap — mechanical)
-
-**PR assignment:** PR 1 — runs after Tasks 3 + 4 are committed. Completes PR 1.
-
-**Depends on:** Tasks 1 + 3 + 4
-
-**Files you OWN:**
-- src/components/client/OverviewTab.tsx
-
-**Files you must NOT touch:**
-- src/components/settings/FeaturesTab.tsx (Task 4 owns it)
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-
-The `IntelligenceSummaryCard` in `OverviewTab.tsx` at line ~282 needs to be gated by `ws.siteIntelligenceClientView !== false`.
-
-- [ ] Read `src/components/client/OverviewTab.tsx` lines 275–300
-- [ ] Confirm `ws` prop type includes `siteIntelligenceClientView`; if not, add to `OverviewTabProps.ws` type (the `WorkspaceInfo` type used by client components)
-
-- [ ] **Edit `src/components/client/OverviewTab.tsx`** — wrap the Intelligence Summary ErrorBoundary:
-
-Replace:
-```tsx
-    {/* Intelligence summary — insights, pipeline, win rate */}
-    <ErrorBoundary label="Intelligence Summary">
-      <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
-    </ErrorBoundary>
-```
-
-With:
-```tsx
-    {/* Intelligence summary — insights, pipeline, win rate */}
-    {ws.siteIntelligenceClientView !== false && (
-      <ErrorBoundary label="Intelligence Summary">
-        <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
-      </ErrorBoundary>
-    )}
-```
-
-> NOTE: `!== false` means `undefined` (default/NULL) shows the card. Only an explicit `false` hides it — consistent with `clientPortalEnabled` and `analyticsClientView` patterns.
-
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(client): gate IntelligenceSummaryCard on siteIntelligenceClientView toggle`
-
----
-
-### Task 7 — BrandTab Component
+### Task 6 — BrandTab Component
 
 **Model:** Sonnet (new UI component, design system compliance required)
-
-**PR assignment:** PR 2 — first task in PR 2. Must complete before Tasks 8 and 9.
-
-**Depends on:** Task 1 (Phase 0 contracts verified)
-
-**Files you OWN:**
-- src/components/client/BrandTab.tsx (create)
-
-**Files you must NOT touch:**
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-- src/components/ClientDashboard.tsx (Task 8 owns it)
-
-> DEDUPLICATION NOTE: BrandTab shows client-facing contact and presence data (`phone`, `email`, `address`, `openingHours`, `socialProfiles`). This is entirely distinct from `IntelligenceProfileTab.tsx` (admin-only: `industry`, `goals`, `targetAudience` for AI context). BrandTab must NOT call any intelligence endpoint — data comes from the portal workspace endpoint only.
+**Depends on:** Task 1
 
 - [ ] Read `src/components/ui/` to verify available primitives (SectionCard, EmptyState, etc.)
 - [ ] Read `shared/types/workspace.ts` lines 228–260 (businessProfile fields)
@@ -864,22 +622,10 @@ export function BrandTab({
 
 ---
 
-### Task 8 — ClientDashboard Wiring: Brand Tab
+### Task 7 — ClientDashboard Wiring: Brand Tab
 
 **Model:** Sonnet
-
-**PR assignment:** PR 2 — runs after Task 7. Can run in parallel with Task 9.
-
-**Depends on:** Tasks 1 + 7
-
-**Files you OWN:**
-- src/components/ClientDashboard.tsx
-
-**Files you must NOT touch:**
-- src/components/client/BrandTab.tsx (Task 7 owns it — import only, do not edit)
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+**Depends on:** Tasks 1 + 6
 
 - [ ] Read `src/components/ClientDashboard.tsx` lines 145–160 (tab parsing)
 - [ ] Read `src/components/ClientDashboard.tsx` lines 625–645 (NAV array)
@@ -891,22 +637,18 @@ export function BrandTab({
 import { BrandTab } from './client/BrandTab';
 ```
 
-- [ ] **Edit `src/components/ClientDashboard.tsx`** — add `useFeatureFlag` import if not already present (check existing imports first):
+- [ ] **Edit `src/components/ClientDashboard.tsx`** — add `isFeatureEnabled` import if not already present (check existing imports first):
 
 ```typescript
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { isFeatureEnabled } from '../lib/feature-flags';
 ```
 
-- [ ] **Edit `src/components/ClientDashboard.tsx`** — add flag hook near the top of the component (alongside existing hooks):
-
-```typescript
-const brandEnabled = useFeatureFlag('client-brand-section');
-```
+> Note: Check whether `isFeatureEnabled` is imported from `'../lib/feature-flags'` or another path before adding.
 
 - [ ] **Edit `src/components/ClientDashboard.tsx`** — add Brand tab to NAV array, after the ROI entry:
 
 ```typescript
-    ...(brandEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
+    ...(isFeatureEnabled('client-brand-section') ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
 ```
 
 Also add `Building2` to the lucide-react import block.
@@ -921,7 +663,7 @@ Also add `Building2` to the lucide-react import block.
 
 ```tsx
         {/* ════════════ BRAND TAB ════════════ */}
-        {tab === 'brand' && brandEnabled && (
+        {tab === 'brand' && isFeatureEnabled('client-brand-section') && (
           <ErrorBoundary label="Brand">
             <BrandTab
               workspaceId={workspaceId}
@@ -954,23 +696,161 @@ Also add `Building2` to the lucide-react import block.
 
 ---
 
+### Task 8 — useSmartPlaceholder Hook
+
+**Model:** Sonnet (new hook, reads seoContext slice — no AI calls)
+**Depends on:** Task 1
+
+- [ ] Read `src/hooks/admin/useWorkspaceIntelligence.ts` for query pattern
+- [ ] Read `server/seo-context.ts` lines 17–55 to understand `SeoContext` shape
+- [ ] Read `src/lib/queryKeys.ts` lines 82–90 for intelligence query key
+
+- [ ] **Create `src/hooks/useSmartPlaceholder.ts`**:
+
+```typescript
+// src/hooks/useSmartPlaceholder.ts
+// Smart placeholder hook for chat inputs.
+// Admin context: generates suggestion chips from seoContext (brand voice, personas, businessContext).
+// Client context: ghost text only — no chips, no indication of AI.
+// Feature flag: 'smart-placeholders' off → returns generic placeholder only.
+// CRITICAL: Reads from cached seoContext intelligence slice. NO independent AI calls.
+
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { isFeatureEnabled } from '../lib/feature-flags';
+import { intelligenceApi } from '../api/intelligence';
+import { queryKeys } from '../lib/queryKeys';
+
+export interface SmartPlaceholderResult {
+  /** The ghost-text placeholder string for the input */
+  placeholder: string;
+  /**
+   * 2-3 suggestion chip strings. Only populated in admin context when
+   * seoContext is available and 'smart-placeholders' flag is on.
+   * Always undefined in client context.
+   */
+  suggestions?: string[];
+}
+
+interface UseSmartPlaceholderOptions {
+  workspaceId: string;
+  isAdminContext: boolean;
+}
+
+/** Generic fallback when seoContext is unavailable */
+function genericPlaceholder(isAdmin: boolean): SmartPlaceholderResult {
+  return {
+    placeholder: isAdmin
+      ? 'Ask about this workspace...'
+      : 'Ask a question about your site...',
+  };
+}
+
+/** Industry-based placeholder when workspace has industry but thin seoContext */
+function industryPlaceholder(industry: string, isAdmin: boolean): SmartPlaceholderResult {
+  const industryMap: Record<string, string> = {
+    'ecommerce': isAdmin ? 'Ask about product page performance...' : 'Ask about your store performance...',
+    'saas': isAdmin ? 'Ask about trial conversion...' : 'Ask about your product traffic...',
+    'agency': isAdmin ? 'Ask about client site performance...' : 'Ask about your service pages...',
+    'legal': isAdmin ? 'Ask about practice area rankings...' : 'Ask about your practice areas...',
+    'healthcare': isAdmin ? 'Ask about local search performance...' : 'Ask about your services...',
+    'real-estate': isAdmin ? 'Ask about local listing performance...' : 'Ask about your listings...',
+  };
+  const lc = industry.toLowerCase();
+  const match = Object.entries(industryMap).find(([k]) => lc.includes(k));
+  return { placeholder: match ? match[1] : genericPlaceholder(isAdmin).placeholder };
+}
+
+/** Generate 2-3 suggestion chips from seoContext for admin use */
+function buildAdminSuggestions(
+  brandVoiceBlock: string,
+  personasBlock: string,
+  businessContext: string,
+): string[] {
+  const chips: string[] = [];
+
+  if (brandVoiceBlock && brandVoiceBlock.length > 20) {
+    chips.push('What does our brand voice say about tone?');
+  }
+  if (personasBlock && personasBlock.length > 20) {
+    chips.push('Summarize our target audience');
+  }
+  if (businessContext && businessContext.length > 10) {
+    chips.push('What services should we highlight?');
+  }
+
+  // Always include a universal chip as fallback
+  if (chips.length === 0) {
+    chips.push('What should I prioritize this week?');
+  }
+
+  return chips.slice(0, 3);
+}
+
+export function useSmartPlaceholder(
+  fieldKey: string,
+  { workspaceId, isAdminContext }: UseSmartPlaceholderOptions,
+): SmartPlaceholderResult {
+  const flagEnabled = isFeatureEnabled('smart-placeholders');
+
+  // Fetch seoContext slice — reads from 5-min TTL cache on server
+  // Only fetch when flag is on and we have a workspaceId
+  const { data: intel } = useQuery({
+    queryKey: queryKeys.admin.intelligence(workspaceId, ['seoContext']),
+    queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, ['seoContext'], undefined, undefined, signal),
+    enabled: flagEnabled && !!workspaceId,
+    staleTime: 5 * 60 * 1000, // match server cache TTL
+  });
+
+  return useMemo(() => {
+    if (!flagEnabled) {
+      return genericPlaceholder(isAdminContext);
+    }
+
+    const seoCtx = intel?.seoContext;
+
+    // Thin workspace — try industry-based placeholder
+    if (!seoCtx || (!seoCtx.brandVoiceBlock && !seoCtx.businessContext && !seoCtx.personasBlock)) {
+      const industry = (intel as { intelligenceProfile?: { industry?: string } } | undefined)
+        ?.intelligenceProfile?.industry;
+      if (industry) return industryPlaceholder(industry, isAdminContext);
+      return genericPlaceholder(isAdminContext);
+    }
+
+    if (isAdminContext) {
+      // Admin: contextual placeholder + suggestion chips
+      const placeholder = seoCtx.businessContext
+        ? `Ask about ${seoCtx.businessContext.slice(0, 40)}...`
+        : 'Ask about this workspace...';
+
+      const suggestions = buildAdminSuggestions(
+        seoCtx.brandVoiceBlock,
+        seoCtx.personasBlock,
+        seoCtx.businessContext,
+      );
+
+      return { placeholder, suggestions };
+    } else {
+      // Client: ghost text only — no chips, no AI indication
+      const placeholder = seoCtx.businessContext
+        ? 'Ask about your site performance...'
+        : 'Ask a question about your site...';
+
+      return { placeholder };
+    }
+  }, [flagEnabled, intel, isAdminContext, fieldKey]);
+}
+```
+
+- [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
+- [ ] Commit: `feat(hooks): useSmartPlaceholder — reads seoContext cache, admin chips + client ghost text`
+
+---
+
 ### Task 9 — BrandTab Component Tests
 
 **Model:** Sonnet
-
-**PR assignment:** PR 2 — runs after Task 7. Can run in parallel with Task 8.
-
-**Depends on:** Task 7
-
-**Files you OWN:**
-- tests/component/BrandTab.test.tsx (create)
-
-**Files you must NOT touch:**
-- src/components/client/BrandTab.tsx (Task 7 owns it — import only, do not edit)
-- src/components/ClientDashboard.tsx (Task 8 owns it)
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+**Depends on:** Task 6
 
 - [ ] **Create `tests/component/BrandTab.test.tsx`**:
 
@@ -1090,215 +970,10 @@ describe('BrandTab', () => {
 
 ---
 
-### Task 10 — useSmartPlaceholder Hook
-
-**Model:** Sonnet (new hook, reads seoContext slice — no AI calls)
-
-**PR assignment:** PR 3 — first task in PR 3. Must complete before Tasks 11 and 12.
-
-**Depends on:** Task 1 (Phase 0 contracts verified)
-
-**Files you OWN:**
-- src/hooks/useSmartPlaceholder.ts (create)
-
-**Files you must NOT touch:**
-- src/components/AdminChat.tsx (Task 11 owns it)
-- src/components/ChatPanel.tsx (Task 11 owns it)
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-
-> DEDUPLICATION NOTE: ChatPanel.tsx currently has NO chips concept. Do not add chips rendering here — that belongs to Task 11. This task creates the hook only.
-
-> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
->
-> 1. **No AI calls. Ever.** `useSmartPlaceholder` reads from the existing React Query cache only (`seoContext` intelligence slice). If the cache is empty, loading, or errored, return `{ chips: [], placeholder: 'Ask anything...' }` immediately without triggering any network request to an AI or analytics endpoint.
->
-> 2. **Client context gets placeholder only — no chips.** When `context === 'client'`, return `{ chips: [], placeholder: ghostText }`. Chips are admin-only. Never populate the `chips` array in a client context, even if the cache has data.
->
-> 3. **Feature flag gates rendering, not the hook.** The hook always runs and always returns data. The `smart-placeholders` flag is the caller's responsibility to check before rendering chips. Do not add `useFeatureFlag` inside this hook — keep it pure and testable.
->
-> 4. **Use the existing intelligence query key from `src/lib/queryKeys.ts`.** Do not hardcode a new string key. A mismatched query key silently reads from the wrong cache slot and returns stale or empty data without any error.
->
-> 5. **Return type must be typed, not `any`.** Export a `SmartPlaceholderResult` interface (`{ chips: string[]; placeholder: string }`) from the hook file. Import it in Task 11 — do not inline the type there.
-
-- [ ] Read `src/hooks/admin/useWorkspaceIntelligence.ts` for query pattern
-- [ ] Read `server/seo-context.ts` lines 17–55 to understand `SeoContext` shape
-- [ ] Read `src/lib/queryKeys.ts` lines 82–90 for intelligence query key
-
-- [ ] **Create `src/hooks/useSmartPlaceholder.ts`**:
-
-```typescript
-// src/hooks/useSmartPlaceholder.ts
-// Smart placeholder hook for chat inputs.
-// Admin context: generates suggestion chips from seoContext (brand voice, personas, businessContext).
-// Client context: ghost text only — no chips, no indication of AI.
-// Feature flag: 'smart-placeholders' off → returns generic placeholder only.
-// CRITICAL: Reads from cached seoContext intelligence slice. NO independent AI calls.
-
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useFeatureFlag } from './useFeatureFlag';
-import { intelligenceApi } from '../api/intelligence';
-import { queryKeys } from '../lib/queryKeys';
-
-export interface SmartPlaceholderResult {
-  /** The ghost-text placeholder string for the input */
-  placeholder: string;
-  /**
-   * 2-3 suggestion chip strings. Only populated in admin context when
-   * seoContext is available and 'smart-placeholders' flag is on.
-   * Always undefined in client context.
-   */
-  suggestions?: string[];
-}
-
-interface UseSmartPlaceholderOptions {
-  workspaceId: string;
-  isAdminContext: boolean;
-}
-
-/** Generic fallback when seoContext is unavailable */
-function genericPlaceholder(isAdmin: boolean): SmartPlaceholderResult {
-  return {
-    placeholder: isAdmin
-      ? 'Ask about this workspace...'
-      : 'Ask a question about your site...',
-  };
-}
-
-/** Industry-based placeholder when workspace has industry but thin seoContext */
-function industryPlaceholder(industry: string, isAdmin: boolean): SmartPlaceholderResult {
-  const industryMap: Record<string, string> = {
-    'ecommerce': isAdmin ? 'Ask about product page performance...' : 'Ask about your store performance...',
-    'saas': isAdmin ? 'Ask about trial conversion...' : 'Ask about your product traffic...',
-    'agency': isAdmin ? 'Ask about client site performance...' : 'Ask about your service pages...',
-    'legal': isAdmin ? 'Ask about practice area rankings...' : 'Ask about your practice areas...',
-    'healthcare': isAdmin ? 'Ask about local search performance...' : 'Ask about your services...',
-    'real-estate': isAdmin ? 'Ask about local listing performance...' : 'Ask about your listings...',
-  };
-  const lc = industry.toLowerCase();
-  const match = Object.entries(industryMap).find(([k]) => lc.includes(k));
-  return { placeholder: match ? match[1] : genericPlaceholder(isAdmin).placeholder };
-}
-
-/** Generate 2-3 suggestion chips from seoContext for admin use */
-function buildAdminSuggestions(
-  brandVoiceBlock: string,
-  personasBlock: string,
-  businessContext: string,
-): string[] {
-  const chips: string[] = [];
-
-  if (brandVoiceBlock && brandVoiceBlock.length > 20) {
-    chips.push('What does our brand voice say about tone?');
-  }
-  if (personasBlock && personasBlock.length > 20) {
-    chips.push('Summarize our target audience');
-  }
-  if (businessContext && businessContext.length > 10) {
-    chips.push('What services should we highlight?');
-  }
-
-  // Always include a universal chip as fallback
-  if (chips.length === 0) {
-    chips.push('What should I prioritize this week?');
-  }
-
-  return chips.slice(0, 3);
-}
-
-export function useSmartPlaceholder(
-  fieldKey: string,
-  { workspaceId, isAdminContext }: UseSmartPlaceholderOptions,
-): SmartPlaceholderResult {
-  const flagEnabled = useFeatureFlag('smart-placeholders');
-
-  // Fetch seoContext slice — reads from 5-min TTL cache on server
-  // Only fetch when flag is on and we have a workspaceId
-  const { data: intel } = useQuery({
-    queryKey: queryKeys.admin.intelligence(workspaceId, ['seoContext']),
-    queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, ['seoContext'], undefined, undefined, signal),
-    enabled: flagEnabled && !!workspaceId,
-    staleTime: 5 * 60 * 1000, // match server cache TTL
-  });
-
-  return useMemo(() => {
-    if (!flagEnabled) {
-      return genericPlaceholder(isAdminContext);
-    }
-
-    const seoCtx = intel?.seoContext;
-
-    // Thin workspace — try industry-based placeholder
-    if (!seoCtx || (!seoCtx.brandVoiceBlock && !seoCtx.businessContext && !seoCtx.personasBlock)) {
-      const industry = (intel as { intelligenceProfile?: { industry?: string } } | undefined)
-        ?.intelligenceProfile?.industry;
-      if (industry) return industryPlaceholder(industry, isAdminContext);
-      return genericPlaceholder(isAdminContext);
-    }
-
-    if (isAdminContext) {
-      // Admin: contextual placeholder + suggestion chips
-      const placeholder = seoCtx.businessContext
-        ? `Ask about ${seoCtx.businessContext.slice(0, 40)}...`
-        : 'Ask about this workspace...';
-
-      const suggestions = buildAdminSuggestions(
-        seoCtx.brandVoiceBlock,
-        seoCtx.personasBlock,
-        seoCtx.businessContext,
-      );
-
-      return { placeholder, suggestions };
-    } else {
-      // Client: ghost text only — no chips, no AI indication
-      const placeholder = seoCtx.businessContext
-        ? 'Ask about your site performance...'
-        : 'Ask a question about your site...';
-
-      return { placeholder };
-    }
-  }, [flagEnabled, intel, isAdminContext, fieldKey]);
-}
-```
-
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(hooks): useSmartPlaceholder — reads seoContext cache, admin chips + client ghost text`
-
----
-
-### Task 11 — AdminChat + ChatPanel: Smart Placeholder Integration
+### Task 10 — AdminChat + ChatPanel: Smart Placeholder Integration
 
 **Model:** Sonnet
-
-**PR assignment:** PR 3 — runs after Task 10. Can run in parallel with Task 12.
-
-**Depends on:** Task 10
-
-**Files you OWN:**
-- src/components/AdminChat.tsx
-- src/components/ChatPanel.tsx
-
-**Files you must NOT touch:**
-- src/hooks/useSmartPlaceholder.ts (Task 10 owns it — import only, do not edit)
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
-
-> DEDUPLICATION NOTE: ChatPanel currently has no `suggestionChips` prop. This task adds it as a new optional prop — pure addition. AdminChat currently derives `placeholder` from a simple chatMode ternary (line 121) with no hook. Both are clean additions.
-
-> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
->
-> 1. **Never render chips in a client-facing context.** `ChatPanel` is used in both admin and client portal. `suggestionChips` must ONLY be passed from `AdminChat`. Add this exact comment above the prop in the interface: `/** Admin context only — never pass in client-facing renders (client portal chat, public ChatPanel wrappers). */`
->
-> 2. **Color rule: teal chips only — never purple in `ChatPanel.tsx`.** Chip buttons are interactive → teal (`border-teal-500/30`, `text-teal-300`, `hover:bg-teal-500/10`). This file is also rendered in the client portal; purple is admin-AI-only and must never appear here. `pr-check.ts` flags purple across `src/components/`.
->
-> 3. **`onChipClick` populates input — it does NOT auto-submit.** Clicking a chip fills `input` with the chip text. The user still presses Enter or the send button. Do not call `onSend` or trigger submission inside `onChipClick`. Unexpected auto-submit on chip click is a UX defect.
->
-> 4. **Existing `placeholder?` prop continues to work.** `useSmartPlaceholder` returns a `placeholder` string that `AdminChat` passes to `ChatPanel` via the existing `placeholder` prop. Do not remove the prop or hard-code the placeholder inside `ChatPanel`. The hook output flows through the caller, not through an internal hook inside `ChatPanel`.
->
-> 5. **Import `SmartPlaceholderResult` type from Task 10.** Use the exported interface — do not inline a local type definition. Typed contracts between Task 10 and Task 11 prevent silent shape mismatches that only surface at runtime.
+**Depends on:** Task 8
 
 - [ ] Read `src/components/AdminChat.tsx` lines 118–135 (existing placeholder logic)
 - [ ] Read `src/components/ChatPanel.tsx` lines 1–60 (props interface)
@@ -1384,25 +1059,10 @@ In the `<ChatPanel>` JSX, add after `placeholder={placeholder}`:
 
 ---
 
-### Task 12 — Unit + Component Tests: Smart Placeholder
+### Task 11 — Unit + Component Tests: Smart Placeholder
 
 **Model:** Sonnet
-
-**PR assignment:** PR 3 — runs after Task 10. Can run in parallel with Task 11.
-
-**Depends on:** Tasks 10 + 11
-
-**Files you OWN:**
-- tests/unit/smart-placeholder.test.ts (create)
-- tests/component/SmartPlaceholder.test.tsx (create)
-
-**Files you must NOT touch:**
-- src/hooks/useSmartPlaceholder.ts (Task 10 owns it — import only)
-- src/components/AdminChat.tsx (Task 11 owns it — import only)
-- src/components/ChatPanel.tsx (Task 11 owns it — import only)
-- server/workspaces.ts (Phase 0 — mapper already complete)
-- shared/types/ (Phase 0 — do not modify any type files)
-- server/db/migrations/047-* or 048-* (Phase 0 — do not touch existing migrations)
+**Depends on:** Tasks 8 + 10
 
 - [ ] **Create `tests/unit/smart-placeholder.test.ts`**:
 
@@ -1413,9 +1073,9 @@ import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 
-// Mock feature flag hook
-vi.mock('../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: vi.fn(),
+// Mock feature flags
+vi.mock('../../src/lib/feature-flags', () => ({
+  isFeatureEnabled: vi.fn(),
 }));
 
 // Mock intelligence API
@@ -1425,11 +1085,11 @@ vi.mock('../../src/api/intelligence', () => ({
   },
 }));
 
-import { useFeatureFlag } from '../../src/hooks/useFeatureFlag';
+import { isFeatureEnabled } from '../../src/lib/feature-flags';
 import { intelligenceApi } from '../../src/api/intelligence';
 import { useSmartPlaceholder } from '../../src/hooks/useSmartPlaceholder';
 
-const mockUseFeatureFlag = vi.mocked(useFeatureFlag);
+const mockIsFeatureEnabled = vi.mocked(isFeatureEnabled);
 const mockGetIntelligence = vi.mocked(intelligenceApi.getIntelligence);
 
 function createWrapper() {
@@ -1459,7 +1119,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('flag off → returns generic placeholder, no suggestions', async () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+    mockIsFeatureEnabled.mockReturnValue(false);
     const { result } = renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
@@ -1469,7 +1129,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('flag on + admin context → returns suggestions (array with length > 0)', async () => {
-    mockUseFeatureFlag.mockReturnValue(true);
+    mockIsFeatureEnabled.mockReturnValue(true);
     const { result, rerender } = renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
@@ -1485,7 +1145,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('flag on + client context → returns placeholder only, no suggestions', async () => {
-    mockUseFeatureFlag.mockReturnValue(true);
+    mockIsFeatureEnabled.mockReturnValue(true);
     const { result } = renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: false }),
       { wrapper: createWrapper() }
@@ -1495,7 +1155,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('thin workspace (no seoContext) → industry-based placeholder when industry present', async () => {
-    mockUseFeatureFlag.mockReturnValue(true);
+    mockIsFeatureEnabled.mockReturnValue(true);
     mockGetIntelligence.mockResolvedValue({
       seoContext: { brandVoiceBlock: '', personasBlock: '', businessContext: '', keywordBlock: '', knowledgeBlock: '', fullContext: '', strategy: undefined },
       intelligenceProfile: { industry: 'ecommerce' },
@@ -1510,7 +1170,7 @@ describe('useSmartPlaceholder', () => {
   });
 
   it('does NOT call getIntelligence when flag is off', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+    mockIsFeatureEnabled.mockReturnValue(false);
     renderHook(
       () => useSmartPlaceholder('field', { workspaceId: 'ws1', isAdminContext: true }),
       { wrapper: createWrapper() }
@@ -1618,6 +1278,43 @@ describe('ChatPanel — smart placeholder behavior', () => {
 
 ---
 
+### Task 12 — OverviewTab: Site Intelligence Gate
+
+**Model:** Haiku (single conditional wrap — mechanical)
+**Depends on:** Tasks 1 + 3 + 4
+
+The `IntelligenceSummaryCard` in `OverviewTab.tsx` at line ~282 needs to be gated by `ws.siteIntelligenceClientView !== false`.
+
+- [ ] Read `src/components/client/OverviewTab.tsx` lines 275–300
+- [ ] Confirm `ws` prop type includes `siteIntelligenceClientView`; if not, add to `OverviewTabProps.ws` type (the `WorkspaceInfo` type used by client components)
+
+- [ ] **Edit `src/components/client/OverviewTab.tsx`** — wrap the Intelligence Summary ErrorBoundary:
+
+Replace:
+```tsx
+    {/* Intelligence summary — insights, pipeline, win rate */}
+    <ErrorBoundary label="Intelligence Summary">
+      <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
+```
+
+With:
+```tsx
+    {/* Intelligence summary — insights, pipeline, win rate */}
+    {ws.siteIntelligenceClientView !== false && (
+      <ErrorBoundary label="Intelligence Summary">
+        <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+      </ErrorBoundary>
+    )}
+```
+
+> NOTE: `!== false` means `undefined` (default/NULL) shows the card. Only an explicit `false` hides it — consistent with `clientPortalEnabled` and `analyticsClientView` patterns.
+
+- [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
+- [ ] Commit: `feat(client): gate IntelligenceSummaryCard on siteIntelligenceClientView toggle`
+
+---
+
 ## Verification Sequence
 
 Run all of the following commands and confirm each passes before marking this PR ready for review:
@@ -1676,146 +1373,82 @@ grep -r "hmpsn\.studio" src/components/client/ --include="*.tsx"
 
 ---
 
-## PR 4 — SERP Intelligence (Tier 2 Expansion)
+## Manual QA Checklist (Staging)
 
-> Ship after PR 3 is merged and CI-green on staging. All tasks in this PR are independent and can run in parallel.
+After deploying to staging (`asset-dashboard-staging.onrender.com`):
 
-**Goal:** Turn the SERP feature signals unlocked in Group 2 PR 2 into active platform intelligence — insights that surface in the insight panel, schema suggestions that fire automatically, and smarter meta rewrites that are aware of featured snippet opportunities.
+### Feature Flag Verification (all default OFF)
+- [ ] Navigate to `/ws/:id/settings` → Features tab — Brand tab NOT visible in client nav
+- [ ] Navigate to `/client/:id` — Brand tab NOT visible in client nav bar
+- [ ] Toggle `VITE_FEATURE_CLIENT_BRAND_SECTION=true` in staging env → Brand tab appears in client nav
+- [ ] Toggle `VITE_FEATURE_SMART_PLACEHOLDERS=true` in staging env → Admin chat shows suggestion chips
 
-**Context:** `page_keywords.serp_features` (migration 051) stores per-page SERP feature flags (`featured_snippet`, `people_also_ask`, `video`, `local_pack`) captured from SEMRush during strategy generation. `seoContext.serpFeatures` aggregates these workspace-wide. Content briefs already consume `matchedPage.serpFeatures` for SERP-aware directives (done in Group 2 PR 2). This PR wires the same data into the insights engine, schema suggester, and SEO editor.
+### Site Intelligence Toggle
+- [ ] Go to admin workspace settings → Features tab
+- [ ] Confirm "Site Intelligence Summary" toggle is visible, defaults to ON (teal)
+- [ ] Toggle OFF → save → navigate to client portal Overview tab → IntelligenceSummaryCard is hidden
+- [ ] Toggle ON → save → reload client portal → IntelligenceSummaryCard returns
 
----
+### Brand Tab (with `client-brand-section` flag ON)
+- [ ] Navigate to `/client/:id/brand` — tab renders without errors
+- [ ] Click Edit → form fields appear for phone, email, address
+- [ ] Enter data and click Save → data persists on page reload
+- [ ] Cancel edit → original values restored, save NOT called
+- [ ] Brand Positioning panel shows read-only summary text (no inputs)
+- [ ] NO purple colors visible anywhere on the tab
+- [ ] Tab is missing from nav when `client-brand-section` flag is OFF
 
-### Task 13 — `serp_feature_opportunity` Insight Type
+### Smart Placeholder (with `smart-placeholders` flag ON)
+- [ ] Open Admin chat (purple panel) → placeholder reflects workspace context, not generic
+- [ ] Suggestion chips appear below the input in admin chat
+- [ ] Clicking a chip fills the input AND submits
+- [ ] Open client chat panel → NO chips visible, generic/contextual ghost text only
+- [ ] Toggle flag OFF → admin chat falls back to "Ask about this workspace..."
 
-**Model:** Sonnet (new insight type requires all 4 registration steps)
-
-**PR assignment:** PR 4 — can run in parallel with Tasks 14 and 15.
-
-**Files you OWN:**
-- shared/types/analytics.ts (add InsightType + InsightDataMap entry)
-- server/schemas/serp-feature-opportunity.ts (create Zod schema)
-- server/insight-bridges/ (create bridge file)
-- src/components/insights/ (add renderer case)
-
-**Files you must NOT touch:**
-- server/page-keywords.ts (data already stored — read only)
-- server/workspace-intelligence.ts (aggregation already done — read only)
-
-**Registration — all 4 required in the same commit (CLAUDE.md §New insight type registration):**
-
-- [ ] Add `'serp_feature_opportunity'` to `InsightType` union in `shared/types/analytics.ts`
-- [ ] Add `SerpFeatureOpportunityData` interface to `shared/types/analytics.ts`:
-  ```typescript
-  export interface SerpFeatureOpportunityData {
-    pagePath: string;
-    keyword: string;
-    features: string[]; // ['featured_snippet', 'people_also_ask', ...]
-    missingSchema: string[]; // schema types that would help target these features
-    actionableDirective: string; // human-readable recommendation
-  }
-  ```
-- [ ] Add `serp_feature_opportunity: SerpFeatureOpportunityData` to `InsightDataMap`
-- [ ] Create `server/schemas/serp-feature-opportunity.ts` with Zod schema matching `SerpFeatureOpportunityData`
-- [ ] Create bridge: scan `listPageKeywords(workspaceId)` for pages with `serpFeatures?.length > 0`; for each page with `people_also_ask` and no `FAQPage` schema, generate an insight with `severity: 'opportunity'`, `impactScore` derived from `volume ?? 5`; for each page with `featured_snippet` and no structured content schema, generate insight; use `upsertInsight()` with `bridgeSource: 'serp-features'`
-- [ ] Add renderer case in the insights panel component for `serp_feature_opportunity` — show feature tags (chip-style), actionable directive, link to page
-- [ ] Add unit test: bridge fires for page with `people_also_ask` + no schema; bridge skips page with no serpFeatures
-- [ ] Commit: `feat(insights): serp_feature_opportunity insight type — surfaces PAA/snippet opportunities per page`
+### pr-check Rules
+- [ ] Run `npx tsx scripts/pr-check.ts --all` on staging branch
+- [ ] Confirm all 4 new rules produce output in the check list (even if 0 violations)
+- [ ] No new errors introduced by the new rules in unchanged files
 
 ---
 
-### Task 14 — Schema Suggester: SERP-Aware Auto-Suggestions
+## PR Merge Instructions
 
-**Model:** Sonnet (reads existing schema suggester patterns, adds SERP signal integration)
+This is **PR 4 of 4** in the Platform Intelligence Enhancements series.
 
-**PR assignment:** PR 4 — can run in parallel with Tasks 13 and 15.
+### Before Merging
 
-**Files you OWN:**
-- server/seo-schema-suggester.ts (or wherever the schema suggestion logic lives — grep first)
+1. Confirm PR 3 is merged and green on `staging`
+2. Run full verification sequence above — zero errors
+3. Deploy to staging and complete manual QA checklist
+4. Invoke `superpowers:requesting-code-review` for final review pass
 
-**Files you must NOT touch:**
-- server/page-keywords.ts (read only)
-- shared/types/analytics.ts (Task 13 owns this)
-
-- [ ] Read the existing schema suggester to find the suggestion-generation function
-- [ ] Import `listPageKeywords` and check `serpFeatures` for the target page
-- [ ] When `people_also_ask` is present → push `FAQPage` schema suggestion if not already present
-- [ ] When `featured_snippet` is present → push `HowTo` or `Article` schema suggestion (prefer HowTo for how-to intent, Article otherwise)
-- [ ] When `local_pack` is present → push `LocalBusiness` schema suggestion
-- [ ] Add unit test: page with PAA → FAQPage suggested; page with no serpFeatures → no SERP-driven suggestions added
-- [ ] Commit: `feat(schema): auto-suggest FAQPage/HowTo schema from SERP feature signals`
-
----
-
-### Task 15 — SEO Edits: Featured Snippet-Aware Meta Rewrites
-
-**Model:** Sonnet (prompt injection into existing rewrite flow)
-
-**PR assignment:** PR 4 — can run in parallel with Tasks 13 and 14.
-
-**Files you OWN:**
-- server/routes/webflow-seo.ts (the meta/title rewrite prompt section)
-
-**Files you must NOT touch:**
-- server/page-keywords.ts (read only)
-- server/workspace-intelligence.ts (read only)
-
-- [ ] In the rewrite path that generates meta/title suggestions, load the page's `serpFeatures` from `getPageKeyword(workspaceId, pagePath)` (already available from `page-keywords.ts`)
-- [ ] When `featured_snippet` → inject into prompt: "FEATURED SNIPPET OPPORTUNITY: Write the meta description as a direct, declarative answer to the search query in 40-60 words. The meta description should be optimized for snippet extraction."
-- [ ] When `people_also_ask` → inject: "PEOPLE ALSO ASK: This keyword has PAA boxes. Consider a title that frames the page as an authoritative answer (e.g. 'What Is X? / How to X / X: Complete Guide')."
-- [ ] Inject only when `serpFeatures` is non-empty — no-op for pages without SERP data
-- [ ] Add integration test: rewrite for page with featured_snippet signal → prompt contains snippet directive
-- [ ] Commit: `feat(seo-edits): inject SERP feature context into meta/title rewrite prompts`
-
----
-
-### PR 4 — Dependency Graph
+### Merge Order
 
 ```
-[After PR 3 merged] ──► Task 13 (serp_feature_opportunity insight) ─┐
-                    ──► Task 14 (schema suggester SERP signals)    ──┤  (all parallel)
-                    ──► Task 15 (SEO edits SERP context)           ──┘
+PR 4 branch → staging
+  ↓ (verify on staging, check logs, confirm no regressions)
+staging → main
 ```
 
-All three tasks are fully independent. Dispatch as a single parallel batch.
+**Never merge directly to main.** Always staging first.
 
----
+### After Merging to main
 
-### PR 4 Staging Verification
+1. Update `FEATURE_AUDIT.md`:
+   - Add: "Client Brand Tab — business profile (editable) + brand positioning (read-only). Feature-flagged: `client-brand-section`."
+   - Add: "Site Intelligence Client View toggle — per-workspace control in FeaturesTab."
+   - Add: "Smart Placeholder hook — admin gets contextual chips from seoContext cache; client gets ghost text."
+   - Add: "pr-check rules: bulk_lookup, ai_estimate, replaceAllPageKeywords, getBacklinksOverview enforcement."
 
-- [ ] Run strategy generation for a workspace with SEMRush configured → confirm `page_keywords.serp_features` is populated (check via `/api/debug/intelligence?workspaceId=...`)
-- [ ] Open the Insights panel → confirm `serp_feature_opportunity` insights appear for pages with PAA/featured snippet signals
-- [ ] Open Schema Suggestions for a page with `people_also_ask` → confirm FAQPage is in the suggestion list
-- [ ] Open SEO Editor for a page with `featured_snippet` → trigger a meta rewrite → confirm the generated meta description is structured as a direct answer (not generic)
-- [ ] Run `npx tsc --noEmit --skipLibCheck` → 0 errors
-- [ ] Run `npx vitest run` → all tests pass
+2. Update `data/roadmap.json`:
+   - Mark all Group 3 items `"pending"` → `"done"`, add `"notes"` with PR number
+   - Run `npx tsx scripts/sort-roadmap.ts`
 
----
+3. Update `BRAND_DESIGN_LANGUAGE.md`:
+   - Note: BrandTab client component — teal for CTAs, no purple
+   - Note: Admin chat chips — purple allowed (admin-AI context only)
 
-## Future Ideation — Post-Group 3 (Flag for Group 4 Planning)
+4. Update `data/features.json` if BrandTab or Site Intelligence toggle is sales-relevant
 
-> These items are not scoped into any current group. Review and prioritize during Group 4 kickoff.
-
-**PAA question harvesting for FAQ brief sections** — The `questionKeywords` field on `ContentGap` already stores related questions captured from SEMRush. When a brief's target keyword has `people_also_ask` signals, pull the matching questions from the content gap and inject them as pre-populated FAQ items in the brief outline. Currently the brief only knows PAA is present; this would give it the actual questions. Requires: matching content gap `questionKeywords` to the brief's target keyword during `generateBrief()`.
-
-**Content matrix SERP-aware cell suggestions** — When building a content matrix, cells targeting keywords with PAA signals could be flagged as "FAQ format recommended" and cells with featured snippet opportunities flagged as "definition/list format recommended." This gives writers per-cell format guidance without leaving the matrix view.
-
-**Featured snippet ownership tracking** — Extend rank tracking to detect whether the site currently owns a featured snippet for tracked keywords (SEMRush `serpFeatures` on domain organic keywords already returns this data). Surface ownership changes ("You won the featured snippet for X" / "Competitor stole the snippet for Y") as `serp_feature_change` insights. Requires: comparing current vs. previous `serpFeatures` for each keyword on rank tracking refresh.
-
-**Schema deployment + SERP feature correlation** — After deploying FAQPage schema on a page that had PAA signals, track whether PAA box appearances increase. Feed this back into the learnings engine as a `schema_serp_win` outcome type. Long-term payoff: the platform learns which schema deployments actually move the needle for each workspace's domain.
-
----
-
-## Deferred Cleanup Items — From PR #137 Code Review
-
-> These were flagged as informational/non-blocking during the PR #137 review passes. Not bugs, but worth addressing in a polish pass. Review and fold into the appropriate Group 4 or tech-debt sprint.
-
-**Content gap enrichment fields missing from `strategyCardContext`** — `StrategyCardContext` has fields for `volume`, `difficulty`, `trendDirection`, `serpFeatures`, `competitorProof`, and `impressions` but the route handler only populates `rationale`, `intent`, `priority`, and `journeyStage`. The enrichment data lives on `ContentGap` but is not transferred to `ContentTopicRequest` at creation time. Fix: when a content request is created from a content gap (`source='strategy'`), copy the gap's `volume`, `difficulty`, `trendDirection`, and `serpFeatures` onto the request and persist them. This is a design-limitation fix, not a bug — the `buildStrategyCardBlock` already handles these fields; they just need to be stored. Dependency: content_gaps normalization (roadmap item #365) would make this a trivial join rather than a denormalization.
-
-**SERP directives duplicating content gap `serpTargeting` in briefs** — `serpFeaturesDirectiveBlock` in `server/content-brief.ts` and the `serpTargeting` field from content gaps both produce SERP guidance when a keyword appears in both `pageMap` and `contentGaps`. Not incorrect, but adds ~100-200 tokens of redundant text per brief. Fix: in `generateBrief()`, check if `matchedGap?.serpTargeting` is already populated before injecting `serpFeaturesDirectiveBlock`; if both are present, either skip the directive block or merge them to avoid repetition.
-
-**Competitor brand name extraction regex imprecise for ccTLDs** — `server/routes/keyword-strategy.ts` uses `.replace(/\.[^.]+$/, '')` to strip TLD from competitor domains. Produces `competitor.co` instead of `competitor` for `competitor.co.uk`. Only affects AI prompt text so impact is low, but for precise brand filtering consider stripping the last two segments when the second-to-last is a known ccSLD (`.co`, `.com`, `.org`, `.net` before `.uk`, `.au`, `.nz`, etc.).
-
-**Stale SERP features on partial-match strategy reruns** — If a subsequent strategy run finds only a partial keyword match (not exact) for a page that previously had an exact match, the `serpFeatures` value from the old run persists via COALESCE. This is intentional by design (partial matches don't invalidate the data), but means stale SERP feature data can persist indefinitely for pages that drop off the exact-match list. Low-risk for now, but could surface as confusion ("Why does this page show featured_snippet opportunity when the keyword changed?"). Mitigation: add a `serp_features_updated_at` column and show data age in the UI, or document in the strategy generation log.
-
----
+5. Tag release: `git tag v<next-semver> && git push origin --tags`

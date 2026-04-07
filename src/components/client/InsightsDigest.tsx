@@ -47,6 +47,8 @@ interface InsightsDigestProps {
   isEventPinned: (name: string) => boolean;
   workspaceId: string;
   contentPlanSummary?: { totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null;
+  /** When false, server-computed Site Intelligence insights are hidden. Local data cards still show. */
+  siteIntelligenceEnabled?: boolean;
 }
 
 // ─── Helpers ───
@@ -475,11 +477,13 @@ const SENTIMENT_LABELS: Record<string, string> = {
 export function InsightsDigest(props: InsightsDigestProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
-  const { data: serverData } = useClientInsights(props.workspaceId);
+  const { data: serverData } = useClientInsights(props.workspaceId, props.siteIntelligenceEnabled !== false);
   const [expanded, setExpanded] = useState(false);
 
   const localInsights = generateInsights(props);
-  const serverInsights = mapServerInsights(serverData?.insights ?? []);
+  const serverInsights = props.siteIntelligenceEnabled !== false
+    ? mapServerInsights(serverData?.insights ?? [])
+    : [];
   const insights = mergeInsights(localInsights, serverInsights);
 
   if (insights.length === 0) return null;

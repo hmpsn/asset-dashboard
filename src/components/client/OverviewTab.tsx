@@ -304,6 +304,7 @@ export function OverviewTab({
             isEventPinned={isEventPinned}
             workspaceId={workspaceId}
             contentPlanSummary={contentPlanSummary}
+            siteIntelligenceEnabled={ws.siteIntelligenceClientView !== false}
           />
         </ErrorBoundary>
 

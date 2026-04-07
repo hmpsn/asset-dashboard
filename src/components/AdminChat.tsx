@@ -3,6 +3,7 @@ import { X, MessageSquare, Bot, Plus, PanelRightClose, PanelRightOpen } from 'lu
 import { ChatPanel } from './ChatPanel';
 import type { ChatMessage } from './ChatPanel';
 import { chat } from '../api/misc';
+import { useSmartPlaceholder } from '../hooks/useSmartPlaceholder';
 
 const ADMIN_QUICK_QUESTIONS = [
   'Give me a full status report on this site',
@@ -118,11 +119,16 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
     }).catch((err) => { console.error('AdminChat operation failed:', err); });
   };
 
+  const { placeholder: smartPlaceholder, suggestions } = useSmartPlaceholder({
+    workspaceId,
+    isAdminContext: true,
+  });
+
   const placeholder = chatMode === 'content_reviewer'
     ? 'Paste content or ask a follow-up...'
     : chatMode === 'page_reviewer'
       ? 'Ask about this page...'
-      : 'Ask about this workspace...';
+      : smartPlaceholder;
 
   // ── Container classes ──
   const containerCls = docked
@@ -227,6 +233,11 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
               quickQuestions={ADMIN_QUICK_QUESTIONS}
               placeholder={placeholder}
               accent="purple"
+              suggestionChips={chatMode === 'analyst' ? suggestions : undefined}
+              onChipClick={(chip) => {
+                setInput(chip);
+                askAi(chip);
+              }}
               emptyExtra={
                 <p className="text-[10px] text-zinc-600 mt-2">
                   Internal analyst for <strong className="text-zinc-500">{workspaceName}</strong>. Full data access — paste a URL to analyze a page, or paste content for a review.

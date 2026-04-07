@@ -61,6 +61,7 @@ interface WorkspaceRow {
   client_portal_enabled: number;
   seo_client_view: number;
   analytics_client_view: number;
+  site_intelligence_client_view: number;
   auto_reports: number;
   auto_report_frequency: string | null;
   brand_voice: string | null;
@@ -127,6 +128,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
   if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
   if (row.analytics_client_view !== null) ws.analyticsClientView = !!row.analytics_client_view;
+  if (row.site_intelligence_client_view !== null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.auto_reports !== null) ws.autoReports = !!row.auto_reports;
   if (row.auto_report_frequency) ws.autoReportFrequency = row.auto_report_frequency as 'weekly' | 'monthly';
   if (row.brand_voice) ws.brandVoice = row.brand_voice;
@@ -226,7 +228,7 @@ function insertStmt() {
          gsc_property_url, ga4_property_id, client_password, client_email,
          live_domain, event_config, event_groups, keyword_strategy,
          competitor_domains, personas, client_portal_enabled, seo_client_view,
-         analytics_client_view, auto_reports, auto_report_frequency,
+         analytics_client_view, site_intelligence_client_view, auto_reports, auto_report_frequency,
          brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
          tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
          onboarding_enabled, onboarding_completed, content_pricing,
@@ -236,7 +238,7 @@ function insertStmt() {
          @gsc_property_url, @ga4_property_id, @client_password, @client_email,
          @live_domain, @event_config, @event_groups, @keyword_strategy,
          @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
-         @analytics_client_view, @auto_reports, @auto_report_frequency,
+         @analytics_client_view, @site_intelligence_client_view, @auto_reports, @auto_report_frequency,
          @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
          @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
          @onboarding_enabled, @onboarding_completed, @content_pricing,
@@ -336,6 +338,7 @@ function workspaceToParams(ws: Workspace) {
     client_portal_enabled: ws.clientPortalEnabled === undefined ? null : (ws.clientPortalEnabled ? 1 : 0),
     seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
     analytics_client_view: ws.analyticsClientView === undefined ? null : (ws.analyticsClientView ? 1 : 0),
+    site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
     auto_reports: ws.autoReports === undefined ? null : (ws.autoReports ? 1 : 0),
     auto_report_frequency: ws.autoReportFrequency ?? null,
     brand_voice: ws.brandVoice ?? null,
@@ -439,7 +442,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     eventConfig: 'event_config', eventGroups: 'event_groups', keywordStrategy: 'keyword_strategy',
     competitorDomains: 'competitor_domains', personas: 'personas',
     clientPortalEnabled: 'client_portal_enabled', seoClientView: 'seo_client_view',
-    analyticsClientView: 'analytics_client_view', autoReports: 'auto_reports',
+    analyticsClientView: 'analytics_client_view', siteIntelligenceClientView: 'site_intelligence_client_view', autoReports: 'auto_reports',
     autoReportFrequency: 'auto_report_frequency', brandVoice: 'brand_voice',
     knowledgeBase: 'knowledge_base', rewritePlaybook: 'rewrite_playbook', brandLogoUrl: 'brand_logo_url',
     brandAccentColor: 'brand_accent_color', contentPricing: 'content_pricing',

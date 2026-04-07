@@ -26,7 +26,8 @@ import type { GA4Overview } from '../../../shared/types/analytics.ts';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
-export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; contentPricing?: ContentPricing | null; tier?: 'free' | 'growth' | 'premium'; baseTier?: 'free' | 'growth' | 'premium'; isTrial?: boolean; trialDaysRemaining?: number; trialEndsAt?: string | null; stripeEnabled?: boolean; onboardingEnabled?: boolean; onboardingCompleted?: boolean; brandLogoUrl?: string; brandAccentColor?: string; bookingUrl?: string | null; }
+export interface BusinessProfile { phone?: string; email?: string; address?: { street?: string; city?: string; state?: string; zip?: string; country?: string }; socialProfiles?: string[]; openingHours?: string; foundedDate?: string; numberOfEmployees?: string; }
+export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; siteIntelligenceClientView?: boolean; contentPricing?: ContentPricing | null; tier?: 'free' | 'growth' | 'premium'; baseTier?: 'free' | 'growth' | 'premium'; isTrial?: boolean; trialDaysRemaining?: number; trialEndsAt?: string | null; stripeEnabled?: boolean; onboardingEnabled?: boolean; onboardingCompleted?: boolean; brandLogoUrl?: string; brandAccentColor?: string; bookingUrl?: string | null; businessProfile?: BusinessProfile | null; }
 export interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
 export interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; affectedPages?: string[]; }
 export interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; noindex?: boolean; }
@@ -70,7 +71,7 @@ export interface ClientBriefPreview {
 }
 
 export type SortKey = 'clicks' | 'impressions' | 'ctr' | 'position';
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'schema-review';
+export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'schema-review' | 'brand';
 
 export interface ClientKeywordStrategy {
   siteKeywords: string[];
