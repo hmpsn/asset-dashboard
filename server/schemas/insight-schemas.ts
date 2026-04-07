@@ -64,3 +64,12 @@ export const auditPageHealthInsightDataSchema = z.object({
   warningCount: z.number(),
   topIssues: z.array(z.string()),
 });
+
+// --- StrategyAlignmentData (InsightDataMap['strategy_alignment']) ---
+// Cross-referenced against shared/types/analytics.ts:StrategyAlignmentData
+export const strategyAlignmentDataSchema = z.object({
+  alignedCount: z.number(),
+  misalignedCount: z.number(),
+  untrackedCount: z.number(),
+  summary: z.string().optional(),
+});
