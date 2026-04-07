@@ -103,4 +103,45 @@ describe('BrandTab', () => {
     // Edit mode should remain open — user's changes are preserved
     expect(screen.getByDisplayValue('+1 (555) 123-4567')).toBeInTheDocument();
   });
+
+  it('form re-syncs when businessProfile prop changes while not editing', () => {
+    const { rerender } = renderBrandTab();
+    // Simulate external update (admin edits via WebSocket → parent re-renders)
+    rerender(
+      <BrandTab
+        businessProfile={{ ...mockBusinessProfile, phone: '+1 (555) 999-9999' }}
+        onSaveBusinessProfile={mockSave}
+      />
+    );
+    // Click Edit — form should show the new phone, not the stale mount-time value
+    fireEvent.click(screen.getByText('Edit'));
+    expect(screen.getByDisplayValue('+1 (555) 999-9999')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('+1 (555) 123-4567')).toBeNull();
+  });
+
+  it('form does NOT re-sync when businessProfile prop changes while editing', () => {
+    const { rerender } = renderBrandTab();
+    fireEvent.click(screen.getByText('Edit'));
+    // User starts typing
+    const phoneInput = screen.getByDisplayValue('+1 (555) 123-4567');
+    fireEvent.change(phoneInput, { target: { value: '+1 (555) 777-7777' } });
+    // External update arrives — should not clobber user's in-progress edit
+    rerender(
+      <BrandTab
+        businessProfile={{ ...mockBusinessProfile, phone: '+1 (555) 999-9999' }}
+        onSaveBusinessProfile={mockSave}
+      />
+    );
+    expect(screen.getByDisplayValue('+1 (555) 777-7777')).toBeInTheDocument();
+  });
+
+  it('does not render empty string social profiles as links', () => {
+    renderBrandTab({
+      businessProfile: { ...mockBusinessProfile, socialProfiles: ['https://twitter.com/test', ''] },
+    });
+    const links = document.querySelectorAll('a[href=""]');
+    expect(links.length).toBe(0);
+    // Valid URL still renders
+    expect(screen.getByText('https://twitter.com/test')).toBeInTheDocument();
+  });
 });
