@@ -1,5 +1,5 @@
 import type { ContentBrief } from './content-brief.js';
-import { STUDIO_URL } from './constants.js';
+import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="51" viewBox="0 0 1000 320">
   <g>
@@ -54,13 +54,13 @@ export function renderBriefHTML(brief: ContentBrief): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Content Brief: ${esc(b.targetKeyword)} — HMPSN Studio</title>
+<title>Content Brief: ${esc(b.targetKeyword)} — ${STUDIO_NAME}</title>
 <style>
   @page {
     size: letter;
     margin: 0.75in 0.75in 1in 0.75in;
     @bottom-center {
-      content: "HMPSN Studio  ·  Content Brief  ·  ${esc(b.targetKeyword).replace(/'/g, "\\'")}";
+      content: "${STUDIO_NAME}  ·  Content Brief  ·  ${esc(b.targetKeyword).replace(/'/g, "\\'")}";
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 9px; color: #64748b; letter-spacing: 0.5px;
     }
@@ -191,7 +191,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
 <body>
 <div class="print-bar no-print">
   <div style="display:flex;align-items:center;gap:12px">
-    <span class="info">HMPSN Studio &mdash; Content Brief</span>
+    <span class="info">${STUDIO_NAME} &mdash; Content Brief</span>
     <span class="tip">Tip: Use &ldquo;Save as PDF&rdquo; in the print dialog for best results</span>
   </div>
   <button id="print-btn">Save as PDF</button>
@@ -339,7 +339,7 @@ export function renderBriefHTML(brief: ContentBrief): string {
   <!-- Footer -->
   <div class="footer">
     <div style="margin-bottom:8px;filter:brightness(0) saturate(100%) invert(25%) sepia(10%) saturate(500%) hue-rotate(180deg)">${LOGO_SVG.replace('width="160" height="51"', 'width="100" height="32"')}</div>
-    Prepared by <a href="${STUDIO_URL}">HMPSN Studio</a> &mdash; ${date}
+    Prepared by <a href="${STUDIO_URL}">${STUDIO_NAME}</a> &mdash; ${date}
     <div class="disclaimer">This content brief is proprietary and prepared exclusively for the intended recipient. It contains strategic recommendations based on current search data and competitive analysis. Results may vary based on implementation quality and market conditions.</div>
   </div>
 </div>

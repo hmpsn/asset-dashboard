@@ -1287,7 +1287,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-[11px] text-zinc-700">Powered by hmpsn studio</span>
+          <span className="text-[11px] text-zinc-700">Powered by {STUDIO_NAME}</span>
           <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">{STUDIO_NAME}</a>
         </div>
       </footer>

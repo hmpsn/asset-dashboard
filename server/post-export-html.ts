@@ -1,5 +1,5 @@
 import type { GeneratedPost } from '../shared/types/content.ts';
-import { STUDIO_URL } from './constants.js';
+import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="51" viewBox="0 0 1000 320">
   <g>
@@ -25,7 +25,7 @@ function esc(s: string): string {
 
 /**
  * Render a professional branded HTML page for a blog post, suitable for PDF export.
- * Matches the content brief export styling with print-ready layout, HMPSN Studio branding,
+ * Matches the content brief export styling with print-ready layout, studio branding,
  * and @page rules for clean PDF output.
  */
 export function renderPostHTML(post: GeneratedPost): string {
@@ -48,13 +48,13 @@ export function renderPostHTML(post: GeneratedPost): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(titleTag)} — HMPSN Studio</title>
+<title>${esc(titleTag)} — ${STUDIO_NAME}</title>
 <style>
   @page {
     size: letter;
     margin: 0.75in 0.75in 1in 0.75in;
     @bottom-center {
-      content: "HMPSN Studio  ·  Content Post  ·  ${esc(post.targetKeyword).replace(/'/g, "\\'")}";
+      content: "${STUDIO_NAME}  ·  Content Post  ·  ${esc(post.targetKeyword).replace(/'/g, "\\'")}";
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 9px; color: #64748b; letter-spacing: 0.5px;
     }
@@ -149,7 +149,7 @@ export function renderPostHTML(post: GeneratedPost): string {
 <body>
 <div class="print-bar no-print">
   <div style="display:flex;align-items:center;gap:12px">
-    <span class="info">HMPSN Studio &mdash; Content Post</span>
+    <span class="info">${STUDIO_NAME} &mdash; Content Post</span>
     <span class="tip">Tip: Use &ldquo;Save as PDF&rdquo; in the print dialog for best results</span>
   </div>
   <button id="print-btn">Save as PDF</button>
@@ -216,7 +216,7 @@ export function renderPostHTML(post: GeneratedPost): string {
   <!-- Footer -->
   <div class="footer">
     <div style="margin-bottom:8px;filter:brightness(0) saturate(100%) invert(25%) sepia(10%) saturate(500%) hue-rotate(180deg)">${LOGO_SVG.replace('width="160" height="51"', 'width="100" height="32"')}</div>
-    Prepared by <a href="${STUDIO_URL}">HMPSN Studio</a> &mdash; ${date}
+    Prepared by <a href="${STUDIO_URL}">${STUDIO_NAME}</a> &mdash; ${date}
     <div class="disclaimer">This content is proprietary and prepared exclusively for the intended recipient. It has been crafted with SEO best practices and optimized for search performance. Please review all content for accuracy before publishing.</div>
   </div>
 </div>
