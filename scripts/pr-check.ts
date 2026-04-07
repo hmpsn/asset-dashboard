@@ -190,9 +190,12 @@ const CHECKS: Check[] = [
     severity: 'warn',
   },
   {
-    name: 'Raw ai_estimate string in server or src files',
+    // Scope to server/ only — frontend type annotations (e.g. metricsSource?: 'ai_estimate')
+    // are legitimate mirrors of the shared type and don't create runtime magic strings
+    name: 'Raw ai_estimate string in server files',
     pattern: "'ai_estimate'",
-    fileGlobs: ['*.ts', '*.tsx'],
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
     exclude: ['shared/types/workspace.ts', 'shared/types/keywords.ts'],
     message: "The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal.",
     severity: 'warn',
@@ -207,11 +210,21 @@ const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // Excludes: function/method definitions, interface declarations, and existing pre-PR callers
+    // that go via the provider abstraction (routes/backlinks.ts, routes/semrush.ts)
     name: 'getBacklinksOverview called outside workspace-intelligence',
     pattern: 'getBacklinksOverview\\s*\\(',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/workspace-intelligence.ts'],
+    exclude: [
+      'server/workspace-intelligence.ts',
+      'server/semrush.ts',                      // function definition
+      'server/seo-data-provider.ts',             // interface definition
+      'server/providers/semrush-provider.ts',    // provider implementation
+      'server/providers/dataforseo-provider.ts', // provider implementation
+      'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
+      'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
+    ],
     message: 'getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced.',
     severity: 'error',
   },

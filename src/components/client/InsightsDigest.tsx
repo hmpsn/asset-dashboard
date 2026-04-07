@@ -477,7 +477,7 @@ const SENTIMENT_LABELS: Record<string, string> = {
 export function InsightsDigest(props: InsightsDigestProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
-  const { data: serverData } = useClientInsights(props.workspaceId);
+  const { data: serverData } = useClientInsights(props.workspaceId, props.siteIntelligenceEnabled !== false);
   const [expanded, setExpanded] = useState(false);
 
   const localInsights = generateInsights(props);

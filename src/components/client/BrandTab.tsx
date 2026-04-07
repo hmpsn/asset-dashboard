@@ -10,6 +10,10 @@ import { EmptyState } from '../ui/EmptyState';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { BusinessProfile } from './types';
 
+function isValidUrl(url: string): boolean {
+  try { new URL(url); return true; } catch { return false; }
+}
+
 interface BrandTabProps {
   businessProfile?: BusinessProfile;
   /** Plain-language brand voice summary (NOT the full brand voice doc). */
@@ -30,13 +34,20 @@ export function BrandTab({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Local form state — initialised from props
-  const [form, setForm] = useState<BusinessProfile>(() => businessProfile ?? {});
+  // socialProfiles are sanitized on load: strip malformed URLs stored before validation was added
+  // so that saving any other field doesn't fail Zod validation on old data
+  const sanitize = (profile: BusinessProfile | undefined): BusinessProfile => {
+    const p = profile ?? {};
+    if (!p.socialProfiles) return p;
+    return { ...p, socialProfiles: p.socialProfiles.filter(u => !u || isValidUrl(u)) };
+  };
+  const [form, setForm] = useState<BusinessProfile>(() => sanitize(businessProfile));
 
   // Re-sync form when prop changes externally (e.g. admin edits via WebSocket) but only
   // when not in edit mode — avoids clobbering in-progress edits
   useEffect(() => {
     if (!editing) {
-      setForm(businessProfile ?? {});
+      setForm(sanitize(businessProfile));
     }
   }, [businessProfile, editing]);
 
