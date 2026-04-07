@@ -6,6 +6,7 @@
  */
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 export interface SeoSuggestion {
   id: string;
   workspaceId: string;
@@ -48,7 +49,7 @@ function rowToSuggestion(row: SuggestionRow): SeoSuggestion {
     pageSlug: row.page_slug,
     field: row.field as 'title' | 'description',
     currentValue: row.current_value,
-    variations: JSON.parse(row.variations),
+    variations: parseJsonFallback(row.variations, []),
     selectedIndex: row.selected_index,
     status: row.status as 'pending' | 'applied' | 'dismissed',
     createdAt: row.created_at,
@@ -163,8 +164,8 @@ export function getSuggestionCounts(workspaceId: string): { pending: number; sel
   const row = db.prepare(`
     SELECT
       COUNT(*) as total,
-      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-      SUM(CASE WHEN status = 'pending' AND selected_index IS NOT NULL THEN 1 ELSE 0 END) as selected
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending,
+      COALESCE(SUM(CASE WHEN status = 'pending' AND selected_index IS NOT NULL THEN 1 ELSE 0 END), 0) as selected
     FROM seo_suggestions
     WHERE workspace_id = ?
   `).get(workspaceId) as { total: number; pending: number; selected: number };

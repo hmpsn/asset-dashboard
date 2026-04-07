@@ -36,7 +36,7 @@ import { validate, z } from '../middleware/validate.js';
 const log = createLogger('content-requests');
 
 const updateContentRequestSchema = z.object({
-  status: z.string().optional(),
+  status: z.enum(['pending_payment', 'requested', 'brief_generated', 'client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published', 'declined']).optional(),
   internalNote: z.string().max(5000).optional(),
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
@@ -63,9 +63,17 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
   res.json(request);
 });
 
-router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res) => {
+router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
   const { status, internalNote, deliveryUrl, deliveryNotes } = req.body;
-  const updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
+  let updated;
+  try {
+    updated = updateContentRequest(req.params.workspaceId, req.params.id, { status, internalNote, deliveryUrl, deliveryNotes });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   // Send email when brief is sent to client review
   if (status === 'client_review') {

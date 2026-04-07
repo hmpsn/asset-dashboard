@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { getUploadRoot } from './data-dir.js';
 
 const UPLOAD_ROOT = getUploadRoot();
@@ -45,8 +46,8 @@ function rowToRequest(row: RequestRow): ClientRequest {
     submittedBy: row.submitted_by ?? undefined,
     pageUrl: row.page_url ?? undefined,
     pageId: row.page_id ?? undefined,
-    attachments: row.attachments ? JSON.parse(row.attachments) : undefined,
-    notes: JSON.parse(row.notes),
+    attachments: parseJsonFallback(row.attachments, undefined),
+    notes: parseJsonFallback(row.notes, []),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
