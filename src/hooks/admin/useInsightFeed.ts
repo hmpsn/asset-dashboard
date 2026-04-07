@@ -16,9 +16,21 @@ import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.j
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Known acronyms that should be fully uppercased — mirrors server/insight-enrichment.ts. */
+const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
+
+function titleCaseWord(word: string): string {
+  return ACRONYMS.has(word.toLowerCase())
+    ? word.toUpperCase()
+    : word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/** GA4/GSC placeholder values that should be treated as missing. */
+const GA_PLACEHOLDER_RE = /^\(not set\)$/i;
+
 /**
  * Converts a URL slug to a readable title.
- * e.g. "https://example.com/blog/seo-tips" → "Seo Tips"
+ * e.g. "https://example.com/blog/seo-tips" → "SEO Tips"
  */
 export function cleanSlugToTitle(url: string | null): string {
   if (!url) return 'Unknown Page';
@@ -33,7 +45,9 @@ export function cleanSlugToTitle(url: string | null): string {
     const slug = parts[parts.length - 1];
     return slug
       .replace(/[-_]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
+      .split(' ')
+      .map(titleCaseWord)
+      .join(' ')
       .trim() || 'Home';
   } catch {
     // Not a valid URL — try treating the string as a slug directly
@@ -41,7 +55,9 @@ export function cleanSlugToTitle(url: string | null): string {
     if (!cleaned) return 'Home';
     return cleaned
       .replace(/[-_/]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
+      .split(' ')
+      .map(titleCaseWord)
+      .join(' ')
       .trim() || 'Home';
   }
 }
@@ -52,9 +68,6 @@ export function cleanSlugToTitle(url: string | null): string {
  * Transforms a raw AnalyticsInsight into a FeedInsight for display.
  * Exported for unit testing.
  */
-/** GA4/GSC placeholder values that should be treated as missing. */
-const GA_PLACEHOLDER_RE = /^\(not set\)$/i;
-
 export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
   const rawTitle = insight.pageTitle;
   const title = (rawTitle && !GA_PLACEHOLDER_RE.test(rawTitle))

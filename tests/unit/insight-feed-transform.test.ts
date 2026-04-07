@@ -49,7 +49,7 @@ describe('transformToFeedInsight', () => {
         data: { previousPosition: 4, currentPosition: 11 },
       });
       const result = transformToFeedInsight(insight);
-      expect(result.title).toBe('Seo Tips');
+      expect(result.title).toBe('SEO Tips');
     });
 
     it('falls back to cleaned slug when pageTitle is GA4 placeholder "(Not set)"', () => {
@@ -60,7 +60,7 @@ describe('transformToFeedInsight', () => {
         data: { previousPosition: 4, currentPosition: 11 },
       });
       const result = transformToFeedInsight(insight);
-      expect(result.title).toBe('Seo Tips');
+      expect(result.title).toBe('SEO Tips');
     });
 
     it('returns Home for root page with "(not set)" title', () => {
