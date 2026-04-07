@@ -503,7 +503,7 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
 
 const clientBusinessProfileSchema = z.object({
   phone: z.string().max(30).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().or(z.literal('')).optional(),
   address: z.object({
     street: z.string().max(200).optional(),
     city: z.string().max(100).optional(),
@@ -529,7 +529,15 @@ router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusin
 
   const existing = getWorkspace(wsId);
   if (!existing) return res.status(404).json({ error: 'Workspace not found' });
-  const mergedProfile = { ...(existing.businessProfile ?? {}), ...req.body };
+  const existingProfile = existing.businessProfile ?? {};
+  const mergedProfile = {
+    ...existingProfile,
+    ...req.body,
+    // Deep-merge address sub-object so partial address PATCHes don't wipe sibling fields
+    ...(req.body.address !== undefined
+      ? { address: { ...(existingProfile.address ?? {}), ...req.body.address } }
+      : {}),
+  };
   const ws = updateWorkspace(wsId, { businessProfile: mergedProfile });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
