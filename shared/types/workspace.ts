@@ -174,6 +174,7 @@ export interface Workspace {
   eventGroups?: EventGroup[];
   keywordStrategy?: KeywordStrategy;
   competitorDomains?: string[];
+  competitorLastFetchedAt?: string | null;
   personas?: AudiencePersona[];
   // Feature toggles
   clientPortalEnabled?: boolean;

@@ -57,6 +57,7 @@ interface WorkspaceRow {
   event_groups: string | null;
   keyword_strategy: string | null;
   competitor_domains: string | null;
+  competitor_last_fetched_at: string | null;
   personas: string | null;
   client_portal_enabled: number;
   seo_client_view: number;
@@ -124,6 +125,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.event_groups) ws.eventGroups = parseJsonSafeArray(row.event_groups, eventGroupSchema, { workspaceId: row.id, field: 'event_groups', table: 'workspaces' });
   if (row.keyword_strategy) ws.keywordStrategy = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, { siteKeywords: [], pageMap: [], opportunities: [] }, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
   if (row.competitor_domains) ws.competitorDomains = parseJsonSafeArray(row.competitor_domains, z.string(), { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
+  ws.competitorLastFetchedAt = row.competitor_last_fetched_at ?? null;
   if (row.personas) ws.personas = parseJsonSafeArray(row.personas, audiencePersonaSchema, { workspaceId: row.id, field: 'personas', table: 'workspaces' });
   if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
   if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
@@ -334,6 +336,7 @@ function workspaceToParams(ws: Workspace) {
     event_groups: ws.eventGroups ? JSON.stringify(ws.eventGroups) : null,
     keyword_strategy: ws.keywordStrategy ? JSON.stringify(ws.keywordStrategy) : null,
     competitor_domains: ws.competitorDomains ? JSON.stringify(ws.competitorDomains) : null,
+    competitor_last_fetched_at: ws.competitorLastFetchedAt ?? null,
     personas: ws.personas ? JSON.stringify(ws.personas) : null,
     client_portal_enabled: ws.clientPortalEnabled === undefined ? null : (ws.clientPortalEnabled ? 1 : 0),
     seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
@@ -422,7 +425,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -440,7 +443,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     webflowToken: 'webflow_token', gscPropertyUrl: 'gsc_property_url', ga4PropertyId: 'ga4_property_id',
     clientPassword: 'client_password', clientEmail: 'client_email', liveDomain: 'live_domain',
     eventConfig: 'event_config', eventGroups: 'event_groups', keywordStrategy: 'keyword_strategy',
-    competitorDomains: 'competitor_domains', personas: 'personas',
+    competitorDomains: 'competitor_domains', competitorLastFetchedAt: 'competitor_last_fetched_at', personas: 'personas',
     clientPortalEnabled: 'client_portal_enabled', seoClientView: 'seo_client_view',
     analyticsClientView: 'analytics_client_view', siteIntelligenceClientView: 'site_intelligence_client_view', autoReports: 'auto_reports',
     autoReportFrequency: 'auto_report_frequency', brandVoice: 'brand_voice',
