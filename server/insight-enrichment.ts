@@ -26,6 +26,9 @@ const log = createLogger('insight-enrichment');
 /** Known acronyms that should be fully uppercased in title-cased text. */
 const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
 
+/** GA4/GSC placeholder values that should be treated as empty (no real title). */
+const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
+
 /** Title-case a single word, uppercasing known acronyms. */
 function titleCaseWord(word: string): string {
   return ACRONYMS.has(word.toLowerCase())
@@ -178,9 +181,9 @@ export function resolvePageTitle(
     }
   }
 
-  // Exact match first
+  // Exact match first (skip GA4 placeholder values like "(not set)")
   const exactTitle = titleMap.get(pageId);
-  if (exactTitle) return exactTitle;
+  if (exactTitle && !GA_PLACEHOLDER_RE.test(exactTitle)) return exactTitle;
 
   // Try matching by pathname in case the stored key differs from the full URL
   let pathname = pageId;
@@ -193,7 +196,7 @@ export function resolvePageTitle(
   }
 
   const pathTitle = titleMap.get(pathname);
-  if (pathTitle) return pathTitle;
+  if (pathTitle && !GA_PLACEHOLDER_RE.test(pathTitle)) return pathTitle;
 
   // Fall back to slug-derived title
   return cleanSlugToTitle(pageId);
