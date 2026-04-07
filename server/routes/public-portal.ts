@@ -18,6 +18,7 @@ import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { clearSeoContextCache } from '../seo-context.js';
@@ -542,6 +543,7 @@ router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusin
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   broadcastToWorkspace(wsId, 'workspace:updated', { businessProfile: ws.businessProfile });
+  addActivity(wsId, 'client_profile_updated', 'Client updated business profile', 'Via client portal');
   log.info(`Client updated business profile for workspace ${wsId}`);
   res.json({ businessProfile: ws.businessProfile });
 });

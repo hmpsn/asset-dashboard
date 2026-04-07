@@ -59,7 +59,8 @@ export type ActivityType =
   | 'playbook_suggested'
   | 'learnings_updated'
   | 'schema_plan_deleted'
-  | 'note';
+  | 'note'
+  | 'client_profile_updated';
 
 export interface ActivityEntry {
   id: string;

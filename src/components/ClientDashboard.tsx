@@ -45,6 +45,7 @@ import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { BrandTab } from './client/BrandTab';
 import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
+  type BusinessProfile,
   type WorkspaceInfo,
   type ClientTab,
   type ClientContentRequest,
@@ -1027,7 +1028,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             <BrandTab
               businessProfile={ws?.businessProfile ?? undefined}
               onSaveBusinessProfile={async (profile) => {
-                await patch(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                if (res?.businessProfile) {
+                  setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
+                }
               }}
             />
           </ErrorBoundary>
