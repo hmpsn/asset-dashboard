@@ -181,6 +181,40 @@ const CHECKS: Check[] = [
     message: 'Use chartDotStroke()/chartAxisColor() from ui/constants.ts for SVG colors. Dark hex breaks light mode.',
     severity: 'warn',
   },
+  {
+    name: 'Raw bulk_lookup string outside keywords type file',
+    pattern: "'bulk_lookup'",
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['shared/types/keywords.ts', 'shared/types/workspace.ts'],
+    message: "Use the 'bulk_lookup' literal only from shared/types/workspace.ts (PageKeywordMap.metricsSource). Raw string references in other files create undiscoverable magic values.",
+    severity: 'warn',
+  },
+  {
+    name: 'Raw ai_estimate string in server or src files',
+    pattern: "'ai_estimate'",
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['shared/types/'],
+    message: "The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal.",
+    severity: 'warn',
+  },
+  {
+    name: 'replaceAllPageKeywords called outside keyword-strategy route',
+    pattern: 'replaceAllPageKeywords\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/routes/keyword-strategy.ts', 'server/page-keywords.ts'],
+    message: 'replaceAllPageKeywords() is a destructive bulk operation. Only call it from server/routes/keyword-strategy.ts. For incremental updates use upsertPageKeyword().',
+    severity: 'error',
+  },
+  {
+    name: 'getBacklinksOverview called outside workspace-intelligence',
+    pattern: 'getBacklinksOverview\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/workspace-intelligence.ts'],
+    message: 'getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced.',
+    severity: 'error',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
