@@ -16,7 +16,7 @@ vi.mock('../../server/broadcast.js', () => ({
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createTestContext } from '../integration/helpers.js';
 
-const ctx = createTestContext(13302);
+const ctx = createTestContext(13307);
 const { api } = ctx;
 
 let workspaceId = '';
