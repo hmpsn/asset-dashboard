@@ -6,6 +6,7 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { getValidToken } from './google-auth.js';
 import { createLogger } from './logger.js';
 
@@ -79,7 +80,7 @@ function rowToEvent(row: ChangeRow): SeoChangeEvent {
     pageId: row.page_id,
     pageSlug: row.page_slug,
     pageTitle: row.page_title,
-    fields: JSON.parse(row.fields),
+    fields: parseJsonFallback<string[]>(row.fields, []),
     source: row.source,
     changedAt: row.changed_at,
   };
@@ -112,7 +113,7 @@ export function recordSeoChange(
 
   if (recent) {
     // Merge fields and update
-    const existingFields: string[] = JSON.parse(recent.fields);
+    const existingFields: string[] = parseJsonFallback<string[]>(recent.fields, []);
     event.fields = [...new Set([...existingFields, ...fields])];
     event.id = recent.id; // keep original id
     stmts().updateById.run({

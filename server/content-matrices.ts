@@ -6,6 +6,7 @@
  */
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import type {
   ContentMatrix,
   MatrixCell,
@@ -102,13 +103,13 @@ function computeStats(cells: MatrixCell[]): ContentMatrix['stats'] {
 }
 
 function rowToMatrix(row: MatrixRow): ContentMatrix {
-  const cells = JSON.parse(row.cells) as MatrixCell[];
+  const cells = parseJsonFallback<MatrixCell[]>(row.cells, []);
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     name: row.name,
     templateId: row.template_id,
-    dimensions: JSON.parse(row.dimensions) as MatrixDimension[],
+    dimensions: parseJsonFallback<MatrixDimension[]>(row.dimensions, []),
     urlPattern: row.url_pattern,
     keywordPattern: row.keyword_pattern,
     cells,
