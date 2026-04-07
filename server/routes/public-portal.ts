@@ -512,7 +512,7 @@ const clientBusinessProfileSchema = z.object({
     zip: z.string().max(20).optional(),
     country: z.string().max(100).optional(),
   }).optional(),
-  socialProfiles: z.array(z.string().url()).max(10).optional(),
+  socialProfiles: z.array(z.string().url().or(z.literal(''))).max(10).optional(),
   openingHours: z.string().max(500).optional(),
   foundedDate: z.string().max(20).optional(),
   numberOfEmployees: z.string().max(50).optional(),
