@@ -14,7 +14,7 @@ import {
 const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
 import { RenderMarkdown } from './client/helpers';
-import { STUDIO_NAME } from '../constants';
+import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -1288,7 +1288,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <footer className="border-t border-zinc-800/50 mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <span className="text-[11px] text-zinc-700">Powered by hmpsn studio</span>
-          <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
+          <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">{STUDIO_NAME}</a>
         </div>
       </footer>
     </div>
