@@ -714,8 +714,8 @@
           "source": "Staging deploy 2026-03-31",
           "est": "0.5h",
           "priority": "P2",
-          "notes": "recordScanTime() inserts a sentinel row with workspace_id='__system__' which violates the FK to workspaces table. Options: store scan timestamps in a system_meta table, make workspace_id nullable on anomalies, or use a real workspace. Pre-existing bug, not caused by Phase 1.",
-          "status": "pending"
+          "notes": "Already fixed in migration 045-anomaly-scan-tracker.sql. Dedicated anomaly_scan_tracker singleton table replaces fake sentinel row. listAnomalies() __last_scan__ filter is vestigial but harmless.",
+          "status": "done"
         },
         {
           "id": 531,

@@ -181,6 +181,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
       onboardingCompleted: true,
     });
 
+    addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
     log.error({ err: err }, 'Error saving responses');
@@ -382,6 +383,7 @@ router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy);
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
+  addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${kw}`, 'Via client portal');
   res.json({ keyword: kw, status, reason: reason || null });
 });
 
@@ -422,6 +424,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
   });
   insert(keywords);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
+  addActivity(wsId, 'client_keyword_feedback', `Client gave bulk keyword feedback (${keywords.length} keywords)`, 'Via client portal');
   res.json({ updated: keywords.length });
 });
 
@@ -499,6 +502,7 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
   }
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
+  addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
   res.json({ saved: clean.length });
 });
 
@@ -588,6 +592,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', (req, res) => {
     `).run(wsId, kw, vote, clientPayload?.email || 'client');
   }
 
+  addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${kw}`, 'Via client portal');
   res.json({ ok: true });
 });
 
