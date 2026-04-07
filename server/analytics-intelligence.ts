@@ -1146,7 +1146,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     // Load pages that already have schema markup from the DB (graceful fallback)
     let pagesWithSchema = new Set<string>();
     try {
-      const schemaDb = await import('./db/index.js');
+      const schemaDb = await import('./db/index.js'); // dynamic-import-ok — circular dep prevention, default export is typed
       const rows = schemaDb.default.prepare(
         `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
       ).all(workspaceId) as Array<{ page_path: string }>;
