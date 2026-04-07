@@ -470,6 +470,28 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const capNote = cappedFromTotal > 0 ? ` of ${cappedFromTotal} total` : '';
     sendProgress('content', `Fetched ${pageInfo.length} live pages${capNote} (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
 
+    // Incremental mode: re-inject skeleton pageInfo entries for fresh pages that were skipped
+    // during content fetch. They need to be present in pageInfo so getPagesNeedingAnalysis()
+    // puts them in toPreserve — otherwise the synthesis AI sees only stale pages and produces
+    // an incomplete picture of the site (missing content gaps already covered by fresh pages).
+    // Empty contentSnippet is intentional — these pages never go through AI batching;
+    // their keyword data is pulled from existingPageKeywords in the merge step below.
+    if (strategyMode === 'incremental' && _preloadedPageKeywords && freshPathSet.size > 0) {
+      const fetchedPaths = new Set(pageInfo.map(p => p.path));
+      for (const pk of _preloadedPageKeywords) {
+        if (freshPathSet.has(pk.pagePath) && !fetchedPaths.has(pk.pagePath)) {
+          pageInfo.push({
+            path: pk.pagePath,
+            title: pk.pageTitle || '',
+            seoTitle: '',
+            seoDesc: '',
+            contentSnippet: '', // not used — this page goes to toPreserve, not toAnalyze
+          });
+        }
+      }
+      log.info(`Incremental: re-added ${freshPathSet.size} fresh page skeletons for synthesis context`);
+    }
+
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
     let gscData: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
@@ -775,6 +797,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       if (pagesToAnalyze.length === 0) {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
+        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
         res.end();
         return;
       }
