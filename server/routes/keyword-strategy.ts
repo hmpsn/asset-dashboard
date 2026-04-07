@@ -798,7 +798,14 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
         sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
         if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
-        res.end();
+        // Match the dual-response pattern used at the normal exit (line ~1999):
+        // SSE callers already got progress events + the sendProgress('complete') above.
+        // JSON callers need a proper response body — res.end() gives them an empty 200.
+        if (wantsStream) {
+          res.end();
+        } else {
+          res.json({ ok: true, upToDate: true, freshPageCount: pagesToPreserve.length });
+        }
         return;
       }
     }
