@@ -52,6 +52,28 @@ describe('transformToFeedInsight', () => {
       expect(result.title).toBe('Seo Tips');
     });
 
+    it('falls back to cleaned slug when pageTitle is GA4 placeholder "(Not set)"', () => {
+      const insight = makeInsight({
+        insightType: 'ranking_mover',
+        pageTitle: '(Not set)',
+        pageId: 'https://example.com/blog/seo-tips',
+        data: { previousPosition: 4, currentPosition: 11 },
+      });
+      const result = transformToFeedInsight(insight);
+      expect(result.title).toBe('Seo Tips');
+    });
+
+    it('returns Home for root page with "(not set)" title', () => {
+      const insight = makeInsight({
+        insightType: 'ranking_mover',
+        pageTitle: '(not set)',
+        pageId: 'https://example.com/',
+        data: { previousPosition: 4, currentPosition: 11 },
+      });
+      const result = transformToFeedInsight(insight);
+      expect(result.title).toBe('Home');
+    });
+
     it('produces headline containing "dropped off page 1" when position worsened past 10', () => {
       const insight = makeInsight({
         insightType: 'ranking_mover',

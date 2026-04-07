@@ -22,20 +22,27 @@ import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.j
  */
 export function cleanSlugToTitle(url: string | null): string {
   if (!url) return 'Unknown Page';
+
+  // Root path = homepage
+  if (url === '/' || url === '') return 'Home';
+
   try {
     const parsed = new URL(url);
     const parts = parsed.pathname.replace(/\/$/, '').split('/').filter(Boolean);
-    const slug = parts[parts.length - 1] ?? parsed.hostname;
+    if (parts.length === 0) return 'Home';
+    const slug = parts[parts.length - 1];
     return slug
       .replace(/[-_]/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase())
-      .trim() || 'Unknown Page';
+      .trim() || 'Home';
   } catch {
     // Not a valid URL — try treating the string as a slug directly
-    return url
+    const cleaned = url.replace(/^\/+|\/+$/g, '');
+    if (!cleaned) return 'Home';
+    return cleaned
       .replace(/[-_/]/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase())
-      .trim() || 'Unknown Page';
+      .trim() || 'Home';
   }
 }
 
@@ -45,8 +52,14 @@ export function cleanSlugToTitle(url: string | null): string {
  * Transforms a raw AnalyticsInsight into a FeedInsight for display.
  * Exported for unit testing.
  */
+/** GA4/GSC placeholder values that should be treated as missing. */
+const GA_PLACEHOLDER_RE = /^\(not set\)$/i;
+
 export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
-  const title = insight.pageTitle ?? cleanSlugToTitle(insight.pageId);
+  const rawTitle = insight.pageTitle;
+  const title = (rawTitle && !GA_PLACEHOLDER_RE.test(rawTitle))
+    ? rawTitle
+    : cleanSlugToTitle(insight.pageId);
   const data = insight.data as Record<string, unknown>;
 
   let headline = '';
