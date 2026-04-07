@@ -4,6 +4,7 @@
  * Covers: PageWeight, PageSpeed, LinkChecker, InternalLinks, CompetitorCompare.
  */
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 
 // ── Prepared statements (lazy) ──
 
@@ -74,10 +75,12 @@ function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
 function load<T>(sub: string, siteId: string): Snapshot<T> | null {
   const row = getStmt().get(sub, siteId) as PerfRow | undefined;
   if (!row) return null;
+  const result = parseJsonFallback<T | null>(row.result, null);
+  if (result === null) return null;
   return {
     siteId: row.site_id,
     createdAt: row.created_at,
-    result: JSON.parse(row.result),
+    result,
   };
 }
 
@@ -156,15 +159,14 @@ export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: s
   let latest: { createdAt: string; result: unknown } | null = null;
 
   for (const row of rows) {
-    try {
-      const data = JSON.parse(row.result);
-      const snapMyUrl = normalize(data?.mySite?.url || '');
-      if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
-        if (!latest || row.created_at > latest.createdAt) {
-          latest = { createdAt: row.created_at, result: data };
-        }
+    const data = parseJsonFallback(row.result, null);
+    if (!data?.mySite?.url) continue; // skip corrupt/empty rows
+    const snapMyUrl = normalize(data.mySite.url);
+    if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
+      if (!latest || row.created_at > latest.createdAt) {
+        latest = { createdAt: row.created_at, result: data };
       }
-    } catch { /* skip corrupt rows */ }
+    }
   }
   return latest;
 }
@@ -173,14 +175,13 @@ export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: s
 export function listCompetitorCompares(): Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }> {
   const rows = listBySubStmt().all('competitor') as PerfRow[];
   return rows.map(row => {
-    try {
-      const data = JSON.parse(row.result);
-      return {
-        key: row.site_id,
-        createdAt: row.created_at,
-        myUrl: data?.mySite?.url,
-        competitorUrl: data?.competitor?.url,
-      };
-    } catch { return null; }
+    const data = parseJsonFallback(row.result, null);
+    if (!data) return null; // skip corrupt rows
+    return {
+      key: row.site_id,
+      createdAt: row.created_at,
+      myUrl: data?.mySite?.url,
+      competitorUrl: data?.competitor?.url,
+    };
   }).filter(Boolean) as Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }>;
 }

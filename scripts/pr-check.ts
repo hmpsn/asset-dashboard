@@ -309,6 +309,51 @@ const CHECKS: Check[] = [
     message: 'Test behavior via imports and mocks, not source-file string matching. Add // readFile-ok on the line if this is an intentional endpoint migration guard.',
     severity: 'warn',
   },
+  {
+    // FM-7: Vacuous .every() assertions on potentially empty arrays.
+    // [].every(fn) returns true for any fn — the test proves nothing.
+    name: 'Vacuous .every() in tests (no length guard)',
+    pattern: '\\.every\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'tests/',
+    excludeLines: ['// every-ok', '.length', 'toBeGreaterThan', 'toHaveLength'],
+    message: 'Assert array.length > 0 before .every(). [].every(fn) always returns true. Add // every-ok if intentional.',
+    severity: 'warn',
+  },
+  {
+    // FM-6: Bare JSON.parse on DB row columns — must use parseJsonSafe/parseJsonFallback.
+    // More specific than the existing "Bare JSON.parse" check — this targets the row.* pattern
+    // that indicates a DB column read.
+    name: 'Bare JSON.parse on DB row column',
+    pattern: 'JSON\\.parse\\(row\\.',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/json-validation.ts', 'server/db/json-column.ts', 'server/db/migrate-json.ts'],
+    message: 'Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data.',
+    severity: 'error',
+  },
+  {
+    // FM-5: Direct SET status without a validation function.
+    // State machine transitions should use validateTransition() to reject invalid transitions.
+    name: 'Unguarded SET status = ? (state machine transition)',
+    pattern: "SET\\s+(status|batch_status)\\s*=\\s*[?@]",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['status-ok', 'validateTransition'],
+    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok if this is a non-state-machine column.',
+    severity: 'warn',
+  },
+  {
+    // FM-4: Untyped dynamic import results — as any suppresses field name checks.
+    name: 'Untyped dynamic import (missing import type)',
+    pattern: 'await import\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/', 'tests/', 'server/workspace-intelligence.ts'],
+    excludeLines: ['// dynamic-import-ok'],
+    message: 'Add `import type { T } from "./module.js"` at file top to type dynamic import results. `as any` on dynamic imports hides wrong property names. Add // dynamic-import-ok if unavoidable.',
+    severity: 'warn',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -347,14 +392,16 @@ function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
   const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
-  const excludeList = check.exclude ? (Array.isArray(check.exclude) ? check.exclude : [check.exclude]) : [];
-  const excludeFlag = excludeList.map(e => `--exclude="${path.basename(e)}"`).join(' ');
   try {
     const out = execSync(
-      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} ${excludeFlag} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
+      `grep -rn ${globs} ${excludeDirs} ${excludeFiles} -E "${check.pattern}" "${dir}" 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     );
-    const lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    let lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    // Post-filter by check.exclude using full path matching (grep --exclude only matches basenames)
+    if (check.exclude) {
+      lines = lines.filter(line => !isExcluded(line, check.exclude));
+    }
     return applyExcludeLines(lines, check.excludeLines);
   } catch {
     return [];

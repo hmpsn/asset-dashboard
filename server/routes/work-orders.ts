@@ -13,6 +13,7 @@ import { notifyClientFixesApplied } from '../email.js';
 import { listPayments } from '../payments.js';
 import { listWorkOrders, updateWorkOrder } from '../work-orders.js';
 import { getWorkspace, updatePageState } from '../workspaces.js';
+import { validate, z } from '../middleware/validate.js';
 
 router.get('/api/public/fix-orders/:workspaceId', (req, res) => {
   const payments = listPayments(req.params.workspaceId);
@@ -31,12 +32,18 @@ router.get('/api/public/fix-orders/:workspaceId', (req, res) => {
   res.json(fixOrders);
 });
 
+const updateWorkOrderSchema = z.object({
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
+  assignedTo: z.string().max(200).optional().nullable(),
+  notes: z.string().max(5000).optional(),
+});
+
 // --- Work Orders (admin + public) ---
 router.get('/api/work-orders/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
   res.json(listWorkOrders(req.params.workspaceId));
 });
 
-router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('workspaceId'), validate(updateWorkOrderSchema), (req, res, next) => {
   const { status, assignedTo, notes } = req.body;
   const wsId = req.params.workspaceId;
   const updates: Record<string, unknown> = {};
@@ -44,7 +51,15 @@ router.patch('/api/work-orders/:workspaceId/:orderId', requireWorkspaceAccess('w
   if (assignedTo !== undefined) updates.assignedTo = assignedTo;
   if (notes !== undefined) updates.notes = notes;
   if (status === 'completed') updates.completedAt = new Date().toISOString();
-  const order = updateWorkOrder(wsId, req.params.orderId, updates as Parameters<typeof updateWorkOrder>[2]);
+  let order;
+  try {
+    order = updateWorkOrder(wsId, req.params.orderId, updates as Parameters<typeof updateWorkOrder>[2]);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!order) return res.status(404).json({ error: 'Work order not found' });
 
   // When work order is completed, update page states + log activity + email client

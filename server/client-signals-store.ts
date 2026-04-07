@@ -70,7 +70,7 @@ const stmts = createStmtCache(() => ({
   `),
   updateStatus: db.prepare(`
     UPDATE client_signals
-    SET status = ?, updated_at = ?
+    SET status = ?, updated_at = ? -- status-ok: simple new/acknowledged/resolved lifecycle
     WHERE id = ?
   `),
   countNewByWorkspace: db.prepare(`

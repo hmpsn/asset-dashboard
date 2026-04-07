@@ -1,5 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import { validateTransition, WORK_ORDER_TRANSITIONS } from './state-machines.js';
 
 // --- Types ---
 
@@ -36,7 +38,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`,
+    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`, // status-ok: validateTransition guard in updateWorkOrder()
   ),
 }));
 
@@ -47,8 +49,8 @@ function rowToOrder(row: OrderRow): WorkOrder {
     paymentId: row.payment_id,
     productType: row.product_type as ProductType,
     status: row.status as WorkOrder['status'],
-    pageIds: JSON.parse(row.page_ids),
-    issueChecks: row.issue_checks ? JSON.parse(row.issue_checks) : undefined,
+    pageIds: parseJsonFallback(row.page_ids, []),
+    issueChecks: parseJsonFallback(row.issue_checks, undefined),
     quantity: row.quantity,
     assignedTo: row.assigned_to ?? undefined,
     completedAt: row.completed_at ?? undefined,
@@ -122,6 +124,11 @@ export function updateWorkOrder(
 ): WorkOrder | null {
   const order = getWorkOrder(workspaceId, orderId);
   if (!order) return null;
+
+  // Validate status transition if status is being changed
+  if (updates.status !== undefined && updates.status !== order.status) {
+    validateTransition('work_order', WORK_ORDER_TRANSITIONS, order.status, updates.status);
+  }
 
   if (updates.status !== undefined) order.status = updates.status;
   if (updates.assignedTo !== undefined) order.assignedTo = updates.assignedTo;
