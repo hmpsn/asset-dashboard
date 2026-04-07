@@ -1,8 +1,15 @@
 # hmpsn.studio — Platform-Wide Testing Plan
 
-> **Status:** Plan only. No tests written yet.
-> **Date:** 2026-04-06
+> **Status:** Complete. Delivered across 4 PRs — 216 test files, 3,609 tests, all passing.
+> **Date:** 2026-04-06 (plan) → 2026-04-06 (completed)
 > **Context:** Produced after multi-agent audit of 277 features, 73 route files, 20 shared type modules, 165+ existing test files (1860+ tests), and full-codebase grep for 6 failure patterns. Revised after owner review with 5 substantive corrections.
+>
+> **Delivery summary:**
+> - PR1: Test infrastructure (mock factories, seed fixtures, JSON.parse safety migration) + 13 integration tests
+> - PR2: State machine transition guards + 3 test files (155 tests)
+> - PR3: Cross-layer contract tests — 6 files (168 tests)
+> - PR4: Auth, AI, data integrity, client-facing, and coverage gap tests — 31 files
+> - Production bugs found: schema validator crash on null @graph, reviewChecklist rejected by .strict() schema, missing COALESCE on SUM queries
 
 ---
 
