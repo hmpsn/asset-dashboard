@@ -62,7 +62,7 @@ interface WorkspaceRow {
   client_portal_enabled: number;
   seo_client_view: number;
   analytics_client_view: number;
-  site_intelligence_client_view: number;
+  site_intelligence_client_view: number | null;
   auto_reports: number;
   auto_report_frequency: string | null;
   brand_voice: string | null;
@@ -84,7 +84,6 @@ interface WorkspaceRow {
   seo_data_provider: string | null;
   scoring_config: string | null;
   intelligence_profile: string | null;
-  site_intelligence_client_view: number | null;
   business_priorities: string | null;
   created_at: string;
 }
@@ -361,7 +360,6 @@ function workspaceToParams(ws: Workspace) {
     seo_data_provider: ws.seoDataProvider || null,
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
-    site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     created_at: ws.createdAt,
   };
@@ -455,7 +453,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
-    siteIntelligenceClientView: 'site_intelligence_client_view', businessPriorities: 'business_priorities',
+    businessPriorities: 'business_priorities',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));

@@ -549,6 +549,10 @@ router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusin
   const ws = updateWorkspace(wsId, { businessProfile: mergedProfile });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
+  // businessProfile feeds into workspace-intelligence.ts (base.businessProfile → AI prompts).
+  // Flush caches immediately so AI chat/strategy use the updated data.
+  clearSeoContextCache(wsId);
+  invalidateIntelligenceCache(wsId);
   broadcastToWorkspace(wsId, 'workspace:updated', { businessProfile: ws.businessProfile });
   addActivity(wsId, 'client_profile_updated', 'Client updated business profile', 'Via client portal');
   log.info(`Client updated business profile for workspace ${wsId}`);

@@ -278,9 +278,11 @@ export function OverviewTab({
     </ErrorBoundary>
 
     {/* Intelligence summary — insights, pipeline, win rate */}
+    {ws.siteIntelligenceClientView !== false && (
     <ErrorBoundary label="Intelligence Summary">
       <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
+    )}
 
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

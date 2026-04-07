@@ -196,7 +196,7 @@ export function ChatPanel({
             <button
               key={i}
               onClick={() => onChipClick?.(chip)}
-              className="text-[10px] px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
+              className="text-[10px] px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
             >
               {chip}
             </button>
