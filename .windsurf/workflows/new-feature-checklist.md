@@ -32,6 +32,12 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 - [ ] **Feature toggles**: If feature is tier-gated, `effectiveTier` check is in place and updates when `workspace:updated` fires
 - [ ] **Studio name in copy**: Any user-facing text referencing the team/studio uses `STUDIO_NAME` from `src/constants.ts` (client) or `server/constants.ts` (server) — never hardcoded strings. See `ui-vocabulary.md` § Studio / Agency Name for interpolation rules.
 
+## During Implementation — Tests
+
+- [ ] **New public-portal mutation endpoint**: Integration test covers (1) 401 unauthenticated, (2) 200 valid authenticated request, (3) empty string for any `.email()` / `.url()` validated field (`''` must return 200, not 400), (4) merge semantics if the endpoint touches a JSON column with nested structure
+- [ ] **New form component**: Component tests cover (1) prop re-renders update form state when not editing, (2) prop changes do NOT clobber in-progress edits, (3) empty/null values render no broken elements (empty `<a href="">`, etc.), (4) feature-flag-off behavior (direct URL navigation doesn't show blank content)
+- [ ] **Full suite passes**: `npx vitest run` — not just the new tests
+
 ## After Implementation
 
 - [ ] **TypeScript build check**: `npx tsc --noEmit` passes with zero errors
