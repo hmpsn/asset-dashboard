@@ -11,6 +11,7 @@ interface WorkspaceData {
   clientPortalEnabled?: boolean;
   seoClientView?: boolean;
   analyticsClientView?: boolean;
+  siteIntelligenceClientView?: boolean;
   onboardingEnabled?: boolean;
   onboardingCompleted?: boolean;
   autoReports?: boolean;

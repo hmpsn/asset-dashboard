@@ -5,6 +5,7 @@ import { Router } from 'express';
 
 const router = Router();
 
+import { validate, z } from '../middleware/validate.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';
@@ -491,6 +492,42 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
   res.json({ saved: clean.length });
+});
+
+// ── Business Profile (client-facing PATCH) ─────────────────────
+// Allows client portal users to update their verified business data
+
+const clientBusinessProfileSchema = z.object({
+  phone: z.string().max(30).optional(),
+  email: z.string().email().optional(),
+  address: z.object({
+    street: z.string().max(200).optional(),
+    city: z.string().max(100).optional(),
+    state: z.string().max(100).optional(),
+    zip: z.string().max(20).optional(),
+    country: z.string().max(100).optional(),
+  }).optional(),
+  socialProfiles: z.array(z.string().url()).max(10).optional(),
+  openingHours: z.string().max(500).optional(),
+  foundedDate: z.string().max(20).optional(),
+  numberOfEmployees: z.string().max(50).optional(),
+});
+
+router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusinessProfileSchema), (req, res) => {
+  const wsId = req.params.id;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const hasClientUserAuth = clientUserToken && (verifyClientToken(clientUserToken)?.workspaceId === wsId);
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const ws = updateWorkspace(wsId, { businessProfile: req.body });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  log.info(`Client updated business profile for workspace ${wsId}`);
+  res.json({ businessProfile: ws.businessProfile });
 });
 
 // ── Content Gap Voting ──────────────────────────

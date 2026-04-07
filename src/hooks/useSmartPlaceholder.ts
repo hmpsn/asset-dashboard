@@ -88,7 +88,7 @@ export function useSmartPlaceholder(
   const { data: intel } = useQuery({
     queryKey: queryKeys.admin.intelligence(workspaceId, ['seoContext']),
     queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, ['seoContext'], undefined, undefined, signal),
-    enabled: flagEnabled && !!workspaceId,
+    enabled: flagEnabled && !!workspaceId && isAdminContext,
     staleTime: 5 * 60 * 1000, // match server cache TTL
   });
 
