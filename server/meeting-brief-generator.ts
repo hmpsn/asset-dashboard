@@ -112,6 +112,8 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
 
   if (hash === cachedHash) {
     log.debug({ workspaceId }, 'Meeting brief data unchanged — returning cached brief');
+    // Intentional control flow: the route handler catches BRIEF_UNCHANGED and returns
+    // the stored brief as a 200 { brief, unchanged: true }. This never reaches Sentry.
     throw new Error('BRIEF_UNCHANGED');
   }
 
@@ -159,7 +161,12 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       feature: 'meeting-brief',
       workspaceId,
     });
-    parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
+    try {
+      parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
+    } catch {
+      log.error({ workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid JSON after retry');
+      throw new Error('Meeting brief AI returned invalid JSON after retry');
+    }
   }
 
   const metrics = assembleMeetingBriefMetrics(intel);
