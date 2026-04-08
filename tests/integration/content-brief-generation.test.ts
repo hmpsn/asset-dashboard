@@ -336,7 +336,7 @@ describe('generateBrief — prompt construction', () => {
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
     expect(briefCall).toBeDefined();
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('dental marketing');
     expect(promptContent).toContain('200 clicks');
   });
@@ -362,7 +362,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('REAL KEYWORD DATA');
     expect(promptContent).toContain('12,000');
     expect(promptContent).toContain('65/100');
@@ -382,7 +382,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('EXISTING PAGE PERFORMANCE DATA');
     expect(promptContent).toContain('/blog/old-seo-guide');
     expect(promptContent).toContain('500 sessions');
@@ -402,7 +402,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     // buildSerpContext is mocked and returns PAA content
     expect(promptContent).toContain('SERP DATA');
   });
@@ -422,7 +422,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('TEMPLATE STRUCTURE');
     expect(promptContent).toContain('Overview');
     expect(promptContent).toContain('Benefits');
@@ -447,7 +447,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('PAGE ANALYSIS CONTEXT');
     expect(promptContent).toContain('42/100');
     expect(promptContent).toContain('Missing H1 tag');
@@ -468,7 +468,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('STRATEGY CARD CONTEXT');
     expect(promptContent).toContain('High-volume gap with no existing page');
     expect(promptContent).toContain('awareness');
@@ -484,7 +484,7 @@ describe('generateBrief — prompt construction', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('PAGE TYPE: Landing Page');
     expect(promptContent).toContain('conversion-focused');
     expect(brief.pageType).toBe('landing');
@@ -740,7 +740,7 @@ describe('regenerateBrief — refinement with feedback', () => {
     const calls = getCapturedOpenAICalls();
     const regenCall = calls.find(c => c.feature === 'content-brief-regenerate');
     expect(regenCall).toBeDefined();
-    const promptContent = regenCall!.messages[0].content;
+    const promptContent = (regenCall!.messages.find(m => m.role === 'user') ?? regenCall!.messages[0]).content;
     expect(promptContent).toContain('PREVIOUS BRIEF');
     expect(promptContent).toContain('USER FEEDBACK');
     expect(promptContent).toContain('Add more technical depth and case studies.');
@@ -854,7 +854,7 @@ describe('regenerateOutline — outline-only regeneration', () => {
     const calls = getCapturedOpenAICalls();
     const outlineCall = calls.find(c => c.feature === 'content-brief-outline-regen');
     expect(outlineCall).toBeDefined();
-    const promptContent = outlineCall!.messages[0].content;
+    const promptContent = (outlineCall!.messages.find(m => m.role === 'user') ?? outlineCall!.messages[0]).content;
     expect(promptContent).toContain('Add more how-to sections.');
     expect(promptContent).toContain('addresses the feedback');
   });
@@ -920,7 +920,7 @@ describe('generateBrief — analytics intelligence integration', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).toContain('CANNIBALIZATION');
     expect(promptContent).toContain('consider updating');
   });
@@ -935,7 +935,7 @@ describe('generateBrief — analytics intelligence integration', () => {
 
     const calls = getCapturedOpenAICalls();
     const briefCall = calls.find(c => c.feature === 'content-brief');
-    const promptContent = briefCall!.messages[0].content;
+    const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
     expect(promptContent).not.toContain('ANALYTICS INTELLIGENCE');
   });
 
@@ -975,7 +975,7 @@ describe('generateBrief — page type-specific generation', () => {
 
       const calls = getCapturedOpenAICalls();
       const briefCall = calls.find(c => c.feature === 'content-brief');
-      const promptContent = briefCall!.messages[0].content;
+      const promptContent = (briefCall!.messages.find(m => m.role === 'user') ?? briefCall!.messages[0]).content;
       expect(promptContent).toContain(`PAGE TYPE:`);
       expect(promptContent).toContain('CONTENT STYLE:');
 
