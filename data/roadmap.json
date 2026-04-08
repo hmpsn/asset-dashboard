@@ -1282,7 +1282,7 @@
       "rationale": "Bridge site architecture tree with schema generation. Deterministic breadcrumbs, unified schema plan, coverage dashboard, priority queue, competitive intelligence, and full pipeline automation.",
       "items": [
         {
-          "id": 500,
+          "id": 543,
           "title": "[C1] Deterministic BreadcrumbList from architecture tree",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "2h",
@@ -1291,7 +1291,7 @@
           "status": "done"
         },
         {
-          "id": 501,
+          "id": 544,
           "title": "[C2] Unify schema plan with architecture tree input",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "3h",
@@ -1300,7 +1300,7 @@
           "status": "done"
         },
         {
-          "id": 502,
+          "id": 545,
           "title": "[D1] Page type → schema type mapping + prompt injection",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1309,7 +1309,7 @@
           "status": "done"
         },
         {
-          "id": 503,
+          "id": 546,
           "title": "[C3] Schema coverage dashboard in SiteArchitecture UI",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
@@ -1318,7 +1318,7 @@
           "status": "done"
         },
         {
-          "id": 504,
+          "id": 547,
           "title": "[D2] Template → schema template binding",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1327,7 +1327,7 @@
           "status": "done"
         },
         {
-          "id": 505,
+          "id": 548,
           "title": "[D3] Hub page → CollectionPage/ItemList auto-suggest",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "2h",
@@ -1336,7 +1336,7 @@
           "status": "done"
         },
         {
-          "id": 506,
+          "id": 549,
           "title": "[C4] Internal link health → schema priority queue",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "2h",
@@ -1345,7 +1345,7 @@
           "status": "done"
         },
         {
-          "id": 507,
+          "id": 550,
           "title": "[C5] SiteNavigationElement auto-gen for homepage",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "1h",
@@ -1354,7 +1354,7 @@
           "status": "done"
         },
         {
-          "id": 508,
+          "id": 551,
           "title": "[D5] Sibling/parent-child relationship enrichment",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1363,7 +1363,7 @@
           "status": "done"
         },
         {
-          "id": 509,
+          "id": 552,
           "title": "[D4] Competitor schema intelligence",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "4h",
@@ -1372,7 +1372,7 @@
           "status": "done"
         },
         {
-          "id": 510,
+          "id": 553,
           "title": "[C6] Schema impact tracking via GSC before/after",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
@@ -1381,7 +1381,7 @@
           "status": "done"
         },
         {
-          "id": 511,
+          "id": 554,
           "title": "[D6] Brief E-E-A-T → author/publisher schema enrichment",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1390,7 +1390,7 @@
           "status": "done"
         },
         {
-          "id": 512,
+          "id": 555,
           "title": "[D7] Planned page schema pre-generation",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "4h",
@@ -1448,7 +1448,7 @@
           "shippedAt": "2026-03-19"
         },
         {
-          "id": 321,
+          "id": 556,
           "title": "HealthTab redesign — Card-based command center",
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2-3h",
@@ -1692,13 +1692,13 @@
           "shippedAt": "2026-03-15"
         },
         {
-          "id": 279,
+          "id": 557,
           "title": "Growth Opportunities reframe (client Strategy tab)",
           "status": "done",
           "shippedAt": "2026-03-15"
         },
         {
-          "id": 280,
+          "id": 558,
           "title": "Content pipeline status cards + post-publish performance",
           "status": "done",
           "shippedAt": "2026-03-15"
@@ -1896,7 +1896,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 235,
+          "id": 559,
           "title": "AEO Trust Audit: trust pages existence check",
           "status": "done",
           "shippedAt": "2026-03-12"
@@ -2010,31 +2010,31 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 230,
+          "id": 560,
           "title": "Fix notification bell tray not opening in admin dashboard",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 231,
+          "id": 561,
           "title": "SEO Change Performance Tracker — track pages after meta/description updates, compare GSC before/after",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 232,
+          "id": 562,
           "title": "Move AI Usage to top nav button in Command Center header",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 233,
+          "id": 563,
           "title": "Fix Keyword Difficulty and impressions showing 0 in admin dashboard",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 234,
+          "id": 564,
           "title": "Stylize admin sidebar nav links with per-group color accents",
           "status": "done",
           "shippedAt": "2026-03-12"
@@ -2184,25 +2184,25 @@
           "shippedAt": "2026-03"
         },
         {
-          "id": 282,
+          "id": 565,
           "title": "Recharts migration (all custom SVG charts)",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 283,
+          "id": 566,
           "title": "AI Usage Dashboard in Command Center",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 284,
+          "id": 567,
           "title": "Mobile Guard interstitial",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 285,
+          "id": 568,
           "title": "Client Onboarding Questionnaire",
           "status": "done",
           "shippedAt": "2026-03"
@@ -3026,7 +3026,7 @@
           "shippedAt": "2026"
         },
         {
-          "id": 281,
+          "id": 569,
           "title": "Revenue analytics dashboard",
           "status": "done",
           "shippedAt": "2026"
@@ -3369,7 +3369,7 @@
           "shippedAt": "2026-03-23"
         },
         {
-          "id": 320,
+          "id": 570,
           "title": "Competitor Content Monitoring (Scheduled Job)",
           "source": "USER REQUEST",
           "est": "4h",
@@ -3378,7 +3378,7 @@
           "status": "pending"
         },
         {
-          "id": 321,
+          "id": 571,
           "title": "Authority-Adjusted Difficulty Filtering",
           "source": "USER REQUEST",
           "est": "3h",
@@ -3396,7 +3396,7 @@
           "status": "pending"
         },
         {
-          "id": 323,
+          "id": 572,
           "title": "Client keyword feedback system (approve/decline)",
           "source": "USER REQUEST",
           "est": "4h",
@@ -3576,7 +3576,7 @@
           "status": "done"
         },
         {
-          "id": 336,
+          "id": 573,
           "title": "React Query Migration - Complete Simple Components",
           "source": "REACT_QUERY_MIGRATION",
           "est": "3h",
@@ -3828,7 +3828,7 @@
           "status": "pending"
         },
         {
-          "id": 523,
+          "id": 574,
           "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
           "source": "TECH DEBT",
           "est": "1.5h",
@@ -3864,7 +3864,7 @@
           "status": "done"
         },
         {
-          "id": 371,
+          "id": 575,
           "title": "Approval review cycle audit — P0-P3 fixes",
           "source": "CODE REVIEW",
           "est": "3h",

@@ -94,10 +94,12 @@ describe('callOpenAI response_format', () => {
   });
 
   it('includes response_format in request body when provided', async () => {
+    // Set test-only API key so executeOpenAICall doesn't bail before fetch
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+
     // Dynamic import to pick up the mocked fetch
     const { callOpenAI } = await import('../openai-helpers.js');
 
-    // Skip if no API key configured (CI)
     try {
       await callOpenAI({
         messages: [{ role: 'user', content: 'test' }],
@@ -106,17 +108,17 @@ describe('callOpenAI response_format', () => {
         maxRetries: 0,
       });
     } catch {
-      // May fail if no API key — that's OK, we just need to check the fetch call
+      // Expected — mock fetch returns non-JSON
     }
 
-    if ((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length > 0) {
-      const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      const body = JSON.parse(call[1].body);
-      expect(body.response_format).toEqual({ type: 'json_object' });
-    }
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body);
+    expect(body.response_format).toEqual({ type: 'json_object' });
   });
 
   it('omits response_format from request body when not provided', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
     const { callOpenAI } = await import('../openai-helpers.js');
 
     try {
@@ -126,14 +128,13 @@ describe('callOpenAI response_format', () => {
         maxRetries: 0,
       });
     } catch {
-      // May fail if no API key
+      // Expected — mock fetch returns non-JSON
     }
 
-    if ((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length > 0) {
-      const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      const body = JSON.parse(call[1].body);
-      expect(body.response_format).toBeUndefined();
-    }
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body);
+    expect(body.response_format).toBeUndefined();
   });
 });
 ```
@@ -725,7 +726,9 @@ Find the helper (around line 625):
     };
 ```
 
-Add a system message prepend using `buildSystemPrompt()`:
+Add a system message prepend using `buildSystemPrompt()`.
+
+> **⚠️ Implementation note:** Before adding the system message, verify that existing callers of `callStrategyAI` don't already pass a system message as the first element of `messages`. If they do, replace it rather than prepending a second one — OpenAI concatenates multiple system messages, which can subtly change model behavior due to duplicated instructions. Grep: `callStrategyAI(` to find all call sites and inspect their message arrays.
 
 ```typescript
     const strategySystemPrompt = buildSystemPrompt(ws.id, 'You are an expert SEO strategist. Analyze the website data and generate keyword strategies as valid JSON. Be specific: name pages, queries, and volumes when data supports it.');
