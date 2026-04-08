@@ -456,7 +456,7 @@
           "shippedAt": "2026-03-26"
         },
         {
-          "id": 509,
+          "id": 538,
           "title": "Approval Reminders UI — Add 'Send reminder' to approval batches",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "1-2h",
@@ -466,7 +466,7 @@
           "shippedAt": "2026-03-26"
         },
         {
-          "id": 510,
+          "id": 539,
           "title": "Scheduled Audits Config — UI for recurring audit settings",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "2h",
@@ -475,7 +475,7 @@
           "status": "pending"
         },
         {
-          "id": 511,
+          "id": 540,
           "title": "Widget System — Customizable Workspace Home dashboard",
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "6-8h",
@@ -484,7 +484,7 @@
           "status": "pending"
         },
         {
-          "id": 512,
+          "id": 541,
           "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "4-6h",
@@ -493,7 +493,7 @@
           "status": "pending"
         },
         {
-          "id": 513,
+          "id": 542,
           "title": "Command Palette 2.0 — Action palette with natural language",
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "4-6h",

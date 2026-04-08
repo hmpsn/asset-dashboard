@@ -187,7 +187,27 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   } = opts;
 ```
 
-Then update the request body construction (line ~296) to conditionally include `response_format`:
+Then update the `executeOpenAICall` pass-through (line ~270) to forward `responseFormat`:
+
+```typescript
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs }),
+```
+
+Also add `responseFormat` to the dedup key (line ~255) so two otherwise-identical calls with different `responseFormat` values aren't incorrectly deduped:
+
+```typescript
+  const dedupeKey = AIRequestDeduplicator.createKey({
+    model,
+    messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
+    temperature,
+    maxTokens,
+    responseFormat,
+    workspaceId,
+    feature,
+  });
+```
+
+Then update the request body construction inside `executeOpenAICall` (line ~296) to conditionally include `response_format`:
 
 ```typescript
   const body = JSON.stringify({
