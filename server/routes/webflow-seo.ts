@@ -221,7 +221,15 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
     if (workspaceId) {
       try {
         const allInsights = getInsights(workspaceId);
-        const pageInsights = allInsights.filter(i => i.pageId === pagePath || i.pageId === `/${pagePath}`);
+        // pageId is stored as a full URL (https://domain.com/path) or synthetic key.
+        // pagePath is a path like /services/seo (already has leading slash).
+        // Match if pageId ends with pagePath or equals it exactly.
+        const pageInsights = allInsights.filter(i =>
+          i.pageId != null && (
+            i.pageId === pagePath ||
+            i.pageId.endsWith(pagePath)
+          )
+        );
 
         const cannibalization = pageInsights
           .filter(i => i.insightType === 'cannibalization')

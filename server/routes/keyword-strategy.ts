@@ -756,7 +756,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         messages: wrappedMessages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
         maxTokens,
         temperature: 0.3,
-        responseFormat: { type: 'json_object' },
+        // No responseFormat: callers expect arrays or objects — instruction-based JSON is safer
         feature: 'keyword-strategy',
         workspaceId: ws.id,
         maxRetries: 3,
