@@ -121,10 +121,12 @@ beforeAll(async () => {
   // fails with a fast auth error (not a hang). The test asserts 500 — the
   // correct behavior when the AI call fails (not phantom success).
   // Save and restore so we don't contaminate sibling test files in this process.
+  // Always override OPENAI_API_KEY with a fake value before spawning — even
+  // in CI or dev environments where a real key is configured. The child
+  // process inherits env at spawn time, so we must unconditionally set the
+  // fake key here (not conditionally) to guarantee the 500 path in all envs.
   const savedOpenAIKey = process.env.OPENAI_API_KEY;
-  if (!process.env.OPENAI_API_KEY) {
-    process.env.OPENAI_API_KEY = 'fake-key-for-content-decay-test';
-  }
+  process.env.OPENAI_API_KEY = 'fake-key-for-content-decay-test';
   await ctx.startServer();
   if (savedOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
   else process.env.OPENAI_API_KEY = savedOpenAIKey;

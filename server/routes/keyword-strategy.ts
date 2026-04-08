@@ -565,13 +565,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
     const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
-    if (!fetchCompetitors) {
-      log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
-      sendProgress('semrush', 'Using cached competitor data (still fresh)...', 0.58);
-    }
 
     if (semrushMode !== 'none' && provider) {
       sendProgress('semrush', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
+      if (!fetchCompetitors) {
+        log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
+        sendProgress('semrush', 'Competitor data still fresh — skipping re-fetch...', 0.58);
+      }
       // Derive domain from baseUrl so provider always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
 
