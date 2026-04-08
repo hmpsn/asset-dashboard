@@ -5,6 +5,7 @@
 import type { SchemaPageSuggestion } from './schema-suggester.js';
 import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment } from '../shared/types/schema-plan.ts';
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('schema-store');
@@ -55,7 +56,7 @@ function rowToSnapshot(row: SchemaRow): SchemaSnapshot {
     siteId: row.site_id,
     workspaceId: row.workspace_id,
     createdAt: row.created_at,
-    results: JSON.parse(row.results),
+    results: parseJsonFallback(row.results, []),
     pageCount: row.page_count,
   };
 }
@@ -196,8 +197,8 @@ export function getSiteTemplate(siteId: string): SchemaSiteTemplate | null {
   return {
     siteId: row.site_id,
     workspaceId: row.workspace_id,
-    organizationNode: JSON.parse(row.organization_node),
-    websiteNode: JSON.parse(row.website_node),
+    organizationNode: parseJsonFallback<Record<string, unknown>>(row.organization_node, {}),
+    websiteNode: parseJsonFallback<Record<string, unknown>>(row.website_node, {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -224,7 +225,7 @@ export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): Sch
   // Parse the schema and extract Organization + WebSite nodes
   try {
     const schemaObj = typeof homepage.suggestedSchemas[0].template === 'string'
-      ? JSON.parse(homepage.suggestedSchemas[0].template as unknown as string)
+      ? parseJsonFallback(homepage.suggestedSchemas[0].template as unknown as string, {})
       : homepage.suggestedSchemas[0].template;
     const graph = schemaObj?.['@graph'] as Record<string, unknown>[] | undefined;
     if (!Array.isArray(graph)) return null;
@@ -294,8 +295,8 @@ function rowToPlan(row: PlanRow): SchemaSitePlan {
     siteId: row.site_id,
     workspaceId: row.workspace_id,
     siteUrl: row.site_url,
-    canonicalEntities: JSON.parse(row.canonical_entities) as CanonicalEntity[],
-    pageRoles: JSON.parse(row.page_roles) as PageRoleAssignment[],
+    canonicalEntities: parseJsonFallback<CanonicalEntity[]>(row.canonical_entities, []),
+    pageRoles: parseJsonFallback<PageRoleAssignment[]>(row.page_roles, []),
     status: row.status as SchemaSitePlan['status'],
     clientPreviewBatchId: row.client_preview_batch_id || undefined,
     generatedAt: row.generated_at,
@@ -524,7 +525,7 @@ function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
     siteId: row.site_id,
     pageId: row.page_id,
     workspaceId: row.workspace_id,
-    schemaJson: JSON.parse(row.schema_json),
+    schemaJson: parseJsonFallback(row.schema_json, {}),
     publishedAt: row.published_at,
   };
 }

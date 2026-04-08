@@ -34,6 +34,8 @@ export const WS_EVENTS = {
   INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
   ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
+  CLIENT_SIGNAL_CREATED: 'client-signal:created',
+  CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 } as const;
 

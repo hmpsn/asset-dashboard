@@ -5,6 +5,7 @@ import { ConnectionsTab } from './settings/ConnectionsTab';
 import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { BusinessProfileTab } from './settings/BusinessProfileTab';
+import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
 import { PublishSettings } from './PublishSettings';
 import { get, patch, post } from '../api/client';
 import { themeColor } from './ui/constants';
@@ -43,6 +44,11 @@ interface WorkspaceData {
     foundedDate?: string;
     numberOfEmployees?: string;
   } | null;
+  intelligenceProfile?: {
+    industry?: string;
+    goals?: string[];
+    targetAudience?: string;
+  } | null;
 }
 
 interface Props {
@@ -53,7 +59,7 @@ interface Props {
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
-type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'export';
+type SectionTab = 'connections' | 'features' | 'dashboard' | 'publishing' | 'business-profile' | 'intelligence-profile' | 'export';
 
 export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
   const { toast } = useToast();
@@ -171,7 +177,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
 
       {/* Tab nav */}
       <nav className="flex items-center gap-1 border-b border-zinc-800">
-        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export']] as [SectionTab, string][]).map(([id, label]) => (
+        {([['connections', 'Connections'], ['features', 'Features'], ['publishing', 'Publishing'], ['business-profile', 'Business Profile'], ['intelligence-profile', 'Intelligence Profile'], ['dashboard', 'Client Dashboard'], ['export', 'Data Export']] as [SectionTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className="px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px"
             style={tab === id ? { borderColor: '#2dd4bf', color: '#2dd4bf' } : { borderColor: 'transparent', color: themeColor('#71717a', '#94a3b8') }}>
@@ -225,6 +231,15 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
           businessProfile={ws?.businessProfile}
           toast={toast}
           onSave={(profile) => setWs(w => w ? { ...w, businessProfile: profile } : w)}
+        />
+      )}
+
+      {tab === 'intelligence-profile' && (
+        <IntelligenceProfileTab
+          workspaceId={workspaceId}
+          intelligenceProfile={ws?.intelligenceProfile}
+          toast={toast}
+          onSave={(profile) => setWs(w => w ? { ...w, intelligenceProfile: profile } : w)}
         />
       )}
 

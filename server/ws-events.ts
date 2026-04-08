@@ -65,6 +65,9 @@ export const WS_EVENTS = {
   SUGGESTED_BRIEF_UPDATED: 'suggested-brief:updated',
   INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
   ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
+  // Client signals (PIE Group 1)
+  CLIENT_SIGNAL_CREATED: 'client-signal:created',
+  CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
 
   // Meeting Brief
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
@@ -84,6 +87,7 @@ export const ADMIN_EVENTS = {
   REQUEST_DELETED: 'request:deleted',
   REQUEST_BATCH_CREATED: 'request:batch_created',
   REQUEST_BULK_UPDATED: 'request:bulk_updated',
+  QUEUE_UPDATE: 'queue:update',
 } as const;
 
 export type AdminEventName = typeof ADMIN_EVENTS[keyof typeof ADMIN_EVENTS];

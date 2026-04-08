@@ -10,10 +10,7 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-// NotificationBell uses fetch internally; mock it to avoid side effects
-vi.mock('../../src/components/NotificationBell', () => ({
-  NotificationBell: () => <div data-testid="notification-bell" />,
-}));
+// NotificationBell was removed from Breadcrumbs (moved to Sidebar only).
 
 const WORKSPACES: Workspace[] = [
   { id: 'ws-1', name: 'Acme', webflowSiteId: 'site-1', webflowSiteName: 'acme.com', folder: 'acme', createdAt: '2025-01-01' },
@@ -96,11 +93,6 @@ describe('Breadcrumbs', () => {
   it('shows pending requests badge when > 0', () => {
     renderBreadcrumbs({ pendingContentRequests: 3 });
     expect(screen.getByText('3')).toBeInTheDocument();
-  });
-
-  it('renders notification bell', () => {
-    renderBreadcrumbs();
-    expect(screen.getByTestId('notification-bell')).toBeInTheDocument();
   });
 
   it('renders command palette trigger', () => {

@@ -58,7 +58,8 @@ export interface PageEditRowProps {
   onToggleExpand: (id: string) => void;
   onToggleApprovalSelect: (id: string) => void;
   onUpdateField: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
-  onSave: (pageId: string) => void;
+  onSave?: (pageId: string) => void;
+  isCmsPage?: boolean;
   onSaveDraft?: (pageId: string) => void;
   onAiRewrite: (pageId: string, field: 'title' | 'description' | 'both') => void;
   onSelectVariation: (pageId: string, field: 'seoTitle' | 'seoDescription', value: string) => void;
@@ -76,7 +77,7 @@ export function PageEditRow({
   page, edit, expanded, isSaving, isSaved, isAiLoading, isDraftSaving, isDraftSaved, isSelected,
   pageRecs, pageState, variations, showApprovalCheckbox,
   isSendingToClient, isSentToClient, hasChanges, onSendToClient,
-  onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, onSaveDraft,
+  onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, isCmsPage, onSaveDraft,
   onAiRewrite, onSelectVariation, onClearVariations, onClearTracking, errorState,
   showPreview, onTogglePreview, onAnalyzePage, hasAnalysis, isAnalyzing,
 }: PageEditRowProps) {
@@ -186,7 +187,7 @@ export function PageEditRow({
                 <button
                   onClick={() => onAnalyzePage(page.id)}
                   disabled={isAnalyzing}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-violet-600/80 hover:bg-violet-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium rounded transition-colors disabled:opacity-50"
                   title={hasAnalysis ? 'Re-analyze page (update recommendations)' : 'Run page analysis to generate optimization recommendations'}
                 >
                   {isAnalyzing ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Search className="w-2.5 h-2.5" />}
@@ -365,8 +366,9 @@ export function PageEditRow({
               </button>
             )}
             <button
-              onClick={() => onSave(page.id)}
-              disabled={!edit.dirty || isSaving}
+              onClick={() => onSave?.(page.id)}
+              disabled={!edit.dirty || isSaving || !onSave}
+              title={!onSave && isCmsPage ? 'CMS pages must be updated directly in Webflow' : undefined}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isSaved ? 'bg-green-600 text-white' : 'bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}

@@ -8,6 +8,7 @@ import { uploadAsset } from './webflow.js';
 
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
+import { ADMIN_EVENTS } from './ws-events.js';
 
 const log = createLogger('processor');
 
@@ -94,14 +95,14 @@ export function getQueue(): QueueItem[] {
 function addToQueue(item: QueueItem, broadcast: BroadcastFn) {
   queue.push(item);
   if (queue.length > 100) queue.splice(0, queue.length - 100);
-  broadcast('queue:update', item);
+  broadcast(ADMIN_EVENTS.QUEUE_UPDATE, item);
 }
 
 function updateQueueItem(id: string, updates: Partial<QueueItem>, broadcast: BroadcastFn) {
   const item = queue.find(q => q.id === id);
   if (item) {
     Object.assign(item, updates);
-    broadcast('queue:update', item);
+    broadcast(ADMIN_EVENTS.QUEUE_UPDATE, item);
   }
 }
 

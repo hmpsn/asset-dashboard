@@ -345,4 +345,6 @@ export interface PageTypeBriefConfig {
   sectionRange: string;
   /** Full content style guidance injected into the prompt. */
   contentStyle: string;
+  /** Full page-type instruction block injected verbatim into the generateBrief() prompt. */
+  prompt: string;
 }

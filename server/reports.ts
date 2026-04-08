@@ -86,6 +86,16 @@ function listSnapshotsStmt() {
   return _listSnapshots;
 }
 
+let _cleanupOldSnapshots: ReturnType<typeof db.prepare> | null = null;
+function cleanupOldSnapshotsStmt() {
+  if (!_cleanupOldSnapshots) {
+    _cleanupOldSnapshots = db.prepare(`
+      DELETE FROM audit_snapshots WHERE created_at < datetime('now', ? || ' days')
+    `);
+  }
+  return _cleanupOldSnapshots;
+}
+
 interface SnapshotRow {
   id: string;
   site_id: string;
@@ -108,6 +118,11 @@ function rowToSnapshot(row: SnapshotRow): AuditSnapshot {
     actionItems: row.action_items ? parseJsonFallback(row.action_items, []) : [],
     previousScore: row.previous_score ?? undefined,
   };
+}
+
+export function cleanupOldSnapshots(maxAgeDays: number = 365): number {
+  const result = cleanupOldSnapshotsStmt().run(`-${maxAgeDays}`);
+  return (result as { changes: number }).changes;
 }
 
 export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditResult, logoUrl?: string): AuditSnapshot {

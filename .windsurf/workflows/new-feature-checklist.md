@@ -24,6 +24,12 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 - [ ] **New activity type?**: If adding a new `ActivityType`, add it to the union in `activity-log.ts`. If clients should see it, add to `CLIENT_VISIBLE_TYPES` in `listClientActivity()`
 - [ ] **New event name?**: Register it in `server/ws-events.ts`
 
+## During Implementation — Testing
+
+- [ ] **Write tests alongside code**: New routes need integration tests (use `createTestContext()` from `tests/integration/helpers.ts`). New state transitions need guard tests. New shared type fields need contract tests asserting endpoint response shape.
+- [ ] **Use test infrastructure**: Mock factories in `tests/mocks/` (webflow, stripe, openai, anthropic, google, semrush). Seed fixtures in `tests/fixtures/` (workspace-seed, auth-seed, content-seed, approval-seed). Never hand-roll mocks when a factory exists.
+- [ ] **Run full test suite**: `npx vitest run` passes — not just new tests. Existing contract tests catch regressions from your changes.
+
 ## During Implementation — Frontend Side
 
 - [ ] **Client dashboard handler**: `ClientDashboard.tsx` `useWorkspaceEvents()` has a handler for the event that refetches relevant data
@@ -31,6 +37,12 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 - [ ] **State updates**: Components receive fresh data from state (not stale closures or one-time fetches)
 - [ ] **Feature toggles**: If feature is tier-gated, `effectiveTier` check is in place and updates when `workspace:updated` fires
 - [ ] **Studio name in copy**: Any user-facing text referencing the team/studio uses `STUDIO_NAME` from `src/constants.ts` (client) or `server/constants.ts` (server) — never hardcoded strings. See `ui-vocabulary.md` § Studio / Agency Name for interpolation rules.
+
+## During Implementation — Tests
+
+- [ ] **New public-portal mutation endpoint**: Integration test covers (1) 401 unauthenticated, (2) 200 valid authenticated request, (3) empty string for any `.email()` / `.url()` validated field (`''` must return 200, not 400), (4) merge semantics if the endpoint touches a JSON column with nested structure
+- [ ] **New form component**: Component tests cover (1) prop re-renders update form state when not editing, (2) prop changes do NOT clobber in-progress edits, (3) empty/null values render no broken elements (empty `<a href="">`, etc.), (4) feature-flag-off behavior (direct URL navigation doesn't show blank content)
+- [ ] **Full suite passes**: `npx vitest run` — not just the new tests
 
 ## After Implementation
 

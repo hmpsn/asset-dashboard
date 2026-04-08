@@ -6,6 +6,7 @@ import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
 import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
+import type { PageKeywordMap } from '../../../shared/types/workspace';
 import type { ContentPlanReviewCell } from '../../hooks/useClientData';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
@@ -52,6 +53,8 @@ interface InboxTabProps {
   contentPlanReviewCells?: ContentPlanReviewCell[];
   // Which section to show initially (for deep-linking from Overview actions)
   initialFilter?: InboxFilter;
+  // Keyword strategy page map for approval card context chips
+  pageMap?: PageKeywordMap[];
 }
 
 export function InboxTab({
@@ -62,6 +65,7 @@ export function InboxTab({
   setToast,
   contentPlanReviewCells = [],
   initialFilter,
+  pageMap,
 }: InboxTabProps) {
   const betaMode = useBetaMode();
   const [filter, setFilter] = useState<InboxFilter>(initialFilter || 'all');
@@ -157,6 +161,7 @@ export function InboxTab({
             setApprovalBatches={setApprovalBatches}
             loadApprovals={loadApprovals}
             setToast={setToast}
+            pageMap={pageMap}
           />
         </div>
       )}
@@ -192,9 +197,9 @@ export function InboxTab({
         <div>
           {filter === 'all' && (
             <div className="flex items-center gap-2 mb-3 mt-2">
-              <Layers className="w-4 h-4 text-violet-400" />
+              <Layers className="w-4 h-4 text-teal-400" />
               <span className="text-sm font-medium text-zinc-300">Content Plan</span>
-              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">{planReviewCount} needs review</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">{planReviewCount} needs review</span>
             </div>
           )}
           <div className="space-y-2">
@@ -211,7 +216,7 @@ export function InboxTab({
                           <span className={`text-[11px] px-1.5 py-0.5 rounded border ${
                             isFlagged
                               ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                              : 'bg-violet-500/10 border-violet-500/30 text-violet-400'
+                              : 'bg-teal-500/10 border-teal-500/30 text-teal-400'
                           }`}>
                             {isFlagged ? 'Flagged' : 'Needs Review'}
                           </span>
@@ -244,13 +249,13 @@ export function InboxTab({
                           onChange={e => setFlagComment(e.target.value)}
                           placeholder="Describe what you'd like changed..."
                           rows={2}
-                          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 resize-none"
+                          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500 resize-none"
                         />
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleFlagCell(cell)}
                             disabled={flagSubmitting || !flagComment.trim()}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg text-[11px] font-medium transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 rounded-lg text-[11px] font-medium transition-colors"
                           >
                             {flagSubmitting ? 'Submitting...' : 'Submit Feedback'}
                           </button>

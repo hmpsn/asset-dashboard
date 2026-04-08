@@ -1,6 +1,6 @@
 /**
- * Studio / agency name used in server-side copy (emails, request notes, etc.).
- * Single source of truth — change here to rebrand all client-facing server copy.
+ * Studio / agency name used in server-side copy (emails, exports, etc.).
+ * SYNC: Must match src/constants.ts — pr-check validates they're identical.
  * Future: make per-workspace for agency resale (ws.studioName || STUDIO_NAME).
  */
 export const STUDIO_NAME = 'hmpsn studio';

@@ -38,72 +38,45 @@
 ## Dependency Graph
 
 ```
-Task 1 (feature flags + types + routes) ──┐
-                                           ├──► Task 3 (migration + workspaces.ts)
-                                           │      └──► Task 4 (FeaturesTab toggle)
-                                           │      └──► Task 5 (integration test)
+[DONE] Task 1 (Phase 0 shipped) ──────────┐
                                            │
-Task 1 ────────────────────────────────────┼──► Task 6 (BrandTab component)
-                                           │      └──► Task 7 (ClientDashboard wiring)
-                                           │      └──► Task 9 (BrandTab component test)
+  Batch 1 (parallel, no deps):            │
+    Task 2 (pr-check rules)                │
+    Task 3 (migration 048 + workspaces.ts) │
+    Task 6 (BrandTab component)            │
+    Task 8 (useSmartPlaceholder hook)      │
                                            │
-Task 1 ────────────────────────────────────┼──► Task 8 (useSmartPlaceholder hook)
-                                           │      └──► Task 10 (AdminChat + ChatPanel integration)
-                                           │      └──► Task 11 (unit + component tests)
+  Batch 2 (parallel, after Batch 1):       │
+    Task 4 (FeaturesTab toggle) ← Task 3   │
+    Task 7 (ClientDashboard wiring) ← Task 6
+    Task 10 (AdminChat + ChatPanel) ← Task 8
+    Task 12 (OverviewTab SI gate) ← Task 3 │
                                            │
-[Independent] ─────────────────────────────┴──► Task 2 (pr-check rules — no deps)
+  Batch 3 (parallel, after Batch 2):       │
+    Task 5 (integration test) ← Task 3     │
+    Task 9 (BrandTab test) ← Task 6        │
+    Task 11 (SmartPlaceholder tests) ← Task 8+10
 ```
 
-**Sequential constraints:**
-- Task 1 must complete before Tasks 3, 6, 8
-- Task 3 must complete before Tasks 4 and 5
-- Task 6 must complete before Tasks 7 and 9
-- Task 8 must complete before Tasks 10 and 11
-
-**Parallel opportunities:**
-- Tasks 1 and 2 can run in parallel
-- Tasks 4, 6, and 8 can run in parallel after Task 1 + 3 complete
-- Tasks 5, 9, 11 can run in parallel after their respective feature tasks complete
+**Since Task 1 is complete, the revised execution plan is:**
+- **Batch 1:** Tasks 2, 3, 6, 8 (all independent — run in parallel)
+- **Batch 2:** Tasks 4, 7, 10, 12 (each depends on its Batch 1 parent — run in parallel after Batch 1 merges)
+- **Batch 3:** Tasks 5, 9, 11 (tests — run in parallel after Batch 2 merges)
 
 ---
 
 ## Tasks
 
-### Task 1 — Shared Contracts: Feature Flags, Workspace Type, ClientTab Union
+### Task 1 — COMPLETED BY PHASE 0 (skip)
 
-**Model:** Haiku (mechanical additions to existing files)
+**Status:** All shared contracts were committed in Phase 0. The following already exist on `main`:
+- `'client-brand-section'` and `'smart-placeholders'` flags in `shared/types/feature-flags.ts`
+- `siteIntelligenceClientView` field in `shared/types/workspace.ts`
+- `'brand'` in `ClientTab` union in `src/routes.ts`
 
-- [ ] Read `shared/types/feature-flags.ts` to confirm current flag list
-- [ ] Read `shared/types/workspace.ts` to confirm `Workspace` interface end
-- [ ] Read `src/routes.ts` to confirm current `ClientTab` type
+**Remaining from original Task 1:** The `ClientDashboard.tsx` allowed-tabs-array edit has been folded into Task 7.
 
-- [ ] **Edit `shared/types/feature-flags.ts`** — add two new flags:
-
-```typescript
-// After 'bridge-client-signal':
-'client-brand-section': false,  // Client portal Brand tab
-'smart-placeholders': false,    // Smart placeholder chips in admin + ghost text in client chat
-```
-
-The full diff for `FEATURE_FLAGS` adds these two entries before `} as const;`.
-
-- [ ] **Edit `shared/types/workspace.ts`** — add `siteIntelligenceClientView` to `Workspace` interface, immediately after `analyticsClientView`:
-
-```typescript
-analyticsClientView?: boolean;
-siteIntelligenceClientView?: boolean;  // Show Site Intelligence summary card on OverviewTab (default true)
-```
-
-- [ ] **Edit `src/routes.ts`** — add `'brand'` to `ClientTab`:
-
-```typescript
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
-```
-
-Also add `'brand'` to the allowed tabs array in `ClientDashboard.tsx` line 152 (`if (t && ['overview',...,'brand'].includes(t))`).
-
-- [ ] Run `npx tsc --noEmit --skipLibCheck` — expect 0 errors (types only, no consumers yet)
-- [ ] Commit: `feat(types): add client-brand-section + smart-placeholders flags, siteIntelligenceClientView field, brand ClientTab`
+No action needed. Proceed directly to Tasks 2, 3, 6, and 8.
 
 ---
 
@@ -166,7 +139,7 @@ Also add `'brand'` to the allowed tabs array in `ClientDashboard.tsx` line 152 (
 **Model:** Haiku (mechanical DB addition)
 **Depends on:** Task 1 (Workspace type must have `siteIntelligenceClientView`)
 
-- [ ] **Create `server/db/migrations/047-site-intelligence-client-view.sql`**:
+- [ ] **Create `server/db/migrations/048-site-intelligence-client-view.sql`**:
 
 ```sql
 -- Add site_intelligence_client_view column to workspaces
@@ -205,7 +178,7 @@ In the `Partial<Pick<Workspace, '...' | 'siteIntelligenceClientView'>>` union.
 ```
 
 - [ ] Run `npx tsc --noEmit --skipLibCheck` — 0 errors
-- [ ] Commit: `feat(db): migration 047 + workspaces.ts — add siteIntelligenceClientView column and mapper`
+- [ ] Commit: `feat(db): migration 048 + workspaces.ts — add siteIntelligenceClientView column and mapper`
 
 ---
 

@@ -11,7 +11,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
@@ -272,7 +272,11 @@ export async function analyzeInternalLinks(
 
   // Enrich with brand voice for better anchor text quality
   const wsObj = workspaceId ? getWorkspace(workspaceId) : null;
-  const { brandVoiceBlock } = buildSeoContext(workspaceId);
+  const intel = workspaceId
+    ? await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] })
+    : null;
+  const seo = intel?.seoContext;
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
   const brandCtx = brandVoiceBlock || (wsObj?.brandVoice ? `\nBrand voice: ${wsObj.brandVoice}` : '');
 
   // Build the page summary for AI analysis
@@ -310,7 +314,8 @@ export async function analyzeInternalLinks(
   }
 
   // Add business knowledge + personas for better link priority and anchor text
-  const { knowledgeBlock, personasBlock } = workspaceId ? buildSeoContext(workspaceId) : { knowledgeBlock: '', personasBlock: '' };
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
+  const personasBlock = formatPersonasForPrompt(seo?.personas ?? []);
 
   const prompt = `You are an expert SEO strategist analyzing internal linking opportunities for a website. 
 

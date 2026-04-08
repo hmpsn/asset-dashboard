@@ -43,7 +43,7 @@ let _updateStmt: ReturnType<typeof db.prepare> | null = null;
 function updateStmt() {
   if (!_updateStmt) {
     _updateStmt = db.prepare(`
-      UPDATE jobs SET status = @status, progress = @progress, total = @total, message = @message,
+      UPDATE jobs SET status = @status, progress = @progress, total = @total, message = @message, -- status-ok: job progress tracker
         result = @result, error = @error, updated_at = @updatedAt
       WHERE id = @id
     `);

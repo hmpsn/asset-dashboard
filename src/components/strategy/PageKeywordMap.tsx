@@ -2,6 +2,7 @@ import {
   ChevronDown, ChevronRight, Loader2, Pencil, Check, X,
   Search, BarChart3, Shield, DollarSign, ArrowUp, ArrowDown,
 } from 'lucide-react';
+import type { MetricsSource } from '../../../shared/types/keywords.js';
 import { SeoCopyPanel } from './SeoCopyPanel';
 
 interface PageKeywordMap {
@@ -16,7 +17,7 @@ interface PageKeywordMap {
   volume?: number;
   difficulty?: number;
   cpc?: number;
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
 }

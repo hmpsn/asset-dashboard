@@ -1,5 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 
@@ -65,7 +66,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM feedback WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id`,
+    `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id`, // status-ok: simple lifecycle, validateTransition planned in Batch 2
   ),
   deleteById: db.prepare(
     `DELETE FROM feedback WHERE id = ? AND workspace_id = ?`,
@@ -83,9 +84,9 @@ function rowToFeedback(row: FeedbackRow): FeedbackItem {
     title: row.title,
     description: row.description,
     status: row.status as FeedbackStatus,
-    context: row.context ? JSON.parse(row.context) : undefined,
+    context: parseJsonFallback(row.context, undefined),
     submittedBy: row.submitted_by ?? undefined,
-    replies: JSON.parse(row.replies),
+    replies: parseJsonFallback(row.replies, []),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

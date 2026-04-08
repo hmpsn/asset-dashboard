@@ -545,66 +545,14 @@
           "priority": "P2",
           "notes": "Standardize loading patterns: route-level (keep ChunkFallback), data fetching (skeleton screens), actions (button loading + optimistic UI), background jobs (progress panel).",
           "status": "pending"
-        }
-      ]
-    },
-    {
-      "id": "sprint-semrush-optimization",
-      "name": "SEMRush API Cost Optimization",
-      "goal": "Reduce SEMRush credit consumption by 40-60% without degrading strategy quality",
-      "items": [
+        },
         {
-          "id": 371,
-          "title": "Extend SEMRush cache TTLs by data volatility",
-          "source": "OPTIMIZATION",
-          "est": "0.5h",
+          "id": 535,
+          "title": "CMS Editor UX Redesign — Match SeoEditor simplicity",
+          "source": "PR #138 review / manual testing",
+          "est": "3-5h",
           "priority": "P1",
-          "notes": "Shipped — Named TTL constants: keyword metrics 7d→30d, related/questions 7d→30d, domain overview 48h→7d, backlinks 48h→7d, competitors 72h→14d. Domain organic stays at 7d (rankings shift weekly). ~10-20% fewer cache misses on repeat operations.",
-          "status": "done"
-        },
-        {
-          "id": 372,
-          "title": "Unify domain organic fetch limit to prevent cache misses",
-          "source": "OPTIMIZATION",
-          "est": "0.5h",
-          "priority": "P1",
-          "notes": "Shipped — Strategy gen fetched limit=100 (quick) or limit=200 (full), but getKeywordGap internally re-fetches client domain with limit=200. Different limit = different cache key = duplicate API call. Standardized to 200 for all modes.",
-          "status": "done"
-        },
-        {
-          "id": 373,
-          "title": "Global cross-workspace keyword metrics cache (SQLite)",
-          "source": "OPTIMIZATION",
-          "est": "3h",
-          "priority": "P1",
-          "notes": "Shipped — keyword_metrics_cache SQLite table with L1/L2 cache chain in getKeywordOverview: L1 (global SQLite) → L2 (per-workspace file) → L3 (SEMRush API). File cache hits backfill global table. API results write to both caches. Saves 30-50% of keyword_overview credits across workspaces in same industry. Feature #178.",
-          "status": "done"
-        },
-        {
-          "id": 374,
-          "title": "Pre-enrichment deduplication in strategy generation",
-          "source": "OPTIMIZATION",
-          "est": "1h",
-          "priority": "P1",
-          "notes": "Shipped — Post-AI validation now checks domain organic data (already fetched earlier in the same run) before calling SEMRush API. Combined with #375 (page_keywords skip). Saves ~1,000 credits per strategy run. Feature #178.",
-          "status": "done"
-        },
-        {
-          "id": 375,
-          "title": "Skip keywords with existing metrics in page_keywords table",
-          "source": "OPTIMIZATION",
-          "est": "1.5h",
-          "priority": "P2",
-          "notes": "Shipped — Post-AI validation checks existing page_keywords entries (from previous runs) before calling SEMRush API. On re-runs, 60-90% of validation API calls eliminated since most keywords are unchanged. Combined with global cache (#373) and domain organic dedup (#374). Feature #178.",
-          "status": "done"
-        },
-        {
-          "id": 376,
-          "title": "Incremental strategy updates (re-analyze changed pages only)",
-          "source": "OPTIMIZATION",
-          "est": "4h",
-          "priority": "P2",
-          "notes": "Add 'Update Strategy' mode alongside full 'Regenerate'. Uses page_keywords.analysis_generated_at to identify pages needing re-analysis. Skips competitor data if fetched within 7 days. Only runs AI on new/changed pages. Preserves existing keyword assignments for unchanged pages. Biggest long-term savings: 50-70% of a full run. Depends on: page_keywords table (#364, done).",
+          "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.",
           "status": "pending"
         }
       ]
@@ -691,13 +639,22 @@
       "rationale": "Revisit quarterly. Prioritize when a specific client need, revenue opportunity, or scale threshold justifies it.",
       "items": [
         {
+          "id": 535,
+          "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
+          "source": "PIE Group 3 code review",
+          "est": "0.5h",
+          "priority": "P2",
+          "notes": "5 public-portal mutation endpoints have no addActivity() call: POST /onboarding/:id, POST /keyword-feedback (single + bulk), POST /business-priorities, POST /content-gap-vote. Admin has zero visibility into client portal engagement. The business-profile PATCH was fixed in PR #146; the rest need the same treatment. Quick — import exists, just add the calls with appropriate ActivityType values.",
+          "status": "pending"
+        },
+        {
           "id": 532,
           "title": "Fix anomaly-detection recordScanTime FK constraint failure",
           "source": "Staging deploy 2026-03-31",
           "est": "0.5h",
           "priority": "P2",
-          "notes": "recordScanTime() inserts a sentinel row with workspace_id='__system__' which violates the FK to workspaces table. Options: store scan timestamps in a system_meta table, make workspace_id nullable on anomalies, or use a real workspace. Pre-existing bug, not caused by Phase 1.",
-          "status": "pending"
+          "notes": "Already fixed in migration 045-anomaly-scan-tracker.sql. Dedicated anomaly_scan_tracker singleton table replaces fake sentinel row. listAnomalies() __last_scan__ filter is vestigial but harmless.",
+          "status": "done"
         },
         {
           "id": 531,
@@ -1067,10 +1024,72 @@
           "source": "Connected Intelligence PR review",
           "est": "3-4h",
           "priority": "P2",
-          "notes": "Audit all JSON-column stores and cross-layer data flows for untyped Record<string, unknown> patterns. Replace with typed interfaces in shared/types/. Add JSDoc unit-of-measure annotations for percentage/decimal fields. Add shared const objects for string enums used across producer/consumer boundaries. Priority targets: workspace config JSON, audit snapshot data, strategy objects, content pipeline metadata. Pattern established in PR #86 (InsightDataMap, INSIGHT_FILTER_KEYS, JSDoc on CTR/CVR fields).",
-          "status": "pending"
+          "notes": "Added StrategyAlignmentData interface for the only untyped InsightDataMap entry (strategy_alignment). Updated UpsertInsightParams.data to InsightDataMap[InsightType] union type. Updated enrichAndUpsert<T> to generic with typed data. Removed all as unknown as Record<string,unknown> casts in analytics-intelligence.ts for compute functions (ranking_mover, ctr_opportunity, serp_opportunity). Added strategyAlignmentDataSchema to server/schemas/insight-schemas.ts. Added tests/unit/insight-data-types.test.ts. All 224 test files / 3669 tests pass.",
+          "status": "done"
         }
       ]
+    },
+    {
+      "id": "sprint-semrush-optimization",
+      "name": "✅ SHIPPED — SEMRush API Cost Optimization",
+      "goal": "Reduce SEMRush credit consumption by 40-60% without degrading strategy quality",
+      "items": [
+        {
+          "id": 371,
+          "title": "Extend SEMRush cache TTLs by data volatility",
+          "source": "OPTIMIZATION",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — Named TTL constants: keyword metrics 7d→30d, related/questions 7d→30d, domain overview 48h→7d, backlinks 48h→7d, competitors 72h→14d. Domain organic stays at 7d (rankings shift weekly). ~10-20% fewer cache misses on repeat operations.",
+          "status": "done"
+        },
+        {
+          "id": 372,
+          "title": "Unify domain organic fetch limit to prevent cache misses",
+          "source": "OPTIMIZATION",
+          "est": "0.5h",
+          "priority": "P1",
+          "notes": "Shipped — Strategy gen fetched limit=100 (quick) or limit=200 (full), but getKeywordGap internally re-fetches client domain with limit=200. Different limit = different cache key = duplicate API call. Standardized to 200 for all modes.",
+          "status": "done"
+        },
+        {
+          "id": 373,
+          "title": "Global cross-workspace keyword metrics cache (SQLite)",
+          "source": "OPTIMIZATION",
+          "est": "3h",
+          "priority": "P1",
+          "notes": "Shipped — keyword_metrics_cache SQLite table with L1/L2 cache chain in getKeywordOverview: L1 (global SQLite) → L2 (per-workspace file) → L3 (SEMRush API). File cache hits backfill global table. API results write to both caches. Saves 30-50% of keyword_overview credits across workspaces in same industry. Feature #178.",
+          "status": "done"
+        },
+        {
+          "id": 374,
+          "title": "Pre-enrichment deduplication in strategy generation",
+          "source": "OPTIMIZATION",
+          "est": "1h",
+          "priority": "P1",
+          "notes": "Shipped — Post-AI validation now checks domain organic data (already fetched earlier in the same run) before calling SEMRush API. Combined with #375 (page_keywords skip). Saves ~1,000 credits per strategy run. Feature #178.",
+          "status": "done"
+        },
+        {
+          "id": 375,
+          "title": "Skip keywords with existing metrics in page_keywords table",
+          "source": "OPTIMIZATION",
+          "est": "1.5h",
+          "priority": "P2",
+          "notes": "Shipped — Post-AI validation checks existing page_keywords entries (from previous runs) before calling SEMRush API. On re-runs, 60-90% of validation API calls eliminated since most keywords are unchanged. Combined with global cache (#373) and domain organic dedup (#374). Feature #178.",
+          "status": "done"
+        },
+        {
+          "id": 376,
+          "title": "Incremental strategy updates (re-analyze changed pages only)",
+          "source": "OPTIMIZATION",
+          "est": "4h",
+          "priority": "P2",
+          "notes": "Implemented: mode='incremental' param on POST /api/webflow/keyword-strategy/:id. Uses analysis_generated_at (7-day threshold) to split pages into toAnalyze vs toPreserve. Only runs AI batching on stale/new pages; existing keyword rows for fresh pages are left untouched via upsertPageKeywordsBatch instead of upsertAndCleanPageKeywords. Added 'Update changed pages' button in KeywordStrategy.tsx. New competitorLastFetchedAt field on Workspace (migration 052). 8 integration tests pass.",
+          "status": "done"
+        }
+      ],
+      "shippedAt": "2026-04-07"
     },
     {
       "id": "sprint-outcome-engine-wiring",
@@ -1148,47 +1167,56 @@
         {
           "title": "Phase 3A: Title/Meta A/B variants in content briefs (3 options each)",
           "status": "done",
-          "notes": "Shipped — AI prompt generates 3 title + 3 meta variants. DB migration 027-brief-variants.sql. Variant picker in BriefDetail with swap-to-primary UX. Feature #175."
+          "notes": "Shipped — AI prompt generates 3 title + 3 meta variants. DB migration 027-brief-variants.sql. Variant picker in BriefDetail with swap-to-primary UX. Feature #175.",
+          "id": "content-brief-ab-variants-3a"
         },
         {
           "title": "Phase 3B: Outline-only regeneration with optional feedback",
           "status": "done",
-          "notes": "Shipped — regenerateOutline() + POST endpoint. Teal button in BriefDetail with optional feedback textarea. Preserves all other brief fields. Feature #176."
+          "notes": "Shipped — regenerateOutline() + POST endpoint. Teal button in BriefDetail with optional feedback textarea. Preserves all other brief fields. Feature #176.",
+          "id": "content-brief-outline-regen-3b"
         },
         {
           "title": "Phase 3C: Brand voice scoring on generated content posts",
           "status": "done",
-          "notes": "Shipped — scoreVoiceMatch() evaluates 4 dimensions via GPT-4.1. DB migration 028-post-voice-score.sql. MetricRing + Score Voice button in ContentManager. Expandable feedback panel. Feature #177."
+          "notes": "Shipped — scoreVoiceMatch() evaluates 4 dimensions via GPT-4.1. DB migration 028-post-voice-score.sql. MetricRing + Score Voice button in ContentManager. Expandable feedback panel. Feature #177.",
+          "id": "content-brief-brand-voice-3c"
         },
         {
           "title": "Phase 4A: Client keyword submission to strategy",
           "status": "done",
-          "notes": "Shipped — 'requested' status in keyword_feedback. Migration 029. getRequestedKeywords() + AI prompt injection. Client UI: Suggest a Keyword section in StrategyTab. Feature #178."
+          "notes": "Shipped — 'requested' status in keyword_feedback. Migration 029. getRequestedKeywords() + AI prompt injection. Client UI: Suggest a Keyword section in StrategyTab. Feature #178.",
+          "id": "keyword-strategy-client-submission-4a"
         },
         {
           "title": "Phase 4B: SERP feature targeting in keyword strategy",
           "status": "done",
-          "notes": "Shipped — serpTargeting recommendations generated per content gap with SERP features. Displayed as yellow guidance text in ContentGaps component. Feature #179."
+          "notes": "Shipped — serpTargeting recommendations generated per content gap with SERP features. Displayed as yellow guidance text in ContentGaps component. Feature #179.",
+          "id": "keyword-strategy-serp-targeting-4b"
         },
         {
           "title": "Phase 4C: Strategy diff — What Changed between runs",
           "status": "done",
-          "notes": "Shipped — strategy_history table (migration 030, keeps last 5). Diff endpoint. StrategyDiff component shows new/lost keywords, new/resolved gaps, keyword reassignments. Feature #180."
+          "notes": "Shipped — strategy_history table (migration 030, keeps last 5). Diff endpoint. StrategyDiff component shows new/lost keywords, new/resolved gaps, keyword reassignments. Feature #180.",
+          "id": "keyword-strategy-diff-4c"
         },
         {
           "title": "Phase 4D: Prioritized quick wins by ROI score",
           "status": "done",
-          "notes": "Shipped — ROI score = (volume*(1-difficulty/100))/position. Blue ROI badge in QuickWins. Sorted by score descending. Feature #181."
+          "notes": "Shipped — ROI score = (volume*(1-difficulty/100))/position. Blue ROI badge in QuickWins. Sorted by score descending. Feature #181.",
+          "id": "keyword-strategy-quick-wins-4d"
         },
         {
           "title": "Phase 5: DataForSEO migration + provider toggle in Command Center",
           "status": "done",
-          "notes": "Shipped — SeoDataProvider interface (9 methods) + registry with preferred/fallback. SemrushProvider (zero behavior change). DataForSeoProvider with Basic auth, file cache, credit tracking, circuit breaker. Migration 031. Per-workspace provider toggle in KeywordStrategy settings. Strategy generator + AI usage wired through abstraction. Feature #182."
+          "notes": "Shipped — SeoDataProvider interface (9 methods) + registry with preferred/fallback. SemrushProvider (zero behavior change). DataForSeoProvider with Basic auth, file cache, credit tracking, circuit breaker. Migration 031. Per-workspace provider toggle in KeywordStrategy settings. Strategy generator + AI usage wired through abstraction. Feature #182.",
+          "id": "keyword-strategy-dataforseo-5"
         },
         {
           "title": "Phase 6: CMS Image Optimization — compress + alt text + RichText repair",
           "status": "done",
-          "notes": "Shipped — GET /api/webflow/cms-images/:siteId scans all collections for Image, MultiImage, and RichText fields. Per-asset usage map with collection + field metadata. Compress endpoint now accepts cmsUsages[] and calls repairCmsReferences() before deleting old asset: Image fields (fileId/url swap), MultiImage (array entry swap), RichText (HTML string URL replacement). Auto-publishes updated CMS items. CmsFieldSelector UI with smart defaults (meta/OG fields unchecked, content fields checked). cms-images and cms-missing-alt filter types in AssetBrowser. Blue CMS badge on AssetCard showing collection → field name. selectedCmsFields state gates both filter and bulk operations. Feature #183."
+          "notes": "Shipped — GET /api/webflow/cms-images/:siteId scans all collections for Image, MultiImage, and RichText fields. Per-asset usage map with collection + field metadata. Compress endpoint now accepts cmsUsages[] and calls repairCmsReferences() before deleting old asset: Image fields (fileId/url swap), MultiImage (array entry swap), RichText (HTML string URL replacement). Auto-publishes updated CMS items. CmsFieldSelector UI with smart defaults (meta/OG fields unchecked, content fields checked). cms-images and cms-missing-alt filter types in AssetBrowser. Blue CMS badge on AssetCard showing collection → field name. selectedCmsFields state gates both filter and bulk operations. Feature #183.",
+          "id": "keyword-strategy-cms-images-6"
         }
       ],
       "shippedAt": "2026-03-28"
@@ -2440,22 +2468,50 @@
         {
           "title": "Phase 1A: Auto-track client-approved keywords to RankTracker",
           "status": "done",
-          "notes": "Shipped — keyword-strategy.ts feedback POST handlers now call addTrackedKeyword() on approval, both single and bulk. Deduplication handled by addTrackedKeyword."
+          "notes": "Shipped — keyword-strategy.ts feedback POST handlers now call addTrackedKeyword() on approval, both single and bulk. Deduplication handled by addTrackedKeyword.",
+          "id": "rank-tracker-auto-track-1a"
         },
         {
           "title": "Phase 1B: Track keyword buttons in KeywordStrategy and PageIntelligence",
           "status": "done",
-          "notes": "Shipped — teal + / ✓ Track buttons on keyword badges in KeywordStrategy site target keywords and PageIntelligence page detail. Calls POST /api/rank-tracking/:wid/keywords."
+          "notes": "Shipped — teal + / ✓ Track buttons on keyword badges in KeywordStrategy site target keywords and PageIntelligence page detail. Calls POST /api/rank-tracking/:wid/keywords.",
+          "id": "rank-tracker-track-buttons-1b"
         },
         {
           "title": "Phase 2A: Auto dead link scan integrated into site audit",
           "status": "done",
-          "notes": "Shipped — runSeoAudit() now calls checkSiteLinks() post-page-analysis. Results in SeoAuditResult.deadLinkSummary + deadLinkDetails. skipLinkCheck opt-out param added to all audit trigger paths."
+          "notes": "Shipped — runSeoAudit() now calls checkSiteLinks() post-page-analysis. Results in SeoAuditResult.deadLinkSummary + deadLinkDetails. skipLinkCheck opt-out param added to all audit trigger paths.",
+          "id": "dead-links-auto-scan-2a"
         },
         {
           "title": "Phase 2B+C: Dead link details panel in audit UI with fix actions + CSV export",
           "status": "done",
-          "notes": "Shipped — SeoAudit.tsx renders broken link panel with status, type, found-on, anchor text. Fix in SEO Editor button (internal links), inline Add Redirect form (best-effort server save), and Export CSV button (dead-links.csv with redirect column)."
+          "notes": "Shipped — SeoAudit.tsx renders broken link panel with status, type, found-on, anchor text. Fix in SEO Editor button (internal links), inline Add Redirect form (best-effort server save), and Export CSV button (dead-links.csv with redirect column).",
+          "id": "dead-links-details-panel-2bc"
+        },
+        {
+          "id": "pie-g2-pr3-kd-framing",
+          "title": "KD framing labels + tooltips on keyword rows",
+          "status": "done",
+          "notes": "kdFraming(kd) + kdTooltip(kd) utils; wired into StrategyTab and ContentGaps"
+        },
+        {
+          "id": "pie-g2-pr3-predicted-impact",
+          "title": "Predicted organic impact (volume × CTR) on keyword rows",
+          "status": "done",
+          "notes": "estimatedCTR uses Backlinko curve; ContentGaps uses pos-3 floor (0.103)"
+        },
+        {
+          "id": "pie-g2-pr3-serp-chip-fix",
+          "title": "SERP feature chips: all 4 types, corrected to blue",
+          "status": "done",
+          "notes": "featured snippet, PAA, local pack, video carousel — yellow/cyan chips replaced with blue (data law)"
+        },
+        {
+          "id": "pie-g2-pr3-seo-editor-unified",
+          "title": "SEO Editor unified pages: CMS filter + collectionId threading",
+          "status": "done",
+          "notes": "all-pages endpoint, showCmsOnly toggle, manual-apply badge, collectionId in approval items"
         }
       ]
     },
@@ -3831,8 +3887,53 @@
           "est": "20-30h",
           "priority": "P1",
           "sprint": "E",
-          "notes": "In progress. PR #118 covers Tasks 1-3 (shared types, bridge wiring, siteHealth assembler). Tasks 4-17 remaining.",
-          "status": "pending"
+          "notes": "Shipped — 5 PRs (#116-#120). Shared types + bridge scaffolding. All 8 slice assemblers + compositeHealthScore + read-time bridges #8/#9/#14 + scheduler/churn/anomaly cache invalidation + WS INTELLIGENCE_CACHE_UPDATED handler. as-any elimination (38 casts → import type, surfaced 9 hidden data bugs). formatForPrompt expansion (5 new slice formatters, verbosity levels), tokenBudget §20 priority chain, pr-check regression guards (listPages, buildSeoContext, recordAction), 120+ new tests. Deferred to Phase 3B: mini-builder retirement (25 buildSeoContext callers + 6 buildPageAnalysisContext callers), businessProfile enrichment (needs structured editor UI), contentGaps bridge.",
+          "status": "done",
+          "shippedAt": "2026-04-02"
+        },
+        {
+          "id": "unified-workspace-intelligence-3b",
+          "title": "Unified Workspace Intelligence Layer — Phase 3B (Mini-Builder Retirement + Advanced Slices)",
+          "source": "docs/superpowers/plans/2026-04-02-unified-workspace-intelligence-phase3b.md",
+          "est": "12-16h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #125. Retired buildSeoContext (all callers migrated to buildWorkspaceIntelligence). Structured businessProfile editor + wire into SeoContextSlice. contentGaps bridge from strategy to PageProfileSlice. N+1 pre-assembly in seo-audit.ts and webflow-seo.ts (hoist workspace slices before per-page loops). Fixed strategyHistory SQL (wrong column names silently broke stmts() cache). Removed as-any cast on seoDataProvider. Format fidelity: 7 previously-assembled fields now rendered in prompt formatters. pr-check guards upgraded from warn → error (buildSeoContext + listPages). 25+ new contract tests.",
+          "shippedAt": "2026-04-02",
+          "status": "done"
+        },
+        {
+          "id": "unified-workspace-intelligence-4a",
+          "title": "Unified Workspace Intelligence Layer — Phase 4A (Infrastructure: Data Retention + Cache Warming)",
+          "source": "session planning 2026-04-03",
+          "est": "3-4h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #128. Data retention crons (daily): chat_sessions 180d, audit_snapshots 365d (time-based, preserves full trend history), llms_txt_cache 90d. Intelligence cache warming cron every 6h for workspaces with activity in last 30 days (7 slices, excludes pageProfile). isRunning guard prevents overlapping cycles. Startup timeouts tracked at module level for clean cancellation. 10 tests.",
+          "shippedAt": "2026-04-03",
+          "status": "done"
+        },
+        {
+          "id": "unified-workspace-intelligence-4b",
+          "title": "Unified Workspace Intelligence Layer — Phase 4B (Admin Chat Migration + businessProfile Auto-Populate)",
+          "source": "session planning 2026-04-03",
+          "est": "3-4h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #129. Admin chat context now sources activity/performance/client health from intelligence slices (operational, siteHealth, clientSignals) instead of direct DB helpers. Context size managed through selective slice inclusion per question category (not tokenBudget — admin-chat-context never calls formatForPrompt). getLinkCheck/getPageSpeed supplemental direct calls preserved for per-URL dead link detail and worst-page scores (siteHealth slice stores counts only — same pattern as listBatches() for approvals). CWV pass rate decimal fix (0-1 → %). ChurnSignalSummary title+description fields surfaced. businessProfile auto-populate: Sparkles button in IntelligenceProfileTab calls POST autofill endpoint, uses seoContext slice (not businessProfile — avoids chicken-and-egg), GPT-4.1-mini (temp 0.3, 300 tokens) returns industry/goals/targetAudience. 16 tests (8 structural + 8 behavioural classifyQuestion).",
+          "shippedAt": "2026-04-03",
+          "status": "done"
+        },
+        {
+          "id": "unified-workspace-intelligence-4c",
+          "title": "Unified Workspace Intelligence Layer — Phase 4C (Client Intelligence API + Portal Widget)",
+          "source": "session planning 2026-04-03",
+          "est": "2-3h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #130. ClientIntelligence shared type (5 interfaces — scrubbed, tier-gated view; no knowledgeBase/brandVoice/churnRisk/operational/strategy_alignment). GET /api/public/intelligence/:workspaceId: free gets insightsSummary+pipelineStatus, growth adds learningHighlights, premium adds siteHealthSummary. useClientIntelligence hook (5-min stale, React Query). IntelligenceSummaryCard in client OverviewTab: high-priority insights + briefs in progress (blue, all tiers), win rate (teal, Growth+ TierGate). 13 tests across 4 test files.",
+          "shippedAt": "2026-04-03",
+          "status": "done"
         },
         {
           "id": "bridge-audit-finding-auto-resolve",
@@ -3908,6 +4009,59 @@
           "priority": "P1",
           "notes": "Full page-level AI copy generation: per-page intelligence injection (content decay + CTR + SERP opportunity → copy structure), copy intelligence feedback loop (patterns back into prompts via buildCopyIntelligenceContext()), approved copy → voice sample loop. Uses buildSystemPrompt() for voice-calibrated output. Prerequisite: Page Strategy Engine shipped to staging. Plan audit deferred until after Page Strategy ships.",
           "status": "pending"
+        },
+        {
+          "id": "pie-group2-strategy-card-context",
+          "title": "Strategy Card Context — AI-Aware Per-Page SEO Metadata",
+          "source": "PIE Group 2 (docs/superpowers/plans/2026-04-03-pie-group2-strategy-seo.md)",
+          "est": "2h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #137. strategyCardContext block added to keyword strategy generation: each page in pageMap carries cardContext.pageType, pageTypeLabel, strategicPriority, priorityReason from getPageTypeConfig(). Injected into content brief prompts via buildStrategyCardBlock(). Exports getPageTypeConfig() for downstream consumption. Feature #206.",
+          "status": "done",
+          "shippedAt": "2026-04-04"
+        },
+        {
+          "id": "pie-group2-backlink-intel-context",
+          "title": "Backlink Profile in Admin AI Intelligence Context",
+          "source": "PIE Group 2 (docs/superpowers/plans/2026-04-03-pie-group2-strategy-seo.md)",
+          "est": "2h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #137. backlinkProfile field added to SeoContextSlice; opt-in via enrichWithBacklinks flag in IntelligenceOptions. Admin chat sets flag to give AI advisor real backlink data (total backlinks, referring domains). Cache key includes :bl suffix to prevent bleed between enriched/non-enriched entries. Provider respects workspace.seoDataProvider preference via getBacklinksProvider() with capability-disabled fallback. Cron does NOT pre-warm this key (different slice combinations prevent cache hit). Feature #207.",
+          "status": "done",
+          "shippedAt": "2026-04-04"
+        },
+        {
+          "id": "pie-group2-serp-features-pipeline",
+          "title": "SERP Features Pipeline — Capture, Store, Aggregate, Brief Directives",
+          "source": "PIE Group 2 (docs/superpowers/plans/2026-04-03-pie-group2-strategy-seo.md)",
+          "est": "3h",
+          "priority": "P1",
+          "sprint": "F",
+          "notes": "Shipped — PR #137. Four-stage pipeline: (1) Capture: hasSerpOpportunity() parses SEMRush Fk codes during strategy generation → writes serp_features TEXT column (migration 051) per page. Exact matches always write (even []) to prevent COALESCE stale-data bug. (2) Aggregate: assembleSeoContext() computes workspace-level SerpFeatures (featuredSnippets, peopleAlsoAsk, localPack count). (3) Prompt: formatSeoContextSection() renders SERP features at standard/verbose verbosity. (4) Brief directives: generateBrief() injects per-feature structural directives into prompt (40-60w direct answer for featured snippet, 4-6 Q&A FAQ for PAA, video embed for video, NAP+LocalBusiness for local pack). Feature #208.",
+          "status": "done",
+          "shippedAt": "2026-04-04"
+        },
+        {
+          "id": "strategy-zero-volume-display-fix",
+          "title": "Strategy cards: handle below-threshold volume gracefully",
+          "source": "Session 2026-04-06 — visual inconsistency on local/niche keywords",
+          "est": "1-2h",
+          "priority": "P2",
+          "sprint": "A",
+          "status": "pending",
+          "notes": "SEMRush and DataForSEO round sub-threshold search volume to 0 rather than reporting the real number. Cards currently display '0/mo' which implies zero demand — but 0 can coexist with real GSC impressions, competitor rankings, and a high-priority AI rationale, creating a contradiction that undermines trust. Fix: (1) Display '<10/mo' instead of '0/mo' when volume === 0 in both StrategyTab.tsx and ContentGaps.tsx — this is the accurate meaning (below threshold, not actually zero). (2) Predicted impact line currently returns null when volume=0 (impact = 0 * 0.103 = 0, fails the < 10 guard). When volume is 0 but gap.impressions > 0, use impressions as a fallback signal: show '~{impressions} existing impr — opportunity confirmed via GSC' instead of hiding the line entirely. Touches: src/components/client/StrategyTab.tsx, src/components/strategy/ContentGaps.tsx."
+        },
+        {
+          "id": "seo-provider-hybrid-capability-routing",
+          "title": "Hybrid SEO provider: DataForSEO primary with SEMRush capability fallback",
+          "source": "Session 2026-04-06 — follow-up to provider abstraction (PR #137)",
+          "est": "3-5h",
+          "priority": "P2",
+          "sprint": "D",
+          "status": "pending",
+          "notes": "When DataForSEO is selected as seoDataProvider, all keyword/domain intelligence should route through it. Capabilities DataForSEO does not natively support (backlinks, SERP feature codes) should automatically fall back to SEMRush if both providers are configured. Current state: getBacklinksProvider() already does this reactively for backlinks — DataForSEO marks the capability disabled after a 403, then falls back. What's missing: (1) Proactive capability declarations — DataForSEO registers unsupported capabilities at init rather than waiting for a failure. (2) SERP features fallback — hasSerpOpportunity() currently parses SEMRush-specific Fk codes; needs a getSerPFeaturesProvider() path so DataForSEO workspaces can still capture SERP signals via SEMRush fallback. (3) Generalize getBacklinksProvider() into getCapableProvider(capability) to handle both cases and any future gaps cleanly. (4) Workspace settings UI — show which provider is serving which data type (e.g. 'Keywords: DataForSEO | Backlinks: SEMRush (fallback)') so admins have visibility. Architecture: seo-data-provider.ts already has the capability flag system (markCapabilityDisabled / isCapabilityDisabled) — this feature expands it from reactive-only to proactive + generalized."
         }
       ]
     }
