@@ -65,7 +65,8 @@ export type ActivityType =
   | 'client_onboarding_submitted'
   | 'client_keyword_feedback'
   | 'client_priorities_updated'
-  | 'client_content_gap_vote';
+  | 'client_content_gap_vote'
+  | 'meeting_brief_generated';
 
 export interface ActivityEntry {
   id: string;

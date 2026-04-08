@@ -32,7 +32,7 @@ router.post(
     const { workspaceId } = req.params;
     try {
       const brief = await generateMeetingBrief(workspaceId);
-      addActivity(workspaceId, 'brief_generated', 'Meeting brief generated');
+      addActivity(workspaceId, 'meeting_brief_generated', 'Meeting brief generated');
       res.json({ brief });
     } catch (err) {
       if (err instanceof Error && err.message === 'BRIEF_UNCHANGED') {
