@@ -11,6 +11,7 @@ import type {
   ActionPlaybook,
   LearningsConfidence,
   LearningsTrend,
+  TopWin,
 } from './outcome-tracking.js';
 
 // ── Slice selection ─────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ export interface LearningsSlice {
     hasActiveAction: boolean;
   };
   // New in 3A
-  topWins?: TrackedAction[];
+  topWins?: TopWin[];
   winRateByActionType?: Record<string, number>;
   roiAttribution?: ROIAttribution[];
   weCalledIt?: WeCalledItEntry[];

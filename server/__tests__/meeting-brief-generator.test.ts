@@ -2,6 +2,20 @@
 import { describe, it, expect } from 'vitest';
 import { assembleMeetingBriefMetrics, buildBriefPrompt } from '../meeting-brief-generator.js';
 import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
+import type { AnalyticsInsight, InsightType, InsightSeverity } from '../../shared/types/analytics.js';
+
+/** Factory for fully-typed AnalyticsInsight fixtures with sensible defaults. */
+function buildInsight(overrides: Partial<AnalyticsInsight> & Pick<AnalyticsInsight, 'id'>): AnalyticsInsight {
+  return {
+    workspaceId: 'test-ws',
+    pageId: null,
+    insightType: 'ranking_opportunity' as InsightType,
+    data: {},
+    severity: 'warning' as InsightSeverity,
+    computedAt: '2026-04-07T12:00:00Z',
+    ...overrides,
+  };
+}
 
 // Minimal intelligence fixture — only the slices our code touches
 const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
@@ -20,20 +34,19 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
   insights: {
     all: [],
     byType: {
-      ranking_opportunity: [{ id: '1' } as any, { id: '2' } as any, { id: '3' } as any],
+      ranking_opportunity: [buildInsight({ id: '1' }), buildInsight({ id: '2' }), buildInsight({ id: '3' })],
     },
     bySeverity: { critical: 2, warning: 5, opportunity: 8, positive: 3 },
     topByImpact: [
-      {
+      buildInsight({
         id: 'top-1',
-        workspaceId: 'test-ws',
         pageId: 'page-1',
         insightType: 'ranking_opportunity',
         data: { keyword: 'test keyword', position: 12 },
         severity: 'critical',
         computedAt: '2026-04-07T12:00:00Z',
         pageTitle: 'About Us',
-      } as any,
+      }),
     ],
   },
   contentPipeline: {
@@ -52,6 +65,18 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
     overallWinRate: 0.72,
     recentTrend: null,
     playbooks: [],
+    topWins: [
+      {
+        actionId: 'action-1',
+        actionType: 'meta_updated',
+        pageUrl: '/about-us',
+        targetKeyword: 'seo services',
+        delta: { primary_metric: 'clicks', baseline_value: 650, current_value: 770, delta_absolute: 120, delta_percent: 18.5, direction: 'improved' },
+        score: 'strong_win',
+        createdAt: '2026-03-01T00:00:00Z',
+        scoredAt: '2026-04-01T00:00:00Z',
+      },
+    ],
   },
 };
 
@@ -92,6 +117,13 @@ describe('buildBriefPrompt', () => {
     const prompt = buildBriefPrompt(MOCK_INTELLIGENCE);
     expect(prompt).toContain('83');
     expect(prompt).toContain('72%');
+  });
+
+  it('includes topWins in RECENT WINS section with delta and keyword', () => {
+    const prompt = buildBriefPrompt(MOCK_INTELLIGENCE);
+    expect(prompt).toContain('meta_updated on /about-us');
+    expect(prompt).toContain('seo services');
+    expect(prompt).toContain('+18.5%');
   });
 
   it('handles sparse intelligence without crashing', () => {

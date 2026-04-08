@@ -32,6 +32,7 @@ vi.mock('../server/outcome-tracking.js', () => ({
   getOutcomesForAction: vi.fn(() => [
     { actionId: 'a1', score: 'strong_win', measuredAt: '2026-03-30' },
   ]),
+  getTopWinsFromActions: vi.fn(() => []),
   getPendingActions: vi.fn(() => []),
 }));
 

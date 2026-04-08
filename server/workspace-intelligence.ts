@@ -57,7 +57,7 @@ import type { SeoChangeEvent } from './seo-change-tracker.js';
 import type { CannibalizationReport } from './cannibalization-detection.js';
 import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
 import type { Annotation as TimelineAnnotation } from './annotations.js';
-import type { ActionOutcome, ActionPlaybook } from '../shared/types/outcome-tracking.js';
+import type { ActionOutcome, ActionPlaybook, TopWin } from '../shared/types/outcome-tracking.js';
 import type { SafeClientUser } from '../shared/types/users.js';
 import type { ClientRequest } from '../shared/types/requests.js';
 import type { ContentBrief } from '../shared/types/content.js';
@@ -430,12 +430,24 @@ async function assembleLearnings(
 
   // WeCalledIt entries — actions with strong_win outcomes
   let weCalledIt: WeCalledItEntry[] = [];
+  let topWins: TopWin[] = [];
   try {
-    const { getActionsByWorkspace, getOutcomesForAction } = await import('./outcome-tracking.js');
+    const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('./outcome-tracking.js');
     const actions = getActionsByWorkspace(workspaceId);
+    // Lazy-caching outcomes accessor: fetches on first access, caches the result.
+    // Shared between getTopWinsFromActions and the weCalledIt loop so each action's
+    // outcomes are queried at most once, while preserving both loops' early-exit behaviour.
+    const outcomesCache = new Map<string, ActionOutcome[]>();
+    const cachedGetOutcomes = (actionId: string): ActionOutcome[] => {
+      if (!outcomesCache.has(actionId)) {
+        outcomesCache.set(actionId, getOutcomesForAction(actionId));
+      }
+      return outcomesCache.get(actionId)!;
+    };
+    topWins = getTopWinsFromActions(actions, 5, cachedGetOutcomes);
     for (const action of actions.slice(0, 50)) {
-      if (weCalledIt.length >= 5) break; // guard before DB call to avoid redundant queries
-      const outcomes: ActionOutcome[] = getOutcomesForAction(action.id);
+      if (weCalledIt.length >= 5) break;
+      const outcomes = cachedGetOutcomes(action.id);
       const strongWin = outcomes.find(o => o.score === 'strong_win');
       if (strongWin) {
         weCalledIt.push({
@@ -460,6 +472,7 @@ async function assembleLearnings(
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
     roiAttribution,
+    topWins,
     weCalledIt,
   };
 }

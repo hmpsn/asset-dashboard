@@ -14,8 +14,9 @@ export function useAdminMeetingBrief(workspaceId: string) {
 
   const generate = useMutation({
     mutationFn: () => meetingBriefApi.generate(workspaceId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.admin.meetingBrief(workspaceId) });
+    onSuccess: (data) => {
+      // Set cache directly from mutation response — eliminates refetch flicker on first generation
+      qc.setQueryData(queryKeys.admin.meetingBrief(workspaceId), data);
     },
   });
 

@@ -17,9 +17,11 @@ import {
   getActionsByWorkspaceAndType,
   getOutcomesForAction,
   getRecentActions,
+  getTopWinsForWorkspace,
   getWorkspaceCounts,
   recordAction,
   updateActionContext,
+  WIN_SCORES,
 } from '../outcome-tracking.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
@@ -52,8 +54,6 @@ router.use('/api/public/outcomes', (_req, res, next) => {
 });
 
 // ── Helpers ──
-
-const WIN_SCORES: OutcomeScore[] = ['strong_win', 'win'];
 
 function computeScorecard(workspaceId: string): OutcomeScorecard {
   const actions = getActionsByWorkspace(workspaceId);
@@ -129,33 +129,6 @@ function computeScorecard(workspaceId: string): OutcomeScorecard {
     byCategory,
     trend,
   };
-}
-
-function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
-  const actions = getActionsByWorkspace(workspaceId);
-  const wins: TopWin[] = [];
-
-  for (const action of actions) {
-    const outcomes = getOutcomesForAction(action.id);
-    for (const outcome of outcomes) {
-      if (outcome.score && WIN_SCORES.includes(outcome.score)) {
-        wins.push({
-          actionId: action.id,
-          actionType: action.actionType,
-          pageUrl: action.pageUrl,
-          targetKeyword: action.targetKeyword,
-          delta: outcome.deltaSummary,
-          score: outcome.score,
-          createdAt: action.createdAt,
-          scoredAt: outcome.measuredAt,
-        });
-      }
-    }
-  }
-
-  // Sort by absolute delta (highest impact first)
-  wins.sort((a, b) => Math.abs(b.delta.delta_percent) - Math.abs(a.delta.delta_percent));
-  return wins.slice(0, limit);
 }
 
 // ══════════════════════════════════════════════════════
@@ -288,7 +261,7 @@ router.post(
         }
       }
 
-      const action = recordAction({
+      const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
         workspaceId: req.params.workspaceId,
         actionType: req.body.actionType as ActionType,
         sourceType: req.body.sourceType,
