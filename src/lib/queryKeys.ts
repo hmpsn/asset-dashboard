@@ -58,6 +58,7 @@ export const queryKeys = {
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
     actionQueue: (wsId: string) => ['admin-action-queue', wsId] as const,
+    meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
