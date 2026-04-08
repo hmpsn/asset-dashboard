@@ -432,9 +432,10 @@ async function assembleLearnings(
   let weCalledIt: WeCalledItEntry[] = [];
   let topWins: import('../shared/types/outcome-tracking.js').TopWin[] = [];
   try {
-    const { getActionsByWorkspace, getOutcomesForAction, getTopWinsForWorkspace } = await import('./outcome-tracking.js');
-    topWins = getTopWinsForWorkspace(workspaceId, 5);
+    const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('./outcome-tracking.js');
+    // Fetch once — shared by both topWins and weCalledIt to avoid a double DB round-trip.
     const actions = getActionsByWorkspace(workspaceId);
+    topWins = getTopWinsFromActions(actions, 5);
     for (const action of actions.slice(0, 50)) {
       if (weCalledIt.length >= 5) break; // guard before DB call to avoid redundant queries
       const outcomes: ActionOutcome[] = getOutcomesForAction(action.id);

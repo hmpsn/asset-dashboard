@@ -371,14 +371,15 @@ export function getRecentActions(workspaceId: string, limit = 50): TrackedAction
 export const WIN_SCORES: OutcomeScore[] = ['strong_win', 'win'];
 
 /**
- * Returns top wins for a workspace sorted by absolute delta (highest impact first).
- * Extracted from routes/outcomes.ts so the intelligence assembler can use it.
+ * Core wins computation from a pre-fetched actions list.
+ * Used by getTopWinsForWorkspace and by assembleLearnings (which already holds the actions
+ * list from the weCalledIt loop, avoiding a second getActionsByWorkspace call).
  */
-export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
-  const actions = getActionsByWorkspace(workspaceId);
+export function getTopWinsFromActions(actions: TrackedAction[], limit = 10): TopWin[] {
   const wins: TopWin[] = [];
 
-  for (const action of actions) {
+  for (const action of actions.slice(0, 50)) { // guard: avoid unbounded N+1 for workspaces with many actions
+    if (wins.length >= limit) break;
     const outcomes = getOutcomesForAction(action.id);
     for (const outcome of outcomes) {
       if (outcome.score && WIN_SCORES.includes(outcome.score)) {
@@ -398,6 +399,15 @@ export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[
 
   wins.sort((a, b) => Math.abs(b.delta.delta_percent) - Math.abs(a.delta.delta_percent));
   return wins.slice(0, limit);
+}
+
+/**
+ * Returns top wins for a workspace sorted by absolute delta (highest impact first).
+ * Extracted from routes/outcomes.ts so the intelligence assembler can use it.
+ * For callers that already hold the actions list, use getTopWinsFromActions directly.
+ */
+export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
+  return getTopWinsFromActions(getActionsByWorkspace(workspaceId), limit);
 }
 
 export function archiveOldActions(): { archived: number } {

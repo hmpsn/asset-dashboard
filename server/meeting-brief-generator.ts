@@ -105,7 +105,9 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     briefsTotal: intel.contentPipeline?.briefs.total,
     postsTotal: intel.contentPipeline?.posts.total,
     winRate: intel.learnings?.overallWinRate,
-    topWinIds: intel.learnings?.topWins?.slice(0, 5).map(w => w.actionId) ?? [],
+    // Include score + delta_percent: both are mutable (outcome INSERT OR REPLACE), so a changed
+    // result must bust the cache even when the action ID stays the same.
+    topWins: intel.learnings?.topWins?.slice(0, 5).map(w => `${w.actionId}:${w.score}:${w.delta?.delta_percent ?? 0}`) ?? [],
     criticalIssues: intel.insights?.bySeverity.critical,
     rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],
