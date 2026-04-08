@@ -7,7 +7,7 @@ interface ClientInsightsResponse {
   insights: ClientInsight[];
 }
 
-export function useClientInsights(workspaceId: string) {
+export function useClientInsights(workspaceId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.client.clientInsights(workspaceId),
     queryFn: () =>
@@ -16,6 +16,6 @@ export function useClientInsights(workspaceId: string) {
         { insights: [] },
       ),
     staleTime: 10 * 60 * 1000, // 10 min — client data changes less frequently
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && enabled,
   });
 }

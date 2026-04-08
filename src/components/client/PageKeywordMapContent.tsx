@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownRight, Minus, Layers, MessageCircle, ChevronDown, Search, ThumbsUp, ThumbsDown, Ban, Undo2 } from 'lucide-react';
+import type { MetricsSource } from '../../../shared/types/keywords.js';
 import { post } from '../../api';
 
 interface GscKeyword {
@@ -20,7 +21,7 @@ interface PageMapItem {
   clicks?: number;
   volume?: number;
   difficulty?: number;
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   searchIntent?: string;
   gscKeywords?: GscKeyword[];

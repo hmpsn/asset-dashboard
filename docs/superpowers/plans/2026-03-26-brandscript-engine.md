@@ -16,6 +16,8 @@
 
 **Coordination rules:** `.windsurf/rules/multi-agent-coordination.md`
 
+> **🔧 NEED TO ADD:** The client-facing `BrandTab` accepts optional `brandVoiceSummary` and `industry` props (`src/components/client/BrandTab.tsx:19-22`), but `ClientDashboard.tsx` does not pass them because neither field is on the `WorkspaceInfo` client type or in the public workspace serialization list (`public-portal.ts:27-77`). The Brand Positioning panel always shows EmptyState even when server-side data exists. Wiring requires: (1) add `brandVoiceSummary` + `industry` to the public workspace response in `public-portal.ts`, (2) add both fields to `WorkspaceInfo` in `src/components/client/types.ts`, (3) pass them through `ClientDashboard.tsx` → `BrandTab`. *(Flagged 2026-04-07 during PR #149 review.)*
+
 ---
 
 ## Task Dependencies
@@ -623,7 +625,8 @@ describe('voice calibration store', () => {
   });
 
   it('adds a voice sample and retrieves with profile', () => {
-    addVoiceSample(wsId, 'This is our voice.', 'headline', 'manual');
+    const profile = getOrCreateVoiceProfile(wsId);
+    addVoiceSample(profile.id, 'This is our voice.', 'headline', 'manual');
     const fetched = getVoiceProfile(wsId);
     expect(fetched!.samples?.length).toBeGreaterThan(0);
   });
@@ -2529,30 +2532,20 @@ All `callAnthropic()` and `callOpenAI()` calls in this feature must specify expl
 
 Pattern for callAnthropic:
 ```typescript
-const result = await callAnthropic({
-  model: 'claude-sonnet-4-20250514',
-  system: systemPrompt,      // valid field in AnthropicChatOptions
-  messages,
+const result = await callAnthropic(messages, {
+  system: systemPrompt,
   maxTokens: 1500,
-  temperature: 0.85,         // ← always explicit
-  feature: 'feature-name',   // ← required
-  workspaceId,
+  temperature: 0.85,  // ← always explicit
 });
 ```
 
 Pattern for callOpenAI (structured extraction):
 ```typescript
-const result = await callOpenAI({
-  model: 'gpt-4.1-mini',
-  messages: [
-    { role: 'system', content: systemPrompt },  // system goes in messages array for OpenAI
-    ...messages,
-  ],
+const result = await callOpenAI(messages, {
+  system: systemPrompt,
   maxTokens: 1000,
   temperature: 0.2,
-  responseFormat: { type: 'json_object' },      // camelCase
-  feature: 'feature-name',                       // ← required
-  workspaceId,
+  response_format: { type: 'json_object' },
 });
 ```
 
@@ -2584,23 +2577,15 @@ This activates voice DNA framing (Layer 2) automatically once the voice profile 
 Pattern used throughout this plan that MUST be applied at implementation:
 ```typescript
 // ✅ CORRECT
-const result = await callAnthropic({
-  model: 'claude-sonnet-4-20250514',
-  system: systemPromptString,   // separate system param — valid in AnthropicChatOptions
-  messages,
+const result = await callAnthropic(messages, {
+  system: systemPromptString,
   maxTokens: 2000,
-  feature: 'feature-name',      // required
-  workspaceId,
 });
 
 // ❌ WRONG — do not prefix system prompt into user messages array
-const result = await callAnthropic({
-  messages: [{ role: 'user', content: `${systemPrompt}\n\n${userContent}` }],
-  feature: 'feature-name',
-});
-
-// ❌ ALSO WRONG — two-argument signature does not exist
-const result = await callAnthropic(messages, { system: systemPromptString });
+const result = await callAnthropic([
+  { role: 'user', content: `${systemPrompt}\n\n${userContent}` }
+]);
 ```
 
 Check `server/anthropic-helpers.ts` to confirm the `AnthropicChatOptions` interface — look for `system?: string` field.

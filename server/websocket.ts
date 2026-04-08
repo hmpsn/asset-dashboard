@@ -145,7 +145,11 @@ export function initWebSocket(server: Server): WebSocketServer {
   initActivityBroadcast(_broadcastToWorkspace);
   initAnomalyBroadcast(_broadcastToWorkspace);
   initStripeBroadcast(_broadcastToWorkspace);
-  startWatcher(_broadcast);
+  // Skip file watchers in test environment — chokidar exhausts open file descriptor
+  // limits when multiple test server subprocesses run concurrently (EMFILE errors).
+  if (process.env.NODE_ENV !== 'test') {
+    startWatcher(_broadcast);
+  }
 
   return wss;
 }

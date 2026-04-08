@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain, AnomalyDigestData } from '../shared/types/analytics.js';
+import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain, InsightDataMap, AnomalyDigestData } from '../shared/types/analytics.js';
 import { parseJsonFallback } from './db/json-validation.js';
 
 // ── SQLite row shape ──
@@ -118,7 +118,7 @@ export interface UpsertInsightParams {
   workspaceId: string;
   pageId: string | null;
   insightType: InsightType;
-  data: Record<string, unknown>;
+  data: InsightDataMap[InsightType];
   severity: InsightSeverity;
   // Enrichment fields (Phase 1)
   pageTitle?: string | null;
@@ -221,7 +221,7 @@ export function upsertAnomalyDigestInsight(params: {
     workspaceId: params.workspaceId,
     pageId: dedupKey,
     insightType: 'anomaly_digest',
-    data: params.data as unknown as Record<string, unknown>,
+    data: params.data,
     severity: params.severity,
     anomalyLinked: true,
     impactScore: params.impactScore,

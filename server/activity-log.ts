@@ -59,7 +59,14 @@ export type ActivityType =
   | 'playbook_suggested'
   | 'learnings_updated'
   | 'schema_plan_deleted'
-  | 'note';
+  | 'client_signal'
+  | 'note'
+  | 'client_profile_updated'
+  | 'client_onboarding_submitted'
+  | 'client_keyword_feedback'
+  | 'client_priorities_updated'
+  | 'client_content_gap_vote'
+  | 'meeting_brief_generated';
 
 export interface ActivityEntry {
   id: string;
@@ -129,7 +136,9 @@ const stmts = createStmtCache(() => ({
   selectClientVisible: db.prepare(
     `SELECT * FROM activity_log WHERE workspace_id = ? AND type IN (${[...CLIENT_VISIBLE_TYPES].map(() => '?').join(',')}) ORDER BY created_at DESC LIMIT ?`,
   ),
-  deleteById: db.prepare('DELETE FROM activity_log WHERE id = ?'),
+  hasRecent: db.prepare(
+    `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
+  ),
   countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
   pruneOldest: db.prepare(`
         DELETE FROM activity_log WHERE id IN (
@@ -192,7 +201,8 @@ export function listClientActivity(workspaceId: string, limit = 50): ActivityEnt
   return rows.map(rowToEntry);
 }
 
-export function deleteActivity(id: string): boolean {
-  const info = stmts().deleteById.run(id);
-  return info.changes > 0;
+/** Returns true if the workspace has any activity log entry within the last `withinDays` days. */
+export function hasRecentActivity(workspaceId: string, withinDays: number = 30): boolean {
+  const row = stmts().hasRecent.get(workspaceId, `-${withinDays}`);
+  return row != null;
 }

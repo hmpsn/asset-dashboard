@@ -13,6 +13,7 @@ import {
 } from '../webflow.js';
 import {
   getTokenForSite,
+  getWorkspace,
   updatePageState,
   listWorkspaces,
 } from '../workspaces.js';
@@ -54,7 +55,12 @@ router.get('/api/webflow/collections/:collectionId/items', async (req, res) => {
 });
 
 router.patch('/api/webflow/collections/:collectionId/items/:itemId', async (req, res) => {
-  const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData);
+  // Resolve per-site token: workspaceId → workspace → siteId → token.
+  // Without this, webflowFetch falls back to the global WEBFLOW_API_TOKEN env var,
+  // which may belong to a different Webflow account → 404 on the collection/item.
+  const ws = req.body.workspaceId ? getWorkspace(req.body.workspaceId) : undefined;
+  const token = ws?.webflowSiteId ? getTokenForSite(ws.webflowSiteId) || undefined : undefined;
+  const result = await updateCollectionItem(req.params.collectionId, req.params.itemId, req.body.fieldData, token);
   if (req.body.workspaceId) {
     updatePageState(req.body.workspaceId, req.params.itemId, { status: 'live', source: 'cms', updatedBy: 'admin' });
   }
@@ -181,11 +187,13 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
 // --- CMS SEO: Publish collection items after editing ---
 router.post('/api/webflow/collections/:collectionId/publish', async (req, res) => {
   try {
-    const { itemIds } = req.body;
+    const { itemIds, workspaceId } = req.body;
     if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ error: 'itemIds array required' });
     }
-    const result = await publishCollectionItems(req.params.collectionId, itemIds);
+    const ws = workspaceId ? getWorkspace(workspaceId) : undefined;
+    const token = ws?.webflowSiteId ? getTokenForSite(ws.webflowSiteId) || undefined : undefined;
+    const result = await publishCollectionItems(req.params.collectionId, itemIds, token);
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -18,7 +18,7 @@ interface ValidationError {
   message: string;
 }
 
-interface ValidationResult {
+export interface ValidationResult {
   status: 'valid' | 'warnings' | 'errors';
   richResults: string[];
   errors: ValidationError[];
@@ -92,7 +92,17 @@ interface ValidationRow {
   validated_at: string;
 }
 
-function rowToValidation(row: ValidationRow) {
+export interface SchemaValidation {
+  id: string;
+  pageId: string;
+  status: string;
+  richResults: unknown[];
+  errors: unknown[];
+  warnings: unknown[];
+  validatedAt: string;
+}
+
+function rowToValidation(row: ValidationRow): SchemaValidation {
   return {
     id: row.id,
     pageId: row.page_id,

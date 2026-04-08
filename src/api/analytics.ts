@@ -8,6 +8,7 @@ import type {
   GA4ConversionSummary, GA4EventPageBreakdown, GA4Comparison,
   GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../shared/types/analytics';
+import type { ClientIntelligence } from '../../shared/types/intelligence.js';
 
 // ── Query-string helper ────────────────────────────────────────────
 function qs(days: number, dateRange?: { startDate: string; endDate: string }): string {
@@ -106,3 +107,17 @@ export const gscAdmin = {
   chat: (siteId: string, body: { question: string; context: Record<string, unknown> }) =>
     post<{ answer: string }>(`/api/google/search-chat/${siteId}`, body),
 };
+
+// ── Client Intelligence ────────────────────────────────────────────
+export async function fetchClientIntelligence(workspaceId: string): Promise<ClientIntelligence> {
+  return getSafe<ClientIntelligence>(
+    `/api/public/intelligence/${workspaceId}`,
+    {
+      workspaceId,
+      assembledAt: new Date().toISOString(),
+      tier: 'free',
+      insightsSummary: null,
+      pipelineStatus: null,
+    },
+  );
+}

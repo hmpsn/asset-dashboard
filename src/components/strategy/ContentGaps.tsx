@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { FileText, Sparkles, Layers, BarChart3, Eye, Swords, TrendingUp, TrendingDown, Minus, Award, MessageCircleQuestion } from 'lucide-react';
+import { FileText, Sparkles, BarChart3, Eye, Swords, TrendingUp, TrendingDown, Minus, MessageCircleQuestion } from 'lucide-react';
 import { adminPath } from '../../routes';
+import { kdFraming, kdTooltip } from '../../lib/kdFraming.js';
 
 interface ContentGap {
   topic: string;
@@ -19,8 +20,9 @@ interface ContentGap {
   questionKeywords?: string[];
 }
 
-const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : 'text-red-400';
+const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+
 
 export interface ContentGapsProps {
   contentGaps: ContentGap[];
@@ -66,19 +68,41 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] text-teal-400">Target keyword: &ldquo;{gap.targetKeyword}&rdquo;</span>
                   {gap.volume != null && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
-                  {gap.difficulty != null && gap.difficulty > 0 && <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)}`}>KD {gap.difficulty}</span>}
+                  {gap.difficulty != null && gap.difficulty > 0 && (
+                    <span
+                      className={`text-[10px] font-medium ${kdColor(gap.difficulty)} cursor-help`}
+                      title={kdTooltip(gap.difficulty)}
+                    >
+                      KD {gap.difficulty}
+                    </span>
+                  )}
+                  {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
+                    <span className="text-[10px] text-zinc-500 leading-none">
+                      {kdFraming(gap.difficulty)}
+                    </span>
+                  )}
                   {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} impr</span>}
+                  {gap.volume && gap.volume > 0 && (() => {
+                    const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
+                    if (impact < 10) return null;
+                    return (
+                      <span className="text-[10px] text-blue-400/70 flex items-center gap-0.5">
+                        <TrendingUp className="w-2.5 h-2.5" />
+                        ~{fmtNum(impact)}/mo est. clicks at rank #3
+                      </span>
+                    );
+                  })()}
                 </div>
                 {workspaceId && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { plannerKeyword: gap.targetKeyword, plannerPageType: gap.suggestedPageType || 'blog' } })}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-600/20 border border-violet-500/30 text-[11px] text-violet-300 font-medium hover:bg-violet-600/40 transition-all"
+                      onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'), { state: { fixContext: { targetRoute: 'content-pipeline', primaryKeyword: gap.targetKeyword, pageType: gap.suggestedPageType || undefined, autoGenerate: true } } })}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                     >
-                      <Layers className="w-3 h-3" /> Add to Planner
+                      <FileText className="w-3 h-3" /> Draft Brief
                     </button>
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { pageName: gap.targetKeyword } } })}
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), { state: { fixContext: { targetRoute: 'seo-briefs', pageName: gap.targetKeyword, pageType: gap.suggestedPageType || undefined } } })}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600/20 border border-teal-500/30 text-[11px] text-teal-300 font-medium hover:bg-teal-600/40 transition-all"
                     >
                       <Sparkles className="w-3 h-3" /> Generate Brief
@@ -97,11 +121,29 @@ export function ContentGaps({ contentGaps, workspaceId, intentColor }: ContentGa
                 {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
                   <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
                 )}
-                {gap.serpFeatures?.includes('featured_snippet') && (
-                  <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-medium"><Award className="w-3 h-3" />Featured Snippet</span>
-                )}
-                {gap.serpFeatures?.includes('people_also_ask') && (
-                  <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium"><MessageCircleQuestion className="w-3 h-3" />PAA</span>
+                {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {gap.serpFeatures.includes('featured_snippet') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        ⬜ Snippet
+                      </span>
+                    )}
+                    {gap.serpFeatures.includes('people_also_ask') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        ❓ PAA
+                      </span>
+                    )}
+                    {gap.serpFeatures.includes('video') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        ▶ Video
+                      </span>
+                    )}
+                    {gap.serpFeatures.includes('local_pack') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        📍 Local
+                      </span>
+                    )}
+                  </div>
                 )}
                 {gap.competitorProof && (
                   <span className="flex items-center gap-0.5 text-[10px] text-orange-400 font-medium"><Swords className="w-3 h-3" />{gap.competitorProof}</span>

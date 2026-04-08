@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { formatForPrompt } from '../../server/workspace-intelligence.js';
 import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
+import { RICH_INTELLIGENCE, RICH_SEO_CONTEXT } from '../fixtures/rich-intelligence.js';
 
 const baseIntelligence: WorkspaceIntelligence = {
   version: 1,
@@ -79,5 +80,68 @@ describe('formatForPrompt', () => {
   it('defaults to standard verbosity', () => {
     const result = formatForPrompt(richIntelligence);
     expect(result).toContain('warning');
+  });
+
+  it('includes persona pain points at standard verbosity', () => {
+    const result = formatForPrompt(RICH_INTELLIGENCE, { verbosity: 'standard', sections: ['seoContext'] });
+    expect(result).toContain('Proving SEO ROI');
+  });
+
+  it('includes site keyword names (not just count)', () => {
+    const result = formatForPrompt(RICH_INTELLIGENCE, { verbosity: 'standard', sections: ['seoContext'] });
+    expect(result).toContain('enterprise seo');
+    expect(result).not.toMatch(/\d+ site keywords/);
+  });
+
+  it('includes backlinkProfile in standard mode when present', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210 },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'standard' });
+    expect(result).toContain('3,400');
+    expect(result).toContain('210');
+    // trend not shown — BacklinksOverview API doesn't provide it
+  });
+
+  it('omits backlinkProfile in compact mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        backlinkProfile: { totalBacklinks: 3400, referringDomains: 210 },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'compact' });
+    expect(result).not.toContain('Backlinks:');
+  });
+
+  it('includes serpFeatures in standard mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false, videoCarousel: 2 },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'standard' });
+    expect(result).toContain('featured snippet');
+    expect(result).toContain('People Also Ask');
+    expect(result).toContain('video carousel');
+  });
+
+  it('omits serpFeatures in compact mode', () => {
+    const intel: WorkspaceIntelligence = {
+      ...baseIntelligence,
+      seoContext: {
+        ...RICH_SEO_CONTEXT,
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: false, videoCarousel: 0 },
+      },
+    };
+    const result = formatForPrompt(intel, { verbosity: 'compact' });
+    expect(result).not.toContain('SERP features:');
   });
 });

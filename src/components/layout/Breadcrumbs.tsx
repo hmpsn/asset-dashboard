@@ -2,10 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { type Page, adminPath } from '../../routes';
 import type { Workspace } from '../WorkspaceSelector';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
-import { NotificationBell } from '../NotificationBell';
 
 const TAB_LABELS: Record<string, string> = {
-  home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
+  home: 'Home', brief: 'Meeting Brief', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
   links: 'Links', 'seo-strategy': 'Strategy',
   'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
   'seo-ranks': 'Rank Tracker', 'analytics-hub': 'Analytics', performance: 'Performance', 'content-perf': 'Content Performance',
@@ -116,8 +115,6 @@ export function Breadcrumbs({
             )}
           </button>
         )}
-        {/* Notification bell */}
-        <NotificationBell onSelectWorkspace={(wsId) => navigate(adminPath(wsId))} />
       </div>
     </div>
   );

@@ -2442,30 +2442,20 @@ All AI calls in the copy pipeline must specify explicit temperature values.
 
 Pattern for copy generation:
 ```typescript
-const result = await callAnthropic({
-  model: 'claude-sonnet-4-20250514',
+const result = await callAnthropic(messages, {
   system: systemPrompt,
-  messages,
   maxTokens: 2500,
   temperature: 0.7,
-  feature: 'copy-generation',
-  workspaceId,
 });
 ```
 
 Pattern for structured outline:
 ```typescript
-const result = await callOpenAI({
-  model: 'gpt-4.1',
-  messages: [
-    { role: 'system', content: systemPrompt },
-    ...messages,
-  ],
+const result = await callOpenAI(messages, {
+  system: systemPrompt,
   maxTokens: 1500,
   temperature: 0.4,
-  responseFormat: { type: 'json_object' },
-  feature: 'copy-outline',
-  workspaceId,
+  response_format: { type: 'json_object' },
 });
 ```
 
@@ -2478,20 +2468,19 @@ let parsed: YourOutputType;
 try {
   parsed = JSON.parse(raw) as YourOutputType;
 } catch {
-  const retryResult = await callOpenAI({
-    model: 'gpt-4.1',
-    messages: [
-      { role: 'system', content: systemPrompt },
+  const retryRaw = await callOpenAI(
+    [
       ...messages,
       { role: 'assistant' as const, content: raw },
       { role: 'user' as const, content: 'Your response was not valid JSON. Return only the JSON object.' },
     ],
-    maxTokens: 1500,
-    temperature: 0.1,
-    responseFormat: { type: 'json_object' },
-    feature: 'copy-outline-retry',
-    workspaceId,
-  });
-  parsed = JSON.parse(retryResult.text) as YourOutputType;
+    {
+      system: systemPrompt,
+      maxTokens: 1500,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }
+  );
+  parsed = JSON.parse(retryRaw) as YourOutputType;
 }
 ```

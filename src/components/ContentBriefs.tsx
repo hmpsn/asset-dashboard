@@ -71,7 +71,12 @@ interface ContentTopicRequest {
   updatedAt: string;
 }
 
-export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null }) {
+/** targetRoute values that ContentBriefs recognises as legitimate brief-generation navigations.
+ *  Any fixContext without one of these routes is treated as stale (e.g. from seo-editor). */
+const BRIEF_ROUTES = ['seo-briefs', 'content-pipeline'] as const;
+type BriefRoute = typeof BRIEF_ROUTES[number];
+
+export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: { workspaceId: string; onRequestCountChange?: (pending: number) => void; fixContext?: FixContext | null; clearFixContext?: () => void }) {
   const queryClient = useQueryClient();
   const briefsQ = useAdminBriefsList(workspaceId);
   const requestsQ = useAdminRequestsList(workspaceId);
@@ -99,26 +104,49 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
   const [error, setError] = useState('');
   const [briefSearch, setBriefSearch] = useState('');
 
-  // Auto-fill keyword from Page Intelligence context and optionally auto-generate
+  // ── fixContext lifecycle (3 refs, 3 effects) ──
+  //
+  // When the user navigates here from Page Intelligence or Content Gaps, fixContext
+  // carries the page/keyword context. Three refs coordinate consumption:
+  //
+  //   fixContextRef   — snapshot of fixContext for handleGenerate to read after
+  //                     clearFixContext() nulls the prop. Cleared after first generation
+  //                     so subsequent manual briefs don't inherit stale page data.
+  //
+  //   fixConsumed     — ensures the keyword/pageType pre-fill runs exactly once per
+  //                     navigation, even if fixContext re-renders before being cleared.
+  //
+  //   autoGenTriggered — gates the auto-generate effect so it fires once after keyword
+  //                     is set, only when fixContext.autoGenerate was true.
+  //
+  // All three are guarded on BRIEF_ROUTES to ignore stale fixContext from other tabs.
+
+  const fixContextRef = useRef<FixContext | null | undefined>(null);
+  useEffect(() => {
+    if (fixContext && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
+      fixContextRef.current = fixContext;
+    }
+  }, [fixContext]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fixConsumed = useRef(false);
   useEffect(() => {
-    if (fixContext && !fixConsumed.current) {
+    if (fixContext && !fixConsumed.current && BRIEF_ROUTES.includes(fixContext.targetRoute as BriefRoute)) {
       fixConsumed.current = true;
-      // Prefer the actual primary keyword over page name
       const prefill = fixContext.primaryKeyword || fixContext.pageName || fixContext.pageSlug || '';
       if (prefill) setKeyword(prefill.replace(/-/g, ' '));
+      if (fixContext.pageType) setPageType(fixContext.pageType);
+      clearFixContext?.();
     }
   }, [fixContext]);
 
-  // Auto-generate when arriving from Page Intelligence with autoGenerate flag
   const autoGenTriggered = useRef(false);
   useEffect(() => {
-    if (fixContext?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {
+    if (fixContextRef.current?.autoGenerate && !autoGenTriggered.current && keyword.trim() && !generating) {
       autoGenTriggered.current = true;
       handleGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword, fixContext?.autoGenerate]);
+  }, [keyword]);
   const [briefSort, setBriefSort] = useState<'date' | 'keyword' | 'difficulty'>('date');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'brief' | 'request'; id: string; label: string } | null>(null);
   const [editingBrief, setEditingBrief] = useState<string | null>(null);
@@ -306,23 +334,26 @@ export function ContentBriefs({ workspaceId, onRequestCountChange, fixContext }:
       const brief = await post<ContentBrief>(`/api/content-briefs/${workspaceId}/generate`, {
         targetKeyword: keyword.trim(),
         businessContext: businessCtx.trim() || undefined,
-        targetPageId: fixContext?.pageId,
-        targetPageSlug: fixContext?.pageSlug,
+        targetPageId: fixContextRef.current?.pageId,
+        targetPageSlug: fixContextRef.current?.pageSlug,
         pageType: pageType || undefined,
         referenceUrls: refUrls.trim() ? refUrls.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')) : undefined,
-        pageAnalysisContext: fixContext?.optimizationIssues || fixContext?.recommendations || fixContext?.contentGaps
+        pageAnalysisContext: fixContextRef.current?.optimizationIssues || fixContextRef.current?.recommendations || fixContextRef.current?.contentGaps
           ? {
-              optimizationScore: fixContext.optimizationScore,
-              optimizationIssues: fixContext.optimizationIssues,
-              recommendations: fixContext.recommendations,
-              contentGaps: fixContext.contentGaps,
-              searchIntent: fixContext.searchIntent,
+              optimizationScore: fixContextRef.current.optimizationScore,
+              optimizationIssues: fixContextRef.current.optimizationIssues,
+              recommendations: fixContextRef.current.recommendations,
+              contentGaps: fixContextRef.current.contentGaps,
+              searchIntent: fixContextRef.current.searchIntent,
             }
           : undefined,
       });
       queryClient.setQueryData<ContentBrief[]>(['admin-briefs', workspaceId], old => [brief, ...(old ?? [])]);
       setKeyword('');
       setExpanded(brief.id);
+      // Clear the navigation context so subsequent manual generations don't inherit
+      // stale page analysis data (pageId, optimizationIssues, etc.) from the first brief.
+      fixContextRef.current = null;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate brief');
     } finally {

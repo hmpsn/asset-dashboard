@@ -105,9 +105,10 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const jobIdRef = useRef<string | null>(null);
 
   // Auto-generate for a specific page when arriving from audit Fix→
+  // Guard on targetRoute so stale fixContext from other tabs doesn't trigger generation.
   const fixConsumed = useRef(false);
   useEffect(() => {
-    if (fixContext?.pageId && !fixConsumed.current) {
+    if (fixContext?.pageId && fixContext.targetRoute === 'seo-schema' && !fixConsumed.current) {
       fixConsumed.current = true;
       // Small delay to let snapshot load finish first
       const timer = setTimeout(() => {

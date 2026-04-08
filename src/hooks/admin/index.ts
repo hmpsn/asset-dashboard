@@ -23,3 +23,6 @@ export { useIntelligenceSignals } from './useIntelligenceSignals';
 export { useWorkspaceIntelligence } from './useWorkspaceIntelligence';
 export { useAiSuggestedBriefs } from './useAiSuggestedBriefs';
 export { useActionQueue } from './useActionQueue';
+export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from './useClientSignals';
+export { useNotifications, type NotificationItem } from './useNotifications';
+export { useAdminMeetingBrief } from './useAdminMeetingBrief';

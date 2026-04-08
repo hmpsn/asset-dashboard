@@ -373,9 +373,19 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const productType = session.metadata?.productType || 'unknown';
       const contentRequestId = session.metadata?.contentRequestId;
 
-      // Update content request status if linked
+      // Update content request status if linked — if already fast-tracked past
+      // 'requested', the transition guard will reject it; that's fine, the payment
+      // is still valid and downstream operations must proceed.
       if (contentRequestId) {
-        updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+        try {
+          updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'InvalidTransitionError') {
+            log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Handle tier upgrade
@@ -488,9 +498,17 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       const productType = intent.metadata?.productType || 'unknown';
       const contentRequestId = intent.metadata?.contentRequestId;
 
-      // Update content request status if linked
+      // Update content request status if linked — same guard as checkout.session.completed
       if (contentRequestId) {
-        updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+        try {
+          updateContentRequest(workspaceId, contentRequestId, { status: 'requested' });
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'InvalidTransitionError') {
+            log.info({ workspaceId, contentRequestId, error: err.message }, 'Content request already past requested — skipping status update');
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Handle tier upgrade
