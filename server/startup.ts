@@ -9,6 +9,7 @@ import { startTrialReminders } from './trial-reminders.js';
 import { startChurnSignalScheduler } from './churn-signals.js';
 import { startAnomalyDetection } from './anomaly-detection.js';
 import { startOutcomeCrons } from './outcome-crons.js';
+import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
 
 /** Start all background schedulers and queues. */
 export function startSchedulers() {
@@ -23,4 +24,5 @@ export function startSchedulers() {
   startChurnSignalScheduler();
   startAnomalyDetection();
   startOutcomeCrons();
+  startRankTrackingScheduler();
 }

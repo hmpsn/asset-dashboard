@@ -466,7 +466,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     if (!cachedHtml) continue;
     const pageLinks = extractLinks(cachedHtml);
     for (const link of pageLinks) {
-      if (link.href.startsWith('/')) {
+      if (link.href.startsWith('/') && !link.href.startsWith('/cdn-cgi/')) {
         internalLinkTargets.add(link.href.replace(/\/$/, '').toLowerCase());
       } else if (link.href.startsWith('http')) {
         try {

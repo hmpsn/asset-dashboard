@@ -47,7 +47,7 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
   try {
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws?.gscPropertyUrl) return res.status(400).json({ error: 'No GSC property linked' });
-    const overview = await getSearchOverview(ws.id, ws.gscPropertyUrl, 7);
+    const overview = await getSearchOverview(ws.webflowSiteId ?? ws.id, ws.gscPropertyUrl, 7);
     const date = new Date().toISOString().split('T')[0];
     const queries = overview.topQueries.map(q => ({
       query: q.query, position: q.position, clicks: q.clicks, impressions: q.impressions, ctr: q.ctr,
