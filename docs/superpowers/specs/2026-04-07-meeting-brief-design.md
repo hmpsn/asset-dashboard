@@ -153,8 +153,8 @@ CREATE TABLE meeting_briefs (
 ### Frontend
 - **Hook:** `useAdminMeetingBrief(workspaceId)` — `useQuery` reads stored brief, `useMutation` triggers generate endpoint
 - **Query key:** `['admin-meeting-brief', workspaceId]`
-- **WebSocket:** Handle `MEETING_BRIEF_UPDATED` broadcast → invalidate query cache
-- **Broadcast:** Server calls `broadcastToWorkspace(workspaceId, 'MEETING_BRIEF_UPDATED', {})` after upsert
+- **WebSocket:** Handle `MEETING_BRIEF_GENERATED` broadcast → invalidate query cache
+- **Broadcast:** Server calls `broadcastToWorkspace(workspaceId, 'MEETING_BRIEF_GENERATED', {})` after upsert
 
 ### Generation Flow
 1. Assemble WorkspaceIntelligence (uses existing LRU cache — fast)
@@ -162,14 +162,14 @@ CREATE TABLE meeting_briefs (
 3. Build structured prompt with client-friendly framing
 4. `callOpenAI()` → parse + validate JSON response
 5. Upsert to `meeting_briefs`
-6. `broadcastToWorkspace()` with `MEETING_BRIEF_UPDATED`
+6. `broadcastToWorkspace()` with `MEETING_BRIEF_GENERATED`
 7. Return `{ brief, generatedAt }`
 
 ---
 
 ## DB Migration
 
-New migration file: `server/db/migrations/048-meeting-briefs.ts`
+New migration file: `server/db/migrations/048-meeting-briefs.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS meeting_briefs (

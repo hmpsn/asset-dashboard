@@ -1678,13 +1678,13 @@ import {
 const router = Router();
 
 // Get or create voice profile
-router.get('/api/voice/:wsId', requireWorkspaceAccess('wsId'), (req, res) => {
-  res.json(getOrCreateVoiceProfile(req.params.wsId));
+router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  res.json(getOrCreateVoiceProfile(req.params.workspaceId));
 });
 
 // Update voice profile (DNA, guardrails, modifiers, status)
-router.patch('/api/voice/:wsId', requireWorkspaceAccess('wsId'), (req, res) => {
-  const result = updateVoiceProfile(req.params.wsId, req.body);
+router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const result = updateVoiceProfile(req.params.workspaceId, req.body);
   if (!result) return res.status(500).json({ error: 'Update failed' });
   res.json(result);
 });
@@ -1696,25 +1696,25 @@ router.patch('/api/voice/:wsId', requireWorkspaceAccess('wsId'), (req, res) => {
 // See workspace-intelligence.ts for the cache invalidation API.
 
 // Add voice sample
-router.post('/api/voice/:wsId/samples', requireWorkspaceAccess('wsId'), (req, res) => {
+router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { content, contextTag, source } = req.body;
   if (!content) return res.status(400).json({ error: 'content required' });
-  res.json(addVoiceSample(req.params.wsId, content, contextTag, source));
+  res.json(addVoiceSample(req.params.workspaceId, content, contextTag, source));
 });
 
 // Delete voice sample
-router.delete('/api/voice/:wsId/samples/:sampleId', requireWorkspaceAccess('wsId'), (req, res) => {
-  const ok = deleteVoiceSample(req.params.wsId, req.params.sampleId);
+router.delete('/api/voice/:workspaceId/samples/:sampleId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ok = deleteVoiceSample(req.params.workspaceId, req.params.sampleId);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   res.json({ deleted: true });
 });
 
 // Generate calibration variations
-router.post('/api/voice/:wsId/calibrate', requireWorkspaceAccess('wsId'), async (req, res) => {
+router.post('/api/voice/:workspaceId/calibrate', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { promptType, steeringNotes } = req.body;
   if (!promptType) return res.status(400).json({ error: 'promptType required' });
   try {
-    const session = await generateCalibrationVariations(req.params.wsId, promptType, steeringNotes);
+    const session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Calibration failed' });
@@ -1722,11 +1722,11 @@ router.post('/api/voice/:wsId/calibrate', requireWorkspaceAccess('wsId'), async 
 });
 
 // Refine a specific variation
-router.post('/api/voice/:wsId/calibrate/:sessionId/refine', requireWorkspaceAccess('wsId'), async (req, res) => {
+router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { variationIndex, direction } = req.body;
   if (variationIndex === undefined || !direction) return res.status(400).json({ error: 'variationIndex and direction required' });
   try {
-    const session = await refineVariation(req.params.wsId, req.params.sessionId, variationIndex, direction);
+    const session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
     if (!session) return res.status(404).json({ error: 'Session or variation not found' });
     res.json(session);
   } catch (err) {

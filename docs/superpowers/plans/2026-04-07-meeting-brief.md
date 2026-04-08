@@ -393,7 +393,7 @@ Tests first — write a failing test, then implement.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `server/tests/meeting-brief-store.test.ts`:
+Create `server/__tests__/meeting-brief-store.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -453,7 +453,7 @@ describe('meeting-brief-store', () => {
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-npx vitest run server/tests/meeting-brief-store.test.ts
+npx vitest run server/__tests__/meeting-brief-store.test.ts
 ```
 
 Expected: FAIL — `getMeetingBrief` not found.
@@ -549,7 +549,7 @@ export function getMeetingBriefHash(workspaceId: string): string | null {
 - [ ] **Step 4: Run test to confirm it passes**
 
 ```bash
-npx vitest run server/tests/meeting-brief-store.test.ts
+npx vitest run server/__tests__/meeting-brief-store.test.ts
 ```
 
 Expected: PASS (3 tests).
@@ -557,7 +557,7 @@ Expected: PASS (3 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add server/meeting-brief-store.ts server/db/migrations/048-meeting-briefs.sql server/tests/meeting-brief-store.test.ts
+git add server/meeting-brief-store.ts server/db/migrations/048-meeting-briefs.sql server/__tests__/meeting-brief-store.test.ts
 git commit -m "feat(server): add meeting brief DB store with tests"
 ```
 
@@ -592,11 +592,30 @@ Do not start Task 5 until all Critical and Important findings are resolved.
 ## Task 5: Server Brief Generator
 
 **Files:**
+- Modify: `server/openai-helpers.ts` — add `responseFormat` option to `OpenAIChatOptions`
 - Create: `server/meeting-brief-generator.ts`
+
+- [ ] **Step 0: Add `responseFormat` to `OpenAIChatOptions`**
+
+The generator uses `responseFormat: { type: 'json_object' }` in its `callOpenAI` calls. This field must exist in `OpenAIChatOptions` before the generator compiles. The Prompt Standardization plan adds it later — add it here first.
+
+Find the `OpenAIChatOptions` interface in `server/openai-helpers.ts` and add the field alongside `temperature` and `maxTokens`:
+
+```typescript
+responseFormat?: { type: 'json_object' };
+```
+
+Then verify the type-check passes:
+
+```bash
+npx tsc --noEmit --skipLibCheck
+```
+
+Expected: zero errors.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `server/tests/meeting-brief-generator.test.ts`:
+Create `server/__tests__/meeting-brief-generator.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
@@ -680,7 +699,7 @@ describe('buildBriefPrompt', () => {
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-npx vitest run server/tests/meeting-brief-generator.test.ts
+npx vitest run server/__tests__/meeting-brief-generator.test.ts
 ```
 
 Expected: FAIL — `assembleMeetingBriefMetrics` not found.
@@ -694,7 +713,7 @@ import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
+import { getMeetingBrief, getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { createLogger } from './logger.js';
@@ -887,7 +906,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
 - [ ] **Step 4: Run tests to confirm they pass**
 
 ```bash
-npx vitest run server/tests/meeting-brief-generator.test.ts
+npx vitest run server/__tests__/meeting-brief-generator.test.ts
 ```
 
 Expected: PASS (4 tests).
@@ -895,7 +914,7 @@ Expected: PASS (4 tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add server/meeting-brief-generator.ts server/tests/meeting-brief-generator.test.ts
+git add server/meeting-brief-generator.ts server/__tests__/meeting-brief-generator.test.ts
 git commit -m "feat(server): add meeting brief generator with intelligence assembly"
 ```
 
@@ -973,7 +992,7 @@ app.use(meetingBriefRouter);
 
 - [ ] **Step 3: Write route integration tests**
 
-Create `server/tests/meeting-brief-routes.test.ts`:
+Create `server/__tests__/meeting-brief-routes.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -1041,12 +1060,12 @@ describe('POST /api/workspaces/:workspaceId/meeting-brief/generate', () => {
 });
 ```
 
-> Note: If `createApp` is not an exported factory function in `server/app.ts`, check how other route tests import the Express app — mirror the same pattern. Look at an existing test file in `server/tests/` for the import convention.
+> Note: If `createApp` is not an exported factory function in `server/app.ts`, check how other route tests import the Express app — mirror the same pattern. Look at an existing test file in `server/__tests__/` for the import convention.
 
 - [ ] **Step 4: Run route tests**
 
 ```bash
-npx vitest run server/tests/meeting-brief-routes.test.ts
+npx vitest run server/__tests__/meeting-brief-routes.test.ts
 ```
 
 Expected: PASS (3 tests).
@@ -1062,7 +1081,7 @@ Expected: zero errors.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add server/routes/meeting-brief.ts server/app.ts server/tests/meeting-brief-routes.test.ts
+git add server/routes/meeting-brief.ts server/app.ts server/__tests__/meeting-brief-routes.test.ts
 git commit -m "feat(server): add meeting brief GET + POST/generate routes with integration tests"
 ```
 
