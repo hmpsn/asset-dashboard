@@ -54,10 +54,19 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
 /** Register the daily rank snapshot cron. Safe to call multiple times (idempotent). */
 export function startRankTrackingScheduler(): void {
   if (rankInterval) return;
+
+  // Run 2 minutes after startup, then every 24 hours
+  setTimeout(() => {
+    runRankTrackingSnapshots().catch(err =>
+      log.error({ err }, 'Rank tracking scheduler initial run error'),
+    );
+  }, 2 * 60 * 1000);
+
   rankInterval = setInterval(() => {
     runRankTrackingSnapshots().catch(err =>
       log.error({ err }, 'Rank tracking scheduler error'),
     );
   }, DAILY_MS);
-  log.info('Rank tracking scheduler started (24h interval)');
+
+  log.info('Rank tracking scheduler started (initial run in 2m, then 24h interval)');
 }

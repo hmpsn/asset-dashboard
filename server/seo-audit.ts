@@ -471,7 +471,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       } else if (link.href.startsWith('http')) {
         try {
           const p = new URL(link.href).pathname.replace(/\/$/, '').toLowerCase();
-          internalLinkTargets.add(p);
+          if (!p.startsWith('/cdn-cgi/')) internalLinkTargets.add(p);
         } catch { /* skip */ }
       }
     }
