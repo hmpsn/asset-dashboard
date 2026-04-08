@@ -16,6 +16,8 @@
 
 **Coordination rules:** `.windsurf/rules/multi-agent-coordination.md`
 
+> **🔧 NEED TO ADD:** The client-facing `BrandTab` accepts optional `brandVoiceSummary` and `industry` props (`src/components/client/BrandTab.tsx:19-22`), but `ClientDashboard.tsx` does not pass them because neither field is on the `WorkspaceInfo` client type or in the public workspace serialization list (`public-portal.ts:27-77`). The Brand Positioning panel always shows EmptyState even when server-side data exists. Wiring requires: (1) add `brandVoiceSummary` + `industry` to the public workspace response in `public-portal.ts`, (2) add both fields to `WorkspaceInfo` in `src/components/client/types.ts`, (3) pass them through `ClientDashboard.tsx` → `BrandTab`. *(Flagged 2026-04-07 during PR #149 review.)*
+
 ---
 
 ## Task Dependencies
