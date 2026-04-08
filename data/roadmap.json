@@ -3885,7 +3885,7 @@
         {
           "id": "prompt-standardization-pass",
           "title": "Prompt Standardization Pass — wire existing AI features through buildSystemPrompt()",
-          "source": "Architecture discussion 2026-04-07",
+          "source": "docs/superpowers/plans/2026-04-08-prompt-standardization-pass.md",
           "est": "4-6h",
           "priority": "P1",
           "notes": "After Brandscript ships to staging: retrofit all existing AI calls to use buildSystemPrompt(workspaceId, baseInstructions) from server/prompt-assembly.ts. Priority order: (1) content rewrite + brief generator (most client-visible), (2) admin chat, (3) schema generation. Also adds explicit temperature settings and structured JSON output reliability (response_format + retry-once) to existing calls. After this pass, any workspace with a calibrated voice profile automatically gets voice-calibrated output from all AI features — no further per-feature code changes needed.",
