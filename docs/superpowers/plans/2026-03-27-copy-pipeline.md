@@ -2293,4 +2293,95 @@ Phase 2 (Page Strategy + Blueprint) — must be merged + green on staging
 Phase 3 (Copy Pipeline) — this plan
 ```
 
+---
+
+## Post-Phase 3 Reminder: Wire Blueprint into Meeting Brief
+
+> **Context:** The Meeting Brief (shipped before this plan) was designed as a two-phase Strategic Intelligence Layer. Phase 1 = Meeting Brief. Phase 2 = Site Architecture Intelligence. The Site Blueprint (this plan, Phase 2) is the first piece of data that makes the Meeting Brief's "Blueprint Progress" section come alive. Once Phase 3 ships, all three phases of the Copy Engine are done and the blueprint tables are stable — that's the right time to close this loop.
+
+### Why this matters
+
+The Meeting Brief shows clients a screen-shareable narrative before every call. Section 5 is "Blueprint Progress" — how many blueprint pages are live vs. in-progress vs. planned. Right now it's hardcoded `null` (hidden). Wiring it in makes every client meeting brief tell the story of how the site is progressing against the agreed plan. This is a high-value, high-visibility connection between two major features.
+
+### What's already done (no changes needed)
+
+- `meeting_briefs.blueprint_progress` column exists in the DB
+- `MeetingBrief.blueprintProgress: string | null` in shared types
+- `<BlueprintProgress>` component renders when the value is non-null, hidden when null
+- `buildBriefPrompt()` already asks the AI to generate `blueprintProgress` in its JSON output — it just currently instructs the AI to always set it to null
+
+### What needs to change (single file: `server/meeting-brief-generator.ts`)
+
+**Step 1 — Add `getBlueprintSummary()`:**
+
+```typescript
+async function getBlueprintSummary(workspaceId: string): Promise<{ raw: string; total: number; live: number; inProgress: number; planned: number } | null> {
+  try {
+    const rows = db.prepare(`
+      SELECT status, COUNT(*) as count
+      FROM blueprint_entries
+      WHERE workspace_id = ?
+      GROUP BY status
+    `).all(workspaceId) as Array<{ status: string; count: number }>;
+
+    if (rows.length === 0) return null;
+
+    const total = rows.reduce((sum, r) => sum + r.count, 0);
+    const live = rows.find(r => r.status === 'live')?.count ?? 0;
+    const inProgress = rows.find(r => r.status === 'in_progress')?.count ?? 0;
+    const planned = total - live - inProgress;
+
+    return {
+      raw: `${live} of ${total} blueprint pages live, ${inProgress} in progress, ${planned} planned`,
+      total, live, inProgress, planned,
+    };
+  } catch {
+    // Blueprint feature not yet shipped or no blueprint for this workspace
+    return null;
+  }
+}
+```
+
+**Step 2 — Pass blueprint data into `buildBriefPrompt()`:**
+
+Update the function signature:
+```typescript
+export function buildBriefPrompt(intel: WorkspaceIntelligence, blueprintSummary: { raw: string; total: number } | null): string {
+```
+
+Add a `BLUEPRINT` section to the prompt context:
+```
+${blueprintSummary ? `BLUEPRINT PROGRESS:\n${blueprintSummary.raw}\nTotal pages in plan: ${blueprintSummary.total}` : 'BLUEPRINT PROGRESS:\nNo site blueprint has been created for this workspace yet.'}
+```
+
+Update the AI instructions — replace:
+```
+- blueprintProgress is always null in this version (Phase 1)
+```
+With:
+```
+- blueprintProgress: if blueprint data is present above, write 1-2 sentences on progress toward the plan, framed as momentum (not deficit). If no blueprint data, set to null.
+```
+
+**Step 3 — Call in `generateMeetingBrief()`:**
+
+```typescript
+const [intel, blueprintSummary] = await Promise.all([
+  buildWorkspaceIntelligence(workspaceId, { slices: BRIEF_SLICES }),
+  getBlueprintSummary(workspaceId),
+]);
+```
+
+Pass `blueprintSummary` to `buildBriefPrompt(intel, blueprintSummary)`.
+
+### Acceptance criteria for this follow-up task
+
+- [ ] Workspace with an active blueprint shows Section 5 ("Blueprint Progress") in the brief
+- [ ] Workspace without a blueprint still renders correctly (section hidden)
+- [ ] `getBlueprintSummary()` does not throw if `blueprint_entries` table doesn't exist
+- [ ] `npx tsc --noEmit --skipLibCheck` passes
+- [ ] `npx vitest run` passes
+
+> This is a ~1-hour task, not a full plan. It's a single-file change to `server/meeting-brief-generator.ts` plus a brief test addition.
+
 No phase may start implementation until the prior phase is merged and CI is green on staging. Use `<FeatureFlag flag="copyPipeline">` to dark-launch Phase 3 UI until the full pipeline is verified end-to-end.
