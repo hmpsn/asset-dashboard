@@ -434,16 +434,20 @@ async function assembleLearnings(
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('./outcome-tracking.js');
     const actions = getActionsByWorkspace(workspaceId);
-    // Pre-fetch outcomes for the top 50 actions once, shared between topWins and weCalledIt
-    // to avoid duplicate getOutcomesForAction queries for the same action IDs.
-    const outcomesMap = new Map<string, ActionOutcome[]>();
-    for (const action of actions.slice(0, 50)) {
-      outcomesMap.set(action.id, getOutcomesForAction(action.id));
-    }
-    topWins = getTopWinsFromActions(actions, 5, outcomesMap);
+    // Lazy-caching outcomes accessor: fetches on first access, caches the result.
+    // Shared between getTopWinsFromActions and the weCalledIt loop so each action's
+    // outcomes are queried at most once, while preserving both loops' early-exit behaviour.
+    const outcomesCache = new Map<string, ActionOutcome[]>();
+    const cachedGetOutcomes = (actionId: string): ActionOutcome[] => {
+      if (!outcomesCache.has(actionId)) {
+        outcomesCache.set(actionId, getOutcomesForAction(actionId));
+      }
+      return outcomesCache.get(actionId)!;
+    };
+    topWins = getTopWinsFromActions(actions, 5, cachedGetOutcomes);
     for (const action of actions.slice(0, 50)) {
       if (weCalledIt.length >= 5) break;
-      const outcomes = outcomesMap.get(action.id) ?? [];
+      const outcomes = cachedGetOutcomes(action.id);
       const strongWin = outcomes.find(o => o.score === 'strong_win');
       if (strongWin) {
         weCalledIt.push({
