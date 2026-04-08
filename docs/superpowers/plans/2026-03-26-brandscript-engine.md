@@ -2530,20 +2530,30 @@ All `callAnthropic()` and `callOpenAI()` calls in this feature must specify expl
 
 Pattern for callAnthropic:
 ```typescript
-const result = await callAnthropic(messages, {
-  system: systemPrompt,
+const result = await callAnthropic({
+  model: 'claude-sonnet-4-20250514',
+  system: systemPrompt,      // valid field in AnthropicChatOptions
+  messages,
   maxTokens: 1500,
-  temperature: 0.85,  // ← always explicit
+  temperature: 0.85,         // ← always explicit
+  feature: 'feature-name',   // ← required
+  workspaceId,
 });
 ```
 
 Pattern for callOpenAI (structured extraction):
 ```typescript
-const result = await callOpenAI(messages, {
-  system: systemPrompt,
+const result = await callOpenAI({
+  model: 'gpt-4.1-mini',
+  messages: [
+    { role: 'system', content: systemPrompt },  // system goes in messages array for OpenAI
+    ...messages,
+  ],
   maxTokens: 1000,
   temperature: 0.2,
-  response_format: { type: 'json_object' },
+  responseFormat: { type: 'json_object' },      // camelCase
+  feature: 'feature-name',                       // ← required
+  workspaceId,
 });
 ```
 
@@ -2575,15 +2585,23 @@ This activates voice DNA framing (Layer 2) automatically once the voice profile 
 Pattern used throughout this plan that MUST be applied at implementation:
 ```typescript
 // ✅ CORRECT
-const result = await callAnthropic(messages, {
-  system: systemPromptString,
+const result = await callAnthropic({
+  model: 'claude-sonnet-4-20250514',
+  system: systemPromptString,   // separate system param — valid in AnthropicChatOptions
+  messages,
   maxTokens: 2000,
+  feature: 'feature-name',      // required
+  workspaceId,
 });
 
 // ❌ WRONG — do not prefix system prompt into user messages array
-const result = await callAnthropic([
-  { role: 'user', content: `${systemPrompt}\n\n${userContent}` }
-]);
+const result = await callAnthropic({
+  messages: [{ role: 'user', content: `${systemPrompt}\n\n${userContent}` }],
+  feature: 'feature-name',
+});
+
+// ❌ ALSO WRONG — two-argument signature does not exist
+const result = await callAnthropic(messages, { system: systemPromptString });
 ```
 
 Check `server/anthropic-helpers.ts` to confirm the `AnthropicChatOptions` interface — look for `system?: string` field.

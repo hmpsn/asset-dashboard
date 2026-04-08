@@ -106,7 +106,7 @@ Batch G (sequential — final wiring):
 **Files:**
 - Create: `server/prompt-assembly.ts`
 - Create: `server/__tests__/prompt-assembly.test.ts`
-- Modify: `server/db/migrations/048-meeting-briefs.ts` (add `custom_prompt_notes` column to workspaces)
+- Modify: `server/db/migrations/048-meeting-briefs.sql` (add `custom_prompt_notes` column to workspaces)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -173,22 +173,14 @@ Expected: FAIL — `Cannot find module '../prompt-assembly.js'`
  */
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
-// ── Statement cache (module-level lazy init — never inside a function)
-let _stmts: {
-  getCustomNotes: ReturnType<typeof db.prepare>;
-} | null = null;
-
-function stmts() {
-  if (!_stmts) {
-    _stmts = {
-      getCustomNotes: db.prepare(
-        `SELECT custom_prompt_notes FROM workspaces WHERE id = ? LIMIT 1`
-      ),
-    };
-  }
-  return _stmts;
-}
+// ── Statement cache (canonical pattern — createStmtCache per CLAUDE.md)
+const stmts = createStmtCache(() => ({
+  getCustomNotes: db.prepare(
+    `SELECT custom_prompt_notes FROM workspaces WHERE id = ? LIMIT 1`
+  ),
+}));
 
 /**
  * Assembles a system prompt by layering workspace-specific context onto base instructions.
@@ -218,7 +210,7 @@ export function buildSystemPrompt(workspaceId: string, baseInstructions: string)
 
 - [ ] **Step 4: Add `custom_prompt_notes` column to the migration**
 
-In `server/db/migrations/048-meeting-briefs.ts`, add this SQL statement after the `meeting_briefs` table creation:
+In `server/db/migrations/048-meeting-briefs.sql`, add this SQL statement after the `meeting_briefs` table creation:
 
 ```sql
 -- Layer 3 prompt assembly: per-workspace custom AI framing notes
@@ -700,7 +692,7 @@ Create `server/meeting-brief-generator.ts`:
 ```typescript
 import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { callOpenAI } from './openai-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -810,17 +802,13 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
 
   if (hash === cachedHash) {
     log.debug({ workspaceId }, 'Meeting brief data unchanged — returning cached brief');
-    // The caller should use getMeetingBrief() for the cached version;
-    // we return a signal that nothing changed by throwing a special error.
-    throw new Error('BRIEF_UNCHANGED');
+    const cached = getMeetingBrief(workspaceId);
+    if (cached) return cached;
+    // Hash exists but brief row is missing — fall through to regenerate
   }
 
-  // Select top 5 insights by impact score to avoid lost-in-the-middle degradation
-  const topInsights = (intel.insights?.topByImpact ?? [])
-    .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
-    .slice(0, 5)
-    .map(i => `- ${i.title}: ${i.summary ?? ''}`)
-    .join('\n');
+  // buildBriefPrompt(intel) handles insight selection internally (topByImpact.slice(0, 5)).
+  // No additional filtering needed here.
 
   const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic analyst preparing a client-facing meeting brief. Your output must be valid JSON matching the MeetingBriefAIOutput interface exactly.
@@ -837,30 +825,40 @@ Avoid: "Your site health score is 78. You have 12 open insights."
   const messages: { role: 'user' | 'assistant'; content: string }[] = [
     { role: 'user', content: prompt },
   ];
-  const raw = await callOpenAI(messages, {
-    system: systemPrompt,
+  const result = await callOpenAI({
+    model: 'gpt-4.1',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages,
+    ],
     maxTokens: 2000,
     temperature: 0.3,
-    response_format: { type: 'json_object' },
+    responseFormat: { type: 'json_object' },
+    feature: 'meeting-brief',
+    workspaceId,
   });
 
   let parsed: MeetingBriefAIOutput;
   try {
-    parsed = JSON.parse(raw) as MeetingBriefAIOutput;
+    parsed = JSON.parse(result.text) as MeetingBriefAIOutput;
   } catch {
     // Retry once with an explicit JSON reminder
-    const retryMessages = [
+    const retryMessages2 = [
+      { role: 'system' as const, content: systemPrompt },
       ...messages,
-      { role: 'assistant' as const, content: raw },
+      { role: 'assistant' as const, content: result.text },
       { role: 'user' as const, content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
     ];
-    const retryRaw = await callOpenAI(retryMessages, {
-      system: systemPrompt,
+    const retryResult = await callOpenAI({
+      model: 'gpt-4.1',
+      messages: retryMessages2,
       maxTokens: 2000,
       temperature: 0.1,
-      response_format: { type: 'json_object' },
+      responseFormat: { type: 'json_object' },
+      feature: 'meeting-brief-retry',
+      workspaceId,
     });
-    parsed = JSON.parse(retryRaw) as MeetingBriefAIOutput;
+    parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
   }
 
   const aiOutput = parsed;
@@ -949,11 +947,6 @@ router.post(
       const brief = await generateMeetingBrief(workspaceId);
       res.json({ brief });
     } catch (err) {
-      if (err instanceof Error && err.message === 'BRIEF_UNCHANGED') {
-        // Data hasn't changed — return existing brief
-        const existing = getMeetingBrief(workspaceId);
-        return res.json({ brief: existing, unchanged: true });
-      }
       const msg = err instanceof Error ? err.message : String(err);
       log.error({ err, workspaceId }, 'Failed to generate meeting brief');
       res.status(500).json({ error: msg });
