@@ -705,23 +705,17 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       {auditTabBar}
       {/* Summary cards */}
       <div className={`grid gap-3 ${effectiveData!.deadLinkSummary ? 'grid-cols-6' : 'grid-cols-5'}`}>
-        <div className="bg-zinc-900 p-5 border border-zinc-800 col-span-1" style={{ borderRadius: '6px 12px 6px 12px' }}>
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-[11px] text-zinc-500 tracking-wider font-medium">Site Score</span>
-          </div>
-          <div className="flex items-end gap-2">
-            <div className={`text-3xl font-bold ${scoreColorClass(effectiveData!.siteScore)}`}>{effectiveData!.siteScore}</div>
-            {history.length >= 2 && (() => {
-              const delta = history[0].siteScore - history[1].siteScore;
-              if (delta === 0) return null;
-              return (
-                <span className={`text-[11px] font-medium mb-1 ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {delta > 0 ? '↑' : '↓'} {Math.abs(delta)} from last audit
-                </span>
-              );
-            })()}
-          </div>
-          <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="col-span-1 flex flex-col gap-1.5">
+          <StatCard
+            label="Site Score"
+            value={effectiveData!.siteScore}
+            valueColor={scoreColorClass(effectiveData!.siteScore)}
+            delta={history.length >= 2 ? history[0].siteScore - history[1].siteScore : undefined}
+            deltaLabel=" from last audit"
+            size="hero"
+            staggerIndex={0}
+          />
+          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${scoreBgBarClass(effectiveData!.siteScore)}`} style={{ width: `${effectiveData!.siteScore}%` }} />
           </div>
         </div>

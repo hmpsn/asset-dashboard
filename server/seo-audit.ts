@@ -468,12 +468,12 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     if (!cachedHtml) continue;
     const pageLinks = extractLinks(cachedHtml);
     for (const link of pageLinks) {
-      if (link.href.startsWith('/')) {
+      if (link.href.startsWith('/') && !link.href.startsWith('/cdn-cgi/')) {
         internalLinkTargets.add(link.href.replace(/\/$/, '').toLowerCase());
       } else if (link.href.startsWith('http')) {
         try {
           const p = new URL(link.href).pathname.replace(/\/$/, '').toLowerCase();
-          internalLinkTargets.add(p);
+          if (!p.startsWith('/cdn-cgi/')) internalLinkTargets.add(p);
         } catch { /* skip */ }
       }
     }

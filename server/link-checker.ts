@@ -64,8 +64,13 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-function isCheckableUrl(href: string): boolean {
-  return !!href && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('javascript:') && !href.startsWith('#');
+export function isCheckableUrl(href: string): boolean {
+  return !!href
+    && !href.startsWith('mailto:')
+    && !href.startsWith('tel:')
+    && !href.startsWith('javascript:')
+    && !href.startsWith('#')
+    && !href.includes('/cdn-cgi/'); // Cloudflare email/phone protection URLs
 }
 
 function extractLinks(html: string): Array<{ href: string; text: string }> {

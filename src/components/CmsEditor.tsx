@@ -327,6 +327,20 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     });
   };
 
+  // Toggle all items in a collection: if all selected → deselect all; otherwise → select all
+  const toggleSelectAllInCollection = (collectionItemIds: string[]) => {
+    setApprovalSelected(prev => {
+      const allSelected = collectionItemIds.every(id => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) {
+        collectionItemIds.forEach(id => next.delete(id));
+      } else {
+        collectionItemIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const sendForApproval = async () => {
     if (!workspaceId || approvalSelected.size === 0) return;
     setSendingApproval(true);
@@ -571,6 +585,9 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
         if (filteredItems.length === 0 && search) return null;
         const isExpanded = expandedCollections.has(coll.collectionId);
         const collSavedIds = coll.items.filter(i => saved.has(i.id)).map(i => i.id);
+        const filteredItemIds = filteredItems.map(i => i.id);
+        const selectedInColl = filteredItemIds.filter(id => approvalSelected.has(id)).length;
+        const allInCollSelected = filteredItemIds.length > 0 && selectedInColl === filteredItemIds.length;
         const extraSeoFields = coll.seoFields.filter(f => f.slug !== 'name' && f.slug !== 'slug');
         const titleField = extraSeoFields.find(f => f.slug.includes('title'));
         const descField = extraSeoFields.find(f => f.slug.includes('description') || f.slug.includes('desc'));
@@ -586,6 +603,16 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors"
             >
               <div className="flex items-center gap-2 flex-wrap">
+                {workspaceId && filteredItemIds.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={allInCollSelected}
+                    onChange={e => { e.stopPropagation(); toggleSelectAllInCollection(filteredItemIds); }}
+                    onClick={e => e.stopPropagation()}
+                    className="w-3.5 h-3.5 rounded border-zinc-600 text-teal-500 focus:ring-teal-500 bg-zinc-800 flex-shrink-0 cursor-pointer"
+                    title={allInCollSelected ? 'Deselect all in collection' : `Select all ${filteredItemIds.length} items`}
+                  />
+                )}
                 {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
                 <span className="text-sm font-medium text-zinc-200">{coll.collectionName}</span>
                 <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">/{coll.collectionSlug}</span>
@@ -612,6 +639,11 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {selectedInColl > 0 && (
+                  <span className="text-[11px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded">
+                    {selectedInColl} selected
+                  </span>
+                )}
                 {collSavedIds.length > 0 && (
                   <span
                     onClick={e => { e.stopPropagation(); publishCollection(coll.collectionId); }}

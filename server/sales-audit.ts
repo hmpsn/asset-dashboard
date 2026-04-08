@@ -163,7 +163,7 @@ async function fetchHtml(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-function normalizeUrl(base: string, href: string): string | null {
+export function normalizeUrl(base: string, href: string): string | null {
   try {
     const u = new URL(href, base);
     // Only same-origin pages
@@ -173,6 +173,7 @@ function normalizeUrl(base: string, href: string): string | null {
     if (u.hash) u.hash = '';
     const path = u.pathname;
     if (/\.(pdf|jpg|jpeg|png|gif|svg|webp|mp4|mp3|zip|css|js|ico|woff|woff2|ttf|eot)$/i.test(path)) return null;
+    if (path.startsWith('/cdn-cgi/')) return null; // Cloudflare utility endpoints
     return u.toString();
   } catch { return null; }
 }
