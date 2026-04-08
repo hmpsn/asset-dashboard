@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSystemPrompt } from './prompt-assembly.js';
+import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -89,9 +89,10 @@ Rules:
 `.trim();
 }
 
-function buildPromptHash(intel: WorkspaceIntelligence): string {
-  // Must cover every signal used by buildBriefPrompt() and assembleMeetingBriefMetrics().
-  // Missing a signal → cached brief returned even when that data changed (stale metrics/narrative).
+function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string | null): string {
+  // Must cover every signal used by buildBriefPrompt(), assembleMeetingBriefMetrics(),
+  // AND buildSystemPrompt() (Layer 3: custom_prompt_notes). Missing any signal → cached
+  // brief returned even when that data changed (stale metrics/narrative/framing).
   const relevant = {
     topIds: intel.insights?.topByImpact?.slice(0, 10).map(i => i.id) ?? [],
     siteScore: intel.siteHealth?.auditScore,
@@ -104,6 +105,7 @@ function buildPromptHash(intel: WorkspaceIntelligence): string {
     rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],
     siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
+    customPromptNotes,
   };
   return createHash('sha256').update(JSON.stringify(relevant)).digest('hex');
 }
@@ -114,7 +116,8 @@ function buildPromptHash(intel: WorkspaceIntelligence): string {
  */
 export async function generateMeetingBrief(workspaceId: string): Promise<MeetingBrief> {
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: BRIEF_SLICES });
-  const hash = buildPromptHash(intel);
+  const customPromptNotes = getCustomPromptNotes(workspaceId);
+  const hash = buildPromptHash(intel, customPromptNotes);
   const cachedHash = getMeetingBriefHash(workspaceId);
 
   if (hash === cachedHash) {

@@ -20,6 +20,20 @@ const stmts = createStmtCache(() => ({
 }));
 
 /**
+ * Returns the trimmed custom_prompt_notes for a workspace, or null if absent.
+ * Used by the meeting brief hash to detect admin note changes.
+ */
+export function getCustomPromptNotes(workspaceId: string): string | null {
+  try {
+    const row = stmts().getCustomNotes.get(workspaceId) as
+      { custom_prompt_notes: string | null } | undefined;
+    return row?.custom_prompt_notes?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Assembles a system prompt by layering workspace-specific context onto base instructions.
  * Safe to call before Brandscript ships — Layer 2 is a no-op until extended in Task 5b.
  */
