@@ -57,7 +57,7 @@ import type { SeoChangeEvent } from './seo-change-tracker.js';
 import type { CannibalizationReport } from './cannibalization-detection.js';
 import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
 import type { Annotation as TimelineAnnotation } from './annotations.js';
-import type { ActionOutcome, ActionPlaybook } from '../shared/types/outcome-tracking.js';
+import type { ActionOutcome, ActionPlaybook, TopWin } from '../shared/types/outcome-tracking.js';
 import type { SafeClientUser } from '../shared/types/users.js';
 import type { ClientRequest } from '../shared/types/requests.js';
 import type { ContentBrief } from '../shared/types/content.js';
@@ -430,7 +430,7 @@ async function assembleLearnings(
 
   // WeCalledIt entries — actions with strong_win outcomes
   let weCalledIt: WeCalledItEntry[] = [];
-  let topWins: import('../shared/types/outcome-tracking.js').TopWin[] = [];
+  let topWins: TopWin[] = [];
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('./outcome-tracking.js');
     const actions = getActionsByWorkspace(workspaceId);

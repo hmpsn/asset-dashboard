@@ -71,7 +71,7 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
         actionType: 'meta_updated',
         pageUrl: '/about-us',
         targetKeyword: 'seo services',
-        delta: { delta_percent: 18.5, delta_absolute: 120, direction: 'up' },
+        delta: { primary_metric: 'clicks', baseline_value: 650, current_value: 770, delta_absolute: 120, delta_percent: 18.5, direction: 'improved' },
         score: 'strong_win',
         createdAt: '2026-03-01T00:00:00Z',
         scoredAt: '2026-04-01T00:00:00Z',
