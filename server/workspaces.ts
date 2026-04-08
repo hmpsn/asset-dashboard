@@ -85,6 +85,7 @@ interface WorkspaceRow {
   scoring_config: string | null;
   intelligence_profile: string | null;
   business_priorities: string | null;
+  custom_prompt_notes: string | null;
   created_at: string;
 }
 
@@ -164,6 +165,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   // preserving the "undefined = enabled by default" intent until migration 049 lands in Group 3.
   if (row.site_intelligence_client_view != null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.business_priorities) ws.businessPriorities = parseJsonSafeArray(row.business_priorities, z.string(), { workspaceId: row.id, field: 'business_priorities', table: 'workspaces' });
+  if (row.custom_prompt_notes) ws.customPromptNotes = row.custom_prompt_notes;
   return ws;
 }
 
@@ -361,6 +363,7 @@ function workspaceToParams(ws: Workspace) {
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
+    custom_prompt_notes: ws.customPromptNotes ?? null,
     created_at: ws.createdAt,
   };
 }
@@ -423,7 +426,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -453,7 +456,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
-    businessPriorities: 'business_priorities',
+    businessPriorities: 'business_priorities', customPromptNotes: 'custom_prompt_notes',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));

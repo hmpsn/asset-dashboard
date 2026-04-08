@@ -175,9 +175,14 @@ Avoid: "Your site health score is 78. You have 12 open insights."
     workspaceId,
     generatedAt: new Date().toISOString(),
     situationSummary: parsed.situationSummary ?? '',
-    wins: Array.isArray(parsed.wins) ? parsed.wins : [],
-    attention: Array.isArray(parsed.attention) ? parsed.attention : [],
-    recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+    wins: Array.isArray(parsed.wins) ? parsed.wins.filter((x): x is string => typeof x === 'string') : [],
+    attention: Array.isArray(parsed.attention) ? parsed.attention.filter((x): x is string => typeof x === 'string') : [],
+    recommendations: Array.isArray(parsed.recommendations)
+      ? parsed.recommendations.filter(
+          (r): r is { action: string; rationale: string } =>
+            typeof r?.action === 'string' && typeof r?.rationale === 'string',
+        )
+      : [],
     blueprintProgress: null,
     metrics,
   };

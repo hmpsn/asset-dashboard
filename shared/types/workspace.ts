@@ -255,6 +255,8 @@ export interface Workspace {
    * priorities submitted by the client via the portal questionnaire.
    */
   businessPriorities?: string[];
+  /** Per-workspace custom AI framing notes for system prompt assembly (Layer 3). */
+  customPromptNotes?: string;
   // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
   scoringConfig?: Partial<Record<string, { primary_metric: string; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
   /** Structured business intelligence profile (industry, goals, target audience). Separate from businessProfile (contact info). */

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { getMeetingBrief } from '../meeting-brief-store.js';
 import { generateMeetingBrief } from '../meeting-brief-generator.js';
+import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('meeting-brief-routes');
@@ -16,9 +17,8 @@ router.get(
       const brief = getMeetingBrief(req.params.workspaceId);
       res.json({ brief });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to fetch meeting brief');
-      res.status(500).json({ error: msg });
+      res.status(500).json({ error: 'Failed to fetch meeting brief' });
     }
   },
 );
@@ -32,6 +32,7 @@ router.post(
     const { workspaceId } = req.params;
     try {
       const brief = await generateMeetingBrief(workspaceId);
+      addActivity(workspaceId, 'brief_generated', 'Meeting brief generated');
       res.json({ brief });
     } catch (err) {
       if (err instanceof Error && err.message === 'BRIEF_UNCHANGED') {
@@ -39,9 +40,8 @@ router.post(
         res.json({ brief: existing, unchanged: true });
         return;
       }
-      const msg = err instanceof Error ? err.message : String(err);
       log.error({ err, workspaceId }, 'Failed to generate meeting brief');
-      res.status(500).json({ error: msg });
+      res.status(500).json({ error: 'Failed to generate meeting brief' });
     }
   },
 );
