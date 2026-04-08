@@ -3233,6 +3233,14 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**277 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**278 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **277**. Last updated: April 2026.
+Current feature count: **278**. Last updated: April 2026.
+
+---
+
+### 278. Incremental Keyword Strategy Update Mode
+**What it does:** Adds a `mode` parameter to `POST /api/webflow/keyword-strategy/:workspaceId`. When `mode='incremental'`, the server checks each page's `analysis_generated_at` timestamp against a 7-day threshold. Pages with fresh analysis (< 7 days old) are skipped from AI batching and their existing keyword assignments are preserved untouched in the database. Only stale/new pages go through the full AI + SEMRush pipeline. At save time, `upsertPageKeywordsBatch` is used instead of `upsertAndCleanPageKeywords` so the untouched fresh rows remain intact. The admin `KeywordStrategy.tsx` component gains an "Update changed pages" button (secondary style, adjacent to "Regenerate") that triggers incremental mode. Also adds `competitorLastFetchedAt` field to the `Workspace` type and DB (migration 052) for future use tracking when competitor data was last fetched.
+**Files:** `server/routes/keyword-strategy.ts`, `src/components/KeywordStrategy.tsx`, `server/workspaces.ts`, `shared/types/workspace.ts`, `server/db/migrations/052-workspace-competitor-fetch.sql`, `tests/integration/keyword-strategy-incremental.test.ts`
+
+**Agency value:** Cuts strategy generation time and AI/SEMRush API costs by 50-70% for sites that haven't changed much since the last full run. One click to update only the pages that need it.

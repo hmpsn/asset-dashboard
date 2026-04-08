@@ -354,6 +354,53 @@ const CHECKS: Check[] = [
     message: 'Add `import type { T } from "./module.js"` at file top to type dynamic import results. `as any` on dynamic imports hides wrong property names. Add // dynamic-import-ok if unavoidable.',
     severity: 'warn',
   },
+  {
+    name: 'Raw bulk_lookup string outside keywords type file',
+    pattern: "'bulk_lookup'",
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: ['shared/types/keywords.ts', 'shared/types/workspace.ts'],
+    message: "Use the 'bulk_lookup' literal only from shared/types/workspace.ts (PageKeywordMap.metricsSource). Raw string references in other files create undiscoverable magic values.",
+    severity: 'warn',
+  },
+  {
+    // Scope to server/ only — frontend type annotations (e.g. metricsSource?: 'ai_estimate')
+    // are legitimate mirrors of the shared type and don't create runtime magic strings
+    name: 'Raw ai_estimate string in server files',
+    pattern: "'ai_estimate'",
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['shared/types/workspace.ts', 'shared/types/keywords.ts'],
+    message: "The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal.",
+    severity: 'warn',
+  },
+  {
+    name: 'replaceAllPageKeywords called outside keyword-strategy route',
+    pattern: 'replaceAllPageKeywords\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/routes/keyword-strategy.ts', 'server/page-keywords.ts'],
+    message: 'replaceAllPageKeywords() is a destructive bulk operation. Only call it from server/routes/keyword-strategy.ts. For incremental updates use upsertPageKeyword().',
+    severity: 'error',
+  },
+  {
+    // Excludes: function/method definitions, interface declarations, and existing pre-PR callers
+    // that go via the provider abstraction (routes/backlinks.ts, routes/semrush.ts)
+    name: 'getBacklinksOverview called outside workspace-intelligence',
+    pattern: 'getBacklinksOverview\\s*\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: [
+      'server/workspace-intelligence.ts',
+      'server/semrush.ts',                      // function definition
+      'server/seo-data-provider.ts',             // interface definition
+      'server/providers/semrush-provider.ts',    // provider implementation
+      'server/providers/dataforseo-provider.ts', // provider implementation
+      'server/routes/backlinks.ts',              // pre-existing caller via provider abstraction
+      'server/routes/semrush.ts',                // pre-existing caller via provider abstraction
+    ],
+    message: 'getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced.',
+    severity: 'error',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

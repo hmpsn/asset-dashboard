@@ -57,10 +57,12 @@ interface WorkspaceRow {
   event_groups: string | null;
   keyword_strategy: string | null;
   competitor_domains: string | null;
+  competitor_last_fetched_at: string | null;
   personas: string | null;
   client_portal_enabled: number;
   seo_client_view: number;
   analytics_client_view: number;
+  site_intelligence_client_view: number | null;
   auto_reports: number;
   auto_report_frequency: string | null;
   brand_voice: string | null;
@@ -82,7 +84,6 @@ interface WorkspaceRow {
   seo_data_provider: string | null;
   scoring_config: string | null;
   intelligence_profile: string | null;
-  site_intelligence_client_view: number | null;
   business_priorities: string | null;
   created_at: string;
 }
@@ -123,10 +124,12 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.event_groups) ws.eventGroups = parseJsonSafeArray(row.event_groups, eventGroupSchema, { workspaceId: row.id, field: 'event_groups', table: 'workspaces' });
   if (row.keyword_strategy) ws.keywordStrategy = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, { siteKeywords: [], pageMap: [], opportunities: [] }, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
   if (row.competitor_domains) ws.competitorDomains = parseJsonSafeArray(row.competitor_domains, z.string(), { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
+  ws.competitorLastFetchedAt = row.competitor_last_fetched_at ?? null;
   if (row.personas) ws.personas = parseJsonSafeArray(row.personas, audiencePersonaSchema, { workspaceId: row.id, field: 'personas', table: 'workspaces' });
   if (row.client_portal_enabled !== null) ws.clientPortalEnabled = !!row.client_portal_enabled;
   if (row.seo_client_view !== null) ws.seoClientView = !!row.seo_client_view;
   if (row.analytics_client_view !== null) ws.analyticsClientView = !!row.analytics_client_view;
+  if (row.site_intelligence_client_view !== null) ws.siteIntelligenceClientView = !!row.site_intelligence_client_view;
   if (row.auto_reports !== null) ws.autoReports = !!row.auto_reports;
   if (row.auto_report_frequency) ws.autoReportFrequency = row.auto_report_frequency as 'weekly' | 'monthly';
   if (row.brand_voice) ws.brandVoice = row.brand_voice;
@@ -226,7 +229,7 @@ function insertStmt() {
          gsc_property_url, ga4_property_id, client_password, client_email,
          live_domain, event_config, event_groups, keyword_strategy,
          competitor_domains, personas, client_portal_enabled, seo_client_view,
-         analytics_client_view, auto_reports, auto_report_frequency,
+         analytics_client_view, site_intelligence_client_view, auto_reports, auto_report_frequency,
          brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
          tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
          onboarding_enabled, onboarding_completed, content_pricing,
@@ -236,7 +239,7 @@ function insertStmt() {
          @gsc_property_url, @ga4_property_id, @client_password, @client_email,
          @live_domain, @event_config, @event_groups, @keyword_strategy,
          @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
-         @analytics_client_view, @auto_reports, @auto_report_frequency,
+         @analytics_client_view, @site_intelligence_client_view, @auto_reports, @auto_report_frequency,
          @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
          @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
          @onboarding_enabled, @onboarding_completed, @content_pricing,
@@ -332,10 +335,12 @@ function workspaceToParams(ws: Workspace) {
     event_groups: ws.eventGroups ? JSON.stringify(ws.eventGroups) : null,
     keyword_strategy: ws.keywordStrategy ? JSON.stringify(ws.keywordStrategy) : null,
     competitor_domains: ws.competitorDomains ? JSON.stringify(ws.competitorDomains) : null,
+    competitor_last_fetched_at: ws.competitorLastFetchedAt ?? null,
     personas: ws.personas ? JSON.stringify(ws.personas) : null,
     client_portal_enabled: ws.clientPortalEnabled === undefined ? null : (ws.clientPortalEnabled ? 1 : 0),
     seo_client_view: ws.seoClientView === undefined ? null : (ws.seoClientView ? 1 : 0),
     analytics_client_view: ws.analyticsClientView === undefined ? null : (ws.analyticsClientView ? 1 : 0),
+    site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
     auto_reports: ws.autoReports === undefined ? null : (ws.autoReports ? 1 : 0),
     auto_report_frequency: ws.autoReportFrequency ?? null,
     brand_voice: ws.brandVoice ?? null,
@@ -355,7 +360,6 @@ function workspaceToParams(ws: Workspace) {
     seo_data_provider: ws.seoDataProvider || null,
     business_profile: ws.businessProfile ? JSON.stringify(ws.businessProfile) : null,
     intelligence_profile: ws.intelligenceProfile ? JSON.stringify(ws.intelligenceProfile) : null,
-    site_intelligence_client_view: ws.siteIntelligenceClientView === undefined ? null : (ws.siteIntelligenceClientView ? 1 : 0),
     business_priorities: ws.businessPriorities ? JSON.stringify(ws.businessPriorities) : null,
     created_at: ws.createdAt,
   };
@@ -419,7 +423,7 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>): Workspace | null {
   const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
@@ -437,9 +441,9 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     webflowToken: 'webflow_token', gscPropertyUrl: 'gsc_property_url', ga4PropertyId: 'ga4_property_id',
     clientPassword: 'client_password', clientEmail: 'client_email', liveDomain: 'live_domain',
     eventConfig: 'event_config', eventGroups: 'event_groups', keywordStrategy: 'keyword_strategy',
-    competitorDomains: 'competitor_domains', personas: 'personas',
+    competitorDomains: 'competitor_domains', competitorLastFetchedAt: 'competitor_last_fetched_at', personas: 'personas',
     clientPortalEnabled: 'client_portal_enabled', seoClientView: 'seo_client_view',
-    analyticsClientView: 'analytics_client_view', autoReports: 'auto_reports',
+    analyticsClientView: 'analytics_client_view', siteIntelligenceClientView: 'site_intelligence_client_view', autoReports: 'auto_reports',
     autoReportFrequency: 'auto_report_frequency', brandVoice: 'brand_voice',
     knowledgeBase: 'knowledge_base', rewritePlaybook: 'rewrite_playbook', brandLogoUrl: 'brand_logo_url',
     brandAccentColor: 'brand_accent_color', contentPricing: 'content_pricing',
@@ -449,7 +453,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     portalContacts: 'portal_contacts', auditSuppressions: 'audit_suppressions',
     publishTarget: 'publish_target', seoDataProvider: 'seo_data_provider',
     businessProfile: 'business_profile', intelligenceProfile: 'intelligence_profile',
-    siteIntelligenceClientView: 'site_intelligence_client_view', businessPriorities: 'business_priorities',
+    businessPriorities: 'business_priorities',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));

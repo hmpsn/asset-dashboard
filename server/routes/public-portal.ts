@@ -5,6 +5,8 @@ import { Router } from 'express';
 
 const router = Router();
 
+import { validate, z } from '../middleware/validate.js';
+import { broadcastToWorkspace } from '../broadcast.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';
@@ -16,6 +18,7 @@ import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
+import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { clearSeoContextCache } from '../seo-context.js';
@@ -44,6 +47,9 @@ router.get('/api/public/workspace/:id', (req, res) => {
     clientPortalEnabled: ws.clientPortalEnabled != null ? !!ws.clientPortalEnabled : true,
     seoClientView: !!ws.seoClientView,
     analyticsClientView: ws.analyticsClientView != null ? !!ws.analyticsClientView : true,
+    siteIntelligenceClientView: ws.siteIntelligenceClientView != null ? !!ws.siteIntelligenceClientView : true,
+    // Business profile — safe to expose to client portal
+    businessProfile: ws.businessProfile || null,
     autoReports: !!ws.autoReports,
     // Branding
     brandLogoUrl: ws.brandLogoUrl || '',
@@ -175,6 +181,7 @@ router.post('/api/public/onboarding/:id', async (req, res) => {
       onboardingCompleted: true,
     });
 
+    addActivity(wsId, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
     res.json({ ok: true, message: 'Onboarding responses saved successfully' });
   } catch (err) {
     log.error({ err: err }, 'Error saving responses');
@@ -376,6 +383,7 @@ router.post('/api/public/keyword-feedback/:workspaceId', (req, res) => {
   `).run(ws.id, kw, status, reason || null, source || 'content_gap', declinedBy);
 
   log.info(`Client keyword feedback: "${kw}" → ${status} for workspace ${ws.id}`);
+  addActivity(wsId, 'client_keyword_feedback', `Client gave ${status} feedback on keyword: ${kw}`, 'Via client portal');
   res.json({ keyword: kw, status, reason: reason || null });
 });
 
@@ -416,6 +424,7 @@ router.post('/api/public/keyword-feedback/:workspaceId/bulk', (req, res) => {
   });
   insert(keywords);
   log.info(`Client bulk keyword feedback: ${keywords.length} keywords for workspace ${ws.id}`);
+  addActivity(wsId, 'client_keyword_feedback', `Client gave bulk keyword feedback (${keywords.length} keywords)`, 'Via client portal');
   res.json({ updated: keywords.length });
 });
 
@@ -493,7 +502,61 @@ router.post('/api/public/business-priorities/:workspaceId', (req, res) => {
   }
 
   log.info(`Client submitted ${clean.length} business priorities for workspace ${wsId}`);
+  addActivity(wsId, 'client_priorities_updated', `Client updated business priorities (${clean.length} items)`, 'Via client portal');
   res.json({ saved: clean.length });
+});
+
+// ── Business Profile (client-facing PATCH) ─────────────────────
+// Allows client portal users to update their verified business data
+
+const clientBusinessProfileSchema = z.object({
+  phone: z.string().max(30).optional(),
+  email: z.string().email().or(z.literal('')).optional(),
+  address: z.object({
+    street: z.string().max(200).optional(),
+    city: z.string().max(100).optional(),
+    state: z.string().max(100).optional(),
+    zip: z.string().max(20).optional(),
+    country: z.string().max(100).optional(),
+  }).optional(),
+  socialProfiles: z.array(z.string().url().or(z.literal(''))).max(10).optional(),
+  openingHours: z.string().max(500).optional(),
+  foundedDate: z.string().max(20).optional(),
+  numberOfEmployees: z.string().max(50).optional(),
+});
+
+router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusinessProfileSchema), (req, res) => {
+  const wsId = req.params.id;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const hasClientUserAuth = clientUserToken && (verifyClientToken(clientUserToken)?.workspaceId === wsId);
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const existing = getWorkspace(wsId);
+  if (!existing) return res.status(404).json({ error: 'Workspace not found' });
+  const existingProfile = existing.businessProfile ?? {};
+  const mergedProfile = {
+    ...existingProfile,
+    ...req.body,
+    // Deep-merge address sub-object so partial address PATCHes don't wipe sibling fields
+    ...(req.body.address !== undefined
+      ? { address: { ...(existingProfile.address ?? {}), ...req.body.address } }
+      : {}),
+  };
+  const ws = updateWorkspace(wsId, { businessProfile: mergedProfile });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  // businessProfile feeds into workspace-intelligence.ts (base.businessProfile → AI prompts).
+  // Flush caches immediately so AI chat/strategy use the updated data.
+  clearSeoContextCache(wsId);
+  invalidateIntelligenceCache(wsId);
+  broadcastToWorkspace(wsId, 'workspace:updated', { businessProfile: ws.businessProfile });
+  addActivity(wsId, 'client_profile_updated', 'Client updated business profile', 'Via client portal');
+  log.info(`Client updated business profile for workspace ${wsId}`);
+  res.json({ businessProfile: ws.businessProfile });
 });
 
 // ── Content Gap Voting ──────────────────────────
@@ -533,6 +596,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', (req, res) => {
     `).run(wsId, kw, vote, clientPayload?.email || 'client');
   }
 
+  addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${kw}`, 'Via client portal');
   res.json({ ok: true });
 });
 

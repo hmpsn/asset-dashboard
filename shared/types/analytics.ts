@@ -368,6 +368,18 @@ export interface SiteHealthInsightData {
   siteWideIssueCount: number;
 }
 
+/** Data shape for strategy_alignment insights (workspace-level strategy vs reality) */
+export interface StrategyAlignmentData {
+  /** Number of pages aligned with their target strategy keyword */
+  alignedCount: number;
+  /** Number of pages misaligned with their target strategy keyword */
+  misalignedCount: number;
+  /** Number of pages without any strategy keyword assigned */
+  untrackedCount: number;
+  /** Human-readable summary of the alignment state */
+  summary?: string;
+}
+
 // ── Insight Data Map (discriminated union) ────────────────────────
 // Use this to get type-safe access to insight data by type.
 
@@ -382,7 +394,7 @@ export interface InsightDataMap {
   ranking_mover: RankingMoverData;
   ctr_opportunity: CtrOpportunityData;
   serp_opportunity: SerpOpportunityData;
-  strategy_alignment: Record<string, unknown>;
+  strategy_alignment: StrategyAlignmentData;
   anomaly_digest: AnomalyDigestData;
   audit_finding: AuditFindingData;
   site_health: SiteHealthInsightData;

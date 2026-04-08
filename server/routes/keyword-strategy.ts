@@ -37,7 +37,7 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
-import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
+import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -53,6 +53,43 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 
 const log = createLogger('keyword-strategy');
+
+// ── Incremental mode helpers ─────────────────────────────────────
+
+const INCREMENTAL_THRESHOLD_DAYS = 7;
+
+/**
+ * Split pages into those needing AI analysis vs those with fresh analysis.
+ * In 'full' mode all pages go to toAnalyze.
+ * In 'incremental' mode only pages with no analysis_generated_at or a stale
+ * one (older than INCREMENTAL_THRESHOLD_DAYS) go to toAnalyze; the rest go
+ * to toPreserve so their existing keyword assignments are kept unchanged.
+ */
+function getPagesNeedingAnalysis<T extends { path: string }>(
+  allPages: T[],
+  mode: 'full' | 'incremental',
+  existingByPath: Map<string, { analysisGeneratedAt?: string | null }>,
+): { toAnalyze: T[]; toPreserve: T[] } {
+  if (mode === 'full') {
+    return { toAnalyze: allPages, toPreserve: [] };
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - INCREMENTAL_THRESHOLD_DAYS);
+  const cutoffIso = cutoff.toISOString();
+
+  const toAnalyze: T[] = [];
+  const toPreserve: T[] = [];
+  for (const page of allPages) {
+    const existing = existingByPath.get(page.path);
+    const genAt = existing?.analysisGeneratedAt;
+    if (!genAt || genAt < cutoffIso) {
+      toAnalyze.push(page);
+    } else {
+      toPreserve.push(page);
+    }
+  }
+  return { toAnalyze, toPreserve };
+}
 
 // ── Strategy Intelligence Block ──────────────────────────────────
 
@@ -161,6 +198,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const provider = getConfiguredProvider(ws.seoDataProvider);
 
   const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
+  const strategyMode = (req.body?.mode as string) === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
   const semrushMode = (req.body?.semrushMode as string) || 'none'; // 'quick', 'full', 'none'
   const competitorDomains = (req.body?.competitorDomains as string[]) || ws.competitorDomains || [];
   const rawMaxPages = req.body?.maxPages != null ? Number(req.body.maxPages) : 500;
@@ -315,14 +353,38 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const SNIPPET_LIMIT = cappedFromTotal > 0 ? 800 : 1200;
     const HTML_READ_LIMIT = 100_000; // 100KB max per page — enough for snippet extraction
 
+    // Incremental mode: pre-compute fresh pages BEFORE content fetch to skip wasted I/O.
+    // Pages with analysis_generated_at < INCREMENTAL_THRESHOLD_DAYS old don't need new HTML.
+    let freshPathSet = new Set<string>();
+    let _preloadedPageKeywords: ReturnType<typeof listPageKeywords> | null = null;
+    if (strategyMode === 'incremental') {
+      _preloadedPageKeywords = listPageKeywords(ws.id);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - INCREMENTAL_THRESHOLD_DAYS);
+      const cutoffIso = cutoff.toISOString();
+      for (const pk of _preloadedPageKeywords) {
+        if (pk.analysisGeneratedAt && pk.analysisGeneratedAt >= cutoffIso) {
+          freshPathSet.add(pk.pagePath);
+        }
+      }
+      if (freshPathSet.size > 0) {
+        log.info(`Incremental pre-check: ${freshPathSet.size} fresh pages skip content fetch`);
+        sendProgress('discovery', `Incremental: fetching ${pathArray.length - freshPathSet.size} pages (${freshPathSet.size} already fresh)`, 0.135);
+      }
+    }
+
     // 3. Fetch actual page content for prioritized pages (parallel, batched)
-    sendProgress('content', `Fetching content from ${pathArray.length} pages...`, 0.15);
+    // In incremental mode skip fresh pages — their HTML hasn't changed.
+    const pathsToFetch = strategyMode === 'incremental' && freshPathSet.size > 0
+      ? pathArray.filter(p => !freshPathSet.has(p))
+      : pathArray;
+    sendProgress('content', `Fetching content from ${pathsToFetch.length} pages...`, 0.15);
     const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
     const contentBatch = 6;
-    for (let i = 0; i < pathArray.length; i += contentBatch) {
-      const chunk = pathArray.slice(i, i + contentBatch);
-      const fetched = Math.min(i + contentBatch, pathArray.length);
-      sendProgress('content', `Fetching page content... ${fetched}/${pathArray.length}`, 0.15 + (fetched / pathArray.length) * 0.30);
+    for (let i = 0; i < pathsToFetch.length; i += contentBatch) {
+      const chunk = pathsToFetch.slice(i, i + contentBatch);
+      const fetched = Math.min(i + contentBatch, pathsToFetch.length);
+      sendProgress('content', `Fetching page content... ${fetched}/${pathsToFetch.length}`, 0.15 + (fetched / pathsToFetch.length) * 0.30);
       const contents = await Promise.all(chunk.map(async (pagePath): Promise<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string } | null> => {
         const wfMeta = wfMetaByPath.get(pagePath);
         let contentSnippet = '';
@@ -389,7 +451,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }));
       pageInfo.push(...contents.filter((c): c is NonNullable<typeof c> => c !== null));
     }
-    const skipped = pathArray.length - pageInfo.length;
+    const skipped = pathsToFetch.length - pageInfo.length;
     if (skipped > 0) log.info(`Filtered out ${skipped} non-live pages (404/unreachable)`);
 
     // Post-fetch: filter out pages with very thin content (utility/legal pages with < 50 chars)
@@ -407,6 +469,28 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     const capNote = cappedFromTotal > 0 ? ` of ${cappedFromTotal} total` : '';
     sendProgress('content', `Fetched ${pageInfo.length} live pages${capNote} (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
+
+    // Incremental mode: re-inject skeleton pageInfo entries for fresh pages that were skipped
+    // during content fetch. They need to be present in pageInfo so getPagesNeedingAnalysis()
+    // puts them in toPreserve — otherwise the synthesis AI sees only stale pages and produces
+    // an incomplete picture of the site (missing content gaps already covered by fresh pages).
+    // Empty contentSnippet is intentional — these pages never go through AI batching;
+    // their keyword data is pulled from existingPageKeywords in the merge step below.
+    if (strategyMode === 'incremental' && _preloadedPageKeywords && freshPathSet.size > 0) {
+      const fetchedPaths = new Set(pageInfo.map(p => p.path));
+      for (const pk of _preloadedPageKeywords) {
+        if (freshPathSet.has(pk.pagePath) && !fetchedPaths.has(pk.pagePath)) {
+          pageInfo.push({
+            path: pk.pagePath,
+            title: pk.pageTitle || '',
+            seoTitle: '',
+            seoDesc: '',
+            contentSnippet: '', // not used — this page goes to toPreserve, not toAnalyze
+          });
+        }
+      }
+      log.info(`Incremental: re-added ${freshPathSet.size} fresh page skeletons for synthesis context`);
+    }
 
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
@@ -695,13 +779,46 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let strategy: any;
     try {
+    // --- Incremental mode: split pages into fresh (preserve) vs stale (analyze) ---
+    // Reuse the pre-loaded records from before content fetch (avoids a redundant DB read).
+    const existingPageKeywords = _preloadedPageKeywords ?? listPageKeywords(ws.id);
+    const existingByPath = new Map(
+      existingPageKeywords.map(pk => [pk.pagePath, { analysisGeneratedAt: pk.analysisGeneratedAt ?? null }])
+    );
+    const { toAnalyze: pagesToAnalyze, toPreserve: pagesToPreserve } = getPagesNeedingAnalysis(
+      pageInfo,
+      strategyMode,
+      existingByPath,
+    );
+    if (strategyMode === 'incremental') {
+      log.info(`Incremental mode: ${pagesToAnalyze.length} stale pages to analyze, ${pagesToPreserve.length} fresh pages to preserve`);
+      sendProgress('ai', `Incremental mode: ${pagesToAnalyze.length} pages need fresh analysis, ${pagesToPreserve.length} already fresh`, 0.54);
+      // Early exit: all pages are fresh — nothing to re-analyze, no usage credit burned.
+      if (pagesToAnalyze.length === 0) {
+        log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
+        sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
+        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
+        // Match the dual-response pattern used at the normal exit (line ~1999):
+        // SSE callers already got progress events + the sendProgress('complete') above.
+        // JSON callers need a proper response body — res.end() gives them an empty 200.
+        if (wantsStream) {
+          res.end();
+        } else {
+          res.json({ ok: true, upToDate: true, freshPageCount: pagesToPreserve.length });
+        }
+        return;
+      }
+    }
+    // For AI batching we only process stale pages; preserved pages are merged back after.
+    const pagesForBatching = strategyMode === 'incremental' ? pagesToAnalyze : pageInfo;
+
     // --- STEP 1: Parallel page analysis batches ---
     const BATCH_SIZE = 20;
     const batches: typeof pageInfo[] = [];
-    for (let i = 0; i < pageInfo.length; i += BATCH_SIZE) {
-      batches.push(pageInfo.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < pagesForBatching.length; i += BATCH_SIZE) {
+      batches.push(pagesForBatching.slice(i, i + BATCH_SIZE));
     }
-    log.info(`Splitting ${pageInfo.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
+    log.info(`Splitting ${pagesForBatching.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
     sendProgress('ai', `Analyzing pages in ${batches.length} parallel batches...`, 0.55);
 
     // Build per-page GSC context lookup
@@ -906,6 +1023,24 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       allPageMappings.push(...validMappings);
     }
     log.info(`All batches complete: ${allPageMappings.length} total page mappings`);
+
+    // --- Incremental mode: merge preserved (fresh) pages back into the page mappings ---
+    // These pages had analysis_generated_at < 7 days old so we keep their existing keywords.
+    if (strategyMode === 'incremental' && pagesToPreserve.length > 0) {
+      const preservedPaths = new Set(pagesToPreserve.map(p => p.path));
+      for (const pk of existingPageKeywords) {
+        if (preservedPaths.has(pk.pagePath)) {
+          allPageMappings.push({
+            pagePath: pk.pagePath,
+            pageTitle: pk.pageTitle,
+            primaryKeyword: pk.primaryKeyword,
+            secondaryKeywords: pk.secondaryKeywords || [],
+            searchIntent: pk.searchIntent || 'informational',
+          });
+        }
+      }
+      log.info(`Incremental mode: merged ${pagesToPreserve.length} preserved pages into final mappings`);
+    }
 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
@@ -1766,9 +1901,28 @@ Rules:
     sendProgress('complete', 'Strategy complete!', 1.0);
     const pageMap = strategy.pageMap || [];
     // Snapshot previous page map BEFORE replacing (needed for strategy diff)
+    // NOTE: for incremental mode we already called listPageKeywords() above (existingPageKeywords),
+    // but we re-read here to get the freshest snapshot right before writing.
     const prevPageMapForHistory = listPageKeywords(ws.id);
-    // Save pageMap to dedicated table (upserts new entries + deletes stale ones, preserves PI data)
-    upsertAndCleanPageKeywords(ws.id, pageMap);
+    // Save pageMap to dedicated table.
+    // Full mode: upsert + delete stale rows (clean replacement).
+    // Incremental mode: only upsert analyzed pages (preserve existing rows for fresh pages).
+    // Both modes stamp analysisGeneratedAt = now so incremental freshness checks work correctly
+    // on the next run. Without this, analysis_generated_at stays NULL indefinitely and every
+    // incremental run re-analyzes everything (COALESCE preserves NULL, not the current time).
+    const now = new Date().toISOString();
+    if (strategyMode === 'full') {
+      const stampedMap = pageMap.map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+      upsertAndCleanPageKeywords(ws.id, stampedMap);
+    } else {
+      // Only update the pages that were actually re-analyzed in this incremental run.
+      // Pages with fresh analysis_generated_at are left untouched in the DB.
+      const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
+      const analyzedMappings = pageMap
+        .filter((pm: { pagePath: string }) => analyzedPaths.has(pm.pagePath))
+        .map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+      upsertPageKeywordsBatch(ws.id, analyzedMappings);
+    }
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
