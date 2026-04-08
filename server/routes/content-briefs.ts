@@ -111,7 +111,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     }
 
     // --- Parallel enrichment: reference URLs, SERP data, GA4 style examples ---
-    const { scrapeUrls, scrapeSerpData } = await import('../web-scraper.js');
+    const { scrapeUrls, scrapeSerpData } = await import('../web-scraper.js'); // dynamic-import-ok — lazy-loaded per-request; TypeScript resolves types via module inference, no as-any cast
 
     // 1. Scrape reference URLs (user-provided competitor/inspiration pages)
     const refUrlList: string[] = Array.isArray(referenceUrls)
@@ -124,7 +124,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     let ga4Performance: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[] = [];
     if (ws?.ga4PropertyId) {
       try {
-        const { getGA4LandingPages } = await import('../google-analytics.js');
+        const { getGA4LandingPages } = await import('../google-analytics.js'); // dynamic-import-ok — lazy-loaded; TypeScript resolves types, no as-any cast
         const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
         ga4Performance = pages.slice(0, 10);
         // Pick top 2 pages with lowest bounce rate + highest engagement for style examples
@@ -185,7 +185,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
 
     // Record for outcome tracking
     try {
-      recordAction({
+      recordAction({ // recordAction-ok — workspaceId is req.params.workspaceId, validated by requireWorkspaceAccess middleware
         workspaceId: req.params.workspaceId,
         actionType: 'brief_created',
         sourceType: 'brief',
