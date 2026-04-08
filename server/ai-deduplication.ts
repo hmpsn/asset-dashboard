@@ -211,14 +211,17 @@ class AIRequestDeduplicator {
       reject = rej;
     });
     
-    // Execute fetcher and store the pending request
-    const fetchPromise = fetcher().then(resolve).catch(reject);
-    
+    // Fire-and-forget: pipe fetcher result into the deferred promise.
+    // Do NOT store fetchPromise — .then(resolve) resolves to undefined (the
+    // return value of resolve()), so concurrent callers would get undefined back.
+    // Store `promise` (the real deferred) so getPendingRequest returns the correct T.
+    fetcher().then(resolve!).catch(reject!);
+
     this.pending.set(key, {
-      promise: fetchPromise,
+      promise,
       timestamp: Date.now(),
-      resolve,
-      reject,
+      resolve: resolve!,
+      reject: reject!,
     } as PendingRequest<unknown>);
     
     return promise;
