@@ -1561,10 +1561,12 @@ Only extract patterns that are generalizable — skip one-off content-specific f
     const response = await callOpenAI({
       model: 'gpt-4.1-mini',
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
+      responseFormat: { type: 'json_object' },
+      feature: 'copy-pattern-extraction',
+      workspaceId,
     });
 
-    const text = response.choices[0]?.message?.content ?? '[]';
+    const text = response.text ?? '[]';
     const parsed = JSON.parse(text);
     const patterns = Array.isArray(parsed) ? parsed : parsed.patterns ?? [];
 

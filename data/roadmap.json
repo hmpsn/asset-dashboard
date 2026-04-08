@@ -456,7 +456,7 @@
           "shippedAt": "2026-03-26"
         },
         {
-          "id": 509,
+          "id": 538,
           "title": "Approval Reminders UI — Add 'Send reminder' to approval batches",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "1-2h",
@@ -466,7 +466,7 @@
           "shippedAt": "2026-03-26"
         },
         {
-          "id": 510,
+          "id": 539,
           "title": "Scheduled Audits Config — UI for recurring audit settings",
           "source": "UI_UX_AUDIT §Backend Capabilities",
           "est": "2h",
@@ -475,7 +475,7 @@
           "status": "pending"
         },
         {
-          "id": 511,
+          "id": 540,
           "title": "Widget System — Customizable Workspace Home dashboard",
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "6-8h",
@@ -484,7 +484,7 @@
           "status": "pending"
         },
         {
-          "id": 512,
+          "id": 541,
           "title": "AI Insights Feed — TikTok-style vertical feed of actionable insights",
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "4-6h",
@@ -493,7 +493,7 @@
           "status": "pending"
         },
         {
-          "id": 513,
+          "id": 542,
           "title": "Command Palette 2.0 — Action palette with natural language",
           "source": "UI_UX_AUDIT §Long-Term",
           "est": "4-6h",
@@ -1035,6 +1035,51 @@
           "priority": "P2",
           "notes": "Added StrategyAlignmentData interface for the only untyped InsightDataMap entry (strategy_alignment). Updated UpsertInsightParams.data to InsightDataMap[InsightType] union type. Updated enrichAndUpsert<T> to generic with typed data. Removed all as unknown as Record<string,unknown> casts in analytics-intelligence.ts for compute functions (ranking_mover, ctr_opportunity, serp_opportunity). Added strategyAlignmentDataSchema to server/schemas/insight-schemas.ts. Added tests/unit/insight-data-types.test.ts. All 224 test files / 3669 tests pass.",
           "status": "done"
+        },
+        {
+          "id": "meeting-brief-phase1",
+          "title": "Meeting Brief — Phase 1 (Strategic Intelligence Brief)",
+          "source": "docs/superpowers/plans/2026-04-07-meeting-brief.md",
+          "est": "8-12h",
+          "priority": "P1",
+          "notes": "On-demand AI-synthesized meeting brief tab (admin-only, screen-shareable). 6 sections: situation summary, wins, attention items, recommendations, blueprint progress (conditional), at-a-glance metrics strip. DB: meeting_briefs table (migration 048) + custom_prompt_notes column on workspaces (Layer 3 prompt assembly). Server: GET + POST /api/workspaces/:id/meeting-brief/generate. Uses buildSystemPrompt() from prompt-assembly.ts. Prompt hash deduplication skips AI call when data unchanged. Phase 2 (Site Architecture Intelligence) deferred until Voice Intelligence lands.",
+          "status": "pending"
+        },
+        {
+          "id": "brandscript-engine-phase1",
+          "title": "Brandscript Engine + Voice Calibration — Phase 1",
+          "source": "docs/superpowers/plans/2026-03-26-brandscript-engine.md",
+          "est": "20-28h",
+          "priority": "P1",
+          "notes": "4 new Brand Hub sub-tabs: Brandscript Builder (StoryBrand framework + AI-assist), Discovery Ingestion (transcript/doc upload → extraction review), Voice Calibration (calibration loop with steering), Brand Identity (deliverable generation). Migration 049. Task 5b extends prompt-assembly.ts with Layer 2 voice DNA translation — activates automatically for all AI features once a workspace profile is calibrated. Prerequisite for prompt standardization pass and Page Strategy Engine.",
+          "status": "pending"
+        },
+        {
+          "id": "prompt-standardization-pass",
+          "title": "Prompt Standardization Pass — wire existing AI features through buildSystemPrompt()",
+          "source": "docs/superpowers/plans/2026-04-08-prompt-standardization-pass.md",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "After Brandscript ships to staging: retrofit all existing AI calls to use buildSystemPrompt(workspaceId, baseInstructions) from server/prompt-assembly.ts. Priority order: (1) content rewrite + brief generator (most client-visible), (2) admin chat, (3) schema generation. Also adds explicit temperature settings and structured JSON output reliability (response_format + retry-once) to existing calls. After this pass, any workspace with a calibrated voice profile automatically gets voice-calibrated output from all AI features — no further per-feature code changes needed.",
+          "status": "pending"
+        },
+        {
+          "id": "page-strategy-engine-phase2",
+          "title": "Page Strategy Engine + Site Blueprint — Phase 2",
+          "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
+          "est": "16-22h",
+          "priority": "P1",
+          "notes": "Site Blueprint deliverable: page-by-page content plan tied to brandscript + keyword strategy. Intelligence-informed generation: cannibalization insights → consolidation, competitor gaps → prioritization, learnings → proven patterns. Auto-brief creation after blueprint generation. Prerequisite for Copy Pipeline Phase 3. Plan audit deferred until after Brandscript ships to staging.",
+          "status": "pending"
+        },
+        {
+          "id": "copy-pipeline-phase3",
+          "title": "Copy Pipeline — Phase 3 (Full AI Copy Generation)",
+          "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
+          "est": "24-32h",
+          "priority": "P1",
+          "notes": "Full page-level AI copy generation: per-page intelligence injection (content decay + CTR + SERP opportunity → copy structure), copy intelligence feedback loop (patterns back into prompts via buildCopyIntelligenceContext()), approved copy → voice sample loop. Uses buildSystemPrompt() for voice-calibrated output. Prerequisite: Page Strategy Engine shipped to staging. Plan audit deferred until after Page Strategy ships.",
+          "status": "pending"
         }
       ]
     },
@@ -1237,7 +1282,7 @@
       "rationale": "Bridge site architecture tree with schema generation. Deterministic breadcrumbs, unified schema plan, coverage dashboard, priority queue, competitive intelligence, and full pipeline automation.",
       "items": [
         {
-          "id": 500,
+          "id": 543,
           "title": "[C1] Deterministic BreadcrumbList from architecture tree",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "2h",
@@ -1246,7 +1291,7 @@
           "status": "done"
         },
         {
-          "id": 501,
+          "id": 544,
           "title": "[C2] Unify schema plan with architecture tree input",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "3h",
@@ -1255,7 +1300,7 @@
           "status": "done"
         },
         {
-          "id": 502,
+          "id": 545,
           "title": "[D1] Page type → schema type mapping + prompt injection",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1264,7 +1309,7 @@
           "status": "done"
         },
         {
-          "id": 503,
+          "id": 546,
           "title": "[C3] Schema coverage dashboard in SiteArchitecture UI",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
@@ -1273,7 +1318,7 @@
           "status": "done"
         },
         {
-          "id": 504,
+          "id": 547,
           "title": "[D2] Template → schema template binding",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1282,7 +1327,7 @@
           "status": "done"
         },
         {
-          "id": 505,
+          "id": 548,
           "title": "[D3] Hub page → CollectionPage/ItemList auto-suggest",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "2h",
@@ -1291,7 +1336,7 @@
           "status": "done"
         },
         {
-          "id": 506,
+          "id": 549,
           "title": "[C4] Internal link health → schema priority queue",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "2h",
@@ -1300,7 +1345,7 @@
           "status": "done"
         },
         {
-          "id": 507,
+          "id": 550,
           "title": "[C5] SiteNavigationElement auto-gen for homepage",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "1h",
@@ -1309,7 +1354,7 @@
           "status": "done"
         },
         {
-          "id": 508,
+          "id": 551,
           "title": "[D5] Sibling/parent-child relationship enrichment",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1318,7 +1363,7 @@
           "status": "done"
         },
         {
-          "id": 509,
+          "id": 552,
           "title": "[D4] Competitor schema intelligence",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "4h",
@@ -1327,7 +1372,7 @@
           "status": "done"
         },
         {
-          "id": 510,
+          "id": 553,
           "title": "[C6] Schema impact tracking via GSC before/after",
           "source": "ARCHITECTURE_SCHEMA_PLAN",
           "est": "4h",
@@ -1336,7 +1381,7 @@
           "status": "done"
         },
         {
-          "id": 511,
+          "id": 554,
           "title": "[D6] Brief E-E-A-T → author/publisher schema enrichment",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "3h",
@@ -1345,7 +1390,7 @@
           "status": "done"
         },
         {
-          "id": 512,
+          "id": 555,
           "title": "[D7] Planned page schema pre-generation",
           "source": "DEVIN_SCHEMA_SPECS",
           "est": "4h",
@@ -1403,7 +1448,7 @@
           "shippedAt": "2026-03-19"
         },
         {
-          "id": 321,
+          "id": 556,
           "title": "HealthTab redesign — Card-based command center",
           "source": "UI_UX_AUDIT Mar 2026",
           "est": "2-3h",
@@ -1647,13 +1692,13 @@
           "shippedAt": "2026-03-15"
         },
         {
-          "id": 279,
+          "id": 557,
           "title": "Growth Opportunities reframe (client Strategy tab)",
           "status": "done",
           "shippedAt": "2026-03-15"
         },
         {
-          "id": 280,
+          "id": 558,
           "title": "Content pipeline status cards + post-publish performance",
           "status": "done",
           "shippedAt": "2026-03-15"
@@ -1851,7 +1896,7 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 235,
+          "id": 559,
           "title": "AEO Trust Audit: trust pages existence check",
           "status": "done",
           "shippedAt": "2026-03-12"
@@ -1965,31 +2010,31 @@
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 230,
+          "id": 560,
           "title": "Fix notification bell tray not opening in admin dashboard",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 231,
+          "id": 561,
           "title": "SEO Change Performance Tracker — track pages after meta/description updates, compare GSC before/after",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 232,
+          "id": 562,
           "title": "Move AI Usage to top nav button in Command Center header",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 233,
+          "id": 563,
           "title": "Fix Keyword Difficulty and impressions showing 0 in admin dashboard",
           "status": "done",
           "shippedAt": "2026-03-12"
         },
         {
-          "id": 234,
+          "id": 564,
           "title": "Stylize admin sidebar nav links with per-group color accents",
           "status": "done",
           "shippedAt": "2026-03-12"
@@ -2139,25 +2184,25 @@
           "shippedAt": "2026-03"
         },
         {
-          "id": 282,
+          "id": 565,
           "title": "Recharts migration (all custom SVG charts)",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 283,
+          "id": 566,
           "title": "AI Usage Dashboard in Command Center",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 284,
+          "id": 567,
           "title": "Mobile Guard interstitial",
           "status": "done",
           "shippedAt": "2026-03"
         },
         {
-          "id": 285,
+          "id": 568,
           "title": "Client Onboarding Questionnaire",
           "status": "done",
           "shippedAt": "2026-03"
@@ -2981,7 +3026,7 @@
           "shippedAt": "2026"
         },
         {
-          "id": 281,
+          "id": 569,
           "title": "Revenue analytics dashboard",
           "status": "done",
           "shippedAt": "2026"
@@ -3324,7 +3369,7 @@
           "shippedAt": "2026-03-23"
         },
         {
-          "id": 320,
+          "id": 570,
           "title": "Competitor Content Monitoring (Scheduled Job)",
           "source": "USER REQUEST",
           "est": "4h",
@@ -3333,7 +3378,7 @@
           "status": "pending"
         },
         {
-          "id": 321,
+          "id": 571,
           "title": "Authority-Adjusted Difficulty Filtering",
           "source": "USER REQUEST",
           "est": "3h",
@@ -3351,7 +3396,7 @@
           "status": "pending"
         },
         {
-          "id": 323,
+          "id": 572,
           "title": "Client keyword feedback system (approve/decline)",
           "source": "USER REQUEST",
           "est": "4h",
@@ -3531,7 +3576,7 @@
           "status": "done"
         },
         {
-          "id": 336,
+          "id": 573,
           "title": "React Query Migration - Complete Simple Components",
           "source": "REACT_QUERY_MIGRATION",
           "est": "3h",
@@ -3783,7 +3828,7 @@
           "status": "pending"
         },
         {
-          "id": 523,
+          "id": 574,
           "title": "JSON validation follow-up: schema coverage for high-value parseJsonFallback columns",
           "source": "TECH DEBT",
           "est": "1.5h",
@@ -3819,7 +3864,7 @@
           "status": "done"
         },
         {
-          "id": 371,
+          "id": 575,
           "title": "Approval review cycle audit — P0-P3 fixes",
           "source": "CODE REVIEW",
           "est": "3h",
@@ -3972,51 +4017,6 @@
           "priority": "P2",
           "sprint": "E",
           "notes": "Bridge #10 applies +10 anomaly boost to matching insights but never reverses it when anomalies age out or are dismissed. Boosted scores remain inflated permanently. Needs a decay or reversal mechanism (e.g., remove boost when no recent anomalies match, or time-decay the boost).",
-          "status": "pending"
-        },
-        {
-          "id": "meeting-brief-phase1",
-          "title": "Meeting Brief — Phase 1 (Strategic Intelligence Brief)",
-          "source": "docs/superpowers/plans/2026-04-07-meeting-brief.md",
-          "est": "8-12h",
-          "priority": "P1",
-          "notes": "On-demand AI-synthesized meeting brief tab (admin-only, screen-shareable). 6 sections: situation summary, wins, attention items, recommendations, blueprint progress (conditional), at-a-glance metrics strip. DB: meeting_briefs table (migration 048) + custom_prompt_notes column on workspaces (Layer 3 prompt assembly). Server: GET + POST /api/workspaces/:id/meeting-brief/generate. Uses buildSystemPrompt() from prompt-assembly.ts. Prompt hash deduplication skips AI call when data unchanged. Phase 2 (Site Architecture Intelligence) deferred until Voice Intelligence lands.",
-          "status": "pending"
-        },
-        {
-          "id": "brandscript-engine-phase1",
-          "title": "Brandscript Engine + Voice Calibration — Phase 1",
-          "source": "docs/superpowers/plans/2026-03-26-brandscript-engine.md",
-          "est": "20-28h",
-          "priority": "P1",
-          "notes": "4 new Brand Hub sub-tabs: Brandscript Builder (StoryBrand framework + AI-assist), Discovery Ingestion (transcript/doc upload → extraction review), Voice Calibration (calibration loop with steering), Brand Identity (deliverable generation). Migration 049. Task 5b extends prompt-assembly.ts with Layer 2 voice DNA translation — activates automatically for all AI features once a workspace profile is calibrated. Prerequisite for prompt standardization pass and Page Strategy Engine.",
-          "status": "pending"
-        },
-        {
-          "id": "prompt-standardization-pass",
-          "title": "Prompt Standardization Pass — wire existing AI features through buildSystemPrompt()",
-          "source": "Architecture discussion 2026-04-07",
-          "est": "4-6h",
-          "priority": "P1",
-          "notes": "After Brandscript ships to staging: retrofit all existing AI calls to use buildSystemPrompt(workspaceId, baseInstructions) from server/prompt-assembly.ts. Priority order: (1) content rewrite + brief generator (most client-visible), (2) admin chat, (3) schema generation. Also adds explicit temperature settings and structured JSON output reliability (response_format + retry-once) to existing calls. After this pass, any workspace with a calibrated voice profile automatically gets voice-calibrated output from all AI features — no further per-feature code changes needed.",
-          "status": "pending"
-        },
-        {
-          "id": "page-strategy-engine-phase2",
-          "title": "Page Strategy Engine + Site Blueprint — Phase 2",
-          "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
-          "est": "16-22h",
-          "priority": "P1",
-          "notes": "Site Blueprint deliverable: page-by-page content plan tied to brandscript + keyword strategy. Intelligence-informed generation: cannibalization insights → consolidation, competitor gaps → prioritization, learnings → proven patterns. Auto-brief creation after blueprint generation. Prerequisite for Copy Pipeline Phase 3. Plan audit deferred until after Brandscript ships to staging.",
-          "status": "pending"
-        },
-        {
-          "id": "copy-pipeline-phase3",
-          "title": "Copy Pipeline — Phase 3 (Full AI Copy Generation)",
-          "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
-          "est": "24-32h",
-          "priority": "P1",
-          "notes": "Full page-level AI copy generation: per-page intelligence injection (content decay + CTR + SERP opportunity → copy structure), copy intelligence feedback loop (patterns back into prompts via buildCopyIntelligenceContext()), approved copy → voice sample loop. Uses buildSystemPrompt() for voice-calibrated output. Prerequisite: Page Strategy Engine shipped to staging. Plan audit deferred until after Page Strategy ships.",
           "status": "pending"
         },
         {

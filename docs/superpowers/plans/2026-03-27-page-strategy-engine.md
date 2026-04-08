@@ -1047,13 +1047,15 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
 
   const aiResponse = await callAnthropic({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 4000,
+    maxTokens: 4000,
     messages: [{ role: 'user', content: prompt }],
+    feature: 'blueprint-generation',
+    workspaceId,
   });
 
   let generatedEntries: GeneratedBlueprintEntry[];
   try {
-    const text = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : '';
+    const text = aiResponse.text;
     // Strip markdown code fences if present
     const jsonStr = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
     generatedEntries = JSON.parse(jsonStr);

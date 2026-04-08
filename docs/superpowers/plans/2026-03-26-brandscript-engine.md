@@ -1691,7 +1691,7 @@ router.patch('/api/voice/:wsId', requireWorkspaceAccess('wsId'), (req, res) => {
   res.json(result);
 });
 // ⚠️ Cache invalidation required: when req.body.status === 'calibrated', call
-// clearSeoContextCache(req.params.workspaceId) (or equivalent) so that downstream
+// clearSeoContextCache(req.params.wsId) (or equivalent) so that downstream
 // intelligence consumers (Page Strategy, Copy Pipeline, Admin Chat) immediately see
 // the updated voice context on their next request. Without this, old cached context
 // persists and the new voice profile doesn't take effect until TTL expires.
