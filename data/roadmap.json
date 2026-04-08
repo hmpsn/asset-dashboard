@@ -1060,8 +1060,8 @@
           "source": "docs/superpowers/plans/2026-04-08-prompt-standardization-pass.md",
           "est": "4-6h",
           "priority": "P1",
-          "notes": "After Brandscript ships to staging: retrofit all existing AI calls to use buildSystemPrompt(workspaceId, baseInstructions) from server/prompt-assembly.ts. Priority order: (1) content rewrite + brief generator (most client-visible), (2) admin chat, (3) schema generation. Also adds explicit temperature settings and structured JSON output reliability (response_format + retry-once) to existing calls. After this pass, any workspace with a calibrated voice profile automatically gets voice-calibrated output from all AI features — no further per-feature code changes needed.",
-          "status": "pending"
+          "notes": "Shipped (April 2026, PR #156). Wired 5 AI features through buildSystemPrompt(): SEO rewrite (single + bulk), content brief, monthly digest, rewrite chat, keyword strategy. Added response_format support to callOpenAI() + AIRequestDeduplicator.createKey(). SEO rewrite now injects keyword map context (buildKeywordMapContext) + page intelligence (cannibalization, decay, health) with URL-aware pageId matching. Content brief adds workspace learnings block (outcome-ai-injection gated) and moves to system+user message structure with JSON mode. Monthly digest gets top-wins narrative from insights. Keyword strategy wraps existing system messages rather than prepending a second one. Temperature standardized across all features. Tests: 6 new unit tests (openai-helpers-format, prompt-standardization); content-brief integration tests updated for system+user message split.",
+          "status": "done"
         },
         {
           "id": "page-strategy-engine-phase2",

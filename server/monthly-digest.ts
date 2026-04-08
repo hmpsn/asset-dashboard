@@ -130,11 +130,11 @@ async function computeDigest(
     }
   }
 
-  // Top wins from outcome tracking — concrete evidence of what worked
+  // Top wins from outcome tracking — reuse already-fetched insights, no second DB call
   let topWinsBlock = '';
   if (isFeatureEnabled('outcome-ai-injection')) {
     try {
-      const positiveInsights = getInsights(ws.id)
+      const positiveInsights = insights
         .filter(i => i.severity === 'positive')
         .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
         .slice(0, 3);
