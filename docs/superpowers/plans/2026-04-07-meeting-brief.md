@@ -47,7 +47,7 @@ Tasks must execute in these batches. Never start a batch until all previous batc
 
 ```
 Batch A (sequential foundation):
-  Task 1 — DB Migration
+  Task 0 (Prompt Assembly Foundation) → Task 1 (DB Migration)
 
 Batch B (parallel, both depend only on Task 1):
   Task 2 — Shared Types
@@ -59,7 +59,7 @@ Batch C (parallel, all depend on Task 2):
   Task 9 — Route + Nav Wiring       [owns: src/routes.ts, Sidebar, Breadcrumbs, CommandPalette]
   Task 10 — Core Components         [owns: src/components/admin/MeetingBrief/AtAGlanceStrip.tsx, BriefSection.tsx, RecommendationsList.tsx, BlueprintProgress.tsx]
 
-  ⚠ Diff review checkpoint after Batch C before proceeding.
+  ▶ CHECKPOINT A — scaled-code-review on Batch C output. Fix Critical/Important before Batch D.
 
 Batch D (parallel):
   Task 5 — Server Generator          [depends on Task 4; owns: server/meeting-brief-generator.ts]
@@ -67,6 +67,8 @@ Batch D (parallel):
 
 Batch E (sequential):
   Task 6 — Server Routes + app.ts    [depends on Task 5]
+
+  ▶ CHECKPOINT B — server smoke test + scaled-code-review on all server files. Fix before Batch F.
 
 Batch F (sequential):
   Task 11 — BriefHeader + MeetingBriefPage  [depends on Task 10 + Task 8]
@@ -79,6 +81,7 @@ Batch G (sequential — final wiring):
 
 | Task | Model | Reason |
 |------|-------|--------|
+| Task 0 — Prompt Assembly | Sonnet | Shared utility, layered pattern, needs judgment |
 | Task 1 — Migration | (none) | Pure SQL |
 | Task 2 — Types | Haiku | Mechanical type definitions |
 | Task 3 — WS Event | Haiku | One-liner constant additions |
@@ -91,6 +94,150 @@ Batch G (sequential — final wiring):
 | Task 10 — Components | Sonnet | Tailwind + component logic |
 | Task 11 — MeetingBriefPage | Sonnet | Multi-state composition |
 | Task 12 — App.tsx + QA | Sonnet | Final wiring + quality gates |
+
+---
+
+## Task 0: Prompt Assembly Foundation
+
+> Build once. Every AI feature (Meeting Brief, Brandscript, Copy Pipeline) calls `buildSystemPrompt()` instead of building system prompts inline. This task creates the shared utility before any feature-specific AI work.
+
+**Model:** Sonnet
+
+**Files:**
+- Create: `server/prompt-assembly.ts`
+- Create: `server/__tests__/prompt-assembly.test.ts`
+- Modify: `server/db/migrations/048-meeting-briefs.ts` (add `custom_prompt_notes` column to workspaces)
+
+- [ ] **Step 1: Write the failing test**
+
+```typescript
+// server/__tests__/prompt-assembly.test.ts
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import db from '../db/index.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
+
+const TEST_WS = `test-prompt-${Date.now()}`;
+
+beforeAll(() => {
+  db.prepare(
+    `INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES (?, 'Test', datetime('now'))`
+  ).run(TEST_WS);
+});
+
+afterAll(() => {
+  db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(TEST_WS);
+});
+
+describe('buildSystemPrompt', () => {
+  it('returns base instructions when no enrichments exist', () => {
+    const result = buildSystemPrompt(TEST_WS, 'Base instructions');
+    expect(result).toBe('Base instructions');
+  });
+
+  it('appends custom notes when set', () => {
+    db.prepare(`UPDATE workspaces SET custom_prompt_notes = ? WHERE id = ?`)
+      .run('Always use ROI framing', TEST_WS);
+    const result = buildSystemPrompt(TEST_WS, 'Base');
+    expect(result).toContain('Always use ROI framing');
+    db.prepare(`UPDATE workspaces SET custom_prompt_notes = NULL WHERE id = ?`).run(TEST_WS);
+  });
+
+  it('does not include voice layer when voice_profiles table does not exist', () => {
+    // Passes trivially in Phase 1 — becomes meaningful after Brandscript Task 5b
+    const result = buildSystemPrompt(TEST_WS, 'Base');
+    expect(result).not.toContain('Voice profile');
+  });
+});
+```
+
+- [ ] **Step 2: Run test to confirm it fails**
+
+```bash
+npx vitest run server/__tests__/prompt-assembly.test.ts
+```
+Expected: FAIL — `Cannot find module '../prompt-assembly.js'`
+
+- [ ] **Step 3: Write the implementation**
+
+```typescript
+// server/prompt-assembly.ts
+/**
+ * Layered system prompt assembly for all AI features.
+ *
+ * Layer 1 — base instructions (always present, feature-specific)
+ * Layer 2 — voice DNA translation (no-op until Brandscript Task 5b adds it)
+ * Layer 3 — per-workspace custom notes (activates when custom_prompt_notes is non-empty)
+ *
+ * Each layer activates automatically when its data exists — no code changes needed
+ * when Brandscript or custom notes ship.
+ */
+
+import db from './db/index.js';
+
+// ── Statement cache (module-level lazy init — never inside a function)
+let _stmts: {
+  getCustomNotes: ReturnType<typeof db.prepare>;
+} | null = null;
+
+function stmts() {
+  if (!_stmts) {
+    _stmts = {
+      getCustomNotes: db.prepare(
+        `SELECT custom_prompt_notes FROM workspaces WHERE id = ? LIMIT 1`
+      ),
+    };
+  }
+  return _stmts;
+}
+
+/**
+ * Assembles a system prompt by layering workspace-specific context onto base instructions.
+ * Safe to call before Brandscript ships — Layer 2 is a no-op until extended in Task 5b.
+ */
+export function buildSystemPrompt(workspaceId: string, baseInstructions: string): string {
+  const parts: string[] = [baseInstructions];
+
+  // ── Layer 2: voice DNA (extended in Brandscript Phase 1 — Task 5b)
+  // No-op here. voiceDNAToPromptInstructions() and the voice_profiles lookup
+  // are added to this file when the voice_profiles table exists (migration 049).
+
+  // ── Layer 3: per-workspace custom notes
+  try {
+    const row = stmts().getCustomNotes.get(workspaceId) as
+      { custom_prompt_notes: string | null } | undefined;
+    if (row?.custom_prompt_notes?.trim()) {
+      parts.push(`Additional context for this client:\n${row.custom_prompt_notes.trim()}`);
+    }
+  } catch {
+    // Graceful degradation: column may not exist in test or legacy DBs
+  }
+
+  return parts.join('\n\n');
+}
+```
+
+- [ ] **Step 4: Add `custom_prompt_notes` column to the migration**
+
+In `server/db/migrations/048-meeting-briefs.ts`, add this SQL statement after the `meeting_briefs` table creation:
+
+```sql
+-- Layer 3 prompt assembly: per-workspace custom AI framing notes
+ALTER TABLE workspaces ADD COLUMN custom_prompt_notes TEXT;
+```
+
+- [ ] **Step 5: Run tests**
+
+```bash
+npx vitest run server/__tests__/prompt-assembly.test.ts
+```
+Expected: All 3 tests pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add server/prompt-assembly.ts server/__tests__/prompt-assembly.test.ts
+git commit -m "feat(prompt-assembly): add layered system prompt assembly foundation"
+```
 
 ---
 
@@ -424,6 +571,32 @@ git commit -m "feat(server): add meeting brief DB store with tests"
 
 ---
 
+## Checkpoint A: Batch C Review
+
+> Four agents just ran in parallel (Tasks 4, 7, 9, 10). Review their combined diff before generator and hook work starts. This is the highest-risk batch — server store, frontend routing, query keys, and four components all changed concurrently.
+
+- [ ] **Step 1: Invoke scaled-code-review**
+
+Use the `superpowers:scaled-code-review` skill. Pass the diff of all files touched in Tasks 4, 7, 9, 10:
+
+```bash
+git diff HEAD~4..HEAD -- \
+  server/meeting-brief-store.ts \
+  src/lib/queryKeys.ts \
+  src/api/meetingBrief.ts \
+  src/routes.ts \
+  src/components/layout/Sidebar.tsx \
+  src/components/layout/Breadcrumbs.tsx \
+  src/components/CommandPalette.tsx \
+  src/components/admin/MeetingBrief/
+```
+
+- [ ] **Step 2: Fix all Critical and Important issues before proceeding**
+
+Do not start Task 5 until all Critical and Important findings are resolved.
+
+---
+
 ## Task 5: Server Brief Generator
 
 **Files:**
@@ -528,6 +701,7 @@ Create `server/meeting-brief-generator.ts`:
 import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -641,23 +815,55 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
     throw new Error('BRIEF_UNCHANGED');
   }
 
+  // Select top 5 insights by impact score to avoid lost-in-the-middle degradation
+  const topInsights = (intel.insights?.topByImpact ?? [])
+    .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
+    .slice(0, 5)
+    .map(i => `- ${i.title}: ${i.summary ?? ''}`)
+    .join('\n');
+
+  const systemPrompt = buildSystemPrompt(workspaceId, `
+You are a strategic analyst preparing a client-facing meeting brief. Your output must be valid JSON matching the MeetingBriefAIOutput interface exactly.
+
+Write for the client — no admin jargon, no internal scoring language. Be specific: name pages, queries, and numbers when the data supports it. Narrative tone, not bullet-point data dumps. Lead with wins before challenges.
+
+Example of a strong situation summary:
+"Your site has gained traction in local search this quarter, with 3 service pages now ranking top-5 for location-specific queries. The main opportunity is a content gap around [topic] — competitors capture 40% of that traffic while your pages sit outside the top 20."
+
+Avoid: "Your site health score is 78. You have 12 open insights."
+`.trim());
+
   const prompt = buildBriefPrompt(intel);
-  const result = await callOpenAI({
-    model: 'gpt-4.1',
-    messages: [{ role: 'user', content: prompt }],
-    maxTokens: 1200,
-    temperature: 0.6,
-    feature: 'meeting-brief',
-    workspaceId,
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [
+    { role: 'user', content: prompt },
+  ];
+  const raw = await callOpenAI(messages, {
+    system: systemPrompt,
+    maxTokens: 2000,
+    temperature: 0.3,
+    response_format: { type: 'json_object' },
   });
 
-  let aiOutput: MeetingBriefAIOutput;
+  let parsed: MeetingBriefAIOutput;
   try {
-    aiOutput = parseAIJson<MeetingBriefAIOutput>(result.text);
-  } catch (err) {
-    log.error({ err, workspaceId, raw: result.text.slice(0, 500) }, 'Failed to parse meeting brief AI response');
-    throw new Error('Failed to parse AI response for meeting brief');
+    parsed = JSON.parse(raw) as MeetingBriefAIOutput;
+  } catch {
+    // Retry once with an explicit JSON reminder
+    const retryMessages = [
+      ...messages,
+      { role: 'assistant' as const, content: raw },
+      { role: 'user' as const, content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
+    ];
+    const retryRaw = await callOpenAI(retryMessages, {
+      system: systemPrompt,
+      maxTokens: 2000,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    });
+    parsed = JSON.parse(retryRaw) as MeetingBriefAIOutput;
   }
+
+  const aiOutput = parsed;
 
   const metrics = assembleMeetingBriefMetrics(intel);
 
@@ -1249,6 +1455,44 @@ Expected: zero errors.
 git add src/components/admin/MeetingBrief/
 git commit -m "feat(ui): add MeetingBrief core display components"
 ```
+
+---
+
+## Checkpoint B: Server Complete Review
+
+> All server tasks are done (Tasks 0–6). Before composing the full page component, verify the server layer is solid end-to-end.
+
+- [ ] **Step 1: Run the full server test suite**
+
+```bash
+npx vitest run server/__tests__/
+```
+Expected: All tests pass, including prompt-assembly, meeting-brief-store, and route integration tests.
+
+- [ ] **Step 2: Manual smoke test of both endpoints**
+
+Start the server (`npm run dev:server`) and confirm:
+```bash
+# Should return null (no brief yet)
+curl -H "x-auth-token: $APP_PASSWORD" http://localhost:3000/api/workspaces/YOUR_WS_ID/meeting-brief
+
+# Should generate and return a brief
+curl -X POST -H "x-auth-token: $APP_PASSWORD" http://localhost:3000/api/workspaces/YOUR_WS_ID/meeting-brief/generate
+```
+Expected: GET returns `null`, POST returns a `MeetingBrief` object with all required fields populated.
+
+- [ ] **Step 3: Invoke scaled-code-review on server files**
+
+Use `superpowers:scaled-code-review`. Pass:
+```bash
+git diff HEAD -- \
+  server/prompt-assembly.ts \
+  server/meeting-brief-store.ts \
+  server/meeting-brief-generator.ts \
+  server/routes/meeting-brief.ts
+```
+
+- [ ] **Step 4: Fix all Critical and Important issues before proceeding to Task 11**
 
 ---
 

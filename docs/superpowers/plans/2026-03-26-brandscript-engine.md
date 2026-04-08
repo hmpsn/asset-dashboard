@@ -4,7 +4,7 @@
 
 **Goal:** Add a structured brandscript system, discovery ingestion from transcripts/docs/website crawl, voice calibration with conversational steering, and brand identity deliverable generation to the existing Brand Hub.
 
-**Architecture:** Four new server-side modules (`brandscript.ts`, `discovery-ingestion.ts`, `voice-calibration.ts`, `brand-identity.ts`) with corresponding route files, a single new migration (`041-brandscript-engine.sql`), frontend API layer (`src/api/brand-engine.ts`), and four new Brand Hub sub-tab components. The existing `seo-context.ts` gets extended with three new builder functions. All AI calls go through the existing `callAnthropic` / `callOpenAI` helpers.
+**Architecture:** Four new server-side modules (`brandscript.ts`, `discovery-ingestion.ts`, `voice-calibration.ts`, `brand-identity.ts`) with corresponding route files, a single new migration (`049-brandscript-engine.sql`), frontend API layer (`src/api/brand-engine.ts`), and four new Brand Hub sub-tab components. The existing `seo-context.ts` gets extended with three new builder functions. All AI calls go through the existing `callAnthropic` / `callOpenAI` helpers.
 
 > **⚠️ AMENDMENTS:** A pattern alignment audit (2026-03-28) identified 9 corrections to the inline code blocks below. See the **Amendments** section at the bottom of this file. Implementers MUST apply those corrections — the inline code is the original draft, amendments override it.
 
@@ -21,27 +21,36 @@
 ## Task Dependencies
 
 ```
-Sequential foundation:
-  Task 1 (Migration 026) → Task 2 (Shared Types)
+Batch A — Foundation (sequential):
+  Task 1 (Migration 049)
+  Task 2 (Shared Types)
 
-Parallel services (after Task 2):
-  Task 3 (Brandscript Service) ∥ Task 4 (Discovery Ingestion) ∥ Task 5 (Voice Calibration) ∥ Task 6 (Brand Identity)
+Batch B — Server Services (parallel, after Batch A commits):
+  Task 3 (Brandscript Service)  ∥  Task 4 (Discovery Ingestion)
+  Task 5 (Voice Calibration)    ∥  Task 6 (Brand Identity)
+  File ownership: each task owns its server/*.ts + server/routes/*.ts exclusively
 
-▶ CHECKPOINT: Invoke `scaled-code-review` on Tasks 3-6 output. Fix Critical/Important before proceeding.
+▶ CHECKPOINT after Batch B: Run scaled-code-review. Fix Critical/Important before proceeding.
 
-Sequential shared-file tasks (after review):
-  Task 7 (SEO Context Builders) — modifies server/seo-context.ts
-  Task 8 (App.ts Route Registration) — modifies server/app.ts
-  Task 9 (Brand Engine API Client) — creates src/api/brand-engine.ts
+Batch C — Shared Server Files (sequential, after Batch B review):
+  Task 7 (SEO Context Builders) — owns server/seo-context.ts
+  Task 8 (App.ts Route Registration) — owns server/app.ts
 
-Parallel frontend (after Task 9):
-  Task 10 (BrandscriptTab) ∥ Task 11 (DiscoveryTab) ∥ Task 12 (VoiceTab) ∥ Task 13 (IdentityTab)
+Batch D — Frontend API Layer (sequential, after Batch C):
+  Task 9 (Brand Engine API Client) — owns src/api/brand-engine.ts
 
-▶ CHECKPOINT: Invoke `scaled-code-review` on Tasks 10-13 output. Fix Critical/Important before proceeding.
+Batch E — Frontend Tabs (parallel, after Batch D commits):
+  Task 10 (BrandscriptTab)  ∥  Task 11 (DiscoveryTab)
+  Task 12 (VoiceTab)        ∥  Task 13 (IdentityTab)
+  File ownership: each task owns its src/components/brand/*.tsx exclusively
 
-Sequential shared frontend (after review):
-  Task 14 (SteeringChat — shared component)
-  Task 15 (BrandHub.tsx integration)
+▶ CHECKPOINT after Batch E: Run scaled-code-review. Fix Critical/Important before proceeding.
+
+Batch F — Shared Frontend (sequential, after Batch E review):
+  Task 14 (SteeringChat) — owns src/components/brand/SteeringChat.tsx
+  Task 15 (BrandHub.tsx integration) — owns src/components/BrandHub.tsx
+
+▶ CHECKPOINT after Batch F: PR checkpoint — see Task 16 below.
 ```
 
 ---
@@ -52,7 +61,7 @@ Sequential shared frontend (after review):
 
 | File | Responsibility |
 |------|---------------|
-| `server/db/migrations/026-brandscript-engine.sql` | All new tables: brandscripts, brandscript_sections, brandscript_templates, discovery_sources, discovery_extractions, voice_profiles, voice_samples, voice_calibration_sessions, brand_identity_deliverables, brand_identity_versions |
+| `server/db/migrations/049-brandscript-engine.sql` | All new tables: brandscripts, brandscript_sections, brandscript_templates, discovery_sources, discovery_extractions, voice_profiles, voice_samples, voice_calibration_sessions, brand_identity_deliverables, brand_identity_versions |
 | `server/brandscript.ts` | Brandscript CRUD, import parsing, AI-assisted completion, template management |
 | `server/discovery-ingestion.ts` | Source upload processing, AI extraction, review workflow, confidence scoring |
 | `server/voice-calibration.ts` | Voice profile CRUD, calibration loop (generate/rate/steer), voice sample management |
@@ -79,15 +88,37 @@ Sequential shared frontend (after review):
 
 ---
 
+## Model Assignments
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Task 1 (Migration) | Haiku | Mechanical SQL — no judgment needed |
+| Task 2 (Shared Types) | Haiku | Type definitions — mechanical, pattern-following |
+| Task 3 (Brandscript Service) | Sonnet | CRUD logic + AI-assist wiring |
+| Task 4 (Discovery Ingestion) | Sonnet | File processing + extraction parsing |
+| Task 5 (Voice Calibration) | Sonnet | Calibration loop logic |
+| Task 6 (Brand Identity) | Sonnet | Deliverable generation + versioning |
+| Task 7 (SEO Context Builders) | Sonnet | Context assembly — must match existing patterns exactly |
+| Task 8 (App.ts Route Registration) | Haiku | Mechanical registration |
+| Task 9 (Brand Engine API Client) | Haiku | Typed fetch wrappers — mechanical |
+| Task 10 (BrandscriptTab) | Sonnet | Complex UI with section editor |
+| Task 11 (DiscoveryTab) | Sonnet | Upload + review card UI |
+| Task 12 (VoiceTab) | Sonnet | Calibration loop UI |
+| Task 13 (IdentityTab) | Sonnet | Deliverable workflow UI |
+| Task 14 (SteeringChat) | Sonnet | Shared conversational component |
+| Task 15 (BrandHub.tsx integration) | Opus | Cross-cutting integration, must match existing patterns |
+
+---
+
 ## Task 1: Database Migration
 
 **Files:**
-- Create: `server/db/migrations/026-brandscript-engine.sql`
+- Create: `server/db/migrations/049-brandscript-engine.sql`
 
 - [ ] **Step 1: Write the migration file**
 
 ```sql
--- 026-brandscript-engine.sql
+-- 049-brandscript-engine.sql
 -- Brandscript Engine + Voice Calibration tables
 
 -- ═══ BRANDSCRIPT BUILDER ═══
@@ -239,8 +270,8 @@ Expected: No errors, tables created. Check with: `sqlite3 data/app.db ".tables"`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/026-brandscript-engine.sql
-git commit -m "feat(db): add brandscript engine tables — migration 026"
+git add server/db/migrations/049-brandscript-engine.sql
+git commit -m "feat(db): add brandscript engine tables — migration 049"
 ```
 
 ---
@@ -476,6 +507,142 @@ export const DEFAULT_TIER_MAP: Record<DeliverableType, DeliverableTier> = {
 ```bash
 git add shared/types/brand-engine.ts
 git commit -m "feat: add shared TypeScript types for brandscript engine"
+```
+
+---
+
+## Task 2b: Unit Tests — Server Modules
+
+**Files:**
+- Create: `server/__tests__/brandscript.test.ts`
+- Create: `server/__tests__/voice-calibration.test.ts`
+
+> Write these tests after Task 3–6 are committed. They verify the DB layer and core business logic.
+
+- [ ] **Step 1: Write brandscript store tests**
+
+```typescript
+// server/__tests__/brandscript.test.ts
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import db from '../db/index.js';
+import {
+  createBrandscript,
+  getBrandscript,
+  updateBrandscriptSection,
+  deleteBrandscript,
+} from '../brandscript.js';
+
+function freshWorkspaceId() {
+  return `test-ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+describe('brandscript store', () => {
+  const wsId = freshWorkspaceId();
+  let scriptId: string;
+
+  afterEach(() => {
+    db.prepare(`DELETE FROM brandscripts WHERE workspace_id = ?`).run(wsId);
+  });
+
+  it('creates a brandscript with sections from template', () => {
+    const script = createBrandscript(wsId, 'Test Brand', 'storybrand');
+    expect(script.workspaceId).toBe(wsId);
+    expect(script.sections.length).toBeGreaterThan(0);
+    scriptId = script.id;
+  });
+
+  it('retrieves the created brandscript by id', () => {
+    const script = createBrandscript(wsId, 'Retrieve Test', 'storybrand');
+    const fetched = getBrandscript(wsId, script.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.name).toBe('Retrieve Test');
+  });
+
+  it('updates a section content', () => {
+    const script = createBrandscript(wsId, 'Update Test', 'storybrand');
+    const sectionId = script.sections[0].id;
+    const updated = updateBrandscriptSection(sectionId, { content: 'New content' });
+    expect(updated.content).toBe('New content');
+  });
+
+  it('deletes a brandscript and cascades sections', () => {
+    const script = createBrandscript(wsId, 'Delete Test', 'storybrand');
+    deleteBrandscript(wsId, script.id);
+    const fetched = getBrandscript(wsId, script.id);
+    expect(fetched).toBeNull();
+    const sections = db.prepare(`SELECT * FROM brandscript_sections WHERE brandscript_id = ?`).all(script.id);
+    expect(sections.length).toBe(0);
+  });
+});
+```
+
+- [ ] **Step 2: Write voice calibration store tests**
+
+```typescript
+// server/__tests__/voice-calibration.test.ts
+import { describe, it, expect, afterEach } from 'vitest';
+import db from '../db/index.js';
+import {
+  getOrCreateVoiceProfile,
+  updateVoiceDNA,
+  addVoiceSample,
+  getVoiceProfile,
+} from '../voice-calibration.js';
+import type { VoiceDNA } from '../../shared/types/brand-engine.js';
+
+function freshWorkspaceId() {
+  return `test-vp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+describe('voice calibration store', () => {
+  const wsId = freshWorkspaceId();
+
+  afterEach(() => {
+    db.prepare(`DELETE FROM voice_profiles WHERE workspace_id = ?`).run(wsId);
+  });
+
+  it('creates a voice profile on first call, returns same on second', () => {
+    const p1 = getOrCreateVoiceProfile(wsId);
+    const p2 = getOrCreateVoiceProfile(wsId);
+    expect(p1.id).toBe(p2.id);
+    expect(p1.status).toBe('draft');
+  });
+
+  it('updates voice DNA and reflects in retrieved profile', () => {
+    const profile = getOrCreateVoiceProfile(wsId);
+    const dna: VoiceDNA = {
+      personalityTraits: ['Bold', 'Direct'],
+      toneSpectrum: { formal_casual: 7, serious_playful: 5, technical_accessible: 6 },
+      sentenceStyle: 'Short punchy lines',
+      vocabularyLevel: 'Conversational',
+      humorStyle: 'Dry wit',
+    };
+    updateVoiceDNA(wsId, dna);
+    const updated = getVoiceProfile(wsId);
+    expect(updated!.voiceDNA?.personalityTraits).toContain('Bold');
+  });
+
+  it('adds a voice sample and retrieves with profile', () => {
+    const profile = getOrCreateVoiceProfile(wsId);
+    addVoiceSample(profile.id, 'This is our voice.', 'headline', 'manual');
+    const fetched = getVoiceProfile(wsId);
+    expect(fetched!.samples?.length).toBeGreaterThan(0);
+  });
+});
+```
+
+- [ ] **Step 3: Run tests to confirm they pass**
+
+```bash
+npx vitest run server/__tests__/brandscript.test.ts server/__tests__/voice-calibration.test.ts
+```
+Expected: All tests pass.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/__tests__/brandscript.test.ts server/__tests__/voice-calibration.test.ts
+git commit -m "test(brand-engine): add brandscript + voice calibration store unit tests"
 ```
 
 ---
@@ -1579,6 +1746,191 @@ git commit -m "feat: add voice calibration service — profile, samples, calibra
 
 ---
 
+## Task 5b: Extend Prompt Assembly with Voice DNA (Layer 2)
+
+> This task extends `server/prompt-assembly.ts` (created in Meeting Brief Task 0) with voice DNA translation. Once this ships, every AI call that uses `buildSystemPrompt()` automatically gains voice-calibrated framing when a workspace's profile is calibrated.
+
+**Model:** Sonnet
+
+**Files:**
+- Modify: `server/prompt-assembly.ts`
+- Modify: `server/__tests__/prompt-assembly.test.ts`
+
+**Prerequisite:** Meeting Brief Task 0 must be merged to staging before this task runs.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add these tests to `server/__tests__/prompt-assembly.test.ts`:
+
+```typescript
+// Add after existing tests — requires voice_profiles table (migration 049)
+
+describe('buildSystemPrompt — Layer 2 (voice DNA)', () => {
+  const wsId = `test-voice-prompt-${Date.now()}`;
+
+  beforeAll(() => {
+    db.prepare(
+      `INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES (?, 'VoiceTest', datetime('now'))`
+    ).run(wsId);
+  });
+
+  afterAll(() => {
+    db.prepare(`DELETE FROM voice_profiles WHERE workspace_id = ?`).run(wsId);
+    db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(wsId);
+  });
+
+  it('does not include voice layer when profile is draft', () => {
+    db.prepare(
+      `INSERT INTO voice_profiles (id, workspace_id, status, created_at, updated_at) VALUES (?, ?, 'draft', datetime('now'), datetime('now'))`
+    ).run(`vp-${wsId}`, wsId);
+    const result = buildSystemPrompt(wsId, 'Base');
+    expect(result).not.toContain('Voice profile');
+  });
+
+  it('includes voice layer when profile is calibrated', () => {
+    const dna = JSON.stringify({
+      personalityTraits: ['Bold', 'Direct'],
+      toneSpectrum: { formal_casual: 8, serious_playful: 5, technical_accessible: 7 },
+      sentenceStyle: 'Short punchy lines',
+      vocabularyLevel: 'Conversational',
+      humorStyle: 'Dry wit',
+    });
+    db.prepare(
+      `UPDATE voice_profiles SET status = 'calibrated', voice_dna_json = ? WHERE workspace_id = ?`
+    ).run(dna, wsId);
+    const result = buildSystemPrompt(wsId, 'Base');
+    expect(result).toContain('Voice profile');
+    expect(result).toContain('conversational and casual');
+    expect(result).toContain('Bold');
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to confirm they fail**
+
+```bash
+npx vitest run server/__tests__/prompt-assembly.test.ts
+```
+Expected: New tests FAIL — Layer 2 not yet implemented.
+
+- [ ] **Step 3: Extend `server/prompt-assembly.ts` with Layer 2**
+
+Add these exports and the Layer 2 logic to `server/prompt-assembly.ts`:
+
+```typescript
+// Add at top of file (after existing import):
+import { parseJsonFallback } from './db/json-validation.js';
+import type { VoiceDNA, VoiceGuardrails } from '../shared/types/brand-engine.js';
+
+// Add module-level statement cache for voice profile (after existing _stmts):
+let _voiceStmts: {
+  getVoiceProfile: ReturnType<typeof db.prepare>;
+} | null = null;
+
+function voiceStmts() {
+  if (!_voiceStmts) {
+    _voiceStmts = {
+      getVoiceProfile: db.prepare(
+        `SELECT status, voice_dna_json, guardrails_json FROM voice_profiles WHERE workspace_id = ? LIMIT 1`
+      ),
+    };
+  }
+  return _voiceStmts;
+}
+
+// Add these exported translation functions:
+
+export function voiceDNAToPromptInstructions(dna: VoiceDNA): string {
+  const formalCasual = dna.toneSpectrum.formal_casual >= 7
+    ? 'conversational and casual'
+    : dna.toneSpectrum.formal_casual <= 3
+      ? 'formal and professional'
+      : 'professional but approachable';
+
+  const playfulness = dna.toneSpectrum.serious_playful >= 7
+    ? 'playful — humor welcome'
+    : dna.toneSpectrum.serious_playful <= 3
+      ? 'serious — no jokes'
+      : 'measured — light warmth only';
+
+  const accessibility = dna.toneSpectrum.technical_accessible >= 7
+    ? 'plain language — avoid jargon'
+    : dna.toneSpectrum.technical_accessible <= 3
+      ? 'technical — assume domain expertise'
+      : 'balanced — define terms where helpful';
+
+  return [
+    `Voice profile for this client:`,
+    `- Tone: ${formalCasual}`,
+    `- Playfulness: ${playfulness}`,
+    `- Complexity: ${accessibility}`,
+    `- Sentence style: ${dna.sentenceStyle}`,
+    `- Vocabulary: ${dna.vocabularyLevel}`,
+    dna.humorStyle ? `- Humor: ${dna.humorStyle}` : null,
+    dna.personalityTraits.length > 0
+      ? `- Personality: ${dna.personalityTraits.join(', ')}`
+      : null,
+  ].filter(Boolean).join('\n');
+}
+
+function guardrailsToPromptInstructions(guardrails: VoiceGuardrails): string {
+  const parts: string[] = ['Voice guardrails:'];
+  if (guardrails.forbiddenWords.length > 0) {
+    parts.push(`- Never use: ${guardrails.forbiddenWords.join(', ')}`);
+  }
+  if (guardrails.requiredTerminology.length > 0) {
+    const terms = guardrails.requiredTerminology
+      .map(t => `"${t.use}" (not "${t.insteadOf}")`).join(', ');
+    parts.push(`- Preferred terms: ${terms}`);
+  }
+  if (guardrails.toneBoundaries.length > 0) {
+    parts.push(`- Tone boundaries: ${guardrails.toneBoundaries.join('; ')}`);
+  }
+  if (guardrails.antiPatterns.length > 0) {
+    parts.push(`- Avoid: ${guardrails.antiPatterns.join('; ')}`);
+  }
+  return parts.join('\n');
+}
+```
+
+Then update the `buildSystemPrompt` function body — replace the Layer 2 comment placeholder with:
+
+```typescript
+  // ── Layer 2: voice DNA
+  try {
+    const profileRow = voiceStmts().getVoiceProfile.get(workspaceId) as {
+      status: string;
+      voice_dna_json: string | null;
+      guardrails_json: string | null;
+    } | undefined;
+
+    if (profileRow?.status === 'calibrated') {
+      const dna = parseJsonFallback<VoiceDNA | null>(profileRow.voice_dna_json, null);
+      const guardrails = parseJsonFallback<VoiceGuardrails | null>(profileRow.guardrails_json, null);
+      if (dna) parts.push(voiceDNAToPromptInstructions(dna));
+      if (guardrails) parts.push(guardrailsToPromptInstructions(guardrails));
+    }
+  } catch {
+    // voice_profiles table may not exist in test or legacy DBs
+  }
+```
+
+- [ ] **Step 4: Run tests**
+
+```bash
+npx vitest run server/__tests__/prompt-assembly.test.ts
+```
+Expected: All tests pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add server/prompt-assembly.ts server/__tests__/prompt-assembly.test.ts
+git commit -m "feat(prompt-assembly): add Layer 2 voice DNA translation"
+```
+
+---
+
 ## Task 6: Brand Identity Service (Backend)
 
 **Files:**
@@ -2084,7 +2436,64 @@ git commit -m "feat: wire brandscript engine tabs into Brand Hub — complete Ph
 
 ---
 
-## Task 16: Documentation Update
+## Task 16: PR Checkpoint
+
+- [ ] **Step 1: Quality gates**
+
+```bash
+npx tsc --noEmit --skipLibCheck
+npx vite build
+npx vitest run
+npx tsx scripts/pr-check.ts
+```
+All four must pass before creating the PR.
+
+- [ ] **Step 2: Check no purple in client-visible components**
+
+```bash
+grep -r "purple-" src/components/brand/
+```
+Expected: no matches (brand components are admin-only but follow the same no-purple-in-brand rule).
+
+- [ ] **Step 3: Preview verification**
+
+Start the dev server (`npm run dev:all`) and verify:
+- Navigate to `/ws/:workspaceId/brand` — BrandHub loads with 4 sub-tabs (Brandscript, Discovery, Voice, Identity)
+- BrandscriptTab: empty state shown for new workspace, "New BrandScript" CTA works
+- VoiceTab: voice DNA editor visible, "Generate Calibration Sample" works (sends request, returns 3 variations)
+- IdentityTab: "Generate" button produces deliverable content for at least Mission/Tagline
+
+Take a screenshot and confirm no layout regressions in existing Brand sections.
+
+- [ ] **Step 4: Create PR**
+
+```bash
+gh pr create --base staging --title "feat(brand-engine): brandscript + voice calibration (Phase 1)" --body "$(cat <<'EOF'
+## Summary
+- Adds Brandscript Builder with StoryBrand framework + AI-assist
+- Adds Discovery Ingestion (transcript/doc upload → extraction review)
+- Adds Voice Calibration (calibration loop with steering)
+- Adds Brand Identity deliverable generation (mission/tagline/pitch etc.)
+- Wires brand context into seo-context.ts for downstream AI prompts
+
+## Test plan
+- [ ] \`npx tsc --noEmit --skipLibCheck\` passes
+- [ ] \`npx vite build\` passes
+- [ ] \`npx vitest run\` passes (full suite)
+- [ ] BrandHub sub-tabs render correctly
+- [ ] Brandscript creation + section editing works
+- [ ] Voice calibration loop: generate → rate → steer → regenerate
+- [ ] Brand Identity deliverable generation works (Mission, Tagline)
+- [ ] Discovery ingestion: upload transcript, extractions appear for review
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+---
+
+## Task 17: Documentation Update
 
 **Files:**
 - Modify: `docs/FEATURE_VISION.md` or relevant docs
@@ -2106,17 +2515,99 @@ git commit -m "docs: add brandscript engine to feature documentation"
 
 > These amendments were identified by auditing the plan against the current codebase (migrations 001-040, 26+ server modules, 15+ route files). **Every agent dispatcher and implementer MUST apply these corrections.** The inline code blocks above reflect the original plan — these amendments override them.
 
-### Amendment 1: Migration Number — 026 → 041
+### Amendment 12: Temperature settings per AI call
 
-Migration 026 already exists (`026-missing-indexes.sql`). The current highest migration is 040.
+All `callAnthropic()` and `callOpenAI()` calls in this feature must specify explicit temperature values. Never rely on defaults.
 
-**Change:** All references to `026-brandscript-engine.sql` become `041-brandscript-engine.sql`.
+| Task | Feature | Model | Temperature | Reason |
+|------|---------|-------|-------------|--------|
+| Task 3 | Brandscript AI-assist | Claude | 0.6 | Creative section completion — controlled variation |
+| Task 4 | Discovery extraction | GPT-4.1-mini | 0.2 | Structured extraction — near-deterministic |
+| Task 5 | Voice calibration variations | Claude | 0.85 | Must produce meaningfully different variations |
+| Task 5 | Voice steering regeneration | Claude | 0.75 | Directed variation based on feedback |
+| Task 6 | Brand identity deliverables | Claude | 0.7 | Creative but structured |
+| Task 6 | Deliverable refinement | Claude | 0.6 | Smaller variance — steering adjustments only |
+
+Pattern for callAnthropic:
+```typescript
+const result = await callAnthropic(messages, {
+  system: systemPrompt,
+  maxTokens: 1500,
+  temperature: 0.85,  // ← always explicit
+});
+```
+
+Pattern for callOpenAI (structured extraction):
+```typescript
+const result = await callOpenAI(messages, {
+  system: systemPrompt,
+  maxTokens: 1000,
+  temperature: 0.2,
+  response_format: { type: 'json_object' },
+});
+```
+
+### Amendment 13: Use buildSystemPrompt() for all AI calls
+
+Every AI call across Tasks 3, 5, and 6 must use `buildSystemPrompt(workspaceId, baseInstructions)` from `server/prompt-assembly.ts` instead of building system prompts inline.
+
+**Import to add** to each service file (`brandscript.ts`, `voice-calibration.ts`, `brand-identity.ts`):
+```typescript
+import { buildSystemPrompt } from './prompt-assembly.js';
+```
+
+**Usage pattern:**
+```typescript
+// ❌ Wrong — inline string
+const systemPrompt = `Write for a client audience. This brand is ${brandName}.`;
+
+// ✅ Correct — layered assembly
+const systemPrompt = buildSystemPrompt(workspaceId, `Write for a client audience. This brand is ${brandName}.`);
+```
+
+This activates voice DNA framing (Layer 2) automatically once the voice profile is calibrated — zero code changes needed at that point.
+
+**Note:** `buildSystemPrompt()` is synchronous. If it needs to become async in the future (e.g., external voice model), that's a breaking change — keep it sync for Phase 1.
+
+### Amendment 10: callAnthropic system parameter
+**All calls to `callAnthropic()` that pass a system prompt must use the separate `system` parameter in `AnthropicChatOptions`, not concatenate it into the first user message.**
+
+Pattern used throughout this plan that MUST be applied at implementation:
+```typescript
+// ✅ CORRECT
+const result = await callAnthropic(messages, {
+  system: systemPromptString,
+  maxTokens: 2000,
+});
+
+// ❌ WRONG — do not prefix system prompt into user messages array
+const result = await callAnthropic([
+  { role: 'user', content: `${systemPrompt}\n\n${userContent}` }
+]);
+```
+
+Check `server/anthropic-helpers.ts` to confirm the `AnthropicChatOptions` interface — look for `system?: string` field.
+
+### Amendment 11: multer upload import path
+Verify `import { upload } from '../middleware.js'` is correct before using. Check whether multer is exported from `server/middleware.ts` or a dedicated file. If it lives in `server/middleware/upload.ts`, the import must be `import { upload } from './middleware/upload.js'`.
+
+Run before implementing Task 4 (Discovery Ingestion):
+```bash
+grep -rn "multer\|upload" server/middleware* 2>/dev/null || grep -rn "multer" server/app.ts
+```
+Use the actual path found.
+
+### Amendment 1: Migration Number — 026 → 049
+
+Migration 026 already exists (`026-missing-indexes.sql`). The current highest migration is 047 (Meeting Brief will use 048).
+
+**Change:** All references to `026-brandscript-engine.sql` become `049-brandscript-engine.sql`.
 
 Affected locations:
 - Task 1: filename, step descriptions, commit message
 - Guardrails doc: file ownership map, task dependency graph, model assignments
 
-Downstream impact: Phase 2 migration becomes **042**, Phase 3 becomes **043**.
+Downstream impact: Phase 2 migration becomes **050**, Phase 3 becomes **051**.
 
 ### Amendment 2: ID Generation — `genId()` → `randomUUID()` Convention
 
@@ -2230,7 +2721,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 voiceDNA: row.voice_dna_json ? JSON.parse(row.voice_dna_json) : undefined,
 
 // After (amended):
-voiceDNA: row.voice_dna_json ? parseJsonFallback(row.voice_dna_json, null, 'voice_dna_json') ?? undefined : undefined,
+voiceDNA: row.voice_dna_json ? parseJsonFallback<VoiceDNA | null>(row.voice_dna_json, null) ?? undefined : undefined,
 ```
 
 Apply to all `rowToX()` converters that parse JSON columns: `rowToTemplate` (sections_json), `rowToProfile` (voice_dna_json, guardrails_json, context_modifiers_json), `rowToSession` (variations_json).
@@ -2257,7 +2748,7 @@ The plan's Task 9 (now Task 9/10 depending on renumbering) introduces sub-tab na
 
 | # | What | Where in plan | Impact |
 |---|------|--------------|--------|
-| 1 | Migration 026 → 041 | Task 1, guardrails | All references |
+| 1 | Migration 026 → 049 | Task 1, guardrails | All references |
 | 2 | `genId()` → `randomUUID()` | Tasks 3-6 | All ID generation |
 | 3 | Manual stmt cache → `createStmtCache()` | Tasks 3-6 | All DB access |
 | 4 | app.ts registration → Task 8 only | Tasks 3-6 steps removed, Task 8 expanded | File ownership |
@@ -2266,6 +2757,10 @@ The plan's Task 9 (now Task 9/10 depending on renumbering) introduces sub-tab na
 | 7 | `JSON.parse` → `parseJsonFallback()` | Tasks 3-6 row converters | All JSON column reads |
 | 8 | Task 16 not in guardrails | Documentation only | No structural change |
 | 9 | TabBar component for BrandHub | Task 9/15 | Use UI primitive |
+| 10 | `callAnthropic()` system param — separate field not concatenated | Tasks 3-6 AI calls | All Anthropic calls |
+| 11 | Verify multer import path before Task 4 | Task 4 route file | Discovery ingestion upload |
+| 12 | Explicit temperature values on all AI calls | Tasks 3-6 AI calls | All AI calls must set temperature |
+| 13 | Use `buildSystemPrompt()` for all AI calls in Tasks 3, 5, 6 | Tasks 3, 5, 6 service files | All system prompt construction |
 
 ---
 

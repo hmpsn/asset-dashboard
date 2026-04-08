@@ -3863,6 +3863,51 @@
           "sprint": "E",
           "notes": "Bridge #10 applies +10 anomaly boost to matching insights but never reverses it when anomalies age out or are dismissed. Boosted scores remain inflated permanently. Needs a decay or reversal mechanism (e.g., remove boost when no recent anomalies match, or time-decay the boost).",
           "status": "pending"
+        },
+        {
+          "id": "meeting-brief-phase1",
+          "title": "Meeting Brief — Phase 1 (Strategic Intelligence Brief)",
+          "source": "docs/superpowers/plans/2026-04-07-meeting-brief.md",
+          "est": "8-12h",
+          "priority": "P1",
+          "notes": "On-demand AI-synthesized meeting brief tab (admin-only, screen-shareable). 6 sections: situation summary, wins, attention items, recommendations, blueprint progress (conditional), at-a-glance metrics strip. DB: meeting_briefs table (migration 048) + custom_prompt_notes column on workspaces (Layer 3 prompt assembly). Server: GET + POST /api/workspaces/:id/meeting-brief/generate. Uses buildSystemPrompt() from prompt-assembly.ts. Prompt hash deduplication skips AI call when data unchanged. Phase 2 (Site Architecture Intelligence) deferred until Voice Intelligence lands.",
+          "status": "pending"
+        },
+        {
+          "id": "brandscript-engine-phase1",
+          "title": "Brandscript Engine + Voice Calibration — Phase 1",
+          "source": "docs/superpowers/plans/2026-03-26-brandscript-engine.md",
+          "est": "20-28h",
+          "priority": "P1",
+          "notes": "4 new Brand Hub sub-tabs: Brandscript Builder (StoryBrand framework + AI-assist), Discovery Ingestion (transcript/doc upload → extraction review), Voice Calibration (calibration loop with steering), Brand Identity (deliverable generation). Migration 049. Task 5b extends prompt-assembly.ts with Layer 2 voice DNA translation — activates automatically for all AI features once a workspace profile is calibrated. Prerequisite for prompt standardization pass and Page Strategy Engine.",
+          "status": "pending"
+        },
+        {
+          "id": "prompt-standardization-pass",
+          "title": "Prompt Standardization Pass — wire existing AI features through buildSystemPrompt()",
+          "source": "Architecture discussion 2026-04-07",
+          "est": "4-6h",
+          "priority": "P1",
+          "notes": "After Brandscript ships to staging: retrofit all existing AI calls to use buildSystemPrompt(workspaceId, baseInstructions) from server/prompt-assembly.ts. Priority order: (1) content rewrite + brief generator (most client-visible), (2) admin chat, (3) schema generation. Also adds explicit temperature settings and structured JSON output reliability (response_format + retry-once) to existing calls. After this pass, any workspace with a calibrated voice profile automatically gets voice-calibrated output from all AI features — no further per-feature code changes needed.",
+          "status": "pending"
+        },
+        {
+          "id": "page-strategy-engine-phase2",
+          "title": "Page Strategy Engine + Site Blueprint — Phase 2",
+          "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
+          "est": "16-22h",
+          "priority": "P1",
+          "notes": "Site Blueprint deliverable: page-by-page content plan tied to brandscript + keyword strategy. Intelligence-informed generation: cannibalization insights → consolidation, competitor gaps → prioritization, learnings → proven patterns. Auto-brief creation after blueprint generation. Prerequisite for Copy Pipeline Phase 3. Plan audit deferred until after Brandscript ships to staging.",
+          "status": "pending"
+        },
+        {
+          "id": "copy-pipeline-phase3",
+          "title": "Copy Pipeline — Phase 3 (Full AI Copy Generation)",
+          "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
+          "est": "24-32h",
+          "priority": "P1",
+          "notes": "Full page-level AI copy generation: per-page intelligence injection (content decay + CTR + SERP opportunity → copy structure), copy intelligence feedback loop (patterns back into prompts via buildCopyIntelligenceContext()), approved copy → voice sample loop. Uses buildSystemPrompt() for voice-calibrated output. Prerequisite: Page Strategy Engine shipped to staging. Plan audit deferred until after Page Strategy ships.",
+          "status": "pending"
         }
       ]
     }

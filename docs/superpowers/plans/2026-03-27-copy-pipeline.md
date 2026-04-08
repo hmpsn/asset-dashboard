@@ -827,6 +827,8 @@ git commit -m "feat: add copy review service with section CRUD, steering, and st
 >    From `intelligence.learnings`, extract outcome patterns related to content published for this workspace. Inject: "Content with these characteristics has produced measurable results for this workspace: [patterns]. Factor this into copy structure and keyword treatment."
 >
 > Add these signals as a new context layer (e.g., "Layer 8.5: Live Intelligence") in `buildCopyGenerationContext()`, inserted after the existing learned patterns layer and before the accumulated steering layer.
+>
+> **Prompt assembly:** After assembling intelligence context, pass it through `buildSystemPrompt(workspaceId, baseInstructions)` — do not concatenate intelligence directly into the system prompt string. `buildSystemPrompt()` wraps the base instructions and appends voice DNA (Layer 2) + custom notes (Layer 3) when available.
 
 This is the core engine. It assembles the 8-layer context prompt, generates copy for all sections at once, runs the quality check, and saves results.
 
@@ -2385,3 +2387,98 @@ Pass `blueprintSummary` to `buildBriefPrompt(intel, blueprintSummary)`.
 > This is a ~1-hour task, not a full plan. It's a single-file change to `server/meeting-brief-generator.ts` plus a brief test addition.
 
 No phase may start implementation until the prior phase is merged and CI is green on staging. Use `<FeatureFlag flag="copyPipeline">` to dark-launch Phase 3 UI until the full pipeline is verified end-to-end.
+
+---
+
+## Amendments
+
+### Amendment 1: Use buildSystemPrompt() for all AI calls
+
+Every AI call in the copy generator and related services must use `buildSystemPrompt(workspaceId, baseInstructions)` from `server/prompt-assembly.ts`.
+
+**Import to add** to every server file that makes an AI call:
+```typescript
+import { buildSystemPrompt } from './prompt-assembly.js';
+```
+
+**Usage pattern:**
+```typescript
+// ❌ Wrong — inline string, misses voice DNA
+const systemPrompt = `You are writing copy for ${brandName}. Voice: ${voiceNotes}.`;
+
+// ✅ Correct — layered assembly (voice DNA from Layer 2 + custom notes from Layer 3)
+const systemPrompt = buildSystemPrompt(workspaceId, `
+You are writing copy for ${brandName}.
+Page type: ${pageType}
+Target audience: ${targetAudience}
+`.trim());
+```
+
+By Phase 3, when a workspace has a calibrated voice profile (Brandscript Phase 1), Layer 2 activates automatically — the copy generator gets voice-calibrated framing with zero code changes.
+
+**Token budget:** Before injecting intelligence context into any prompt, select the top 3 per-page insights (not all of them) to avoid lost-in-the-middle degradation:
+```typescript
+const pageInsights = (intelligence.insights ?? [])
+  .filter(i => i.pagePath === targetPagePath)
+  .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
+  .slice(0, 3)
+  .map(i => `- ${i.title}: ${i.summary ?? ''}`)
+  .join('\n');
+```
+
+### Amendment 2: Temperature settings for copy generation
+
+All AI calls in the copy pipeline must specify explicit temperature values.
+
+| Call type | Model | Temperature | Reason |
+|-----------|-------|-------------|--------|
+| Page copy generation (first draft) | Claude | 0.7 | Creative — needs variation to iterate on |
+| Page copy refinement / rewrite | Claude | 0.5 | Smaller variance — steering adjustments only |
+| Brief → outline generation | GPT-4.1 | 0.4 | Structured output — controlled |
+| Bulk copy generation | Claude | 0.65 | Slight reduction vs single-page — consistency across pages |
+| Meta description generation | GPT-4.1 | 0.3 | Near-deterministic — SEO-constrained |
+
+Pattern for copy generation:
+```typescript
+const result = await callAnthropic(messages, {
+  system: systemPrompt,
+  maxTokens: 2500,
+  temperature: 0.7,
+});
+```
+
+Pattern for structured outline:
+```typescript
+const result = await callOpenAI(messages, {
+  system: systemPrompt,
+  maxTokens: 1500,
+  temperature: 0.4,
+  response_format: { type: 'json_object' },
+});
+```
+
+### Amendment 3: Structured JSON output reliability
+
+Any AI call that returns structured JSON must include `response_format: { type: 'json_object' }` (OpenAI) or XML-tagged sections with explicit parsing (Anthropic). Add retry-once logic for any JSON parse failure:
+
+```typescript
+let parsed: YourOutputType;
+try {
+  parsed = JSON.parse(raw) as YourOutputType;
+} catch {
+  const retryRaw = await callOpenAI(
+    [
+      ...messages,
+      { role: 'assistant' as const, content: raw },
+      { role: 'user' as const, content: 'Your response was not valid JSON. Return only the JSON object.' },
+    ],
+    {
+      system: systemPrompt,
+      maxTokens: 1500,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }
+  );
+  parsed = JSON.parse(retryRaw) as YourOutputType;
+}
+```
