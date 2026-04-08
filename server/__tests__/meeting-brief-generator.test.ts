@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { assembleMeetingBriefMetrics, buildBriefPrompt } from '../meeting-brief-generator.js';
 import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';

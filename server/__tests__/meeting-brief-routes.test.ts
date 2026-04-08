@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Integration tests for meeting-brief routes.
  *

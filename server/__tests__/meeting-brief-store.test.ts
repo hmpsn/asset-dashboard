@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getMeetingBrief, upsertMeetingBrief, getMeetingBriefHash } from '../meeting-brief-store.js';
 import type { MeetingBrief } from '../../shared/types/meeting-brief.js';
