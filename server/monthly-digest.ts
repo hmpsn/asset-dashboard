@@ -139,7 +139,7 @@ async function computeDigest(
         .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
         .slice(0, 3);
       if (positiveInsights.length > 0) {
-        topWinsBlock = `\nNotable wins this period:\n${positiveInsights.map(i => `- ${i.title}`).join('\n')}`;
+        topWinsBlock = `\nNotable wins this period:\n${positiveInsights.map(i => `- ${i.pageTitle ?? i.insightType}`).join('\n')}`;
       }
     } catch { /* insights not available — skip */ }
   }

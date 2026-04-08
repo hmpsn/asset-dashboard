@@ -226,17 +226,17 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
         const cannibalization = pageInsights
           .filter(i => i.insightType === 'cannibalization')
           .slice(0, 2)
-          .map(i => `- Cannibalization: ${i.title}`);
+          .map(i => `- Cannibalization: ${i.pageTitle ?? i.pageId ?? 'unknown page'}`);
 
         const decay = pageInsights
           .filter(i => i.insightType === 'content_decay')
           .slice(0, 1)
-          .map(i => `- Content decay: ${i.title}`);
+          .map(i => `- Content decay: ${i.pageTitle ?? i.pageId ?? 'unknown page'}`);
 
         const health = pageInsights
           .filter(i => i.insightType === 'page_health')
           .slice(0, 1)
-          .map(i => `- Page health: ${i.title} (impact: ${i.impactScore ?? 'n/a'})`);
+          .map(i => `- Page health: ${i.pageTitle ?? i.pageId ?? 'unknown page'} (impact: ${i.impactScore ?? 'n/a'})`);
 
         const lines = [...cannibalization, ...decay, ...health];
         if (lines.length > 0) {
