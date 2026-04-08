@@ -21,7 +21,7 @@ import {
 import { listContentRequests } from '../content-requests.js';
 import { notifyClientWelcome } from '../email.js';
 import { applySuppressionsToAudit, resolvePagePath } from '../helpers.js';
-import { callOpenAI } from '../openai-helpers.js';
+import { callOpenAI, parseAIJson } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
 import { listRequests } from '../requests.js';
 import {
@@ -33,6 +33,7 @@ import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-in
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
+import { listClientSignals } from '../client-signals-store.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -47,7 +48,7 @@ import {
   clearPageStatesByStatus,
 } from '../workspaces.js';
 import { clearSeoContextCache } from '../seo-context.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
 import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
@@ -126,6 +127,12 @@ router.get('/api/workspace-overview', (_req, res) => {
       churnWarning = signals.filter(s => s.severity === 'warning').length;
     } catch { /* non-critical */ }
 
+    // Client signals (new = unreviewed)
+    let clientSignalsNew = 0;
+    try {
+      clientSignalsNew = listClientSignals(ws.id).filter(s => s.status === 'new').length;
+    } catch { /* non-critical */ }
+
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
     const trialDaysRemaining = isTrial && trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : undefined;
@@ -148,6 +155,7 @@ router.get('/api/workspace-overview', (_req, res) => {
       workOrders: { pending: pendingWorkOrders, total: workOrders.length },
       contentPlan: { review: reviewCells },
       churnSignals: { critical: churnCritical, warning: churnWarning },
+      clientSignals: { new: clientSignalsNew },
       pageStates,
     };
   });
@@ -312,6 +320,76 @@ router.put('/api/workspaces/:id/business-profile', requireWorkspaceAccess(), val
   res.json({ businessProfile: ws.businessProfile });
 });
 
+// --- Intelligence Profile (structured business intelligence: industry, goals, target audience) ---
+const intelligenceProfileSchema = z.object({
+  industry: z.string().max(200).optional(),
+  goals: z.array(z.string().max(500)).max(20).optional(),
+  targetAudience: z.string().max(2000).optional(),
+});
+
+router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(), validate(intelligenceProfileSchema), (req, res) => {
+  const ws = updateWorkspace(req.params.id, { intelligenceProfile: req.body });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  invalidateIntelligenceCache(req.params.id);
+  broadcastToWorkspace(req.params.id, 'workspace:updated', { intelligenceProfile: ws.intelligenceProfile });
+  res.json({ intelligenceProfile: ws.intelligenceProfile });
+});
+
+router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspaceAccess(), async (req, res) => {
+  try {
+    const ws = getWorkspace(req.params.id);
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Fetch seoContext slice for keyword/strategy context.
+    // businessProfile is intentionally NOT requested here — that's what we're generating.
+    const intel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const seoCtx = intel.seoContext;
+
+    const siteName = ws.name || 'this website';
+    const keywordBlock = seoCtx ? formatKeywordsForPrompt(seoCtx) : '';
+    const bizContext = seoCtx?.businessContext ?? '';
+    const contentGapTopics = seoCtx?.strategy?.contentGaps?.slice(0, 5).map(g => g.topic).join(', ') ?? '';
+
+    const contextParts: string[] = [`Site name: ${siteName}`];
+    if (keywordBlock) contextParts.push(`Target keywords:\n${keywordBlock}`);
+    if (bizContext) contextParts.push(`Business context: ${bizContext}`);
+    if (contentGapTopics) contextParts.push(`Content topics: ${contentGapTopics}`);
+
+    const result = await callOpenAI({
+      model: 'gpt-4.1-mini',
+      feature: 'intelligence-profile-autofill',
+      workspaceId: ws.id,
+      temperature: 0.3,  // low temperature for consistent JSON output
+      maxTokens: 300,    // response is a small JSON object
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
+        },
+        {
+          role: 'user',
+          content: `Based on this website context, suggest a business intelligence profile:\n\n${contextParts.join('\n\n')}\n\nRespond with JSON: {"industry": "string", "goals": ["string", ...], "targetAudience": "string"}`,
+        },
+      ],
+    });
+
+    // parseAIJson strips markdown fences (```json ... ```) that LLMs occasionally emit
+    // even when instructed not to. parseJsonFallback does bare JSON.parse and silently
+    // returns {} on fenced output, leaving the frontend fields blank with no error shown.
+    let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
+    try { suggestion = parseAIJson(result.text); } catch { /* malformed — fall through to empty fields */ }
+
+    return res.json({
+      industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',
+      goals: Array.isArray(suggestion.goals) ? suggestion.goals.filter((g: unknown) => typeof g === 'string') : [],
+      targetAudience: typeof suggestion.targetAudience === 'string' ? suggestion.targetAudience : '',
+    });
+  } catch (err) {
+    log.error({ err }, 'Intelligence profile autofill failed');
+    return res.status(500).json({ error: 'Auto-fill failed — try again or fill manually' });
+  }
+});
+
 // --- Auto-generate knowledge base from website crawl ---
 router.post('/api/workspaces/:id/generate-knowledge-base', requireWorkspaceAccess(), async (req, res) => {
   const ws = getWorkspace(req.params.id);
@@ -445,7 +523,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
     });
 
     try {
-      if (!getActionBySource('brand_voice', req.params.id)) recordAction({
+      if (!getActionBySource('brand_voice', req.params.id)) recordAction({ // recordAction-ok: req.params.id is workspaceId (workspaces route)
         workspaceId: req.params.id,
         actionType: 'voice_calibrated',
         sourceType: 'brand_voice',

@@ -204,7 +204,7 @@ export function CmsEditor({ siteId, workspaceId }: Props) {
     if (savedItemIds.length === 0) return;
     setPublishing(prev => new Set(prev).add(collectionId));
     try {
-      const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds });
+      const result = await post<{ success?: boolean }>(`/api/webflow/collections/${collectionId}/publish`, { itemIds: savedItemIds, workspaceId });
       if (result.success) {
         setPublished(prev => new Set(prev).add(collectionId));
         setTimeout(() => setPublished(prev => { const n = new Set(prev); n.delete(collectionId); return n; }), 3000);

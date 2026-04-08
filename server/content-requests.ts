@@ -1,6 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machines.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 import type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
@@ -174,6 +175,11 @@ export function updateContentRequest(
 ): ContentTopicRequest | null {
   const existing = getContentRequest(workspaceId, id);
   if (!existing) return null;
+
+  // Validate status transition if status is being changed
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    validateTransition('content_request', CONTENT_REQUEST_TRANSITIONS, existing.status, updates.status);
+  }
 
   // Filter undefined values to avoid overwriting existing fields
   const cleanUpdates: Record<string, unknown> = {};

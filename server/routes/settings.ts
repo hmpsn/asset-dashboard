@@ -2,6 +2,7 @@
  * settings routes — extracted from server/index.ts
  */
 import { Router } from 'express';
+import { getBookingUrl, setBookingUrl, clearBookingUrl } from '../studio-config.js';
 
 const router = Router();
 
@@ -28,6 +29,25 @@ router.post('/api/settings/webflow-token', (req, res) => {
   process.env.WEBFLOW_API_TOKEN = token;
 
   res.json({ ok: true });
+});
+
+// ── Studio-level config ───────────────────────────────────────────────────────
+
+router.get('/api/studio-config', (_req, res) => {
+  res.json({ bookingUrl: getBookingUrl() ?? '' });
+});
+
+router.patch('/api/studio-config', (req, res) => {
+  const { bookingUrl } = req.body as { bookingUrl?: string };
+  if (bookingUrl === undefined) return res.status(400).json({ error: 'bookingUrl required' });
+  if (bookingUrl === '') {
+    clearBookingUrl();
+  } else {
+    // Basic URL validation — must be http(s)
+    try { new URL(bookingUrl); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
+    setBookingUrl(bookingUrl);
+  }
+  res.json({ ok: true, bookingUrl: bookingUrl || null });
 });
 
 export default router;

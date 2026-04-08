@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { get, post, getOptional, getSafe } from '../api/client';
+import { get, post, patch, getOptional, getSafe } from '../api/client';
 import { ApiError } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { clientPath } from '../routes';
@@ -9,12 +9,12 @@ import {
   Sparkles, Send, AlertTriangle,
   Target, Zap, Shield, MessageSquare, X,
   CheckCircle2, LineChart, Lock, Trophy, Check, Layers,
-  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail,
+  Sun, Moon, Plus, FileText, Calendar, Clock, CreditCard, Mail, Building2,
 } from 'lucide-react';
 const LazyStripePaymentModal = lazyWithRetry(() => import('./StripePaymentForm').then(m => ({ default: m.StripePaymentModal })));
 import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal } from './ui';
 import { RenderMarkdown } from './client/helpers';
-import { STUDIO_NAME } from '../constants';
+import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { HealthTab } from './client/HealthTab';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -39,10 +39,14 @@ import { useClientAuth } from '../hooks/useClientAuth';
 import TurnstileWidget from './TurnstileWidget';
 import { useClientData } from '../hooks/useClientData';
 import { useChat } from '../hooks/useChat';
+import { ServiceInterestCTA } from './client/ServiceInterestCTA';
 import { usePayments } from '../hooks/usePayments';
 import { useToast } from '../hooks/useToast';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { BrandTab } from './client/BrandTab';
 import {
   QUICK_QUESTIONS, LEARN_SEO_QUESTIONS,
+  type BusinessProfile,
   type WorkspaceInfo,
   type ClientTab,
   type ClientContentRequest,
@@ -53,6 +57,7 @@ const MODULE_DEFAULT_START = new Date(Date.now() - 28 * 86400000).toISOString().
 const MODULE_TODAY = new Date().toISOString().split('T')[0];
 
 export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: { workspaceId: string; betaMode?: boolean; initialTab?: string }) {
+  const brandTabEnabled = useFeatureFlag('client-brand-section');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('dashboard-theme') as 'dark' | 'light') || 'dark'; } catch { return 'dark'; }
   });
@@ -140,6 +145,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     showChatHistory, setShowChatHistory,
     chatUsage,
     roiValue,
+    lastIntent, clearIntent,
     proactiveInsight, proactiveInsightLoading,
     askAi,
   } = useChat(chatDeps);
@@ -149,6 +155,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const tab: ClientTab = (() => {
     const t = initialTab;
     if (t === 'search' || t === 'analytics') return 'performance' as ClientTab;
+    if (t === 'brand') return brandTabEnabled ? 'brand' as ClientTab : 'overview';
     if (t && ['overview','performance','health','strategy','inbox','approvals','requests','content','plans','roi','content-plan','schema-review'].includes(t)) return t as ClientTab;
     return 'overview';
   })();
@@ -329,7 +336,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           window.history.replaceState({}, '', url.toString());
         }
       })
-      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? 'This dashboard is currently unavailable. Please contact hmpsn studio for access.' : 'Failed to load dashboard'); setLoading(false); });
+      .catch((err) => { setError(err instanceof ApiError && err.status === 403 ? `This dashboard is currently unavailable. Please contact ${STUDIO_NAME} for access.` : 'Failed to load dashboard'); setLoading(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]); // large init effect — only re-runs on workspace change; missing deps are stable useState setters
 
@@ -391,7 +398,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <div className="w-full max-w-sm">
         <div className="bg-zinc-900 border border-zinc-800 p-8 shadow-2xl shadow-black/40" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <div className="flex flex-col items-center mb-6">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-7 opacity-60 mb-4" />
+            <img src="/logo.svg" alt={STUDIO_NAME} className="h-7 opacity-60 mb-4" />
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-4">
               <Lock className="w-6 h-6 text-teal-400" />
             </div>
@@ -639,6 +646,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ...(isPaid ? [{ id: 'schema-review' as ClientTab, label: 'Schema', icon: Shield, locked: false }] : []),
     ...(!betaMode ? [{ id: 'plans' as ClientTab, label: 'Plans', icon: CreditCard, locked: false }] : []),
     ...(isPaid && !betaMode && strategyData ? [{ id: 'roi' as ClientTab, label: 'ROI', icon: Trophy, locked: false }] : []),
+    ...(brandTabEnabled ? [{ id: 'brand' as ClientTab, label: 'Brand', icon: Building2, locked: false }] : []),
   ];
 
   return (
@@ -650,7 +658,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       <header className="border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="hmpsn studio" className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
+            <img src="/logo.svg" alt={STUDIO_NAME} className="h-8 opacity-80" style={theme === 'light' ? { filter: 'invert(1) brightness(0.3)' } : undefined} />
             <div className="w-px h-8 bg-zinc-800" />
             <div>
               <div className="flex items-center gap-2">
@@ -855,7 +863,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={strategyData?.pageMap} />
         )}
 
 
@@ -877,12 +885,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     {chatUsage.remaining}/{chatUsage.limit} left
                   </span>
                 ) : (
-                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by hmpsn studio</span>
+                  <span className="text-[11px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">by {STUDIO_NAME}</span>
                 )}
               </div>
               <div className="flex items-center gap-1">
                 {chatMessages.length > 0 && (
-                  <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); setShowChatHistory(false); }}
+                  <button onClick={() => { setChatSessionId(`cs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); setChatMessages([]); clearIntent(); setShowChatHistory(false); }}
                     title="New conversation" className="text-zinc-500 hover:text-zinc-300 p-1"><Plus className="w-3.5 h-3.5" /></button>
                 )}
                 <button onClick={() => { setShowChatHistory(!showChatHistory); if (!showChatHistory && ws) { getSafe<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>(`/api/public/chat-sessions/${ws.id}?channel=client`, []).then(d => { if (Array.isArray(d)) setChatSessions(d); }).catch((err) => { console.error('ClientDashboard operation failed:', err); }); } }}
@@ -945,6 +953,18 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                     <div className="flex gap-3"><div className="w-6 h-6 rounded-lg bg-teal-500/10 flex items-center justify-center"><Loader2 className="w-3 h-3 text-teal-400 animate-spin" /></div>
                       <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5"><div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} /></div></div>
                     </div>
+                  )}
+                  {/* CTA — shown after last assistant message when intent is detected */}
+                  {!chatLoading && lastIntent && chatMessages.length > 0 && chatMessages[chatMessages.length - 1].role === 'assistant' && (
+                    <ServiceInterestCTA
+                      type={lastIntent}
+                      workspaceId={workspaceId}
+                      bookingUrl={ws?.bookingUrl}
+                      onAction={(type) => {
+                        clearIntent();
+                        if (type === 'content_interest') clientNavigate(clientPath(workspaceId, 'strategy', betaMode));
+                      }}
+                    />
                   )}
                   {/* Show quick questions as follow-ups after proactive greeting */}
                   {chatMessages.length === 1 && chatMessages[0].role === 'assistant' && !chatLoading && (
@@ -1014,6 +1034,21 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         {tab === 'schema-review' && (
           <ErrorBoundary label="Schema Review">
             <SchemaReviewTab workspaceId={workspaceId} setToast={setToast} />
+          </ErrorBoundary>
+        )}
+
+        {/* ════════════ BRAND TAB ════════════ */}
+        {tab === 'brand' && brandTabEnabled && (
+          <ErrorBoundary label="Brand">
+            <BrandTab
+              businessProfile={ws?.businessProfile ?? undefined}
+              onSaveBusinessProfile={async (profile) => {
+                const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+                if (res?.businessProfile) {
+                  setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
+                }
+              }}
+            />
           </ErrorBoundary>
         )}
 
@@ -1266,8 +1301,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
       {/* Powered by footer */}
       <footer className="border-t border-zinc-800/50 mt-12">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-[11px] text-zinc-700">Powered by hmpsn studio</span>
-          <a href="https://hmpsn.studio" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">hmpsn.studio</a>
+          <span className="text-[11px] text-zinc-700">Powered by {STUDIO_NAME}</span>
+          <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-700 hover:text-zinc-500 transition-colors">{STUDIO_NAME}</a>
         </div>
       </footer>
     </div>

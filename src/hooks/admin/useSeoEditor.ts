@@ -1,6 +1,7 @@
 /**
- * React Query hook for SEO editor pages data
- * Replaces manual useEffect fetch pattern in SeoEditor.tsx
+ * React Query hook for SEO editor pages data.
+ * Fetches static Webflow pages only. CMS collection items are edited
+ * through the separate CmsEditor component which has real item IDs.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -8,15 +9,19 @@ import { get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 
-interface PageMeta {
+export interface PageMeta {
   id: string;
   title: string;
   slug: string;
-  seo?: { title?: string; description?: string };
-  openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
+  publishedPath?: string | null;
+  seo?: { title?: string | null; description?: string | null };
+  /** 'static' = Webflow static page. 'cms' = CMS collection item from sitemap discovery. */
+  source?: 'static' | 'cms';
+  /** For CMS items — the Webflow collection ID needed for SEO write-back via the approvals API. */
+  collectionId?: string;
 }
 
-export function useSeoEditor(siteId: string) {
+export function useSeoEditor(siteId: string, _workspaceId?: string) {
   return useQuery({
     queryKey: queryKeys.admin.seoEditor(siteId),
     queryFn: async (): Promise<PageMeta[]> => {

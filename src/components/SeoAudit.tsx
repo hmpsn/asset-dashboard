@@ -991,7 +991,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
                       {workspaceId && link.type === 'internal' && (
                         <button
                           onClick={() => navigate(adminPath(workspaceId, 'seo-editor' as Page), {
-                            state: { fixContext: { pageSlug: link.foundOnSlug, pageName: link.foundOn, issueCheck: 'broken_link', issueMessage: `Broken link: ${link.url}` } },
+                            state: { fixContext: { targetRoute: 'seo-editor', pageSlug: link.foundOnSlug, pageName: link.foundOn, issueCheck: 'broken_link', issueMessage: `Broken link: ${link.url}` } },
                           })}
                           className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
                           title="Open source page in SEO Editor"

@@ -56,6 +56,7 @@ Every completed task must include:
 | Conflicts with existing patterns | Flag conflict, recommend pattern-consistent approach. |
 | Unsure if something exists | Search first, then proceed. |
 | Pre-existing lint errors | Check Known Issues below. If listed, ignore. If new, fix only if caused by your changes. |
+| Bug found during review (any origin) | Fix it in the current PR. Never defer a fixable bug — whether it's from your changes, pre-existing, or out-of-scope. Compounding unfixed bugs is worse than a slightly larger diff. If the fix is genuinely risky or large, flag it explicitly and offer to fix it. |
 
 ---
 
@@ -121,6 +122,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
    - New filter/category values → use shared const objects (like `INSIGHT_FILTER_KEYS`), not string literals
    - Percentage vs decimal fields → add JSDoc: `/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */`
    - Shared string enums between producer/consumer → single const object imported by both sides
+7. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/workspace-intelligence.ts`. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND read from the new store inside the corresponding `assemble*` function. The AI context and AdminChat are blind to data that isn't wired into a slice. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`.
 
 ## UI/UX Rules (mandatory)
 
@@ -199,7 +201,8 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
 - **Test assertions on collections** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously, hiding real failures. Pattern: `expect(arr.length).toBeGreaterThan(0); expect(arr.every(fn)).toBe(true);`
 - **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `.windsurf/rules/analytics-insights.md`.
-- **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, and write path (`upsertX()`) in the same commit. TypeScript will not catch a mapper that silently ignores a new column.
+- **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, write path (`upsertX()`), AND the public endpoint serialization list in `public-portal.ts` if the field is client-facing, all in the same commit. TypeScript will not catch a mapper that silently ignores a new column, and the public endpoint's explicit field list will silently omit it.
+- **Integration tests must cover the actual read path** — when a feature gates client-facing behavior on a field from `GET /api/public/workspace/:id`, the integration test must exercise that endpoint, not the admin GET. A test that only verifies the admin route gives false confidence; a regression in the public serialization goes undetected.
 - **Enrichment field fallbacks** — optional fields computed at insight-store time must have explicit fallbacks. `pageTitle` must always resolve to something (cleaned slug if all else fails) — never render a raw URL. Enrichment failure must degrade gracefully, not block insight storage.
 - **Feedback loop completeness** — every cross-system write (e.g. insights → strategy, insights → pipeline) requires both halves: server `broadcastToWorkspace()` AND frontend `useWebSocket` handler that invalidates the correct React Query key. Neither half alone is sufficient.
 - **Bridge authoring rules** — all bridges must follow these patterns. Violations produce recurring bugs:
@@ -210,6 +213,22 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Client vs admin insight framing** — client-facing insight components must use narrative, outcome-oriented language. No purple. No admin jargon. Premium features wrapped in `<TierGate>`. Verify with `grep -r "purple-" src/components/client/` before marking Phase 3 done.
 - **Rate display: numerator and denominator must share a source** — if a component shows both a computed rate (win rate, conversion rate, etc.) and a "total" count, the displayed count must be the exact denominator used to compute the rate. Never mix a DB-aggregated count with a locally-filtered count. A mismatch causes users to infer the wrong raw counts from the displayed percentage.
 - **Guard `recordAction()` with a valid `workspaceId`** — never fall back to a non-workspace ID (Webflow siteId, sourceId, etc.) as the FK value. Always gate: `if (workspaceId) { recordAction({ workspaceId, ... }) }`. A Webflow siteId passed as `workspaceId` fails the FK constraint and silently kills outcome tracking for that call.
+- **Never use `as any` on dynamic import results** — the `(x: any)` or `as any` cast on a dynamically imported module's return value suppresses TypeScript and lets wrong property/function names compile silently. Every field resolves to `undefined` and falls through to `?? ''` / `?? 0` defaults, producing all-zero/empty data. Instead: (1) add `import type { T } from './module.js'` at the top of the file, (2) type the variable from the dynamic import, (3) let TypeScript verify every field access. If the type isn't exported, export it. If a circular dependency prevents a value import, `import type` is always safe (erased at compile time). The `// as-any-ok` escape hatch is for genuinely untyped third-party code only.
+- **Read-before-write for cross-module consumption** — before writing code that consumes another module's exports (assemblers, bridges, mappers), read the source module's actual interface/type definitions and exported function signatures. Never guess property names, function names, or return shapes from memory. The #1 bug pattern in this codebase is guessed field names (`pages` vs `decayingPages`, `createdAt` vs `changedAt`, `organicValue` vs `organicTrafficValue`) that compile because of `as any` casts but produce silent data loss at runtime.
+- **Zod clearable-field pattern** — optional validated fields that back user-editable inputs (email, URL, phone with pattern) must use `.or(z.literal(''))` so clearing the field doesn't return a 400. `.optional()` only handles the key being absent, not an empty string from a cleared input.
+- **PATCH depth-aware merge on nested JSON** — PATCH endpoints on JSON columns with nested sub-objects (e.g. `address` inside `businessProfile`) must deep-merge known nested keys, not just top-level spread. `{ ...existing, ...req.body }` silently replaces nested objects. Pattern: `...(req.body.address !== undefined ? { address: { ...(existing.address ?? {}), ...req.body.address } } : {})`.
+- **Feature toggle scope minimality** — feature toggles must gate the specific sub-feature, never a composite parent component. Pass the flag as a prop and gate inside the component at the narrowest point. Wrapping a composite component (e.g. `InsightsDigest` with 12+ card types) hides far more than the toggle intends.
+- **Public-portal mutations must call `addActivity()`** — every POST/PUT/PATCH/DELETE in `public-portal.ts` that changes workspace data must call `addActivity()` with an appropriate type. Without it, admins have zero visibility into client portal engagement in the activity feed.
+
+---
+
+## Test Conventions (mandatory for feature work)
+
+- **Write tests alongside code** — new routes need integration tests, new state transitions need guard tests, new shared type fields need contract tests. Use the existing infrastructure; don't hand-roll mocks when a factory exists.
+- **Test infrastructure** — mock factories in `tests/mocks/` (webflow, stripe, openai, anthropic, google, semrush), seed fixtures in `tests/fixtures/` (workspace-seed, auth-seed, content-seed, approval-seed), HTTP test helper `createTestContext(port)` in `tests/integration/helpers.ts`.
+- **Port uniqueness** — each integration test file using `createTestContext()` must use a unique port. Check existing ports with `grep -r 'createTestContext(' tests/` before allocating. Current range: 13201–13314.
+- **External API error tests** — mock the API to return an error, then assert the operation records `failed`/`error` status, not success (FM-2 pattern).
+- **Cleanup** — all `beforeAll` resource creation must be paired with `afterAll` cleanup. Use `seedWorkspace().cleanup()` or `deleteWorkspace(id)`. Never leave orphaned test data.
 
 ---
 
@@ -237,6 +256,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `.windsurf/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
 | `.windsurf/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
 | `.windsurf/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
+| `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 
 ---
 
@@ -277,6 +297,15 @@ git diff HEAD -- <list of shared files touched>
 ```
 Check for: duplicate imports, conflicting function definitions, missed exports, mismatched type names. Fix before starting the next batch.
 
+### 5. Dispatch prompts must declare app-level context
+When dispatching a subagent to write or modify a server route or frontend component, the prompt **must include** a brief "App-level context" section covering:
+- Which rate limiters already apply (e.g., "all /api/public/ POST routes already have `publicWriteLimiter` via `app.ts` — do NOT add it in the route file")
+- Which React Query caches already exist and their keys
+- Which WS events the component already subscribes to
+- Current conditional rendering state (e.g., "the EmptyState shows when `items.length === 0` — adding a parallel signal banner requires updating this condition too")
+
+Subagents have no awareness of code they haven't been explicitly shown. Missing context is the #1 source of "looks right in isolation, broken in context" bugs.
+
 ---
 
 ## Implementation Planning Standards
@@ -304,4 +333,5 @@ Work is not done until ALL pass:
 - [ ] No `violet` or `indigo` in `src/components/`
 - [ ] `npx tsx scripts/pr-check.ts` — zero errors
 - [ ] If subagents were used: invoke `scaled-code-review` skill for parallel batch output (10+ files), or `superpowers:requesting-code-review` for single-task output. Fix Critical/Important issues before proceeding.
+- [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.

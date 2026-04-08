@@ -8,7 +8,86 @@
 
 **Tech Stack:** React 19, TypeScript, Express, SQLite (better-sqlite3), Vitest, @testing-library/react
 
-**Dependency:** Phase 0 plan must be merged and green on staging before this plan begins. Imports `ClientSignal`, `ClientSignalType`, `ClientSignalStatus` from `shared/types/client-signals.ts`.
+**Dependency:** Phase 0 plan must be merged and green on staging before this plan begins. Imports `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`, `ClientSignalMessage` from `shared/types/client-signals.ts`.
+
+---
+
+## Phase 1 Deduplication Audit Findings
+
+> Completed 2026-04-03. Results incorporated into task notes below.
+
+**Q1 — Does any existing file already store or query client intent/signals?**
+No. `server/workspace-intelligence.ts` has a `clientSignals` slice (`assembleClientSignals`, line 741) but it reads *aggregate* signals — churn signals, engagement metrics, approval patterns, ROI. It does NOT read from the `client_signals` table. The new `server/client-signals-store.ts` is genuinely new work.
+
+**Q2 — Does `workspace-intelligence.ts` already have a `clientSignals` slice that reads from `client_signals` table?**
+The slice exists (line 192: `case 'clientSignals'`) but reads from `churn-signals.ts` and other aggregate sources — not from the `client_signals` table. The store (`client-signals-store.ts`) has not been built yet. Task 1 is not duplicating anything.
+
+**Q3 — Do existing admin hooks already handle signal-like data that `useClientSignals` would duplicate?**
+`useIntelligenceSignals` and `useWorkspaceIntelligence` exist but handle workspace intelligence context (the `ClientSignalsSlice` assembled by `workspace-intelligence.ts`). They do NOT query the `client_signals` table. `useClientSignals` (Task 6) is not a duplicate.
+
+**Q4 — What WS event constants already exist? Is `CLIENT_SIGNAL_CREATED` already defined?**
+`src/lib/wsEvents.ts` defines `INTELLIGENCE_SIGNALS_UPDATED` and `INTELLIGENCE_CACHE_UPDATED` but no `CLIENT_SIGNAL_CREATED` or `CLIENT_SIGNAL_UPDATED`. Task 5 additions are safe.
+
+**Q5 — Does `src/lib/queryKeys.ts` already have signal-related keys?**
+`queryKeys.admin.intelligenceSignals` exists (line 58) but targets the intelligence context endpoint. No `clientSignals` key exists. Task 5 addition is safe and does not conflict.
+
+---
+
+## PR Structure
+
+This group ships as 4 sequential PRs. Each must be merged to staging and CI-green before the next starts.
+
+**PR 1 — Signal Backend** (Tasks 1–4)
+- Task 1: `server/client-signals-store.ts` (new)
+- Task 2: `server/routes/client-signals.ts` (new) + `server/app.ts` (mount)
+- Task 3: `server/routes/public-analytics.ts` (intent detection)
+- Task 4: `server/email-templates.ts`, `server/email.ts` (email template + helper)
+
+> Within PR 1: Tasks 1 → 2 are strictly sequential (routes need the store). Task 3 and Task 4 both depend on Task 1 (store) and can run in parallel after Task 2 is committed — Task 3 needs the routes mounted for its integration test; Task 4 only needs the store types. In practice, run them sequentially (Task 3 → Task 4) unless parallel agents are available.
+
+**PR 2 — Admin Notification Circuit** (Tasks 5–8)
+- Task 4.5: `shared/types/intelligence.ts`, `server/workspace-intelligence.ts` (wire intent signals into ClientSignalsSlice — must run before Task 8)
+- Task 5: `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts` (constants — frontend foundation)
+- Task 6: `src/hooks/admin/useClientSignals.ts`, `src/hooks/admin/index.ts`, `src/hooks/useWsInvalidation.ts` (hooks)
+- Task 7: `src/components/NotificationBell.tsx` (drawer refactor)
+- Task 8: `src/components/admin/AdminInbox.tsx` (new component)
+
+> Within PR 2: Task 4.5 can run in parallel with Task 5 (separate files, no dependency). Tasks 5 → 6 are strictly sequential. Tasks 7 and 8 both depend on Task 6. Run order: 4.5 → 5 → 6 → 7 → 8 (or 4.5 ∥ 5 → 6 → 7 → 8).
+
+**PR 3 — Client CTA Circuit** (Tasks 9–11)
+- Task 9: `src/lib/loadingPhrases.ts` (new utility)
+- Task 10: `src/components/client/ServiceInterestCTA.tsx` (new component — must commit before Task 11)
+- Task 11: `src/components/ChatPanel.tsx` (loading phrases + CTA trigger)
+
+> Within PR 3: Tasks 9 → 10 → 11 are strictly sequential. ServiceInterestCTA must be committed before ChatPanel imports it can pass `tsc`.
+
+> **⚠️ PR 3 App-level context — read before dispatching any Task 10 or 11 agent:**
+>
+> The following is already handled at layers the CTA agent will not see. Do not re-implement any of it:
+>
+> - **Rate limiting is at the app level.** `server/app.ts` applies `publicWriteLimiter` (10 req/min per IP:path) to ALL `POST /api/public/` routes automatically. Do NOT import or apply `publicWriteLimiter` inside any route file or component — applying it a second time shares the same in-memory bucket and halves the effective limit to 5 req/min.
+> - **The signal endpoint returns `{ ok: true }` only.** `POST /api/public/signal/:workspaceId` returns `{ ok: true }`. There is no `signalId` in the response. Do not expect or destructure a `signalId`.
+> - **No server-side dedup on explicit CTA clicks.** The public endpoint has no `hasRecentSignal` guard — that guard is only on auto-detected signals in `public-analytics.ts`. Two rapid CTA clicks will create two signals. Dedup is the CTA component's responsibility: disable the button after click, show confirmation state, do not re-enable.
+> - **WS event constants are in `server/ws-events.ts`.** If any broadcast call is needed, use `WS_EVENTS.*` or `ADMIN_EVENTS.*` constants — never raw string literals. `pr-check.ts` will flag string literals as warnings.
+> - **Existing contract tests cover the server API.** `tests/integration/client-cta-contracts.test.ts` (21 tests) documents all server-side contracts for this component. Read that file before implementing Task 10 — it is the executable spec for what the CTA must send and what responses it must handle.
+
+**PR 4 — Final Verification** (Task 12)
+- Task 12: Full test suite + build + pr-check verification (no file changes)
+
+---
+
+## Phase 0 Pre-done
+
+The following items were delivered on the Phase 0 branch and are already committed. Agents must **not** re-create or overwrite these files.
+
+| File | What was delivered |
+|------|--------------------|
+| `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalMessage`, `ClientSignalType`, `ClientSignalStatus` types |
+| `server/db/migrations/047-client-signals.sql` | `client_signals` table with all required columns, FK to `workspaces`, and composite indexes |
+| `server/db/migrations/048-business-priorities.sql` | `business_priorities` column added to `workspaces` table |
+| `server/workspaces.ts` | `businessPriorities` and `siteIntelligenceClientView` mapped (read + write) — `rowToWorkspace()` mapper already wired |
+
+The two pre-done tasks (shared types + DB migration) are kept below as reference contracts but are marked **SKIP**. Begin at **Task 1**.
 
 ---
 
@@ -16,8 +95,8 @@
 
 | Action | Path | Purpose |
 |--------|------|---------|
-| Create | `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalType`, `ClientSignalStatus` types |
-| Create | `server/db/migrations/046-client-signals.sql` | `client_signals` table DDL |
+| ~~Pre-done~~ | `shared/types/client-signals.ts` | `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`, `ClientSignalMessage` types — shipped in Phase 0 |
+| ~~Pre-done~~ | `server/db/migrations/047-client-signals.sql` | `client_signals` table DDL — shipped in Phase 0 |
 | Create | `server/client-signals-store.ts` | DB store: `createClientSignal`, `listClientSignals`, `updateSignalStatus`, `getSignalById` |
 | Create | `server/routes/client-signals.ts` | Admin REST: GET list, PATCH status, GET single |
 | Modify | `server/app.ts` | Mount `client-signals` routes |
@@ -30,6 +109,8 @@
 | Modify | `src/components/NotificationBell.tsx` | Convert absolute dropdown to fixed slide-out drawer from left; add Client Signals section at top |
 | Create | `src/components/admin/AdminInbox.tsx` | New admin component with Signals tab: list signals, expand to chat context, status workflow |
 | Modify | `src/hooks/admin/index.ts` | Export `useClientSignals`, `useUpdateSignalStatus` |
+| Modify | `shared/types/intelligence.ts` | Add `intentSignals` field to `ClientSignalsSlice` |
+| Modify | `server/workspace-intelligence.ts` | Wire `listClientSignals` + `countNewSignals` into `assembleClientSignals()` |
 | Create | `src/hooks/admin/useClientSignals.ts` | React Query hooks for signals |
 | Modify | `src/lib/queryKeys.ts` | Add `admin.clientSignals(wsId)` key |
 | Modify | `src/lib/wsEvents.ts` | Add `CLIENT_SIGNAL_CREATED` event constant |
@@ -43,14 +124,12 @@
 
 ---
 
-## Task 1 — Shared types: `ClientSignal`, `ClientSignalType`, `ClientSignalStatus`
+## Pre-done Reference: Shared types — *(Phase 0, SKIP)*
+
+> **SKIP THIS TASK.** `shared/types/client-signals.ts` was created in Phase 0 and is already committed. The content below is preserved as a reference contract for what agents can import.
 
 **Owns:** `shared/types/client-signals.ts`
 **Must not touch:** any other file in this task
-
-### Step 1.1 — Write the file
-
-- [ ] Create `shared/types/client-signals.ts`:
 
 ```typescript
 /**
@@ -84,24 +163,14 @@ export interface ClientSignal {
 }
 ```
 
-### Step 1.2 — Type-check
-
-- [ ] Run:
-  ```bash
-  npx tsc --noEmit --skipLibCheck
-  ```
-  Expected: zero errors.
-
 ---
 
-## Task 2 — DB migration: `client_signals` table
+## Pre-done Reference: DB migration — *(Phase 0, SKIP)*
 
-**Owns:** `server/db/migrations/046-client-signals.sql`
+> **SKIP THIS TASK.** `server/db/migrations/047-client-signals.sql` (migration `047`) was created in Phase 0 and is already committed. The content below is preserved as a reference for the table schema.
+
+**Owns:** `server/db/migrations/047-client-signals.sql`
 **Must not touch:** any other file in this task
-
-### Step 2.1 — Write the migration
-
-- [ ] Create `server/db/migrations/046-client-signals.sql`:
 
 ```sql
 -- client_signals: stores signals created when the AI detects purchase/service
@@ -126,22 +195,16 @@ CREATE INDEX IF NOT EXISTS idx_client_signals_status
   ON client_signals(status, created_at DESC);
 ```
 
-### Step 2.2 — Verify migration runs without error
-
-- [ ] Run (requires dev server to be off):
-  ```bash
-  npx tsx -e "import('./server/db/index.ts').then(m => m.runMigrations()).then(() => { console.log('MIGRATION OK'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })"
-  ```
-  Expected output contains: `MIGRATION OK` or `Applying migration: 046-client-signals.sql`
-
 ---
 
-## Task 3 — DB store: `server/client-signals-store.ts`
+## Task 1 — DB store: `server/client-signals-store.ts` **[HAIKU]** — mechanical DB layer
 
-**Owns:** `server/client-signals-store.ts`
+**PR:** PR 1
+**Depends on:** Phase 0 pre-done (types + migration already committed)
+**Owns:** `server/client-signals-store.ts`, `tests/unit/client-signals-store.test.ts`
 **Must not touch:** any other file in this task
 
-### Step 3.1 — Write failing unit test first
+### Step 1.1 — Write failing unit test first
 
 - [ ] Create `tests/unit/client-signals-store.test.ts`:
 
@@ -229,7 +292,7 @@ describe('client-signals-store', () => {
   ```
   Expected: tests fail (module not found).
 
-### Step 3.2 — Implement the store
+### Step 1.2 — Implement the store
 
 - [ ] Create `server/client-signals-store.ts`:
 
@@ -377,7 +440,7 @@ export function countNewSignals(workspaceId: string): number {
 }
 ```
 
-### Step 3.3 — Run the tests, confirm they pass
+### Step 1.3 — Run the tests, confirm they pass
 
 - [ ] Run:
   ```bash
@@ -385,21 +448,23 @@ export function countNewSignals(workspaceId: string): number {
   ```
   Expected: all 4 tests pass.
 
-### Step 3.4 — Commit
+### Step 1.4 — Commit
 
 - [ ] Commit with message:
   ```
-  feat: add client_signals DB store (Task 3)
+  feat: add client_signals DB store (Task 1)
   ```
 
 ---
 
-## Task 4 — API routes: `server/routes/client-signals.ts` + mount in app.ts
+## Task 2 — API routes: `server/routes/client-signals.ts` + mount in app.ts **[HAIKU]** — mechanical route scaffolding
 
-**Owns:** `server/routes/client-signals.ts`, `server/app.ts`
+**PR:** PR 1
+**Depends on:** Task 1 (store must be committed)
+**Owns:** `server/routes/client-signals.ts`, `server/app.ts`, `tests/integration/client-signals-routes.test.ts`
 **Must not touch:** any file not listed above
 
-### Step 4.1 — Write failing integration test first
+### Step 2.1 — Write failing integration test first
 
 - [ ] Create `tests/integration/client-signals-routes.test.ts`:
 
@@ -520,7 +585,7 @@ describe('POST /api/public/signal/:workspaceId', () => {
   npx vitest run tests/integration/client-signals-routes.test.ts
   ```
 
-### Step 4.2 — Implement the routes file
+### Step 2.2 — Implement the routes file
 
 - [ ] Create `server/routes/client-signals.ts`:
 
@@ -645,7 +710,7 @@ router.post(
 export default router;
 ```
 
-### Step 4.3 — Mount routes in app.ts
+### Step 2.3 — Mount routes in app.ts
 
 - [ ] Open `server/app.ts`. Read the imports section (lines 30–99) and the `app.use(suggestedBriefsRouter)` line (around line 341).
 
@@ -659,7 +724,7 @@ export default router;
   app.use(clientSignalsRouter);
   ```
 
-### Step 4.4 — Run integration tests, confirm they pass
+### Step 2.4 — Run integration tests, confirm they pass
 
 - [ ] Run:
   ```bash
@@ -667,7 +732,7 @@ export default router;
   ```
   Expected: all tests pass (or the workspace-not-found test returns 400 as expected).
 
-### Step 4.5 — TypeScript check
+### Step 2.5 — TypeScript check
 
 - [ ] Run:
   ```bash
@@ -675,678 +740,29 @@ export default router;
   ```
   Expected: zero errors.
 
-### Step 4.6 — Commit
+### Step 2.6 — Commit
 
 - [ ] Commit with message:
   ```
-  feat: add client signals API routes and mount in app.ts (Task 4)
+  feat: add client signals API routes and mount in app.ts (Task 2)
   ```
 
 ---
 
-## Task 5 — Email: `clientSignalEmail()` template + `notifyTeamClientSignal()` helper
+## Task 3 — Intent detection in `public-analytics.ts` chat route **[SONNET]** — NLP-adjacent logic in chat handler
 
-**Owns:** `server/email-templates.ts`, `server/email.ts`
-**Must not touch:** any other file in this task
-
-### Step 5.1 — Add `clientSignalEmail()` to email-templates.ts
-
-- [ ] Read `server/email-templates.ts` to find the end of the file (currently ends around line 180).
-
-- [ ] Append at the end of `server/email-templates.ts`:
-
-```typescript
-// ── Client Signal ──
-
-export function clientSignalEmail(opts: {
-  workspaceName: string;
-  signalType: string;
-  triggerMessage: string;
-  adminUrl: string;
-}): string {
-  const typeLabel = opts.signalType === 'service_interest' ? 'Service Interest' : 'Content Interest';
-  const body = `
-    <p class="text-primary" style="margin:0 0 12px;font-size:14px;color:#202945;">
-      A client at <strong>${esc(opts.workspaceName)}</strong> expressed <strong>${esc(typeLabel)}</strong> in their chat session.
-    </p>
-    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
-      <div class="text-muted" style="font-size:11px;font-weight:600;letter-spacing:0.5px;color:#9ca3af;text-transform:uppercase;margin-bottom:6px;">Client message</div>
-      <div class="text-primary" style="font-size:13px;color:#374151;line-height:1.5;">${esc(opts.triggerMessage)}</div>
-    </div>
-    <p class="text-secondary" style="margin:0;font-size:13px;color:#6b7280;">
-      Review the full conversation and update the signal status in your admin inbox.
-    </p>
-  `;
-  return layout({
-    preheader: `Client signal from ${opts.workspaceName}: ${typeLabel}`,
-    headline: `Client signal: ${typeLabel}`,
-    subtitle: opts.workspaceName,
-    body,
-    cta: { label: 'View in Admin Inbox', url: opts.adminUrl },
-  });
-}
-```
-
-### Step 5.2 — Add `notifyTeamClientSignal()` to email.ts
-
-- [ ] Read `server/email.ts`. Find the `notifyTeamChurnSignal` function (or similar) near the end. Add after it:
-
-```typescript
-export async function notifyTeamClientSignal(
-  workspaceName: string,
-  signalType: string,
-  triggerMessage: string,
-): Promise<void> {
-  const to = getNotificationEmail();
-  if (!to) return;
-  const adminUrl = process.env.ADMIN_URL || 'https://hmpsn.studio';
-  const { clientSignalEmail } = await import('./email-templates.js');
-  const html = clientSignalEmail({ workspaceName, signalType, triggerMessage, adminUrl });
-  const subject = `[hmpsn.studio] Client signal from ${workspaceName}`;
-  await sendEmail(to, subject, html);
-}
-```
-
-### Step 5.3 — TypeScript check
-
-- [ ] Run:
-  ```bash
-  npx tsc --noEmit --skipLibCheck
-  ```
-  Expected: zero errors.
-
-### Step 5.4 — Commit
-
-- [ ] Commit with message:
-  ```
-  feat: add clientSignalEmail template and notifyTeamClientSignal helper (Task 5)
-  ```
-
----
-
-## Task 6 — Loading phrases utility
-
-**Owns:** `src/lib/loadingPhrases.ts`
-**Must not touch:** any other file in this task
-
-### Step 6.1 — Write failing unit test first
-
-- [ ] Create `tests/unit/loading-phrases.test.ts`:
-
-```typescript
-import { describe, it, expect } from 'vitest';
-import { LOADING_PHRASES, pickPhrase } from '../../src/lib/loadingPhrases.js';
-
-describe('loadingPhrases', () => {
-  it('exports exactly 9 phrases', () => {
-    expect(LOADING_PHRASES).toHaveLength(9);
-  });
-
-  it('every phrase ends with the ellipsis character …', () => {
-    expect(LOADING_PHRASES.length).toBeGreaterThan(0);
-    expect(LOADING_PHRASES.every(p => p.endsWith('…'))).toBe(true);
-  });
-
-  it('all 9 phrases are reachable over 50 random picks', () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < 50; i++) {
-      seen.add(pickPhrase());
-    }
-    // All 9 should appear at least once in 50 tries
-    expect(seen.size).toBe(9);
-  });
-
-  it('pickPhrase returns a string that is in LOADING_PHRASES', () => {
-    const phrase = pickPhrase();
-    expect(LOADING_PHRASES).toContain(phrase);
-  });
-
-  it('no two consecutive pickPhrase() calls return the same phrase (50 runs)', () => {
-    let prev = pickPhrase();
-    for (let i = 0; i < 50; i++) {
-      const next = pickPhrase(prev);
-      expect(next).not.toBe(prev);
-      prev = next;
-    }
-  });
-});
-```
-
-- [ ] Run to confirm failures:
-  ```bash
-  npx vitest run tests/unit/loading-phrases.test.ts
-  ```
-
-### Step 6.2 — Implement the utility
-
-- [ ] Create `src/lib/loadingPhrases.ts`:
-
-```typescript
-/**
- * Western-flavored loading phrases for the client chat AI response indicator.
- *
- * Displayed during AI thinking state when response takes > 4 seconds.
- * Rotate with pickPhrase() — never the same phrase twice in a row.
- */
-
-export const LOADING_PHRASES: readonly string[] = [
-  "Hootin'…",
-  "Hollerin'…",
-  "Rustlin'…",
-  "Wranglin'…",
-  "Cookin'…",
-  "Fetchin'…",
-  "Gettin' after it…",
-  "Tinkerin'…",
-  "Rummagin'…",
-] as const;
-
-/**
- * Pick a random phrase from LOADING_PHRASES.
- * Pass the current phrase as `exclude` to guarantee no consecutive repeat.
- */
-export function pickPhrase(exclude?: string): string {
-  const available = exclude
-    ? LOADING_PHRASES.filter(p => p !== exclude)
-    : [...LOADING_PHRASES];
-  return available[Math.floor(Math.random() * available.length)];
-}
-```
-
-### Step 6.3 — Run tests, confirm all pass
-
-- [ ] Run:
-  ```bash
-  npx vitest run tests/unit/loading-phrases.test.ts
-  ```
-  Expected: all 5 tests pass.
-
-  > Note: the "all 9 reachable in 50 tries" test is probabilistic. With 9 phrases and 50 picks the probability of missing one is approximately 0.03%. If it flakes, re-run once. If it flakes repeatedly, increase the loop to 200.
-
-### Step 6.4 — Commit
-
-- [ ] Commit with message:
-  ```
-  feat: add Western loading phrases utility (Task 6)
-  ```
-
----
-
-## Task 7 — Frontend query key + WS event constant
-
-**Owns:** `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts`
-**Must not touch:** any other file in this task
-
-### Step 7.1 — Add query key
-
-- [ ] Open `src/lib/queryKeys.ts`. Read lines 58–85 (admin section).
-
-- [ ] In the `admin:` object, add after `intelligenceAll` (around line 84):
-  ```typescript
-  clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
-  ```
-
-### Step 7.2 — Add WS event constant
-
-- [ ] Open `src/lib/wsEvents.ts`. Read the file.
-
-- [ ] In the `WS_EVENTS` object, add after `ANNOTATION_BRIDGE_CREATED`:
-  ```typescript
-  CLIENT_SIGNAL_CREATED: 'client-signal:created',
-  CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
-  ```
-
-### Step 7.3 — TypeScript check
-
-- [ ] Run:
-  ```bash
-  npx tsc --noEmit --skipLibCheck
-  ```
-  Expected: zero errors.
-
-### Step 7.4 — Commit
-
-- [ ] Commit with message:
-  ```
-  feat: add clientSignals query key and WS event constants (Task 7)
-  ```
-
----
-
-## Task 8 — React Query hooks: `useClientSignals`, `useUpdateSignalStatus`
-
-**Owns:** `src/hooks/admin/useClientSignals.ts`, `src/hooks/admin/index.ts`
-**Must not touch:** any other file in this task
-
-### Step 8.1 — Create the hooks file
-
-- [ ] Create `src/hooks/admin/useClientSignals.ts`:
-
-```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { get, patch } from '../../api/client';
-import { queryKeys } from '../../lib/queryKeys';
-import type { ClientSignal, ClientSignalStatus } from '../../../../shared/types/client-signals';
-
-// ── Fetch all signals for a workspace ──
-
-export function useClientSignals(workspaceId: string | undefined) {
-  return useQuery({
-    queryKey: workspaceId ? queryKeys.admin.clientSignals(workspaceId) : ['admin-client-signals-disabled'],
-    queryFn: () => get<ClientSignal[]>(`/api/client-signals/${workspaceId}`),
-    enabled: !!workspaceId,
-    staleTime: 60_000,
-  });
-}
-
-// ── Update signal status ──
-
-export function useUpdateSignalStatus(workspaceId: string | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: ClientSignalStatus }) =>
-      patch<ClientSignal>(`/api/client-signals/${id}/status`, { status }),
-    onSuccess: () => {
-      if (workspaceId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
-      }
-    },
-  });
-}
-
-// ── Create signal (from client portal) ──
-
-export function useCreateClientSignal(workspaceId: string | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: {
-      type: 'content_interest' | 'service_interest';
-      triggerMessage: string;
-      chatContext: Array<{ role: 'user' | 'assistant'; content: string }>;
-    }) =>
-      import('../../api/client').then(({ post }) =>
-        post<{ ok: boolean; signalId: string }>(`/api/public/signal/${workspaceId}`, body),
-      ),
-    onSuccess: () => {
-      if (workspaceId) {
-        qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
-      }
-    },
-  });
-}
-```
-
-### Step 8.2 — Export from barrel
-
-- [ ] Open `src/hooks/admin/index.ts`. Read it fully.
-
-- [ ] Append at the end of `src/hooks/admin/index.ts`:
-  ```typescript
-  export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from './useClientSignals';
-  ```
-
-### Step 8.3 — Add WS invalidation handler
-
-- [ ] Open `src/hooks/useWsInvalidation.ts`. Read the file.
-
-- [ ] Add `CLIENT_SIGNAL_CREATED` and `CLIENT_SIGNAL_UPDATED` handlers inside the `useWorkspaceEvents` call, after the `ANNOTATION_BRIDGE_CREATED` handler (before the closing `}`):
-
-```typescript
-[WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => {
-  if (!workspaceId) return;
-  qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
-},
-[WS_EVENTS.CLIENT_SIGNAL_UPDATED]: () => {
-  if (!workspaceId) return;
-  qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
-},
-```
-
-### Step 8.4 — TypeScript check
-
-- [ ] Run:
-  ```bash
-  npx tsc --noEmit --skipLibCheck
-  ```
-  Expected: zero errors.
-
-### Step 8.5 — Commit
-
-- [ ] Commit with message:
-  ```
-  feat: add useClientSignals hooks and WS invalidation (Task 8)
-  ```
-
----
-
-## Task 9 — Loading phrases in ChatPanel
-
-**Owns:** `src/components/ChatPanel.tsx`
-**Must not touch:** any other file in this task
-
-### Step 9.1 — Read the current file
-
-- [ ] Read `src/components/ChatPanel.tsx` fully to understand current imports and prop shapes.
-
-### Step 9.2 — Modify ChatPanel
-
-The loading dots at lines 117–119 need to be replaced with a Western phrase that fades in/out when loading takes > 4 seconds. The component also needs a `lastIntent?` prop and an `onCTAAction?` prop to render `<ServiceInterestCTA>` after the final assistant message. The `ServiceInterestCTA` component will be created in Task 10 — for now, import it conditionally.
-
-- [ ] Apply the following changes to `src/components/ChatPanel.tsx`:
-
-**1. Add imports at the top with existing imports:**
-```typescript
-import { useState, useEffect, useRef } from 'react';
-import { pickPhrase } from '../lib/loadingPhrases';
-```
-(Note: `useState` is likely already imported — verify before adding. If already present, only add `pickPhrase`.)
-
-**2. Extend `ChatPanelProps` interface:**
-```typescript
-interface ChatPanelProps {
-  messages: ChatMessage[];
-  loading: boolean;
-  input: string;
-  onInputChange: (val: string) => void;
-  onSend: (msg: string) => void;
-  quickQuestions?: string[];
-  placeholder?: string;
-  accent?: 'teal' | 'purple';
-  disabled?: boolean;
-  /** Extra content rendered above the input (e.g. usage limits) */
-  inputPrefix?: React.ReactNode;
-  /** Extra content rendered in the empty state below quick questions */
-  emptyExtra?: React.ReactNode;
-  /** Detected intent from the last AI response (for CTA rendering) */
-  lastIntent?: 'content_interest' | 'service_interest' | null;
-  /** Called when the user acts on the CTA */
-  onCTAAction?: (type: 'content_interest' | 'service_interest') => void;
-}
-```
-
-**3. Inside the component function body, add phrase state after `const a = ACCENT[accent]`:**
-```typescript
-const [phrase, setPhrase] = useState<string>('');
-const phraseRef = useRef<string>('');
-const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-// Show phrase after 4s of loading; rotate phrase on each trigger
-useEffect(() => {
-  if (loading) {
-    loadingTimerRef.current = setTimeout(() => {
-      const next = pickPhrase(phraseRef.current);
-      phraseRef.current = next;
-      setPhrase(next);
-    }, 4000);
-  } else {
-    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-    setPhrase('');
-    phraseRef.current = '';
-  }
-  return () => {
-    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-  };
-}, [loading]);
-```
-
-**4. Replace the loading indicator block (lines 110–123) with:**
-```tsx
-{loading && (
-  <div className="flex gap-3">
-    <div className={`w-6 h-6 rounded-lg ${a.icon} flex items-center justify-center`}>
-      <Loader2 className={`w-3 h-3 ${a.iconText} animate-spin`} />
-    </div>
-    <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5 min-w-[56px]">
-      {phrase ? (
-        <span className="text-[11px] text-zinc-400 animate-pulse">{phrase}</span>
-      ) : (
-        <div className="flex gap-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-        </div>
-      )}
-    </div>
-  </div>
-)}
-```
-
-**5. After the loading indicator block (before `<div ref={endRef} />`), add CTA rendering:**
-```tsx
-{!loading && lastIntent && onCTAAction && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
-  <ServiceInterestCTA
-    type={lastIntent}
-    workspaceId={undefined}
-    onAction={onCTAAction}
-  />
-)}
-```
-
-**6. Add import for `ServiceInterestCTA` after existing imports at top of file:**
-```typescript
-import { ServiceInterestCTA } from './client/ServiceInterestCTA';
-```
-
-> Note: `ServiceInterestCTA` is created in Task 10. If implementing this task before Task 10, use a conditional guard: `{typeof ServiceInterestCTA !== 'undefined' && ...}` — but the preferred order is Task 10 first.
-
-### Step 9.3 — TypeScript check
-
-- [ ] Run:
-  ```bash
-  npx tsc --noEmit --skipLibCheck
-  ```
-  Expected: zero errors.
-
-### Step 9.4 — Commit
-
-- [ ] Commit with message:
-  ```
-  feat: add Western loading phrases to ChatPanel + lastIntent/onCTAAction props (Task 9)
-  ```
-
----
-
-## Task 10 — `ServiceInterestCTA` component
-
-**Owns:** `src/components/client/ServiceInterestCTA.tsx`
-**Must not touch:** any other file in this task
-
-### Step 10.1 — Write failing component test first
-
-- [ ] Create `tests/component/ServiceInterestCTA.test.tsx`:
-
-```tsx
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-// Minimal wrapper for React Query
-function Wrapper({ children }: { children: React.ReactNode }) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
-}
-
-describe('ServiceInterestCTA', () => {
-  it('renders "Explore content recommendations" for content_interest type', async () => {
-    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
-    const onAction = vi.fn();
-    render(
-      <Wrapper>
-        <ServiceInterestCTA type="content_interest" workspaceId="ws-1" onAction={onAction} />
-      </Wrapper>,
-    );
-    expect(screen.getByText(/Explore content recommendations/i)).toBeInTheDocument();
-  });
-
-  it('renders "Get in touch" for service_interest type', async () => {
-    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
-    const onAction = vi.fn();
-    render(
-      <Wrapper>
-        <ServiceInterestCTA type="service_interest" workspaceId="ws-1" onAction={onAction} />
-      </Wrapper>,
-    );
-    expect(screen.getByText(/Get in touch/i)).toBeInTheDocument();
-  });
-
-  it('calls onAction with the correct type when button is clicked', async () => {
-    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
-    const onAction = vi.fn();
-    render(
-      <Wrapper>
-        <ServiceInterestCTA type="service_interest" workspaceId="ws-1" onAction={onAction} />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('button'));
-    expect(onAction).toHaveBeenCalledWith('service_interest');
-  });
-
-  it('button is disabled while a mutation is in-flight (loading state)', async () => {
-    // This tests that the button has disabled attribute when isLoading is true.
-    // We mock useMutation to simulate in-flight state.
-    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
-    const onAction = vi.fn();
-    // Render with a slow mutation — button should not be disabled on initial render
-    render(
-      <Wrapper>
-        <ServiceInterestCTA type="service_interest" workspaceId="ws-1" onAction={onAction} />
-      </Wrapper>,
-    );
-    const btn = screen.getByRole('button');
-    expect(btn).not.toBeDisabled(); // not in-flight yet
-  });
-});
-```
-
-- [ ] Run to confirm failures:
-  ```bash
-  npx vitest run tests/component/ServiceInterestCTA.test.tsx
-  ```
-
-### Step 10.2 — Implement `ServiceInterestCTA`
-
-- [ ] Create `src/components/client/ServiceInterestCTA.tsx`:
-
-```tsx
-/**
- * ServiceInterestCTA — rendered below AI chat responses when intent is detected.
- *
- * content_interest: navigates to the strategy tab
- * service_interest: fires a signal mutation, then shows confirmation
- *
- * Color rule: teal for actions (Three Laws of Color). Never purple.
- */
-import { useState } from 'react';
-import { ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
-
-interface ServiceInterestCTAProps {
-  type: 'content_interest' | 'service_interest';
-  workspaceId: string | undefined;
-  /** Called after user clicks — parent handles navigation or mutation */
-  onAction: (type: 'content_interest' | 'service_interest') => void;
-}
-
-export function ServiceInterestCTA({ type, workspaceId: _workspaceId, onAction }: ServiceInterestCTAProps) {
-  const [loading, setLoading] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
-
-  const label =
-    type === 'content_interest'
-      ? 'Explore content recommendations'
-      : 'Get in touch';
-
-  const subtext =
-    type === 'content_interest'
-      ? 'See what content we recommend for your site.'
-      : "We'll reach out to discuss how we can help.";
-
-  const handleClick = async () => {
-    if (loading || confirmed) return;
-    if (type === 'service_interest') {
-      setLoading(true);
-      try {
-        onAction(type);
-        // Show confirmation after a brief delay to let parent handle async
-        await new Promise(r => setTimeout(r, 600));
-        setConfirmed(true);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // content_interest: navigate immediately
-      onAction(type);
-    }
-  };
-
-  if (confirmed) {
-    return (
-      <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20">
-        <CheckCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />
-        <span className="text-xs text-teal-300">Got it — we'll be in touch soon.</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3">
-      <button
-        onClick={handleClick}
-        disabled={loading}
-        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-teal-600/10 hover:bg-teal-600/20 border border-teal-500/20 hover:border-teal-500/40 transition-all disabled:opacity-60 group"
-        aria-label={label}
-      >
-        <div className="text-left">
-          <div className="text-xs font-medium text-teal-300">{label}</div>
-          <div className="text-[10px] text-teal-400/60 mt-0.5">{subtext}</div>
-        </div>
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />
-        ) : (
-          <ArrowRight className="w-3.5 h-3.5 text-teal-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
-        )}
-      </button>
-    </div>
-  );
-}
-```
-
-### Step 10.3 — Run tests, confirm all pass
-
-- [ ] Run:
-  ```bash
-  npx vitest run tests/component/ServiceInterestCTA.test.tsx
-  ```
-  Expected: all 4 tests pass.
-
-### Step 10.4 — TypeScript check
-
-- [ ] Run:
-  ```bash
-  npx tsc --noEmit --skipLibCheck
-  ```
-  Expected: zero errors.
-
-### Step 10.5 — Commit
-
-- [ ] Commit with message:
-  ```
-  feat: add ServiceInterestCTA component (Task 10)
-  ```
-
----
-
-## Task 11 — Intent detection in `public-analytics.ts` chat route
-
+**PR:** PR 1
+**Depends on:** Task 1 (store), Task 2 (routes mounted — integration test needs this)
 **Owns:** `server/routes/public-analytics.ts`
-**Must not touch:** any other file in this task
+**Must not touch:** `server/client-signals-store.ts` (owned by Task 1), `server/email.ts` (owned by Task 4), any other file not listed
 
-### Step 11.1 — Read the chat route
+### Step 3.1 — Read the chat route
 
 - [ ] Read `server/routes/public-analytics.ts` lines 174–418 to understand the full handler. Pay attention to:
   - Line 177: `const { question, context, sessionId, betaMode } = req.body;`
   - Lines 396–413: the `res.json({ answer, sessionId })` response block
 
-### Step 11.2 — Add intent detection + signal creation
+### Step 3.2 — Add intent detection + signal creation
 
 The detection happens after the AI response is generated and persisted. We detect intent by scanning the AI's answer for service/content interest signals.
 
@@ -1413,7 +829,7 @@ res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
 
 > Note: `getChatSession` must already be imported in this file. Verify with `grep -n 'getChatSession' server/routes/public-analytics.ts` before applying. If not imported, add: `import { getChatSession } from '../chat-memory.js';`
 
-### Step 11.3 — TypeScript check
+### Step 3.3 — TypeScript check
 
 - [ ] Run:
   ```bash
@@ -1421,15 +837,15 @@ res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   ```
   Expected: zero errors.
 
-### Step 11.4 — Verify getChatSession import
+### Step 3.4 — Verify getChatSession import
 
 - [ ] Run:
   ```bash
-  grep -n 'getChatSession' /Users/joshuahampson/CascadeProjects/asset-dashboard/.claude/worktrees/beautiful-yonath/server/routes/public-analytics.ts
+  grep -n 'getChatSession' server/routes/public-analytics.ts
   ```
   If present: no action needed. If absent, add the import at the top of the file with existing imports.
 
-### Step 11.5 — Integration test for intent detection
+### Step 3.5 — Integration test for intent detection
 
 - [ ] Add to `tests/integration/client-signals-routes.test.ts` (append to end):
 
@@ -1458,21 +874,349 @@ describe('Intent detection in /api/public/search-chat/:workspaceId', () => {
 });
 ```
 
-### Step 11.6 — Commit
+### Step 3.6 — Commit
 
 - [ ] Commit with message:
   ```
-  feat: add intent detection + signal creation in public chat route (Task 11)
+  feat: add intent detection + signal creation in public chat route (Task 3)
   ```
 
 ---
 
-## Task 12 — NotificationBell: convert to fixed slide-out drawer
+## Task 4 — Email: `clientSignalEmail()` template + `notifyTeamClientSignal()` helper **[HAIKU]** — mechanical template addition
 
-**Owns:** `src/components/NotificationBell.tsx`
+**PR:** PR 1
+**Depends on:** Task 1 (store — types needed for function signature)
+**Owns:** `server/email-templates.ts`, `server/email.ts`
 **Must not touch:** any other file in this task
 
-### Step 12.1 — Write failing component test first
+> **Dedup note:** `notifyTeamChurnSignal` is already defined in `server/email.ts` — import its pattern as a reference. Do not re-implement it; add `notifyTeamClientSignal` as a new sibling export.
+
+> **Test note:** Email template output should be spot-checked manually (render the HTML in a browser). No unit test is needed for this task — the template is a pure string function with no branching logic beyond `esc()` calls.
+
+> **Parallelism note:** Task 4 can run in parallel with Task 3 once Task 1 is committed (both only need the store types, not the routes). In a single-agent run, complete Task 3 first, then Task 4.
+
+### Step 4.1 — Add `clientSignalEmail()` to email-templates.ts
+
+- [ ] Read `server/email-templates.ts` to find the end of the file (currently ends around line 180).
+
+- [ ] Append at the end of `server/email-templates.ts`:
+
+```typescript
+// ── Client Signal ──
+
+export function clientSignalEmail(opts: {
+  workspaceName: string;
+  signalType: string;
+  triggerMessage: string;
+  adminUrl: string;
+}): string {
+  const typeLabel = opts.signalType === 'service_interest' ? 'Service Interest' : 'Content Interest';
+  const body = `
+    <p class="text-primary" style="margin:0 0 12px;font-size:14px;color:#202945;">
+      A client at <strong>${esc(opts.workspaceName)}</strong> expressed <strong>${esc(typeLabel)}</strong> in their chat session.
+    </p>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+      <div class="text-muted" style="font-size:11px;font-weight:600;letter-spacing:0.5px;color:#9ca3af;text-transform:uppercase;margin-bottom:6px;">Client message</div>
+      <div class="text-primary" style="font-size:13px;color:#374151;line-height:1.5;">${esc(opts.triggerMessage)}</div>
+    </div>
+    <p class="text-secondary" style="margin:0;font-size:13px;color:#6b7280;">
+      Review the full conversation and update the signal status in your admin inbox.
+    </p>
+  `;
+  return layout({
+    preheader: `Client signal from ${opts.workspaceName}: ${typeLabel}`,
+    headline: `Client signal: ${typeLabel}`,
+    subtitle: opts.workspaceName,
+    body,
+    cta: { label: 'View in Admin Inbox', url: opts.adminUrl },
+  });
+}
+```
+
+### Step 4.2 — Add `notifyTeamClientSignal()` to email.ts
+
+- [ ] Read `server/email.ts`. Find the `notifyTeamChurnSignal` function (or similar) near the end. Add after it:
+
+```typescript
+export async function notifyTeamClientSignal(
+  workspaceName: string,
+  signalType: string,
+  triggerMessage: string,
+): Promise<void> {
+  const to = getNotificationEmail();
+  if (!to) return;
+  const adminUrl = process.env.ADMIN_URL || 'https://hmpsn.studio';
+  const { clientSignalEmail } = await import('./email-templates.js');
+  const html = clientSignalEmail({ workspaceName, signalType, triggerMessage, adminUrl });
+  const subject = `[hmpsn.studio] Client signal from ${workspaceName}`;
+  await sendEmail(to, subject, html);
+}
+```
+
+### Step 4.3 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 4.4 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: add clientSignalEmail template and notifyTeamClientSignal helper (Task 4)
+  ```
+
+---
+
+## Task 4.5 — Wire intent signals into `ClientSignalsSlice` **[HAIKU]** — intelligence engine integration
+
+**PR:** PR 2
+**Depends on:** PR 1 merged and green (`client-signals-store.ts` must be available)
+**Owns:** `shared/types/intelligence.ts`, `server/workspace-intelligence.ts`
+**Must not touch:** `server/client-signals-store.ts`, any frontend file, any other file not listed above
+
+> **Why this task exists:** `workspace-intelligence.ts` is the central intelligence engine that feeds AdminChat, AI context prompts, and the client portal intelligence summary. Any new table capturing workspace activity must be surfaced here — otherwise the AI is blind to it. The new `client_signals` table records purchase/service intent expressed in chat; this task wires it into `ClientSignalsSlice` so AdminChat can reference "this client expressed service interest 3 times this week."
+
+### Step 4.5.1 — Add `intentSignals` to `ClientSignalsSlice`
+
+- [ ] Open `shared/types/intelligence.ts`. Find `ClientSignalsSlice` (around line 173).
+
+- [ ] Add after `serviceRequests?: { pending: number; total: number };`:
+
+```typescript
+/** Intent signals detected in client chat (service_interest / content_interest) */
+intentSignals?: {
+  /** Count of unactioned (status = 'new') signals */
+  newCount: number;
+  /** Total signals created (all statuses) */
+  totalCount: number;
+  /** Signal types seen recently, most recent first (max 5) */
+  recentTypes: Array<'service_interest' | 'content_interest'>;
+};
+```
+
+### Step 4.5.2 — Wire into `assembleClientSignals()`
+
+- [ ] Open `server/workspace-intelligence.ts`. Find `assembleClientSignals` (around line 741).
+
+- [ ] Add the import at the top of the file with existing imports (never mid-file):
+```typescript
+import { listClientSignals, countNewSignals } from './client-signals-store.js';
+```
+
+- [ ] In `assembleClientSignals`, add after the `serviceRequests` block and before the `recentChatTopics` block:
+
+```typescript
+// Intent signals from client chat
+let intentSignals: ClientSignalsSlice['intentSignals'];
+try {
+  const signals = listClientSignals(workspaceId);
+  const newCount = countNewSignals(workspaceId);
+  intentSignals = {
+    newCount,
+    totalCount: signals.length,
+    recentTypes: signals.slice(0, 5).map(s => s.type),
+  };
+} catch {
+  // client_signals table may not exist on older DBs — degrade gracefully
+}
+```
+
+- [ ] In the return object at the end of `assembleClientSignals`, add `intentSignals` alongside the other fields.
+
+> Verify the return object location with `grep -n 'serviceRequests\|return {' server/workspace-intelligence.ts` — the return statement is near the end of `assembleClientSignals`.
+
+### Step 4.5.3 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 4.5.4 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: wire intent signals into ClientSignalsSlice intelligence engine (Task 4.5)
+  ```
+
+---
+
+## Task 5 — Frontend query key + WS event constant **[HAIKU]** — mechanical constant additions
+
+**PR:** PR 2
+**Depends on:** Tasks 1–4 merged and CI-green on staging (PR 1 complete)
+**Owns:** `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts`
+**Must not touch:** any other file in this task
+
+> **Dedup note (Phase 1 audit):** `queryKeys.admin.intelligenceSignals` already exists at line 58 of `src/lib/queryKeys.ts` — it is for the workspace intelligence context endpoint, NOT the `client_signals` table. Add `clientSignals` as a new distinct key. `WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED` and `INTELLIGENCE_CACHE_UPDATED` already exist — add `CLIENT_SIGNAL_CREATED` and `CLIENT_SIGNAL_UPDATED` as new entries, do not modify existing ones.
+
+> **Test note:** After committing, run `npx vitest run tests/unit/queryKeys.test.ts` if that file exists. If it does not exist yet, verify the new keys do not conflict by running `npx tsc --noEmit --skipLibCheck`.
+
+### Step 5.1 — Add query key
+
+- [ ] Open `src/lib/queryKeys.ts`. Read lines 58–85 (admin section).
+
+- [ ] In the `admin:` object, add after `intelligenceAll` (around line 84):
+  ```typescript
+  clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
+  ```
+
+### Step 5.2 — Add WS event constant
+
+- [ ] Open `src/lib/wsEvents.ts`. Read the file.
+
+- [ ] In the `WS_EVENTS` object, add after `ANNOTATION_BRIDGE_CREATED`:
+  ```typescript
+  CLIENT_SIGNAL_CREATED: 'client-signal:created',
+  CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
+  ```
+
+### Step 5.3 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 5.4 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: add clientSignals query key and WS event constants (Task 5)
+  ```
+
+---
+
+## Task 6 — React Query hooks: `useClientSignals`, `useUpdateSignalStatus` **[SONNET]** — React Query hook with invalidation logic
+
+**PR:** PR 2
+**Depends on:** Task 5 (query keys + WS constants must be committed)
+**Owns:** `src/hooks/admin/useClientSignals.ts`, `src/hooks/admin/index.ts`, `src/hooks/useWsInvalidation.ts`
+**Must not touch:** `src/lib/queryKeys.ts`, `src/lib/wsEvents.ts` (owned by Task 5), `src/components/` (owned by Tasks 7, 8)
+
+> **Dedup note (Phase 1 audit):** `useIntelligenceSignals` and `useWorkspaceIntelligence` in `src/hooks/admin/index.ts` handle workspace intelligence context — a different data source. `useClientSignals` (this task) is not a duplicate.
+
+> **Test note:** Create `tests/unit/useClientSignals.test.ts` with a mock React Query setup (use `renderHook` from `@testing-library/react`). Test that `useClientSignals` calls the correct endpoint and that `useUpdateSignalStatus` invalidates `queryKeys.admin.clientSignals(wsId)` on success.
+
+### Step 6.1 — Create the hooks file
+
+- [ ] Create `src/hooks/admin/useClientSignals.ts`:
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { get, patch } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
+import type { ClientSignal, ClientSignalStatus } from '../../../../shared/types/client-signals';
+
+// ── Fetch all signals for a workspace ──
+
+export function useClientSignals(workspaceId: string | undefined) {
+  return useQuery({
+    queryKey: workspaceId ? queryKeys.admin.clientSignals(workspaceId) : ['admin-client-signals-disabled'],
+    queryFn: () => get<ClientSignal[]>(`/api/client-signals/${workspaceId}`),
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
+}
+
+// ── Update signal status ──
+
+export function useUpdateSignalStatus(workspaceId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ClientSignalStatus }) =>
+      patch<ClientSignal>(`/api/client-signals/${id}/status`, { status }),
+    onSuccess: () => {
+      if (workspaceId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
+      }
+    },
+  });
+}
+
+// ── Create signal (from client portal) ──
+
+export function useCreateClientSignal(workspaceId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      type: 'content_interest' | 'service_interest';
+      triggerMessage: string;
+      chatContext: Array<{ role: 'user' | 'assistant'; content: string }>;
+    }) =>
+      import('../../api/client').then(({ post }) =>
+        post<{ ok: boolean; signalId: string }>(`/api/public/signal/${workspaceId}`, body),
+      ),
+    onSuccess: () => {
+      if (workspaceId) {
+        qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
+      }
+    },
+  });
+}
+```
+
+### Step 6.2 — Export from barrel
+
+- [ ] Open `src/hooks/admin/index.ts`. Read it fully.
+
+- [ ] Append at the end of `src/hooks/admin/index.ts`:
+  ```typescript
+  export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from './useClientSignals';
+  ```
+
+### Step 6.3 — Add WS invalidation handler
+
+- [ ] Open `src/hooks/useWsInvalidation.ts`. Read the file.
+
+- [ ] Add `CLIENT_SIGNAL_CREATED` and `CLIENT_SIGNAL_UPDATED` handlers inside the `useWorkspaceEvents` call, after the `ANNOTATION_BRIDGE_CREATED` handler (before the closing `}`):
+
+```typescript
+[WS_EVENTS.CLIENT_SIGNAL_CREATED]: () => {
+  if (!workspaceId) return;
+  qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
+},
+[WS_EVENTS.CLIENT_SIGNAL_UPDATED]: () => {
+  if (!workspaceId) return;
+  qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
+},
+```
+
+### Step 6.4 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 6.5 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: add useClientSignals hooks and WS invalidation (Task 6)
+  ```
+
+---
+
+## Task 7 — NotificationBell: refactor existing component to fixed slide-out drawer **[SONNET]** — component refactor with drawer pattern
+
+**PR:** PR 2
+**Depends on:** Task 6 (hooks + WS invalidation must be committed)
+**Owns:** `src/components/NotificationBell.tsx`, `tests/component/NotificationBell.test.tsx`
+**Must not touch:** `src/hooks/admin/useClientSignals.ts` (owned by Task 6), `src/lib/wsEvents.ts` (owned by Task 5), `src/components/admin/AdminInbox.tsx` (owned by Task 8), any other file not listed
+
+> **Note:** `src/components/NotificationBell.tsx` already EXISTS. This task refactors the existing file — do NOT create it from scratch. The current implementation uses `absolute top-full right-0` dropdown positioning which must be replaced with a fixed slide-out drawer pattern.
+
+> **Parallelism note:** Tasks 7 and 8 both depend on Task 6 and own separate files. They can run in parallel if parallel agents are available. In a single-agent run, complete Task 7 first, then Task 8.
+
+### Step 7.1 — Write failing component test first
 
 - [ ] Create `tests/component/NotificationBell.test.tsx`:
 
@@ -1572,7 +1316,7 @@ describe('NotificationBell — drawer conversion', () => {
   npx vitest run tests/component/NotificationBell.test.tsx
   ```
 
-### Step 12.2 — Rewrite NotificationBell drawer
+### Step 7.2 — Rewrite NotificationBell drawer
 
 - [ ] Open `src/components/NotificationBell.tsx`. Read the full file.
 
@@ -1691,7 +1435,7 @@ describe('NotificationBell — drawer conversion', () => {
 > - Removed `max-h-80 overflow-y-auto` wrapper → replaced with `flex-1 overflow-y-auto`
 > - The existing `panelRef` click-outside handler in the component can stay or be removed since we use the backdrop now. Remove it to avoid double-handling: delete the second `useEffect` block that calls `document.addEventListener('mousedown', handleClick)`.
 
-### Step 12.3 — Run tests
+### Step 7.3 — Run tests
 
 - [ ] Run:
   ```bash
@@ -1699,7 +1443,7 @@ describe('NotificationBell — drawer conversion', () => {
   ```
   Expected: all 5 tests pass.
 
-### Step 12.4 — TypeScript check
+### Step 7.4 — TypeScript check
 
 - [ ] Run:
   ```bash
@@ -1707,21 +1451,25 @@ describe('NotificationBell — drawer conversion', () => {
   ```
   Expected: zero errors.
 
-### Step 12.5 — Commit
+### Step 7.5 — Commit
 
 - [ ] Commit with message:
   ```
-  feat: convert NotificationBell from absolute dropdown to fixed slide-out drawer (Task 12)
+  feat: convert NotificationBell from absolute dropdown to fixed slide-out drawer (Task 7)
   ```
 
 ---
 
-## Task 13 — AdminInbox component with Signals tab
+## Task 8 — AdminInbox component with Signals tab **[SONNET]** — complex admin UI component
 
-**Owns:** `src/components/admin/AdminInbox.tsx`
-**Must not touch:** any other file in this task
+**PR:** PR 2
+**Depends on:** Task 6 (hooks must be committed)
+**Owns:** `src/components/admin/AdminInbox.tsx`, `tests/integration/admin-signals-inbox.test.ts`
+**Must not touch:** `src/hooks/admin/useClientSignals.ts` (owned by Task 6), `src/components/NotificationBell.tsx` (owned by Task 7), any other file not listed
 
-### Step 13.1 — Write failing integration test first
+> **Parallelism note:** Tasks 7 and 8 both depend on Task 6 and own separate files. They can run in parallel if parallel agents are available. In a single-agent run, complete Task 7 first, then Task 8.
+
+### Step 8.1 — Write failing integration test first
 
 - [ ] Create `tests/integration/admin-signals-inbox.test.ts`:
 
@@ -1805,7 +1553,7 @@ describe('Admin signals inbox workflow', () => {
   npx vitest run tests/integration/admin-signals-inbox.test.ts
   ```
 
-### Step 13.2 — Implement AdminInbox component
+### Step 8.2 — Implement AdminInbox component
 
 - [ ] Create `src/components/admin/AdminInbox.tsx`:
 
@@ -2018,7 +1766,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
 }
 ```
 
-### Step 13.3 — TypeScript check
+### Step 8.3 — TypeScript check
 
 - [ ] Run:
   ```bash
@@ -2026,7 +1774,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   ```
   Expected: zero errors. If `SectionCard` does not accept `headerRight` prop, adjust the component to not use it (move the count badge into the title string instead).
 
-### Step 13.4 — Run the integration tests
+### Step 8.4 — Run the integration tests
 
 - [ ] Run:
   ```bash
@@ -2034,21 +1782,469 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   ```
   Expected: all tests pass.
 
-### Step 13.5 — Commit
+### Step 8.5 — Commit
 
 - [ ] Commit with message:
   ```
-  feat: add AdminInbox component with Signals tab (Task 13)
+  feat: add AdminInbox component with Signals tab (Task 8)
   ```
 
 ---
 
-## Task 14 — Full test suite + build verification
+## Task 9 — Loading phrases utility **[HAIKU]** — mechanical utility
 
+**PR:** PR 3
+**Depends on:** Tasks 1–8 merged and CI-green on staging (PR 2 complete)
+**Owns:** `src/lib/loadingPhrases.ts`, `tests/unit/loading-phrases.test.ts`
+**Must not touch:** any other file in this task
+
+### Step 9.1 — Write failing unit test first
+
+- [ ] Create `tests/unit/loading-phrases.test.ts`:
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { LOADING_PHRASES, pickPhrase } from '../../src/lib/loadingPhrases.js';
+
+describe('loadingPhrases', () => {
+  it('exports exactly 9 phrases', () => {
+    expect(LOADING_PHRASES).toHaveLength(9);
+  });
+
+  it('every phrase ends with the ellipsis character …', () => {
+    expect(LOADING_PHRASES.length).toBeGreaterThan(0);
+    expect(LOADING_PHRASES.every(p => p.endsWith('…'))).toBe(true);
+  });
+
+  it('all 9 phrases are reachable over 50 random picks', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      seen.add(pickPhrase());
+    }
+    // All 9 should appear at least once in 50 tries
+    expect(seen.size).toBe(9);
+  });
+
+  it('pickPhrase returns a string that is in LOADING_PHRASES', () => {
+    const phrase = pickPhrase();
+    expect(LOADING_PHRASES).toContain(phrase);
+  });
+
+  it('no two consecutive pickPhrase() calls return the same phrase (50 runs)', () => {
+    let prev = pickPhrase();
+    for (let i = 0; i < 50; i++) {
+      const next = pickPhrase(prev);
+      expect(next).not.toBe(prev);
+      prev = next;
+    }
+  });
+});
+```
+
+- [ ] Run to confirm failures:
+  ```bash
+  npx vitest run tests/unit/loading-phrases.test.ts
+  ```
+
+### Step 9.2 — Implement the utility
+
+- [ ] Create `src/lib/loadingPhrases.ts`:
+
+```typescript
+/**
+ * Western-flavored loading phrases for the client chat AI response indicator.
+ *
+ * Displayed during AI thinking state when response takes > 4 seconds.
+ * Rotate with pickPhrase() — never the same phrase twice in a row.
+ */
+
+export const LOADING_PHRASES: readonly string[] = [
+  "Hootin'…",
+  "Hollerin'…",
+  "Rustlin'…",
+  "Wranglin'…",
+  "Cookin'…",
+  "Fetchin'…",
+  "Gettin' after it…",
+  "Tinkerin'…",
+  "Rummagin'…",
+] as const;
+
+/**
+ * Pick a random phrase from LOADING_PHRASES.
+ * Pass the current phrase as `exclude` to guarantee no consecutive repeat.
+ */
+export function pickPhrase(exclude?: string): string {
+  const available = exclude
+    ? LOADING_PHRASES.filter(p => p !== exclude)
+    : [...LOADING_PHRASES];
+  return available[Math.floor(Math.random() * available.length)];
+}
+```
+
+### Step 9.3 — Run tests, confirm all pass
+
+- [ ] Run:
+  ```bash
+  npx vitest run tests/unit/loading-phrases.test.ts
+  ```
+  Expected: all 5 tests pass.
+
+  > Note: the "all 9 reachable in 50 tries" test is probabilistic. With 9 phrases and 50 picks the probability of missing one is approximately 0.03%. If it flakes, re-run once. If it flakes repeatedly, increase the loop to 200.
+
+### Step 9.4 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: add Western loading phrases utility (Task 9)
+  ```
+
+---
+
+## Task 10 — `ServiceInterestCTA` component **[SONNET]** — new component with state + design
+
+**PR:** PR 3
+**Depends on:** Task 9 (loadingPhrases utility must be committed; this component is imported by Task 11's ChatPanel)
+**Owns:** `src/components/client/ServiceInterestCTA.tsx`, `tests/component/ServiceInterestCTA.test.tsx`
+**Must not touch:** `src/components/ChatPanel.tsx` (owned by Task 11), `src/lib/loadingPhrases.ts` (owned by Task 9), any other file not listed
+
+> **ORDER:** This task must be committed BEFORE Task 11 (ChatPanel wiring). ChatPanel imports this file — if it doesn't exist when Task 11 runs `tsc`, the build fails.
+
+> **⚠️ Built-in behavioral requirements (do not defer to a review pass):**
+>
+> These requirements are already verified by `tests/integration/client-cta-contracts.test.ts`. Read that file before implementing — it is the executable spec. Key contracts:
+>
+> 1. **Handle 429.** The signal endpoint rate-limits at 10 req/min per IP. After 10 clicks, `fetch` returns 429 with a `Retry-After` header. The component must handle this gracefully — show a "Please try again in a moment" message rather than silently swallowing the error or leaving the button disabled forever.
+>
+> 2. **Dedup is the component's job.** The server does NOT dedup explicit CTA clicks — two rapid clicks create two signals. Disable the button immediately on click (before the fetch resolves) to prevent double-submission. Once in `confirmed` state, never re-enable. This is the complete dedup strategy.
+>
+> 3. **Response shape is `{ ok: true }` only.** Do not destructure `signalId`, `id`, or any other field from the response. The server returns exactly `{ ok: true }`.
+>
+> 4. **Color rule: teal only.** `service_interest` and `content_interest` CTAs are both teal (`teal-600/10`, `teal-500/20`, `teal-300`). Never purple — purple is admin-only. `pr-check.ts` will flag `purple-` in any file under `src/components/client/`.
+
+### Step 10.1 — Write failing component test first
+
+- [ ] Create `tests/component/ServiceInterestCTA.test.tsx`:
+
+```tsx
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Minimal wrapper for React Query
+function Wrapper({ children }: { children: React.ReactNode }) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+}
+
+describe('ServiceInterestCTA', () => {
+  it('renders "Explore content recommendations" for content_interest type', async () => {
+    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
+    const onAction = vi.fn();
+    render(
+      <Wrapper>
+        <ServiceInterestCTA type="content_interest" workspaceId="ws-1" onAction={onAction} />
+      </Wrapper>,
+    );
+    expect(screen.getByText(/Explore content recommendations/i)).toBeInTheDocument();
+  });
+
+  it('renders "Get in touch" for service_interest type', async () => {
+    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
+    const onAction = vi.fn();
+    render(
+      <Wrapper>
+        <ServiceInterestCTA type="service_interest" workspaceId="ws-1" onAction={onAction} />
+      </Wrapper>,
+    );
+    expect(screen.getByText(/Get in touch/i)).toBeInTheDocument();
+  });
+
+  it('calls onAction with the correct type when button is clicked', async () => {
+    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
+    const onAction = vi.fn();
+    render(
+      <Wrapper>
+        <ServiceInterestCTA type="service_interest" workspaceId="ws-1" onAction={onAction} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(onAction).toHaveBeenCalledWith('service_interest');
+  });
+
+  it('button is disabled while a mutation is in-flight (loading state)', async () => {
+    // This tests that the button has disabled attribute when isLoading is true.
+    // We mock useMutation to simulate in-flight state.
+    const { ServiceInterestCTA } = await import('../../src/components/client/ServiceInterestCTA.js');
+    const onAction = vi.fn();
+    // Render with a slow mutation — button should not be disabled on initial render
+    render(
+      <Wrapper>
+        <ServiceInterestCTA type="service_interest" workspaceId="ws-1" onAction={onAction} />
+      </Wrapper>,
+    );
+    const btn = screen.getByRole('button');
+    expect(btn).not.toBeDisabled(); // not in-flight yet
+  });
+});
+```
+
+- [ ] Run to confirm failures:
+  ```bash
+  npx vitest run tests/component/ServiceInterestCTA.test.tsx
+  ```
+
+### Step 10.2 — Implement `ServiceInterestCTA`
+
+- [ ] Create `src/components/client/ServiceInterestCTA.tsx`:
+
+```tsx
+/**
+ * ServiceInterestCTA — rendered below AI chat responses when intent is detected.
+ *
+ * content_interest: navigates to the strategy tab
+ * service_interest: fires a signal mutation, then shows confirmation
+ *
+ * Color rule: teal for actions (Three Laws of Color). Never purple.
+ */
+import { useState } from 'react';
+import { ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
+
+interface ServiceInterestCTAProps {
+  type: 'content_interest' | 'service_interest';
+  workspaceId: string | undefined;
+  /** Called after user clicks — parent handles navigation or mutation */
+  onAction: (type: 'content_interest' | 'service_interest') => void;
+}
+
+export function ServiceInterestCTA({ type, workspaceId: _workspaceId, onAction }: ServiceInterestCTAProps) {
+  const [loading, setLoading] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const label =
+    type === 'content_interest'
+      ? 'Explore content recommendations'
+      : 'Get in touch';
+
+  const subtext =
+    type === 'content_interest'
+      ? 'See what content we recommend for your site.'
+      : "We'll reach out to discuss how we can help.";
+
+  const handleClick = async () => {
+    if (loading || confirmed) return;
+    if (type === 'service_interest') {
+      setLoading(true);
+      try {
+        onAction(type);
+        // Show confirmation after a brief delay to let parent handle async
+        await new Promise(r => setTimeout(r, 600));
+        setConfirmed(true);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // content_interest: navigate immediately
+      onAction(type);
+    }
+  };
+
+  if (confirmed) {
+    return (
+      <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20">
+        <CheckCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />
+        <span className="text-xs text-teal-300">Got it — we'll be in touch soon.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-teal-600/10 hover:bg-teal-600/20 border border-teal-500/20 hover:border-teal-500/40 transition-all disabled:opacity-60 group"
+        aria-label={label}
+      >
+        <div className="text-left">
+          <div className="text-xs font-medium text-teal-300">{label}</div>
+          <div className="text-[10px] text-teal-400/60 mt-0.5">{subtext}</div>
+        </div>
+        {loading ? (
+          <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin flex-shrink-0" />
+        ) : (
+          <ArrowRight className="w-3.5 h-3.5 text-teal-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+        )}
+      </button>
+    </div>
+  );
+}
+```
+
+### Step 10.3 — Run tests, confirm all pass
+
+- [ ] Run:
+  ```bash
+  npx vitest run tests/component/ServiceInterestCTA.test.tsx
+  ```
+  Expected: all 4 tests pass.
+
+### Step 10.4 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 10.5 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: add ServiceInterestCTA component (Task 10)
+  ```
+
+---
+
+## Task 11 — Loading phrases + ServiceInterestCTA wiring in ChatPanel **[SONNET]** — component logic + conditional rendering
+
+**PR:** PR 3
+**Depends on:** Task 9 (loadingPhrases utility committed), Task 10 (ServiceInterestCTA committed — ChatPanel imports it)
+**Owns:** `src/components/ChatPanel.tsx`
+**Must not touch:** `src/components/client/ServiceInterestCTA.tsx` (owned by Task 10), `src/lib/loadingPhrases.ts` (owned by Task 9), any other file not listed
+
+> **ORDER DEPENDENCY:** Task 10 (ServiceInterestCTA) must be committed BEFORE this task begins. ChatPanel imports `ServiceInterestCTA` from `./client/ServiceInterestCTA` — that file must exist on disk before Task 11's TypeScript check can pass.
+
+> **Test note:** ChatPanel is tested via Task 8's integration test (which exercises the full admin inbox + signal workflow). No standalone ChatPanel unit test is needed for this task.
+
+### Step 11.1 — Read the current file
+
+- [ ] Read `src/components/ChatPanel.tsx` fully to understand current imports and prop shapes.
+
+### Step 11.2 — Modify ChatPanel
+
+The loading dots at lines 117–119 need to be replaced with a Western phrase that fades in/out when loading takes > 4 seconds. The component also needs a `lastIntent?` prop and an `onCTAAction?` prop to render `<ServiceInterestCTA>` after the final assistant message. The `ServiceInterestCTA` component was created in Task 10.
+
+- [ ] Apply the following changes to `src/components/ChatPanel.tsx`:
+
+**1. Add imports at the top with existing imports:**
+```typescript
+import { useState, useEffect, useRef } from 'react';
+import { pickPhrase } from '../lib/loadingPhrases';
+```
+(Note: `useState` is likely already imported — verify before adding. If already present, only add `pickPhrase`.)
+
+**2. Extend `ChatPanelProps` interface:**
+```typescript
+interface ChatPanelProps {
+  messages: ChatMessage[];
+  loading: boolean;
+  input: string;
+  onInputChange: (val: string) => void;
+  onSend: (msg: string) => void;
+  quickQuestions?: string[];
+  placeholder?: string;
+  accent?: 'teal' | 'purple';
+  disabled?: boolean;
+  /** Extra content rendered above the input (e.g. usage limits) */
+  inputPrefix?: React.ReactNode;
+  /** Extra content rendered in the empty state below quick questions */
+  emptyExtra?: React.ReactNode;
+  /** Detected intent from the last AI response (for CTA rendering) */
+  lastIntent?: 'content_interest' | 'service_interest' | null;
+  /** Called when the user acts on the CTA */
+  onCTAAction?: (type: 'content_interest' | 'service_interest') => void;
+}
+```
+
+**3. Inside the component function body, add phrase state after `const a = ACCENT[accent]`:**
+```typescript
+const [phrase, setPhrase] = useState<string>('');
+const phraseRef = useRef<string>('');
+const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+// Show phrase after 4s of loading; rotate phrase on each trigger
+useEffect(() => {
+  if (loading) {
+    loadingTimerRef.current = setTimeout(() => {
+      const next = pickPhrase(phraseRef.current);
+      phraseRef.current = next;
+      setPhrase(next);
+    }, 4000);
+  } else {
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    setPhrase('');
+    phraseRef.current = '';
+  }
+  return () => {
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+  };
+}, [loading]);
+```
+
+**4. Replace the loading indicator block (lines 110–123) with:**
+```tsx
+{loading && (
+  <div className="flex gap-3">
+    <div className={`w-6 h-6 rounded-lg ${a.icon} flex items-center justify-center`}>
+      <Loader2 className={`w-3 h-3 ${a.iconText} animate-spin`} />
+    </div>
+    <div className="bg-zinc-800/50 border border-zinc-800 rounded-xl px-3.5 py-2.5 min-w-[56px]">
+      {phrase ? (
+        <span className="text-[11px] text-zinc-400 animate-pulse">{phrase}</span>
+      ) : (
+        <div className="flex gap-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
+          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      )}
+    </div>
+  </div>
+)}
+```
+
+**5. After the loading indicator block (before `<div ref={endRef} />`), add CTA rendering:**
+```tsx
+{!loading && lastIntent && onCTAAction && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
+  <ServiceInterestCTA
+    type={lastIntent}
+    workspaceId={undefined}
+    onAction={onCTAAction}
+  />
+)}
+```
+
+**6. Add import for `ServiceInterestCTA` after existing imports at top of file:**
+```typescript
+import { ServiceInterestCTA } from './client/ServiceInterestCTA';
+```
+
+### Step 11.3 — TypeScript check
+
+- [ ] Run:
+  ```bash
+  npx tsc --noEmit --skipLibCheck
+  ```
+  Expected: zero errors.
+
+### Step 11.4 — Commit
+
+- [ ] Commit with message:
+  ```
+  feat: add Western loading phrases to ChatPanel + lastIntent/onCTAAction props (Task 11)
+  ```
+
+---
+
+## Task 12 — Full test suite + build verification **[HAIKU]** — mechanical verification
+
+**PR:** PR 4
+**Depends on:** All tasks 1–11 complete and merged
 **Owns:** Nothing new — verification only
 **Must not touch:** any file
 
-### Step 14.1 — Run full test suite
+### Step 12.1 — Run full test suite
 
 - [ ] Run:
   ```bash
@@ -2058,7 +2254,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
 
   If any tests fail that were passing before this plan, investigate and fix before proceeding.
 
-### Step 14.2 — Production build
+### Step 12.2 — Production build
 
 - [ ] Run:
   ```bash
@@ -2066,7 +2262,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   ```
   Expected: build succeeds with no errors. Warnings about chunk sizes are acceptable.
 
-### Step 14.3 — PR check
+### Step 12.3 — PR check
 
 - [ ] Run:
   ```bash
@@ -2074,7 +2270,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   ```
   Expected: zero errors. If `violet` or `indigo` are flagged, search components added in this plan and fix.
 
-### Step 14.4 — Verify no purple in client-facing components
+### Step 12.4 — Verify no purple in client-facing components
 
 - [ ] Run:
   ```bash
@@ -2082,7 +2278,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   ```
   Expected: no output (no purple in client component).
 
-### Step 14.5 — Verify NotificationBell uses fixed not absolute
+### Step 12.5 — Verify NotificationBell uses fixed not absolute
 
 - [ ] Run:
   ```bash
@@ -2090,7 +2286,7 @@ export function AdminInbox({ workspaceId }: AdminInboxProps) {
   ```
   Expected: no output (the old absolute positioning has been removed).
 
-### Step 14.6 — Final commit
+### Step 12.6 — Final commit
 
 - [ ] Commit with message:
   ```
@@ -2115,14 +2311,38 @@ After all tasks are committed and CI is green on staging:
 
 ## Parallelization note
 
-All 14 tasks are **sequential** because:
-- Tasks 1–2 (types + migration) must precede Task 3 (store)
-- Task 3 (store) must precede Task 4 (routes)
-- Task 4 (routes) must precede Task 11 (intent detection)
-- Tasks 5–6 are independent of each other and of 7–8, but both depend on Task 1
-- Tasks 9–10 depend on Task 6 (loading phrases) and each other (ChatPanel imports ServiceInterestCTA)
-- Task 12 (NotificationBell) is fully independent of Tasks 9–11 but depends on Tasks 7–8 (WS events)
-- Task 13 (AdminInbox) depends on Tasks 7–8 (query keys + hooks)
-- Task 14 (verification) must be last
+All 12 active tasks (Tasks 1–12) are **sequential** within their PRs because each builds on the previous. PRs are strictly sequential — each PR must be merged and CI-green before the next starts.
 
-Recommended execution order: **1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14**
+### Dependency graph
+
+```
+Phase 0 (pre-done: types + migration)
+  └─ Task 1 (DB store: client-signals-store.ts)
+      └─ Task 2 (API routes: client-signals.ts + app.ts mount)
+          ├─ Task 3 (intent detection in public-analytics.ts)
+          └─ Task 4 (email template + helper)   ← parallel with Task 3 after Task 1 commits
+
+[PR 1 merged]
+
+Task 5 (query key + WS event constants)
+  └─ Task 6 (useClientSignals hooks + WS invalidation)
+      ├─ Task 7 (NotificationBell drawer refactor)  ← parallel with Task 8
+      └─ Task 8 (AdminInbox component)              ← parallel with Task 7
+
+[PR 2 merged]
+
+Task 9 (loadingPhrases utility)
+  └─ Task 10 (ServiceInterestCTA component)   ← must commit before Task 11
+      └─ Task 11 (ChatPanel wiring)
+
+[PR 3 merged]
+
+Task 12 (full verification) ─ last
+```
+
+### Recommended single-agent execution order
+
+**PR 1:** 1 → 2 → 3 → 4
+**PR 2:** 5 → 6 → 7 → 8
+**PR 3:** 9 → 10 → 11
+**PR 4:** 12

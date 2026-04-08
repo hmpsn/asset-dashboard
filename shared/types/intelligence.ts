@@ -36,6 +36,12 @@ export interface IntelligenceOptions {
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   /** Token budget hint for downstream prompt formatting */
   tokenBudget?: number;
+  /**
+   * Opt-in: fetch backlink profile from the configured SEO data provider.
+   * OFF by default — the provider call adds network latency and costs credits.
+   * Only enable for callers that actually surface backlink data (e.g. admin AI chat).
+   */
+  enrichWithBacklinks?: boolean;
 }
 
 // ── Core return type ────────────────────────────────────────────────────
@@ -59,9 +65,13 @@ export interface WorkspaceIntelligence {
 
 export interface SeoContextSlice {
   strategy: KeywordStrategy | undefined;
+  /** Raw text — no headers. Use formatBrandVoiceForPrompt() before injecting into prompts.
+   *  formatSeoContextSection renders this with an emphatic BRAND VOICE header automatically. */
   brandVoice: string;
   businessContext: string;
   personas: AudiencePersona[];
+  /** Raw text — no headers. Use formatKnowledgeBaseForPrompt() before injecting into prompts.
+   *  formatSeoContextSection renders this with a KNOWLEDGE BASE header automatically. */
   knowledgeBase: string;
   pageKeywords?: PageKeywordMap;
   // New in 3A
@@ -106,11 +116,21 @@ export interface PageProfileSlice {
   primaryKeyword: string | null;
   searchIntent: string | null;
   optimizationScore: number | null;
+  /** Platform-wide action recommendations filtered to this page (from recommendation store). */
   recommendations: string[];
+  /** Per-page content gap topics from AI keyword analysis (getPageKeyword). */
   contentGaps: string[];
   insights: AnalyticsInsight[];
   actions: TrackedAction[];
+  /** Structural SEO issues from Webflow audit snapshot (missing tags, OG issues, etc.). */
   auditIssues: string[];
+  /** Keyword optimization issues from AI per-page keyword analysis. Distinct from auditIssues. */
+  optimizationIssues: string[];
+  /** Whether the primary keyword appears in key placement locations (from AI keyword analysis). */
+  primaryKeywordPresence: { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | null;
+  competitorKeywords: string[];
+  topicCluster: string | null;
+  estimatedDifficulty: string | null;
   schemaStatus: 'valid' | 'warnings' | 'errors' | 'none';
   linkHealth: { inbound: number; outbound: number; orphan: boolean };
   seoEdits: { currentTitle: string; currentMeta: string; lastEditedAt: string | null };
@@ -170,6 +190,15 @@ export interface ClientSignalsSlice {
   compositeHealthScore?: number | null;
   feedbackItems?: Array<{ id: string; type: string; status: string; createdAt: string }>;
   serviceRequests?: { pending: number; total: number };
+  /** Intent signals detected in client chat (service_interest / content_interest) */
+  intentSignals?: {
+    /** Count of unactioned (status = 'new') signals */
+    newCount: number;
+    /** Total signals created (all statuses) */
+    totalCount: number;
+    /** Signal types seen recently, most recent first (max 5) */
+    recentTypes: Array<'service_interest' | 'content_interest'>;
+  };
 }
 
 export interface OperationalSlice {
@@ -188,6 +217,64 @@ export interface OperationalSlice {
   insightAcceptanceRate?: InsightAcceptanceRate | null;
 }
 
+// ── Client Intelligence API types (Phase 4C) ────────────────────────────────
+// Scrubbed, tier-gated view of WorkspaceIntelligence for client portal consumption.
+// NEVER expose: knowledgeBase, brandVoice, churnRisk, impact_score, operational slice,
+// admin-only insight types (strategy_alignment), or bridge source tags.
+
+export interface ClientInsightsSummary {
+  /** Total actionable insights (critical + warning + opportunity; positive excluded) */
+  total: number;
+  /** highPriority = critical+warning; mediumPriority = opportunity */
+  highPriority: number;
+  mediumPriority: number;
+  /** Human-readable top insight titles (max 3) */
+  topInsights: Array<{ title: string; type: string }>;
+}
+
+export interface ClientPipelineStatus {
+  briefs: { total: number; inProgress: number };
+  posts: { total: number; inProgress: number };
+  /** Pending SEO edits awaiting client approval */
+  pendingApprovals: number;
+}
+
+export interface ClientLearningHighlights {
+  /** Overall win rate across all tracked actions (0-1) */
+  overallWinRate: number;
+  /** Top performing action type (e.g. "title_update") */
+  topActionType: string | null;
+  /** Count of strong_win outcomes from weCalledIt entries (up to 5; no date filter) */
+  recentWins: number;
+}
+
+export interface ClientSiteHealthSummary {
+  /** 0-100 audit score */
+  auditScore: number | null;
+  /** Direction vs previous audit */
+  auditScoreDelta: number | null;
+  /** CWV pass rate as 0-100 integer (average of available rates; currently mobile-only until assembler populates desktop) */
+  cwvPassRatePct: number | null;
+  /** Count of dead links */
+  deadLinks: number;
+}
+
+export interface ClientIntelligence {
+  workspaceId: string;
+  assembledAt: string;
+  tier: 'free' | 'growth' | 'premium';
+
+  // All tiers
+  insightsSummary: ClientInsightsSummary | null;
+  pipelineStatus: ClientPipelineStatus | null;
+
+  // Growth+ only
+  learningHighlights?: ClientLearningHighlights | null;
+
+  // Premium only
+  siteHealthSummary?: ClientSiteHealthSummary | null;
+}
+
 // ── New supporting types (Phase 3A) ─────────────────────────────────
 
 export interface BusinessProfile {
@@ -199,13 +286,16 @@ export interface BusinessProfile {
 export interface BacklinkProfile {
   totalBacklinks: number;
   referringDomains: number;
-  trend: 'growing' | 'stable' | 'declining';
+  /** Omitted when trend cannot be computed from available API data. */
+  trend?: 'growing' | 'stable' | 'declining';
 }
 
 export interface SerpFeatures {
   featuredSnippets: number;
   peopleAlsoAsk: number;
   localPack: boolean;
+  /** Pages where a video carousel is present for the primary keyword. */
+  videoCarousel: number;
 }
 
 export interface EngagementMetrics {
@@ -231,6 +321,8 @@ export interface ChurnSignalSummary {
   type: string;
   severity: string;
   detectedAt: string;
+  title: string;
+  description: string;
 }
 
 export interface ROIAttribution {
@@ -261,7 +353,6 @@ export interface RankTrackingSummary {
 export interface StrategyHistory {
   revisionsCount: number;
   lastRevisedAt: string;
-  trajectory: string;
 }
 
 export interface DecayAlert {

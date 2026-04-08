@@ -12,6 +12,7 @@ import type {
   InsightSeverity,
   InsightType,
   AnalyticsInsight,
+  InsightDataMap,
   PageHealthData,
   QuickWinData,
   ContentDecayData,
@@ -19,6 +20,9 @@ import type {
   ConversionAttributionData,
   CompetitorGapData,
   KeywordClusterData,
+  RankingMoverData,
+  CtrOpportunityData,
+  SerpOpportunityData,
 } from '../shared/types/analytics.js';
 import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData, paginateGscQuery } from './search-console.js';
@@ -32,6 +36,7 @@ import { runFeedbackLoops } from './insight-feedback.js';
 import { apiCache } from './api-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
+import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
 import { createLogger } from './logger.js';
 
 // ── Shared types for computation results ─────────────────────────
@@ -379,41 +384,6 @@ interface GapInput {
  * Score and classify competitor keyword gaps.
  * Enriches with our existing GSC position when available.
  */
-/**
- * Extract brand-like tokens from a domain for branded query detection.
- * "competitor-site.com" → ["competitor", "site", "competitorsite"]
- * "acme.co" → ["acme"]
- */
-function extractBrandTokens(domain: string): string[] {
-  // Strip TLD and www
-  const base = domain.replace(/^www\./, '').replace(/\.(com|co|io|ai|org|net|dev|app)$/i, '');
-  const tokens: string[] = [];
-  // Split on dots and hyphens
-  const parts = base.split(/[.\-]/);
-  for (const p of parts) {
-    if (p.length >= 3) tokens.push(p.toLowerCase());
-  }
-  // Also add the joined form (e.g., "competitorsite" from "competitor-site")
-  if (parts.length > 1) tokens.push(parts.join('').toLowerCase());
-  return tokens;
-}
-
-/** Check if a keyword is likely a branded search for a competitor.
- * Uses word-boundary matching to avoid false positives from short tokens
- * that are also common industry terms (e.g. "seo" from seo.com).
- */
-function isBrandedQuery(keyword: string, competitorBrandTokens: string[]): boolean {
-  const lower = keyword.toLowerCase();
-  return competitorBrandTokens.some(token => {
-    // Short tokens (< 5 chars) are too likely to match common words
-    // e.g. "seo" from seo.com, "web" from web.io, "hub" from hub.io
-    if (token.length < 5) return false;
-    // Word-boundary match to avoid substring false positives
-    const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-    return regex.test(lower);
-  });
-}
-
 export function computeCompetitorGapInsights(
   gapData: GapInput[],
   ourQueryData: QueryPageRow[],
@@ -639,7 +609,7 @@ export function computeKeywordClusterInsights(
 export function computeRankingMovers(
   currentQueryPages: QueryPageRow[],
   previousQueryPages: QueryPageRow[],
-): Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
+): Array<{ insightType: 'ranking_mover'; pageId: string; data: RankingMoverData; severity: InsightSeverity }> {
   const prevMap = new Map<string, QueryPageRow>();
   for (const row of previousQueryPages) {
     prevMap.set(`${row.query}::${row.page}`, row);
@@ -648,7 +618,7 @@ export function computeRankingMovers(
   // Collect all significant movers, then deduplicate to one entry per page URL.
   // Keeping the query with the highest impact (|positionChange| × impressions) ensures
   // the DB UNIQUE constraint (workspace_id, page_id, insight_type) works as intended.
-  type MoverCandidate = { insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity; impact: number };
+  type MoverCandidate = { insightType: 'ranking_mover'; pageId: string; data: RankingMoverData; severity: InsightSeverity; impact: number };
   const bestByPage = new Map<string, MoverCandidate>();
 
   for (const curr of currentQueryPages) {
@@ -680,12 +650,12 @@ export function computeRankingMovers(
     }
   }
 
-  const results: Array<{ insightType: 'ranking_mover'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> =
+  const results: Array<{ insightType: 'ranking_mover'; pageId: string; data: RankingMoverData; severity: InsightSeverity }> =
     Array.from(bestByPage.values());
 
   return results.sort((a, b) => {
-    const aI = Math.abs(a.data.positionChange as number) * (a.data.impressions as number);
-    const bI = Math.abs(b.data.positionChange as number) * (b.data.impressions as number);
+    const aI = Math.abs(a.data.positionChange) * a.data.impressions;
+    const bI = Math.abs(b.data.positionChange) * b.data.impressions;
     return bI - aI;
   }).slice(0, 30);
 }
@@ -702,10 +672,10 @@ const CTR_OPPORTUNITY_THRESHOLD_RATIO = 0.70; // actual CTR must be < 70% of exp
  */
 export function computeCtrOpportunities(
   queryPageData: QueryPageRow[],
-): Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
+): Array<{ insightType: 'ctr_opportunity'; pageId: string; data: CtrOpportunityData; severity: InsightSeverity }> {
   // Group by page URL — keep only the highest click-gap query per page so the
   // DB UNIQUE constraint (workspace_id, page_id, insight_type) works as intended.
-  type CtrCandidate = { insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity; clickGap: number };
+  type CtrCandidate = { insightType: 'ctr_opportunity'; pageId: string; data: CtrOpportunityData; severity: InsightSeverity; clickGap: number };
   const bestByPage = new Map<string, CtrCandidate>();
 
   for (const row of queryPageData) {
@@ -752,12 +722,12 @@ export function computeCtrOpportunities(
     }
   }
 
-  const results: Array<{ insightType: 'ctr_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> =
+  const results: Array<{ insightType: 'ctr_opportunity'; pageId: string; data: CtrOpportunityData; severity: InsightSeverity }> =
     Array.from(bestByPage.values());
 
   // Sort by estimated click gap descending
   return results
-    .sort((a, b) => (b.data.estimatedClickGap as number) - (a.data.estimatedClickGap as number))
+    .sort((a, b) => b.data.estimatedClickGap - a.data.estimatedClickGap)
     .slice(0, 30);
 }
 
@@ -772,8 +742,8 @@ const SERP_OPPORTUNITY_MIN_IMPRESSIONS = 500;
 export function computeSerpOpportunities(
   gscPages: SearchPage[],
   pagesWithSchema: Set<string>,
-): Array<{ insightType: 'serp_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> {
-  const results: Array<{ insightType: 'serp_opportunity'; pageId: string; data: Record<string, unknown>; severity: InsightSeverity }> = [];
+): Array<{ insightType: 'serp_opportunity'; pageId: string; data: SerpOpportunityData; severity: InsightSeverity }> {
+  const results: Array<{ insightType: 'serp_opportunity'; pageId: string; data: SerpOpportunityData; severity: InsightSeverity }> = [];
 
   for (const page of gscPages) {
     if (page.impressions < SERP_OPPORTUNITY_MIN_IMPRESSIONS) continue;
@@ -806,7 +776,7 @@ export function computeSerpOpportunities(
   }
 
   return results
-    .sort((a, b) => (b.data.impressions as number) - (a.data.impressions as number))
+    .sort((a, b) => b.data.impressions - a.data.impressions)
     .slice(0, 20);
 }
 
@@ -974,14 +944,14 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const cycleStart = new Date().toISOString();
 
   /** Helper: enrich and upsert a single insight */
-  function enrichAndUpsert(insight: {
-    insightType: InsightType;
+  function enrichAndUpsert<T extends InsightType>(insight: {
+    insightType: T;
     pageId: string | null;
-    data: Record<string, unknown>;
+    data: InsightDataMap[T];
     severity: InsightSeverity;
   }): void {
     const enrichment = enrichInsight(
-      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data },
+      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data as AnalyticsInsight['data'] },
       enrichCtx,
     );
     upsertInsight({
@@ -1001,7 +971,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       enrichAndUpsert({
         insightType: 'page_health',
         pageId: insight.pageId,
-        data: insight.data as unknown as Record<string, unknown>,
+        data: insight.data,
         severity: insight.severity,
       });
     }
@@ -1015,7 +985,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       enrichAndUpsert({
         insightType: 'ranking_opportunity',
         pageId: insight.pageId,
-        data: insight.data as unknown as Record<string, unknown>,
+        data: insight.data,
         severity: insight.severity,
       });
     }
@@ -1027,7 +997,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       enrichAndUpsert({
         insightType: 'cannibalization',
         pageId: insight.pageId,
-        data: insight.data as unknown as Record<string, unknown>,
+        data: insight.data,
         severity: insight.severity,
       });
     }
@@ -1078,7 +1048,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       enrichAndUpsert({
         insightType: 'keyword_cluster',
         pageId: insight.pageId,
-        data: insight.data as unknown as Record<string, unknown>,
+        data: insight.data,
         severity: insight.severity,
       });
     }
@@ -1089,7 +1059,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   // Phase 3B: Competitor gap analysis (uses SEMRush/DataForSEO provider)
   if (ws.liveDomain) {
     try {
-      const provider = getConfiguredProvider(ws.seoDataProvider as any);
+      const provider = getConfiguredProvider(ws.seoDataProvider);
       if (provider?.isConfigured()) {
         const competitors = ws.competitorDomains?.length
           ? ws.competitorDomains
@@ -1105,7 +1075,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
               enrichAndUpsert({
                 insightType: 'competitor_gap',
                 pageId: insight.pageId,
-                data: insight.data as unknown as Record<string, unknown>,
+                data: insight.data,
                 severity: insight.severity,
               });
             }
@@ -1131,7 +1101,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
           enrichAndUpsert({
             insightType: 'conversion_attribution',
             pageId: insight.pageId,
-            data: insight.data as unknown as Record<string, unknown>,
+            data: insight.data,
             severity: insight.severity,
           });
         }
@@ -1176,7 +1146,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     // Load pages that already have schema markup from the DB (graceful fallback)
     let pagesWithSchema = new Set<string>();
     try {
-      const schemaDb = await import('./db/index.js');
+      const schemaDb = await import('./db/index.js'); // dynamic-import-ok — circular dep prevention, default export is typed
       const rows = schemaDb.default.prepare(
         `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
       ).all(workspaceId) as Array<{ page_path: string }>;

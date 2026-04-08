@@ -8,7 +8,7 @@ import type {
   TopWin,
   WorkspaceLearnings,
   WorkspaceOutcomeOverview,
-  WeCalledItEntry,
+  OutcomeWinEntry,
 } from '../../shared/types/outcome-tracking';
 
 export interface ActionWithOutcomes extends TrackedAction {
@@ -64,5 +64,5 @@ export const clientOutcomesApi = {
     getSafe<OutcomeScorecard | null>(`/api/public/outcomes/${wsId}/summary`, null, signal),
 
   getWins: (wsId: string, signal?: AbortSignal) =>
-    getSafe<WeCalledItEntry[]>(`/api/public/outcomes/${wsId}/wins`, [], signal),
+    getSafe<OutcomeWinEntry[]>(`/api/public/outcomes/${wsId}/wins`, [], signal),
 };

@@ -15,7 +15,7 @@ import {
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from '../seo-context.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
 import {
@@ -69,7 +69,12 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   // Build full context: keyword strategy + brand voice + personas + knowledge base
-  const { keywordBlock: keywordContext, brandVoiceBlock, personasBlock, knowledgeBlock } = buildSeoContext(workspaceId, pagePath);
+  const rewriteIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'], pagePath: pagePath || undefined });
+  const rewriteSeo = rewriteIntel.seoContext;
+  const keywordContext = formatKeywordsForPrompt(rewriteSeo);
+  const brandVoiceBlock = formatBrandVoiceForPrompt(rewriteSeo?.brandVoice);
+  const personasBlock = formatPersonasForPrompt(rewriteSeo?.personas ?? []);
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(rewriteSeo?.knowledgeBase);
 
   // Resolve explicit brand name so the AI doesn't guess from the domain
   let brandName = '';
@@ -206,7 +211,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
 
   try {
     // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
-    const pageAnalysisBlock = buildPageAnalysisContext(workspaceId, pagePath);
+    const pageAnalysisBlock = formatForPrompt(rewriteIntel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: rewriteIntel used for raw field access above
 
     // Assemble all context blocks
     const contextBlocks = [
@@ -371,7 +376,9 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
 
 // --- Bulk AI SEO Fix ---
 router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
+  const { pages: rawPages, field, workspaceId } = req.body as { pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string; pageContent?: string }>; field: 'title' | 'description'; workspaceId?: string };
+  // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
+  const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
   if (!pages?.length) return res.status(400).json({ error: 'pages required' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -394,10 +401,27 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
   const inlineBrandName = getBrandName(ws);
 
+  // Pre-assemble workspace-level seoContext once — brandVoice, personas, knowledgeBase,
+  // rank tracking, and strategy are identical for every page. pageKeywords (the only
+  // page-specific field) is a simple find() on the pre-built pageMap, done inline per page.
+  const resolvedWsIdBulk = workspaceId || ws?.id || '';
+  const wsIntelBulk = await buildWorkspaceIntelligence(resolvedWsIdBulk, { slices: ['seoContext'] });
+  const wsBulkSeo = wsIntelBulk.seoContext;
+
   const results = [];
   for (const page of pages) {
     try {
-      const { keywordBlock, brandVoiceBlock: bvBlock, personasBlock: bulkPersonasBlock, knowledgeBlock: bulkKnowledgeBlock } = buildSeoContext(workspaceId || ws?.id, page.slug ? `/${page.slug}` : undefined);
+      // Derive per-page keywords from the pre-built pageMap — no extra DB call
+      const bulkPagePath = page.slug ? `/${page.slug}` : undefined;
+      const bulkFixSeo = wsBulkSeo ? { ...wsBulkSeo } : undefined;
+      if (bulkFixSeo && bulkPagePath && bulkFixSeo.strategy?.pageMap?.length) {
+        const kw = bulkFixSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === bulkPagePath.toLowerCase());
+        if (kw) bulkFixSeo.pageKeywords = kw;
+      }
+      const keywordBlock = formatKeywordsForPrompt(bulkFixSeo);
+      const bvBlock = formatBrandVoiceForPrompt(bulkFixSeo?.brandVoice);
+      const bulkPersonasBlock = formatPersonasForPrompt(bulkFixSeo?.personas ?? []);
+      const bulkKnowledgeBlock = formatKnowledgeBaseForPrompt(bulkFixSeo?.knowledgeBase);
 
       // Fetch page content if not provided and we have a base URL
       let contentExcerpt = page.pageContent || '';
@@ -478,12 +502,14 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
 
 // --- Bulk Pattern Apply (instant text transforms, no AI) ---
 router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFromQuery(), async (req, res) => {
-  const { pages, field, action, text: patternText } = req.body as {
+  const { pages: rawPages, field, action, text: patternText } = req.body as {
     pages: Array<{ pageId: string; title: string; slug?: string; currentValue: string }>;
     field: 'title' | 'description';
     action: 'append' | 'prepend' | 'replace';
     text: string;
   };
+  // Strip synthetic CMS IDs at the boundary — they are not real Webflow page IDs
+  const pages = (rawPages || []).filter(p => !p.pageId.startsWith('cms-'));
   if (!pages?.length || !field || !action || !patternText) {
     return res.status(400).json({ error: 'pages, field, action, text required' });
   }
@@ -601,11 +627,29 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   const suggestions: SeoSuggestion[] = [];
   const errors: Array<{ pageId: string; error: string }> = [];
 
+  // Pre-assemble workspace-level seoContext once. pageProfile stays per-page
+  // (page-specific optimization issues + recommendations require pagePath).
+  const wsIntelRw = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
+  const wsRwSeo = wsIntelRw.seoContext;
+
   // Process in concurrent batches for performance
   for (let i = 0; i < pages.length; i += CONCURRENCY) {
     const batch = pages.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.allSettled(batch.map(async (page) => {
-      const { keywordBlock, brandVoiceBlock: bvBlock, personasBlock: rwPersonasBlock, knowledgeBlock: rwKnowledgeBlock } = buildSeoContext(resolvedWsId, page.slug ? `/${page.slug}` : undefined);
+      // Derive per-page keywords from the pre-built pageMap — no extra DB call for seoContext
+      const rwPagePath = page.slug ? `/${page.slug}` : undefined;
+      const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
+      if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
+        const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
+        if (kw) rwSeo.pageKeywords = kw;
+      }
+      const keywordBlock = formatKeywordsForPrompt(rwSeo);
+      const bvBlock = formatBrandVoiceForPrompt(rwSeo?.brandVoice);
+      const rwPersonasBlock = formatPersonasForPrompt(rwSeo?.personas ?? []);
+      const rwKnowledgeBlock = formatKnowledgeBaseForPrompt(rwSeo?.knowledgeBase);
+      // pageProfile is page-specific — assemble per page then merge with hoisted intel
+      const pageProfileIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['pageProfile'], pagePath: rwPagePath });
+      const rwIntel = { ...wsIntelRw, seoContext: rwSeo, pageProfile: pageProfileIntel.pageProfile };
 
       // Fetch page content for context (best-effort)
       let contentExcerpt = '';
@@ -665,7 +709,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       }
 
       // Persisted page analysis (optimizationIssues + recommendations from keyword analysis)
-      const rwPageAnalysis = buildPageAnalysisContext(resolvedWsId, page.slug ? `/${page.slug}` : undefined);
+      const rwPageAnalysis = formatForPrompt(rwIntel, { verbosity: 'detailed', sections: ['pageProfile'] }); // bip-ok: rwIntel used for raw field access above
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
       const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name, never an abbreviated version.` : '';
@@ -919,8 +963,11 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   // Build full context: keywords + brand voice + keyword map
-  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId, pagePath);
-  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const copyIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath });
+  const copySeo = copyIntel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(copySeo);
+  const brandVoiceBlock = formatBrandVoiceForPrompt(copySeo?.brandVoice);
+  const kwMapContext = formatPageMapForPrompt(copySeo);
 
   // If no page content was passed, try to fetch it from the live site
   let content = pageContent || '';

@@ -37,7 +37,8 @@ import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
 import { captureBaselineFromGsc } from '../outcome-measurement.js';
 import { callOpenAI, parseAIJson } from '../openai-helpers.js';
-import { buildSeoContext } from '../seo-context.js';
+import { buildIntelPrompt } from '../workspace-intelligence.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('content-posts');
 
@@ -128,10 +129,43 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requir
   }
 });
 
+const updatePostSchema = z.object({
+  title: z.string().max(500).optional(),
+  metaDescription: z.string().max(500).optional(),
+  introduction: z.string().optional(),
+  sections: z.array(z.object({
+    index: z.number(),
+    heading: z.string(),
+    content: z.string(),
+    wordCount: z.number(),
+    targetWordCount: z.number().optional(),
+    keywords: z.array(z.string()).optional(),
+    status: z.enum(['pending', 'generating', 'done', 'error']).optional(),
+  })).optional(),
+  conclusion: z.string().optional(),
+  seoTitle: z.string().max(200).optional(),
+  seoMetaDescription: z.string().max(500).optional(),
+  status: z.enum(['generating', 'draft', 'review', 'approved']).optional(),
+  voiceScore: z.number().min(0).max(100).optional(),
+  voiceFeedback: z.string().optional(),
+  webflowItemId: z.string().optional(),
+  webflowCollectionId: z.string().optional(),
+  publishedAt: z.string().optional(),
+  publishedSlug: z.string().optional(),
+  reviewChecklist: z.object({
+    factual_accuracy: z.boolean(),
+    brand_voice: z.boolean(),
+    internal_links: z.boolean(),
+    no_hallucinations: z.boolean(),
+    meta_optimized: z.boolean(),
+    word_count_target: z.boolean(),
+  }).optional(),
+}).strict();
+
 // Update post fields (inline editing of title, sections, status, etc.)
 // If status is changed to 'approved' and workspace has auto-publish configured,
 // triggers publish-to-webflow in the background.
-router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), validate(updatePostSchema), (req, res, next) => {
   const previous = getPost(req.params.workspaceId, req.params.postId);
 
   // Snapshot before content-changing edits (not status-only changes)
@@ -144,7 +178,15 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     }
   }
 
-  const updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
+  let updated;
+  try {
+    updated = updatePostField(req.params.workspaceId, req.params.postId, req.body);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'InvalidTransitionError') {
+      return res.status(400).json({ error: err.message });
+    }
+    return next(err);
+  }
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 
   // Auto-publish on approval if workspace has publishTarget and post isn't already published
@@ -181,7 +223,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
             // Record for outcome tracking — guard prevents duplicates if .then() fires more than once
             try {
               if (!getActionByWorkspaceAndSource(req.params.workspaceId, 'post', req.params.postId)) {
-                const postAction = recordAction({
+                const postAction = recordAction({ // recordAction-ok: workspaceId from validated route param
                   workspaceId: req.params.workspaceId,
                   actionType: 'content_published',
                   sourceType: 'post',
@@ -251,7 +293,7 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
   const ws = getWorkspace(req.params.workspaceId);
 
   // Build full business context for brand voice checking
-  const { fullContext } = buildSeoContext(req.params.workspaceId);
+  const fullContext = await buildIntelPrompt(req.params.workspaceId, ['seoContext', 'learnings'], { verbosity: 'detailed' });
 
   // Build a text summary of the post content for AI analysis
   const allContent = [

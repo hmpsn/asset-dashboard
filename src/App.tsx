@@ -61,18 +61,24 @@ const RevenueDashboard = lazyWithRetry(() => import('./components/RevenueDashboa
 const FeatureLibrary = lazyWithRetry(() => import('./components/FeatureLibrary'));
 const OutcomeDashboard = lazyWithRetry(() => import('./components/admin/outcomes/OutcomeDashboard'));
 const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes/OutcomesOverview'));
+const AdminInbox = lazyWithRetry(() => import('./components/admin/AdminInbox').then(m => ({ default: m.AdminInbox })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
 }
 
 export interface FixContext {
+  /** Which admin route this fixContext is intended for (e.g. 'content-pipeline', 'seo-editor').
+   *  REQUIRED — components check this before reacting. Without it, stale fixContext from one
+   *  tab leaks into another. Making this required ensures TypeScript catches missing values
+   *  at every navigation call site. */
+  targetRoute: string;
   pageId?: string;
   pageSlug?: string;
   pageName?: string;
   issueCheck?: string;
   issueMessage?: string;
-  // Brief generation context from Page Intelligence
+  // Brief generation context from Page Intelligence / Content Gaps
   primaryKeyword?: string;
   searchIntent?: string;
   optimizationScore?: number;
@@ -80,6 +86,8 @@ export interface FixContext {
   recommendations?: string[];
   contentGaps?: string[];
   autoGenerate?: boolean;
+  /** Suggested page type from content gaps (e.g. 'blog', 'service', 'landing'). */
+  pageType?: string;
 }
 
 /** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */
@@ -158,6 +166,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   }, [location.pathname, GLOBAL_TABS]);
 
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
+  const clearFixContext = useCallback(() => setFixContext(null), []);
   const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
@@ -343,8 +352,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
-    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
-    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} />;
+    if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
+    if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
@@ -353,7 +362,12 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'requests') return <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'requests') return (
+      <div className="space-y-6 p-6 overflow-y-auto">
+        <AdminInbox workspaceId={selected.id} />
+        <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />
+      </div>
+    );
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
     if (tab === 'outcomes') return <OutcomeDashboard key={`outcomes-${selected.id}`} workspaceId={selected.id} />;
 

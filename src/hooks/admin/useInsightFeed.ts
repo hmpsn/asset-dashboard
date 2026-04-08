@@ -16,26 +16,50 @@ import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.j
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Known acronyms that should be fully uppercased — mirrors server/insight-enrichment.ts. */
+const ACRONYMS = new Set(['ai', 'ui', 'ux', 'seo', 'ctr', 'gsc', 'ga4', 'api', 'url', 'roi', 'cms']);
+
+function titleCaseWord(word: string): string {
+  return ACRONYMS.has(word.toLowerCase())
+    ? word.toUpperCase()
+    : word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/** GA4/GSC placeholder values that should be treated as missing (no real title). */
+const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
+
 /**
  * Converts a URL slug to a readable title.
- * e.g. "https://example.com/blog/seo-tips" → "Seo Tips"
+ * e.g. "https://example.com/blog/seo-tips" → "SEO Tips"
  */
 export function cleanSlugToTitle(url: string | null): string {
   if (!url) return 'Unknown Page';
+
+  // Root path = homepage
+  if (url === '/') return 'Home';
+
   try {
     const parsed = new URL(url);
     const parts = parsed.pathname.replace(/\/$/, '').split('/').filter(Boolean);
-    const slug = parts[parts.length - 1] ?? parsed.hostname;
+    if (parts.length === 0) return 'Home';
+    const slug = parts[parts.length - 1];
     return slug
       .replace(/[-_]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .trim() || 'Unknown Page';
+      .split(' ')
+      .map(titleCaseWord)
+      .join(' ')
+      .trim() || 'Home';
   } catch {
-    // Not a valid URL — try treating the string as a slug directly
-    return url
-      .replace(/[-_/]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .trim() || 'Unknown Page';
+    // Not a valid URL — treat as a path and take the last segment (mirrors server behavior)
+    const segments = url.replace(/\/$/, '').split('/').filter(Boolean);
+    if (segments.length === 0) return 'Home';
+    const slug = segments[segments.length - 1];
+    return slug
+      .replace(/[-_]/g, ' ')
+      .split(' ')
+      .map(titleCaseWord)
+      .join(' ')
+      .trim() || 'Home';
   }
 }
 
@@ -46,7 +70,10 @@ export function cleanSlugToTitle(url: string | null): string {
  * Exported for unit testing.
  */
 export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
-  const title = insight.pageTitle ?? cleanSlugToTitle(insight.pageId);
+  const rawTitle = insight.pageTitle;
+  const title = (rawTitle && !GA_PLACEHOLDER_RE.test(rawTitle))
+    ? rawTitle
+    : cleanSlugToTitle(insight.pageId);
   const data = insight.data as Record<string, unknown>;
 
   let headline = '';

@@ -3,6 +3,7 @@ import {
   Sparkles, Activity, FileText, Search,
 } from 'lucide-react';
 import { MonthlyDigest } from './MonthlyDigest';
+import { IntelligenceSummaryCard } from './IntelligenceSummaryCard';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
 import { StatCard, MetricRing } from '../ui';
@@ -276,6 +277,13 @@ export function OverviewTab({
       <MonthlyDigest workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
 
+    {/* Intelligence summary — insights, pipeline, win rate */}
+    {ws.siteIntelligenceClientView !== false && (
+    <ErrorBoundary label="Intelligence Summary">
+      <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
+    </ErrorBoundary>
+    )}
+
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       {/* Left column (3/5) — Insights feed */}
@@ -298,6 +306,7 @@ export function OverviewTab({
             isEventPinned={isEventPinned}
             workspaceId={workspaceId}
             contentPlanSummary={contentPlanSummary}
+            siteIntelligenceEnabled={ws.siteIntelligenceClientView !== false}
           />
         </ErrorBoundary>
 

@@ -253,7 +253,7 @@ export function ROIDashboard({ workspaceId, tier }: ROIDashboardProps) {
                         {item.status === 'published' ? 'Published' : 'Delivered'}
                       </span>
                       {item.source === 'matrix' && (
-                        <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400">
+                        <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400">
                           <Layers className="w-2.5 h-2.5" /> Content Plan
                         </span>
                       )}

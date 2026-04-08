@@ -8,6 +8,7 @@ import { notifyAuditAlert, notifyClientAuditComplete } from './email.js';
 import { applySuppressionsToAudit } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 
 const log = createLogger('scheduled-audit');
 
@@ -205,6 +206,9 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       }
       return { modified: 0 };
     });
+
+    // Invalidate intelligence cache so next query gets fresh data
+    invalidateIntelligenceCache(ws.id);
 
     // Check for score drop using suppressed score
     if (oldScore !== undefined && oldScore > effectiveAudit.siteScore) {

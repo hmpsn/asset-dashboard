@@ -51,7 +51,7 @@ router.get(
         }
       }
 
-      const intelligence = await buildWorkspaceIntelligence(workspaceId, {
+      const intelligence = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok: admin endpoint, intentionally assembles all slices when no param provided
         slices,
         pagePath: pagePath || undefined,
         learningsDomain: learningsDomain || undefined,

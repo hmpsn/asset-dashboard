@@ -66,6 +66,10 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
       'bridge-client-signal',
     ],
   },
+  {
+    label: 'Platform Intelligence Enhancements',
+    keys: ['smart-placeholders', 'client-brand-section', 'seo-editor-unified'],
+  },
 ];
 
 const FLAG_LABELS: Record<string, string> = {
@@ -106,6 +110,10 @@ const FLAG_LABELS: Record<string, string> = {
   'bridge-annotation-to-insight':    '#14: Annotation → insight correlation',
   'bridge-audit-site-health':        '#15: Audit → site health insight',
   'bridge-client-signal':            '#16: Client feedback → signal insights',
+  // Platform Intelligence Enhancements
+  'smart-placeholders':   'Smart placeholders (admin chips + client ghost text)',
+  'client-brand-section': 'Client portal — Brand tab (business profile)',
+  'seo-editor-unified':   'SEO editor — merged static + CMS with collection filter',
 };
 
 const SOURCE_LABEL: Record<FlagMeta['source'], string> = {

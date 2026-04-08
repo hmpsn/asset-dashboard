@@ -50,6 +50,12 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // Pre-built rate limiters
+//
+// ⚠️  globalPublicLimiter, publicApiLimiter, and publicWriteLimiter are applied globally
+// in server/app.ts for ALL /api/public/ routes (POST/PATCH/DELETE for the write limiter).
+// Never apply them again inside individual route files — all three share the same
+// rateLimitBuckets map, so a second application increments the counter twice,
+// silently halving the effective limit.
 export const loginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute
 export const publicApiLimiter = rateLimit(60 * 1000, 60);
 export const publicWriteLimiter = rateLimit(60 * 1000, 10);

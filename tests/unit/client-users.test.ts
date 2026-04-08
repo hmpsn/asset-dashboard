@@ -1,7 +1,7 @@
 /**
  * Unit tests for server/client-users.ts — client user CRUD, JWT, password reset.
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   createClientUser,
   getClientUserById,
@@ -23,6 +23,32 @@ import {
 
 const WS_ID = 'ws_test_client_users';
 const createdIds: string[] = [];
+
+// Fixed workspace IDs (not Date.now()-suffixed) can accumulate residual rows when a
+// prior run crashes before afterAll fires. Wipe them clean before each run.
+const FIXED_TEST_WORKSPACES = [
+  WS_ID,
+  WS_ID + '_upper',
+  WS_ID + '_a',
+  WS_ID + '_b',
+  WS_ID + '_inv',
+  WS_ID + '_read',
+  WS_ID + '_upd',
+  WS_ID + '_verify',
+  WS_ID + '_changepw',
+  WS_ID + '_jwt',
+  WS_ID + '_del',
+  WS_ID + '_login',
+];
+
+beforeAll(() => {
+  for (const ws of FIXED_TEST_WORKSPACES) {
+    const users = listClientUsers(ws);
+    for (const u of users) {
+      try { deleteClientUser(u.id); } catch { /* skip */ }
+    }
+  }
+});
 
 afterAll(() => {
   for (const id of createdIds) {
