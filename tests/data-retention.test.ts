@@ -36,9 +36,10 @@ describe('data-retention cleanup functions', () => {
 
 describe('data-retention cron lifecycle', () => {
   it('startDataRetentionCrons is idempotent', () => {
-    startDataRetentionCrons();
-    startDataRetentionCrons();
-    stopDataRetentionCrons();
-    expect(true).toBe(true);
+    expect(() => {
+      startDataRetentionCrons();
+      startDataRetentionCrons();
+      stopDataRetentionCrons();
+    }).not.toThrow();
   });
 });
