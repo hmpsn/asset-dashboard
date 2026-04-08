@@ -1521,6 +1521,12 @@ router.patch('/api/voice/:wsId', requireWorkspaceAccess('wsId'), (req, res) => {
   if (!result) return res.status(500).json({ error: 'Update failed' });
   res.json(result);
 });
+// ⚠️ Cache invalidation required: when req.body.status === 'calibrated', call
+// clearSeoContextCache(req.params.workspaceId) (or equivalent) so that downstream
+// intelligence consumers (Page Strategy, Copy Pipeline, Admin Chat) immediately see
+// the updated voice context on their next request. Without this, old cached context
+// persists and the new voice profile doesn't take effect until TTL expires.
+// See workspace-intelligence.ts for the cache invalidation API.
 
 // Add voice sample
 router.post('/api/voice/:wsId/samples', requireWorkspaceAccess('wsId'), (req, res) => {
@@ -1745,6 +1751,19 @@ Expected: No errors. Existing features continue to work (voice profile is additi
 git add server/seo-context.ts
 git commit -m "feat: extend seo-context with brandscript, voice profile, and identity context builders"
 ```
+
+- [ ] **Step 5 (post-Phase 1): Extend WorkspaceIntelligence seoContext slice to include structured VoiceDNA**
+
+> **Prerequisite:** Phase 1 must be merged and the `voice_profiles` table must exist before this step runs.
+
+After Phase 1 ships, update `assembleSeoContext()` in `server/workspace-intelligence.ts` to include structured VoiceDNA data in the returned `seoContext` slice:
+
+- Import `getLatestVoiceProfile` (or equivalent) from `server/voice-calibration.ts`
+- If a calibrated voice profile exists for the workspace, include a `voiceDNA` field in the `seoContext` slice — structured as `{ personalityTraits, toneSpectrum, sentenceStyle, vocabularyLevel, guardrails }` — alongside the existing plain-text `brandVoice`
+- This allows Phase 3 (Copy Pipeline) to consume structured voice rules through the unified intelligence layer rather than calling `buildVoiceProfileContext()` separately
+- Only include `voiceDNA` when `profile.status === 'calibrated'`; fall back to plain-text `brandVoice` otherwise
+
+**Dependency:** This step is a hard dependency for Phase 3 (Copy Pipeline). Phase 3 implementers must not read `buildVoiceProfileContext()` directly — they must use `buildWorkspaceIntelligence()` with the extended `seoContext` slice.
 
 ---
 
@@ -2247,3 +2266,11 @@ The plan's Task 9 (now Task 9/10 depending on renumbering) introduces sub-tab na
 | 7 | `JSON.parse` → `parseJsonFallback()` | Tasks 3-6 row converters | All JSON column reads |
 | 8 | Task 16 not in guardrails | Documentation only | No structural change |
 | 9 | TabBar component for BrandHub | Task 9/15 | Use UI primitive |
+
+---
+
+## Intelligence Layer Forward Compatibility
+
+- Phase 1 uses `buildSeoContext()` directly in the Brandscript Service — this is intentional and acceptable for Phase 1, which is the foundational phase predating the unified intelligence layer.
+- Phase 2 (Page Strategy) and Phase 3 (Copy Pipeline) must NOT follow this pattern — they must use `buildWorkspaceIntelligence()` with appropriate slices.
+- The `VoiceDNA` output from Phase 1 is consumed by Phase 3 via the extended `seoContext` slice (see Task 7 Step 5 above) — not via direct `buildVoiceProfileContext()` calls.
