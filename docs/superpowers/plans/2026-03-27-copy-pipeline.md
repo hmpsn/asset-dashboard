@@ -794,6 +794,40 @@ git commit -m "feat: add copy review service with section CRUD, steering, and st
 
 - [ ] **Step 1: Write the copy generation service**
 
+> **PATCH NOTE — WorkspaceIntelligence layer:** Use `buildWorkspaceIntelligence()` instead of separate builder calls in `buildCopyGenerationContext()`. The reference implementation below uses individual calls to `getBrandscript()`, `getVoiceProfile()`, `getDeliverables()`, etc. — **replace those** with a single `buildWorkspaceIntelligence()` call:
+>
+> ```typescript
+> import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+>
+> const intelligence = await buildWorkspaceIntelligence(workspaceId, {
+>   slices: ['seoContext', 'insights', 'learnings', 'contentPipeline'],
+>   pagePath: entry.pagePath, // enables per-page insight filtering
+> });
+> ```
+>
+> This replaces the separate calls to `getBrandscript()`, `getVoiceProfile()`, `getVoiceSamples()`, `getDeliverables()`, and `buildSeoContext()` in `buildCopyGenerationContext()`. Single DB round-trip, uses the LRU cache, consistent context. The `seoContext` slice (after Phase 1 ships) includes structured VoiceDNA, brandscript, and identity — no need to call those builders separately. Extract relevant fields from `intelligence.seoContext` wherever the reference implementation calls those functions directly.
+>
+> **Intelligence-Informed Copy Generation** — inject the following additional signals into the per-page AI prompt before `buildGenerationPrompt()`:
+>
+> 1. **Page-specific diagnostic insights → targeted copy direction**
+>    Filter `intelligence.insights` for insights scoped to the current page path. For each matching insight, inject:
+>    - `content_decay` → "This page has been losing ranking position for [keyword]. The copy should reinforce keyword focus and add depth on [topic]."
+>    - `ctr_opportunity` → "This page ranks position [N] for [query] but has below-benchmark CTR. The opening section and headline need to be more compelling to improve click-through."
+>    - `ranking_opportunity` → "This page is at position [N] for [query] with high impressions. A focused push on this keyword could yield significant traffic gains."
+>
+> 2. **SERP opportunity insights → copy structure**
+>    If a `serp_opportunity` insight exists for this page (eligible for FAQ schema, HowTo schema, etc.):
+>    - Inject: "Structure this content to support [schema type] markup. [For FAQ: use natural Q&A format with clear question headings. For HowTo: use numbered steps with clear action verbs.]"
+>    - This makes copy structure and schema eligibility coordinated by design, not retrofitted.
+>
+> 3. **Client signal approval patterns → generation style**
+>    From `intelligence.clientSignals`, extract approval pattern signals (what content the client has consistently approved vs. rejected). Inject a brief style guidance note: "Based on prior client approvals, this client responds best to [direct/formal/conversational] register with [short/longer] sentences. Avoid [rejected patterns]."
+>
+> 4. **Learnings → proven copy patterns**
+>    From `intelligence.learnings`, extract outcome patterns related to content published for this workspace. Inject: "Content with these characteristics has produced measurable results for this workspace: [patterns]. Factor this into copy structure and keyword treatment."
+>
+> Add these signals as a new context layer (e.g., "Layer 8.5: Live Intelligence") in `buildCopyGenerationContext()`, inserted after the existing learned patterns layer and before the accumulated steering layer.
+
 This is the core engine. It assembles the 8-layer context prompt, generates copy for all sections at once, runs the quality check, and saves results.
 
 ```typescript
@@ -1555,7 +1589,24 @@ export function getPatternsForPromotion(workspaceId: string): CopyIntelligencePa
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Expose `buildCopyIntelligenceContext()` for use in generation prompts**
+
+> **PATCH NOTE — wire the learning loop:** The service above extracts patterns and stores them, but they must also be explicitly fed back into Task 5's generation prompts to close the loop. Without this wiring, copy intelligence is write-only.
+>
+> Add a `buildCopyIntelligenceContext(workspaceId, pageType)` function to `server/seo-context.ts` (following the pattern of other builder functions in that file). Task 5 (`copy-generation.ts`) must call this function before generating copy for each page, and inject the result into the generation prompt:
+>
+> ```
+> PATTERNS FROM SUCCESSFUL COPY FOR THIS WORKSPACE:
+> [extracted patterns: vocabulary themes, structural approaches, tone markers that client approved]
+>
+> Generate copy that incorporates these learned patterns while remaining unique to this page.
+> ```
+>
+> This function is already partially specified in Task 7 below (`buildCopyIntelligenceContext`) — ensure Task 5 imports and calls it. The call in Task 5's Layer 7 context block (using `getActivePatterns()` directly) should be replaced with a call to `buildCopyIntelligenceContext()` once Task 7 ships it via `seo-context.ts`.
+>
+> **Acceptance criterion:** Approved copy for workspace B reflects learned patterns from workspace B's prior approved copy. Verify by: (1) approving copy with a distinctive steering note, (2) triggering pattern extraction, (3) generating new copy for a different entry in the same workspace, (4) confirming the AI prompt includes the extracted pattern.
+
+- [ ] **Step 3: Commit**
 
 ```bash
 git add server/copy-intelligence.ts
@@ -2077,6 +2128,15 @@ const SECTION_TYPE_TO_CONTEXT_TAG: Record<string, string> = {
 
 **Cap:** Max 3 copy_approved samples per context_tag per voice profile.
 
+> **PATCH NOTE — close the full loop:** After calling `addVoiceSample()`, also call `clearSeoContextCache(workspaceId)` to invalidate the LRU cache so future copy generations pick up the new voice sample immediately. Without this cache bust, the voice profile doesn't update for the current session.
+>
+> This task closes the complete learning loop:
+> **Discovery → Voice Calibration → Blueprint → Copy Generation → Approval → Voice Sample → better future Copy Generation**
+>
+> Without this task, the voice profile never grows from real-world copy work.
+>
+> **Implementation requirement:** Phase 1's `addVoiceSample()` must be importable from `server/voice-calibration.ts`. Phase 3 agents must NOT implement their own voice sample storage logic — import from Phase 1 only.
+
 ---
 
 ## Task 17: Voice Feedback Loop (Enhancement 9)
@@ -2196,3 +2256,41 @@ When brandscript is approved:
 - [ ] **Step 5: Verify seo-context.ts includes copy intelligence in fullContext**
 - [ ] **Step 6: Verify UI renders — copy review panel, batch controls, export panel**
 - [ ] **Step 7: End-to-end test: generate → review → approve → export CSV**
+- [ ] **Step 8 (intelligence loop): Approve a copy section → confirm voice sample was added → generate new copy for a different entry → confirm AI prompt includes learned patterns**
+
+---
+
+## Intelligence Layer Integration Notes
+
+> These notes document how Phase 3 depends on the WorkspaceIntelligence layer and prior phases. Read before dispatching implementation agents.
+
+**WorkspaceIntelligence dependency:**
+- Copy generation (`copy-generation.ts`) uses `buildWorkspaceIntelligence()` from `server/workspace-intelligence.ts`
+- Requires Phase 1 (Brandscript) to be shipped and merged so `seoContext` includes VoiceDNA, brandscript, and identity
+- Requires Phase 2 (Page Strategy) to be shipped and merged so blueprint entries and briefs exist and are queryable
+- Do NOT start Phase 3 implementation until both Phase 1 and Phase 2 are merged and green on staging
+
+**Per-page insight injection (Patch 2 above):**
+- Requires `pagePath` to be stored on blueprint entries — Phase 2 must write the target page path onto each `blueprint_entries` row
+- If `pagePath` is missing from Phase 2 entries, per-page insight filtering will not work; fall back to injecting all workspace-level insights unfiltered
+
+**Approved copy → voice sample feedback (Task 16 / Patch 4):**
+- Requires Phase 1's `addVoiceSample()` to be importable from `server/voice-calibration.ts`
+- Phase 3 agents must NOT implement their own voice sample storage logic — import from Phase 1 only
+- Also requires `clearSeoContextCache(workspaceId)` to be exported from `server/workspace-intelligence.ts` or `server/seo-context.ts`
+
+**Copy Intelligence context builder (Patch 3):**
+- `buildCopyIntelligenceContext(workspaceId, pageType)` should be added to `server/seo-context.ts`, following the pattern of `buildBlueprintContext()` and other builder functions in that file
+- Once added, Task 5's Layer 7 context block should call this function rather than calling `getActivePatterns()` directly
+
+**Dependency chain (strict order):**
+
+```
+Phase 1 (Brandscript + Voice Calibration) — must be merged + green on staging
+  ↓
+Phase 2 (Page Strategy + Blueprint) — must be merged + green on staging
+  ↓
+Phase 3 (Copy Pipeline) — this plan
+```
+
+No phase may start implementation until the prior phase is merged and CI is green on staging. Use `<FeatureFlag flag="copyPipeline">` to dark-launch Phase 3 UI until the full pipeline is verified end-to-end.
