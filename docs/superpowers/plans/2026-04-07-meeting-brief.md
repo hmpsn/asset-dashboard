@@ -41,6 +41,59 @@
 
 ---
 
+## Dependency Graph + Parallelization
+
+Tasks must execute in these batches. Never start a batch until all previous batch tasks are committed.
+
+```
+Batch A (sequential foundation):
+  Task 1 — DB Migration
+
+Batch B (parallel, both depend only on Task 1):
+  Task 2 — Shared Types
+  Task 3 — WS Event Constant
+
+Batch C (parallel, all depend on Task 2):
+  Task 4 — Server DB Store          [owns: server/meeting-brief-store.ts]
+  Task 7 — Query Keys + API Client  [owns: src/lib/queryKeys.ts, src/api/meetingBrief.ts]
+  Task 9 — Route + Nav Wiring       [owns: src/routes.ts, Sidebar, Breadcrumbs, CommandPalette]
+  Task 10 — Core Components         [owns: src/components/admin/MeetingBrief/AtAGlanceStrip.tsx, BriefSection.tsx, RecommendationsList.tsx, BlueprintProgress.tsx]
+
+  ⚠ Diff review checkpoint after Batch C before proceeding.
+
+Batch D (parallel):
+  Task 5 — Server Generator          [depends on Task 4; owns: server/meeting-brief-generator.ts]
+  Task 8 — Hook + WsInvalidation     [depends on Task 7 + Task 3; owns: useAdminMeetingBrief.ts, useWsInvalidation.ts, hooks/admin/index.ts]
+
+Batch E (sequential):
+  Task 6 — Server Routes + app.ts    [depends on Task 5]
+
+Batch F (sequential):
+  Task 11 — BriefHeader + MeetingBriefPage  [depends on Task 10 + Task 8]
+
+Batch G (sequential — final wiring):
+  Task 12 — App.tsx + Quality Gates  [depends on everything]
+```
+
+### Model assignments
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Task 1 — Migration | (none) | Pure SQL |
+| Task 2 — Types | Haiku | Mechanical type definitions |
+| Task 3 — WS Event | Haiku | One-liner constant additions |
+| Task 4 — DB Store | Sonnet | Prepared statement patterns + mapper |
+| Task 5 — Generator | **Opus** | AI prompt quality, intelligence assembly logic, hash strategy — requires judgment |
+| Task 6 — Routes | Sonnet | Standard route pattern + error handling |
+| Task 7 — Query Keys + API | Haiku | Mechanical wiring |
+| Task 8 — Hook + WsInvalidation | Haiku | Mechanical wiring |
+| Task 9 — Nav Wiring | Haiku | 4 mechanical additions |
+| Task 10 — Components | Sonnet | Tailwind + component logic |
+| Task 11 — MeetingBriefPage | Sonnet | Multi-state composition |
+| Task 12 — App.tsx + QA | Sonnet | Final wiring + quality gates |
+
+---
+
 ## Task 1: DB Migration
 
 **Files:**
@@ -175,15 +228,13 @@ In `server/ws-events.ts`, add to the `WS_EVENTS` object (after `INSIGHT_BRIDGE_U
 MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 ```
 
-- [ ] **Step 2: Add frontend mirror**
+- [ ] **Step 2: Add to frontend copy**
 
-In `src/lib/wsEvents.ts` (the frontend copy), add the same constant:
+`src/lib/wsEvents.ts` is a **separate copy** (not a re-export). Add the same constant to `WS_EVENTS` in that file:
 
 ```typescript
 MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 ```
-
-> Note: Check if `src/lib/wsEvents.ts` re-exports from the server file or is a separate copy. If separate, update both. If it imports from server, no change needed on the frontend side.
 
 - [ ] **Step 3: Commit**
 
@@ -721,7 +772,87 @@ Then register it alongside the other `app.use()` calls (after `intelligenceRoute
 app.use(meetingBriefRouter);
 ```
 
-- [ ] **Step 3: Type-check**
+- [ ] **Step 3: Write route integration tests**
+
+Create `server/tests/meeting-brief-routes.test.ts`:
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import request from 'supertest';
+import { createApp } from '../app.js';
+import db from '../db/index.js';
+
+// Mock the generator to avoid real AI calls in tests
+vi.mock('../meeting-brief-generator.js', () => ({
+  generateMeetingBrief: vi.fn().mockResolvedValue({
+    workspaceId: 'test-ws-routes',
+    generatedAt: '2026-04-07T12:00:00Z',
+    situationSummary: 'Test summary.',
+    wins: ['Win 1'],
+    attention: ['Issue 1'],
+    recommendations: [{ action: 'Do something', rationale: 'Because' }],
+    blueprintProgress: null,
+    metrics: { siteHealthScore: 80, openRankingOpportunities: 3, contentInPipeline: 2, overallWinRate: 65, criticalIssues: 1 },
+  }),
+}));
+
+const WS_ID = 'test-ws-routes';
+let app: ReturnType<typeof createApp>;
+
+beforeAll(async () => {
+  app = await createApp();
+  // Ensure workspace exists for requireWorkspaceAccess
+  db.prepare(`INSERT OR IGNORE INTO workspaces (id, name) VALUES (?, ?)`).run(WS_ID, 'Test Workspace');
+});
+
+afterAll(() => {
+  db.prepare('DELETE FROM meeting_briefs WHERE workspace_id = ?').run(WS_ID);
+  db.prepare('DELETE FROM workspaces WHERE id = ?').run(WS_ID);
+});
+
+describe('GET /api/workspaces/:workspaceId/meeting-brief', () => {
+  it('returns null brief when none exists', async () => {
+    const res = await request(app)
+      .get(`/api/workspaces/${WS_ID}/meeting-brief`)
+      .set('x-auth-token', process.env.APP_PASSWORD ?? 'test');
+    expect(res.status).toBe(200);
+    expect(res.body.brief).toBeNull();
+  });
+});
+
+describe('POST /api/workspaces/:workspaceId/meeting-brief/generate', () => {
+  it('generates and returns a brief', async () => {
+    const res = await request(app)
+      .post(`/api/workspaces/${WS_ID}/meeting-brief/generate`)
+      .set('x-auth-token', process.env.APP_PASSWORD ?? 'test');
+    expect(res.status).toBe(200);
+    expect(res.body.brief).not.toBeNull();
+    expect(res.body.brief.situationSummary).toBe('Test summary.');
+    expect(res.body.brief.wins).toHaveLength(1);
+    expect(res.body.brief.metrics.siteHealthScore).toBe(80);
+  });
+
+  it('GET returns the brief after generation', async () => {
+    const res = await request(app)
+      .get(`/api/workspaces/${WS_ID}/meeting-brief`)
+      .set('x-auth-token', process.env.APP_PASSWORD ?? 'test');
+    expect(res.status).toBe(200);
+    expect(res.body.brief).not.toBeNull();
+  });
+});
+```
+
+> Note: If `createApp` is not an exported factory function in `server/app.ts`, check how other route tests import the Express app — mirror the same pattern. Look at an existing test file in `server/tests/` for the import convention.
+
+- [ ] **Step 4: Run route tests**
+
+```bash
+npx vitest run server/tests/meeting-brief-routes.test.ts
+```
+
+Expected: PASS (3 tests).
+
+- [ ] **Step 5: Type-check**
 
 ```bash
 npx tsc --noEmit --skipLibCheck
@@ -729,11 +860,11 @@ npx tsc --noEmit --skipLibCheck
 
 Expected: zero errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add server/routes/meeting-brief.ts server/app.ts
-git commit -m "feat(server): add meeting brief GET + POST/generate routes"
+git add server/routes/meeting-brief.ts server/app.ts server/tests/meeting-brief-routes.test.ts
+git commit -m "feat(server): add meeting brief GET + POST/generate routes with integration tests"
 ```
 
 ---
@@ -1229,7 +1360,14 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           icon={FileText}
           title="Couldn't load brief"
           description="Something went wrong loading the meeting brief. Try again."
-          action={{ label: 'Retry', onClick: () => window.location.reload() }}
+          action={
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+            >
+              Retry
+            </button>
+          }
         />
       </SectionCard>
     );
@@ -1242,11 +1380,15 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           icon={FileText}
           title="No meeting brief yet"
           description="Generate a brief before your next client call. Takes about 10 seconds."
-          action={{
-            label: isGenerating ? 'Generating…' : 'Generate First Brief',
-            onClick: () => generate(),
-            disabled: isGenerating,
-          }}
+          action={
+            <button
+              onClick={() => generate()}
+              disabled={isGenerating}
+              className="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? 'Generating…' : 'Generate First Brief'}
+            </button>
+          }
         />
         {isGenerating && (
           <div className="mt-6">
@@ -1301,7 +1443,92 @@ export function MeetingBriefPage({ workspaceId }: Props) {
 }
 ```
 
-- [ ] **Step 3: Type-check**
+- [ ] **Step 3: Write component tests**
+
+Create `src/components/admin/MeetingBrief/__tests__/MeetingBriefPage.test.tsx`:
+
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MeetingBriefPage } from '../MeetingBriefPage';
+import type { MeetingBrief } from '../../../../../shared/types/meeting-brief.js';
+
+// Mock the hook to control state in tests
+vi.mock('../../../../hooks/admin/useAdminMeetingBrief', () => ({
+  useAdminMeetingBrief: vi.fn(),
+}));
+
+import { useAdminMeetingBrief } from '../../../../hooks/admin/useAdminMeetingBrief';
+const mockHook = vi.mocked(useAdminMeetingBrief);
+
+const SAMPLE_BRIEF: MeetingBrief = {
+  workspaceId: 'test-ws',
+  generatedAt: new Date().toISOString(),
+  situationSummary: 'Your site is gaining momentum.',
+  wins: ['Ranking improved for /services'],
+  attention: ['Content decay on /blog/old'],
+  recommendations: [{ action: 'Refresh /blog/old', rationale: 'Losing traffic' }],
+  blueprintProgress: null,
+  metrics: { siteHealthScore: 87, openRankingOpportunities: 4, contentInPipeline: 3, overallWinRate: 72, criticalIssues: 2 },
+};
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider client={new QueryClient()}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+
+describe('MeetingBriefPage', () => {
+  it('shows empty state when no brief exists', () => {
+    mockHook.mockReturnValue({ brief: null, isLoading: false, isError: false, generate: vi.fn(), isGenerating: false, generateError: null });
+    render(<MeetingBriefPage workspaceId="test-ws" />, { wrapper });
+    expect(screen.getByText(/No meeting brief yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generate First Brief/i)).toBeInTheDocument();
+  });
+
+  it('shows skeleton while loading', () => {
+    mockHook.mockReturnValue({ brief: null, isLoading: true, isError: false, generate: vi.fn(), isGenerating: false, generateError: null });
+    const { container } = render(<MeetingBriefPage workspaceId="test-ws" />, { wrapper });
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+  });
+
+  it('renders brief content when brief exists', () => {
+    mockHook.mockReturnValue({ brief: SAMPLE_BRIEF, isLoading: false, isError: false, generate: vi.fn(), isGenerating: false, generateError: null });
+    render(<MeetingBriefPage workspaceId="test-ws" />, { wrapper });
+    expect(screen.getByText('Your site is gaining momentum.')).toBeInTheDocument();
+    expect(screen.getByText('Ranking improved for /services')).toBeInTheDocument();
+    expect(screen.getByText('Refresh /blog/old')).toBeInTheDocument();
+    expect(screen.getByText('87/100')).toBeInTheDocument();
+  });
+
+  it('hides blueprint section when blueprintProgress is null', () => {
+    mockHook.mockReturnValue({ brief: SAMPLE_BRIEF, isLoading: false, isError: false, generate: vi.fn(), isGenerating: false, generateError: null });
+    render(<MeetingBriefPage workspaceId="test-ws" />, { wrapper });
+    expect(screen.queryByText(/Blueprint Progress/i)).not.toBeInTheDocument();
+  });
+
+  it('shows blueprint section when blueprintProgress is set', () => {
+    const briefWithBlueprint = { ...SAMPLE_BRIEF, blueprintProgress: '3 of 8 pages live.' };
+    mockHook.mockReturnValue({ brief: briefWithBlueprint, isLoading: false, isError: false, generate: vi.fn(), isGenerating: false, generateError: null });
+    render(<MeetingBriefPage workspaceId="test-ws" />, { wrapper });
+    expect(screen.getByText(/Blueprint Progress/i)).toBeInTheDocument();
+    expect(screen.getByText('3 of 8 pages live.')).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 4: Run component tests**
+
+```bash
+npx vitest run src/components/admin/MeetingBrief/__tests__/MeetingBriefPage.test.tsx
+```
+
+Expected: PASS (5 tests).
+
+- [ ] **Step 5: Type-check**
 
 ```bash
 npx tsc --noEmit --skipLibCheck
@@ -1309,11 +1536,11 @@ npx tsc --noEmit --skipLibCheck
 
 Expected: zero errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/components/admin/MeetingBrief/BriefHeader.tsx src/components/admin/MeetingBrief/MeetingBriefPage.tsx
-git commit -m "feat(ui): add BriefHeader and MeetingBriefPage components"
+git add src/components/admin/MeetingBrief/BriefHeader.tsx src/components/admin/MeetingBrief/MeetingBriefPage.tsx src/components/admin/MeetingBrief/__tests__/MeetingBriefPage.test.tsx
+git commit -m "feat(ui): add BriefHeader and MeetingBriefPage components with component tests"
 ```
 
 ---
@@ -1369,6 +1596,60 @@ Expected: zero errors. Verify no `violet`, `indigo`, or `purple` in any new comp
 git add src/App.tsx
 git commit -m "feat(app): wire MeetingBriefPage into admin route renderer"
 ```
+
+---
+
+### Preview Verification (required before PR)
+
+- [ ] **Step 7: Start dev server and navigate to the brief tab**
+
+```bash
+npm run dev:all
+```
+
+Navigate to `/ws/<any-workspaceId>/brief`. Verify:
+- Empty state renders with "Generate First Brief" button
+- Clicking generate shows skeleton + "Analyzing site performance…"
+- After generation, all 6 sections render (summary, At a Glance, wins, attention, recommendations; blueprint hidden)
+- Regenerate button is visible but understated (not a primary CTA)
+- At a Glance numbers are blue (`text-blue-400`)
+- No purple anywhere on the page
+
+Take a screenshot of the populated brief state for PR documentation.
+
+- [ ] **Step 8: Cross-check At a Glance numbers**
+
+Compare `siteHealthScore` displayed in the brief against the Site Audit tab for the same workspace. They should match. If they don't, the generator is pulling from a different slice than the audit displays — investigate before opening the PR.
+
+---
+
+### Open PR
+
+- [ ] **Step 9: Open PR to `staging`** (not `main`)
+
+```bash
+gh pr create --base staging --title "feat: Meeting Brief — Phase 1 Strategic Intelligence Layer" --body "$(cat <<'EOF'
+## Summary
+- Adds Meeting Brief tab (/ws/:workspaceId/brief) with AI-generated client meeting prep
+- New meeting_briefs table (migration 048), server generator using WorkspaceIntelligence, 6 React components
+- Blueprint Progress section ready and wired — currently hidden (null) until Page Strategy Engine ships
+
+## Test plan
+- [ ] Server store tests pass (Task 4)
+- [ ] Generator unit tests pass (Task 5)  
+- [ ] Route integration tests pass (Task 6)
+- [ ] Component tests pass (Task 11)
+- [ ] Full vitest suite passes
+- [ ] tsc + vite build clean
+- [ ] pr-check passes
+- [ ] Preview screenshot: empty state → generate → populated brief
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+Do NOT merge to `main` until staging is verified.
 
 ---
 
