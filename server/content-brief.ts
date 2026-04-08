@@ -14,6 +14,9 @@ import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } fro
 import type { ScrapedPage } from './web-scraper.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
@@ -993,10 +996,24 @@ The outline sections MUST match the following template sections in order. You ma
     }
   } catch { /* intelligence layer not ready — skip */ }
 
+  // Workspace learnings: what content types and strategies historically win
+  let learningsBlock = '';
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    try {
+      const learnings = getWorkspaceLearnings(workspaceId);
+      if (learnings) {
+        const block = formatLearningsForPrompt(learnings, 'content');
+        if (block) {
+          learningsBlock = `\n\n${block}`;
+        }
+      }
+    } catch { /* learnings not available — skip */ }
+  }
+
   // Strategy card context from content request
   const strategyCardBlock = buildStrategyCardBlock(context.strategyCardContext);
 
-  const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
+  const prompt = `Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
@@ -1004,7 +1021,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
 
 Generate a content brief in the following JSON format:
 {
@@ -1089,11 +1106,18 @@ LANGUAGE RULES for the brief itself:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
+  const systemInstructions = 'You are an expert SEO content strategist. Generate a comprehensive content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
+  const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
+
   const aiResult = await callOpenAI({
     model: 'gpt-4.1',
-    messages: [{ role: 'user', content: prompt }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt },
+    ],
     maxTokens: 7000,
     temperature: 0.5,
+    responseFormat: { type: 'json_object' },
     feature: 'content-brief',
     workspaceId,
   });

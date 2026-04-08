@@ -52,6 +52,7 @@ import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -743,11 +744,19 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Helper: call OpenAI for strategy using shared utility
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const callStrategyAI = async (messages: Array<{ role: string; content: string }>, maxTokens: number, _label?: string): Promise<string> => {
+      // Wrap existing system message with buildSystemPrompt for voice DNA + custom notes
+      const wrappedMessages = messages.map((m, i) =>
+        i === 0 && m.role === 'system'
+          ? { ...m, content: buildSystemPrompt(ws.id, m.content) }
+          : m
+      );
+
       const result = await callOpenAI({
         model: 'gpt-4.1-mini',
-        messages: messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+        messages: wrappedMessages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
         maxTokens,
         temperature: 0.3,
+        // No responseFormat: callers expect arrays or objects — instruction-based JSON is safer
         feature: 'keyword-strategy',
         workspaceId: ws.id,
         maxRetries: 3,

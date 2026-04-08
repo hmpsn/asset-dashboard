@@ -17,6 +17,7 @@ import {
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
 import type { SeoIssue } from '../seo-audit.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
@@ -153,7 +154,7 @@ router.post('/api/rewrite-chat/:workspaceId', requireWorkspaceAccess('workspaceI
       issuesBlock = `\n\nAUDIT ISSUES ON THIS PAGE:\n${issueLines.join('\n')}`;
     }
 
-    const systemPrompt = `You are an expert SEO content strategist and copywriter. You are helping rewrite and optimize a specific web page.
+    const baseInstructions = `You are an expert SEO content strategist and copywriter. You are helping rewrite and optimize a specific web page.
 
 Your role:
 - Analyze the current page content and suggest specific rewrites
@@ -174,6 +175,8 @@ Answer Engine Optimization (AEO) principles:
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
 ${formatKeywordsForPrompt(seo)}${formatBrandVoiceForPrompt(seo?.brandVoice)}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`; // bip-ok: intel used for raw seo field access above
+
+    const systemPrompt = buildSystemPrompt(workspaceId, baseInstructions);
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },

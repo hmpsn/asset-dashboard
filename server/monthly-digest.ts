@@ -9,6 +9,7 @@ import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
 
 const log = createLogger('monthly-digest');
 
@@ -129,7 +130,21 @@ async function computeDigest(
     }
   }
 
-  const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics, learningsSummary, recentOutcomesCount);
+  // Top wins from outcome tracking — reuse already-fetched insights, no second DB call
+  let topWinsBlock = '';
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    try {
+      const positiveInsights = insights
+        .filter(i => i.severity === 'positive')
+        .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
+        .slice(0, 3);
+      if (positiveInsights.length > 0) {
+        topWinsBlock = `\nNotable wins this period:\n${positiveInsights.map(i => `- ${i.pageTitle ?? i.insightType}`).join('\n')}`;
+      }
+    } catch { /* insights not available — skip */ }
+  }
+
+  const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics, learningsSummary, recentOutcomesCount, topWinsBlock, ws.id);
 
   const result: MonthlyDigestData = {
     month: monthLabel,
@@ -198,6 +213,8 @@ async function generateDigestSummary(
   metrics: { clicksChange: number; impressionsChange: number; avgPositionChange: number; pagesOptimized: number },
   learningsSummary?: string,
   recentOutcomesCount?: number,
+  topWinsBlock?: string,
+  workspaceId?: string,
 ): Promise<string> {
   const clicksTrend = metrics.clicksChange > 0 ? `+${metrics.clicksChange.toFixed(1)}%` : metrics.clicksChange < 0 ? `${metrics.clicksChange.toFixed(1)}%` : null;
   const impressionsTrend = metrics.impressionsChange > 0 ? `+${metrics.impressionsChange.toFixed(1)}%` : metrics.impressionsChange < 0 ? `${metrics.impressionsChange.toFixed(1)}%` : null;
@@ -220,6 +237,7 @@ Data for ${month}:
 ${recentOutcomesCount !== undefined ? `- ${recentOutcomesCount} tracked outcome${recentOutcomesCount === 1 ? '' : 's'} in workspace learnings` : ''}
 ${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
 ${learningsSummary ? `\nWorkspace outcome learnings:\n${learningsSummary}` : ''}
+${topWinsBlock ?? ''}
 
 Voice rules (follow exactly):
 - Lead with the most interesting metric or outcome — never start with "In [Month]" or "This month"
@@ -230,11 +248,21 @@ Voice rules (follow exactly):
 - Never say "we're on it", "we're working on", "we will", or "rest assured" — the scope of work depends on the client's retainer.
 - 2-3 sentences max. Warm but concise.`;
 
+    const systemPrompt = buildSystemPrompt(
+      workspaceId ?? '',
+      'You are writing a concise monthly performance update for a website client dashboard. Write 2-3 factual, encouraging sentences. No fluff.',
+    );
+
     const result = await callOpenAI({
       model: 'gpt-4.1',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
       maxTokens: 200,
+      temperature: 0.4,
       feature: 'monthly-digest',
+      workspaceId: workspaceId ?? '',
     });
 
     return result.text || fallbackSummary(month, wins.length, issues.length);

@@ -105,6 +105,7 @@ class AIRequestDeduplicator {
     messages: Array<{ role: string; content: string }>;
     temperature?: number;
     maxTokens?: number;
+    responseFormat?: { type: string };
     workspaceId?: string;
     feature?: string;
   }): string {
@@ -113,6 +114,7 @@ class AIRequestDeduplicator {
       messages: params.messages,
       temperature: params.temperature ?? 0.7,
       maxTokens: params.maxTokens,
+      responseFormat: params.responseFormat,
       workspaceId: params.workspaceId,
       feature: params.feature,
     };
