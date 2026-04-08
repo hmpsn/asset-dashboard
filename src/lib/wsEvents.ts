@@ -34,6 +34,7 @@ export const WS_EVENTS = {
   INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
   ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
+  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

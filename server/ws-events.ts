@@ -65,6 +65,9 @@ export const WS_EVENTS = {
   SUGGESTED_BRIEF_UPDATED: 'suggested-brief:updated',
   INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
   ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
+
+  // Meeting Brief
+  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];
