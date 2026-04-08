@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getMeetingBrief, upsertMeetingBrief } from '../meeting-brief-store.js';
+import { getMeetingBrief, upsertMeetingBrief, getMeetingBriefHash } from '../meeting-brief-store.js';
 import type { MeetingBrief } from '../../shared/types/meeting-brief.js';
 
 import db from '../db/index.js';
@@ -40,6 +40,11 @@ describe('meeting-brief-store', () => {
     expect(result!.wins).toHaveLength(2);
     expect(result!.recommendations[0].action).toBe('Refresh /blog/old-post');
     expect(result!.metrics.siteHealthScore).toBe(87);
+  });
+
+  it('retrieves the stored prompt hash', () => {
+    upsertMeetingBrief(SAMPLE_BRIEF, 'abc123');
+    expect(getMeetingBriefHash(WS_ID)).toBe('abc123');
   });
 
   it('overwrites existing brief on second upsert', () => {
