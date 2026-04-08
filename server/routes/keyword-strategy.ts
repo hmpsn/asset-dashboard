@@ -44,6 +44,7 @@ import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
+import type { Workspace } from '../../shared/types/workspace.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -57,6 +58,8 @@ const log = createLogger('keyword-strategy');
 // ── Incremental mode helpers ─────────────────────────────────────
 
 const INCREMENTAL_THRESHOLD_DAYS = 7;
+/** Days before competitor keyword data is considered stale and re-fetched */
+const COMPETITOR_CACHE_DAYS = 7;
 
 /**
  * Split pages into those needing AI analysis vs those with fresh analysis.
@@ -89,6 +92,13 @@ function getPagesNeedingAnalysis<T extends { path: string }>(
     }
   }
   return { toAnalyze, toPreserve };
+}
+
+export function shouldFetchCompetitorData(ws: Workspace): boolean {
+  if (!ws.competitorLastFetchedAt) return true;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - COMPETITOR_CACHE_DAYS);
+  return new Date(ws.competitorLastFetchedAt) < cutoff;
 }
 
 // ── Strategy Intelligence Block ──────────────────────────────────
@@ -554,8 +564,28 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
+    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
+
+    // When skipping competitor fetch, carry forward previously stored data so the
+    // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
+    // Also inject gaps into semrushContext so the AI still sees competitor gap
+    // narrative on cache-hit incremental runs.
+    if (!fetchCompetitors && ws.keywordStrategy?.keywordGaps) {
+      keywordGaps = ws.keywordStrategy.keywordGaps;
+      if (keywordGaps.length > 0) {
+        semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
+        semrushContext += keywordGaps.slice(0, 30).map(g =>
+          `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
+        ).join('\n');
+      }
+    }
+
     if (semrushMode !== 'none' && provider) {
       sendProgress('semrush', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
+      if (!fetchCompetitors) {
+        log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
+        sendProgress('semrush', 'Competitor data still fresh — skipping re-fetch...', 0.58);
+      }
       // Derive domain from baseUrl so provider always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
 
@@ -577,7 +607,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         // Both quick and full: auto-discover competitors if none provided
-        if (competitorDomains.length === 0) {
+        if (fetchCompetitors && competitorDomains.length === 0) {
           try {
             sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
             const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
@@ -597,7 +627,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         // Both quick and full: fetch competitor keywords (their top terms become our keyword pool)
-        if (competitorDomains.length > 0) {
+        if (fetchCompetitors && competitorDomains.length > 0) {
           try {
             const compLimit = semrushMode === 'full' ? 100 : 50;
             sendProgress('semrush', `Fetching competitor keywords (${competitorDomains.length} competitors)...`, 0.58);
@@ -637,7 +667,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         // Both quick and full: keyword gap analysis
-        if (competitorDomains.length > 0) {
+        if (fetchCompetitors && competitorDomains.length > 0) {
           try {
             sendProgress('semrush', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
@@ -653,6 +683,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           } catch (err) {
             log.error({ err: err }, 'Keyword gap error');
           }
+        }
+
+        if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
+          updateWorkspace(ws.id, { competitorLastFetchedAt: new Date().toISOString() });
         }
 
         // Full mode only: related keywords for deeper topic expansion

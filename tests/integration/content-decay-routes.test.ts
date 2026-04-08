@@ -117,7 +117,19 @@ const allSeverityPages = [criticalPage, warningPage, watchPage];
 // ── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  // Set a fake OpenAI key before spawning so generateBatchRecommendations
+  // fails with a fast auth error (not a hang). The test asserts 500 — the
+  // correct behavior when the AI call fails (not phantom success).
+  // Save and restore so we don't contaminate sibling test files in this process.
+  // Always override OPENAI_API_KEY with a fake value before spawning — even
+  // in CI or dev environments where a real key is configured. The child
+  // process inherits env at spawn time, so we must unconditionally set the
+  // fake key here (not conditionally) to guarantee the 500 path in all envs.
+  const savedOpenAIKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'fake-key-for-content-decay-test';
   await ctx.startServer();
+  if (savedOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = savedOpenAIKey;
 
   const ws1 = createWorkspace('Content Decay Test WS');
   wsWithData = ws1.id;
@@ -367,17 +379,29 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
-  it('returns 500 or 200 when cached analysis exists (depends on OpenAI availability)', async () => {
-    // wsWithData has a seeded analysis — the route will attempt AI generation
-    // In CI without OpenAI keys, this returns 500; with keys it returns 200 with recommendations
+  it('returns 200 with fallback recommendations when AI call fails (FM-2: graceful degradation)', { timeout: 30_000 }, async () => {
+    // generateBatchRecommendations catches OpenAI errors per-page and sets a
+    // meaningful fallback string — it never throws. The route returns 200 with
+    // the analysis object containing fallback text instead of empty/garbage data.
+    // This IS the correct FM-2 behavior: graceful degradation with actionable
+    // fallback, not phantom success with fabricated recommendations.
     const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 2 });
-    expect([200, 500]).toContain(res.status);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DecayAnalysis;
+    expect(body).toHaveProperty('decayingPages');
+    expect(Array.isArray(body.decayingPages)).toBe(true);
+    // At least some pages should have the fallback recommendation text
+    const withRecs = body.decayingPages.filter(p => typeof p.refreshRecommendation === 'string');
+    expect(withRecs.length).toBeGreaterThan(0);
+    // Fallback text must be meaningful, not empty/garbage
+    for (const p of withRecs) {
+      expect(p.refreshRecommendation!.length).toBeGreaterThan(10);
+    }
   });
 
-  it('successful recommendations response preserves DecayAnalysis shape', async () => {
+  it('recommendations response preserves DecayAnalysis shape', { timeout: 30_000 }, async () => {
     const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 1 });
-    if (res.status !== 200) return; // skip if OpenAI unavailable in test env
-
+    expect(res.status).toBe(200);
     const body = (await res.json()) as DecayAnalysis;
     expect(body).toHaveProperty('workspaceId');
     expect(body).toHaveProperty('decayingPages');

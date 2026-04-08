@@ -19,6 +19,7 @@ import {
   createWorkspace,
   deleteWorkspace,
   updateWorkspace,
+  getWorkspace,
 } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
 import {
@@ -27,6 +28,7 @@ import {
   upsertAndCleanPageKeywords,
 } from '../../server/page-keywords.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
+import { shouldFetchCompetitorData } from '../../server/routes/keyword-strategy.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
 const ctx = createTestContext(13315);
@@ -295,4 +297,40 @@ describe('HTTP: incremental early-exit response', () => {
   // a mocked sitemap server — out of scope for this integration test file.
   // The unit-level guarantee: if pathArray includes stale paths, they will go to toAnalyze.
   // This is verified by the DB-layer and threshold tests above.
+});
+
+describe('DB-layer: competitorLastFetchedAt stamped after fetch', () => {
+  it('updateWorkspace writes competitorLastFetchedAt and rowToWorkspace reads it back', () => {
+    const ws = createWorkspace('Competitor Stamp Test');
+    const now = new Date().toISOString();
+    updateWorkspace(ws.id, { competitorLastFetchedAt: now });
+    const reloaded = getWorkspace(ws.id);
+    expect(reloaded?.competitorLastFetchedAt).toBe(now);
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns false when fetched < 7 days ago', () => {
+    const ws = createWorkspace('Competitor Cache Test');
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+    updateWorkspace(ws.id, { competitorLastFetchedAt: recent });
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(false); // 2 days old = still fresh
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns true when fetched > 7 days ago', () => {
+    const ws = createWorkspace('Competitor Stale Test');
+    const stale = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(); // 10 days ago
+    updateWorkspace(ws.id, { competitorLastFetchedAt: stale });
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(true); // 10 days old = stale
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns true when never fetched', () => {
+    const ws = createWorkspace('Competitor Never Fetched');
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(true); // no timestamp = always fetch
+    deleteWorkspace(ws.id);
+  });
 });

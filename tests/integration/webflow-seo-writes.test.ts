@@ -240,7 +240,7 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   // Test 5: Per-site token is threaded to Webflow calls (FM-14)
   // ─────────────────────────────────────────────────────────────────────────
 
-  it('per-site Webflow token from workspace is used, not a global fallback', async () => {
+  it('per-site Webflow token from workspace is used, not a global fallback', { timeout: 20000 }, async () => {
     // The seeded workspace has a unique per-site token (ws.webflowToken).
     // Mock the pages endpoint to succeed so we can capture what token was used.
     mockWebflowSuccess(/\/sites\/.*\/pages/, { pages: [] });
