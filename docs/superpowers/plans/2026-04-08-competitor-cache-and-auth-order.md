@@ -283,16 +283,23 @@ beforeAll(async () => {
 
 - [ ] **4b. Rewrite the non-assertive test at line 370**
 
+> **Implementation note:** The plan originally prescribed asserting `expect(res.status).toBe(500)`.
+> This was wrong. `generateBatchRecommendations` (`server/content-decay.ts:271-278`) catches
+> OpenAI errors **per page** and sets a meaningful fallback string — it never throws. The route
+> always returns 200 with fallback recommendations. The correct FM-2 check is asserting 200 +
+> verifying fallback text is meaningful (not empty/garbage). Updated implementation below.
+
 ```typescript
-it('returns 500 when AI call fails (FM-2: no phantom success from failed recommendations)', async () => {
-  // generateBatchRecommendations calls OpenAI. The test server uses a fake key,
-  // so the call fails with auth error. The route must return 500, not a 200 with
-  // empty/garbage recommendations (phantom success).
+it('returns 200 with fallback recommendations when AI call fails (FM-2: graceful degradation)', { timeout: 30_000 }, async () => {
   const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 2 });
-  expect(res.status).toBe(500);
-  const body = await res.json() as { error?: string };
-  expect(typeof body.error).toBe('string');
-  expect(body.error!.length).toBeGreaterThan(0);
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as DecayAnalysis;
+  expect(Array.isArray(body.decayingPages)).toBe(true);
+  const withRecs = body.decayingPages.filter(p => typeof p.refreshRecommendation === 'string');
+  expect(withRecs.length).toBeGreaterThan(0);
+  for (const p of withRecs) {
+    expect(p.refreshRecommendation!.length).toBeGreaterThan(10);
+  }
 });
 ```
 

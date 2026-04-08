@@ -568,8 +568,16 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     // When skipping competitor fetch, carry forward previously stored data so the
     // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
+    // Also inject gaps into semrushContext so the AI still sees competitor gap
+    // narrative on cache-hit incremental runs.
     if (!fetchCompetitors && ws.keywordStrategy?.keywordGaps) {
       keywordGaps = ws.keywordStrategy.keywordGaps;
+      if (keywordGaps.length > 0) {
+        semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
+        semrushContext += keywordGaps.slice(0, 30).map(g =>
+          `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
+        ).join('\n');
+      }
     }
 
     if (semrushMode !== 'none' && provider) {
