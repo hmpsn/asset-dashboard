@@ -33,7 +33,7 @@ export function assembleMeetingBriefMetrics(intel: WorkspaceIntelligence): Meeti
 /** Builds the prompt context string sent to the AI. */
 export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   const top = intel.insights?.topByImpact?.slice(0, 10) ?? [];
-  const wins = intel.learnings?.topWins?.slice(0, 5) ?? [];
+  const wins = intel.learnings?.weCalledIt?.slice(0, 5) ?? [];
   const winRate = intel.learnings?.overallWinRate != null
     ? `${Math.round(intel.learnings.overallWinRate * 100)}%`
     : 'unknown';
@@ -48,7 +48,7 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   ).join('\n');
 
   const winsLines = wins.map(w =>
-    `- ${w.actionType} on ${w.pageUrl ?? 'workspace'}`
+    `- ${w.prediction}`
   ).join('\n');
 
   return `
@@ -101,7 +101,7 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     briefsTotal: intel.contentPipeline?.briefs.total,
     postsTotal: intel.contentPipeline?.posts.total,
     winRate: intel.learnings?.overallWinRate,
-    topWinIds: intel.learnings?.topWins?.slice(0, 5).map(w => w.id) ?? [],
+    weCalledItIds: intel.learnings?.weCalledIt?.slice(0, 5).map(w => w.actionId) ?? [],
     criticalIssues: intel.insights?.bySeverity.critical,
     rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],

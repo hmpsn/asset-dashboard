@@ -52,6 +52,16 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
     overallWinRate: 0.72,
     recentTrend: null,
     playbooks: [],
+    weCalledIt: [
+      {
+        actionId: 'action-1',
+        prediction: 'meta_updated on /about-us',
+        outcome: 'strong_win',
+        score: 'strong_win',
+        pageUrl: '/about-us',
+        measuredAt: '2026-04-01T00:00:00Z',
+      },
+    ],
   },
 };
 
@@ -92,6 +102,11 @@ describe('buildBriefPrompt', () => {
     const prompt = buildBriefPrompt(MOCK_INTELLIGENCE);
     expect(prompt).toContain('83');
     expect(prompt).toContain('72%');
+  });
+
+  it('includes weCalledIt wins in RECENT WINS section', () => {
+    const prompt = buildBriefPrompt(MOCK_INTELLIGENCE);
+    expect(prompt).toContain('meta_updated on /about-us');
   });
 
   it('handles sparse intelligence without crashing', () => {
