@@ -700,7 +700,7 @@ Create `server/meeting-brief-generator.ts`:
 ```typescript
 import { createHash } from 'crypto';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { callOpenAI, parseAIJson } from './openai-helpers.js';
+import { callOpenAI } from './openai-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -742,7 +742,7 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   const strategy = intel.seoContext?.strategy;
 
   const insightLines = top.map(i =>
-    `- [${i.severity.toUpperCase()}] ${i.type}: ${i.pageId ?? 'workspace'} — ${JSON.stringify(i.data).slice(0, 200)}`
+    `- [${i.severity.toUpperCase()}] ${i.insightType}: ${i.pageTitle ?? i.pageId ?? 'workspace'} — ${JSON.stringify(i.data).slice(0, 200)}`
   ).join('\n');
 
   const winsLines = wins.map(w =>
@@ -755,7 +755,7 @@ You are a strategic SEO analyst preparing a client meeting brief. Write in a con
 SITE CONTEXT:
 - Site health score: ${siteScore}${scoreDelta != null ? ` (${scoreDelta > 0 ? '+' : ''}${scoreDelta} from last audit)` : ''}
 - Overall win rate: ${winRate}
-- Strategy focus: ${strategy?.targetKeywords?.slice(0, 5).join(', ') ?? 'not set'}
+- Strategy focus: ${strategy?.siteKeywords?.slice(0, 5).join(', ') ?? 'not set'}
 - Client priorities: ${priorities.length > 0 ? priorities.join('; ') : 'not specified'}
 
 PIPELINE:
@@ -815,13 +815,6 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
     throw new Error('BRIEF_UNCHANGED');
   }
 
-  // Select top 5 insights by impact score to avoid lost-in-the-middle degradation
-  const topInsights = (intel.insights?.topByImpact ?? [])
-    .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
-    .slice(0, 5)
-    .map(i => `- ${i.title}: ${i.summary ?? ''}`)
-    .join('\n');
-
   const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic analyst preparing a client-facing meeting brief. Your output must be valid JSON matching the MeetingBriefAIOutput interface exactly.
 
@@ -834,33 +827,40 @@ Avoid: "Your site health score is 78. You have 12 open insights."
 `.trim());
 
   const prompt = buildBriefPrompt(intel);
-  const messages: { role: 'user' | 'assistant'; content: string }[] = [
+  // callOpenAI takes a single opts object; system prompt is a message with role 'system';
+  // result is { text, promptTokens, ... } — use .text, not the return value directly.
+  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+    { role: 'system', content: systemPrompt },
     { role: 'user', content: prompt },
   ];
-  const raw = await callOpenAI(messages, {
-    system: systemPrompt,
+  const result = await callOpenAI({
+    model: 'gpt-4.1',
+    messages,
     maxTokens: 2000,
     temperature: 0.3,
-    response_format: { type: 'json_object' },
+    feature: 'meeting-brief',
+    workspaceId,
   });
 
   let parsed: MeetingBriefAIOutput;
   try {
-    parsed = JSON.parse(raw) as MeetingBriefAIOutput;
+    parsed = JSON.parse(result.text) as MeetingBriefAIOutput;
   } catch {
     // Retry once with an explicit JSON reminder
-    const retryMessages = [
+    const retryMessages: typeof messages = [
       ...messages,
-      { role: 'assistant' as const, content: raw },
-      { role: 'user' as const, content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
+      { role: 'assistant', content: result.text },
+      { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
     ];
-    const retryRaw = await callOpenAI(retryMessages, {
-      system: systemPrompt,
+    const retryResult = await callOpenAI({
+      model: 'gpt-4.1',
+      messages: retryMessages,
       maxTokens: 2000,
       temperature: 0.1,
-      response_format: { type: 'json_object' },
+      feature: 'meeting-brief',
+      workspaceId,
     });
-    parsed = JSON.parse(retryRaw) as MeetingBriefAIOutput;
+    parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
   }
 
   const aiOutput = parsed;
