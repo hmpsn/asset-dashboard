@@ -23,7 +23,7 @@ describe('callOpenAI response_format', () => {
   it('includes response_format in request body when provided', async () => {
     process.env.OPENAI_API_KEY = 'test-key-for-format-test';
 
-    const { callOpenAI } = await import('../openai-helpers.js');
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation: fetch mock must be in place before module resolves
 
     try {
       await callOpenAI({
@@ -44,7 +44,7 @@ describe('callOpenAI response_format', () => {
 
   it('omits response_format from request body when not provided', async () => {
     process.env.OPENAI_API_KEY = 'test-key-for-format-test';
-    const { callOpenAI } = await import('../openai-helpers.js');
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
 
     try {
       await callOpenAI({
