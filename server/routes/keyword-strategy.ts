@@ -94,7 +94,7 @@ function getPagesNeedingAnalysis<T extends { path: string }>(
   return { toAnalyze, toPreserve };
 }
 
-function shouldFetchCompetitorData(ws: Workspace): boolean {
+export function shouldFetchCompetitorData(ws: Workspace): boolean {
   if (!ws.competitorLastFetchedAt) return true;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - COMPETITOR_CACHE_DAYS);

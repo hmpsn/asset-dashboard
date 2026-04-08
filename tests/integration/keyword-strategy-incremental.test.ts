@@ -28,6 +28,7 @@ import {
   upsertAndCleanPageKeywords,
 } from '../../server/page-keywords.js';
 import type { PageKeywordMap } from '../../shared/types/workspace.js';
+import { shouldFetchCompetitorData } from '../../server/routes/keyword-strategy.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
 const ctx = createTestContext(13315);
@@ -313,9 +314,23 @@ describe('DB-layer: competitorLastFetchedAt stamped after fetch', () => {
     const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
     updateWorkspace(ws.id, { competitorLastFetchedAt: recent });
     const reloaded = getWorkspace(ws.id)!;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 7);
-    expect(new Date(reloaded.competitorLastFetchedAt!) >= cutoff).toBe(true); // still fresh
+    expect(shouldFetchCompetitorData(reloaded)).toBe(false); // 2 days old = still fresh
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns true when fetched > 7 days ago', () => {
+    const ws = createWorkspace('Competitor Stale Test');
+    const stale = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(); // 10 days ago
+    updateWorkspace(ws.id, { competitorLastFetchedAt: stale });
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(true); // 10 days old = stale
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns true when never fetched', () => {
+    const ws = createWorkspace('Competitor Never Fetched');
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(true); // no timestamp = always fetch
     deleteWorkspace(ws.id);
   });
 });
