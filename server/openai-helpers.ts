@@ -217,6 +217,8 @@ interface OpenAIChatOptions {
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
+  /** JSON mode — forces valid JSON output from OpenAI */
+  responseFormat?: { type: 'json_object' };
   /** Label for logging (e.g. 'seo-rewrite', 'schema-gen') */
   feature: string;
   /** Workspace ID for cost tracking */
@@ -244,6 +246,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     messages,
     maxTokens = 1000,
     temperature = 0.7,
+    responseFormat,
     feature,
     workspaceId,
     maxRetries = 3,
@@ -257,6 +260,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
     temperature,
     maxTokens,
+    responseFormat,
     workspaceId,
     feature,
   });
@@ -264,10 +268,10 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   // Use deduplication with 5-minute cache for most requests
   // Skip cache for one-time operations like content generation
   const shouldSkipCache = ['content-brief', 'content-post'].includes(feature);
-  
+
   return aiDeduplicator.deduplicate(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, feature, workspaceId, maxRetries, timeoutMs }),
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs }),
     {
       cacheTtlMs: 5 * 60 * 1000, // 5 minutes
       skipCache: shouldSkipCache,
@@ -287,6 +291,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     messages,
     maxTokens = 1000,
     temperature = 0.7,
+    responseFormat,
     feature,
     workspaceId,
     maxRetries = 3,
@@ -298,6 +303,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     messages,
     max_tokens: maxTokens,
     temperature,
+    ...(responseFormat && { response_format: responseFormat }),
   });
 
   const callStartMs = Date.now();
