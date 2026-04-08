@@ -218,7 +218,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
 
     // Intelligence context: cannibalization + page health + content decay
     let intelligenceBlock = '';
-    if (workspaceId) {
+    if (workspaceId && pagePath) {
       try {
         const allInsights = getInsights(workspaceId);
         // pageId is stored as a full URL (https://domain.com/path) or synthetic key.
@@ -496,11 +496,11 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
         : `Write an SEO title tag (50-60 chars max) for a page titled "${page.title}". Current SEO title: "${page.currentSeoTitle || 'none'}".${contentSection}${keywordBlock}${bvBlock}${extraContext}${brandNote}\n\nRules:\n- HARD LIMIT: 60 characters\n- Front-load the primary keyword\n- Use specific language from the knowledge base, not generic filler${locationRule}\nReturn ONLY the text.`;
 
       const aiText = await callCreativeAI({
-        systemPrompt: 'You are an elite SEO copywriter. Return ONLY the requested text — no quotes, no explanation, no markdown.',
+        systemPrompt: buildSystemPrompt(resolvedWsIdBulk, 'You are an elite SEO copywriter. Return ONLY the requested text — no quotes, no explanation, no markdown.'),
         userPrompt: prompt,
         maxTokens: 150,
         feature: 'seo-bulk-fix',
-        workspaceId: workspaceId || ws?.id || '',
+        workspaceId: resolvedWsIdBulk,
       });
 
       let text = aiText.replace(/^["']|["']$/g, '');
