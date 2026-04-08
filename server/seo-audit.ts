@@ -97,6 +97,7 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
     // Fetch site info for subdomain
     const siteRes = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
     });
     let subdomain: string | null = null;
     if (siteRes.ok) {
@@ -109,6 +110,7 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
     try {
       const domainRes = await fetch(`${WEBFLOW_API}/sites/${siteId}/custom_domains`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
       });
       if (domainRes.ok) {
         const domainData = await domainRes.json() as { customDomains?: { url?: string }[] };
