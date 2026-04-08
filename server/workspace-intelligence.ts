@@ -433,12 +433,17 @@ async function assembleLearnings(
   let topWins: import('../shared/types/outcome-tracking.js').TopWin[] = [];
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('./outcome-tracking.js');
-    // Fetch once — shared by both topWins and weCalledIt to avoid a double DB round-trip.
     const actions = getActionsByWorkspace(workspaceId);
-    topWins = getTopWinsFromActions(actions, 5);
+    // Pre-fetch outcomes for the top 50 actions once, shared between topWins and weCalledIt
+    // to avoid duplicate getOutcomesForAction queries for the same action IDs.
+    const outcomesMap = new Map<string, ActionOutcome[]>();
     for (const action of actions.slice(0, 50)) {
-      if (weCalledIt.length >= 5) break; // guard before DB call to avoid redundant queries
-      const outcomes: ActionOutcome[] = getOutcomesForAction(action.id);
+      outcomesMap.set(action.id, getOutcomesForAction(action.id));
+    }
+    topWins = getTopWinsFromActions(actions, 5, outcomesMap);
+    for (const action of actions.slice(0, 50)) {
+      if (weCalledIt.length >= 5) break;
+      const outcomes = outcomesMap.get(action.id) ?? [];
       const strongWin = outcomes.find(o => o.score === 'strong_win');
       if (strongWin) {
         weCalledIt.push({

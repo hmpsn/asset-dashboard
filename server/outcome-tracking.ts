@@ -374,13 +374,21 @@ export const WIN_SCORES: OutcomeScore[] = ['strong_win', 'win'];
  * Core wins computation from a pre-fetched actions list.
  * Used by getTopWinsForWorkspace and by assembleLearnings (which already holds the actions
  * list from the weCalledIt loop, avoiding a second getActionsByWorkspace call).
+ *
+ * @param outcomesMap Optional pre-fetched outcomes keyed by actionId. When provided, avoids
+ *   re-querying the DB for outcome data already fetched by the caller (e.g. the weCalledIt
+ *   loop in assembleLearnings). Without it, getOutcomesForAction is called per-action.
  */
-export function getTopWinsFromActions(actions: TrackedAction[], limit = 10): TopWin[] {
+export function getTopWinsFromActions(
+  actions: TrackedAction[],
+  limit = 10,
+  outcomesMap?: Map<string, ActionOutcome[]>,
+): TopWin[] {
   const wins: TopWin[] = [];
 
   for (const action of actions.slice(0, 50)) { // guard: avoid unbounded N+1 for workspaces with many actions
     if (wins.length >= limit) break;
-    const outcomes = getOutcomesForAction(action.id);
+    const outcomes = outcomesMap ? (outcomesMap.get(action.id) ?? []) : getOutcomesForAction(action.id);
     for (const outcome of outcomes) {
       if (outcome.score && WIN_SCORES.includes(outcome.score)) {
         wins.push({
