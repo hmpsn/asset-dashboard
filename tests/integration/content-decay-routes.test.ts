@@ -117,7 +117,17 @@ const allSeverityPages = [criticalPage, warningPage, watchPage];
 // ── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  // Set a fake OpenAI key before spawning so generateBatchRecommendations
+  // fails with a fast auth error (not a hang). The test asserts 500 — the
+  // correct behavior when the AI call fails (not phantom success).
+  // Save and restore so we don't contaminate sibling test files in this process.
+  const savedOpenAIKey = process.env.OPENAI_API_KEY;
+  if (!process.env.OPENAI_API_KEY) {
+    process.env.OPENAI_API_KEY = 'fake-key-for-content-decay-test';
+  }
   await ctx.startServer();
+  if (savedOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = savedOpenAIKey;
 
   const ws1 = createWorkspace('Content Decay Test WS');
   wsWithData = ws1.id;
@@ -367,11 +377,15 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
-  it('returns 500 or 200 when cached analysis exists (depends on OpenAI availability)', async () => {
-    // wsWithData has a seeded analysis — the route will attempt AI generation
-    // In CI without OpenAI keys, this returns 500; with keys it returns 200 with recommendations
+  it('returns 500 when AI call fails (FM-2: no phantom success from failed recommendations)', async () => {
+    // generateBatchRecommendations calls OpenAI. The test server uses a fake key,
+    // so the call fails with auth error. The route must return 500, not a 200 with
+    // empty/garbage recommendations (phantom success).
     const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 2 });
-    expect([200, 500]).toContain(res.status);
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error?: string };
+    expect(typeof body.error).toBe('string');
+    expect(body.error!.length).toBeGreaterThan(0);
   });
 
   it('successful recommendations response preserves DecayAnalysis shape', async () => {

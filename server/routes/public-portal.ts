@@ -525,7 +525,7 @@ const clientBusinessProfileSchema = z.object({
   numberOfEmployees: z.string().max(50).optional(),
 });
 
-router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusinessProfileSchema), (req, res) => {
+router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
   const wsId = req.params.id;
   const sessionToken = req.cookies?.[`client_session_${wsId}`];
   const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
@@ -535,15 +535,20 @@ router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusin
     return res.status(401).json({ error: 'Authentication required' });
   }
 
+  const parsed = clientBusinessProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues.map(i => i.message).join(', ') });
+  }
+
   const existing = getWorkspace(wsId);
   if (!existing) return res.status(404).json({ error: 'Workspace not found' });
   const existingProfile = existing.businessProfile ?? {};
   const mergedProfile = {
     ...existingProfile,
-    ...req.body,
+    ...parsed.data,
     // Deep-merge address sub-object so partial address PATCHes don't wipe sibling fields
-    ...(req.body.address !== undefined
-      ? { address: { ...(existingProfile.address ?? {}), ...req.body.address } }
+    ...(parsed.data.address !== undefined
+      ? { address: { ...(existingProfile.address ?? {}), ...parsed.data.address } }
       : {}),
   };
   const ws = updateWorkspace(wsId, { businessProfile: mergedProfile });

@@ -27,7 +27,14 @@ const ctx = createTestContext(13306);
 const { api, del } = ctx;
 
 beforeAll(async () => {
+  // Unset WEBFLOW_API_TOKEN before spawning the test server so
+  // getTokenForSite('site_no_token_xyz') deterministically returns null.
+  // Workspace-level webflowToken fields are unaffected — only the global fallback is cleared.
+  const savedWebflowToken = process.env.WEBFLOW_API_TOKEN;
+  delete process.env.WEBFLOW_API_TOKEN;
   await ctx.startServer();
+  // Restore in parent process — child process env is already fixed at spawn time.
+  if (savedWebflowToken !== undefined) process.env.WEBFLOW_API_TOKEN = savedWebflowToken;
 }, 25_000);
 
 afterAll(() => {
