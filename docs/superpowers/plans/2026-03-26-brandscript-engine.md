@@ -623,8 +623,7 @@ describe('voice calibration store', () => {
   });
 
   it('adds a voice sample and retrieves with profile', () => {
-    const profile = getOrCreateVoiceProfile(wsId);
-    addVoiceSample(profile.id, 'This is our voice.', 'headline', 'manual');
+    addVoiceSample(wsId, 'This is our voice.', 'headline', 'manual');
     const fetched = getVoiceProfile(wsId);
     expect(fetched!.samples?.length).toBeGreaterThan(0);
   });
