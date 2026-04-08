@@ -21,6 +21,9 @@ const stmts = createStmtCache(() => ({
   get: db.prepare(
     `SELECT * FROM meeting_briefs WHERE workspace_id = ?`,
   ),
+  getHash: db.prepare(
+    `SELECT prompt_hash FROM meeting_briefs WHERE workspace_id = ?`,
+  ),
   upsert: db.prepare(`
     INSERT INTO meeting_briefs
       (workspace_id, generated_at, situation_summary, wins, attention, recommendations, blueprint_progress, prompt_hash, metrics)
@@ -77,6 +80,6 @@ export function upsertMeetingBrief(brief: MeetingBrief, promptHash?: string): vo
 }
 
 export function getMeetingBriefHash(workspaceId: string): string | null {
-  const row = stmts().get.get(workspaceId) as Pick<BriefRow, 'prompt_hash'> | undefined;
+  const row = stmts().getHash.get(workspaceId) as Pick<BriefRow, 'prompt_hash'> | undefined;
   return row?.prompt_hash ?? null;
 }

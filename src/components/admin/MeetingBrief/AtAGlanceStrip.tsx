@@ -1,51 +1,38 @@
+import { StatCard } from '../../ui/StatCard';
 import type { MeetingBriefMetrics } from '../../../../shared/types/meeting-brief.js';
 
 interface Props {
   metrics: MeetingBriefMetrics;
 }
 
-interface MetricTileProps {
-  label: string;
-  value: string | number | null;
-  unit?: string;
-}
-
-function MetricTile({ label, value, unit }: MetricTileProps) {
-  return (
-    <div className="flex flex-col gap-0.5 px-4 py-3 border border-zinc-800 rounded-lg bg-zinc-900/50">
-      <span className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</span>
-      <span className="text-xl font-semibold text-blue-400">
-        {value != null ? `${value}${unit ?? ''}` : '—'}
-      </span>
-    </div>
-  );
-}
-
 export function AtAGlanceStrip({ metrics }: Props) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-      <MetricTile
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
+      <StatCard
         label="Site Health"
-        value={metrics.siteHealthScore}
-        unit="/100"
+        value={metrics.siteHealthScore != null ? `${metrics.siteHealthScore}/100` : '—'}
+        valueColor="text-blue-400"
       />
-      <MetricTile
+      <StatCard
         label="Ranking Opps"
         value={metrics.openRankingOpportunities}
+        valueColor="text-blue-400"
       />
-      <MetricTile
+      <StatCard
         label="In Pipeline"
         value={metrics.contentInPipeline}
-        unit=" pieces"
+        sub="pieces"
+        valueColor="text-blue-400"
       />
-      <MetricTile
+      <StatCard
         label="Win Rate"
-        value={metrics.overallWinRate}
-        unit="%"
+        value={metrics.overallWinRate != null ? `${metrics.overallWinRate}%` : '—'}
+        valueColor="text-blue-400"
       />
-      <MetricTile
+      <StatCard
         label="Critical Issues"
         value={metrics.criticalIssues}
+        valueColor="text-blue-400"
       />
     </div>
   );

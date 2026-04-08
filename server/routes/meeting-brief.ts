@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
+import { aiLimiter } from '../middleware.js';
 import { getMeetingBrief } from '../meeting-brief-store.js';
 import { generateMeetingBrief } from '../meeting-brief-generator.js';
 import { addActivity } from '../activity-log.js';
@@ -28,6 +29,7 @@ router.get(
 router.post(
   '/api/workspaces/:workspaceId/meeting-brief/generate',
   requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
   async (req, res) => {
     const { workspaceId } = req.params;
     try {
@@ -36,8 +38,13 @@ router.post(
       res.json({ brief });
     } catch (err) {
       if (err instanceof Error && err.message === 'BRIEF_UNCHANGED') {
-        const existing = getMeetingBrief(workspaceId);
-        res.json({ brief: existing, unchanged: true });
+        try {
+          const existing = getMeetingBrief(workspaceId);
+          res.json({ brief: existing, unchanged: true });
+        } catch (readErr) {
+          log.error({ readErr, workspaceId }, 'Failed to read cached brief after BRIEF_UNCHANGED');
+          res.status(500).json({ error: 'Failed to generate meeting brief' });
+        }
         return;
       }
       log.error({ err, workspaceId }, 'Failed to generate meeting brief');

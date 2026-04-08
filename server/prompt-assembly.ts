@@ -29,6 +29,7 @@ export function getCustomPromptNotes(workspaceId: string): string | null {
       { custom_prompt_notes: string | null } | undefined;
     return row?.custom_prompt_notes?.trim() || null;
   } catch {
+    // Graceful degradation: column may not exist in test or legacy DBs
     return null;
   }
 }
@@ -36,8 +37,15 @@ export function getCustomPromptNotes(workspaceId: string): string | null {
 /**
  * Assembles a system prompt by layering workspace-specific context onto base instructions.
  * Safe to call before Brandscript ships — Layer 2 is a no-op until extended in Task 5b.
+ *
+ * @param customNotes - Optional pre-fetched custom_prompt_notes. When provided, skips the
+ *   internal DB query (avoids a duplicate read if the caller already fetched it for hashing).
  */
-export function buildSystemPrompt(workspaceId: string, baseInstructions: string): string {
+export function buildSystemPrompt(
+  workspaceId: string,
+  baseInstructions: string,
+  customNotes?: string | null,
+): string {
   const parts: string[] = [baseInstructions];
 
   // Layer 2: voice DNA (extended in Brandscript Phase 1 — Task 5b)
@@ -45,14 +53,22 @@ export function buildSystemPrompt(workspaceId: string, baseInstructions: string)
   // are added to this file when the voice_profiles table exists (migration 049).
 
   // Layer 3: per-workspace custom notes
-  try {
-    const row = stmts().getCustomNotes.get(workspaceId) as
-      { custom_prompt_notes: string | null } | undefined;
-    if (row?.custom_prompt_notes?.trim()) {
-      parts.push(`Additional context for this client:\n${row.custom_prompt_notes.trim()}`);
-    }
-  } catch {
-    // Graceful degradation: column may not exist in test or legacy DBs
+  // Use the pre-fetched value if provided; otherwise query the DB.
+  const notes = customNotes !== undefined
+    ? customNotes
+    : (() => {
+        try {
+          const row = stmts().getCustomNotes.get(workspaceId) as
+            { custom_prompt_notes: string | null } | undefined;
+          return row?.custom_prompt_notes?.trim() || null;
+        } catch {
+          // Graceful degradation: column may not exist in test or legacy DBs
+          return null;
+        }
+      })();
+
+  if (notes) {
+    parts.push(`Additional context for this client:\n${notes}`);
   }
 
   return parts.join('\n\n');

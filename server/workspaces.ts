@@ -235,7 +235,7 @@ function insertStmt() {
          brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
          tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
          onboarding_enabled, onboarding_completed, content_pricing,
-         portal_contacts, audit_suppressions, created_at)
+         portal_contacts, audit_suppressions, custom_prompt_notes, created_at)
       VALUES
         (@id, @name, @folder, @webflow_site_id, @webflow_site_name, @webflow_token,
          @gsc_property_url, @ga4_property_id, @client_password, @client_email,
@@ -245,7 +245,7 @@ function insertStmt() {
          @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
          @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
          @onboarding_enabled, @onboarding_completed, @content_pricing,
-         @portal_contacts, @audit_suppressions, @created_at)
+         @portal_contacts, @audit_suppressions, @custom_prompt_notes, @created_at)
     `);
   }
   return _insert;

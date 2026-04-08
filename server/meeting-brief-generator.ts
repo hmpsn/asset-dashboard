@@ -94,7 +94,8 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
   // AND buildSystemPrompt() (Layer 3: custom_prompt_notes). Missing any signal → cached
   // brief returned even when that data changed (stale metrics/narrative/framing).
   const relevant = {
-    topIds: intel.insights?.topByImpact?.slice(0, 10).map(i => i.id) ?? [],
+    // Include computedAt so insight score/severity/data changes bust the cache even when IDs are stable.
+    topIds: intel.insights?.topByImpact?.slice(0, 10).map(i => `${i.id}:${i.computedAt}`) ?? [],
     siteScore: intel.siteHealth?.auditScore,
     scoreDelta: intel.siteHealth?.auditScoreDelta,
     briefsTotal: intel.contentPipeline?.briefs.total,
@@ -127,6 +128,7 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
     throw new Error('BRIEF_UNCHANGED');
   }
 
+  // Pass pre-fetched customPromptNotes to buildSystemPrompt to avoid a second DB round-trip.
   const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic analyst preparing a client-facing meeting brief. Your output must be valid JSON matching the MeetingBriefAIOutput interface exactly.
 
@@ -136,7 +138,7 @@ Example of a strong situation summary:
 "Your site has gained traction in local search this quarter, with 3 service pages now ranking top-5 for location-specific queries. The main opportunity is a content gap around [topic] — competitors capture 40% of that traffic while your pages sit outside the top 20."
 
 Avoid: "Your site health score is 78. You have 12 open insights."
-`.trim());
+`.trim(), customPromptNotes);
 
   const prompt = buildBriefPrompt(intel);
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [

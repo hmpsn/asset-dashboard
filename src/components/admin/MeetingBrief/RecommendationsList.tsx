@@ -14,7 +14,7 @@ export function RecommendationsList({ items }: Props) {
       <div className="space-y-3">
         {items.map((rec, i) => (
           <div key={i} className="flex gap-3 p-3 rounded-lg bg-zinc-900/60 border border-zinc-800">
-            <span className="shrink-0 mt-0.5 text-xs font-bold text-teal-400 w-5 text-center">
+            <span className="shrink-0 mt-0.5 text-xs font-bold text-zinc-500 w-5 text-center">
               {i + 1}
             </span>
             <div>

@@ -3,6 +3,7 @@ import { useAdminMeetingBrief } from '../../../hooks/admin/useAdminMeetingBrief'
 import { SectionCard } from '../../ui/SectionCard';
 import { Skeleton } from '../../ui/Skeleton';
 import { EmptyState } from '../../ui/EmptyState';
+import { ErrorBoundary } from '../../ErrorBoundary';
 import { BriefHeader } from './BriefHeader';
 import { AtAGlanceStrip } from './AtAGlanceStrip';
 import { BriefSection } from './BriefSection';
@@ -19,7 +20,7 @@ function BriefSkeleton() {
       <Skeleton className="h-5 w-2/3" />
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-5/6" />
-      <div className="grid grid-cols-5 gap-3 mt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-6">
         {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-16 rounded-lg" />
         ))}
@@ -33,7 +34,7 @@ function BriefSkeleton() {
 }
 
 export function MeetingBriefPage({ workspaceId }: Props) {
-  const { brief, isLoading, isError, generate, isGenerating } = useAdminMeetingBrief(workspaceId);
+  const { brief, isLoading, isError, refetch, generate, isGenerating, generateError } = useAdminMeetingBrief(workspaceId);
 
   if (isLoading) {
     return (
@@ -52,7 +53,7 @@ export function MeetingBriefPage({ workspaceId }: Props) {
           description="Something went wrong loading the meeting brief. Try again."
           action={
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => refetch()}
               className="mt-4 px-4 py-2 text-sm font-medium rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
             >
               Retry
@@ -80,6 +81,11 @@ export function MeetingBriefPage({ workspaceId }: Props) {
             </button>
           }
         />
+        {generateError && (
+          <p className="text-xs text-red-400 text-center mt-3">
+            Generation failed. Please try again.
+          </p>
+        )}
         {isGenerating && (
           <div className="mt-6">
             <p className="text-xs text-zinc-500 text-center mb-4">Analyzing site performance\u2026</p>
@@ -98,6 +104,12 @@ export function MeetingBriefPage({ workspaceId }: Props) {
         isGenerating={isGenerating}
       />
 
+      {generateError && (
+        <p className="text-xs text-red-400 text-center mb-4">
+          Generation failed. Please try again.
+        </p>
+      )}
+
       {isGenerating && (
         <SectionCard className="mb-6">
           <p className="text-xs text-zinc-500 text-center mb-4">Analyzing site performance\u2026</p>
@@ -106,16 +118,18 @@ export function MeetingBriefPage({ workspaceId }: Props) {
       )}
 
       {!isGenerating && (
-        <SectionCard>
-          <div className="mb-6">
-            <p className="text-sm text-zinc-200 leading-relaxed">{brief.situationSummary}</p>
-          </div>
-          <AtAGlanceStrip metrics={brief.metrics} />
-          <BriefSection title="Wins Since Last Review" items={brief.wins} />
-          <BriefSection title="What Needs Attention" items={brief.attention} />
-          <RecommendationsList items={brief.recommendations} />
-          <BlueprintProgress progress={brief.blueprintProgress} />
-        </SectionCard>
+        <ErrorBoundary>
+          <SectionCard>
+            <div className="mb-6">
+              <p className="text-sm text-zinc-200 leading-relaxed">{brief.situationSummary}</p>
+            </div>
+            <AtAGlanceStrip metrics={brief.metrics} />
+            <BriefSection title="Wins Since Last Review" items={brief.wins} />
+            <BriefSection title="What Needs Attention" items={brief.attention} />
+            <RecommendationsList items={brief.recommendations} />
+            <BlueprintProgress progress={brief.blueprintProgress} />
+          </SectionCard>
+        </ErrorBoundary>
       )}
     </div>
   );

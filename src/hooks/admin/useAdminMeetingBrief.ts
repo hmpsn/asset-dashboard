@@ -23,8 +23,11 @@ export function useAdminMeetingBrief(workspaceId: string) {
     brief: query.data?.brief ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
     generate: generate.mutate,
     isGenerating: generate.isPending,
     generateError: generate.error,
+    /** True when the server returned unchanged:true (data hadn't changed). */
+    wasUnchanged: generate.data?.unchanged ?? false,
   };
 }

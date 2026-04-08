@@ -53,6 +53,9 @@ vi.mock('../meeting-brief-generator.js', async () => {
   };
 });
 
+// Import mock handle so individual tests can reconfigure generateMeetingBrief
+import { generateMeetingBrief as mockGenerateMeetingBrief } from '../meeting-brief-generator.js';
+
 // ---------------------------------------------------------------------------
 // In-process server helper
 // ---------------------------------------------------------------------------
@@ -131,6 +134,24 @@ describe('Meeting Brief routes', () => {
     expect(brief.workspaceId).toBe(workspaceId);
     expect(brief.situationSummary).toBe('Test summary.');
     expect(brief.wins).toEqual(['Win 1']);
+  });
+
+  it('POST /generate returns cached brief with unchanged:true when data has not changed', async () => {
+    const { upsertMeetingBrief } = await import('../meeting-brief-store.js');
+    // Pre-seed a brief so the route has something to return
+    const cached = { ...MOCK_BRIEF, workspaceId, situationSummary: 'Cached summary.' };
+    upsertMeetingBrief(cached);
+
+    // Configure mock to throw BRIEF_UNCHANGED (simulating unchanged hash)
+    vi.mocked(mockGenerateMeetingBrief).mockRejectedValueOnce(new Error('BRIEF_UNCHANGED'));
+
+    const { status, body } = await postJson(baseUrl, `/api/workspaces/${workspaceId}/meeting-brief/generate`);
+    expect(status).toBe(200);
+    const b = body as Record<string, unknown>;
+    expect(b.unchanged).toBe(true);
+    expect(b).toHaveProperty('brief');
+    const brief = b.brief as Record<string, unknown>;
+    expect(brief.situationSummary).toBe('Cached summary.');
   });
 
   it('GET returns the stored brief after generation', async () => {
