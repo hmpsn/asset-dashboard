@@ -5,7 +5,7 @@ import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
-  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy,
+  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy, BookOpen,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath } from '../routes';
@@ -27,6 +27,7 @@ interface CommandPaletteProps {
 
 const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: string; needsSite?: boolean }> = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, group: '' },
+  { id: 'brief', label: 'Meeting Brief', icon: BookOpen, group: '' },
   { id: 'analytics-hub', label: 'Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
   { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Analytics', needsSite: true },
   { id: 'seo-audit', label: 'Site Audit', icon: Globe, group: 'Site Health', needsSite: true },

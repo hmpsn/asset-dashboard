@@ -54,6 +54,7 @@ function buildNavGroups(hasContentItems: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
+      { id: 'brief', label: 'Meeting Brief', icon: BookOpen, desc: 'AI-generated meeting prep for client calls' },
     ]},
     { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400',
       activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
