@@ -1,6 +1,8 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { meetingBriefRecommendationSchema, meetingBriefMetricsSchema } from './schemas/meeting-brief-schemas.js';
+import { z } from 'zod';
 import type { MeetingBrief, MeetingBriefMetrics, MeetingBriefRecommendation } from '../shared/types/meeting-brief.js';
 
 interface BriefRow {
@@ -41,17 +43,17 @@ function rowToBrief(row: BriefRow): MeetingBrief {
     workspaceId: row.workspace_id,
     generatedAt: row.generated_at,
     situationSummary: row.situation_summary,
-    wins: parseJsonFallback<string[]>(row.wins, []),
-    attention: parseJsonFallback<string[]>(row.attention, []),
-    recommendations: parseJsonFallback<MeetingBriefRecommendation[]>(row.recommendations, []),
+    wins: parseJsonSafeArray(row.wins, z.string(), { table: 'meeting_briefs', field: 'wins' }),
+    attention: parseJsonSafeArray(row.attention, z.string(), { table: 'meeting_briefs', field: 'attention' }),
+    recommendations: parseJsonSafeArray(row.recommendations, meetingBriefRecommendationSchema, { table: 'meeting_briefs', field: 'recommendations' }),
     blueprintProgress: row.blueprint_progress ?? null,
-    metrics: parseJsonFallback<MeetingBriefMetrics>(row.metrics, {
+    metrics: parseJsonSafe(row.metrics, meetingBriefMetricsSchema, {
       siteHealthScore: null,
       openRankingOpportunities: 0,
       contentInPipeline: 0,
       overallWinRate: null,
       criticalIssues: 0,
-    }),
+    }, { table: 'meeting_briefs', field: 'metrics' }),
   };
 }
 

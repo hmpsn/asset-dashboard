@@ -13,6 +13,7 @@ export const meetingBriefApi = {
       { brief: null },
     ),
 
+  /** Note: throws on non-2xx (unlike `get` which uses getSafe). Callers must handle via useMutation onError. */
   generate: (workspaceId: string) =>
     post<BriefResponse>(
       `/api/workspaces/${workspaceId}/meeting-brief/generate`,
