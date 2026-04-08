@@ -2492,6 +2492,6 @@ try {
     feature: 'copy-outline-retry',
     workspaceId,
   });
-  parsed = JSON.parse(retryResult) as YourOutputType;
+  parsed = JSON.parse(retryResult.text) as YourOutputType;
 }
 ```
