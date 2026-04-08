@@ -20,7 +20,7 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
   insights: {
     all: [],
     byType: {
-      ranking_opportunity: [{ id: '1' } as any, { id: '2' } as any, { id: '3' } as any],
+      ranking_opportunity: [{ id: '1' } as any, { id: '2' } as any, { id: '3' } as any], // as-any-ok: partial InsightRecord fixtures
     },
     bySeverity: { critical: 2, warning: 5, opportunity: 8, positive: 3 },
     topByImpact: [
@@ -33,7 +33,7 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
         severity: 'critical',
         computedAt: '2026-04-07T12:00:00Z',
         pageTitle: 'About Us',
-      } as any,
+      } as any, // as-any-ok: partial InsightRecord fixture
     ],
   },
   contentPipeline: {
