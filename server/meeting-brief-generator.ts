@@ -33,7 +33,7 @@ export function assembleMeetingBriefMetrics(intel: WorkspaceIntelligence): Meeti
 /** Builds the prompt context string sent to the AI. */
 export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   const top = intel.insights?.topByImpact?.slice(0, 10) ?? [];
-  const wins = intel.learnings?.weCalledIt?.slice(0, 5) ?? [];
+  const wins = intel.learnings?.topWins?.slice(0, 5) ?? [];
   const winRate = intel.learnings?.overallWinRate != null
     ? `${Math.round(intel.learnings.overallWinRate * 100)}%`
     : 'unknown';
@@ -47,9 +47,13 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
     `- [${i.severity.toUpperCase()}] ${i.insightType}: ${i.pageTitle ?? i.pageId ?? 'workspace'} — ${JSON.stringify(i.data).slice(0, 200)}`
   ).join('\n');
 
-  const winsLines = wins.map(w =>
-    `- ${w.prediction}`
-  ).join('\n');
+  const winsLines = wins.map(w => {
+    const kw = w.targetKeyword ? ` (${w.targetKeyword})` : '';
+    const delta = w.delta?.delta_percent != null
+      ? ` — ${w.delta.delta_percent > 0 ? '+' : ''}${w.delta.delta_percent.toFixed(1)}%`
+      : '';
+    return `- ${w.actionType} on ${w.pageUrl ?? 'workspace'}${kw}${delta}`;
+  }).join('\n');
 
   return `
 SITE CONTEXT:
@@ -101,7 +105,7 @@ function buildPromptHash(intel: WorkspaceIntelligence, customPromptNotes: string
     briefsTotal: intel.contentPipeline?.briefs.total,
     postsTotal: intel.contentPipeline?.posts.total,
     winRate: intel.learnings?.overallWinRate,
-    weCalledItIds: intel.learnings?.weCalledIt?.slice(0, 5).map(w => w.actionId) ?? [],
+    topWinIds: intel.learnings?.topWins?.slice(0, 5).map(w => w.actionId) ?? [],
     criticalIssues: intel.insights?.bySeverity.critical,
     rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
     priorities: intel.clientSignals?.businessPriorities ?? [],

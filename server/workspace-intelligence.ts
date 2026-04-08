@@ -430,8 +430,10 @@ async function assembleLearnings(
 
   // WeCalledIt entries — actions with strong_win outcomes
   let weCalledIt: WeCalledItEntry[] = [];
+  let topWins: import('../shared/types/outcome-tracking.js').TopWin[] = [];
   try {
-    const { getActionsByWorkspace, getOutcomesForAction } = await import('./outcome-tracking.js');
+    const { getActionsByWorkspace, getOutcomesForAction, getTopWinsForWorkspace } = await import('./outcome-tracking.js');
+    topWins = getTopWinsForWorkspace(workspaceId, 5);
     const actions = getActionsByWorkspace(workspaceId);
     for (const action of actions.slice(0, 50)) {
       if (weCalledIt.length >= 5) break; // guard before DB call to avoid redundant queries
@@ -460,6 +462,7 @@ async function assembleLearnings(
     recentTrend: summary?.overall.recentTrend ?? null,
     playbooks,
     roiAttribution,
+    topWins,
     weCalledIt,
   };
 }

@@ -65,14 +65,16 @@ const MOCK_INTELLIGENCE: WorkspaceIntelligence = {
     overallWinRate: 0.72,
     recentTrend: null,
     playbooks: [],
-    weCalledIt: [
+    topWins: [
       {
         actionId: 'action-1',
-        prediction: 'meta_updated on /about-us',
-        outcome: 'strong_win',
-        score: 'strong_win',
+        actionType: 'meta_updated',
         pageUrl: '/about-us',
-        measuredAt: '2026-04-01T00:00:00Z',
+        targetKeyword: 'seo services',
+        delta: { delta_percent: 18.5, delta_absolute: 120, direction: 'up' },
+        score: 'strong_win',
+        createdAt: '2026-03-01T00:00:00Z',
+        scoredAt: '2026-04-01T00:00:00Z',
       },
     ],
   },
@@ -117,9 +119,11 @@ describe('buildBriefPrompt', () => {
     expect(prompt).toContain('72%');
   });
 
-  it('includes weCalledIt wins in RECENT WINS section', () => {
+  it('includes topWins in RECENT WINS section with delta and keyword', () => {
     const prompt = buildBriefPrompt(MOCK_INTELLIGENCE);
     expect(prompt).toContain('meta_updated on /about-us');
+    expect(prompt).toContain('seo services');
+    expect(prompt).toContain('+18.5%');
   });
 
   it('handles sparse intelligence without crashing', () => {

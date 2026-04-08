@@ -20,6 +20,7 @@ import type {
   OutcomeScore,
   DeltaSummary,
   EarlySignal,
+  TopWin,
 } from '../shared/types/outcome-tracking.js';
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -140,7 +141,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
   // If this action relates to a page or keyword, auto-resolve matching insights to 'in_progress'
   // NOTE: recordAction() is SYNC — use fireBridge (fire-and-forget), not executeBridge
   fireBridge('bridge-action-auto-resolve', params.workspaceId, async () => {
-    const { getInsights, resolveInsight } = await import('./analytics-insights-store.js');
+    const { getInsights, resolveInsight } = await import('./analytics-insights-store.js'); // dynamic-import-ok: avoids circular dep
     if (!params.pageUrl && !params.targetKeyword) return { modified: 0 };
     const insights = getInsights(params.workspaceId);
     const related = insights.filter(i =>
@@ -161,7 +162,7 @@ export function recordAction(params: RecordActionParams): TrackedAction {
 
   // ── Bridge #13: Create analytics annotation ───────────────────────
   fireBridge('bridge-action-annotation', params.workspaceId, async () => {
-    const { createAnnotation } = await import('./analytics-annotations.js');
+    const { createAnnotation } = await import('./analytics-annotations.js'); // dynamic-import-ok: avoids circular dep
     const pageCtx = params.pageUrl ? ` (${params.pageUrl})` : '';
     const date = new Date().toISOString().split('T')[0];
     const label = `Action: ${params.actionType}${pageCtx}`;
@@ -289,7 +290,7 @@ export function recordOutcome(params: {
       const workspaceId = actionRow.workspace_id;
       debouncedOutcomeReweight(workspaceId, async () => {
         const modifiedCount = await withWorkspaceLock(workspaceId, async () => {
-          const { getInsights, upsertInsight } = await import('./analytics-insights-store.js');
+          const { getInsights, upsertInsight } = await import('./analytics-insights-store.js'); // dynamic-import-ok: avoids circular dep
           const insights = getInsights(workspaceId);
           const nonResolved = insights.filter(i => i.resolutionStatus !== 'resolved');
 
@@ -364,6 +365,39 @@ export function getWorkspaceCounts(workspaceId: string): { total: number; scored
 export function getRecentActions(workspaceId: string, limit = 50): TrackedAction[] {
   const rows = stmts().getRecentByWorkspace.all(workspaceId, limit) as TrackedActionRow[];
   return rows.map(rowToTrackedAction);
+}
+
+/** Win scores that qualify an outcome as a win for the RECENT WINS section. */
+export const WIN_SCORES: OutcomeScore[] = ['strong_win', 'win'];
+
+/**
+ * Returns top wins for a workspace sorted by absolute delta (highest impact first).
+ * Extracted from routes/outcomes.ts so the intelligence assembler can use it.
+ */
+export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
+  const actions = getActionsByWorkspace(workspaceId);
+  const wins: TopWin[] = [];
+
+  for (const action of actions) {
+    const outcomes = getOutcomesForAction(action.id);
+    for (const outcome of outcomes) {
+      if (outcome.score && WIN_SCORES.includes(outcome.score)) {
+        wins.push({
+          actionId: action.id,
+          actionType: action.actionType,
+          pageUrl: action.pageUrl,
+          targetKeyword: action.targetKeyword,
+          delta: outcome.deltaSummary,
+          score: outcome.score,
+          createdAt: action.createdAt,
+          scoredAt: outcome.measuredAt ?? action.updatedAt,
+        });
+      }
+    }
+  }
+
+  wins.sort((a, b) => Math.abs(b.delta.delta_percent) - Math.abs(a.delta.delta_percent));
+  return wins.slice(0, limit);
 }
 
 export function archiveOldActions(): { archived: number } {
