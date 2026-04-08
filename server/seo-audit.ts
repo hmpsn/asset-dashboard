@@ -4,7 +4,7 @@ import { scanRedirects } from './redirect-scanner.js';
 import { checkSiteLinks } from './link-checker.js';
 import type { DeadLink } from './link-checker.js';
 import { runSinglePageSpeed } from './pagespeed.js';
-import { buildSeoContext, buildPageAnalysisContext } from './seo-context.js';
+import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
@@ -97,6 +97,7 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
     // Fetch site info for subdomain
     const siteRes = await fetch(`${WEBFLOW_API}/sites/${siteId}`, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
     });
     let subdomain: string | null = null;
     if (siteRes.ok) {
@@ -109,6 +110,7 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
     try {
       const domainRes = await fetch(`${WEBFLOW_API}/sites/${siteId}/custom_domains`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
       });
       if (domainRes.ok) {
         const domainData = await domainRes.json() as { customDomains?: { url?: string }[] };
@@ -466,12 +468,12 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     if (!cachedHtml) continue;
     const pageLinks = extractLinks(cachedHtml);
     for (const link of pageLinks) {
-      if (link.href.startsWith('/')) {
+      if (link.href.startsWith('/') && !link.href.startsWith('/cdn-cgi/')) {
         internalLinkTargets.add(link.href.replace(/\/$/, '').toLowerCase());
       } else if (link.href.startsWith('http')) {
         try {
           const p = new URL(link.href).pathname.replace(/\/$/, '').toLowerCase();
-          internalLinkTargets.add(p);
+          if (!p.startsWith('/cdn-cgi/')) internalLinkTargets.add(p);
         } catch { /* skip */ }
       }
     }
@@ -566,6 +568,11 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       return headingStr + text.slice(0, 2000);
     };
 
+    // Pre-assemble workspace-level slices once — learnings and seoContext base data are identical
+    // for every page. pageKeywords (the only page-specific seoContext field) is a find() on the
+    // pre-built pageMap, derived inline per page. pageProfile remains per-page (requires pagePath).
+    const wsIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['learnings', 'seoContext'] as const });
+
     const aiBatch = 15;
     for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
       // Stagger batches to avoid hammering rate limits
@@ -589,7 +596,15 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
 
           // Build keyword strategy + brand voice + KB + personas context for this page
           const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
-          const { fullContext } = buildSeoContext(wsId, pagePath);
+          // Derive per-page keywords from pre-built pageMap — no extra DB call for seoContext
+          const seoCtx = wsIntel.seoContext ? { ...wsIntel.seoContext } : undefined;
+          if (seoCtx && pagePath && seoCtx.strategy?.pageMap?.length) {
+            const kw = seoCtx.strategy.pageMap.find(p => p.pagePath.toLowerCase() === pagePath.toLowerCase());
+            if (kw) seoCtx.pageKeywords = kw;
+          }
+          const pageProfileIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['pageProfile'] as const, pagePath });
+          const intel = { ...wsIntel, seoContext: seoCtx, pageProfile: pageProfileIntel.pageProfile };
+          const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
 
@@ -598,7 +613,7 @@ URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
-${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}${buildPageAnalysisContext(wsId, pagePath)}
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}

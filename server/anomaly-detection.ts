@@ -29,6 +29,7 @@ import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-sto
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
+import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
 const log = createLogger('anomaly');
@@ -590,6 +591,9 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             log.warn({ err: digestErr, anomalyId: a.id }, 'Failed to upsert anomaly digest insight');
           }
         }
+
+        // Invalidate intelligence cache AFTER all insight writes complete
+        invalidateIntelligenceCache(ws.id);
 
         // ── Bridge #10: Anomaly → boost existing insight severity ──────────
         // When anomalies are detected, boost insights in the MATCHING domain

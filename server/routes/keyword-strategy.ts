@@ -33,24 +33,74 @@ import {
   discoverSitemapUrls,
 } from '../webflow.js';
 import { getWorkspacePages } from '../workspace-data.js';
-import { buildSeoContext, clearSeoContextCache } from '../seo-context.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { clearSeoContextCache } from '../seo-context.js';
+import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace, getTokenForSite } from '../workspaces.js';
-import { replaceAllPageKeywords, listPageKeywords } from '../page-keywords.js';
+import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from '../page-keywords.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../../shared/types/analytics.js';
+import type { Workspace } from '../../shared/types/workspace.js';
+import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
 import { buildStrategySignals } from '../insight-feedback.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
+import { buildSystemPrompt } from '../prompt-assembly.js';
 
 const log = createLogger('keyword-strategy');
+
+// ── Incremental mode helpers ─────────────────────────────────────
+
+const INCREMENTAL_THRESHOLD_DAYS = 7;
+/** Days before competitor keyword data is considered stale and re-fetched */
+const COMPETITOR_CACHE_DAYS = 7;
+
+/**
+ * Split pages into those needing AI analysis vs those with fresh analysis.
+ * In 'full' mode all pages go to toAnalyze.
+ * In 'incremental' mode only pages with no analysis_generated_at or a stale
+ * one (older than INCREMENTAL_THRESHOLD_DAYS) go to toAnalyze; the rest go
+ * to toPreserve so their existing keyword assignments are kept unchanged.
+ */
+function getPagesNeedingAnalysis<T extends { path: string }>(
+  allPages: T[],
+  mode: 'full' | 'incremental',
+  existingByPath: Map<string, { analysisGeneratedAt?: string | null }>,
+): { toAnalyze: T[]; toPreserve: T[] } {
+  if (mode === 'full') {
+    return { toAnalyze: allPages, toPreserve: [] };
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - INCREMENTAL_THRESHOLD_DAYS);
+  const cutoffIso = cutoff.toISOString();
+
+  const toAnalyze: T[] = [];
+  const toPreserve: T[] = [];
+  for (const page of allPages) {
+    const existing = existingByPath.get(page.path);
+    const genAt = existing?.analysisGeneratedAt;
+    if (!genAt || genAt < cutoffIso) {
+      toAnalyze.push(page);
+    } else {
+      toPreserve.push(page);
+    }
+  }
+  return { toAnalyze, toPreserve };
+}
+
+export function shouldFetchCompetitorData(ws: Workspace): boolean {
+  if (!ws.competitorLastFetchedAt) return true;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - COMPETITOR_CACHE_DAYS);
+  return new Date(ws.competitorLastFetchedAt) < cutoff;
+}
 
 // ── Strategy Intelligence Block ──────────────────────────────────
 
@@ -159,6 +209,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const provider = getConfiguredProvider(ws.seoDataProvider);
 
   const businessContext = (req.body?.businessContext as string) || ws.keywordStrategy?.businessContext || '';
+  const strategyMode = (req.body?.mode as string) === 'incremental' ? 'incremental' : 'full'; // 'full' | 'incremental'
   const semrushMode = (req.body?.semrushMode as string) || 'none'; // 'quick', 'full', 'none'
   const competitorDomains = (req.body?.competitorDomains as string[]) || ws.competitorDomains || [];
   const rawMaxPages = req.body?.maxPages != null ? Number(req.body.maxPages) : 500;
@@ -313,14 +364,38 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const SNIPPET_LIMIT = cappedFromTotal > 0 ? 800 : 1200;
     const HTML_READ_LIMIT = 100_000; // 100KB max per page — enough for snippet extraction
 
+    // Incremental mode: pre-compute fresh pages BEFORE content fetch to skip wasted I/O.
+    // Pages with analysis_generated_at < INCREMENTAL_THRESHOLD_DAYS old don't need new HTML.
+    let freshPathSet = new Set<string>();
+    let _preloadedPageKeywords: ReturnType<typeof listPageKeywords> | null = null;
+    if (strategyMode === 'incremental') {
+      _preloadedPageKeywords = listPageKeywords(ws.id);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - INCREMENTAL_THRESHOLD_DAYS);
+      const cutoffIso = cutoff.toISOString();
+      for (const pk of _preloadedPageKeywords) {
+        if (pk.analysisGeneratedAt && pk.analysisGeneratedAt >= cutoffIso) {
+          freshPathSet.add(pk.pagePath);
+        }
+      }
+      if (freshPathSet.size > 0) {
+        log.info(`Incremental pre-check: ${freshPathSet.size} fresh pages skip content fetch`);
+        sendProgress('discovery', `Incremental: fetching ${pathArray.length - freshPathSet.size} pages (${freshPathSet.size} already fresh)`, 0.135);
+      }
+    }
+
     // 3. Fetch actual page content for prioritized pages (parallel, batched)
-    sendProgress('content', `Fetching content from ${pathArray.length} pages...`, 0.15);
+    // In incremental mode skip fresh pages — their HTML hasn't changed.
+    const pathsToFetch = strategyMode === 'incremental' && freshPathSet.size > 0
+      ? pathArray.filter(p => !freshPathSet.has(p))
+      : pathArray;
+    sendProgress('content', `Fetching content from ${pathsToFetch.length} pages...`, 0.15);
     const pageInfo: Array<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string }> = [];
     const contentBatch = 6;
-    for (let i = 0; i < pathArray.length; i += contentBatch) {
-      const chunk = pathArray.slice(i, i + contentBatch);
-      const fetched = Math.min(i + contentBatch, pathArray.length);
-      sendProgress('content', `Fetching page content... ${fetched}/${pathArray.length}`, 0.15 + (fetched / pathArray.length) * 0.30);
+    for (let i = 0; i < pathsToFetch.length; i += contentBatch) {
+      const chunk = pathsToFetch.slice(i, i + contentBatch);
+      const fetched = Math.min(i + contentBatch, pathsToFetch.length);
+      sendProgress('content', `Fetching page content... ${fetched}/${pathsToFetch.length}`, 0.15 + (fetched / pathsToFetch.length) * 0.30);
       const contents = await Promise.all(chunk.map(async (pagePath): Promise<{ path: string; title: string; seoTitle: string; seoDesc: string; contentSnippet: string } | null> => {
         const wfMeta = wfMetaByPath.get(pagePath);
         let contentSnippet = '';
@@ -387,7 +462,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
       }));
       pageInfo.push(...contents.filter((c): c is NonNullable<typeof c> => c !== null));
     }
-    const skipped = pathArray.length - pageInfo.length;
+    const skipped = pathsToFetch.length - pageInfo.length;
     if (skipped > 0) log.info(`Filtered out ${skipped} non-live pages (404/unreachable)`);
 
     // Post-fetch: filter out pages with very thin content (utility/legal pages with < 50 chars)
@@ -405,6 +480,28 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     const capNote = cappedFromTotal > 0 ? ` of ${cappedFromTotal} total` : '';
     sendProgress('content', `Fetched ${pageInfo.length} live pages${capNote} (${skipped} non-live, ${beforeThinFilter - pageInfo.length} thin filtered)`, 0.46);
+
+    // Incremental mode: re-inject skeleton pageInfo entries for fresh pages that were skipped
+    // during content fetch. They need to be present in pageInfo so getPagesNeedingAnalysis()
+    // puts them in toPreserve — otherwise the synthesis AI sees only stale pages and produces
+    // an incomplete picture of the site (missing content gaps already covered by fresh pages).
+    // Empty contentSnippet is intentional — these pages never go through AI batching;
+    // their keyword data is pulled from existingPageKeywords in the merge step below.
+    if (strategyMode === 'incremental' && _preloadedPageKeywords && freshPathSet.size > 0) {
+      const fetchedPaths = new Set(pageInfo.map(p => p.path));
+      for (const pk of _preloadedPageKeywords) {
+        if (freshPathSet.has(pk.pagePath) && !fetchedPaths.has(pk.pagePath)) {
+          pageInfo.push({
+            path: pk.pagePath,
+            title: pk.pageTitle || '',
+            seoTitle: '',
+            seoDesc: '',
+            contentSnippet: '', // not used — this page goes to toPreserve, not toAnalyze
+          });
+        }
+      }
+      log.info(`Incremental: re-added ${freshPathSet.size} fresh page skeletons for synthesis context`);
+    }
 
     // 4. Try to gather GSC data if connected
     sendProgress('search_data', 'Fetching Google Search Console data...', 0.48);
@@ -468,8 +565,28 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
     const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
 
+    const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
+
+    // When skipping competitor fetch, carry forward previously stored data so the
+    // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
+    // Also inject gaps into semrushContext so the AI still sees competitor gap
+    // narrative on cache-hit incremental runs.
+    if (!fetchCompetitors && ws.keywordStrategy?.keywordGaps) {
+      keywordGaps = ws.keywordStrategy.keywordGaps;
+      if (keywordGaps.length > 0) {
+        semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
+        semrushContext += keywordGaps.slice(0, 30).map(g =>
+          `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
+        ).join('\n');
+      }
+    }
+
     if (semrushMode !== 'none' && provider) {
       sendProgress('semrush', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
+      if (!fetchCompetitors) {
+        log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
+        sendProgress('semrush', 'Competitor data still fresh — skipping re-fetch...', 0.58);
+      }
       // Derive domain from baseUrl so provider always hits the live site (not webflow.io staging)
       const siteDomain = baseUrl ? new URL(baseUrl).hostname : '';
 
@@ -491,7 +608,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         // Both quick and full: auto-discover competitors if none provided
-        if (competitorDomains.length === 0) {
+        if (fetchCompetitors && competitorDomains.length === 0) {
           try {
             sendProgress('semrush', 'Auto-discovering organic competitors...', 0.57);
             const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
@@ -511,7 +628,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         // Both quick and full: fetch competitor keywords (their top terms become our keyword pool)
-        if (competitorDomains.length > 0) {
+        if (fetchCompetitors && competitorDomains.length > 0) {
           try {
             const compLimit = semrushMode === 'full' ? 100 : 50;
             sendProgress('semrush', `Fetching competitor keywords (${competitorDomains.length} competitors)...`, 0.58);
@@ -551,7 +668,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         // Both quick and full: keyword gap analysis
-        if (competitorDomains.length > 0) {
+        if (fetchCompetitors && competitorDomains.length > 0) {
           try {
             sendProgress('semrush', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
             log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
@@ -567,6 +684,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           } catch (err) {
             log.error({ err: err }, 'Keyword gap error');
           }
+        }
+
+        if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
+          updateWorkspace(ws.id, { competitorLastFetchedAt: new Date().toISOString() });
         }
 
         // Full mode only: related keywords for deeper topic expansion
@@ -623,11 +744,19 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // Helper: call OpenAI for strategy using shared utility
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const callStrategyAI = async (messages: Array<{ role: string; content: string }>, maxTokens: number, _label?: string): Promise<string> => {
+      // Wrap existing system message with buildSystemPrompt for voice DNA + custom notes
+      const wrappedMessages = messages.map((m, i) =>
+        i === 0 && m.role === 'system'
+          ? { ...m, content: buildSystemPrompt(ws.id, m.content) }
+          : m
+      );
+
       const result = await callOpenAI({
         model: 'gpt-4.1-mini',
-        messages: messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+        messages: wrappedMessages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
         maxTokens,
         temperature: 0.3,
+        // No responseFormat: callers expect arrays or objects — instruction-based JSON is safer
         feature: 'keyword-strategy',
         workspaceId: ws.id,
         maxRetries: 3,
@@ -649,7 +778,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     if (businessContext) {
       businessSection = `\nBUSINESS CONTEXT: ${businessContext}\n`;
     }
-    const { knowledgeBlock: kbBlock, personasBlock: persBlock } = buildSeoContext(ws.id);
+    const strategyIntel = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext'] });
+    const strategySeo = strategyIntel.seoContext;
+    const kbBlock = formatKnowledgeBaseForPrompt(strategySeo?.knowledgeBase);
+    const persBlock = formatPersonasForPrompt(strategySeo?.personas ?? []);
     if (kbBlock) {
       businessSection += kbBlock + '\n';
     }
@@ -690,13 +822,46 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let strategy: any;
     try {
+    // --- Incremental mode: split pages into fresh (preserve) vs stale (analyze) ---
+    // Reuse the pre-loaded records from before content fetch (avoids a redundant DB read).
+    const existingPageKeywords = _preloadedPageKeywords ?? listPageKeywords(ws.id);
+    const existingByPath = new Map(
+      existingPageKeywords.map(pk => [pk.pagePath, { analysisGeneratedAt: pk.analysisGeneratedAt ?? null }])
+    );
+    const { toAnalyze: pagesToAnalyze, toPreserve: pagesToPreserve } = getPagesNeedingAnalysis(
+      pageInfo,
+      strategyMode,
+      existingByPath,
+    );
+    if (strategyMode === 'incremental') {
+      log.info(`Incremental mode: ${pagesToAnalyze.length} stale pages to analyze, ${pagesToPreserve.length} fresh pages to preserve`);
+      sendProgress('ai', `Incremental mode: ${pagesToAnalyze.length} pages need fresh analysis, ${pagesToPreserve.length} already fresh`, 0.54);
+      // Early exit: all pages are fresh — nothing to re-analyze, no usage credit burned.
+      if (pagesToAnalyze.length === 0) {
+        log.info({ workspaceId: ws.id }, 'Incremental mode: all pages already fresh, skipping re-analysis');
+        sendProgress('complete', 'All pages are already up to date — no re-analysis needed.', 1.0);
+        if (keepalive) clearInterval(keepalive); // prevent setInterval leak on early exit
+        // Match the dual-response pattern used at the normal exit (line ~1999):
+        // SSE callers already got progress events + the sendProgress('complete') above.
+        // JSON callers need a proper response body — res.end() gives them an empty 200.
+        if (wantsStream) {
+          res.end();
+        } else {
+          res.json({ ok: true, upToDate: true, freshPageCount: pagesToPreserve.length });
+        }
+        return;
+      }
+    }
+    // For AI batching we only process stale pages; preserved pages are merged back after.
+    const pagesForBatching = strategyMode === 'incremental' ? pagesToAnalyze : pageInfo;
+
     // --- STEP 1: Parallel page analysis batches ---
     const BATCH_SIZE = 20;
     const batches: typeof pageInfo[] = [];
-    for (let i = 0; i < pageInfo.length; i += BATCH_SIZE) {
-      batches.push(pageInfo.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < pagesForBatching.length; i += BATCH_SIZE) {
+      batches.push(pagesForBatching.slice(i, i + BATCH_SIZE));
     }
-    log.info(`Splitting ${pageInfo.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
+    log.info(`Splitting ${pagesForBatching.length} pages into ${batches.length} batches of ~${BATCH_SIZE}`);
     sendProgress('ai', `Analyzing pages in ${batches.length} parallel batches...`, 0.55);
 
     // Build per-page GSC context lookup
@@ -769,7 +934,9 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         clientKeywordsAdded++;
       }
     }
-    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)`);
+    // Filter branded competitor keywords from the pool BEFORE feeding to AI
+    const brandedRemoved = filterBrandedKeywords(keywordPool, competitorDomains);
+    log.info(`Keyword pool: ${keywordPool.size} unique terms (${semrushDomainData.length} domain + ${competitorKeywordData.length} competitor + ${keywordGaps.length} gaps + ${clientKeywordsAdded} client + GSC)${brandedRemoved > 0 ? ` — removed ${brandedRemoved} branded competitor keywords` : ''}`);
     if (keywordPool.size > 0) {
       // Sort by volume descending and include ALL keywords
       const poolList = [...keywordPool.entries()]
@@ -899,6 +1066,24 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
       allPageMappings.push(...validMappings);
     }
     log.info(`All batches complete: ${allPageMappings.length} total page mappings`);
+
+    // --- Incremental mode: merge preserved (fresh) pages back into the page mappings ---
+    // These pages had analysis_generated_at < 7 days old so we keep their existing keywords.
+    if (strategyMode === 'incremental' && pagesToPreserve.length > 0) {
+      const preservedPaths = new Set(pagesToPreserve.map(p => p.path));
+      for (const pk of existingPageKeywords) {
+        if (preservedPaths.has(pk.pagePath)) {
+          allPageMappings.push({
+            pagePath: pk.pagePath,
+            pageTitle: pk.pageTitle,
+            primaryKeyword: pk.primaryKeyword,
+            secondaryKeywords: pk.secondaryKeywords || [],
+            searchIntent: pk.searchIntent || 'informational',
+          });
+        }
+      }
+      log.info(`Incremental mode: merged ${pagesToPreserve.length} preserved pages into final mappings`);
+    }
 
     // --- Post-AI keyword validation via SEMRush bulk lookup ---
     // Optimization: check domain organic data + existing page_keywords before calling API
@@ -1176,6 +1361,7 @@ Rules:
 - If SEO AUDIT data shows high-traffic pages with errors, include them as quickWins with specific fix actions.
 - If COUNTRY data shows a dominant market, consider location-specific content gaps.
 ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.' : ''}
+${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a competitor's brand name. Competitor domains are used to identify topic areas and intent gaps — NOT to recommend branded searches that funnel users to a competitor. Specifically, do NOT include keywords containing any of these brand tokens: ${[...new Set(competitorDomains.flatMap(d => extractBrandTokens(d)))].join(', ')}. If a keyword gap came from competitor data but contains a competitor brand name, skip it and find the next best non-branded gap.` : '- NEVER suggest branded competitor keywords — keywords containing a competitor\'s company or product name. Use competitor data to find topic areas, not to recommend searches that drive users to a competitor.'}
 - Return ONLY valid JSON, no markdown`;
 
     log.info(`Master prompt: ${masterPrompt.length} chars (~${Math.ceil(masterPrompt.length / 4)} tokens)`);
@@ -1205,12 +1391,21 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
       log.info(`Applied ${masterData.keywordFixes.length} keyword conflict fixes`);
     }
 
+    // Post-generation hard filter: remove any content gaps containing competitor brand names.
+    // The AI prompt tells it not to suggest these, but LLMs don't always comply.
+    // This filter is the real defense — the prompt is the soft guardrail.
+    const rawContentGaps = masterData.contentGaps || [];
+    const { filtered: cleanContentGaps, removed: brandedGaps } = filterBrandedContentGaps(rawContentGaps, competitorDomains);
+    if (brandedGaps.length > 0) {
+      log.info(`Stripped ${brandedGaps.length} branded content gaps despite prompt instruction: ${brandedGaps.map((g: { targetKeyword: string }) => g.targetKeyword).join(', ')}`);
+    }
+
     // Assemble final strategy: batch pageMap + master site-level data
     strategy = {
       siteKeywords: masterData.siteKeywords || [],
       pageMap: allPageMappings,
       opportunities: masterData.opportunities || [],
-      contentGaps: masterData.contentGaps || [],
+      contentGaps: cleanContentGaps,
       quickWins: masterData.quickWins || [],
     };
     log.info(`Final strategy: ${strategy.pageMap.length} pages, ${strategy.siteKeywords.length} site keywords, ${strategy.contentGaps.length} content gaps, ${strategy.quickWins.length} quick wins`);
@@ -1261,7 +1456,19 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
           pm.volume = match.volume;
           pm.difficulty = match.difficulty;
           pm.cpc = match.cpc;
-          (pm as Record<string, unknown>).metricsSource = 'exact';
+          pm.metricsSource = METRICS_SOURCE.EXACT;
+          // Capture SERP features for this page's primary keyword — stored per-page and
+          // later aggregated into workspace-level SerpFeatures counts in assembleSeoContext()
+          const serp = hasSerpOpportunity(match.serpFeatures);
+          const features: string[] = [];
+          if (serp.featuredSnippet) features.push('featured_snippet');
+          if (serp.paa) features.push('people_also_ask');
+          if (serp.video) features.push('video');
+          if (serp.localPack) features.push('local_pack');
+          // Always write serpFeatures for exact matches (even empty) so COALESCE overwrites
+          // stale features if SEMRush data changed. Pages with no exact match are left
+          // undefined → null → COALESCE keeps previous value (correct for unmatched pages).
+          pm.serpFeatures = features;
         } else {
           // Try word-overlap match (requires >=80% word overlap and at least 2 words)
           const partial = semrushDomainData.find(k => {
@@ -1274,7 +1481,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
             pm.volume = partial.volume;
             pm.difficulty = partial.difficulty;
             pm.cpc = partial.cpc;
-            (pm as Record<string, unknown>).metricsSource = 'partial_match';
+            pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
           }
         }
         // Enrich secondary keywords
@@ -1314,7 +1521,7 @@ ${hasSemrush ? '- Use SEMRush data to inform priorities. KD < 40% = quick wins.'
                 pm.volume = m.volume;
                 pm.difficulty = m.difficulty;
                 pm.cpc = m.cpc;
-                (pm as Record<string, unknown>).metricsSource = 'bulk_lookup';
+                pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
               }
             }
           }
@@ -1737,9 +1944,28 @@ Rules:
     sendProgress('complete', 'Strategy complete!', 1.0);
     const pageMap = strategy.pageMap || [];
     // Snapshot previous page map BEFORE replacing (needed for strategy diff)
+    // NOTE: for incremental mode we already called listPageKeywords() above (existingPageKeywords),
+    // but we re-read here to get the freshest snapshot right before writing.
     const prevPageMapForHistory = listPageKeywords(ws.id);
-    // Save pageMap to dedicated table (replaces all existing entries)
-    replaceAllPageKeywords(ws.id, pageMap);
+    // Save pageMap to dedicated table.
+    // Full mode: upsert + delete stale rows (clean replacement).
+    // Incremental mode: only upsert analyzed pages (preserve existing rows for fresh pages).
+    // Both modes stamp analysisGeneratedAt = now so incremental freshness checks work correctly
+    // on the next run. Without this, analysis_generated_at stays NULL indefinitely and every
+    // incremental run re-analyzes everything (COALESCE preserves NULL, not the current time).
+    const now = new Date().toISOString();
+    if (strategyMode === 'full') {
+      const stampedMap = pageMap.map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+      upsertAndCleanPageKeywords(ws.id, stampedMap);
+    } else {
+      // Only update the pages that were actually re-analyzed in this incremental run.
+      // Pages with fresh analysis_generated_at are left untouched in the DB.
+      const analyzedPaths = new Set(pagesToAnalyze.map(p => p.path));
+      const analyzedMappings = pageMap
+        .filter((pm: { pagePath: string }) => analyzedPaths.has(pm.pagePath))
+        .map((pm: { pagePath: string }) => ({ ...pm, analysisGeneratedAt: now }));
+      upsertPageKeywordsBatch(ws.id, analyzedMappings);
+    }
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);
@@ -1789,7 +2015,7 @@ Rules:
     incrementUsage(ws.id, 'strategy_generations');
 
     try {
-      if (!getActionBySource('strategy', ws.id)) recordAction({
+      if (!getActionBySource('strategy', ws.id)) recordAction({ // recordAction-ok: ws.id is workspaceId
         workspaceId: ws.id,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
@@ -1922,7 +2148,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   // If pageMap is being updated, save to dedicated table
   if (req.body.pageMap) {
-    replaceAllPageKeywords(ws.id, req.body.pageMap);
+    upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
     // Bridge #5: page keywords replaced — invalidate page caches
     debouncedPageAnalysisInvalidate(ws.id, () => {
       clearSeoContextCache(ws.id);

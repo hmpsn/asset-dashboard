@@ -1,15 +1,25 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { buildSeoContext, buildKeywordMapContext, buildPageAnalysisContext } from './seo-context.js';
+import {
+  buildWorkspaceIntelligence,
+  formatKeywordsForPrompt,
+  formatPersonasForPrompt,
+  formatPageMapForPrompt,
+  formatBrandVoiceForPrompt,
+  formatKnowledgeBaseForPrompt,
+} from './workspace-intelligence.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthData } from '../shared/types/analytics.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
+import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
-import type { ContentBrief } from '../shared/types/content.ts';
+import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import {
   outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
@@ -466,8 +476,24 @@ const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
   },
 };
 
+/**
+ * Builds the strategy card context block injected into the generateBrief prompt.
+ * Exported for unit testing.
+ */
+export function buildStrategyCardBlock(ctx: StrategyCardContext | undefined): string {
+  if (!ctx) return '';
+  const lines: string[] = ['\n\nSTRATEGY CARD CONTEXT (from the content gap that triggered this brief):'];
+  if (ctx.rationale) lines.push(`- Strategic rationale: ${ctx.rationale}`);
+  if (ctx.intent) lines.push(`- Search intent: ${ctx.intent}`);
+  if (ctx.priority) lines.push(`- Priority: ${ctx.priority}`);
+  if (ctx.journeyStage) lines.push(`- Journey stage: ${ctx.journeyStage} — tailor depth, CTA, and tone to this stage`);
+  if (lines.length === 1) return ''; // no fields added
+  lines.push('Use this context to align the brief with the client\'s stated strategy. The rationale explains WHY this page is needed — reference it in the executive summary.');
+  return lines.join('\n');
+}
+
 // Helper to get config for a page type, with blog as default
-function getPageTypeConfig(pageType?: string): PageTypeConfig {
+export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   if (pageType && PAGE_TYPE_CONFIGS[pageType]) return PAGE_TYPE_CONFIGS[pageType];
   return PAGE_TYPE_CONFIGS.blog;
 }
@@ -484,7 +510,11 @@ export async function regenerateBrief(
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const { keywordBlock, brandVoiceBlock, knowledgeBlock } = buildSeoContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const previousBriefJson = JSON.stringify({
@@ -654,7 +684,10 @@ export async function regenerateOutline(
   const existingBrief = getBrief(workspaceId, briefId);
   if (!existingBrief) return null;
 
-  const { keywordBlock, brandVoiceBlock } = buildSeoContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
@@ -747,6 +780,8 @@ export async function generateBrief(
       contentGaps?: string[];
       searchIntent?: string;
     };
+    /** Strategy card context threaded from the content request. */
+    strategyCardContext?: StrategyCardContext;
   }
 ): Promise<ContentBrief> {
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -759,18 +794,67 @@ export async function generateBrief(
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
   // Pull in keyword strategy context for alignment
-  const { keywordBlock, brandVoiceBlock, businessContext: stratBizCtx, knowledgeBlock, personasBlock, strategy } = buildSeoContext(workspaceId);
-  const kwMapContext = buildKeywordMapContext(workspaceId);
+  const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+  const seo = intel.seoContext;
+  const keywordBlock = formatKeywordsForPrompt(seo);
+  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  const stratBizCtx = seo?.businessContext ?? '';
+  const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
+  const personasBlock = formatPersonasForPrompt(seo?.personas);
+  const kwMapContext = formatPageMapForPrompt(seo);
   const bizCtx = context.businessContext || stratBizCtx;
 
-  // Find if any page in the strategy targets this keyword — inject its analysis data
-  const matchedPage = strategy?.pageMap?.find(p =>
+  // Find if any page in the strategy targets this keyword — inject its analysis data.
+  // Use intel.seoContext.strategy.pageMap (populated from the live page_keywords table
+  // by assembleSeoContext) rather than getWorkspace().keywordStrategy (which has pageMap
+  // stripped before storage).
+  const matchedPage = seo?.strategy?.pageMap?.find(p =>
     p.primaryKeyword?.toLowerCase() === targetKeyword.toLowerCase()
     || p.secondaryKeywords?.some(sk => sk.toLowerCase() === targetKeyword.toLowerCase())
   );
-  let pageAnalysisBlock = matchedPage
-    ? buildPageAnalysisContext(workspaceId, matchedPage.pagePath)
-    : '';
+  let pageAnalysisBlock = '';
+  if (matchedPage) {
+    const pageIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['pageProfile'],
+      pagePath: matchedPage.pagePath });
+    const profile = pageIntel.pageProfile;
+    if (profile) {
+      const parts: string[] = [];
+      // Use optimizationIssues (AI per-page keyword analysis) — not auditIssues (structural Webflow audit)
+      if (profile.optimizationIssues?.length) {
+        parts.push(`ISSUES IDENTIFIED:\n${profile.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
+      }
+      if (profile.recommendations?.length) {
+        parts.push(`RECOMMENDATIONS:\n${profile.recommendations.map(r => `- ${r}`).join('\n')}`);
+      }
+      if (profile.contentGaps?.length) {
+        parts.push(`CONTENT GAPS:\n${profile.contentGaps.map(g => `- ${g}`).join('\n')}`);
+      }
+      if (profile.optimizationScore != null) {
+        parts.push(`OPTIMIZATION SCORE: ${profile.optimizationScore}/100`);
+      }
+      if (profile.primaryKeywordPresence) {
+        const p = profile.primaryKeywordPresence;
+        const missing = (['inTitle', 'inMeta', 'inContent', 'inSlug'] as const)
+          .filter(k => !p[k])
+          .map(k => ({ inTitle: 'title tag', inMeta: 'meta description', inContent: 'page content', inSlug: 'URL slug' }[k]));
+        if (missing.length > 0) {
+          parts.push(`PRIMARY KEYWORD MISSING FROM: ${missing.join(', ')}`);
+        }
+      }
+      if (profile.competitorKeywords?.length) {
+        parts.push(`COMPETITOR KEYWORDS TO CONSIDER: ${profile.competitorKeywords.join(', ')}`);
+      }
+      if (profile.topicCluster) {
+        parts.push(`TOPIC CLUSTER: ${profile.topicCluster}`);
+      }
+      if (profile.estimatedDifficulty) {
+        parts.push(`ESTIMATED DIFFICULTY: ${profile.estimatedDifficulty}`);
+      }
+      if (parts.length > 0) {
+        pageAnalysisBlock = `\n\nPAGE ANALYSIS (address these issues in your rewrite — this is what our platform flagged for this page):\n${parts.join('\n')}`;
+      }
+    }
+  }
 
   // If no match found via keyword lookup, use pre-computed analysis from Page Intelligence
   if (!pageAnalysisBlock && context.pageAnalysisContext) {
@@ -783,6 +867,30 @@ export async function generateBrief(
     if (pac.recommendations?.length) parts.push(`Recommendations from page analysis:\n${pac.recommendations.map(r => `- ${r}`).join('\n')}`);
     if (parts.length > 0) {
       pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
+    }
+  }
+
+  // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
+  // SEMRush flags which SERP features are present for the primary keyword; we translate
+  // those signals into concrete structural directives for the brief writer.
+  let serpFeaturesDirectiveBlock = '';
+  if (matchedPage?.serpFeatures?.length) {
+    const feats = matchedPage.serpFeatures;
+    const directives: string[] = [];
+    if (feats.includes('featured_snippet')) {
+      directives.push('FEATURED SNIPPET OPPORTUNITY: Structure a clear, concise definition or numbered step list in the first 100 words. The opening paragraph should directly answer the target query in 40-60 words.');
+    }
+    if (feats.includes('people_also_ask')) {
+      directives.push('PEOPLE ALSO ASK OPPORTUNITY: Include a dedicated FAQ section with 4-6 concise Q&A pairs. Questions should directly address what users ask about this topic.');
+    }
+    if (feats.includes('video')) {
+      directives.push('VIDEO CAROUSEL OPPORTUNITY: Recommend embedding a relevant video or note that a video component will improve SERP visibility for this keyword.');
+    }
+    if (feats.includes('local_pack')) {
+      directives.push('LOCAL PACK OPPORTUNITY: Include location-specific content, NAP details, and recommend LocalBusiness schema markup.');
+    }
+    if (directives.length > 0) {
+      serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (SEMRush data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;
     }
   }
 
@@ -888,7 +996,24 @@ The outline sections MUST match the following template sections in order. You ma
     }
   } catch { /* intelligence layer not ready — skip */ }
 
-  const prompt = `You are an expert content strategist and SEO specialist. Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
+  // Workspace learnings: what content types and strategies historically win
+  let learningsBlock = '';
+  if (isFeatureEnabled('outcome-ai-injection')) {
+    try {
+      const learnings = getWorkspaceLearnings(workspaceId);
+      if (learnings) {
+        const block = formatLearningsForPrompt(learnings, 'content');
+        if (block) {
+          learningsBlock = `\n\n${block}`;
+        }
+      }
+    } catch { /* learnings not available — skip */ }
+  }
+
+  // Strategy card context from content request
+  const strategyCardBlock = buildStrategyCardBlock(context.strategyCardContext);
+
+  const prompt = `Generate a comprehensive, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
 ${bizCtx ? `Business context: ${bizCtx}` : ''}
 
@@ -896,7 +1021,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${intelligenceBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
 
 Generate a content brief in the following JSON format:
 {
@@ -981,11 +1106,18 @@ LANGUAGE RULES for the brief itself:
 
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
+  const systemInstructions = 'You are an expert SEO content strategist. Generate a comprehensive content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
+  const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
+
   const aiResult = await callOpenAI({
     model: 'gpt-4.1',
-    messages: [{ role: 'user', content: prompt }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt },
+    ],
     maxTokens: 7000,
     temperature: 0.5,
+    responseFormat: { type: 'json_object' },
     feature: 'content-brief',
     workspaceId,
   });

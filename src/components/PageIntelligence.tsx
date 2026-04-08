@@ -16,6 +16,7 @@ import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import type { FixContext } from '../App';
+import type { MetricsSource } from '../../shared/types/keywords.js';
 
 // ── Types ──
 
@@ -40,7 +41,7 @@ interface StrategyPage {
   volume?: number;
   difficulty?: number;
   cpc?: number;
-  metricsSource?: 'exact' | 'partial_match' | 'ai_estimate';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   optimizationScore?: number;
@@ -250,10 +251,13 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       .finally(() => setPagesLoading(false));
   }, [siteId]);
 
-  // Auto-expand target page from fixContext
+  // Auto-expand target page from fixContext.
+  // Caller: AuditIssueRow "Page" button sets targetRoute='page-intelligence'.
+  // Guard on targetRoute so stale fixContext from other tabs doesn't auto-expand.
+  // fixConsumed ref prevents re-triggering on subsequent renders after initial expand.
   const fixConsumed = useRef(false);
   useEffect(() => {
-    if (fixContext?.pageSlug && !fixConsumed.current && unifiedPages.length > 0) {
+    if (fixContext?.pageSlug && fixContext.targetRoute === 'page-intelligence' && !fixConsumed.current && unifiedPages.length > 0) {
       const match = unifiedPages.find(p =>
         p.slug === fixContext.pageSlug || p.path === `/${fixContext.pageSlug}` || p.id === fixContext.pageId
       );
@@ -1157,7 +1161,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                   {/* ── Action bar ── */}
                   <div className="flex items-center gap-2 pt-3 mt-1 border-t border-zinc-800/60 flex-wrap">
                     <button
-                      onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                      onClick={() => navigate(adminPath(workspaceId, 'seo-editor'), { state: { fixContext: { targetRoute: 'seo-editor', pageSlug: page.slug, pageName: page.title } } })}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                     >
                       <Pencil className="w-3 h-3" /> Fix in SEO Editor
@@ -1167,6 +1171,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                         navigate(adminPath(workspaceId, 'seo-briefs'), {
                           state: {
                             fixContext: {
+                              targetRoute: 'seo-briefs',
                               pageSlug: page.slug,
                               pageName: page.title,
                               primaryKeyword: sp?.primaryKeyword || kw?.primaryKeyword || undefined,
@@ -1186,7 +1191,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     </button>
                     {(kw?.optimizationIssues?.some(i => /schema|structured data/i.test(i)) || sp?.optimizationIssues?.some(i => /schema|structured data/i.test(i))) && (
                       <button
-                        onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { pageSlug: page.slug, pageName: page.title } } })}
+                        onClick={() => navigate(adminPath(workspaceId, 'seo-schema'), { state: { fixContext: { targetRoute: 'seo-schema', pageSlug: page.slug, pageName: page.title } } })}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
                       >
                         <Code2 className="w-3 h-3" /> Add Schema

@@ -11,8 +11,11 @@ import {
   getBrief,
   updateBrief,
   deleteBrief,
+  buildStrategyCardBlock,
+  getPageTypeConfig,
   type ContentBrief,
 } from '../../server/content-brief.js';
+import type { StrategyCardContext } from '../../shared/types/content.js';
 
 // Helper to create a brief directly via SQLite (since createBrief requires OpenAI)
 function seedBrief(workspaceId: string, brief: ContentBrief): void {
@@ -252,5 +255,63 @@ describe('ContentBrief shape', () => {
     const fetched = getBrief(wsId, 'brief_v5');
     expect(fetched!.referenceUrls).toHaveLength(1);
     expect(fetched!.realTopResults![0].position).toBe(1);
+  });
+});
+
+// ── buildStrategyCardBlock ──
+
+describe('buildStrategyCardBlock', () => {
+  it('returns empty string when context is undefined', () => {
+    expect(buildStrategyCardBlock(undefined)).toBe('');
+  });
+
+  it('includes rationale when provided', () => {
+    const block = buildStrategyCardBlock({
+      rationale: 'High-volume gap with no existing page',
+      intent: 'informational',
+      priority: 'high',
+      journeyStage: 'awareness',
+    });
+    expect(block).toContain('High-volume gap with no existing page');
+    expect(block).toContain('informational');
+    expect(block).toContain('high');
+    expect(block).toContain('awareness');
+  });
+
+  it('omits fields that are undefined', () => {
+    const block = buildStrategyCardBlock({ rationale: 'Only rationale set' });
+    expect(block).toContain('Only rationale set');
+    expect(block).not.toContain('undefined');
+  });
+
+  it('returns empty string when context has no fields set', () => {
+    expect(buildStrategyCardBlock({})).toBe('');
+  });
+});
+
+// ── getPageTypeConfig coverage ──
+
+describe('getPageTypeConfig coverage', () => {
+  const PAGE_TYPES = ['blog', 'landing', 'service', 'location', 'pillar', 'product', 'resource'];
+
+  it('returns a config for every supported page type', () => {
+    for (const pt of PAGE_TYPES) {
+      const cfg = getPageTypeConfig(pt);
+      expect(cfg).toBeDefined();
+      expect(typeof cfg.wordCountTarget).toBe('number');
+      expect(cfg.wordCountTarget).toBeGreaterThan(0);
+      expect(typeof cfg.contentStyle).toBe('string');
+      expect(cfg.contentStyle.length).toBeGreaterThan(0);
+      expect(typeof cfg.prompt).toBe('string');
+      expect(cfg.prompt.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('blog config has wordCountTarget >= 1400', () => {
+    expect(getPageTypeConfig('blog').wordCountTarget).toBeGreaterThanOrEqual(1400);
+  });
+
+  it('landing config has wordCountTarget <= 1000', () => {
+    expect(getPageTypeConfig('landing').wordCountTarget).toBeLessThanOrEqual(1000);
   });
 });

@@ -41,7 +41,7 @@ describe('Intelligence types', () => {
       serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true },
       rankTracking: { trackedKeywords: 10, avgPosition: 15.2, positionChanges: { improved: 3, declined: 1, stable: 6 } },
       keywordRecommendations: [],
-      strategyHistory: { revisionsCount: 3, lastRevisedAt: '2026-03-15', trajectory: 'expanding' },
+      strategyHistory: { revisionsCount: 3, lastRevisedAt: '2026-03-15' },
     };
     expect(ctx.businessProfile?.industry).toBe('Tech');
   });

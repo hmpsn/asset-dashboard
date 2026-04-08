@@ -55,7 +55,8 @@ If the shipped feature adds new cross-links between tools, update the table in `
 ## 8. Build and verify
 
 // turbo
-Run `npx vite build` to ensure no build errors from documentation-adjacent code changes.
+Run `npx tsc --noEmit --skipLibCheck && npx vite build` to ensure no type or build errors.
+Run `npx vitest run` to verify no regressions from shipped changes (full suite, not just new tests).
 
 ## 9. Commit and push
 

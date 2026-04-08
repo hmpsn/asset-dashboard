@@ -1,4 +1,5 @@
 // ── Workspace domain types ──────────────────────────────────────
+import type { MetricsSource } from './keywords.ts';
 
 export interface EventGroup {
   id: string;
@@ -33,7 +34,7 @@ export interface PageKeywordMap {
   difficulty?: number;
   cpc?: number;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
-  metricsSource?: 'exact' | 'partial_match' | 'bulk_lookup';
+  metricsSource?: MetricsSource;
   validated?: boolean;
   // Persisted page analysis (generated via keyword analysis, feeds into AI rewrites)
   optimizationIssues?: string[];
@@ -50,6 +51,9 @@ export interface PageKeywordMap {
   monthlyVolume?: number;
   topicCluster?: string;
   searchIntentConfidence?: number;
+  /** SERP features present for the primary keyword (e.g. featured_snippet, people_also_ask, local_pack).
+   *  Captured from SEMRush domain organic data during strategy generation. */
+  serpFeatures?: string[];
 }
 
 export interface KeywordGapItem {
@@ -170,13 +174,14 @@ export interface Workspace {
   eventGroups?: EventGroup[];
   keywordStrategy?: KeywordStrategy;
   competitorDomains?: string[];
+  competitorLastFetchedAt?: string | null;
   personas?: AudiencePersona[];
   // Feature toggles
   clientPortalEnabled?: boolean;
   seoClientView?: boolean;
   analyticsClientView?: boolean;
-  /** When false, the Site Intelligence module is hidden from this workspace's client dashboard. Default true (null treated as true). */
-  siteIntelligenceClientView?: boolean | null;
+  /** When false, the Site Intelligence module is hidden from this workspace's client dashboard. Default true (undefined treated as true). */
+  siteIntelligenceClientView?: boolean;
   autoReports?: boolean;
   autoReportFrequency?: 'weekly' | 'monthly';
   // Branding
@@ -244,10 +249,22 @@ export interface Workspace {
     foundedDate?: string;         // ISO date or year
     numberOfEmployees?: string;   // e.g. "10-50"
   };
-  /** Admin-editable client business goals, e.g. ['Grow patient appointments by 25% in Q3']. */
+  /**
+   * Admin-set strategic goals for AI context, e.g. ['Grow patient appointments by 25% in Q3'].
+   * Distinct from the `client_business_priorities` DB table (public-portal.ts), which stores
+   * priorities submitted by the client via the portal questionnaire.
+   */
   businessPriorities?: string[];
+  /** Per-workspace custom AI framing notes for system prompt assembly (Layer 3). */
+  customPromptNotes?: string;
   // Per-workspace outcome scoring thresholds (overrides DEFAULT_SCORING_CONFIG)
   scoringConfig?: Partial<Record<string, { primary_metric: string; thresholds: { strong_win: number; win: number; neutral_band: number } }>>;
+  /** Structured business intelligence profile (industry, goals, target audience). Separate from businessProfile (contact info). */
+  intelligenceProfile?: {
+    industry?: string;
+    goals?: string[];
+    targetAudience?: string;
+  };
   folder: string;
   createdAt: string;
 }

@@ -126,18 +126,19 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
     const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
 
     // Build result from static pages
-    const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms' }> = published.map(p => ({
+    const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms'; collectionId?: string }> = published.map(p => ({
       id: p.id,
       title: p.title,
       slug: p.slug || '',
       publishedPath: p.publishedPath,
       seo: p.seo ? { title: p.seo.title || undefined, description: p.seo.description || undefined } : undefined,
       source: 'static' as const,
+      collectionId: p.collectionId ?? undefined,
     }));
 
     // Discover CMS pages from sitemap
     try {
-      const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
+      // Reuse outer `ws` — same lookup, no need to re-query listWorkspaces()
       let baseUrl = '';
       if (ws?.liveDomain) {
         baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
@@ -172,6 +173,12 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
 });
 
 router.put('/api/webflow/pages/:pageId/seo', async (req, res) => {
+  // Reject synthetic CMS IDs at the API boundary — these are not real Webflow page IDs
+  // and the Webflow API returns 404 for them. Guard here so no frontend call site can
+  // inadvertently send them through regardless of whether it remembered to filter.
+  if (req.params.pageId.startsWith('cms-')) {
+    return res.status(400).json({ error: 'Cannot update SEO for CMS pages via this endpoint — update directly in Webflow' });
+  }
   try {
     const { siteId, seo, openGraph, title } = req.body;
     const token = siteId ? (getTokenForSite(siteId) || undefined) : undefined;

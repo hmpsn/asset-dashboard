@@ -63,7 +63,7 @@ const stmts = createStmtCache(() => ({
   `),
   getById: db.prepare(`SELECT * FROM suggested_briefs WHERE id = ? AND workspace_id = ?`),
   updateStatus: db.prepare(`
-    UPDATE suggested_briefs SET status = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?
+    UPDATE suggested_briefs SET status = ?, resolved_at = ? WHERE id = ? AND workspace_id = ? -- status-ok: simple pending/accepted/rejected lifecycle
   `),
   updateSnooze: db.prepare(`
     UPDATE suggested_briefs SET status = 'snoozed', snoozed_until = ? WHERE id = ? AND workspace_id = ?

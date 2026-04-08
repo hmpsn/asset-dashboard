@@ -309,16 +309,15 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
               Trends
             </button>
           )}
-          {hasGsc && (
-            <button
-              onClick={takeSnapshot}
-              disabled={snapshotting || keywords.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
-            >
-              {snapshotting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-              {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
-            </button>
-          )}
+          <button
+            onClick={takeSnapshot}
+            disabled={!hasGsc || snapshotting || keywords.length === 0}
+            title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {snapshotting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            {snapshotting ? 'Capturing...' : 'Capture Snapshot'}
+          </button>
         </div>
       </div>
 

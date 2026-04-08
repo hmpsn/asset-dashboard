@@ -1,6 +1,6 @@
 /**
  * Light-mode branded HTML email templates.
- * All emails share a common layout with hmpsn studio branding (#202945 on white).
+ * All emails share a common layout with branded styling (#202945 on white).
  * Templates support both single events and batched digests.
  */
 
@@ -8,11 +8,26 @@ import { STUDIO_NAME } from './constants.js';
 
 // ── Shared helpers ──
 
+/** HTML-escape a string for safe interpolation into raw HTML template literals.
+ *  layout() escapes: preheader, headline, subtitle, footer, CTA label.
+ *  itemRow() escapes: title, detail, badge label.
+ *  Do NOT pre-escape values passed to those fields — only use esc() when
+ *  injecting directly into a `${...}` inside a raw HTML string (e.g. body content). */
 function esc(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** Strip newlines/carriage returns from email subject lines to prevent header injection.
+ *  Email subjects are plain text (not HTML), so esc() is not needed — but newlines
+ *  in a subject string could be exploited for SMTP header injection. */
+function sanitizeSubject(s: string): string {
+  return s.replace(/[\r\n]+/g, ' ').trim();
+}
+
 // ── Layout ──
+// layout() escapes preheader, headline, subtitle, footer, and CTA label internally.
+// body is intentionally raw HTML (it contains styled divs, links, etc.).
+// Do NOT pre-escape values passed to these fields — it causes double-encoding.
 
 function layout(opts: {
   preheader?: string;
@@ -51,8 +66,8 @@ function layout(opts: {
       <!-- Logo -->
       <div style="text-align:center;margin-bottom:24px;">
         ${opts.logoUrl
-          ? `<img src="${esc(opts.logoUrl)}" alt="hmpsn studio" height="22" style="height:22px;width:auto;" />`
-          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">hmpsn studio</span>`
+          ? `<img src="${esc(opts.logoUrl)}" alt="${esc(STUDIO_NAME)}" height="22" style="height:22px;width:auto;" />`
+          : `<span style="font-size:15px;font-weight:700;letter-spacing:0.5px;color:#202945;">${esc(STUDIO_NAME)}</span>`
         }
       </div>
 
@@ -61,8 +76,8 @@ function layout(opts: {
 
         <!-- Header -->
         <div style="padding:28px 28px 0;">
-          <h1 class="text-primary" style="margin:0 0 2px;font-size:18px;font-weight:600;color:#202945;line-height:1.3;">${opts.headline}</h1>
-          ${opts.subtitle ? `<div class="text-secondary" style="font-size:13px;color:#6b7280;margin-top:4px;">${opts.subtitle}</div>` : ''}
+          <h1 class="text-primary" style="margin:0 0 2px;font-size:18px;font-weight:600;color:#202945;line-height:1.3;">${esc(opts.headline)}</h1>
+          ${opts.subtitle ? `<div class="text-secondary" style="font-size:13px;color:#6b7280;margin-top:4px;">${esc(opts.subtitle)}</div>` : ''}
         </div>
 
         <!-- Body -->
@@ -80,7 +95,7 @@ function layout(opts: {
 
       <!-- Footer -->
       <div style="text-align:center;margin-top:20px;">
-        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${opts.footer || `Automated notification from ${STUDIO_NAME}`}</span>
+        <span class="text-muted" style="font-size:11px;color:#9ca3af;">${esc(opts.footer || `Automated notification from ${STUDIO_NAME}`)}</span>
       </div>
 
     </div>
@@ -158,23 +173,26 @@ export type EmailEventType =
   | 'anomaly_alert'
   | 'content_published'
   | 'feedback_new'
-  | 'audit_complete';
+  | 'audit_complete'
+  | 'client_signal';
 
 // ── Template renderers ──
 
 function deriveLogoUrl(dashUrl?: string): string | undefined {
-  // Try to derive from dashboard URL first
-  if (dashUrl) {
-    try {
-      const u = new URL(dashUrl);
-      return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-    } catch { /* continue to fallback */ }
-  }
-  // Fallback: use APP_URL if available
+  // APP_URL is the authoritative platform domain where static files are served.
+  // Check it first — deriving from dashUrl risks using the marketing-site domain
+  // when ADMIN_URL is unset, producing a broken image link.
   const appUrl = process.env.APP_URL;
   if (appUrl) {
     try {
       const u = new URL(appUrl);
+      return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
+    } catch { /* continue to fallback */ }
+  }
+  // Fallback: derive from the dashboard URL passed by the caller
+  if (dashUrl) {
+    try {
+      const u = new URL(dashUrl);
       return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
     } catch { /* continue to fallback */ }
   }
@@ -188,48 +206,53 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
   const dashUrl = events.find(e => e.dashboardUrl)?.dashboardUrl;
   const logoUrl = deriveLogoUrl(dashUrl);
 
+  let result: { subject: string; html: string };
   switch (type) {
     case 'approval_ready':
-      return renderApprovalReady(events, count, ws, dashUrl, logoUrl);
+      result = renderApprovalReady(events, count, ws, dashUrl, logoUrl); break;
     case 'request_new':
-      return renderRequestNew(events, count, ws, dashUrl, logoUrl);
+      result = renderRequestNew(events, count, ws, dashUrl, logoUrl); break;
     case 'request_status':
-      return renderRequestStatus(events, count, ws, dashUrl, logoUrl);
+      result = renderRequestStatus(events, count, ws, dashUrl, logoUrl); break;
     case 'request_response':
-      return renderRequestResponse(events, count, ws, dashUrl, logoUrl);
+      result = renderRequestResponse(events, count, ws, dashUrl, logoUrl); break;
     case 'content_request':
-      return renderContentRequest(events, count, ws, dashUrl, logoUrl);
+      result = renderContentRequest(events, count, ws, dashUrl, logoUrl); break;
     case 'content_brief_ready':
-      return renderContentBriefReady(events, count, ws, dashUrl, logoUrl);
+      result = renderContentBriefReady(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_alert':
-      return renderAuditAlert(events, count, ws, dashUrl, logoUrl);
+      result = renderAuditAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'client_welcome':
-      return renderClientWelcome(events[0], logoUrl);
+      result = renderClientWelcome(events[0], logoUrl); break;
     case 'trial_expiry_warning':
-      return renderTrialExpiryWarning(events[0], logoUrl);
+      result = renderTrialExpiryWarning(events[0], logoUrl); break;
     case 'password_reset':
-      return renderPasswordReset(events[0], logoUrl);
+      result = renderPasswordReset(events[0], logoUrl); break;
     case 'churn_signal':
-      return renderChurnSignal(events, count, ws, dashUrl, logoUrl);
+      result = renderChurnSignal(events, count, ws, dashUrl, logoUrl); break;
     case 'payment_received':
-      return renderPaymentReceived(events, count, ws, dashUrl, logoUrl);
+      result = renderPaymentReceived(events, count, ws, dashUrl, logoUrl); break;
     case 'fixes_applied':
-      return renderFixesApplied(events, count, ws, dashUrl, logoUrl);
+      result = renderFixesApplied(events, count, ws, dashUrl, logoUrl); break;
     case 'recommendations_ready':
-      return renderRecommendationsReady(events, count, ws, dashUrl, logoUrl);
+      result = renderRecommendationsReady(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_improved':
-      return renderAuditImproved(events, count, ws, dashUrl, logoUrl);
+      result = renderAuditImproved(events, count, ws, dashUrl, logoUrl); break;
     case 'anomaly_alert':
-      return renderAnomalyAlert(events, count, ws, dashUrl, logoUrl);
+      result = renderAnomalyAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'content_published':
-      return renderContentPublished(events, count, ws, dashUrl, logoUrl);
+      result = renderContentPublished(events, count, ws, dashUrl, logoUrl); break;
     case 'feedback_new':
-      return renderFeedbackNew(events, count, ws, dashUrl, logoUrl);
+      result = renderFeedbackNew(events, count, ws, dashUrl, logoUrl); break;
     case 'audit_complete':
-      return renderAuditComplete(events[0], logoUrl);
+      result = renderAuditComplete(events[0], logoUrl); break;
+    case 'client_signal':
+      result = renderClientSignal(events, count, ws, dashUrl, logoUrl); break;
     default:
-      return { subject: 'Notification', html: '' };
+      result = { subject: 'Notification', html: '' };
   }
+  // Sanitize subject at the single exit point — strips newlines to prevent SMTP header injection.
+  return { subject: sanitizeSubject(result.subject), html: result.html };
 }
 
 // ── Individual template renderers ──
@@ -457,7 +480,7 @@ function renderPasswordReset(event: EmailEvent, logoUrl?: string) {
           <span style="font-size:12px;color:#92400e;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</span>
         </div>`,
       cta: { label: 'Reset Password', url: resetUrl },
-      footer: `You're receiving this because a password reset was requested for your account on ${esc(ws)}`,
+      footer: `You're receiving this because a password reset was requested for your account on ${ws}`,
       logoUrl: logoUrl || deriveLogoUrl(resetUrl),
     }),
   };
@@ -503,10 +526,10 @@ function renderTrialExpiryWarning(event: EmailEvent, logoUrl?: string) {
           ${itemRow({ title: 'Content pipeline', detail: 'Brief generation, content requests, approval workflows', isLast: true })}
         </div>
         <div style="margin-top:16px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
-          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact ${STUDIO_NAME} to discuss plans.</span>
+          <span style="font-size:12px;color:#0d9488;">Want to keep Growth features? Contact ${esc(STUDIO_NAME)} to discuss plans.</span>
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
-      footer: `You're receiving this because your Growth trial on ${esc(ws)} is ending soon`,
+      footer: `You're receiving this because your Growth trial on ${ws} is ending soon`,
       logoUrl: logoUrl || deriveLogoUrl(dashUrl),
     }),
   };
@@ -532,17 +555,17 @@ function renderClientWelcome(event: EmailEvent, logoUrl?: string) {
     subject: `Welcome to your dashboard — ${ws}`,
     html: layout({
       preheader: `Your ${ws} insights dashboard is ready`,
-      headline: `Welcome, ${esc(name)}!`,
+      headline: `Welcome, ${name}!`,
       subtitle: `Your ${ws} dashboard is ready`,
       body: `
         <p class="text-primary" style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">
-          ${STUDIO_NAME} has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
+          ${esc(STUDIO_NAME)} has set up a personalized insights dashboard for you. It's your central hub for tracking website performance, reviewing SEO improvements, and collaborating on content.
         </p>` + gettingStarted + `
         <div style="margin-top:20px;background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 16px;text-align:center;">
           <span style="font-size:12px;color:#0d9488;">Questions? Just reply to this email — we're here to help.</span>
         </div>`,
       cta: dashUrl ? { label: 'Open Your Dashboard', url: dashUrl } : undefined,
-      footer: `You're receiving this because an account was created for you on ${esc(ws)}`,
+      footer: `You're receiving this because an account was created for you on ${ws}`,
       logoUrl: logoUrl || deriveLogoUrl(dashUrl),
     }),
   };
@@ -697,11 +720,11 @@ export function renderMonthlyReport(data: {
   const trialBanner = d.isTrial ? `
     <div style="margin-bottom:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;text-align:center;">
       <div style="font-size:13px;font-weight:600;color:#92400e;">Growth Trial${d.trialDaysRemaining != null ? ` · ${d.trialDaysRemaining} day${d.trialDaysRemaining !== 1 ? 's' : ''} remaining` : ''}</div>
-      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact ${STUDIO_NAME} to discuss plans and pricing.</div>
+      <div style="font-size:11px;color:#a16207;margin-top:4px;">You're currently on a 14-day Growth trial. Contact ${esc(STUDIO_NAME)} to discuss plans and pricing.</div>
     </div>` : '';
 
   return {
-    subject: `Monthly Report — ${d.workspaceName} (${d.monthName})`,
+    subject: sanitizeSubject(`Monthly Report — ${d.workspaceName} (${d.monthName})`),
     html: layout({
       preheader: `Your ${d.monthName} summary for ${d.workspaceName}`,
       headline: 'Monthly Report',
@@ -974,7 +997,7 @@ export function renderApprovalReminder(data: {
   dashboardUrl?: string;
 }): { subject: string; html: string } {
   return {
-    subject: `Reminder: ${data.pendingCount} SEO changes awaiting your approval — ${data.workspaceName}`,
+    subject: sanitizeSubject(`Reminder: ${data.pendingCount} SEO changes awaiting your approval — ${data.workspaceName}`),
     html: layout({
       preheader: `${data.pendingCount} changes have been waiting ${data.staleDays} days`,
       headline: 'Approval Reminder',
@@ -992,5 +1015,28 @@ export function renderApprovalReminder(data: {
       cta: data.dashboardUrl ? { label: 'Review Changes', url: data.dashboardUrl } : undefined,
       logoUrl: deriveLogoUrl(data.dashboardUrl),
     }),
+  };
+}
+
+function renderClientSignal(events: EmailEvent[], count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const adminUrl = dashUrl ?? '';
+  const items = events.map((e, i) => itemRow({
+    title: (e.data.signalType as string) === 'service_interest' ? 'Service Interest' : 'Content Interest',
+    detail: (e.data.triggerMessage as string) ?? '',
+    badge: { label: (e.data.signalType as string) === 'service_interest' ? 'Service' : 'Content', color: '#0f766e', bg: '#f0fdfa' },
+    isLast: i === events.length - 1,
+  }));
+  const subject = count === 1
+    ? `Client signal from ${ws}`
+    : `${count} client signals from ${ws}`;
+  const body = `
+    <p style="margin:0 0 12px;font-size:14px;color:#202945;">
+      ${count === 1 ? 'A client' : `${count} client signals`} at <strong>${esc(ws)}</strong> expressed purchase or service intent.
+    </p>
+    ${items.join('')}
+  `;
+  return {
+    subject,
+    html: layout({ preheader: subject, headline: subject, subtitle: ws, body, cta: { label: 'View in Admin Inbox', url: adminUrl }, logoUrl }),
   };
 }

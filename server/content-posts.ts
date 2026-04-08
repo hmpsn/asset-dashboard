@@ -44,7 +44,7 @@ export async function generatePost(
   existingPostId?: string,
 ): Promise<GeneratedPost> {
   const postId = existingPostId || `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  const voiceCtx = buildVoiceContext(workspaceId);
+  const voiceCtx = await buildVoiceContext(workspaceId);
 
   // Resolve the site's live domain for internal link URLs
   const ws = getWorkspace(workspaceId);
@@ -200,7 +200,7 @@ export async function regenerateSection(
   const post = getPost(workspaceId, postId);
   if (!post || sectionIndex < 0 || sectionIndex >= post.sections.length) return null;
 
-  const voiceCtx = buildVoiceContext(workspaceId);
+  const voiceCtx = await buildVoiceContext(workspaceId);
   const previousSections = post.sections
     .filter((s, i) => i < sectionIndex && s.status === 'done')
     .map(s => s.content);

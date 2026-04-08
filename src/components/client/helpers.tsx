@@ -140,7 +140,11 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
 
 export function RenderMarkdown({ text }: { text: string }) {
   const inlineMd = (s: string) =>
-    s.replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>')
+    // Strip markdown links [text](url) → text only (CTA buttons handle navigation)
+    s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+     // Strip bare URLs
+     .replace(/https?:\/\/\S+/g, '')
+     .replace(/\*\*(.+?)\*\*/g, '<b class="text-zinc-200">$1</b>')
      .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="text-zinc-400">$1</em>')
      .replace(/`([^`]+)`/g, '<code class="bg-zinc-800 px-1 py-0.5 rounded text-zinc-300 text-[11px]">$1</code>');
   const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();

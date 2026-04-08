@@ -103,6 +103,31 @@ export function measureOutcome(attributionId: string, params: {
 }
 
 /**
+ * Get raw ROI attribution rows for the workspace intelligence assembler.
+ * Returns structured data suitable for the ROIAttribution slice.
+ */
+export function getROIAttributionsRaw(workspaceId: string, limit = 10): Array<{
+  id: string;
+  pageUrl: string;
+  actionType: string;
+  clicksBefore: number;
+  clicksAfter: number;
+  clickGain: number;
+  measuredAt: string;
+}> {
+  const rows = stmts().getHighlights.all(workspaceId, limit) as ROIAttributionRow[];
+  return rows.map(row => ({
+    id: row.id,
+    pageUrl: row.page_url,
+    actionType: row.action_type,
+    clicksBefore: row.clicks_before ?? 0,
+    clicksAfter: row.clicks_after ?? 0,
+    clickGain: (row.clicks_after ?? 0) - (row.clicks_before ?? 0),
+    measuredAt: row.measured_at ?? '',
+  }));
+}
+
+/**
  * Get ROI highlights for a workspace (monthly digest + client dashboard).
  * Only returns attributions where both before and after metrics are available.
  */
