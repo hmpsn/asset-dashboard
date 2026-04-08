@@ -83,9 +83,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
 
     // Fetch GSC data if available
-    if (ws?.gscPropertyUrl) {
+    if (ws?.gscPropertyUrl && ws.webflowSiteId) {
       try {
-        const overview = await getSearchOverview(ws.id, ws.gscPropertyUrl, 28);
+        const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28);
         relatedQueries = overview.topQueries
           .filter(q => { const ql = q.query.toLowerCase(); return targetKeyword.toLowerCase().split(' ').some((w: string) => w.length > 2 && ql.includes(w)); })
           .slice(0, 20);
