@@ -1,9 +1,13 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getMeetingBrief, upsertMeetingBrief, getMeetingBriefHash } from '../meeting-brief-store.js';
 import type { MeetingBrief } from '../../shared/types/meeting-brief.js';
 
 import db from '../db/index.js';
 
+// FK enforcement is disabled in the test environment (tests/db-setup.ts:11 — `PRAGMA foreign_keys = OFF`).
+// Inserting with an ad-hoc workspace ID without a matching workspaces row is intentional
+// and consistent with how all other store tests operate since migration 019.
 const WS_ID = 'test-workspace-store';
 
 const SAMPLE_BRIEF: MeetingBrief = {

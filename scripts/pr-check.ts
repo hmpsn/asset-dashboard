@@ -122,6 +122,7 @@ const CHECKS: Check[] = [
       'server/routes/webflow-seo.ts', // AI response text parser, not DB columns
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
+      'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',

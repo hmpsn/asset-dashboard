@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../db/index.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';

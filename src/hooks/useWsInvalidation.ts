@@ -147,5 +147,9 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.clientSignals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.notifications() });
     },
+    [WS_EVENTS.MEETING_BRIEF_GENERATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.meetingBrief(workspaceId) });
+    },
   });
 }
