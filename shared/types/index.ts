@@ -13,4 +13,5 @@ export type * from './schema-plan.ts';
 export type * from './insights.ts';
 export type * from './intelligence.ts';
 export type * from './client-signals.ts';
+export type * from './meeting-brief.ts';
 export * from './keywords.ts';

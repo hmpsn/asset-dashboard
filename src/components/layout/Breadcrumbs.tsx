@@ -4,7 +4,7 @@ import type { Workspace } from '../WorkspaceSelector';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
 const TAB_LABELS: Record<string, string> = {
-  home: 'Home', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
+  home: 'Home', brief: 'Meeting Brief', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
   links: 'Links', 'seo-strategy': 'Strategy',
   'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
   'seo-ranks': 'Rank Tracker', 'analytics-hub': 'Analytics', performance: 'Performance', 'content-perf': 'Content Performance',

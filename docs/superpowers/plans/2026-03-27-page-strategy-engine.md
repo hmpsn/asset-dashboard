@@ -920,7 +920,34 @@ export async function generateBlueprint(
 ): Promise<SiteBlueprint> {
   log.info({ workspaceId, input }, 'Generating blueprint');
 
-  // 1. Gather context
+  // ── WORKSPACE INTELLIGENCE LAYER ──
+  // NOTE: Use `buildWorkspaceIntelligence()` instead of separate builder calls.
+  //
+  //   import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+  //
+  //   const intelligence = await buildWorkspaceIntelligence(workspaceId, {
+  //     slices: ['seoContext', 'insights'],
+  //   });
+  //
+  // This replaces separate calls to getBrandscript() + any standalone SEO context builders.
+  // Benefits: single DB round-trip, 5-minute LRU cache, consistent context across all AI
+  // prompts in the platform. intelligence.seoContext already contains VoiceDNA and brandscript
+  // context when Phase 1 (Brandscript Engine) has shipped.
+  //
+  // DEPENDENCY: Phase 1 (Brandscript Engine) must ship first so that the `seoContext` slice
+  // includes VoiceDNA and brandscript context. Until Phase 1 is merged, the seoContext slice
+  // will not have brand/voice data and the generator should fall back to the input.brandscriptId
+  // direct lookup below.
+  //
+  // Extract brand context from intelligence:
+  //   const brandContext = intelligence.seoContext?.brandContext ?? '';
+  //
+  // Extract existing keyword context from intelligence (replaces the getDomainOrganicKeywords call):
+  //   const keywordContext = intelligence.seoContext?.topKeywords
+  //     ?.map((k) => `- "${k.keyword}" (vol: ${k.volume}, diff: ${k.difficulty})`)
+  //     .join('\n') ?? '';
+
+  // 1. Gather context (legacy path — replace with intelligence layer above when Phase 1 ships)
   let brandContext = '';
   if (input.brandscriptId) {
     const brandscript = getBrandscript(workspaceId, input.brandscriptId);
@@ -944,6 +971,57 @@ export async function generateBlueprint(
       log.warn({ err }, 'Failed to fetch domain keywords — continuing without');
     }
   }
+
+  // ── INTELLIGENCE-INFORMED BLUEPRINT GENERATION ──
+  // When using buildWorkspaceIntelligence() (see block above), inject the following signals
+  // into the prompt to sharpen page prioritization. These are advisory — use them to inform
+  // recommendations, not to override keyword strategy.
+  //
+  // 1. CANNIBALIZATION + STRATEGY_ALIGNMENT → consolidation recommendations
+  //    Filter intelligence.insights for type 'cannibalization' and 'strategy_alignment'.
+  //    Inject into prompt: "The following pages are currently cannibalizing each other for
+  //    the same queries — the blueprint should recommend consolidating them rather than
+  //    adding new competing pages: [list of affected URLs / page names]."
+  //
+  //    Example:
+  //      const cannibalizationInsights = (intelligence.insights ?? [])
+  //        .filter((i) => i.type === 'cannibalization' || i.type === 'strategy_alignment');
+  //      const consolidationHint = cannibalizationInsights.length > 0
+  //        ? `\n\nCANNIBALIZATION SIGNALS (consolidate rather than add competing pages):\n` +
+  //          cannibalizationInsights.map((i) => `- ${i.title}: ${i.summary}`).join('\n')
+  //        : '';
+  //
+  // 2. COMPETITOR GAP INSIGHTS → page prioritization
+  //    Filter intelligence.insights for type 'competitor_gap' (keywords competitors rank for
+  //    that this site doesn't). Inject as a prioritization signal:
+  //    "These topic areas represent competitor gaps where pages don't exist yet — prioritize
+  //    them in the blueprint: [list with estimated traffic values]."
+  //
+  //    Example:
+  //      const gapInsights = (intelligence.insights ?? [])
+  //        .filter((i) => i.type === 'competitor_gap');
+  //      const gapHint = gapInsights.length > 0
+  //        ? `\n\nCOMPETITOR GAP OPPORTUNITIES (prioritize new pages for these topics):\n` +
+  //          gapInsights.map((i) => `- ${i.title} (est. traffic: ${i.data?.estimatedTraffic ?? 'unknown'})`).join('\n')
+  //        : '';
+  //
+  // 3. LEARNINGS → proven page patterns
+  //    Extract action outcomes from intelligence.learnings related to page creation / content
+  //    publishing. Inject: "These page types have produced measurable ranking improvements for
+  //    this workspace — factor them into page type recommendations: [patterns]."
+  //
+  //    Example:
+  //      const pageCreationLearnings = (intelligence.learnings ?? [])
+  //        .filter((l) => l.actionType === 'page_created' || l.actionType === 'content_published')
+  //        .map((l) => `- ${l.pattern}: ${l.outcome}`);
+  //      const learningsHint = pageCreationLearnings.length > 0
+  //        ? `\n\nPROVEN PAGE PATTERNS (these have produced ranking improvements here):\n` +
+  //          pageCreationLearnings.join('\n')
+  //        : '';
+  //
+  // Combine these hints and append them to the prompt below.
+  // The prompt should note: "These signals are advisory — use them to sharpen page
+  // prioritization, not to override keyword strategy."
 
   // 3. Ask Claude to recommend pages
   const prompt = `You are a web strategist for a design studio. Based on the following business context, recommend a complete list of pages for a new website.
@@ -1006,7 +1084,41 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
     sectionPlan: getDefaultSectionPlan(entry.pageType),
   }));
 
-  bulkAddEntries(blueprint.id, entriesToInsert);
+  const insertedEntries = bulkAddEntries(blueprint.id, entriesToInsert);
+
+  // ── AUTO-BRIEF CREATION (Phase 3 dependency) ──
+  // After entries are written to DB, create a content brief for each entry.
+  // This ensures Phase 3 (Copy Pipeline) can assume briefs exist for all blueprint entries
+  // and does NOT have to create them on the fly. Without this step, Phase 3 will fail at
+  // runtime when it looks up entry.briefId and finds null.
+  //
+  //   import { createContentBrief } from './content-briefs.js';
+  //
+  //   const wordCountByPageType: Record<string, number> = {
+  //     homepage: 1500, service: 2000, about: 1200, location: 1000,
+  //     blog: 1500, faq: 800, contact: 400, /* etc. */
+  //   };
+  //
+  //   for (const entry of insertedEntries) {
+  //     try {
+  //       const brief = await createContentBrief({
+  //         workspaceId,
+  //         blueprintEntryId: entry.id,  // NOTE: createContentBrief() may need this param added
+  //         targetKeyword: entry.primaryKeyword,
+  //         pageType: entry.pageType,
+  //         sectionPlan: entry.sectionPlan,
+  //         wordCountTarget: wordCountByPageType[entry.pageType] ?? 1200,
+  //       });
+  //       // Update the entry's briefId FK with the created brief's ID
+  //       updateEntry(blueprint.id, entry.id, { briefId: brief.id });
+  //     } catch (err) {
+  //       log.warn({ err, entryId: entry.id }, 'Auto-brief creation failed — entry usable without brief');
+  //     }
+  //   }
+  //
+  // IMPORTANT: createContentBrief() may not yet accept a `blueprintEntryId` parameter.
+  // If it doesn't, add that parameter to its signature before calling it here.
+  // The FK column `brief_id` already exists on blueprint_entries (see migration Task 1).
 
   // 6. Validate keywords via SEMrush (non-blocking enrichment)
   enrichKeywords(workspaceId, blueprint.id, generatedEntries).catch((err) => {
@@ -1045,6 +1157,55 @@ export { getBlueprint } from './page-strategy.js';
 ```bash
 git add server/blueprint-generator.ts
 git commit -m "feat: add AI blueprint generator with SEMrush keyword integration"
+```
+
+---
+
+## Task 4b: Auto-Create Content Briefs After Blueprint Generation
+
+> **Phase 3 dependency** — Phase 3 (Copy Pipeline) agents must NOT create briefs themselves.
+> This task ensures every blueprint entry has a `briefId` by the time Phase 3 runs.
+
+**Files:**
+- Modify: `server/blueprint-generator.ts`
+- Possibly modify: `server/content-briefs.ts` (add `blueprintEntryId` param if missing)
+
+- [ ] **Step 1: Activate the auto-brief loop in `generateBlueprint()`**
+
+Uncomment / implement the auto-brief creation block documented in the `// ── AUTO-BRIEF CREATION ──` comment in `generateBlueprint()`.
+
+Check whether `createContentBrief()` in `server/content-briefs.ts` already accepts a `blueprintEntryId` parameter. If it does not, add it as an optional field so the stored brief records the originating blueprint entry FK. This is a non-breaking additive change.
+
+Word count targets per page type (use as defaults; override with explicit values if the generation input provides them):
+
+```typescript
+const WORD_COUNT_BY_PAGE_TYPE: Record<string, number> = {
+  homepage: 1500,
+  service: 2000,
+  about: 1200,
+  location: 1000,
+  blog: 1500,
+  pillar: 3000,
+  resource: 2000,
+  faq: 800,
+  testimonials: 600,
+  contact: 400,
+  'pricing-page': 800,
+  custom: 1200,
+};
+```
+
+The auto-brief loop runs **after** `bulkAddEntries()` and **before** the non-blocking `enrichKeywords()` call. Brief creation failures must not throw — catch per-entry and log warn so the blueprint is still returned even if some briefs fail.
+
+- [ ] **Step 2: Verify briefId is populated**
+
+After `generateBlueprint()` completes, fetch the blueprint and assert that `entries[*].briefId` is non-null for entries where brief creation was attempted.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add server/blueprint-generator.ts server/content-briefs.ts
+git commit -m "feat: auto-create content briefs for each blueprint entry after AI generation"
 ```
 
 ---
@@ -2099,3 +2260,19 @@ Navigate to the Brand Hub page in the browser. The Page Strategy section should 
 git add -A
 git commit -m "fix: address any issues found during verification"
 ```
+
+---
+
+## Intelligence Layer Integration Notes
+
+These notes capture cross-cutting contracts and dependencies introduced by the WorkspaceIntelligence patches above. Read before dispatching Phase 2 or Phase 3 agents.
+
+- **`buildWorkspaceIntelligence()` replaces separate builder calls** — the blueprint generator must call `buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'insights'] })` instead of assembling context from `getBrandscript()`, `buildSeoContext()`, `buildBrandscriptContext()`, or `buildVoiceProfileContext()` individually. One DB round-trip, 5-minute LRU cache, consistent context platform-wide.
+
+- **Phase 1 (Brandscript Engine) is a hard prerequisite for full intelligence** — the `seoContext` slice only includes VoiceDNA and brandscript context after Phase 1 is merged and its data is present in the DB. Until then, the generator falls back to the direct `getBrandscript()` lookup. Do not remove the fallback path until Phase 1 is verified on staging.
+
+- **Auto-brief creation (Task 4b) is a Phase 3 dependency** — Phase 3 (Copy Pipeline) agents must not create briefs themselves. They should read `entry.briefId` and fail loudly if it is null rather than silently creating a brief with incomplete inputs. If `entry.briefId` is null at Phase 3 runtime, the fix is in Task 4b, not Phase 3.
+
+- **Blueprint change invalidation is already wired** — when blueprint entries are added, removed, or updated, the existing strategy-invalidate bridge handles cache invalidation automatically. No additional `broadcastToWorkspace()` wiring is needed in this plan.
+
+- **`brief_id` FK column already exists** — the `blueprint_entries.brief_id` column was included in migration 027 (Task 1). No additional migration is needed for the auto-brief feature. The column is nullable and defaults to NULL until Task 4b populates it.

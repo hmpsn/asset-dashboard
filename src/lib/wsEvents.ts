@@ -36,6 +36,7 @@ export const WS_EVENTS = {
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
+  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

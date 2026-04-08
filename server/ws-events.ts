@@ -68,6 +68,9 @@ export const WS_EVENTS = {
   // Client signals (PIE Group 1)
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
+
+  // Meeting Brief
+  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

@@ -9,3 +9,4 @@ export {
   jobs, chat, roadmap, recommendations, feedback, notifications, upload, settings,
   salesReport, redirects, stripe, auth, keywordFeedback, trackedKeywords, businessPriorities,
 } from './misc';
+export { meetingBriefApi } from './meetingBrief';
