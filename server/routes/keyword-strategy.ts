@@ -566,6 +566,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
 
+    // When skipping competitor fetch, carry forward previously stored data so the
+    // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
+    if (!fetchCompetitors && ws.keywordStrategy?.keywordGaps) {
+      keywordGaps = ws.keywordStrategy.keywordGaps;
+    }
+
     if (semrushMode !== 'none' && provider) {
       sendProgress('semrush', `Fetching keyword intelligence via ${provider.name}...`, 0.55);
       if (!fetchCompetitors) {

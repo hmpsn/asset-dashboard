@@ -379,7 +379,7 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
-  it('returns 500 when AI call fails (FM-2: no phantom success from failed recommendations)', async () => {
+  it('returns 500 when AI call fails (FM-2: no phantom success from failed recommendations)', { timeout: 30_000 }, async () => {
     // generateBatchRecommendations calls OpenAI. The test server uses a fake key,
     // so the call fails with auth error. The route must return 500, not a 200 with
     // empty/garbage recommendations (phantom success).
@@ -390,16 +390,10 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error!.length).toBeGreaterThan(0);
   });
 
-  it('successful recommendations response preserves DecayAnalysis shape', async () => {
-    const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 1 });
-    if (res.status !== 200) return; // skip if OpenAI unavailable in test env
-
-    const body = (await res.json()) as DecayAnalysis;
-    expect(body).toHaveProperty('workspaceId');
-    expect(body).toHaveProperty('decayingPages');
-    expect(body).toHaveProperty('summary');
-    expect(Array.isArray(body.decayingPages)).toBe(true);
-  });
+  // NOTE: A previous test here ("successful recommendations response preserves DecayAnalysis shape")
+  // was removed because the unconditional fake OPENAI_API_KEY means the endpoint always returns 500.
+  // The test's `if (res.status !== 200) return` guard made it vacuously pass in all environments.
+  // Successful recommendation shape is verified by the DecayAnalysis type contract tests instead.
 });
 
 // ── GET /api/public/content-decay/:workspaceId ───────────────────────────────
