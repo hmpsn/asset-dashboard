@@ -52,8 +52,6 @@ export function buildBriefPrompt(intel: WorkspaceIntelligence): string {
   ).join('\n');
 
   return `
-You are a strategic SEO analyst preparing a client meeting brief. Write in a confident, direct tone — like a trusted advisor, not a report.
-
 SITE CONTEXT:
 - Site health score: ${siteScore}${scoreDelta != null ? ` (${scoreDelta > 0 ? '+' : ''}${scoreDelta} from last audit)` : ''}
 - Overall win rate: ${winRate}
@@ -92,11 +90,20 @@ Rules:
 }
 
 function buildPromptHash(intel: WorkspaceIntelligence): string {
+  // Must cover every signal used by buildBriefPrompt() and assembleMeetingBriefMetrics().
+  // Missing a signal → cached brief returned even when that data changed (stale metrics/narrative).
   const relevant = {
     topIds: intel.insights?.topByImpact?.slice(0, 10).map(i => i.id) ?? [],
     siteScore: intel.siteHealth?.auditScore,
-    pipeline: intel.contentPipeline?.briefs.total,
+    scoreDelta: intel.siteHealth?.auditScoreDelta,
+    briefsTotal: intel.contentPipeline?.briefs.total,
+    postsTotal: intel.contentPipeline?.posts.total,
     winRate: intel.learnings?.overallWinRate,
+    topWinIds: intel.learnings?.topWins?.slice(0, 5).map(w => w.id) ?? [],
+    criticalIssues: intel.insights?.bySeverity.critical,
+    rankingOpportunities: intel.insights?.byType.ranking_opportunity?.length,
+    priorities: intel.clientSignals?.businessPriorities ?? [],
+    siteKeywords: intel.seoContext?.strategy?.siteKeywords?.slice(0, 5) ?? [],
   };
   return createHash('sha256').update(JSON.stringify(relevant)).digest('hex');
 }
