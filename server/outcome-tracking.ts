@@ -387,8 +387,10 @@ export function getTopWinsFromActions(
   const fetchOutcomes = getOutcomes ?? getOutcomesForAction;
   const wins: TopWin[] = [];
 
-  for (const action of actions.slice(0, 50)) { // guard: avoid unbounded N+1 for workspaces with many actions
-    if (wins.length >= limit) break;
+  // Iterate the full capped set before sorting — an early break here would mean sort()
+  // only operates on whichever wins appeared first chronologically, not highest-impact.
+  // limit is enforced via slice(0, limit) after the sort below.
+  for (const action of actions.slice(0, 50)) { // guard: cap N+1 queries for large workspaces
     const outcomes = fetchOutcomes(action.id);
     for (const outcome of outcomes) {
       if (outcome.score && WIN_SCORES.includes(outcome.score)) {
