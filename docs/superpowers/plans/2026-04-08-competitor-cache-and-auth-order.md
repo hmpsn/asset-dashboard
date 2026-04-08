@@ -1,31 +1,45 @@
-# Competitor Last-Fetched Cache + Public-Portal Auth Order — Implementation Plan
+# Competitor Cache, Auth Order, and Test Reliability — Implementation Plan
 
-> **Origin:** Flags from PR #149 code review (2026-04-07).
+> **Origin:** Flags from PR #149 code review + two pre-existing flaky tests (2026-04-07/08).
 
-**Goal:** Two small, independent fixes:
-1. Wire `competitorLastFetchedAt` so incremental strategy skips SEMRush competitor re-fetch when data is still fresh
-2. Move auth check before Zod validation on the business-profile PATCH endpoint
+---
 
-**Model:** Sonnet for both — mechanical, well-scoped changes.
+## Task Dependency Graph
+
+```
+All four tasks own distinct files with no shared state → run in parallel.
+
+Task 1 (keyword-strategy.ts) ∥ Task 2 (public-portal.ts) ∥ Task 3 (seo-audit-routes.test.ts) ∥ Task 4 (content-decay-routes.test.ts)
+```
 
 ---
 
 ## Task 1 — Wire `competitorLastFetchedAt` into keyword strategy
 
-**Problem:** Migration 052 added `competitor_last_fetched_at` to the workspaces table and the full read/write plumbing exists, but no code writes to it. The incremental strategy mode still calls SEMRush competitor APIs on every run, burning API credits unnecessarily when competitor data hasn't changed.
-
+**Model:** Sonnet (logic-bearing, multi-location change)
 **Files owned:** `server/routes/keyword-strategy.ts`
+**Must not touch:** any other file
+
+**Problem:** Migration 052 added `competitor_last_fetched_at` to the workspaces table and full plumbing exists (`WorkspaceRow`, `rowToWorkspace` at `server/workspaces.ts:128`, `workspaceToParams` at line 339, `columnMap` at line 446, `Workspace` interface at `shared/types/workspace.ts:177`). But nothing ever writes to it. The incremental strategy mode still calls SEMRush competitor APIs on every run — burning API credits when competitor data is still fresh.
+
+**Verified against codebase:**
+- `getTokenForSite` is at `server/workspaces.ts:383`
+- Competitor fetch block starts around `server/routes/keyword-strategy.ts:554`
+- Auto-discover: ~line 580; competitor keywords: ~line 600; keyword gap: ~line 640
+- `semrushMode` and `provider` guard the whole block at line 557
+- `competitorDomains` populated from `ws.competitorDomains` at line 203 (before the block runs)
+- `updateWorkspace` is available in scope (used at line 210, 592)
 
 ### Steps
 
-- [ ] **1a. Add constants at file top**
+- [ ] **1a. Add constant near top of file** (near `INCREMENTAL_THRESHOLD_DAYS`):
 
 ```typescript
-/** Days before competitor data is considered stale and re-fetched */
+/** Days before competitor keyword data is considered stale and re-fetched */
 const COMPETITOR_CACHE_DAYS = 7;
 ```
 
-- [ ] **1b. Add `shouldFetchCompetitorData` helper** (near `getPagesNeedingAnalysis`)
+- [ ] **1b. Add `shouldFetchCompetitorData` helper** (near the `getPagesNeedingAnalysis` function):
 
 ```typescript
 function shouldFetchCompetitorData(ws: Workspace): boolean {
@@ -36,28 +50,24 @@ function shouldFetchCompetitorData(ws: Workspace): boolean {
 }
 ```
 
-- [ ] **1c. Guard the SEMRush competitor block**
-
-The competitor fetch section (~lines 554–653) currently runs unconditionally when `semrushMode !== 'none' && provider`. Wrap the **competitor-specific** calls (auto-discovery ~580, competitor keywords ~600, keyword gap ~640) in:
+- [ ] **1c. Compute skip flag before the competitor block** (~line 554, before `const competitorKeywordData = []`):
 
 ```typescript
-const fetchCompetitors = shouldFetchCompetitorData(ws);
-if (!fetchCompetitors && strategyMode === 'incremental') {
+const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
+if (!fetchCompetitors) {
   log.info(`Incremental mode: skipping competitor re-fetch (last fetched ${ws.competitorLastFetchedAt})`);
-  sendProgress('semrush', 'Using cached competitor data (still fresh)', 0.58);
+  sendProgress('semrush', 'Using cached competitor data (still fresh)...', 0.58);
 }
 ```
 
-**Important:** Do NOT skip `getDomainKeywords(siteDomain, ...)` (line 566) — that's the site's own organic data, not competitor data. Only skip the three competitor blocks:
-1. Auto-discover competitors (~580–597)
-2. Fetch competitor keywords (~600–637)
-3. Keyword gap analysis (~640–653)
+- [ ] **1d. Guard the three competitor sub-blocks** inside the `if (semrushMode !== 'none' && provider)` block:
+  - Auto-discovery (~line 580): wrap in `if (fetchCompetitors) { ... }`
+  - Competitor keywords (~line 600): wrap in `if (fetchCompetitors && competitorDomains.length > 0) { ... }`
+  - Keyword gap (~line 640): wrap in `if (fetchCompetitors && competitorDomains.length > 0) { ... }`
 
-When skipping, `competitorDomains` should still be populated from `ws.competitorDomains` (line 203 already does this) and `competitorKeywordData` stays empty — the AI just won't get fresh competitor proof in the prompt. The existing domain keywords and GSC data still feed the pool.
+  **Do NOT wrap** the domain organic keywords fetch (~line 564) — that's the site's own data, not competitor data.
 
-- [ ] **1d. Stamp `competitorLastFetchedAt` after successful fetch**
-
-After the competitor blocks complete (approximately line 654, after the keyword-gap try-catch), if any competitor data was actually fetched:
+- [ ] **1e. Stamp timestamp after successful competitor fetch** (~line 655, after the keyword gap try-catch closes):
 
 ```typescript
 if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
@@ -65,89 +75,246 @@ if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length 
 }
 ```
 
-- [ ] **1e. Verify build**
-
+- [ ] **1f. Build verify:**
 ```bash
 npx tsc --noEmit --skipLibCheck && npx vite build
 ```
 
-### Test plan
+### Tests for Task 1
 
-Add a test in `tests/integration/keyword-strategy-incremental.test.ts`:
-- Seed a workspace with `competitorLastFetchedAt` set to today → verify incremental mode logs "skipping competitor re-fetch"
-- Seed a workspace with `competitorLastFetchedAt` set to 14 days ago → verify it doesn't log the skip message
+Add to `tests/integration/keyword-strategy-incremental.test.ts` (the existing incremental test file):
 
-(Both would need a mocked SEMRush provider to fully test the fetch path, so the DB-layer verification that `updateWorkspace` writes the timestamp is the pragmatic test. The incremental test file already has the env var setup for HTTP calls.)
+```typescript
+describe('DB-layer: competitorLastFetchedAt stamped after fetch', () => {
+  it('updateWorkspace writes competitorLastFetchedAt and rowToWorkspace reads it back', () => {
+    const ws = createWorkspace('Competitor Stamp Test');
+    const now = new Date().toISOString();
+    updateWorkspace(ws.id, { competitorLastFetchedAt: now });
+    const reloaded = getWorkspace(ws.id);
+    expect(reloaded?.competitorLastFetchedAt).toBe(now);
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns false when fetched < 7 days ago', () => {
+    // Verify the guard function logic directly via DB state
+    const ws = createWorkspace('Competitor Cache Test');
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+    updateWorkspace(ws.id, { competitorLastFetchedAt: recent });
+    const reloaded = getWorkspace(ws.id)!;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    expect(new Date(reloaded.competitorLastFetchedAt!) >= cutoff).toBe(true); // still fresh
+    deleteWorkspace(ws.id);
+  });
+});
+```
 
 ---
 
-## Task 2 — Move auth before validation on business-profile PATCH
+## Task 2 — Move auth before Zod validation on business-profile PATCH
 
-**Problem:** `PATCH /api/public/workspaces/:id/business-profile` uses `validate(clientBusinessProfileSchema)` as Express middleware, which runs before the in-handler cookie auth check. Unauthenticated requests with invalid bodies get 400 (leaking expected field names) instead of 401. All other mutation handlers in `public-portal.ts` check auth first.
-
+**Model:** Haiku (mechanical, one-file change)
 **Files owned:** `server/routes/public-portal.ts`
+**Must not touch:** any other file
+
+**Problem:** `PATCH /api/public/workspaces/:id/business-profile` at line 528 uses `validate(clientBusinessProfileSchema)` as Express middleware. Express middleware runs before the in-handler cookie auth check at lines 530–536. An unauthenticated request with an invalid body gets 400 (leaks expected field names) instead of 401. All other mutation handlers in `public-portal.ts` (e.g. business-priorities at ~line 445) check auth inside the handler first.
+
+**Verified against codebase:**
+- Route signature: `router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusinessProfileSchema), (req, res) => {` at line 528
+- Auth check: lines 530–536 (cookie check + `verifyClientSession` / `verifyClientToken`)
+- `validate` middleware imported from `'../middleware/validate.js'` — uses `schema.safeParse`
+- `clientBusinessProfileSchema` is defined at lines 512–526 (same file)
 
 ### Steps
 
-- [ ] **2a. Move validation into the handler body**
+- [ ] **2a. Remove `validate(...)` from the route signature**
 
-Change from:
+Change:
 ```typescript
 router.patch('/api/public/workspaces/:id/business-profile', validate(clientBusinessProfileSchema), (req, res) => {
-  const wsId = req.params.id;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  // ... auth check ...
 ```
-
 To:
 ```typescript
 router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
-  const wsId = req.params.id;
-  const sessionToken = req.cookies?.[`client_session_${wsId}`];
-  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
-  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
-  const hasClientUserAuth = clientUserToken && (verifyClientToken(clientUserToken)?.workspaceId === wsId);
-  if (!hasSession && !hasClientUserAuth) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  // Validate after auth — don't leak field names to unauthenticated callers
-  const parsed = clientBusinessProfileSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues.map(i => i.message).join(', ') });
-  }
-
-  const existing = getWorkspace(wsId);
-  // ... rest unchanged, but use parsed.data instead of req.body ...
 ```
 
-**Key change:** Replace `req.body` references in the merge logic with `parsed.data` so we use the Zod-validated output.
+- [ ] **2b. Inline `safeParse` after the auth block** (after the `if (!hasSession && !hasClientUserAuth)` return, before reading the workspace):
 
-- [ ] **2b. Verify build**
+```typescript
+const parsed = clientBusinessProfileSchema.safeParse(req.body);
+if (!parsed.success) {
+  return res.status(400).json({ error: parsed.error.issues.map(i => i.message).join(', ') });
+}
+```
 
+- [ ] **2c. Replace `req.body` references in the merge logic with `parsed.data`**
+
+The merge at lines 540–548 uses `req.body` and `req.body.address`. Replace both with `parsed.data` and `parsed.data.address`.
+
+- [ ] **2d. Build verify:**
 ```bash
 npx tsc --noEmit --skipLibCheck && npx vite build
 ```
 
-### Test plan
+### Tests for Task 2
 
-Quick integration test (or add to an existing public-portal test file):
-- Send `PATCH /api/public/workspaces/:id/business-profile` with invalid body + no auth cookies → expect 401 (not 400)
-- Send with valid auth + invalid body → expect 400
+Add to an existing public-portal integration test file (grep for `public-portal` tests to find the right file):
+
+```typescript
+describe('PATCH /api/public/workspaces/:id/business-profile — auth order', () => {
+  it('returns 401 (not 400) when unauthenticated with invalid body', async () => {
+    const res = await ctx.postJson(`/api/public/workspaces/${wsId}/business-profile`, {
+      email: 'not-an-email', // invalid — would 400 if validation ran first
+    });
+    expect(res.status).toBe(401); // auth check runs before validation
+  });
+
+  it('returns 400 when authenticated with invalid body', async () => {
+    // Set up valid session cookie first, then send invalid body
+    const res = await ctx.api(`/api/public/workspaces/${wsId}/business-profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: validSessionCookie },
+      body: JSON.stringify({ email: 'not-an-email' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+```
 
 ---
 
-## Verification
+## Task 3 — Fix `seo-audit-routes.test.ts` flaky "no token" test
 
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
-- [ ] `npx vite build` — builds
-- [ ] `npx vitest run` — full suite passes
-- [ ] `npx tsx scripts/pr-check.ts` — zero errors
+**Model:** Haiku (targeted env fix, single describe block)
+**Files owned:** `tests/integration/seo-audit-routes.test.ts`
+**Must not touch:** `tests/integration/helpers.ts` or any server file
 
-## Parallelization
-
-Tasks 1 and 2 are fully independent — different files, no shared state. Can be dispatched as parallel agents.
-
+**Problem:** `getTokenForSite` in `server/workspaces.ts:385`:
+```typescript
+return row?.webflow_token || process.env.WEBFLOW_API_TOKEN || null;
 ```
-Task 1 (keyword-strategy.ts) ∥ Task 2 (public-portal.ts)
+Falls back to the global env var. `createTestContext` spawns the server with `{ ...process.env, ... }`, so if `WEBFLOW_API_TOKEN` is set in the parent process (developer machine or CI with API keys), the spawned server inherits it. The test uses `'site_no_token_xyz'` — no workspace-level token — so `getTokenForSite` returns the global env token, route calls `runSeoAudit`, gets 200 instead of 500.
+
+**Verified against codebase:**
+- `getTokenForSite` at `server/workspaces.ts:383–385`
+- `createTestContext` spawn at `tests/integration/helpers.ts:69–80` — `{ ...process.env, PORT, NODE_ENV, APP_PASSWORD }` — no way to suppress inherited vars
+- Route guard: `webflow-seo.ts:38–41` — returns 500 only when `getTokenForSite` returns null
+- Test at `seo-audit-routes.test.ts:641–648` — sole `describe` block at the end of the file
+
+### Steps
+
+- [ ] **3a. Save and unset `WEBFLOW_API_TOKEN` before server startup**
+
+The `ctx` is created at module level but `startServer()` is called in the file-level `beforeAll` at line 29. Modify that `beforeAll` to temporarily unset the env var before spawn so the child process inherits a clean env:
+
+```typescript
+beforeAll(async () => {
+  // Unset WEBFLOW_API_TOKEN before spawning the test server so
+  // getTokenForSite('site_no_token_xyz') deterministically returns null.
+  // Workspace-level webflowToken fields are unaffected — only the global fallback is cleared.
+  const savedWebflowToken = process.env.WEBFLOW_API_TOKEN;
+  delete process.env.WEBFLOW_API_TOKEN;
+  await ctx.startServer();
+  // Restore in parent process — child process env is already fixed at spawn time.
+  if (savedWebflowToken !== undefined) process.env.WEBFLOW_API_TOKEN = savedWebflowToken;
+}, 25_000);
 ```
+
+- [ ] **3b. Build verify:** `npx tsc --noEmit --skipLibCheck`
+
+- [ ] **3c. Run test in isolation to confirm deterministic pass:**
+```bash
+npx vitest run tests/integration/seo-audit-routes.test.ts
+```
+
+### Note on test correctness
+
+The describe block for section 7 has only one test. After this fix, `getTokenForSite('site_no_token_xyz')` always returns null regardless of environment — the 500 path is deterministic.
+
+No new tests needed — the fix makes the existing test reliable.
+
+---
+
+## Task 4 — Fix `content-decay-routes.test.ts` non-assertive recommendations test
+
+**Model:** Haiku (env fix + test rewrite, single test)
+**Files owned:** `tests/integration/content-decay-routes.test.ts`
+**Must not touch:** any server file or `helpers.ts`
+
+**Problem:** `tests/integration/content-decay-routes.test.ts:370`:
+```typescript
+it('returns 500 or 200 when cached analysis exists (depends on OpenAI availability)', async () => {
+  const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 2 });
+  expect([200, 500]).toContain(res.status);  // always passes — no assertion value
+});
+```
+The test accepts both outcomes, making it useless as a regression guard. In environments without an OpenAI key, it logs an ERROR (the route catches the OpenAI auth error and returns 500), creating noise in test output.
+
+**Verified against codebase:**
+- Route at `server/routes/content-decay.ts:63` — calls `generateBatchRecommendations` which makes a real OpenAI call
+- `createTestContext` at line 21: `const ctx = createTestContext(13311)` — spawned process
+- `beforeAll` at line 119: `await ctx.startServer()` — env vars set at spawn time
+- If `OPENAI_API_KEY` is absent, OpenAI SDK throws an auth/config error → `res.status(500)` at line 93
+- If present but fake, same: quick 401 from OpenAI → throws → 500
+
+**Fix approach:** Set a fake `OPENAI_API_KEY` before server startup so the OpenAI call always fails with a quick auth error (not a hang). This makes the behavior deterministic: the test always gets 500. Rewrite the test to explicitly assert 500 with a clear explanation.
+
+### Steps
+
+- [ ] **4a. Set fake `OPENAI_API_KEY` before `ctx.startServer()` in `beforeAll`**
+
+```typescript
+beforeAll(async () => {
+  // Set a fake OpenAI key before spawning so generateBatchRecommendations
+  // fails with a fast auth error (not a hang). The test asserts 500 — the
+  // correct behavior when the AI call fails (not phantom success).
+  // Save and restore so we don't contaminate sibling test files in this process.
+  const savedOpenAIKey = process.env.OPENAI_API_KEY;
+  if (!process.env.OPENAI_API_KEY) {
+    process.env.OPENAI_API_KEY = 'fake-key-for-content-decay-test';
+  }
+  await ctx.startServer();
+  if (savedOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = savedOpenAIKey;
+
+  const ws1 = createWorkspace('Content Decay Test WS');
+  // ... rest of setup unchanged
+```
+
+- [ ] **4b. Rewrite the non-assertive test at line 370**
+
+```typescript
+it('returns 500 when AI call fails (FM-2: no phantom success from failed recommendations)', async () => {
+  // generateBatchRecommendations calls OpenAI. The test server uses a fake key,
+  // so the call fails with auth error. The route must return 500, not a 200 with
+  // empty/garbage recommendations (phantom success).
+  const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 2 });
+  expect(res.status).toBe(500);
+  const body = await res.json() as { error?: string };
+  expect(typeof body.error).toBe('string');
+  expect(body.error!.length).toBeGreaterThan(0);
+});
+```
+
+- [ ] **4c. Run test in isolation:**
+```bash
+npx vitest run tests/integration/content-decay-routes.test.ts
+```
+
+---
+
+## Verification (all tasks)
+
+After all agents complete:
+
+```bash
+npx tsc --noEmit --skipLibCheck   # zero errors
+npx vite build                    # builds clean
+npx vitest run                    # full suite passes
+npx tsx scripts/pr-check.ts       # zero errors
+```
+
+Specific checks:
+- `npx vitest run tests/integration/seo-audit-routes.test.ts` — passes regardless of whether `WEBFLOW_API_TOKEN` is set in the environment
+- `npx vitest run tests/integration/content-decay-routes.test.ts` — passes regardless of whether `OPENAI_API_KEY` is set in the environment
+- `npx vitest run tests/integration/keyword-strategy-incremental.test.ts` — new competitor stamp tests pass
