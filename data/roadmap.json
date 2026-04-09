@@ -3074,6 +3074,24 @@
           "shippedAt": "2026-04-09"
         },
         {
+          "id": 577,
+          "title": "Page Rewriter: applyToSection feedback when target heading not found",
+          "source": "PR #159 code review flag",
+          "est": "0.5h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "When AI sectionTarget slug doesn't match any data-section heading, show a toast (e.g. 'Section not found — content inserted at end') instead of silently appending to document end. Deferred from PR #159."
+        },
+        {
+          "id": 578,
+          "title": "Page Rewriter: expand HTML tokenizer to capture <div>, <li>, <blockquote> body text",
+          "source": "PR #159 code review flag",
+          "est": "1-2h",
+          "priority": "P2",
+          "status": "pending",
+          "notes": "extractPageSections() only tokenizes <h1-6> and <p> tags. Pages using <div> wrappers for body text (common in Webflow CMS templates) produce sections with empty body fields. Expand the two-pass tokenizer to also capture <li>, <blockquote>, and non-empty <div> text nodes. Deferred from PR #159."
+        },
+        {
           "id": 288,
           "title": "Schema generator: enhanced validation, auto-fix, and improved prompting",
           "status": "done",
