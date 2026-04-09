@@ -1280,9 +1280,13 @@ export function formatForPrompt(
   );
   const hasData =
     hasSeoContent ||
-    ((!include || include.has('insights')) && intelligence.insights?.all.length) ||
-    ((!include || include.has('learnings')) && intelligence.learnings?.summary) ||
-    ((!include || include.has('pageProfile')) && !!intelligence.pageProfile);
+    ((!include || include.has('insights')) && !!intelligence.insights?.all.length) ||
+    ((!include || include.has('learnings')) && intelligence.learnings != null) ||
+    ((!include || include.has('pageProfile')) && !!intelligence.pageProfile) ||
+    ((!include || include.has('clientSignals')) && intelligence.clientSignals != null) ||
+    ((!include || include.has('operational')) && intelligence.operational != null) ||
+    ((!include || include.has('contentPipeline')) && intelligence.contentPipeline != null) ||
+    ((!include || include.has('siteHealth')) && intelligence.siteHealth != null);
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {

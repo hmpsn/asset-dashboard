@@ -31,10 +31,16 @@ beforeAll(async () => {
   // getTokenForSite('site_no_token_xyz') deterministically returns null.
   // Workspace-level webflowToken fields are unaffected — only the global fallback is cleared.
   const savedWebflowToken = process.env.WEBFLOW_API_TOKEN;
-  delete process.env.WEBFLOW_API_TOKEN;
+  // Set to empty string (not delete) so the spawned server's `import 'dotenv/config'`
+  // does NOT re-populate it from .env — dotenv only sets vars that are absent entirely.
+  process.env.WEBFLOW_API_TOKEN = '';
   await ctx.startServer();
   // Restore in parent process — child process env is already fixed at spawn time.
-  if (savedWebflowToken !== undefined) process.env.WEBFLOW_API_TOKEN = savedWebflowToken;
+  if (savedWebflowToken !== undefined) {
+    process.env.WEBFLOW_API_TOKEN = savedWebflowToken;
+  } else {
+    delete process.env.WEBFLOW_API_TOKEN;
+  }
 }, 25_000);
 
 afterAll(() => {
