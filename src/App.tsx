@@ -215,6 +215,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     return workspaces.find(w => w.id === urlWorkspaceId) || null;
   }, [urlWorkspaceId, workspaces]);
 
+  // Rewrite tab is always a full-height two-pane layout (independent scroll per pane).
+  // Focus mode additionally hides the sidebar, but height containment is needed in both modes.
+  const isFullHeightLayout = tab === 'rewrite' && !!selected;
+
   // Fetch badge counts via dedicated lightweight endpoint
   useEffect(() => {
     if (!selected) return;
@@ -430,10 +434,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}
-        <main className={`flex-1 overflow-auto ${effectiveFocusMode ? '' : 'p-6'}`}>
-          <ScannerReveal className={effectiveFocusMode ? 'h-full' : undefined}>
-            {/* max-w-5xl for admin (sidebar present); in rewrite focus mode, fill full width */}
-            <div className={effectiveFocusMode ? 'h-full' : 'max-w-5xl mx-auto'}>
+        <main className={`flex-1 ${isFullHeightLayout ? 'overflow-hidden' : 'overflow-auto p-6'}`}>
+          <ScannerReveal className={isFullHeightLayout ? 'h-full' : undefined}>
+            {/* max-w-5xl for admin (sidebar present); rewrite tab fills full width with h-full for two-pane containment */}
+            <div className={isFullHeightLayout ? 'h-full' : 'max-w-5xl mx-auto'}>
               {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
                 <button
                   onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
