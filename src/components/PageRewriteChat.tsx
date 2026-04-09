@@ -89,7 +89,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   // Editable AI message content (keyed by message array index)
   const [msgEdits, setMsgEdits] = useState<Record<number, string>>({});
 
-  const docBodyRef = useRef<HTMLDivElement>(null);
+  const docBodyRef = useRef<HTMLDivElement | null>(null);
   const docPanelRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat
@@ -226,6 +226,33 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     setComboQuery('');
     setComboIdx(0);
     setTimeout(() => comboInputRef.current?.focus(), 0);
+  };
+
+  const buildDocHtml = (data: PageData): string => {
+    const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const bodyP = (body: string, extraClass = '') =>
+      body ? `<p class="text-[13px] text-slate-500 leading-[1.7] mb-3${extraClass ? ' ' + extraClass : ''}">${escHtml(body)}</p>` : '';
+
+    const parts: string[] = [
+      `<h1 data-section="${escHtml(toSectionSlug(data.title))}" class="text-[20px] font-bold text-slate-100 mb-3">${escHtml(data.title)}</h1>`,
+    ];
+
+    for (const section of data.sections) {
+      const slug = toSectionSlug(section.heading);
+      if (section.level === 1) {
+        parts.push(`<h1 data-section="${escHtml(slug)}" class="text-[20px] font-bold text-slate-100 mb-2 mt-5">${escHtml(section.heading)}</h1>${bodyP(section.body)}`);
+      } else if (section.level === 2) {
+        parts.push(`<h2 data-section="${escHtml(slug)}" class="text-[15px] font-semibold text-slate-300 mb-2 mt-5">${escHtml(section.heading)}</h2>${bodyP(section.body)}`);
+      } else if (section.level === 3) {
+        parts.push(`<h3 data-section="${escHtml(slug)}" class="text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700">${escHtml(section.heading)}</h3>${bodyP(section.body, 'ml-3')}`);
+      } else {
+        const extraIndent = (section.level - 3) * 12;
+        parts.push(`<h4 data-section="${escHtml(slug)}" class="text-[12px] font-medium text-slate-400 mb-1.5 mt-3 pl-2 border-l-2 border-slate-700" style="margin-left:${12 + extraIndent}px">${escHtml(section.heading)}</h4>${bodyP(section.body, `ml-[${12 + extraIndent}px]`)}`);
+      }
+    }
+
+    return parts.join('');
   };
 
   return (
@@ -498,52 +525,21 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 </div>
               )}
 
-              {/* Contenteditable document body */}
+              {/* Contenteditable document body — initialized via ref callback, not JSX children, to prevent React from overwriting user edits on re-render */}
               <div
-                ref={docBodyRef}
+                ref={(el) => {
+                  docBodyRef.current = el;
+                  if (!el) return;
+                  const pageKey = pageData.slug || pageData.title;
+                  if (el.dataset.pageKey === pageKey) return; // already initialized for this page
+                  el.dataset.pageKey = pageKey;
+                  el.innerHTML = buildDocHtml(pageData);
+                }}
                 contentEditable
                 suppressContentEditableWarning
                 spellCheck
                 className="flex-1 overflow-y-auto px-6 py-5 focus:outline-none"
-              >
-                {/* H1 title */}
-                <h1
-                  data-section={toSectionSlug(pageData.title)}
-                  className="text-[20px] font-bold text-slate-100 mb-3"
-                >
-                  {pageData.title}
-                </h1>
-
-                {pageData.sections.map((section, i) => {
-                  const slug = toSectionSlug(section.heading);
-                  if (section.level === 1) return (
-                    <div key={i}>
-                      <h1 data-section={slug} className="text-[20px] font-bold text-slate-100 mb-2 mt-5">{section.heading}</h1>
-                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3">{section.body}</p>}
-                    </div>
-                  );
-                  if (section.level === 2) return (
-                    <div key={i}>
-                      <h2 data-section={slug} className="text-[15px] font-semibold text-slate-300 mb-2 mt-5">{section.heading}</h2>
-                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3">{section.body}</p>}
-                    </div>
-                  );
-                  if (section.level === 3) return (
-                    <div key={i}>
-                      <h3 data-section={slug} className="text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700">{section.heading}</h3>
-                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3 ml-3">{section.body}</p>}
-                    </div>
-                  );
-                  // H4+: additional indent per level
-                  const extraIndent = (section.level - 3) * 12;
-                  return (
-                    <div key={i}>
-                      <h4 data-section={slug} className="text-[12px] font-medium text-slate-400 mb-1.5 mt-3 pl-2 border-l-2 border-slate-700" style={{ marginLeft: `${12 + extraIndent}px` }}>{section.heading}</h4>
-                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3" style={{ marginLeft: `${12 + extraIndent}px` }}>{section.body}</p>}
-                    </div>
-                  );
-                })}
-              </div>
+              />
             </>
           )}
         </div>
