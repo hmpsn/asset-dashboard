@@ -422,10 +422,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}
-        <main className={`flex-1 overflow-auto ${focusMode && tab === 'rewrite' ? '' : 'p-6'}`}>
+        <main className={`flex-1 overflow-auto ${focusMode ? '' : 'p-6'}`}>
           <ScannerReveal>
             {/* max-w-5xl for admin (sidebar present); in rewrite focus mode, fill full width */}
-            <div className={focusMode && tab === 'rewrite' ? 'h-full' : 'max-w-5xl mx-auto'}>
+            <div className={focusMode ? 'h-full' : 'max-w-5xl mx-auto'}>
               {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
                 <button
                   onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}

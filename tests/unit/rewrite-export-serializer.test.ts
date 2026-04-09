@@ -12,6 +12,11 @@ function serializeToMarkdown(docBody: Element, issues: Array<{ severity: string;
   }
 
   const walk = (node: Node) => {
+    if (node.nodeType === 3 /* TEXT_NODE */) {
+      const text = (node.textContent || '').trim();
+      if (text) lines.push(`${text}\n`);
+      return;
+    }
     if (node.nodeType === 1 /* ELEMENT_NODE */) {
       const el = node as Element;
       const tag = el.tagName.toLowerCase();
@@ -74,5 +79,14 @@ describe('rewrite export serializer', () => {
     const el = dom.window.document.querySelector('div')!;
     const md = serializeToMarkdown(el, []);
     expect(md.trim()).toBe('');
+  });
+
+  it('serializes bare text nodes at root level (contenteditable produces these)', () => {
+    // JSDOM doesn't let us inject raw text nodes via innerHTML easily, so we create manually
+    const dom = new JSDOM('<div></div>');
+    const el = dom.window.document.querySelector('div')!;
+    el.appendChild(dom.window.document.createTextNode('  bare text  '));
+    const md = serializeToMarkdown(el, []);
+    expect(md).toContain('bare text');
   });
 });

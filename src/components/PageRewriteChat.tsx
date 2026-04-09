@@ -50,6 +50,12 @@ interface Props {
   onBack: () => void;
 }
 
+const HEADING_CLASSES: Record<string, string> = {
+  h1: 'text-[20px] font-bold text-slate-100 mb-2 mt-5',
+  h2: 'text-[15px] font-semibold text-slate-300 mb-2 mt-5',
+  h3: 'text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700',
+};
+
 const QUICK_PROMPTS = [
   'Rewrite the intro paragraph to lead with a direct answer',
   'Suggest an FAQ section with schema-ready Q&A pairs',
@@ -299,12 +305,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     document.execCommand(command, false);
   };
 
-  const HEADING_CLASSES: Record<string, string> = {
-    h1: 'text-[20px] font-bold text-slate-100 mb-2 mt-5',
-    h2: 'text-[15px] font-semibold text-slate-300 mb-2 mt-5',
-    h3: 'text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700',
-  };
-
   const wrapHeading = (tag: 'h2' | 'h3') => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
@@ -325,6 +325,19 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     } else {
       // execCommand-ok: no replacement for contenteditable formatBlock in 2026
       document.execCommand('formatBlock', false, tag);
+      // formatBlock creates a bare heading — apply classes and data-section so Apply can target it
+      const afterSel = window.getSelection();
+      if (afterSel && afterSel.rangeCount > 0) {
+        const anchor = afterSel.anchorNode;
+        const newHeading = (anchor?.nodeType === Node.TEXT_NODE
+          ? anchor.parentElement
+          : anchor as Element)?.closest('h1,h2,h3,h4,h5,h6');
+        if (newHeading) {
+          newHeading.className = HEADING_CLASSES[tag] ?? '';
+          const slug = toSectionSlug(newHeading.textContent || '');
+          if (slug) newHeading.setAttribute('data-section', slug);
+        }
+      }
     }
   };
 
@@ -476,6 +489,10 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 <FileText className="w-3 h-3 text-zinc-500 flex-shrink-0" />
                 <input
                   ref={comboInputRef}
+                  role="combobox"
+                  aria-expanded={filteredPages.length > 0}
+                  aria-activedescendant={filteredPages[comboIdx] ? `combo-opt-${comboIdx}` : undefined}
+                  aria-label="Search pages or paste a URL"
                   autoFocus
                   value={comboQuery}
                   onChange={e => { setComboQuery(e.target.value); setComboIdx(0); }}
@@ -502,6 +519,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   {filteredPages.map((page, i) => (
                     <button
                       key={page.slug}
+                      id={`combo-opt-${i}`}
+                      role="option"
+                      aria-selected={i === comboIdx}
                       onClick={() => selectPage(page)}
                       onMouseEnter={() => setComboIdx(i)}
                       className={`w-full flex items-center gap-2 py-1.5 text-xs text-left transition-colors border-l-2 ${
@@ -779,6 +799,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   el.dataset.pageKey = pageKey;
                   el.innerHTML = buildDocHtml(pageData);
                 }}
+                role="textbox"
+                aria-multiline="true"
+                aria-label="Page content editor"
                 contentEditable
                 suppressContentEditableWarning
                 spellCheck
