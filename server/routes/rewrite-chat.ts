@@ -30,7 +30,7 @@ interface PageSection {
   body: string;     // paragraph text immediately following this heading (up to 800 chars)
 }
 
-function extractPageSections(html: string): { title: string; sections: PageSection[]; bodyText: string } {
+function extractPageSections(html: string): { title: string; sections: PageSection[]; bodyText: string; preamble: string } {
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '';
 
   // Extract main content area (prefer <main>, <article>, then <body>)

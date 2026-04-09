@@ -147,7 +147,8 @@ export function initWebSocket(server: Server): WebSocketServer {
   initStripeBroadcast(_broadcastToWorkspace);
   // Skip file watchers in test environment — chokidar exhausts open file descriptor
   // limits when multiple test server subprocesses run concurrently (EMFILE errors).
-  if (process.env.NODE_ENV !== 'test') {
+  // SKIP_WATCHERS env var allows local dev to bypass when dirs have thousands of entries.
+  if (process.env.NODE_ENV !== 'test' && !process.env.SKIP_WATCHERS) {
     startWatcher(_broadcast);
   }
 
