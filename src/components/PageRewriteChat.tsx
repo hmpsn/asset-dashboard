@@ -206,7 +206,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     content.replace(/^\*\*Rewriting:\s*[^*]+\*\*\s*\n?/, '');
 
   const handleComboKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (filteredPages.length > 0) setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setComboIdx(i => Math.max(i - 1, 0)); }
     else if (e.key === 'Enter') {
       e.preventDefault();
