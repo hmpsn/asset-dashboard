@@ -200,7 +200,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         pageIssues: pageData?.issues,
       });
 
-      const sectionMatch = resp.answer.match(/^\*\*Rewriting:\s*([^*]+)\*\*/i);
+      const sectionMatch = resp.answer.match(/^\*{0,2}Rewriting:\s*([^*\n]+?)\*{0,2}\s*$/im);
       const sectionTarget = sectionMatch ? sectionMatch[1].trim() : undefined;
       const assistantMsg: ChatMessage = { role: 'assistant', content: resp.answer, timestamp: Date.now(), sectionTarget };
       setMessages(prev => [...prev, assistantMsg]);
@@ -247,7 +247,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       );
 
   const stripRewritingPrefix = (content: string): string =>
-    content.replace(/^\*\*Rewriting:\s*[^*]+\*\*\s*\n?/, '');
+    content.replace(/^\*{0,2}Rewriting:\s*[^*\n]+\*{0,2}\s*\n?/, '');
 
   const handleComboKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (filteredPages.length > 0) setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }
@@ -274,7 +274,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   };
 
   const buildDocHtml = (data: PageData): string => {
-    const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    // Server text may contain raw HTML entities (&#x27;, &amp;) — decode first, then re-escape for safe innerHTML
+    const decodeEntities = (s: string) => { const el = document.createElement('span'); el.innerHTML = s; return el.textContent || s; };
+    const escHtml = (s: string) => decodeEntities(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     const bodyP = (body: string, extraClass = '') =>
       body ? `<p class="text-[13px] text-slate-500 leading-[1.7] mb-3${extraClass ? ' ' + extraClass : ''}">${escHtml(body)}</p>` : '';
