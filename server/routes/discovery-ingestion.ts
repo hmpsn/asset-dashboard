@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { upload } from '../middleware.js';
 import fs from 'fs';
+import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import {
   listSources, addSource, deleteSource, processSource,
   listExtractions, listExtractionsBySource,
@@ -16,7 +19,7 @@ router.get('/api/discovery/:workspaceId/sources', requireWorkspaceAccess('worksp
   res.json(listSources(req.params.workspaceId));
 });
 
-// Upload source file(s)
+// Upload source file(s) — disk-based multer, read from file.path
 router.post('/api/discovery/:workspaceId/sources',
   requireWorkspaceAccess('workspaceId'),
   upload.array('files', 10),
@@ -31,17 +34,13 @@ router.post('/api/discovery/:workspaceId/sources',
       const ext = file.originalname.split('.').pop()?.toLowerCase();
       if (ext !== 'txt' && ext !== 'md') continue;
 
+      if (!file.path) continue;
+
       let content: string;
-      if (file.buffer) {
-        content = file.buffer.toString('utf-8');
-      } else if (file.path) {
-        try {
-          content = fs.readFileSync(file.path, 'utf-8');
-          fs.unlinkSync(file.path);
-        } catch {
-          continue;
-        }
-      } else {
+      try {
+        content = fs.readFileSync(file.path, 'utf-8');
+        fs.unlinkSync(file.path);
+      } catch {
         continue;
       }
 
@@ -49,15 +48,22 @@ router.post('/api/discovery/:workspaceId/sources',
       sources.push(source);
     }
 
+    if (sources.length > 0) {
+      addActivity(req.params.workspaceId, 'discovery_source_added', `Added ${sources.length} discovery source${sources.length > 1 ? 's' : ''}`);
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { added: sources.length });
+    }
+
     res.json({ sources });
   },
 );
 
-// Upload source from pasted text
+// Upload source from pasted text — MUST be before /:id routes to avoid shadowing
 router.post('/api/discovery/:workspaceId/sources/text', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const { filename, sourceType, rawContent } = req.body;
   if (!rawContent) return res.status(400).json({ error: 'rawContent required' });
   const source = addSource(req.params.workspaceId, filename || 'pasted-text.txt', (sourceType || 'brand_doc') as SourceType, rawContent);
+  addActivity(req.params.workspaceId, 'discovery_source_added', `Added discovery source "${source.filename}"`);
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: source.id });
   res.json(source);
 });
 
@@ -65,6 +71,8 @@ router.post('/api/discovery/:workspaceId/sources/text', requireWorkspaceAccess('
 router.delete('/api/discovery/:workspaceId/sources/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const ok = deleteSource(req.params.workspaceId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
+  addActivity(req.params.workspaceId, 'discovery_source_deleted', 'Deleted discovery source');
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, deleted: true });
   res.json({ deleted: true });
 });
 
@@ -72,6 +80,8 @@ router.delete('/api/discovery/:workspaceId/sources/:id', requireWorkspaceAccess(
 router.post('/api/discovery/:workspaceId/sources/:id/process', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
     const extractions = await processSource(req.params.workspaceId, req.params.id);
+    addActivity(req.params.workspaceId, 'discovery_processed', `Extracted ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, extractionCount: extractions.length });
     res.json({ extractions });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Processing failed' });
@@ -101,6 +111,7 @@ router.patch('/api/discovery/:workspaceId/extractions/:id', requireWorkspaceAcce
       routedTo as ExtractionDestination | undefined,
     );
   }
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { extractionId: req.params.id });
   res.json({ updated: true });
 });
 

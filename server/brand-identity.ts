@@ -7,9 +7,8 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
-import { addVoiceSample } from './voice-calibration.js';
+import { addVoiceSample, getVoiceProfile } from './voice-calibration.js';
 import { listBrandscripts } from './brandscript.js';
-import { getVoiceProfile } from './voice-calibration.js';
 import { listExtractions } from './discovery-ingestion.js';
 import type {
   BrandDeliverable, DeliverableVersion, DeliverableType, DeliverableTier, DeliverableStatus,
@@ -181,13 +180,16 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
 
   if (existing) {
     const newVersion = existing.version + 1;
-    // Save version snapshot
-    stmts().insertVersion.run({
-      id: `biv_${randomUUID().slice(0, 8)}`,
-      deliverable_id: existing.id, content: existing.content,
-      steering_notes: null, version: existing.version, created_at: now,
+    const doUpdate = db.transaction(() => {
+      // Save version snapshot then update content atomically
+      stmts().insertVersion.run({
+        id: `biv_${randomUUID().slice(0, 8)}`,
+        deliverable_id: existing.id, content: existing.content,
+        steering_notes: null, version: existing.version, created_at: now,
+      });
+      stmts().updateContent.run({ id: existing.id, content, status: 'draft', version: newVersion, updated_at: now });
     });
-    stmts().updateContent.run({ id: existing.id, content, status: 'draft', version: newVersion, updated_at: now });
+    doUpdate();
     return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
   }
 
@@ -227,13 +229,16 @@ Return only the refined content — no preamble.`;
   const now = new Date().toISOString();
   const newVersion = existing.version + 1;
 
-  // Save current as version snapshot
-  stmts().insertVersion.run({
-    id: `biv_${randomUUID().slice(0, 8)}`,
-    deliverable_id: id, content: existing.content,
-    steering_notes: direction, version: existing.version, created_at: now,
+  // Save current as version snapshot then update content atomically
+  const doRefine = db.transaction(() => {
+    stmts().insertVersion.run({
+      id: `biv_${randomUUID().slice(0, 8)}`,
+      deliverable_id: id, content: existing.content,
+      steering_notes: direction, version: existing.version, created_at: now,
+    });
+    stmts().updateContent.run({ id, content, status: 'draft', version: newVersion, updated_at: now });
   });
-  stmts().updateContent.run({ id, content, status: 'draft', version: newVersion, updated_at: now });
+  doRefine();
   return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
 }
 

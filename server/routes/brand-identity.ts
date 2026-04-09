@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
+import { addActivity } from '../activity-log.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import {
   listDeliverables, getDeliverable,
   generateDeliverable, refineDeliverable,
@@ -15,6 +18,13 @@ router.get('/api/brand-identity/:workspaceId', requireWorkspaceAccess('workspace
   res.json(listDeliverables(req.params.workspaceId, tier));
 });
 
+// Export approved deliverables as markdown — MUST be before /:id to avoid shadowing
+router.get('/api/brand-identity/:workspaceId/export', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const tier = req.query.tier as DeliverableTier | undefined;
+  const markdown = exportDeliverables(req.params.workspaceId, tier);
+  res.type('text/markdown').send(markdown);
+});
+
 // Get single deliverable with version history
 router.get('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const result = getDeliverable(req.params.workspaceId, req.params.id);
@@ -28,6 +38,8 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
   if (!deliverableType) return res.status(400).json({ error: 'deliverableType required' });
   try {
     const result = await generateDeliverable(req.params.workspaceId, deliverableType as DeliverableType);
+    addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Generation failed' });
@@ -41,6 +53,7 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
   try {
     const result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
     if (!result) return res.status(404).json({ error: 'Not found' });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Refinement failed' });
@@ -53,16 +66,11 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   if (status === 'approved') {
     const result = approveDeliverable(req.params.workspaceId, req.params.id);
     if (!result) return res.status(404).json({ error: 'Not found' });
+    addActivity(req.params.workspaceId, 'brand_deliverable_approved', `Approved ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status: 'approved' });
     return res.json(result);
   }
   return res.status(400).json({ error: 'Only status "approved" is supported via PATCH' });
-});
-
-// Export approved deliverables as markdown
-router.get('/api/brand-identity/:workspaceId/export', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const tier = req.query.tier as DeliverableTier | undefined;
-  const markdown = exportDeliverables(req.params.workspaceId, tier);
-  res.type('text/markdown').send(markdown);
 });
 
 export default router;

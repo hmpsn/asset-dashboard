@@ -302,6 +302,16 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:created',
   'content-subscription:updated',
   'content-subscription:renewed',
+
+  // Brand Engine Phase 1 events — server-side services and routes are complete
+  // (Tasks 3-6, Batch B).  Frontend tabs (BrandscriptTab, DiscoveryTab, VoiceTab,
+  // IdentityTab) and their useWebSocket handlers are Tasks 10-13 (Batch C).
+  // These events will be wired to React Query cache invalidation once the frontend
+  // components exist.
+  'brandscript:updated',
+  'discovery:updated',
+  'voice:updated',
+  'brand-identity:updated',
 ]);
 
 /**

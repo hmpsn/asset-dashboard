@@ -89,18 +89,21 @@ export function createBrandscript(
 ): Brandscript {
   const now = new Date().toISOString();
   const id = `bs_${randomUUID().slice(0, 8)}`;
-  stmts().insert.run({ id, workspace_id: workspaceId, name, framework_type: frameworkType, created_at: now, updated_at: now });
 
-  const sectionObjs: BrandscriptSection[] = sections.map((sec, i) => {
-    const secId = `bss_${randomUUID().slice(0, 8)}`;
-    stmts().insertSection.run({
-      id: secId, brandscript_id: id, title: sec.title,
-      purpose: sec.purpose ?? null, content: sec.content ?? null,
-      sort_order: i, created_at: now,
+  const doCreate = db.transaction((): BrandscriptSection[] => {
+    stmts().insert.run({ id, workspace_id: workspaceId, name, framework_type: frameworkType, created_at: now, updated_at: now });
+    return sections.map((sec, i) => {
+      const secId = `bss_${randomUUID().slice(0, 8)}`;
+      stmts().insertSection.run({
+        id: secId, brandscript_id: id, title: sec.title,
+        purpose: sec.purpose ?? null, content: sec.content ?? null,
+        sort_order: i, created_at: now,
+      });
+      return { id: secId, brandscriptId: id, title: sec.title, purpose: sec.purpose, content: sec.content, sortOrder: i, createdAt: now };
     });
-    return { id: secId, brandscriptId: id, title: sec.title, purpose: sec.purpose, content: sec.content, sortOrder: i, createdAt: now };
   });
 
+  const sectionObjs = doCreate();
   log.info({ workspaceId, brandscriptId: id, frameworkType }, 'created brandscript');
   return { id, workspaceId, name, frameworkType, sections: sectionObjs, createdAt: now, updatedAt: now };
 }
@@ -114,19 +117,23 @@ export function updateBrandscriptSections(
   if (!existing) return null;
 
   const now = new Date().toISOString();
-  stmts().deleteSectionsByBrandscript.run(brandscriptId);
 
-  const sectionObjs: BrandscriptSection[] = sections.map((sec, i) => {
-    const secId = sec.id || `bss_${randomUUID().slice(0, 8)}`;
-    stmts().insertSection.run({
-      id: secId, brandscript_id: brandscriptId, title: sec.title,
-      purpose: sec.purpose ?? null, content: sec.content ?? null,
-      sort_order: i, created_at: now,
+  const doUpdate = db.transaction((): BrandscriptSection[] => {
+    stmts().deleteSectionsByBrandscript.run(brandscriptId);
+    const inserted = sections.map((sec, i) => {
+      const secId = sec.id || `bss_${randomUUID().slice(0, 8)}`;
+      stmts().insertSection.run({
+        id: secId, brandscript_id: brandscriptId, title: sec.title,
+        purpose: sec.purpose ?? null, content: sec.content ?? null,
+        sort_order: i, created_at: now,
+      });
+      return { id: secId, brandscriptId, title: sec.title, purpose: sec.purpose, content: sec.content, sortOrder: i, createdAt: now };
     });
-    return { id: secId, brandscriptId, title: sec.title, purpose: sec.purpose, content: sec.content, sortOrder: i, createdAt: now };
+    stmts().update.run({ id: brandscriptId, workspace_id: workspaceId, name: existing.name, framework_type: existing.frameworkType, updated_at: now });
+    return inserted;
   });
 
-  stmts().update.run({ id: brandscriptId, workspace_id: workspaceId, name: existing.name, framework_type: existing.frameworkType, updated_at: now });
+  const sectionObjs = doUpdate();
   return { ...existing, sections: sectionObjs, updatedAt: now };
 }
 

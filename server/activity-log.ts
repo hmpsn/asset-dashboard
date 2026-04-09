@@ -66,7 +66,20 @@ export type ActivityType =
   | 'client_keyword_feedback'
   | 'client_priorities_updated'
   | 'client_content_gap_vote'
-  | 'meeting_brief_generated';
+  | 'meeting_brief_generated'
+  | 'brandscript_created'
+  | 'brandscript_deleted'
+  | 'brandscript_imported'
+  | 'brandscript_completed'
+  | 'discovery_source_added'
+  | 'discovery_source_deleted'
+  | 'discovery_processed'
+  | 'voice_sample_added'
+  | 'voice_sample_deleted'
+  | 'voice_calibrated'
+  | 'voice_profile_updated'
+  | 'brand_deliverable_generated'
+  | 'brand_deliverable_approved';
 
 export interface ActivityEntry {
   id: string;
