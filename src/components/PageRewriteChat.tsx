@@ -450,11 +450,23 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     const docBody = docBodyRef.current;
     const paragraphs: Paragraph[] = [];
 
+    // Severity label colors for the Issues section
+    const severityColor: Record<string, string> = { error: 'DC2626', warning: 'D97706', info: '2563EB' };
+
     if (pageData && pageData.issues.length > 0) {
-      paragraphs.push(new Paragraph({ text: 'Issues', heading: HeadingLevel.HEADING_2 }));
-      pageData.issues.forEach(issue =>
-        paragraphs.push(new Paragraph({ text: `[${issue.severity}] ${issue.message}`, bullet: { level: 0 } }))
-      );
+      paragraphs.push(new Paragraph({ text: 'SEO Issues', heading: HeadingLevel.HEADING_2 }));
+      pageData.issues.forEach(issue => {
+        const color = severityColor[issue.severity] ?? '6B7280';
+        paragraphs.push(new Paragraph({
+          bullet: { level: 0 },
+          children: [
+            new TextRun({ text: issue.severity.toUpperCase(), bold: true, color, size: 20 }),
+            new TextRun({ text: `  ${issue.message}`, size: 22 }),
+          ],
+        }));
+      });
+      // Spacer after issues section
+      paragraphs.push(new Paragraph({ text: '' }));
     }
 
     if (!docBody) return paragraphs;
@@ -480,18 +492,24 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         const runs: TextRun[] = [];
         el.childNodes.forEach(child => {
           if (child.nodeType === Node.TEXT_NODE) {
-            runs.push(new TextRun(child.textContent || ''));
+            runs.push(new TextRun({ text: child.textContent || '', size: 24 }));
           } else if (child.nodeType === Node.ELEMENT_NODE) {
             const c = child as Element;
             const ctag = c.tagName;
             runs.push(new TextRun({
               text: c.textContent || '',
+              size: 24,
               bold: ctag === 'STRONG' || ctag === 'B',
               italics: ctag === 'EM' || ctag === 'I',
             }));
           }
         });
-        if (runs.length) paragraphs.push(new Paragraph({ children: runs }));
+        if (runs.length) {
+          paragraphs.push(new Paragraph({
+            children: runs,
+            spacing: { after: 160 },
+          }));
+        }
         return;
       }
       el.childNodes.forEach(walk);
@@ -504,7 +522,44 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   const handleExport = (mode: 'copy' | 'download' | 'docx') => {
     const slug = (pageData?.slug || 'page').replace(/\//g, '-').replace(/^-/, '');
     if (mode === 'docx') {
-      const doc = new Document({ sections: [{ children: serializeDocToDocx() }] });
+      const doc = new Document({
+        styles: {
+          default: {
+            document: { run: { font: 'Calibri', size: 24, color: '1a1a1a' } },
+          },
+          paragraphStyles: [
+            {
+              id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+              run: { font: 'Calibri', size: 56, bold: true, color: '111111' },
+              paragraph: { spacing: { before: 480, after: 160 }, outlineLevel: 0 },
+            },
+            {
+              id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+              run: { font: 'Calibri', size: 40, bold: true, color: '111111' },
+              paragraph: { spacing: { before: 400, after: 120 }, outlineLevel: 1 },
+            },
+            {
+              id: 'Heading3', name: 'Heading 3', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+              run: { font: 'Calibri', size: 32, bold: true, color: '222222' },
+              paragraph: { spacing: { before: 320, after: 80 }, outlineLevel: 2 },
+            },
+            {
+              id: 'Heading4', name: 'Heading 4', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+              run: { font: 'Calibri', size: 26, bold: true, italics: true, color: '444444' },
+              paragraph: { spacing: { before: 240, after: 60 }, outlineLevel: 3 },
+            },
+          ],
+        },
+        sections: [{
+          properties: {
+            page: {
+              size: { width: 12240, height: 15840 },
+              margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+            },
+          },
+          children: serializeDocToDocx(),
+        }],
+      });
       Packer.toBlob(doc).then(blob => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
