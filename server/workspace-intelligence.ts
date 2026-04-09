@@ -3,6 +3,7 @@
 // Spec: docs/superpowers/specs/unified-workspace-intelligence.md §3, §12, §13
 
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { LRUCache, singleFlight } from './intelligence-cache.js';
 import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
@@ -48,6 +49,8 @@ import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
 import type { ChurnSignal } from './churn-signals.js';
+// Compile-time contracts for HIGH-risk dynamic-import modules — erased at runtime; tsc fails if these exports are renamed
+import type { Anomaly } from './anomaly-detection.js';
 // client-signals-store uses dynamic import inside try-catch (like other subsystems)
 // to degrade gracefully if the module or table is unavailable on older DBs.
 import type { DecayAnalysis } from './content-decay.js';
@@ -265,8 +268,8 @@ async function assembleSeoContext(
       avgPosition,
       positionChanges: { improved, declined, stable },
     };
-  } catch {
-    // Rank tracking optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: rank tracking optional, degrading gracefully');
   }
 
   // Business profile from structured intelligence editor (Phase 3B)
@@ -288,8 +291,8 @@ async function assembleSeoContext(
         lastRevisedAt: rows[0].generated_at,
       };
     }
-  } catch {
-    // Strategy history table may not exist
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleSeoContext: strategy history table optional, degrading gracefully');
   }
 
   // Backlink profile — opt-in only (network call, costs SEMRush credits)
@@ -315,8 +318,8 @@ async function assembleSeoContext(
           }
         }
       }
-    } catch {
-      // Backlink data is optional — omit silently
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleSeoContext: backlink data optional, degrading gracefully');
     }
   }
 
@@ -424,8 +427,8 @@ async function assembleLearnings(
       clickGain: h.clickGain,
       measuredAt: h.measuredAt,
     }));
-  } catch {
-    // ROI attribution optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleLearnings: ROI attribution optional, degrading gracefully');
   }
 
   // WeCalledIt entries — actions with strong_win outcomes
@@ -460,8 +463,12 @@ async function assembleLearnings(
         });
       }
     }
-  } catch {
-    // Outcome data optional
+  } catch (err) {
+    if (isProgrammingError(err)) {
+      log.warn({ err, workspaceId }, 'assembleLearnings: programming error in outcome-tracking — check export names');
+    } else {
+      log.debug({ err, workspaceId }, 'assembleLearnings: outcome data optional, degrading gracefully');
+    }
   }
 
   return {
@@ -507,8 +514,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     coverageGaps = strategyKeywords
       .filter(kw => !briefKeywords.has(kw.trim().toLowerCase()))
       .slice(0, 10);
-  } catch {
-    // Non-critical — empty gaps is acceptable
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: coverage gaps optional, degrading gracefully');
   }
 
   // Subscriptions
@@ -519,8 +526,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     const activeSubs = subs.filter(s => s.status === 'active');
     const totalPages = activeSubs.reduce((sum, s) => sum + (s.postsPerMonth ?? 0), 0);
     subscriptions = { active: activeSubs.length, totalPages };
-  } catch {
-    // Non-critical — subscriptions optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: subscriptions optional, degrading gracefully');
   }
 
   // Schema deployment
@@ -538,8 +545,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
       const types = [...new Set((plan?.pageRoles ?? []).map(p => p.primaryType).filter(Boolean))];
       schemaDeployment = { planned, deployed, types };
     }
-  } catch {
-    // Non-critical — schema deployment optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: schema deployment optional, degrading gracefully');
   }
 
   // Cannibalization warnings
@@ -560,8 +567,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
         }
       }
     }
-  } catch {
-    // Non-critical — cannibalization detection optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: cannibalization detection optional, degrading gracefully');
   }
 
   // Decay alerts
@@ -578,8 +585,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
         isRepeatDecay: p.isRepeatDecay ?? false,
       }));
     }
-  } catch {
-    // Non-critical — decay data optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: decay data optional, degrading gracefully');
   }
 
   // Suggested briefs count
@@ -588,8 +595,8 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     const { listSuggestedBriefs } = await import('./suggested-briefs-store.js');
     const briefs = listSuggestedBriefs(workspaceId);
     suggestedBriefs = briefs.filter(b => b.status === 'pending').length;
-  } catch {
-    // Non-critical — suggested briefs optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: suggested briefs optional, degrading gracefully');
   }
 
   return {
@@ -762,11 +769,15 @@ async function assembleSiteHealth(
   try {
     // NOTE: dynamic import required — anomaly-detection.ts statically imports from this module
     const { listAnomalies } = await import('./anomaly-detection.js');
-    const anomalies = listAnomalies(workspaceId);
+    const anomalies: Anomaly[] = listAnomalies(workspaceId);
     anomalyCount = anomalies.length;
     anomalyTypes = [...new Set(anomalies.map(a => a.type))];
   } catch (err) {
-    log.debug({ workspaceId, err }, 'siteHealth: anomaly detection failed — skipping');
+    if (isProgrammingError(err)) {
+      log.warn({ err, workspaceId }, 'assembleSiteHealth: programming error in anomaly-detection — check export names');
+    } else {
+      log.debug({ err, workspaceId }, 'assembleSiteHealth: anomaly detection optional, degrading gracefully');
+    }
   }
 
   // ── SEO change velocity (seo-change-tracker.ts) ──────────────────────
@@ -829,8 +840,8 @@ async function assembleClientSignals(
   try {
     const rows = stmts().contentGapVotes.all(workspaceId) as { keyword: string; cnt: number }[];
     contentGapVotes = rows.map(r => ({ topic: r.keyword, votes: r.cnt }));
-  } catch {
-    // Table may not exist
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: content gap votes table optional, degrading gracefully');
   }
 
   // Business priorities (DB direct)
@@ -840,8 +851,8 @@ async function assembleClientSignals(
     if (row) {
       businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), 'client_business_priorities') ?? [];
     }
-  } catch {
-    // Table may not exist or bad JSON
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities table optional, degrading gracefully');
   }
 
   // Churn signals
@@ -866,8 +877,13 @@ async function assembleClientSignals(
     const warningCount = signals.filter(s => s.severity === 'warning').length;
     const riskSignalCount = criticalCount + warningCount;
     churnRisk = criticalCount > 0 ? 'high' : warningCount >= 2 ? 'medium' : riskSignalCount > 0 ? 'low' : null;
-  } catch {
-    // Churn signals optional — churnFetchSucceeded stays false
+  } catch (err) {
+    if (isProgrammingError(err)) {
+      log.warn({ err, workspaceId }, 'assembleClientSignals: programming error in churn-signals — check export names');
+    } else {
+      log.debug({ err, workspaceId }, 'assembleClientSignals: churn signals optional, degrading gracefully');
+    }
+    // churnFetchSucceeded stays false
   }
 
   // Approval patterns
@@ -886,8 +902,8 @@ async function assembleClientSignals(
       approvalRate: total > 0 ? approved / total : 0,
       avgResponseTime: null,
     };
-  } catch {
-    // Approvals optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: approval patterns optional, degrading gracefully');
   }
 
   // Engagement metrics
@@ -911,8 +927,8 @@ async function assembleClientSignals(
     try {
       const { getMonthlyConversationCount } = await import('./chat-memory.js');
       chatSessionCount = getMonthlyConversationCount(workspaceId, 'client');
-    } catch {
-      // Chat memory optional
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleClientSignals: chat memory optional, degrading gracefully');
     }
 
     engagement = {
@@ -921,8 +937,8 @@ async function assembleClientSignals(
       chatSessionCount,
       portalUsage: null,
     };
-  } catch {
-    // Client users optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: client users optional, degrading gracefully');
   }
 
   // ROI data
@@ -937,8 +953,8 @@ async function assembleClientSignals(
         period: 'monthly',
       };
     }
-  } catch {
-    // ROI data optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: ROI data optional, degrading gracefully');
   }
 
   // Feedback items
@@ -952,8 +968,8 @@ async function assembleClientSignals(
       status: f.status ?? 'new',
       createdAt: f.createdAt ?? '',
     }));
-  } catch {
-    // Feedback optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: feedback items optional, degrading gracefully');
   }
 
   // Service requests
@@ -965,8 +981,8 @@ async function assembleClientSignals(
       pending: reqs.filter(r => r.status === 'new' || r.status === 'in_review').length,
       total: reqs.length,
     };
-  } catch {
-    // Requests optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: service requests optional, degrading gracefully');
   }
 
   // Intent signals from client chat
@@ -997,8 +1013,8 @@ async function assembleClientSignals(
       .slice(0, 5)
       .map((s: SessionSummary) => s.title ?? '')
       .filter(Boolean);
-  } catch {
-    // Chat memory optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleClientSignals: recent chat topics optional, degrading gracefully');
   }
 
   // Composite health score (40% churn + 30% ROI + 30% engagement)
@@ -1067,8 +1083,8 @@ async function assembleOperational(
       description: a.title ?? a.description ?? '',
       timestamp: a.createdAt ?? '',
     }));
-  } catch {
-    // Activity log optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: activity log optional, degrading gracefully');
   }
 
   // Annotations (merge both sources)
@@ -1080,8 +1096,8 @@ async function assembleOperational(
       date: a.date ?? '',
       label: a.label ?? '',
     }));
-  } catch {
-    // Analytics annotations optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: analytics annotations optional, degrading gracefully');
   }
   try {
     const { listAnnotations } = await import('./annotations.js');
@@ -1089,8 +1105,8 @@ async function assembleOperational(
     for (const a of timelineAnnotations.slice(0, 10)) {
       annotations.push({ date: a.date ?? '', label: a.label ?? '' });
     }
-  } catch {
-    // Timeline annotations optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: timeline annotations optional, degrading gracefully');
   }
 
   // Pending jobs
@@ -1099,8 +1115,8 @@ async function assembleOperational(
     const { listJobs } = await import('./jobs.js');
     const jobs = listJobs(workspaceId);
     pendingJobs = jobs.filter((j: Job) => j.status === 'pending' || j.status === 'running').length;
-  } catch {
-    // Jobs optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: jobs optional, degrading gracefully');
   }
 
   // Time saved (usage tracking)
@@ -1121,8 +1137,8 @@ async function assembleOperational(
     if (totalMinutes > 0) {
       timeSaved = { totalMinutes, byFeature };
     }
-  } catch {
-    // Usage tracking optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: usage tracking optional, degrading gracefully');
   }
 
   // Approval queue
@@ -1142,8 +1158,8 @@ async function assembleOperational(
       }
     }
     approvalQueue = { pending, oldestAge: pending > 0 ? Math.round(oldestMs / (60 * 60 * 1000)) : null };
-  } catch {
-    // Approvals optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: approval queue optional, degrading gracefully');
   }
 
   // Recommendation queue
@@ -1160,8 +1176,8 @@ async function assembleOperational(
         }
       }
     }
-  } catch {
-    // Recommendations optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: recommendation queue optional, degrading gracefully');
   }
 
   // Action backlog
@@ -1178,8 +1194,8 @@ async function assembleOperational(
       oldestAge = Math.floor((Date.now() - new Date(oldest.createdAt).getTime()) / (24 * 60 * 60 * 1000));
     }
     actionBacklog = { pendingMeasurement: wsActions.length, oldestAge };
-  } catch {
-    // Outcome tracking optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: outcome tracking optional, degrading gracefully');
   }
 
   // Detected playbooks
@@ -1188,8 +1204,8 @@ async function assembleOperational(
     const { getPlaybooks } = await import('./outcome-playbooks.js');
     const playbooks = getPlaybooks(workspaceId);
     detectedPlaybooks = playbooks.slice(0, 5).map((p: ActionPlaybook) => p.name ?? '').filter(Boolean);
-  } catch {
-    // Playbooks optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: playbooks optional, degrading gracefully');
   }
 
   // Work orders
@@ -1201,8 +1217,8 @@ async function assembleOperational(
       active: orders.filter((o: WorkOrder) => o.status === 'in_progress').length,
       pending: orders.filter((o: WorkOrder) => o.status === 'pending').length,
     };
-  } catch {
-    // Work orders optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: work orders optional, degrading gracefully');
   }
 
   // Insight acceptance rate
@@ -1221,8 +1237,8 @@ async function assembleOperational(
         rate: confirmed / totalShown,
       };
     }
-  } catch {
-    // Insight feedback optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleOperational: insight acceptance rate optional, degrading gracefully');
   }
 
   return {
@@ -1906,8 +1922,8 @@ async function assemblePageProfile(
   try {
     const { getPageKeyword } = await import('./page-keywords.js');
     pageKw = getPageKeyword(workspaceId, pagePath);
-  } catch {
-    // page-keywords optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: page-keywords optional, degrading gracefully');
   }
 
   // Rank history
@@ -1929,11 +1945,12 @@ async function assemblePageProfile(
       // Rank tracking has no match for this keyword — fall back to page-keywords data
       trend = current < previous ? 'up' : current > previous ? 'down' : 'stable';
     }
-  } catch {
+  } catch (err) {
     // Rank tracking module failed — fall back to page-keywords data
     if (current != null && previous != null) {
       trend = current < previous ? 'up' : current > previous ? 'down' : 'stable';
     }
+    log.debug({ err, workspaceId }, 'assemblePageProfile: rank tracking optional, degrading gracefully');
   }
   // best = lowest position number seen (lower is better in SEO)
   const best = (current != null && previous != null) ? Math.min(current, previous)
@@ -1950,8 +1967,8 @@ async function assemblePageProfile(
         .map(r => r.title ?? r.description ?? '')
         .filter(Boolean);
     }
-  } catch {
-    // Recommendations optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: recommendations optional, degrading gracefully');
   }
 
   // Page-specific insights
@@ -1960,8 +1977,8 @@ async function assemblePageProfile(
     const { getInsights } = await import('./analytics-insights-store.js');
     const all = getInsights(workspaceId);
     insights = all.filter(i => i.pageId === pagePath).slice(0, 10);
-  } catch {
-    // Insights optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: insights optional, degrading gracefully');
   }
 
   // Page actions
@@ -1969,8 +1986,8 @@ async function assemblePageProfile(
   try {
     const { getActionsByPage } = await import('./outcome-tracking.js');
     actions = getActionsByPage(workspaceId, pagePath);
-  } catch {
-    // Actions optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: page actions optional, degrading gracefully');
   }
 
   // Audit issues for this page
@@ -1988,8 +2005,8 @@ async function assemblePageProfile(
         }
       }
     }
-  } catch {
-    // Audit data optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: audit data optional, degrading gracefully');
   }
 
   // Schema status
@@ -2002,8 +2019,9 @@ async function assemblePageProfile(
       const status = pageValidation.status;
       schemaStatus = status === 'valid' ? 'valid' : status === 'warnings' ? 'warnings' : status === 'errors' ? 'errors' : 'none';
     }
-  } catch {
+  } catch (err) {
     schemaStatus = 'none';
+    log.debug({ err, workspaceId }, 'assemblePageProfile: schema status optional, degrading gracefully');
   }
 
   // Link health — SiteNode doesn't carry link counts; use orphanPaths from architecture result
@@ -2025,8 +2043,8 @@ async function assemblePageProfile(
         };
       }
     }
-  } catch {
-    // Architecture optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: site architecture optional, degrading gracefully');
   }
 
   // SEO edits
@@ -2040,8 +2058,8 @@ async function assemblePageProfile(
     }
     seoEdits.currentTitle = pageKw?.pageTitle ?? '';
     seoEdits.currentMeta = '';
-  } catch {
-    // SEO changes optional
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assemblePageProfile: SEO changes optional, degrading gracefully');
   }
 
   // Content status
@@ -2064,8 +2082,8 @@ async function assemblePageProfile(
         hasPost = posts.some(p => p.briefId === matchingBrief.id);
         isPublished = posts.some(p => p.briefId === matchingBrief.id && p.status === 'approved');
       }
-    } catch {
-      // Posts optional
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assemblePageProfile: posts optional, degrading gracefully');
     }
 
     let isDecaying = false;
@@ -2073,13 +2091,14 @@ async function assemblePageProfile(
       const { loadDecayAnalysis } = await import('./content-decay.js');
       const decayPP: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
       isDecaying = decayPP?.decayingPages?.some(d => d.page === pagePath) ?? false;
-    } catch {
-      // Decay optional
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assemblePageProfile: decay analysis optional, degrading gracefully');
     }
 
     contentStatus = isDecaying ? 'decay_detected' : isPublished ? 'published' : hasPost ? 'has_post' : hasBrief ? 'has_brief' : null;
-  } catch {
+  } catch (err) {
     contentStatus = null;
+    log.debug({ err, workspaceId }, 'assemblePageProfile: content status optional, degrading gracefully');
   }
 
   // contentGaps — prefer per-page AI keyword analysis (same source as old buildPageAnalysisContext),
@@ -2098,8 +2117,9 @@ async function assemblePageProfile(
         const source = matched.length > 0 ? matched : allGaps;
         contentGaps = source.slice(0, 5).map(g => g.topic).filter(Boolean);
       }
-    } catch {
+    } catch (err) {
       contentGaps = [];
+      log.debug({ err, workspaceId }, 'assemblePageProfile: content gaps optional, degrading gracefully');
     }
   }
 
@@ -2120,8 +2140,9 @@ async function assemblePageProfile(
         }
       }
     }
-  } catch {
+  } catch (err) {
     cwvStatus = null;
+    log.debug({ err, workspaceId }, 'assemblePageProfile: CWV status optional, degrading gracefully');
   }
 
   // Merge platform recs with AI keyword analysis recs — both are page-relevant.
@@ -2174,8 +2195,7 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
   // Invalidate persistent sub-cache
   try {
     invalidateSubCachePrefix(workspaceId, ''); // empty prefix = all keys for this workspace
-  } catch {
-    // Table may not exist yet — non-critical
+  } catch { // catch-ok — sub-cache table may not exist on older DBs; non-critical
   }
 
   // Broadcast to frontend so useWorkspaceIntelligence invalidates its React Query cache
@@ -2184,8 +2204,7 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
       workspaceId,
       invalidatedAt: new Date().toISOString(),
     });
-  } catch {
-    // Broadcasting is best-effort — don't fail cache invalidation
+  } catch { // catch-ok — broadcasting is best-effort; don't fail cache invalidation
   }
 
   log.info({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated (in-memory + persistent + broadcast)');
