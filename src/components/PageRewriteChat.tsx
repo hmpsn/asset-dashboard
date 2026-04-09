@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
-  Copy, Check, FileText, Sparkles, ChevronDown, ChevronUp,
+  Copy, Check, FileText, Sparkles, Maximize2,
 } from 'lucide-react';
-import { post } from '../api/client';
+import { post, get } from '../api/client';
 import { Badge } from './ui';
 import { RenderMarkdown } from './client/helpers';
 
@@ -13,24 +13,40 @@ interface SeoIssue {
   message: string;
 }
 
+interface PageSection {
+  level: number;
+  heading: string;
+  body: string;
+}
+
 interface PageData {
   title: string;
-  headings: string[];
+  sections: PageSection[];
   bodyText: string;
   html: string;
   issues: SeoIssue[];
   slug: string;
 }
 
+interface SitemapPage {
+  slug: string;
+  title: string;
+  url: string;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  /** Heading name parsed from **Rewriting: X** prefix; present on AI rewrite messages only */
+  sectionTarget?: string;
 }
 
 interface Props {
   workspaceId: string;
   initialPageUrl?: string;
+  focusMode?: boolean;
+  onFocusModeToggle?: () => void;
   onBack: () => void;
 }
 
@@ -43,7 +59,7 @@ const QUICK_PROMPTS = [
   'Identify sections that need better keyword integration',
 ];
 
-export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) {
+export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocusModeToggle, onBack }: Props) {
   // Page state
   const [pageUrl, setPageUrl] = useState(initialPageUrl || '');
   const [pageData, setPageData] = useState<PageData | null>(null);
@@ -57,12 +73,25 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
   const [sessionId] = useState(() => `rewrite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
   // Content pane state
-  const [showIssues, setShowIssues] = useState(true);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   // Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sitemap combobox
+  const [sitemapPages, setSitemapPages] = useState<SitemapPage[]>([]);
+  const [comboOpen, setComboOpen] = useState(false);
+  const [comboQuery, setComboQuery] = useState('');
+  const [comboIdx, setComboIdx] = useState(0);
+  const comboRef = useRef<HTMLDivElement>(null);
+  const comboInputRef = useRef<HTMLInputElement>(null);
+
+  // Editable AI message content (keyed by message array index)
+  const [msgEdits, setMsgEdits] = useState<Record<number, string>>({});
+
+  const docBodyRef = useRef<HTMLDivElement>(null);
+  const docPanelRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -74,6 +103,24 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
     if (initialPageUrl) loadPage(initialPageUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch sitemap pages for the combobox
+  useEffect(() => {
+    get<SitemapPage[]>(`/api/rewrite-chat/${workspaceId}/pages`)
+      .then(setSitemapPages)
+      .catch(() => {}); // Silent fail — URL paste still works
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!comboOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (comboRef.current && !comboRef.current.contains(e.target as Node)) {
+        setComboOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [comboOpen]);
 
   const loadPage = useCallback(async (url: string) => {
     if (!url.trim()) return;
@@ -109,7 +156,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
         pageIssues: pageData?.issues,
       });
 
-      const assistantMsg: ChatMessage = { role: 'assistant', content: resp.answer, timestamp: Date.now() };
+      const sectionMatch = resp.answer.match(/^\*\*Rewriting:\s*([^*]+)\*\*/i);
+      const sectionTarget = sectionMatch ? sectionMatch[1].trim() : undefined;
+      const assistantMsg: ChatMessage = { role: 'assistant', content: resp.answer, timestamp: Date.now(), sectionTarget };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
       const errMsg: ChatMessage = {
@@ -137,10 +186,47 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  const sevColor = (sev: string) => {
-    if (sev === 'error') return 'text-red-400/80';
-    if (sev === 'warning') return 'text-amber-400/80';
-    return 'text-blue-400';
+  const toSectionSlug = (text: string) =>
+    text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  const getIndentLevel = (slug: string) => {
+    const segs = slug.replace(/^\/|\/$/g, '').split('/');
+    return Math.max(0, segs.length - 1);
+  };
+
+  const filteredPages = comboQuery.startsWith('https://')
+    ? []
+    : sitemapPages.filter(p =>
+        !comboQuery ||
+        p.slug.toLowerCase().includes(comboQuery.toLowerCase()) ||
+        p.title.toLowerCase().includes(comboQuery.toLowerCase())
+      );
+
+  const stripRewritingPrefix = (content: string): string =>
+    content.replace(/^\*\*Rewriting:\s*[^*]+\*\*\s*\n?/, '');
+
+  const handleComboKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setComboIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (comboQuery.startsWith('https://')) { loadPage(comboQuery); setComboOpen(false); }
+      else if (filteredPages[comboIdx]) { selectPage(filteredPages[comboIdx]); }
+    } else if (e.key === 'Escape') { setComboOpen(false); }
+  };
+
+  const selectPage = (page: SitemapPage) => {
+    setComboQuery('');
+    setComboOpen(false);
+    setComboIdx(0);
+    if (page.url) loadPage(page.url);
+  };
+
+  const openCombo = () => {
+    setComboOpen(true);
+    setComboQuery('');
+    setComboIdx(0);
+    setTimeout(() => comboInputRef.current?.focus(), 0);
   };
 
   return (
@@ -159,24 +245,85 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
           <h1 className="text-sm font-semibold text-zinc-200">AI Page Rewriter</h1>
         </div>
 
-        {/* URL input */}
-        <div className="flex-1 flex items-center gap-2 ml-4">
-          <input
-            type="url"
-            value={pageUrl}
-            onChange={e => setPageUrl(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') loadPage(pageUrl); }}
-            placeholder="Enter page URL to rewrite..."
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
-          />
-          <button
-            onClick={() => loadPage(pageUrl)}
-            disabled={loadingPage || !pageUrl.trim()}
-            className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
-          >
-            {loadingPage ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
-            Load Page
-          </button>
+        {/* Sitemap combobox */}
+        <div className="flex-1 ml-4 relative" ref={comboRef}>
+
+          {/* Collapsed: page loaded */}
+          {pageData && !comboOpen && (
+            <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5">
+              <FileText className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+              <span className="text-xs text-zinc-300 flex-1 truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
+              <button onClick={openCombo} className="text-[10px] text-teal-400 hover:text-teal-300 font-medium flex-shrink-0">Change</button>
+            </div>
+          )}
+
+          {/* Closed: no page */}
+          {!pageData && !comboOpen && (
+            <button
+              onClick={openCombo}
+              className="w-full flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:border-teal-500/50 hover:text-zinc-300 transition-colors"
+            >
+              <FileText className="w-3 h-3" />
+              Search pages or paste a URL…
+            </button>
+          )}
+
+          {/* Open */}
+          {comboOpen && (
+            <div className="flex flex-col bg-zinc-800 border border-teal-500/50 rounded-lg overflow-hidden shadow-xl">
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-700">
+                <FileText className="w-3 h-3 text-zinc-500 flex-shrink-0" />
+                <input
+                  ref={comboInputRef}
+                  autoFocus
+                  value={comboQuery}
+                  onChange={e => { setComboQuery(e.target.value); setComboIdx(0); }}
+                  onKeyDown={handleComboKeyDown}
+                  placeholder="Search pages or paste a URL…"
+                  className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none"
+                />
+                {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-teal-400 flex-shrink-0" />}
+              </div>
+
+              {comboQuery.startsWith('https://') && (
+                <div className="px-3 py-2">
+                  <button
+                    onClick={() => { loadPage(comboQuery); setComboOpen(false); }}
+                    className="text-xs text-teal-400 hover:text-teal-300"
+                  >
+                    Load {comboQuery.length > 60 ? `${comboQuery.slice(0, 60)}…` : comboQuery}
+                  </button>
+                </div>
+              )}
+
+              {!comboQuery.startsWith('https://') && filteredPages.length > 0 && (
+                <div className="max-h-[240px] overflow-y-auto">
+                  {filteredPages.map((page, i) => (
+                    <button
+                      key={page.slug}
+                      onClick={() => selectPage(page)}
+                      onMouseEnter={() => setComboIdx(i)}
+                      className={`w-full flex items-center gap-2 py-1.5 text-xs text-left transition-colors border-l-2 ${
+                        i === comboIdx
+                          ? 'bg-teal-500/10 text-zinc-100 border-teal-500'
+                          : 'text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-200 border-transparent'
+                      }`}
+                      style={{ paddingLeft: `${12 + getIndentLevel(page.slug) * 12}px` }}
+                    >
+                      <FileText className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{page.slug || '/'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!comboQuery.startsWith('https://') && filteredPages.length === 0 && (
+                <div className="px-3 py-2 text-[11px] text-zinc-500">
+                  {sitemapPages.length > 0 ? `No pages match "${comboQuery}"` : 'No sitemap — paste a full URL above'}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -283,7 +430,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
         </div>
 
         {/* ═══ RIGHT PANE: Page Content ═══ */}
-        <div className="flex flex-col w-1/2 overflow-y-auto bg-zinc-950/50">
+        <div className="flex flex-col w-1/2 overflow-y-auto bg-zinc-950/50" ref={docPanelRef}>
           {!pageData && !loadingPage && !pageError && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-3 px-8">
               <FileText className="w-8 h-8 text-zinc-600" />
@@ -311,7 +458,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
           )}
 
           {pageData && !loadingPage && (
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-5 py-4 space-y-4" ref={docBodyRef}>
               {/* Page title & link */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -332,45 +479,46 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, onBack }: Props) 
               {/* Audit issues */}
               {pageData.issues.length > 0 && (
                 <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-                  <button
-                    onClick={() => setShowIssues(!showIssues)}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-zinc-800/50 transition-colors"
-                  >
+                  <div className="w-full flex items-center gap-2 px-4 py-2.5 text-left">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
                     <span className="text-xs font-medium text-zinc-200 flex-1">
                       Audit Issues ({pageData.issues.length})
                     </span>
                     <div className="flex items-center gap-1.5">
                       <Badge label={`${pageData.issues.filter(i => i.severity === 'error').length} errors`} color="red" />
-                      {showIssues ? <ChevronUp className="w-3 h-3 text-zinc-500" /> : <ChevronDown className="w-3 h-3 text-zinc-500" />}
                     </div>
-                  </button>
-                  {showIssues && (
-                    <div className="px-4 pb-3 space-y-1.5">
-                      {pageData.issues.slice(0, 15).map((issue, i) => (
-                        <div key={i} className="flex items-start gap-2 text-[11px]">
-                          <span className={`font-medium uppercase w-12 flex-shrink-0 ${sevColor(issue.severity)}`}>
-                            {issue.severity}
-                          </span>
-                          <span className="text-zinc-400">{issue.message}</span>
-                        </div>
-                      ))}
-                      {pageData.issues.length > 15 && (
-                        <p className="text-[10px] text-zinc-600">+ {pageData.issues.length - 15} more issues</p>
-                      )}
-                    </div>
-                  )}
+                  </div>
+                  <div className="px-4 pb-3 space-y-1.5">
+                    {pageData.issues.slice(0, 15).map((issue, i) => (
+                      <div key={i} className="flex items-start gap-2 text-[11px]">
+                        <span className={`font-medium uppercase w-12 flex-shrink-0 ${
+                          issue.severity === 'error' ? 'text-red-400/80' : issue.severity === 'warning' ? 'text-amber-400/80' : 'text-blue-400'
+                        }`}>
+                          {issue.severity}
+                        </span>
+                        <span className="text-zinc-400">{issue.message}</span>
+                      </div>
+                    ))}
+                    {pageData.issues.length > 15 && (
+                      <p className="text-[10px] text-zinc-600">+ {pageData.issues.length - 15} more issues</p>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Page headings */}
-              {pageData.headings.length > 0 && (
+              {/* Page sections */}
+              {pageData.sections && pageData.sections.length > 0 && (
                 <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
                   <h3 className="text-xs font-semibold text-zinc-300">Heading Structure</h3>
                   <div className="space-y-1">
-                    {pageData.headings.map((h, i) => (
-                      <div key={i} className="text-[11px] text-zinc-400 pl-2 border-l-2 border-zinc-700">
-                        {h}
+                    {pageData.sections.map((section, i) => (
+                      <div
+                        key={i}
+                        id={`section-${toSectionSlug(section.heading)}`}
+                        className="text-[11px] text-zinc-400 pl-2 border-l-2 border-zinc-700"
+                        style={{ paddingLeft: `${8 + (section.level - 1) * 8}px` }}
+                      >
+                        {section.heading}
                       </div>
                     ))}
                   </div>
