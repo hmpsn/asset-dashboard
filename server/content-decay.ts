@@ -12,6 +12,8 @@ import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelli
 import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { isProgrammingError } from './errors.js';
+import type { getActionsByPage, getOutcomesForAction } from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
 
@@ -184,8 +186,12 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
           }
         }
       }
-    } catch {
-      // Non-critical — outcome tracking may not have data for this page
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err, workspaceId: ws.id }, 'content-decay: programming error in outcome-tracking — check export names');
+      } else {
+        log.debug({ err, workspaceId: ws.id }, 'content-decay: outcome tracking optional for repeat decay check, degrading gracefully');
+      }
     }
 
     decayingPages.push(decayingPage);

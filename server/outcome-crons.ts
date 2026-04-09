@@ -29,27 +29,18 @@ export function startOutcomeCrons() {
   if (measureInterval) return; // already started
 
   const runMeasure = async () => {
-    // Collect affected workspace IDs BEFORE measurement (measurement consumes them).
-    // Isolated try/catch so a transient DB error here doesn't skip measurement.
-    let affectedWsIds: string[] = [];
-    try {
-      const { getPendingActions } = await import('./outcome-tracking.js');
-      const pending = getPendingActions();
-      affectedWsIds = [...new Set(pending.map(a => a.workspaceId))];
-    } catch (err) {
-      log.warn({ err }, 'Could not collect pending action workspace IDs — cache invalidation will be skipped');
-    }
-
     try {
       const { measurePendingOutcomes } = await import('./outcome-measurement.js');
-      await measurePendingOutcomes();
+      const { workspaceIds } = await measurePendingOutcomes();
 
-      // Only invalidate workspaces that had pending measurements
-      for (const wsId of affectedWsIds) {
+      // Invalidate cache for every workspace that had pending measurements.
+      // workspaceIds comes from the same getPendingActions() call that drives
+      // measurement, so it's always in sync — no separate pre-read that can fail.
+      for (const wsId of workspaceIds) {
         invalidateIntelligenceCache(wsId);
       }
-      if (affectedWsIds.length > 0) {
-        log.info({ count: affectedWsIds.length }, 'Invalidated intelligence cache for measured workspaces');
+      if (workspaceIds.length > 0) {
+        log.info({ count: workspaceIds.length }, 'Invalidated intelligence cache for measured workspaces');
       }
     } catch (err) {
       log.error({ err }, 'Failed to measure pending outcomes');

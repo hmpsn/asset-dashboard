@@ -406,8 +406,13 @@ async function scoreActionAtCheckpoint(
 
 export async function measurePendingOutcomes(
   scoringConfigOverride?: Partial<ScoringConfig>,
-): Promise<{ measured: number; errors: number }> {
+): Promise<{ measured: number; errors: number; workspaceIds: string[] }> {
   const pendingActions = getPendingActions();
+
+  // Collect workspace IDs from the pending set so the caller can invalidate
+  // intelligence caches for workspaces that were actually measured, regardless
+  // of whether getPendingActions is called independently elsewhere.
+  const workspaceIds = [...new Set(pendingActions.map(a => a.workspaceId))];
 
   log.info({ count: pendingActions.length }, 'Starting outcome measurement run');
 
@@ -445,5 +450,5 @@ export async function measurePendingOutcomes(
 
   log.info({ measured, errors }, 'Outcome measurement run complete');
 
-  return { measured, errors };
+  return { measured, errors, workspaceIds };
 }

@@ -261,8 +261,8 @@ router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (
     } else {
       fs.renameSync(file.path, targetPath);
     }
-  } catch {
-    // Fallback: just move without resize
+  } catch (err) {
+    log.debug({ err }, 'misc: image resize via sips failed, falling back to move without resize');
     fs.renameSync(file.path, targetPath);
   }
 
