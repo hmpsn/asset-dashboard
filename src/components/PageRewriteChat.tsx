@@ -241,7 +241,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     return Math.max(0, segs.length - 1);
   };
 
-  const filteredPages = comboQuery.startsWith('https://')
+  const isUrlQuery = comboQuery.startsWith('https://') || comboQuery.startsWith('http://');
+
+  const filteredPages = isUrlQuery
     ? []
     : sitemapPages.filter(p =>
         !comboQuery ||
@@ -265,7 +267,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     else if (e.key === 'ArrowUp') { e.preventDefault(); setComboIdx(i => Math.max(i - 1, 0)); }
     else if (e.key === 'Enter') {
       e.preventDefault();
-      if (comboQuery.startsWith('https://')) { loadPage(comboQuery); setComboOpen(false); }
+      if (isUrlQuery) { loadPage(comboQuery); setComboOpen(false); }
       else if (filteredPages[comboIdx]) { selectPage(filteredPages[comboIdx]); }
     } else if (e.key === 'Escape') { e.stopPropagation(); setComboOpen(false); }
   };
@@ -520,7 +522,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 {loadingPage && <Loader2 className="w-3 h-3 animate-spin text-teal-400 flex-shrink-0" />}
               </div>
 
-              {comboQuery.startsWith('https://') && (
+              {isUrlQuery && (
                 <div className="px-3 py-2">
                   <button
                     onClick={() => { loadPage(comboQuery); setComboOpen(false); }}
@@ -531,7 +533,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 </div>
               )}
 
-              {!comboQuery.startsWith('https://') && filteredPages.length > 0 && (
+              {!isUrlQuery && filteredPages.length > 0 && (
                 <div className="max-h-[240px] overflow-y-auto">
                   {filteredPages.map((page, i) => (
                     <button
@@ -555,7 +557,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 </div>
               )}
 
-              {!comboQuery.startsWith('https://') && filteredPages.length === 0 && (
+              {!isUrlQuery && filteredPages.length === 0 && (
                 <div className="px-3 py-2 text-[11px] text-zinc-500">
                   {sitemapPages.length > 0 ? `No pages match "${comboQuery}"` : 'No sitemap — paste a full URL above'}
                 </div>
