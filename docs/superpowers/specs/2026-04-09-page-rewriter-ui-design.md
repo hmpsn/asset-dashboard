@@ -7,11 +7,12 @@
 
 ## Overview
 
-Three concrete improvements to `PageRewriteChat.tsx`:
+Four concrete improvements to `PageRewriteChat.tsx`:
 
 1. **Sitemap combobox** — replace the raw URL input with a searchable page picker that browses the site's audit snapshot
 2. **Editable document panel** — replace the raw text dump on the right with a properly formatted, directly editable document view including a light formatting toolbar
 3. **Apply + Export** — AI suggestions are editable before applying; applying patches the document in-place with a visual highlight; Export generates clean markdown
+4. **Focus mode** — collapse the dashboard sidebar so the rewriter (chat + document, layout unchanged) fills the full browser width
 
 These changes make the page rewriter feel like a real editing environment rather than a chat with a preview pane.
 
@@ -123,11 +124,26 @@ No server round-trip needed — serialization runs client-side on the live docum
 
 ---
 
+## 4. Focus Mode
+
+A **focus mode toggle button** (⤢ icon) in the page rewriter header collapses the dashboard sidebar — the workspace icon rail and the tab navigation — so the rewriter fills the full browser width. The internal 50/50 split between chat and document panel is unchanged; both panels simply get wider.
+
+**Behavior:**
+- Toggle button lives in the top-right of the rewriter header
+- Clicking collapses the sidebar; clicking again (or pressing Escape) restores it
+- State is a `focusMode` boolean in `App.tsx`, passed to the sidebar via the existing layout props/context — no routing change, no new pages
+- A slim exit affordance (narrow strip or `◀` chevron) remains at the left edge in focus mode so the user can exit without hunting for the button
+- Focus mode is local to the rewriter page; navigating away resets it to off
+
+---
+
 ## Component Changes
 
 | File | Change |
 |------|--------|
-| `src/components/PageRewriteChat.tsx` | Replace URL input with combobox; replace right panel with editable document view; add toolbar; add Apply logic; add Export |
+| `src/components/PageRewriteChat.tsx` | Replace URL input with combobox; replace right panel with editable document view; add toolbar; add Apply logic; add Export; add focus mode toggle button |
+| `src/components/layout/Sidebar.tsx` | Accept `hidden` prop; renders a slim exit strip when hidden |
+| `src/App.tsx` | Add `focusMode` state; pass to Sidebar and PageRewriteChat |
 | `server/routes/rewrite-chat.ts` | Add `GET /:workspaceId/pages` endpoint returning slug+title list from latest snapshot |
 
 The pages fetch is made directly from the component via the existing `post`/`get` helper (same pattern as the current `load-page` and chat calls — no separate API module needed).
