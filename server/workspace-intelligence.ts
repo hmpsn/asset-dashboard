@@ -1270,14 +1270,18 @@ export function formatForPrompt(
   // Cold-start detection (§29)
   // Check for meaningful content, not just object existence — seoContext is always
   // assembled as an object, so truthy-check on it would always pass.
-  const hasSeoContent = intelligence.seoContext && (
+  const hasSeoContent = (!include || include.has('seoContext')) && intelligence.seoContext && (
     intelligence.seoContext.strategy ||
     intelligence.seoContext.brandVoice ||
     intelligence.seoContext.businessContext ||
     intelligence.seoContext.knowledgeBase ||
     (intelligence.seoContext.personas && intelligence.seoContext.personas.length > 0)
   );
-  const hasData = hasSeoContent || intelligence.insights?.all.length || intelligence.learnings?.summary || intelligence.pageProfile;
+  const hasData =
+    hasSeoContent ||
+    ((!include || include.has('insights')) && intelligence.insights?.all.length) ||
+    ((!include || include.has('learnings')) && intelligence.learnings?.summary) ||
+    ((!include || include.has('pageProfile')) && !!intelligence.pageProfile);
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
@@ -1360,6 +1364,9 @@ export async function buildIntelPrompt(
  * 2. Truncate `insights` to top 5
  * 3. Drop `clientSignals`
  * 4. Summarize `learnings` to one line
+ * 4b. Drop `pageProfile`
+ * 4c. Drop `siteHealth`
+ * 4d. Drop `contentPipeline`
  * 5. Never drop `seoContext`
  */
 function applyTokenBudget(
@@ -1404,6 +1411,21 @@ function applyTokenBudget(
     }
     return s;
   });
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 4b: Drop pageProfile (dynamic header — startsWith covers all pagePath variants)
+  current = current.filter(s => !s.startsWith('## Page Profile'));
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 4c: Drop siteHealth
+  current = current.filter(s => !s.startsWith('## Site Health'));
+  output = current.join('\n\n');
+  if (estimateTokens(output) <= budget) return output;
+
+  // Step 4d: Drop contentPipeline
+  current = current.filter(s => !s.startsWith('## Content Pipeline'));
   output = current.join('\n\n');
   if (estimateTokens(output) <= budget) return output;
 
