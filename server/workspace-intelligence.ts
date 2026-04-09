@@ -1278,15 +1278,26 @@ export function formatForPrompt(
     intelligence.seoContext.knowledgeBase ||
     (intelligence.seoContext.personas && intelligence.seoContext.personas.length > 0)
   );
+  // For unfiltered calls: check meaningful content within each slice because
+  // assemblers always return non-null objects (even when cold). `learnings.summary`
+  // is null when the feature flag is off; `insights.all` is empty before any data.
+  // For section-filtered calls: treat presence of the assembled object as sufficient —
+  // the caller explicitly requested that section so render it rather than cold-starting.
   const hasData =
     hasSeoContent ||
     ((!include || include.has('insights')) && !!intelligence.insights?.all.length) ||
-    ((!include || include.has('learnings')) && intelligence.learnings != null) ||
+    (!include && !!intelligence.learnings?.summary) ||
     ((!include || include.has('pageProfile')) && !!intelligence.pageProfile) ||
-    ((!include || include.has('clientSignals')) && intelligence.clientSignals != null) ||
-    ((!include || include.has('operational')) && intelligence.operational != null) ||
-    ((!include || include.has('contentPipeline')) && intelligence.contentPipeline != null) ||
-    ((!include || include.has('siteHealth')) && intelligence.siteHealth != null);
+    // Section-filtered: if the caller requested a slice and it exists, skip cold-start.
+    // These slices are excluded from the unfiltered path because their assemblers always
+    // return non-null objects even on cold workspaces, which would make cold-start unreachable.
+    (include !== null && (
+      (include.has('learnings') && intelligence.learnings != null) ||
+      (include.has('clientSignals') && intelligence.clientSignals != null) ||
+      (include.has('operational') && intelligence.operational != null) ||
+      (include.has('contentPipeline') && intelligence.contentPipeline != null) ||
+      (include.has('siteHealth') && intelligence.siteHealth != null)
+    ));
   if (!hasData) {
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
