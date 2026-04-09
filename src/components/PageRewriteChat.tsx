@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
-  Copy, Check, FileText, Sparkles, Maximize2,
+  Copy, Check, FileText, Sparkles,
 } from 'lucide-react';
 import { post, get } from '../api/client';
-import { Badge } from './ui';
 import { RenderMarkdown } from './client/helpers';
 
 interface SeoIssue {
@@ -429,16 +428,16 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           </div>
         </div>
 
-        {/* ═══ RIGHT PANE: Page Content ═══ */}
-        <div className="flex flex-col w-1/2 overflow-y-auto bg-zinc-950/50" ref={docPanelRef}>
+        {/* ═══ RIGHT PANE: Editable Document ═══ */}
+        <div ref={docPanelRef} className="flex flex-col w-1/2 overflow-hidden bg-zinc-950/50 relative">
+
+          {/* Empty state */}
           {!pageData && !loadingPage && !pageError && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-3 px-8">
               <FileText className="w-8 h-8 text-zinc-600" />
               <div>
                 <h3 className="text-sm font-medium text-zinc-400">No page loaded</h3>
-                <p className="text-xs text-zinc-600 mt-1">
-                  Enter a URL above and click "Load Page" to see the page content here alongside the chat.
-                </p>
+                <p className="text-xs text-zinc-600 mt-1">Search for a page above or paste a URL to see the content here.</p>
               </div>
             </div>
           )}
@@ -458,84 +457,94 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
           )}
 
           {pageData && !loadingPage && (
-            <div className="px-5 py-4 space-y-4" ref={docBodyRef}>
-              {/* Page title & link */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-zinc-200 flex-1">{pageData.title}</h2>
-                  <a
-                    href={pageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 rounded text-zinc-500 hover:text-teal-400 transition-colors"
-                    title="Open page"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-                <p className="text-[11px] text-zinc-500 truncate">{pageUrl}</p>
+            <>
+              {/* Panel header */}
+              <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-zinc-800 bg-zinc-900/60">
+                <a
+                  href={pageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-teal-400 transition-colors flex-1 min-w-0"
+                >
+                  <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+                {/* Export button — replaced with real popover in Task 6 */}
+                <button
+                  data-export-trigger
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors flex-shrink-0"
+                >
+                  Export brief
+                </button>
               </div>
 
-              {/* Audit issues */}
+              {/* Audit issue chips — always visible, non-collapsible */}
               {pageData.issues.length > 0 && (
-                <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
-                  <div className="w-full flex items-center gap-2 px-4 py-2.5 text-left">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400/80 flex-shrink-0" />
-                    <span className="text-xs font-medium text-zinc-200 flex-1">
-                      Audit Issues ({pageData.issues.length})
+                <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2 border-b border-zinc-800 bg-zinc-900/30">
+                  {pageData.issues.slice(0, 20).map((issue, i) => (
+                    <span
+                      key={i}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${
+                        issue.severity === 'error'
+                          ? 'bg-red-950/40 border-red-500/40 text-red-400'
+                          : issue.severity === 'warning'
+                          ? 'bg-amber-950/40 border-amber-500/40 text-amber-400'
+                          : 'bg-blue-950/40 border-blue-500/40 text-blue-400'
+                      }`}
+                    >
+                      {issue.severity === 'error' ? '✕' : '⚠'} {issue.message}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <Badge label={`${pageData.issues.filter(i => i.severity === 'error').length} errors`} color="red" />
+                  ))}
+                </div>
+              )}
+
+              {/* Contenteditable document body */}
+              <div
+                ref={docBodyRef}
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck
+                className="flex-1 overflow-y-auto px-6 py-5 focus:outline-none"
+              >
+                {/* H1 title */}
+                <h1
+                  data-section={toSectionSlug(pageData.title)}
+                  className="text-[20px] font-bold text-slate-100 mb-3"
+                >
+                  {pageData.title}
+                </h1>
+
+                {pageData.sections.map((section, i) => {
+                  const slug = toSectionSlug(section.heading);
+                  if (section.level === 1) return (
+                    <div key={i}>
+                      <h1 data-section={slug} className="text-[20px] font-bold text-slate-100 mb-2 mt-5">{section.heading}</h1>
+                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3">{section.body}</p>}
                     </div>
-                  </div>
-                  <div className="px-4 pb-3 space-y-1.5">
-                    {pageData.issues.slice(0, 15).map((issue, i) => (
-                      <div key={i} className="flex items-start gap-2 text-[11px]">
-                        <span className={`font-medium uppercase w-12 flex-shrink-0 ${
-                          issue.severity === 'error' ? 'text-red-400/80' : issue.severity === 'warning' ? 'text-amber-400/80' : 'text-blue-400'
-                        }`}>
-                          {issue.severity}
-                        </span>
-                        <span className="text-zinc-400">{issue.message}</span>
-                      </div>
-                    ))}
-                    {pageData.issues.length > 15 && (
-                      <p className="text-[10px] text-zinc-600">+ {pageData.issues.length - 15} more issues</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Page sections */}
-              {pageData.sections && pageData.sections.length > 0 && (
-                <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
-                  <h3 className="text-xs font-semibold text-zinc-300">Heading Structure</h3>
-                  <div className="space-y-1">
-                    {pageData.sections.map((section, i) => (
-                      <div
-                        key={i}
-                        id={`section-${toSectionSlug(section.heading)}`}
-                        className="text-[11px] text-zinc-400 pl-2 border-l-2 border-zinc-700"
-                        style={{ paddingLeft: `${8 + (section.level - 1) * 8}px` }}
-                      >
-                        {section.heading}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Page body text */}
-              <div className="bg-zinc-900 border border-zinc-800 p-4 space-y-2" style={{ borderRadius: '10px 24px 10px 24px' }}>
-                <h3 className="text-xs font-semibold text-zinc-300">Page Content</h3>
-                <div className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap max-h-[60vh] overflow-y-auto pr-2">
-                  {pageData.bodyText.slice(0, 5000)}
-                  {pageData.bodyText.length > 5000 && (
-                    <span className="text-zinc-600">... [truncated]</span>
-                  )}
-                </div>
+                  );
+                  if (section.level === 2) return (
+                    <div key={i}>
+                      <h2 data-section={slug} className="text-[15px] font-semibold text-slate-300 mb-2 mt-5">{section.heading}</h2>
+                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3">{section.body}</p>}
+                    </div>
+                  );
+                  if (section.level === 3) return (
+                    <div key={i}>
+                      <h3 data-section={slug} className="text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700">{section.heading}</h3>
+                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3 ml-3">{section.body}</p>}
+                    </div>
+                  );
+                  // H4+: additional indent per level
+                  const extraIndent = (section.level - 3) * 12;
+                  return (
+                    <div key={i}>
+                      <h4 data-section={slug} className="text-[12px] font-medium text-slate-400 mb-1.5 mt-3 pl-2 border-l-2 border-slate-700" style={{ marginLeft: `${12 + extraIndent}px` }}>{section.heading}</h4>
+                      {section.body && <p className="text-[13px] text-slate-500 leading-[1.7] mb-3" style={{ marginLeft: `${12 + extraIndent}px` }}>{section.body}</p>}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
