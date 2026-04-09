@@ -567,8 +567,12 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
         a.download = `${slug}-brief.docx`;
         a.click();
         URL.revokeObjectURL(url);
+        setExportOpen(false);
+      }).catch(err => {
+        console.error('DOCX export failed:', err);
+        setExportOpen(false);
+        alert('Export failed. Please try again.');
       });
-      setExportOpen(false);
       return;
     }
     const md = serializeDocToMarkdown();
@@ -943,7 +947,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 ref={(el) => {
                   docBodyRef.current = el;
                   if (!el) return;
-                  const pageKey = pageData.slug || pageData.title;
+                  // Use slug, then title, then URL as fallback — never '' (empty string matches cleared state)
+                  const pageKey = pageData.slug || pageData.title || pageData.url || '__loaded__';
                   if (el.dataset.pageKey === pageKey) return; // already initialized for this page
                   el.dataset.pageKey = pageKey;
                   el.innerHTML = buildDocHtml(pageData);
