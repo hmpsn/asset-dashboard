@@ -1,0 +1,262 @@
+import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
+import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
+import { callOpenAI } from './openai-helpers.js';
+import { buildSeoContext } from './seo-context.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import { createLogger } from './logger.js';
+import { randomUUID } from 'crypto';
+import type {
+  VoiceProfile, VoiceSample, CalibrationSession, CalibrationVariation,
+  VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
+  VoiceSampleContext, VoiceSampleSource,
+} from '../shared/types/brand-engine.js';
+
+const log = createLogger('voice-calibration');
+
+interface ProfileRow {
+  id: string; workspace_id: string; status: string;
+  voice_dna_json: string | null; guardrails_json: string | null;
+  context_modifiers_json: string | null; created_at: string; updated_at: string;
+}
+interface SampleRow {
+  id: string; voice_profile_id: string; content: string;
+  context_tag: string | null; source: string | null;
+  sort_order: number | null; created_at: string;
+}
+interface SessionRow {
+  id: string; voice_profile_id: string; prompt_type: string;
+  variations_json: string; steering_notes: string | null; created_at: string;
+}
+
+const stmts = createStmtCache(() => ({
+  getProfileByWorkspace: db.prepare(`SELECT * FROM voice_profiles WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT 1`),
+  insertProfile: db.prepare(`INSERT INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
+  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id`),
+  listSamples: db.prepare(`SELECT * FROM voice_samples WHERE voice_profile_id = ? ORDER BY sort_order`),
+  insertSample: db.prepare(`INSERT INTO voice_samples (id, voice_profile_id, content, context_tag, source, sort_order, created_at) VALUES (@id, @voice_profile_id, @content, @context_tag, @source, @sort_order, @created_at)`),
+  deleteSampleById: db.prepare(`DELETE FROM voice_samples WHERE id = ? AND voice_profile_id = ?`),
+  listSessions: db.prepare(`SELECT * FROM voice_calibration_sessions WHERE voice_profile_id = ? ORDER BY created_at DESC`),
+  getSession: db.prepare(`SELECT * FROM voice_calibration_sessions WHERE id = ? AND voice_profile_id = ?`),
+  insertSession: db.prepare(`INSERT INTO voice_calibration_sessions (id, voice_profile_id, prompt_type, variations_json, steering_notes, created_at) VALUES (@id, @voice_profile_id, @prompt_type, @variations_json, @steering_notes, @created_at)`),
+  updateSession: db.prepare(`UPDATE voice_calibration_sessions SET variations_json = @variations_json, steering_notes = @steering_notes WHERE id = @id`),
+}));
+
+function rowToProfile(row: ProfileRow): Omit<VoiceProfile, 'samples'> {
+  return {
+    id: row.id, workspaceId: row.workspace_id,
+    status: row.status as VoiceProfileStatus,
+    voiceDNA: row.voice_dna_json ? parseJsonFallback<VoiceDNA | null>(row.voice_dna_json, null) ?? undefined : undefined,
+    guardrails: row.guardrails_json ? parseJsonFallback<VoiceGuardrails | null>(row.guardrails_json, null) ?? undefined : undefined,
+    contextModifiers: row.context_modifiers_json ? parseJsonFallback<ContextModifier[] | null>(row.context_modifiers_json, null) ?? undefined : undefined,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+function rowToSample(row: SampleRow): VoiceSample {
+  return {
+    id: row.id, voiceProfileId: row.voice_profile_id, content: row.content,
+    contextTag: (row.context_tag ?? undefined) as VoiceSampleContext | undefined,
+    source: (row.source ?? undefined) as VoiceSampleSource | undefined,
+    sortOrder: row.sort_order ?? undefined, createdAt: row.created_at,
+  };
+}
+
+function rowToSession(row: SessionRow): CalibrationSession {
+  return {
+    id: row.id, voiceProfileId: row.voice_profile_id,
+    promptType: row.prompt_type,
+    variations: parseJsonFallback<CalibrationVariation[]>(row.variations_json, []),
+    steeringNotes: row.steering_notes ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+// Returns profile with samples included
+export function getVoiceProfile(workspaceId: string): (VoiceProfile & { samples: VoiceSample[] }) | null {
+  const row = stmts().getProfileByWorkspace.get(workspaceId) as ProfileRow | undefined;
+  if (!row) return null;
+  const profile = rowToProfile(row);
+  const samples = (stmts().listSamples.all(row.id) as SampleRow[]).map(rowToSample);
+  return { ...profile, samples };
+}
+
+// Gets or creates the voice profile for a workspace, always includes samples
+export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { samples: VoiceSample[] } {
+  const existing = getVoiceProfile(workspaceId);
+  if (existing) return existing;
+
+  const id = `vp_${randomUUID().slice(0, 8)}`;
+  const now = new Date().toISOString();
+  const defaultModifiers: ContextModifier[] = [
+    { context: 'Headlines & CTAs', description: 'Maximum personality. Punchy. Humor welcome.' },
+    { context: 'Service descriptions', description: 'Clear and warm. Less humor, more reassurance.' },
+    { context: 'SEO meta titles/descriptions', description: 'Brand voice balanced with keyword requirements. Personality in the description, precision in the title.' },
+    { context: 'Blog / long-form', description: 'Full voice. Narrative rhythm. Room for extended personality.' },
+    { context: 'FAQ / educational', description: 'Accessible, helpful. Expertise without condescension.' },
+  ];
+
+  stmts().insertProfile.run({
+    id, workspace_id: workspaceId, status: 'draft',
+    voice_dna_json: null, guardrails_json: null,
+    context_modifiers_json: JSON.stringify(defaultModifiers),
+    created_at: now, updated_at: now,
+  });
+
+  log.info({ workspaceId, profileId: id }, 'created voice profile');
+  return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
+}
+
+export function updateVoiceProfile(
+  workspaceId: string,
+  updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
+): (VoiceProfile & { samples: VoiceSample[] }) | null {
+  const profile = getOrCreateVoiceProfile(workspaceId);
+  const now = new Date().toISOString();
+  stmts().updateProfile.run({
+    id: profile.id,
+    status: updates.status ?? profile.status,
+    voice_dna_json: updates.voiceDNA !== undefined ? JSON.stringify(updates.voiceDNA) : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
+    guardrails_json: updates.guardrails !== undefined ? JSON.stringify(updates.guardrails) : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),
+    context_modifiers_json: updates.contextModifiers !== undefined ? JSON.stringify(updates.contextModifiers) : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
+    updated_at: now,
+  });
+  return { ...profile, ...updates, updatedAt: now };
+}
+
+// Takes workspaceId (not profile.id) — resolves profile internally
+export function addVoiceSample(
+  workspaceId: string, content: string,
+  contextTag?: VoiceSampleContext, source?: VoiceSampleSource,
+): VoiceSample {
+  const profile = getOrCreateVoiceProfile(workspaceId);
+  const id = `vs_${randomUUID().slice(0, 8)}`;
+  const now = new Date().toISOString();
+  const sortOrder = profile.samples.length;
+  stmts().insertSample.run({
+    id, voice_profile_id: profile.id, content,
+    context_tag: contextTag ?? null, source: source ?? 'manual',
+    sort_order: sortOrder, created_at: now,
+  });
+  return { id, voiceProfileId: profile.id, content, contextTag, source: source ?? 'manual', sortOrder, createdAt: now };
+}
+
+export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {
+  const profile = getVoiceProfile(workspaceId);
+  if (!profile) return false;
+  return stmts().deleteSampleById.run(sampleId, profile.id).changes > 0;
+}
+
+export function listCalibrationSessions(workspaceId: string): CalibrationSession[] {
+  const profile = getVoiceProfile(workspaceId);
+  if (!profile) return [];
+  return (stmts().listSessions.all(profile.id) as SessionRow[]).map(rowToSession);
+}
+
+export async function generateCalibrationVariations(
+  workspaceId: string, promptType: string, steeringNotes?: string,
+): Promise<CalibrationSession> {
+  const profile = getOrCreateVoiceProfile(workspaceId);
+  const { fullContext } = buildSeoContext(workspaceId);
+
+  const samplesText = profile.samples.length > 0
+    ? `\nVOICE SAMPLES (write like these):\n${profile.samples.map(s => `  [${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`
+    : '';
+
+  const dnaText = profile.voiceDNA
+    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}\n  Humor: ${profile.voiceDNA.humorStyle}`
+    : '';
+
+  const guardrailsText = profile.guardrails
+    ? `\nGUARDRAILS:\n  Forbidden: ${profile.guardrails.forbiddenWords.join(', ')}\n  Required terms: ${profile.guardrails.requiredTerminology.map(t => `"${t.use}" not "${t.insteadOf}"`).join(', ')}\n  Boundaries: ${profile.guardrails.toneBoundaries.join('. ')}`
+    : '';
+
+  const modifierText = profile.contextModifiers
+    ? (() => {
+        const key = promptType.split('_')[0];
+        const mod = profile.contextModifiers!.find(m => m.context.toLowerCase().includes(key));
+        return mod ? `\nCONTEXT MODIFIER for ${promptType}: ${mod.description}` : '';
+      })()
+    : '';
+
+  const userPrompt = `Generate exactly 3 variations of ${promptType.replace(/_/g, ' ')} copy for this brand.
+${fullContext}${samplesText}${dnaText}${guardrailsText}${modifierText}
+${steeringNotes ? `\nSTEERING DIRECTION: ${steeringNotes}` : ''}
+
+Each variation should be meaningfully different in approach while staying on-brand. Be specific to this business.
+
+Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "variation 3 text"] }`;
+
+  const system = buildSystemPrompt(workspaceId, 'You are a copywriter matching a specific brand voice. Generate copy that sounds like this brand, not generic marketing language.');
+
+  log.info({ workspaceId, promptType }, 'generating calibration variations');
+  const useAnthropic = isAnthropicConfigured();
+  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
+    messages: [{ role: 'user', content: userPrompt }],
+    ...(useAnthropic ? { system } : {}),
+    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+    maxTokens: 2000,
+    temperature: 0.85,
+    feature: 'voice-calibration',
+    workspaceId,
+  } as Parameters<typeof callAnthropic>[0]);
+
+  const parsed = parseJsonFallback<{ variations: string[] }>(result.text, { variations: [] });
+  const variations: CalibrationVariation[] = (parsed.variations || []).map(text => ({ text }));
+
+  const id = `cal_${randomUUID().slice(0, 8)}`;
+  const now = new Date().toISOString();
+  stmts().insertSession.run({
+    id, voice_profile_id: profile.id, prompt_type: promptType,
+    variations_json: JSON.stringify(variations),
+    steering_notes: steeringNotes ?? null, created_at: now,
+  });
+
+  return { id, voiceProfileId: profile.id, promptType, variations, steeringNotes, createdAt: now };
+}
+
+export async function refineVariation(
+  workspaceId: string, sessionId: string, variationIndex: number, direction: string,
+): Promise<CalibrationSession | null> {
+  const profile = getVoiceProfile(workspaceId);
+  if (!profile) return null;
+  const row = stmts().getSession.get(sessionId, profile.id) as SessionRow | undefined;
+  if (!row) return null;
+
+  const session = rowToSession(row);
+  const original = session.variations[variationIndex];
+  if (!original) return null;
+
+  const userPrompt = `Refine this copy based on the direction given. Keep the same general idea but adjust as directed.
+
+ORIGINAL: "${original.text}"
+DIRECTION: ${direction}
+
+Return valid JSON: { "refined": "the refined text" }`;
+
+  const system = buildSystemPrompt(workspaceId, 'You are a copywriter refining copy based on feedback. Adjust precisely as directed.');
+
+  const useAnthropic = isAnthropicConfigured();
+  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
+    messages: [{ role: 'user', content: userPrompt }],
+    ...(useAnthropic ? { system } : {}),
+    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+    maxTokens: 1000,
+    temperature: 0.75,
+    feature: 'voice-refinement',
+    workspaceId,
+  } as Parameters<typeof callAnthropic>[0]);
+
+  const parsed = parseJsonFallback<{ refined: string }>(result.text, { refined: original.text });
+  session.variations.push({ text: parsed.refined });
+  const newNotes = `${session.steeringNotes || ''}\n[Refined #${variationIndex}]: ${direction}`.trim();
+
+  stmts().updateSession.run({
+    id: sessionId,
+    variations_json: JSON.stringify(session.variations),
+    steering_notes: newNotes,
+  });
+
+  return { ...session, variations: session.variations, steeringNotes: newNotes };
+}
