@@ -328,8 +328,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
     const targetSlug = toSectionSlug(sectionTarget);
     const heading = docBody.querySelector(`[data-section="${targetSlug}"]`);
-    const insertAnchor = heading ?? docBody.lastElementChild ?? docBody;
-
     // Remove paragraphs between the target heading and the next heading sibling
     if (heading) {
       let sibling = heading.nextElementSibling;
@@ -345,7 +343,12 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     p.textContent = content;
     p.className = 'text-[13px] text-slate-500 leading-[1.7] mb-3';
     p.style.cssText = 'background-color:rgba(13,148,136,0.2);border-left:2px solid #0d9488;padding-left:10px;transition:background-color 2s ease,border-left 2s ease,padding-left 2s ease';
-    insertAnchor.insertAdjacentElement('afterend', p);
+
+    if (heading ?? docBody.lastElementChild) {
+      (heading ?? docBody.lastElementChild!).insertAdjacentElement('afterend', p);
+    } else {
+      docBody.appendChild(p);
+    }
 
     // Fade out the highlight
     setTimeout(() => {
@@ -367,7 +370,11 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     }
 
     const walk = (node: Node) => {
-      if (node.nodeType === Node.TEXT_NODE) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = (node.textContent || '').trim();
+        if (text) lines.push(`${text}\n`);
+        return;
+      }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       const el = node as Element;
       const tag = el.tagName.toLowerCase();
