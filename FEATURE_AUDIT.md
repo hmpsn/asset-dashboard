@@ -3244,3 +3244,14 @@ Current feature count: **278**. Last updated: April 2026.
 **Files:** `server/routes/keyword-strategy.ts`, `src/components/KeywordStrategy.tsx`, `server/workspaces.ts`, `shared/types/workspace.ts`, `server/db/migrations/052-workspace-competitor-fetch.sql`, `tests/integration/keyword-strategy-incremental.test.ts`
 
 **Agency value:** Cuts strategy generation time and AI/SEMRush API costs by 50-70% for sites that haven't changed much since the last full run. One click to update only the pages that need it.
+
+---
+
+### 279. Assembler Catch Hardening (workspace-intelligence.ts)
+**What it does:** Upgrades all 64 catch blocks in `server/workspace-intelligence.ts` to distinguish programming errors (TypeError/ReferenceError/SyntaxError) from expected degradation (plain Error / unavailable module). Adds `server/errors.ts` with `isProgrammingError()` utility. 3 HIGH-risk dynamic-import blocks (outcome-tracking, anomaly-detection, churn-signals) now call `isProgrammingError()` and escalate to `log.warn` so Sentry fires; 43 SILENT blocks upgraded to `log.debug` to surface previously-invisible failures in logs; 2 intentionally-silent cache-invalidation catches annotated with `// catch-ok`. Compile-time export contracts added via `import type` for HIGH-risk modules. Hardening also applied to `content-decay.ts`, `keyword-recommendations.ts`, and `routes/misc.ts`. Backlog bugs resolved in same pass: #17 (stale-cache: workspaceIds from `measurePendingOutcomes` return value), #14 (cold-start section filter: `hasSeoContent`/`hasData` respects include Set), #15/#16 (gradual token budget degradation: steps 4b/4c/4d added to `applyTokenBudget`). A `pr-check` rule was added to prevent bare `catch {` from being re-introduced to `workspace-intelligence.ts`.
+
+**Files:** `server/errors.ts`, `server/workspace-intelligence.ts`, `server/content-decay.ts`, `server/keyword-recommendations.ts`, `server/routes/misc.ts`, `server/outcome-crons.ts`, `scripts/pr-check.ts`, `tests/assembler-programming-error-surfacing.test.ts`
+
+**Agency value:** Programming errors in assembler catch blocks previously silenced TypeErrors and ReferenceErrors as empty-fallback degradation. After hardening, any renamed export or null-dereference in a slice assembler fires a Sentry alert immediately instead of silently returning stale/empty data to the AI prompt. Eliminates the silent data-loss class of bugs in the intelligence engine.
+
+**Mutual:** CI enforcement — the new `pr-check` rule prevents future bare catches from being introduced in workspace-intelligence.ts. Any contributor who writes `} catch {` in that file will see an error before the PR merges.

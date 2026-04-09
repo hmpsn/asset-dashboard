@@ -404,6 +404,19 @@ const CHECKS: Check[] = [
     message: 'getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced.',
     severity: 'error',
   },
+  {
+    name: 'Silent bare catch in workspace-intelligence assemblers',
+    // Matches lines that open a bare catch block with no error variable — the most
+    // dangerous pattern: no err reference means isProgrammingError() can never be called.
+    // Scoped to workspace-intelligence.ts only to avoid flagging the 200+ legitimate
+    // silent catches in other server files. Add // catch-ok if a bare catch is verified safe.
+    pattern: '\\} catch \\{$',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/workspace-intelligence',
+    excludeLines: ['// catch-ok'],
+    message: 'Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum.',
+    severity: 'error',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

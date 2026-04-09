@@ -636,8 +636,17 @@
           "source": "PR #154 review — 2026-04-08",
           "est": "2-3h",
           "priority": "P1",
+          "status": "done",
+          "notes": "Done April 2026. Created server/errors.ts with isProgrammingError(). Upgraded all 64 catch blocks in workspace-intelligence.ts: 3 HIGH-risk dynamic-import blocks get isProgrammingError split → log.warn on TypeError/ReferenceError; 43 SILENT blocks upgraded to log.debug; 2 intentionally-silent invalidateIntelligenceCache catches annotated with // catch-ok. Also applied to content-decay.ts, keyword-recommendations.ts, routes/misc.ts. Compile-time import type contracts added for HIGH-risk modules. Backlog #14/#15/#16/#17 resolved in same pass. pr-check rule added."
+        },
+        {
+          "id": 576,
+          "title": "Broad server catch hardening — extend isProgrammingError to 207 silent catches outside workspace-intelligence.ts",
+          "source": "Assembler catch hardening plan — 2026-04-08",
+          "est": "3-4h",
+          "priority": "P3",
           "status": "pending",
-          "notes": "workspace-intelligence.ts has 48 bare catch {} blocks wrapping dynamic imports (65 total across 86 server/ files). These silently swallow TypeErrors and ReferenceErrors (wrong export names, missing mocks, renamed functions) as if they were expected module-unavailable degradation. Fix: inside each catch, check `err instanceof TypeError || err instanceof ReferenceError` and call `log.error(err, 'assembler programming error in <slice>')` before continuing. This surfaces Sentry alerts for developer mistakes while preserving graceful degradation for legitimately unavailable data. Primary targets: assembleLearnings, assembleSiteHealth, assembleInsights in workspace-intelligence.ts. Secondary: other server/ files with the same bare-catch pattern. Motivated by PR #154 bug where a missing mock `getTopWinsFromActions` was swallowed as 'outcome data optional', zeroing topWins and weCalledIt silently."
+          "notes": "Pre-plan audit found 207 silent catch {} blocks across 67 server files outside workspace-intelligence.ts. Top offenders: admin-chat-context.ts (15), routes/webflow-seo.ts (13), routes/keyword-strategy.ts (10), routes/content-requests.ts (9), schema-suggester.ts (7), insight-enrichment.ts (7). No recent incidents traced to these files, so deferred from #536 plan. When triggered: apply the same isProgrammingError() split from server/errors.ts — programming errors log.warn, expected degradation log.debug. Use --all flag on pr-check to verify full-codebase sweep after. Prerequisite: #536 must be shipped first (server/errors.ts must exist)."
         }
       ]
     },
