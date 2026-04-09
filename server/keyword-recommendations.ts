@@ -11,6 +11,8 @@ import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
+import { isProgrammingError } from './errors.js';
+import type { getWorkspaceLearnings } from './workspace-learnings.js';
 
 const log = createLogger('keyword-recommendations');
 
@@ -151,8 +153,12 @@ export async function getKeywordRecommendations(
       // Re-sort after score adjustments
       scored.sort((a, b) => b._score - a._score);
     }
-  } catch {
-    // Learnings enrichment optional — degrade gracefully
+  } catch (err) {
+    if (isProgrammingError(err)) {
+      log.warn({ err, workspaceId }, 'keyword-recommendations: programming error in workspace-learnings — check export names');
+    } else {
+      log.debug({ err, workspaceId }, 'keyword-recommendations: learnings enrichment optional, degrading gracefully');
+    }
   }
 
   // If AI scoring is enabled and we have business context, re-rank
