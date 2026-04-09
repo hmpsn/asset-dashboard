@@ -11,6 +11,7 @@
       "name": "express-backend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:server"],
+      "env": { "SKIP_WATCHERS": "1" },
       "port": 3002
     }
     ,

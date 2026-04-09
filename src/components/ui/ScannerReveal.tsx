@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 
 interface ScannerRevealProps {
   children: React.ReactNode;
+  className?: string;
 }
 
 interface ContainerRect {
@@ -13,7 +14,7 @@ interface ContainerRect {
   height: number;
 }
 
-export function ScannerReveal({ children }: ScannerRevealProps) {
+export function ScannerReveal({ children, className }: ScannerRevealProps) {
   const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   // Initialize with a full-viewport rect so the overlay renders on the first frame
@@ -52,7 +53,7 @@ export function ScannerReveal({ children }: ScannerRevealProps) {
   }, [location.key]);
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className={className}>
       {children}
 
       <>

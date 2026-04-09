@@ -46,6 +46,10 @@ interface SidebarProps {
   onUnlinkSite: (workspaceId: string) => void;
   toggleTheme: () => void;
   onLogout?: () => void;
+  /** When true, sidebar collapses to a slim 14px exit strip. Used by focus mode. */
+  hidden?: boolean;
+  /** Called when the exit strip is clicked to restore the sidebar. */
+  onExitHidden?: () => void;
 }
 
 const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
@@ -97,7 +101,7 @@ const GLOBAL_TABS = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'rev
 export function Sidebar({
   workspaces, selected, tab, theme, pendingContentRequests, hasContentItems,
   onCreate, onDelete, onLinkSite, onUnlinkSite,
-  toggleTheme, onLogout,
+  toggleTheme, onLogout, hidden, onExitHidden,
 }: SidebarProps) {
   const navigate = useNavigate();
 
@@ -132,6 +136,23 @@ export function Sidebar({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  // Focus mode: render a slim clickable strip so the user can exit
+  if (hidden) {
+    return (
+      <aside
+        role="button"
+        tabIndex={0}
+        aria-label="Exit focus mode"
+        className="w-[14px] flex-shrink-0 border-r border-zinc-800 bg-[#0d0f1a] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/40 transition-colors"
+        onClick={onExitHidden}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onExitHidden?.(); }}
+        title="Exit focus mode"
+      >
+        <span className="[writing-mode:vertical-rl] rotate-180 text-zinc-600 text-[9px] tracking-widest select-none">◀</span>
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
