@@ -8,6 +8,11 @@
 //
 // Everything else (plain Error: no such table, ENOENT, network timeout, module
 // unavailable on older DBs) is expected degradation — log at debug or skip silently.
+//
+// ⚠ SyntaxError caveat: JSON.parse() also throws SyntaxError for malformed input,
+// which is expected degradation (not a code bug). Do NOT wrap JSON.parse() calls
+// in try blocks that call isProgrammingError() — use a dedicated parseJsonSafe
+// helper from server/db/json-validation.ts instead.
 
 export function isProgrammingError(err: unknown): boolean {
   return (

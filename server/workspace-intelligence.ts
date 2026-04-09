@@ -1299,6 +1299,13 @@ export function formatForPrompt(
       (include.has('siteHealth') && intelligence.siteHealth != null)
     ));
   if (!hasData) {
+    // Cold-start messaging is a workspace-level signal, not a page/section signal.
+    // Only show it for unfiltered calls or when seoContext is explicitly requested —
+    // seoContext is always assembled and is the authoritative indicator of workspace
+    // maturity. Targeted callers like `sections: ['pageProfile']` (rewrite-chat,
+    // seo-audit) should get empty string when their specific section has no data,
+    // not a misleading "newly onboarded" message about the workspace.
+    if (include !== null && !include.has('seoContext')) return '';
     sections.push('This workspace is newly onboarded. Limited data available.');
     if (intelligence.seoContext?.brandVoice) {
       sections.push(`Brand voice: ${intelligence.seoContext.brandVoice}`);
