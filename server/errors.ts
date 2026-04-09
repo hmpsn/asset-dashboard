@@ -13,6 +13,7 @@ export function isProgrammingError(err: unknown): boolean {
   return (
     err instanceof TypeError ||
     err instanceof ReferenceError ||
-    err instanceof SyntaxError
+    err instanceof SyntaxError ||
+    err instanceof RangeError
   );
 }
