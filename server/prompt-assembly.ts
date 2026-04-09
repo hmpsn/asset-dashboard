@@ -50,7 +50,7 @@ export function buildSystemPrompt(
 
   // Layer 2: voice DNA (extended in Brandscript Phase 1 — Task 5b)
   // No-op here. voiceDNAToPromptInstructions() and the voice_profiles lookup
-  // are added to this file when the voice_profiles table exists (migration 049).
+  // are added to this file when the voice_profiles table exists (migration 053).
 
   // Layer 3: per-workspace custom notes
   // Use the pre-fetched value if provided; otherwise query the DB.
