@@ -132,7 +132,7 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
     if (!htmlRes.ok) return res.status(502).json({ error: `Failed to fetch page: ${htmlRes.status}` });
 
     const html = await htmlRes.text();
-    const { title, sections, bodyText } = extractPageSections(html);
+    const { title, sections, bodyText, preamble } = extractPageSections(html);
 
     // Get audit issues for this page
     const slug = new URL(url).pathname.replace(/^\//, '').replace(/\/$/, '');
@@ -145,7 +145,7 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
       }
     }
 
-    res.json({ title, sections, bodyText, html: html.slice(0, 50000), issues, slug });
+    res.json({ title, sections, bodyText, preamble, html: html.slice(0, 50000), issues, slug });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg }, 'Failed to load page for rewrite chat');
