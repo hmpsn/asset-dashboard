@@ -412,7 +412,7 @@ const CHECKS: Check[] = [
     // silent catches in other server files. Add // catch-ok if a bare catch is verified safe.
     pattern: '\\} catch \\{$',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/workspace-intelligence',
+    pathFilter: 'server/workspace-intelligence.ts',
     excludeLines: ['// catch-ok'],
     message: 'Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum.',
     severity: 'error',

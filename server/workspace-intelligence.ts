@@ -48,9 +48,9 @@ import type { ContentSubscription, ContentMatrix, GeneratedPost } from '../share
 import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
-import type { ChurnSignal } from './churn-signals.js';
+import type { ChurnSignal, listChurnSignals } from './churn-signals.js';
 // Compile-time contracts for HIGH-risk dynamic-import modules — erased at runtime; tsc fails if these exports are renamed
-import type { Anomaly } from './anomaly-detection.js';
+import type { Anomaly, listAnomalies } from './anomaly-detection.js';
 // client-signals-store uses dynamic import inside try-catch (like other subsystems)
 // to degrade gracefully if the module or table is unavailable on older DBs.
 import type { DecayAnalysis } from './content-decay.js';
@@ -61,6 +61,7 @@ import type { CannibalizationReport } from './cannibalization-detection.js';
 import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
 import type { Annotation as TimelineAnnotation } from './annotations.js';
 import type { ActionOutcome, ActionPlaybook, TopWin } from '../shared/types/outcome-tracking.js';
+import type { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions, getPendingActions, getActionsByPage } from './outcome-tracking.js';
 import type { SafeClientUser } from '../shared/types/users.js';
 import type { ClientRequest } from '../shared/types/requests.js';
 import type { ContentBrief } from '../shared/types/content.js';
