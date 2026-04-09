@@ -8,6 +8,7 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 
 ## Before Implementation
 
+- [ ] **Full-stack scope**: Every backend change needs a matching frontend — new endpoints get UI, new data fields get displayed, new email types get verified, background jobs surface status, webhooks reflect state without hard refresh.
 - [ ] **Narrative placement**: If client-facing, where does this fit in the "why, then how" arc? Data → Diagnosis → Plan → Action. See `feature-integration.md` § 3 tab placement guide.
 - [ ] **Identify all data flow points**: Which endpoints read/write the data? Which components display it?
 - [ ] **Check existing patterns**: Review `wiring-patterns.md` for the relevant pattern (chat, strategy, reports, WebSocket, email, etc.)

@@ -32,8 +32,9 @@ Integrations: Webflow, Google Search Console, GA4, SEMRush, Stripe, OpenAI (GPT-
 1. **Check `data/roadmap.json`** — scan for `"status": "pending"` in current sprint. If user hasn't specified a task, suggest the next pending item.
 2. **Check `FEATURE_AUDIT.md`** — understand what exists. Don't build something that already exists.
 3. **If UI work** — read `BRAND_DESIGN_LANGUAGE.md` before writing any JSX.
-4. **Cross-reference before building** — search the codebase to verify a component/endpoint/feature doesn't already exist.
-5. **For multi-phase or cross-system features** — before writing any implementation code, generate feature-specific guardrails: (a) CLAUDE.md rules for reusable patterns this feature introduces, (b) a `.windsurf/rules/<feature>.md` reference doc for feature-specific contracts, and (c) per-phase acceptance checklists embedded in the implementation plan. Guardrails written after bugs are found cost 3× more than guardrails written before the first commit.
+4. **Before writing any implementation plan** — read `docs/PLAN_WRITING_GUIDE.md`.
+5. **Cross-reference before building** — search the codebase to verify a component/endpoint/feature doesn't already exist.
+5. **For multi-phase or cross-system features** — before writing any implementation code, generate feature-specific guardrails: (a) CLAUDE.md rules for reusable patterns this feature introduces, (b) a `docs/rules/<feature>.md` reference doc for feature-specific contracts, and (c) per-phase acceptance checklists embedded in the implementation plan. Guardrails written after bugs are found cost 3× more than guardrails written before the first commit.
 
 ### After completing a task
 
@@ -143,17 +144,10 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 
 ## Multi-Agent Coordination (mandatory)
 
-> Full rules: `.windsurf/rules/multi-agent-coordination.md`
+> Full rules + model assignment table: `docs/rules/multi-agent-coordination.md`
+> Plan-writing guide (parallel agents, PR gates, testing, verification): `docs/PLAN_WRITING_GUIDE.md`
 
-When dispatching parallel subagents or working on multi-phase features:
-
-1. **Pre-commit shared contracts** — types, function signatures, barrel exports must be committed before any agent starts. Agents read from committed code, never uncommitted state.
-2. **Exclusive file ownership** — every file touched during parallel work has exactly one owner. No file may be modified by two agents concurrently. Shared files (app.ts, seo-context.ts, BrandHub.tsx, api client files) are sequential tasks.
-3. **Diff review after each batch** — after all parallel agents complete, review diffs, grep for duplicate imports, run tsc + full test suite before dispatching the next batch.
-4. **Explicit task dependency graphs** — every multi-task plan must include a dependency section. "Obviously sequential" is not acceptable — dispatchers don't infer dependencies.
-5. **Spec amendment → plan sync** — when a spec is amended, every plan referencing it must be updated in the same commit. Addendums without plan updates create invisible gaps.
-6. **Cross-phase contracts** — multi-phase features require a companion guardrails doc listing what each phase exports for downstream consumption (tables, functions, types, components).
-7. **File ownership in dispatch prompts** — when dispatching implementer subagents, include explicit "Files you OWN" and "Files you must NOT touch" lists.
+Key rules: pre-commit shared contracts before dispatch, exclusive file ownership per agent, diff review after every parallel batch, explicit dependency graphs in every plan, spec amendments sync to plans in same commit, cross-phase contracts doc for multi-phase features.
 
 ---
 
@@ -180,7 +174,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 - **TypeScript strict** — no `any` unless unavoidable
 - **API error shape**: `{ error: string }` consistently
-- **User-facing strings**: follow `.windsurf/workflows/ui-vocabulary.md` canonical labels
+- **User-facing strings**: follow `docs/workflows/ui-vocabulary.md` canonical labels
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
 - **Imports**: always at top of file, grouped with existing imports. Never add imports mid-file next to the code that uses them — this breaks the oxc parser used by vitest/vite and violates code conventions. When adding code to an existing file, check existing imports first (`grep -n '^import' <file>`).
@@ -203,7 +197,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **Staging before main** — all PRs merge into `staging` first. After verifying on the staging deploy, merge `staging` → `main` to release to production. Never merge an unverified PR directly to `main`.
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
 - **Test assertions on collections** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously, hiding real failures. Pattern: `expect(arr.length).toBeGreaterThan(0); expect(arr.every(fn)).toBe(true);`
-- **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `.windsurf/rules/analytics-insights.md`.
+- **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `docs/rules/analytics-insights.md`.
 - **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, write path (`upsertX()`), AND the public endpoint serialization list in `public-portal.ts` if the field is client-facing, all in the same commit. TypeScript will not catch a mapper that silently ignores a new column, and the public endpoint's explicit field list will silently omit it.
 - **Integration tests must cover the actual read path** — when a feature gates client-facing behavior on a field from `GET /api/public/workspace/:id`, the integration test must exercise that endpoint, not the admin GET. A test that only verifies the admin route gives false confidence; a regression in the public serialization goes undetected.
 - **Enrichment field fallbacks** — optional fields computed at insight-store time must have explicit fallbacks. `pageTitle` must always resolve to something (cleaned slug if all else fails) — never render a raw URL. Enrichment failure must degrade gracefully, not block insight storage.
@@ -245,20 +239,21 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `MONETIZATION.md` | Tiers, pricing, Stripe spec, UX soft-gating |
 | `ACTION_PLAN.md` | Execution roadmap, decision log |
 | `data/roadmap.json` | Sprint tracking — what's done/pending |
-| `.windsurf/workflows/use-primitives.md` | When and how to use UI primitives |
-| `.windsurf/workflows/ui-vocabulary.md` | Canonical labels for buttons, badges, status text |
-| `.windsurf/workflows/feature-integration.md` | Connecting features together |
-| `.windsurf/workflows/feature-shipped.md` | 9-step post-ship checklist |
-| `.windsurf/workflows/wiring-patterns.md` | Adding data sources to chat/strategy/briefs |
-| `.windsurf/workflows/stripe-integration.md` | Payment architecture |
-| `.windsurf/workflows/auth-system.md` | Auth architecture and flows |
-| `.windsurf/workflows/new-feature-checklist.md` | Before/during/after feature implementation |
-| `.windsurf/workflows/deploy.md` | Commit, push, verify deploy (staging → main flow) |
-| `.windsurf/workflows/staging-environment.md` | Staging URLs, DB sync, feature flags, env vars |
-| `.windsurf/rules/data-flow.md` | Data flow consistency rules (detailed) |
-| `.windsurf/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
-| `.windsurf/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
-| `.windsurf/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
+| `docs/PLAN_WRITING_GUIDE.md` | **Writing plans** — parallel agents, model assignments, PR gates, testing, verification |
+| `docs/workflows/use-primitives.md` | When and how to use UI primitives |
+| `docs/workflows/ui-vocabulary.md` | Canonical labels for buttons, badges, status text |
+| `docs/workflows/feature-integration.md` | Connecting features together |
+| `docs/workflows/feature-shipped.md` | 9-step post-ship checklist |
+| `docs/workflows/wiring-patterns.md` | Adding data sources to chat/strategy/briefs |
+| `docs/workflows/stripe-integration.md` | Payment architecture |
+| `docs/workflows/auth-system.md` | Auth architecture and flows |
+| `docs/workflows/new-feature-checklist.md` | Before/during/after feature implementation |
+| `docs/workflows/deploy.md` | Commit, push, verify deploy (staging → main flow) |
+| `docs/workflows/staging-environment.md` | Staging URLs, DB sync, feature flags, env vars |
+| `docs/rules/data-flow.md` | Data flow consistency rules (detailed) |
+| `docs/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
+| `docs/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
+| `docs/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 
 ---
@@ -276,50 +271,23 @@ Do not fix during unrelated tasks.
 
 ## Parallel Agent Coordination (mandatory before dispatching subagents)
 
-Subagents are fully isolated — no shared state, no awareness of each other. Conflicts happen when two agents touch the same file or depend on output the other hasn't committed yet. Follow this protocol every time:
+> Full protocol: `docs/PLAN_WRITING_GUIDE.md` — parallel dispatch rules, model assignments, diff review checkpoints, PR gates, testing patterns.
 
-### 1. Pre-commit shared contracts first
-Before any parallel agents start, identify every type, interface, or function signature that multiple agents will depend on. Define and **commit** these to the branch. Agents read from committed code, not from each other's in-progress work.
+Subagents are fully isolated. Conflicts happen when two agents touch the same file or depend on uncommitted output. The three rules that prevent 90% of conflicts:
 
-Examples of shared contracts: new entries in `shared/types/`, new exports in barrel files (`src/hooks/admin/index.ts`), new query keys in `src/lib/queryKeys.ts`, new DB store functions that multiple routes will call.
+1. **Pre-commit shared contracts** before any agent starts (types, function signatures, barrel exports, migrations)
+2. **Exclusive file ownership** — every parallel task declares what it owns and must not touch
+3. **Diff review checkpoint** after every batch before dispatching the next (git diff, grep duplicates, tsc, full test suite)
 
-### 2. Assign exclusive file ownership
-Each agent task description must include:
-- **Owns** — exhaustive list of files it may create or modify
-- **Must not touch** — any file owned by another parallel agent
-
-If a file needs changes from more than one agent, it becomes a **sequential task** instead. No exceptions.
-
-### 3. Shared files are sequential
-Files commonly needed by multiple agents — route files, `analytics-insights-store.ts`, `shared/types/analytics.ts`, barrel exports — should be handled by one agent (or the orchestrator) after parallel work completes.
-
-### 4. Diff review checkpoint after each parallel batch
-After parallel agents finish, run:
-```bash
-git diff HEAD -- <list of shared files touched>
-```
-Check for: duplicate imports, conflicting function definitions, missed exports, mismatched type names. Fix before starting the next batch.
-
-### 5. Dispatch prompts must declare app-level context
-When dispatching a subagent to write or modify a server route or frontend component, the prompt **must include** a brief "App-level context" section covering:
-- Which rate limiters already apply (e.g., "all /api/public/ POST routes already have `publicWriteLimiter` via `app.ts` — do NOT add it in the route file")
-- Which React Query caches already exist and their keys
-- Which WS events the component already subscribes to
-- Current conditional rendering state (e.g., "the EmptyState shows when `items.length === 0` — adding a parallel signal banner requires updating this condition too")
-
-Subagents have no awareness of code they haven't been explicitly shown. Missing context is the #1 source of "looks right in isolation, broken in context" bugs.
+Dispatch prompts must include app-level context: which rate limiters already apply, which React Query caches exist, which WS events the component subscribes to, current conditional rendering state.
 
 ---
 
 ## Implementation Planning Standards
 
-When writing implementation plans (via `writing-plans` skill):
+> Full guide: `docs/PLAN_WRITING_GUIDE.md` — the single reference for what goes into every plan.
 
-1. **Exhaustive audit first** — for refactoring, migration, or audit work, invoke the `pre-plan-audit` skill before writing the plan. This launches parallel agents to grep the entire codebase and categorize every finding. Never write a plan from memory or spot-checks.
-2. **Parallelization strategy required** — every plan must include a dependency graph showing which tasks can run concurrently and which are sequential.
-3. **Model assignments required** — specify Haiku (mechanical replacements), Sonnet (component logic), or Opus (orchestration/judgment) per task.
-4. **Systemic improvements section required** — every plan must include: shared utilities to extract (if 3+ files do the same fix), pr-check rules to prevent recurrence, and test coverage additions.
-5. **Verification strategy required** — specify how to verify the work (preview screenshots, specific test commands, contrast checks) rather than "manual verification."
+Every plan must include: task dependency graph, model assignments (Haiku/Sonnet/Opus), file ownership per parallel task, systemic improvements section (shared utilities, pr-check rules, new tests), and a verification strategy with specific commands — not "manual verification." For refactoring/migration/audit work, run `pre-plan-audit` before writing the plan.
 
 ---
 
