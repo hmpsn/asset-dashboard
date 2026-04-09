@@ -169,6 +169,28 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
   const clearFixContext = useCallback(() => setFixContext(null), []);
   const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+  // Derived synchronously — prevents layout flash when navigating away (useEffect runs after paint)
+  const effectiveFocusMode = focusMode && tab === 'rewrite';
+
+  // Reset backing state when navigating away so returning to rewrite starts fresh
+  useEffect(() => {
+    if (tab !== 'rewrite') setFocusMode(false);
+  }, [tab]);
+
+  // Escape key exits focus mode (in addition to the sidebar strip click)
+  useEffect(() => {
+    if (!effectiveFocusMode) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Don't exit if the user is actively typing in any editable element
+      const target = e.target as HTMLElement;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable) return;
+      setFocusMode(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [effectiveFocusMode]);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
   useEffect(() => {
@@ -211,7 +233,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || (e.target as HTMLElement).isContentEditable) return;
       const tabMap: Record<string, Page> = { '1': 'home', '2': 'seo-audit', '3': 'analytics-hub' };
       if (tabMap[e.key] && selected) { e.preventDefault(); navigate(adminPath(selected.id, tabMap[e.key])); }
       if (e.key === ',') { e.preventDefault(); navigate('/settings'); }
@@ -370,7 +392,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />
       </div>
     );
-    if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
+    if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} focusMode={effectiveFocusMode} onFocusModeToggle={() => setFocusMode(f => !f)} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
     if (tab === 'outcomes') return <OutcomeDashboard key={`outcomes-${selected.id}`} workspaceId={selected.id} />;
 
     return null;
@@ -391,6 +413,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         onUnlinkSite={handleUnlinkSite}
         toggleTheme={toggleTheme}
         onLogout={onLogout}
+        hidden={effectiveFocusMode}
+        onExitHidden={() => setFocusMode(false)}
       />
 
       {/* ── Main content area ── */}
@@ -406,10 +430,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}
-        <main className="flex-1 overflow-auto p-6">
-          <ScannerReveal>
-            {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
-            <div className="max-w-5xl mx-auto">
+        <main className={`flex-1 overflow-auto ${effectiveFocusMode ? '' : 'p-6'}`}>
+          <ScannerReveal className={effectiveFocusMode ? 'h-full' : undefined}>
+            {/* max-w-5xl for admin (sidebar present); in rewrite focus mode, fill full width */}
+            <div className={effectiveFocusMode ? 'h-full' : 'max-w-5xl mx-auto'}>
               {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
                 <button
                   onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}

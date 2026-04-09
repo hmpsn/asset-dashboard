@@ -135,6 +135,9 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 7. **Accessibility** — proper ARIA labels, keyboard navigation, focus management.
 8. **Progressive disclosure** — show summary first, details on demand.
 9. **Extract shared interaction patterns** — when 2+ components implement the same user interaction (toggle logic, filter state, sort behavior), extract to a shared hook or utility. Don't let subagents independently re-implement the same logic — it drifts. Example: `useToggleSet(defaults, { min, max })` instead of 3 inline `useState<Set>` + toggle handlers.
+10. **Global keydown handlers must guard editable targets** — every `window.addEventListener('keydown', ...)` that fires on a special key (Escape, Enter, arrows) must check `e.target` before acting. Use this pattern (copy from `App.tsx` keyboard shortcuts handler and extend it): `if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable) return;`. `isContentEditable` is required — the `HTMLInputElement`/`HTMLTextAreaElement` check alone misses contenteditable divs.
+11. **Layout-driving state must be derived synchronously, not via `useEffect`** — if a boolean state variable drives layout (padding, width, sidebar visibility), derive it as `const effective = state && syncCondition` and use `effective` in JSX. A `useEffect` that resets state runs *after* the browser paints, causing a one-frame layout flash. The effect can still run to clean up backing state, but JSX must not read raw state when a synchronous guard is available (e.g. `effectiveFocusMode = focusMode && tab === 'rewrite'`).
+12. **AI prompt ↔ frontend rendering must be co-designed** — when a system prompt instructs the AI to format output a certain way (Markdown, JSON, prefixed labels), verify the frontend rendering matches. If a rewrite/insertion path uses `textContent` or `innerText`, the AI must be told to return plain prose, not Markdown. If a parsing path uses `match(/regex/)`, the AI's output format must be stable enough for the regex. Document the contract in the system prompt itself (e.g., "content is inserted into a live editor — no Markdown syntax").
 
 ---
 
@@ -226,7 +229,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 - **Write tests alongside code** — new routes need integration tests, new state transitions need guard tests, new shared type fields need contract tests. Use the existing infrastructure; don't hand-roll mocks when a factory exists.
 - **Test infrastructure** — mock factories in `tests/mocks/` (webflow, stripe, openai, anthropic, google, semrush), seed fixtures in `tests/fixtures/` (workspace-seed, auth-seed, content-seed, approval-seed), HTTP test helper `createTestContext(port)` in `tests/integration/helpers.ts`.
-- **Port uniqueness** — each integration test file using `createTestContext()` must use a unique port. Check existing ports with `grep -r 'createTestContext(' tests/` before allocating. Current range: 13201–13314.
+- **Port uniqueness** — each integration test file using `createTestContext()` must use a unique port. Check existing ports with `grep -r 'createTestContext(' tests/` before allocating. Current range: 13201–13316.
 - **External API error tests** — mock the API to return an error, then assert the operation records `failed`/`error` status, not success (FM-2 pattern).
 - **Cleanup** — all `beforeAll` resource creation must be paired with `afterAll` cleanup. Use `seedWorkspace().cleanup()` or `deleteWorkspace(id)`. Never leave orphaned test data.
 

@@ -3067,6 +3067,13 @@
           "shippedAt": "2026-03-16"
         },
         {
+          "id": 387,
+          "title": "Page Rewriter UI — sitemap combobox, editable document panel, Apply+Export, focus mode",
+          "status": "done",
+          "notes": "Shipped — Sitemap combobox replaces URL input (GET /api/rewrite-chat/:workspaceId/pages from snapshot). Contenteditable document panel with heading hierarchy and data-section attributes replaces raw text dump. AI rewrite messages show editable suggestion block + Apply button (patches document with teal highlight fade). Floating formatting toolbar (Bold/Italic/H2/H3/Clear) on text selection. Export brief (Copy as Markdown or Download .md). Focus mode toggle collapses sidebar to 14px strip. Backend returns structured PageSection[] instead of flat heading strings. Tests: rewrite-chat-pages.test.ts (port 13316) + rewrite-export-serializer.test.ts (4 unit tests). Feature #138 updated.",
+          "shippedAt": "2026-04-09"
+        },
+        {
           "id": 288,
           "title": "Schema generator: enhanced validation, auto-fix, and improved prompting",
           "status": "done",

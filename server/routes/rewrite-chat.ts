@@ -16,7 +16,7 @@ import {
 } from '../chat-memory.js';
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
-import type { SeoIssue } from '../seo-audit.js';
+import type { SeoIssue, PageSeoResult } from '../seo-audit.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
@@ -24,16 +24,14 @@ const router = Router();
 const log = createLogger('rewrite-chat');
 
 // ── Helper: strip HTML to readable text sections ──
-function extractPageSections(html: string): { title: string; headings: string[]; bodyText: string } {
-  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '';
+interface PageSection {
+  level: number;    // 1=H1, 2=H2, 3=H3, etc.
+  heading: string;  // heading text
+  body: string;     // paragraph text immediately following this heading (up to 800 chars)
+}
 
-  const headings: string[] = [];
-  const hRegex = /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi;
-  let m;
-  while ((m = hRegex.exec(html)) !== null) {
-    const text = m[1].replace(/<[^>]+>/g, '').trim();
-    if (text) headings.push(text);
-  }
+function extractPageSections(html: string): { title: string; sections: PageSection[]; bodyText: string } {
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || '';
 
   // Extract main content area (prefer <main>, <article>, then <body>)
   let contentHtml = html;
@@ -46,7 +44,7 @@ function extractPageSections(html: string): { title: string; headings: string[];
     if (bodyMatch) contentHtml = bodyMatch[1];
   }
 
-  // Strip scripts, styles, nav, footer, then tags
+  // Strip noisy elements
   contentHtml = contentHtml
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -54,14 +52,71 @@ function extractPageSections(html: string): { title: string; headings: string[];
     .replace(/<footer[\s\S]*?<\/footer>/gi, '')
     .replace(/<header[\s\S]*?<\/header>/gi, '');
 
+  // Two-pass tokeniser: heading tokens and paragraph tokens
+  type Token = { type: 'h'; level: number; text: string } | { type: 'p'; text: string };
+  const tokens: Token[] = [];
+  const tokenRegex = /<(h[1-6])[^>]*>([\s\S]*?)<\/h[1-6]>|<p[^>]*>([\s\S]*?)<\/p>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = tokenRegex.exec(contentHtml)) !== null) {
+    if (m[1]) {
+      const text = m[2].replace(/<[^>]+>/g, '').trim();
+      if (text) tokens.push({ type: 'h', level: parseInt(m[1][1]), text });
+    } else if (m[3] !== undefined) {
+      const text = m[3].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (text) tokens.push({ type: 'p', text });
+    }
+  }
+
+  // Build sections: each heading accumulates following paragraph tokens
+  const sections: PageSection[] = [];
+  let i = 0;
+
+  // Collect orphan paragraphs before the first heading into the title section body
+  const preambleParts: string[] = [];
+  while (i < tokens.length && tokens[i].type === 'p') {
+    preambleParts.push((tokens[i] as { type: 'p'; text: string }).text);
+    i++;
+  }
+  const preambleBody = preambleParts.join(' ').slice(0, 800);
+
+  for (; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type === 'h') {
+      const bodyParts: string[] = [];
+      while (i + 1 < tokens.length && tokens[i + 1].type === 'p') {
+        i++;
+        bodyParts.push((tokens[i] as { type: 'p'; text: string }).text);
+      }
+      sections.push({ level: token.level, heading: token.text, body: bodyParts.join(' ').slice(0, 800) });
+    }
+  }
+
+  // bodyText for AI context — unchanged usage
   const bodyText = contentHtml
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 8000);
 
-  return { title, headings, bodyText };
+  return { title, sections, bodyText, preamble: preambleBody };
 }
+
+// ── List sitemap pages from latest snapshot ──
+router.get('/api/rewrite-chat/:workspaceId/pages', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const { workspaceId } = req.params;
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (!ws.webflowSiteId) return res.json([]);
+
+  const snapshot = getLatestSnapshot(ws.webflowSiteId);
+  if (!snapshot) return res.json([]);
+
+  const pages = (snapshot.audit.pages as PageSeoResult[])
+    .map(p => ({ slug: p.slug || '/', title: p.page || p.slug || '/', url: p.url }))
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+
+  res.json(pages);
+});
 
 // ── Load page for content pane ──
 router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('workspaceId'), async (req, res) => {
@@ -77,7 +132,7 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
     if (!htmlRes.ok) return res.status(502).json({ error: `Failed to fetch page: ${htmlRes.status}` });
 
     const html = await htmlRes.text();
-    const { title, headings, bodyText } = extractPageSections(html);
+    const { title, sections, bodyText, preamble } = extractPageSections(html);
 
     // Get audit issues for this page
     const slug = new URL(url).pathname.replace(/^\//, '').replace(/\/$/, '');
@@ -90,7 +145,7 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
       }
     }
 
-    res.json({ title, headings, bodyText, html: html.slice(0, 50000), issues, slug });
+    res.json({ title, sections, bodyText, preamble, html: html.slice(0, 50000), issues, slug });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg }, 'Failed to load page for rewrite chat');
@@ -162,10 +217,12 @@ Your role:
 - Match the brand voice exactly
 - Incorporate target keywords naturally
 - Optimize for both search engines AND answer engines (AI systems like ChatGPT, Perplexity)
-- Format your rewrites in Markdown so they're easy to read and copy
+- Format analysis, explanations, and rationale in Markdown so they're easy to read
 - When showing rewritten content, use clear before/after formatting
 - Be specific about WHERE on the page each change should go (which section, heading, paragraph)
-- Explain your rationale briefly after each suggestion
+- When writing a rewrite suggestion, ALWAYS start your response with this label on its own first line: **Rewriting: [Heading Name]** — use the exact heading text from the page. Example: **Rewriting: Why SaaS SEO Is Different**
+- After the label, write the rewrite as plain prose only — no Markdown syntax (no ## headings, no **bold**, no bullet lists, no backticks). The content is inserted directly into a live document editor, so raw Markdown characters would appear as literal symbols.
+- Explain your rationale briefly after the rewrite block
 
 Answer Engine Optimization (AEO) principles:
 - Lead with a direct, concise answer to the page's implied question
