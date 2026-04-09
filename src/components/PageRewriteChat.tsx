@@ -174,6 +174,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       setPageData(data);
       setPageUrl(url.trim());
     } catch (err) {
+      setPageData(null);
       setPageError(err instanceof Error ? err.message : 'Failed to load page');
     } finally {
       setLoadingPage(false);
