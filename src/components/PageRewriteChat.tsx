@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
   Copy, Check, FileText, Sparkles, Maximize2,
@@ -79,7 +80,11 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Sitemap combobox
-  const [sitemapPages, setSitemapPages] = useState<SitemapPage[]>([]);
+  const { data: sitemapPages = [] } = useQuery<SitemapPage[]>({
+    queryKey: ['admin-rewrite-pages', workspaceId],
+    queryFn: () => get<SitemapPage[]>(`/api/rewrite-chat/${workspaceId}/pages`),
+    staleTime: 5 * 60 * 1000,
+  });
   const [comboOpen, setComboOpen] = useState(false);
   const [comboQuery, setComboQuery] = useState('');
   const [comboIdx, setComboIdx] = useState(0);
@@ -98,6 +103,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   // Export popover
   const [exportOpen, setExportOpen] = useState(false);
   const exportBtnRef = useRef<HTMLButtonElement>(null);
+  const exportPopoverRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -109,13 +115,6 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     if (initialPageUrl) loadPage(initialPageUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Fetch sitemap pages for the combobox
-  useEffect(() => {
-    get<SitemapPage[]>(`/api/rewrite-chat/${workspaceId}/pages`)
-      .then(setSitemapPages)
-      .catch(() => {}); // Silent fail — URL paste still works
-  }, [workspaceId]);
 
   useEffect(() => {
     if (!comboOpen) return;
@@ -152,7 +151,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   useEffect(() => {
     if (!exportOpen) return;
     const handler = (e: MouseEvent) => {
-      if (exportBtnRef.current && !exportBtnRef.current.closest('div')?.contains(e.target as Node)) {
+      if (exportPopoverRef.current && !exportPopoverRef.current.contains(e.target as Node)) {
         setExportOpen(false);
       }
     };
@@ -250,7 +249,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       e.preventDefault();
       if (comboQuery.startsWith('https://')) { loadPage(comboQuery); setComboOpen(false); }
       else if (filteredPages[comboIdx]) { selectPage(filteredPages[comboIdx]); }
-    } else if (e.key === 'Escape') { setComboOpen(false); }
+    } else if (e.key === 'Escape') { e.stopPropagation(); setComboOpen(false); }
   };
 
   const selectPage = (page: SitemapPage) => {
@@ -300,6 +299,12 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     document.execCommand(command, false);
   };
 
+  const HEADING_CLASSES: Record<string, string> = {
+    h1: 'text-[20px] font-bold text-slate-100 mb-2 mt-5',
+    h2: 'text-[15px] font-semibold text-slate-300 mb-2 mt-5',
+    h3: 'text-[12px] font-medium text-slate-400 mb-1.5 mt-4 ml-3 pl-2 border-l-2 border-slate-700',
+  };
+
   const wrapHeading = (tag: 'h2' | 'h3') => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
@@ -312,6 +317,10 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     if (existingHeading) {
       const newEl = document.createElement(tag);
       newEl.innerHTML = existingHeading.innerHTML;
+      // Preserve data-section so applyToSection can still find this heading after a level change
+      const sectionAttr = existingHeading.getAttribute('data-section');
+      if (sectionAttr) newEl.setAttribute('data-section', sectionAttr);
+      newEl.className = HEADING_CLASSES[tag] ?? '';
       existingHeading.replaceWith(newEl);
     } else {
       // execCommand-ok: no replacement for contenteditable formatBlock in 2026
@@ -604,7 +613,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             Apply to {msg.sectionTarget}
                           </button>
                           <button
-                            onClick={() => copyToClipboard(stripRewritingPrefix(msg.content), i)}
+                            onClick={() => copyToClipboard(msgEdits[i] ?? stripRewritingPrefix(msg.content), i)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
                           >
                             {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
@@ -713,7 +722,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   <ExternalLink className="w-3 h-3 flex-shrink-0" />
                 </a>
                 {/* Export popover */}
-                <div className="relative flex-shrink-0">
+                <div className="relative flex-shrink-0" ref={exportPopoverRef}>
                   <button
                     ref={exportBtnRef}
                     onClick={() => setExportOpen(o => !o)}
