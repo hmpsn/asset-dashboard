@@ -92,6 +92,13 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   const docBodyRef = useRef<HTMLDivElement | null>(null);
   const docPanelRef = useRef<HTMLDivElement>(null);
 
+  // Floating formatting toolbar
+  const [toolbarPos, setToolbarPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Export popover
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
+
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -120,6 +127,38 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [comboOpen]);
+
+  // Show floating toolbar when text is selected inside the document panel
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) { setToolbarPos(null); return; }
+      if (!docBodyRef.current) return;
+      try {
+        const range = sel.getRangeAt(0);
+        if (!docBodyRef.current.contains(range.commonAncestorContainer)) { setToolbarPos(null); return; }
+        const selRect = range.getBoundingClientRect();
+        const panelRect = docPanelRef.current?.getBoundingClientRect();
+        if (!panelRect) return;
+        const left = Math.min(Math.max(selRect.left - panelRect.left, 0), panelRect.width - 148);
+        setToolbarPos({ top: selRect.top - panelRect.top - 38, left });
+      } catch { setToolbarPos(null); }
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
+
+  // Close export popover on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportBtnRef.current && !exportBtnRef.current.closest('div')?.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
 
   const loadPage = useCallback(async (url: string) => {
     if (!url.trim()) return;
@@ -253,6 +292,126 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     }
 
     return parts.join('');
+  };
+
+  // execCommand-ok: no replacement for contenteditable bold/italic in 2026
+  const execFormat = (command: string) => {
+    docBodyRef.current?.focus();
+    document.execCommand(command, false);
+  };
+
+  const wrapHeading = (tag: 'h2' | 'h3') => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    docBodyRef.current?.focus();
+    const range = sel.getRangeAt(0);
+    const block = (range.startContainer.nodeType === Node.TEXT_NODE
+      ? range.startContainer.parentElement
+      : range.startContainer as Element);
+    const existingHeading = block?.closest('h1,h2,h3,h4,h5,h6');
+    if (existingHeading) {
+      const newEl = document.createElement(tag);
+      newEl.innerHTML = existingHeading.innerHTML;
+      existingHeading.replaceWith(newEl);
+    } else {
+      // execCommand-ok: no replacement for contenteditable formatBlock in 2026
+      document.execCommand('formatBlock', false, tag);
+    }
+  };
+
+  // execCommand-ok: no replacement for contenteditable removeFormat in 2026
+  const clearFormatting = () => { document.execCommand('removeFormat'); document.execCommand('formatBlock', false, 'p'); };
+
+  const applyToSection = (content: string, sectionTarget: string) => {
+    const docBody = docBodyRef.current;
+    if (!docBody) return;
+
+    const targetSlug = toSectionSlug(sectionTarget);
+    const heading = docBody.querySelector(`[data-section="${targetSlug}"]`);
+    const insertAnchor = heading ?? docBody.lastElementChild ?? docBody;
+
+    // Remove paragraphs between the target heading and the next heading sibling
+    if (heading) {
+      let sibling = heading.nextElementSibling;
+      while (sibling && !/^H[1-6]$/i.test(sibling.tagName)) {
+        const next = sibling.nextElementSibling;
+        sibling.remove();
+        sibling = next;
+      }
+    }
+
+    // Insert the new content as a paragraph
+    const p = document.createElement('p');
+    p.textContent = content;
+    p.className = 'text-[13px] text-slate-500 leading-[1.7] mb-3';
+    p.style.cssText = 'background-color:rgba(13,148,136,0.2);border-left:2px solid #0d9488;padding-left:10px;transition:background-color 2s ease,border-left 2s ease,padding-left 2s ease';
+    insertAnchor.insertAdjacentElement('afterend', p);
+
+    // Fade out the highlight
+    setTimeout(() => {
+      p.style.backgroundColor = '';
+      p.style.borderLeft = '';
+      p.style.paddingLeft = '';
+    }, 2000);
+  };
+
+  const serializeDocToMarkdown = (): string => {
+    const docBody = docBodyRef.current;
+    if (!docBody) return '';
+    const lines: string[] = [];
+
+    if (pageData && pageData.issues.length > 0) {
+      lines.push('## Issues\n');
+      pageData.issues.forEach(issue => lines.push(`- [${issue.severity}] ${issue.message}`));
+      lines.push('');
+    }
+
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) return;
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const el = node as Element;
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'h1') { lines.push(`# ${el.textContent?.trim()}\n`); return; }
+      if (tag === 'h2') { lines.push(`\n## ${el.textContent?.trim()}\n`); return; }
+      if (tag === 'h3') { lines.push(`\n### ${el.textContent?.trim()}\n`); return; }
+      if (tag === 'h4') { lines.push(`\n#### ${el.textContent?.trim()}\n`); return; }
+      if (tag === 'p') {
+        const parts: string[] = [];
+        el.childNodes.forEach(child => {
+          if (child.nodeType === Node.TEXT_NODE) { parts.push(child.textContent || ''); }
+          else if (child.nodeType === Node.ELEMENT_NODE) {
+            const c = child as Element;
+            if (c.tagName === 'STRONG' || c.tagName === 'B') parts.push(`**${c.textContent}**`);
+            else if (c.tagName === 'EM' || c.tagName === 'I') parts.push(`*${c.textContent}*`);
+            else parts.push(c.textContent || '');
+          }
+        });
+        const text = parts.join('').trim();
+        if (text) lines.push(`${text}\n`);
+        return;
+      }
+      el.childNodes.forEach(walk);
+    };
+
+    docBody.childNodes.forEach(walk);
+    return lines.join('\n');
+  };
+
+  const handleExport = (mode: 'copy' | 'download') => {
+    const md = serializeDocToMarkdown();
+    if (mode === 'copy') {
+      navigator.clipboard.writeText(md);
+    } else {
+      const slug = pageData?.slug || 'page';
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug.replace(/\//g, '-').replace(/^-/, '')}-brief.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setExportOpen(false);
   };
 
   return (
@@ -398,23 +557,58 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                     : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300'
                 }`}>
                   {msg.role === 'assistant' ? (
-                    <div className="text-xs leading-relaxed">
-                      <RenderMarkdown text={msg.content} />
-                    </div>
+                    msg.sectionTarget ? (
+                      // Rewrite message: editable contenteditable block + Apply button
+                      <>
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          className="text-xs leading-relaxed focus:outline-none border border-transparent focus:border-zinc-600 rounded p-1 -m-1 transition-colors"
+                          onInput={e => setMsgEdits(prev => ({ ...prev, [i]: (e.currentTarget as HTMLDivElement).innerText }))}
+                          ref={(el) => {
+                            // Initialize content once; do NOT use dangerouslySetInnerHTML (React would overwrite on re-render)
+                            if (el && !el.dataset.initialized) {
+                              el.dataset.initialized = 'true';
+                              el.innerText = stripRewritingPrefix(msg.content);
+                            }
+                          }}
+                        />
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-zinc-700/30">
+                          <button
+                            onClick={() => applyToSection(msgEdits[i] ?? stripRewritingPrefix(msg.content), msg.sectionTarget!)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/30 hover:bg-teal-500/20 transition-colors"
+                          >
+                            <Check className="w-3 h-3" />
+                            Apply to {msg.sectionTarget}
+                          </button>
+                          <button
+                            onClick={() => copyToClipboard(stripRewritingPrefix(msg.content), i)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
+                          >
+                            {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                            {copiedIdx === i ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      // Regular assistant message: rendered markdown + copy button
+                      <>
+                        <div className="text-xs leading-relaxed">
+                          <RenderMarkdown text={msg.content} />
+                        </div>
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-zinc-700/30">
+                          <button
+                            onClick={() => copyToClipboard(msg.content, i)}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
+                          >
+                            {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
+                            {copiedIdx === i ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      </>
+                    )
                   ) : (
                     <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  )}
-
-                  {msg.role === 'assistant' && (
-                    <div className="flex items-center gap-1 mt-2 pt-2 border-t border-zinc-700/30">
-                      <button
-                        onClick={() => copyToClipboard(msg.content, i)}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
-                      >
-                        {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
-                        {copiedIdx === i ? 'Copied' : 'Copy'}
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>
@@ -496,13 +690,32 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                   <span className="truncate">{pageData.slug ? `/${pageData.slug}` : pageUrl}</span>
                   <ExternalLink className="w-3 h-3 flex-shrink-0" />
                 </a>
-                {/* Export button — replaced with real popover in Task 6 */}
-                <button
-                  data-export-trigger
-                  className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors flex-shrink-0"
-                >
-                  Export brief
-                </button>
+                {/* Export popover */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    ref={exportBtnRef}
+                    onClick={() => setExportOpen(o => !o)}
+                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  >
+                    Export brief
+                  </button>
+                  {exportOpen && (
+                    <div className="absolute right-0 top-7 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-1 flex flex-col gap-0.5 min-w-[170px]">
+                      <button
+                        onClick={() => handleExport('copy')}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
+                      >
+                        <Copy className="w-3 h-3" /> Copy as Markdown
+                      </button>
+                      <button
+                        onClick={() => handleExport('download')}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
+                      >
+                        <FileText className="w-3 h-3" /> Download .md
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Audit issue chips — always visible, non-collapsible */}
@@ -540,6 +753,23 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                 spellCheck
                 className="flex-1 overflow-y-auto px-6 py-5 focus:outline-none"
               />
+
+              {/* Floating formatting toolbar — appears above text selection */}
+              {toolbarPos && (
+                <div
+                  className="absolute z-50 flex items-center gap-0.5 bg-zinc-700 border border-zinc-600 rounded-md shadow-xl px-1 py-0.5 pointer-events-auto"
+                  style={{ top: toolbarPos.top, left: toolbarPos.left }}
+                  onMouseDown={e => e.preventDefault()}
+                >
+                  <button onClick={() => execFormat('bold')} className="px-2 py-1 text-[11px] font-bold text-zinc-200 hover:bg-zinc-600 rounded transition-colors">B</button>
+                  <button onClick={() => execFormat('italic')} className="px-2 py-1 text-[11px] italic text-zinc-200 hover:bg-zinc-600 rounded transition-colors">I</button>
+                  <div className="w-px h-3 bg-zinc-600 mx-0.5" />
+                  <button onClick={() => wrapHeading('h2')} className="px-2 py-1 text-[10px] text-zinc-200 hover:bg-zinc-600 rounded transition-colors">H2</button>
+                  <button onClick={() => wrapHeading('h3')} className="px-2 py-1 text-[10px] text-zinc-200 hover:bg-zinc-600 rounded transition-colors">H3</button>
+                  <div className="w-px h-3 bg-zinc-600 mx-0.5" />
+                  <button onClick={clearFormatting} className="px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-600 rounded transition-colors">&times;</button>
+                </div>
+              )}
             </>
           )}
         </div>
