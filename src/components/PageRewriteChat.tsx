@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
-  Copy, Check, FileText, Sparkles,
+  Copy, Check, FileText, Sparkles, Maximize2,
 } from 'lucide-react';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
@@ -517,6 +517,21 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
             </div>
           )}
         </div>
+
+        {/* Focus mode toggle */}
+        {onFocusModeToggle && (
+          <button
+            onClick={onFocusModeToggle}
+            title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
+            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+              focusMode
+                ? 'text-teal-400 bg-teal-500/10 hover:bg-teal-500/20'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+          >
+            <Maximize2 className={`w-3.5 h-3.5 transition-transform ${focusMode ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
 
       {/* Main two-pane layout */}
