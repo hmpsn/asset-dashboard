@@ -169,6 +169,20 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
   const clearFixContext = useCallback(() => setFixContext(null), []);
   const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+
+  // Reset focus mode when navigating away from the rewriter
+  useEffect(() => {
+    if (tab !== 'rewrite') setFocusMode(false);
+  }, [tab]);
+
+  // Escape key exits focus mode (in addition to the sidebar strip click)
+  useEffect(() => {
+    if (!focusMode) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setFocusMode(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [focusMode]);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
   useEffect(() => {
@@ -370,7 +384,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />
       </div>
     );
-    if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
+    if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} focusMode={focusMode} onFocusModeToggle={() => setFocusMode(f => !f)} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
     if (tab === 'outcomes') return <OutcomeDashboard key={`outcomes-${selected.id}`} workspaceId={selected.id} />;
 
     return null;
@@ -391,6 +405,8 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         onUnlinkSite={handleUnlinkSite}
         toggleTheme={toggleTheme}
         onLogout={onLogout}
+        hidden={focusMode}
+        onExitHidden={() => setFocusMode(false)}
       />
 
       {/* ── Main content area ── */}
@@ -406,10 +422,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
             <Clipboard className="w-3 h-3" /> {clipboardStatus}
           </div>
         )}
-        <main className="flex-1 overflow-auto p-6">
+        <main className={`flex-1 overflow-auto ${focusMode && tab === 'rewrite' ? '' : 'p-6'}`}>
           <ScannerReveal>
-            {/* max-w-5xl for admin (sidebar present); client uses max-w-6xl (full-width data) */}
-            <div className="max-w-5xl mx-auto">
+            {/* max-w-5xl for admin (sidebar present); in rewrite focus mode, fill full width */}
+            <div className={focusMode && tab === 'rewrite' ? 'h-full' : 'max-w-5xl mx-auto'}>
               {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (
                 <button
                   onClick={() => selected && navigate(adminPath(selected.id, 'content-pipeline'))}
