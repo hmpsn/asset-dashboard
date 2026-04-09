@@ -103,19 +103,6 @@ export function Sidebar({
   onCreate, onDelete, onLinkSite, onUnlinkSite,
   toggleTheme, onLogout, hidden, onExitHidden,
 }: SidebarProps) {
-  // Focus mode: render a slim clickable strip so the user can exit
-  if (hidden) {
-    return (
-      <aside
-        className="w-[14px] flex-shrink-0 border-r border-zinc-800 bg-[#0d0f1a] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/40 transition-colors"
-        onClick={onExitHidden}
-        title="Exit focus mode"
-      >
-        <span className="[writing-mode:vertical-rl] rotate-180 text-zinc-600 text-[9px] tracking-widest select-none">◀</span>
-      </aside>
-    );
-  }
-
   const navigate = useNavigate();
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -149,6 +136,19 @@ export function Sidebar({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  // Focus mode: render a slim clickable strip so the user can exit
+  if (hidden) {
+    return (
+      <aside
+        className="w-[14px] flex-shrink-0 border-r border-zinc-800 bg-[#0d0f1a] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/40 transition-colors"
+        onClick={onExitHidden}
+        title="Exit focus mode"
+      >
+        <span className="[writing-mode:vertical-rl] rotate-180 text-zinc-600 text-[9px] tracking-widest select-none">◀</span>
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-[200px] flex-shrink-0 flex flex-col border-r border-zinc-800">
