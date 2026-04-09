@@ -4,6 +4,7 @@ import {
   Send, Loader2, ArrowLeft, ExternalLink, AlertTriangle,
   Copy, Check, FileText, Sparkles, Maximize2,
 } from 'lucide-react';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
 
@@ -445,17 +446,85 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     return lines.join('\n');
   };
 
-  const handleExport = (mode: 'copy' | 'download') => {
+  const serializeDocToDocx = (): Paragraph[] => {
+    const docBody = docBodyRef.current;
+    const paragraphs: Paragraph[] = [];
+
+    if (pageData && pageData.issues.length > 0) {
+      paragraphs.push(new Paragraph({ text: 'Issues', heading: HeadingLevel.HEADING_2 }));
+      pageData.issues.forEach(issue =>
+        paragraphs.push(new Paragraph({ text: `[${issue.severity}] ${issue.message}`, bullet: { level: 0 } }))
+      );
+    }
+
+    if (!docBody) return paragraphs;
+
+    const headingLevel = (tag: string): HeadingLevel | null => {
+      if (tag === 'h1') return HeadingLevel.HEADING_1;
+      if (tag === 'h2') return HeadingLevel.HEADING_2;
+      if (tag === 'h3') return HeadingLevel.HEADING_3;
+      if (tag === 'h4') return HeadingLevel.HEADING_4;
+      return null;
+    };
+
+    const walk = (node: Node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const el = node as Element;
+      const tag = el.tagName.toLowerCase();
+      const level = headingLevel(tag);
+      if (level) {
+        paragraphs.push(new Paragraph({ text: el.textContent?.trim() || '', heading: level }));
+        return;
+      }
+      if (tag === 'p') {
+        const runs: TextRun[] = [];
+        el.childNodes.forEach(child => {
+          if (child.nodeType === Node.TEXT_NODE) {
+            runs.push(new TextRun(child.textContent || ''));
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const c = child as Element;
+            const ctag = c.tagName;
+            runs.push(new TextRun({
+              text: c.textContent || '',
+              bold: ctag === 'STRONG' || ctag === 'B',
+              italics: ctag === 'EM' || ctag === 'I',
+            }));
+          }
+        });
+        if (runs.length) paragraphs.push(new Paragraph({ children: runs }));
+        return;
+      }
+      el.childNodes.forEach(walk);
+    };
+
+    docBody.childNodes.forEach(walk);
+    return paragraphs;
+  };
+
+  const handleExport = (mode: 'copy' | 'download' | 'docx') => {
+    const slug = (pageData?.slug || 'page').replace(/\//g, '-').replace(/^-/, '');
+    if (mode === 'docx') {
+      const doc = new Document({ sections: [{ children: serializeDocToDocx() }] });
+      Packer.toBlob(doc).then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${slug}-brief.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      setExportOpen(false);
+      return;
+    }
     const md = serializeDocToMarkdown();
     if (mode === 'copy') {
       navigator.clipboard.writeText(md);
     } else {
-      const slug = pageData?.slug || 'page';
       const blob = new Blob([md], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${slug.replace(/\//g, '-').replace(/^-/, '')}-brief.md`;
+      a.download = `${slug}-brief.md`;
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -782,6 +851,12 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                         className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
                       >
                         <FileText className="w-3 h-3" /> Download .md
+                      </button>
+                      <button
+                        onClick={() => handleExport('docx')}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded text-[11px] text-zinc-300 hover:bg-zinc-700 transition-colors text-left"
+                      >
+                        <FileText className="w-3 h-3" /> Download .docx
                       </button>
                     </div>
                   )}

@@ -3092,6 +3092,15 @@
           "notes": "extractPageSections() only tokenizes <h1-6> and <p> tags. Pages using <div> wrappers for body text (common in Webflow CMS templates) produce sections with empty body fields. Expand the two-pass tokenizer to also capture <li>, <blockquote>, and non-empty <div> text nodes. Deferred from PR #159."
         },
         {
+          "id": 579,
+          "title": "Page Rewriter: PDF export via print stylesheet",
+          "source": "User request Apr 2026",
+          "est": "1h",
+          "priority": "P3",
+          "status": "pending",
+          "notes": "Add 'Download PDF' option to the Export brief menu. Cleanest approach: inject document content into a hidden print-only div with a styled print stylesheet and call window.print(). No new dependencies. DOCX export (#579 shipped) is the primary export; PDF is a lightweight complement for sharing/printing."
+        },
+        {
           "id": 288,
           "title": "Schema generator: enhanced validation, auto-fix, and improved prompting",
           "status": "done",
