@@ -69,7 +69,17 @@ function extractPageSections(html: string): { title: string; sections: PageSecti
 
   // Build sections: each heading accumulates following paragraph tokens
   const sections: PageSection[] = [];
-  for (let i = 0; i < tokens.length; i++) {
+  let i = 0;
+
+  // Collect orphan paragraphs before the first heading into the title section body
+  const preambleParts: string[] = [];
+  while (i < tokens.length && tokens[i].type === 'p') {
+    preambleParts.push((tokens[i] as { type: 'p'; text: string }).text);
+    i++;
+  }
+  const preambleBody = preambleParts.join(' ').slice(0, 800);
+
+  for (; i < tokens.length; i++) {
     const token = tokens[i];
     if (token.type === 'h') {
       const bodyParts: string[] = [];
@@ -88,7 +98,7 @@ function extractPageSections(html: string): { title: string; sections: PageSecti
     .trim()
     .slice(0, 8000);
 
-  return { title, sections, bodyText };
+  return { title, sections, bodyText, preamble: preambleBody };
 }
 
 // ── List sitemap pages from latest snapshot ──

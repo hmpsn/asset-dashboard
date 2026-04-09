@@ -233,7 +233,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || (e.target as HTMLElement).isContentEditable) return;
       const tabMap: Record<string, Page> = { '1': 'home', '2': 'seo-audit', '3': 'analytics-hub' };
       if (tabMap[e.key] && selected) { e.preventDefault(); navigate(adminPath(selected.id, tabMap[e.key])); }
       if (e.key === ',') { e.preventDefault(); navigate('/settings'); }
@@ -431,7 +431,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           </div>
         )}
         <main className={`flex-1 overflow-auto ${effectiveFocusMode ? '' : 'p-6'}`}>
-          <ScannerReveal>
+          <ScannerReveal className={effectiveFocusMode ? 'h-full' : undefined}>
             {/* max-w-5xl for admin (sidebar present); in rewrite focus mode, fill full width */}
             <div className={effectiveFocusMode ? 'h-full' : 'max-w-5xl mx-auto'}>
               {pendingContentRequests > 0 && selected && tab !== 'content-pipeline' && (

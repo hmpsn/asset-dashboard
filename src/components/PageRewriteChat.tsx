@@ -26,6 +26,7 @@ interface PageData {
   html: string;
   issues: SeoIssue[];
   slug: string;
+  preamble?: string;
 }
 
 interface SitemapPage {
@@ -169,6 +170,8 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     if (!url.trim()) return;
     setLoadingPage(true);
     setPageError('');
+    // Clear the pageKey guard so the ref callback re-initializes even for the same page
+    if (docBodyRef.current) docBodyRef.current.dataset.pageKey = '';
     try {
       const data = await post<PageData>(`/api/rewrite-chat/${workspaceId}/load-page`, { url: url.trim() });
       setPageData(data);
@@ -247,7 +250,15 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
       );
 
   const stripRewritingPrefix = (content: string): string =>
-    content.replace(/^\*{0,2}Rewriting:\s*[^*\n]+\*{0,2}\s*\n?/, '');
+    content.replace(/^\*{0,2}Rewriting:\s*[^*\n]+\*{0,2}\s*\n?/im, '');
+
+  /** Strip prefix AND rationale — returns only the rewrite prose for Apply/editable */
+  const extractRewriteOnly = (content: string): string => {
+    const stripped = stripRewritingPrefix(content);
+    // Remove "Rationale:" or "**Rationale:**" section and everything after
+    const rationaleIdx = stripped.search(/\n\s*\*{0,2}Rationale:?\*{0,2}/i);
+    return (rationaleIdx > 0 ? stripped.slice(0, rationaleIdx) : stripped).trim();
+  };
 
   const handleComboKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (filteredPages.length > 0) setComboIdx(i => Math.min(i + 1, filteredPages.length - 1)); }
@@ -284,6 +295,9 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
     const parts: string[] = [
       `<h1 data-section="${escHtml(toSectionSlug(data.title))}" class="text-[20px] font-bold text-slate-100 mb-3">${escHtml(data.title)}</h1>`,
     ];
+
+    // Render preamble paragraphs (text before the first heading on the page)
+    if (data.preamble) parts.push(bodyP(data.preamble));
 
     for (const section of data.sections) {
       const slug = toSectionSlug(section.heading);
@@ -447,7 +461,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm flex-shrink-0">
         <button
@@ -623,20 +637,20 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
                             // Initialize content once; do NOT use dangerouslySetInnerHTML (React would overwrite on re-render)
                             if (el && !el.dataset.initialized) {
                               el.dataset.initialized = 'true';
-                              el.innerText = stripRewritingPrefix(msg.content);
+                              el.innerText = extractRewriteOnly(msg.content);
                             }
                           }}
                         />
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-zinc-700/30">
                           <button
-                            onClick={() => applyToSection(msgEdits[i] ?? stripRewritingPrefix(msg.content), msg.sectionTarget!)}
+                            onClick={() => applyToSection(msgEdits[i] ?? extractRewriteOnly(msg.content), msg.sectionTarget!)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/30 hover:bg-teal-500/20 transition-colors"
                           >
                             <Check className="w-3 h-3" />
                             Apply to {msg.sectionTarget}
                           </button>
                           <button
-                            onClick={() => copyToClipboard(msgEdits[i] ?? stripRewritingPrefix(msg.content), i)}
+                            onClick={() => copyToClipboard(msgEdits[i] ?? extractRewriteOnly(msg.content), i)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
                           >
                             {copiedIdx === i ? <Check className="w-3 h-3 text-teal-400" /> : <Copy className="w-3 h-3" />}
