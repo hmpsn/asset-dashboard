@@ -11,6 +11,7 @@ import {
   generateCalibrationVariations, refineVariation,
 } from '../voice-calibration.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
 
@@ -84,6 +85,7 @@ router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), v
   addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json(result);
 });
 
@@ -99,6 +101,7 @@ router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspace
   addActivity(req.params.workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: sample.id });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json(sample);
 });
 
@@ -109,6 +112,7 @@ router.delete('/api/voice/:workspaceId/samples/:sampleId', requireWorkspaceAcces
   addActivity(req.params.workspaceId, 'voice_sample_deleted', 'Deleted voice sample');
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: req.params.sampleId, deleted: true });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json({ deleted: true });
 });
 
@@ -120,6 +124,7 @@ router.post('/api/voice/:workspaceId/calibrate', requireWorkspaceAccess('workspa
     addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
     clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Calibration failed' });
@@ -134,6 +139,7 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine', requireWorksp
     if (!session) return res.status(404).json({ error: 'Session or variation not found' });
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
     clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Refinement failed' });

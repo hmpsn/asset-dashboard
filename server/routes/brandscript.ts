@@ -11,6 +11,7 @@ import {
   importBrandscript, completeBrandscript,
 } from '../brandscript.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 
 const router = Router();
 
@@ -74,6 +75,7 @@ router.post('/api/brandscripts/:workspaceId/import', requireWorkspaceAccess('wor
     addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
     clearSeoContextCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
     res.json(bs);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Import failed' });
@@ -121,6 +123,7 @@ router.post('/api/brandscripts/:workspaceId/:id/complete', requireWorkspaceAcces
     addActivity(req.params.workspaceId, 'brandscript_completed', `AI completed sections in brandscript "${bs.name}"`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
     clearSeoContextCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
     res.json(bs);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Completion failed' });
