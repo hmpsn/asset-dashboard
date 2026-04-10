@@ -33,7 +33,7 @@ const stmts = createStmtCache(() => ({
   getById: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE id = ? AND workspace_id = ?`),
   getByType: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND deliverable_type = ? ORDER BY updated_at DESC LIMIT 1`),
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
-  updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, updated_at = @updated_at WHERE id = @id`),
+  updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id`),
   updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
   listVersions: db.prepare(`SELECT * FROM brand_identity_versions WHERE deliverable_id = ? ORDER BY version DESC`),
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
@@ -182,7 +182,7 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
         deliverable_id: existing.id, content: existing.content,
         steering_notes: null, version: existing.version, created_at: now,
       });
-      stmts().updateContent.run({ id: existing.id, content, status: 'draft', version: newVersion, updated_at: now });
+      stmts().updateContent.run({ id: existing.id, content, status: 'draft', version: newVersion, tier, updated_at: now });
     });
     doUpdate();
     // Use fresh `tier` from DEFAULT_TIER_MAP — map values may have shifted since the row was created.
@@ -228,7 +228,7 @@ Return only the refined content — no preamble.`;
       deliverable_id: id, content: existing.content,
       steering_notes: direction, version: existing.version, created_at: now,
     });
-    stmts().updateContent.run({ id, content, status: 'draft', version: newVersion, updated_at: now });
+    stmts().updateContent.run({ id, content, status: 'draft', version: newVersion, tier: existing.tier, updated_at: now });
   });
   doRefine();
   return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };

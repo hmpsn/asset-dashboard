@@ -55,22 +55,28 @@ router.post('/api/discovery/:workspaceId/sources',
     if (!parsed.success) return res.status(400).json({ error: 'Invalid sourceType' });
     const sourceType = parsed.data;
     const sources = [];
+    const rejected: { filename: string; reason: string }[] = [];
 
     for (const file of files) {
       const ext = file.originalname.split('.').pop()?.toLowerCase();
       if (ext !== 'txt' && ext !== 'md') {
         // Clean up disk temp file for rejected types — multer doesn't auto-delete
         if (file.path) { try { fs.unlinkSync(file.path); } catch { /* ignore cleanup errors */ } }
+        rejected.push({ filename: file.originalname, reason: 'Unsupported file type (only .txt and .md are accepted)' });
         continue;
       }
 
-      if (!file.path) continue;
+      if (!file.path) {
+        rejected.push({ filename: file.originalname, reason: 'Upload failed — no file path' });
+        continue;
+      }
 
       let content: string;
       try {
         content = fs.readFileSync(file.path, 'utf-8');
         fs.unlinkSync(file.path);
       } catch {
+        rejected.push({ filename: file.originalname, reason: 'Could not read uploaded file' });
         continue;
       }
 
@@ -83,7 +89,15 @@ router.post('/api/discovery/:workspaceId/sources',
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { added: sources.length });
     }
 
-    res.json({ sources });
+    // If every file was rejected, surface a 400 so the client sees a hard failure.
+    if (sources.length === 0 && rejected.length > 0) {
+      return res.status(400).json({
+        error: 'No files were accepted',
+        rejected,
+      });
+    }
+
+    res.json({ sources, rejected });
   },
 );
 

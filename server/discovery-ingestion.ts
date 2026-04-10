@@ -179,24 +179,35 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
   );
 
   const now = new Date().toISOString();
-  const extractions: DiscoveryExtraction[] = (parsed.extractions || []).map(ext => {
-    const id = `ext_${randomUUID().slice(0, 8)}`;
-    stmts().insertExtraction.run({
-      id, source_id: sourceId, workspace_id: workspaceId,
-      extraction_type: ext.extraction_type, category: ext.category,
-      content: ext.content, source_quote: ext.source_quote ?? null,
-      confidence, status: 'pending', created_at: now,
-    });
-    return {
-      id, sourceId, workspaceId,
-      extractionType: ext.extraction_type as ExtractionType,
-      category: ext.category as ExtractionCategory,
-      content: ext.content, sourceQuote: ext.source_quote,
-      confidence, status: 'pending' as ExtractionStatus, createdAt: now,
-    };
+  const rawExtractions = parsed.extractions || [];
+
+  // All-or-nothing: if any insert fails mid-loop we can't leave the source half-extracted
+  // (the retry would insert fresh UUIDs alongside the committed ones, creating permanent
+  // duplicates). markProcessed runs inside the same transaction so the source is only
+  // flagged processed when every extraction landed.
+  const persist = db.transaction((): DiscoveryExtraction[] => {
+    const inserted: DiscoveryExtraction[] = [];
+    for (const ext of rawExtractions) {
+      const id = `ext_${randomUUID().slice(0, 8)}`;
+      stmts().insertExtraction.run({
+        id, source_id: sourceId, workspace_id: workspaceId,
+        extraction_type: ext.extraction_type, category: ext.category,
+        content: ext.content, source_quote: ext.source_quote ?? null,
+        confidence, status: 'pending', created_at: now,
+      });
+      inserted.push({
+        id, sourceId, workspaceId,
+        extractionType: ext.extraction_type as ExtractionType,
+        category: ext.category as ExtractionCategory,
+        content: ext.content, sourceQuote: ext.source_quote,
+        confidence, status: 'pending' as ExtractionStatus, createdAt: now,
+      });
+    }
+    stmts().markProcessed.run(now, sourceId);
+    return inserted;
   });
 
-  stmts().markProcessed.run(now, sourceId);
+  const extractions = persist();
   log.info({ workspaceId, sourceId, count: extractions.length }, 'extracted insights');
   return extractions;
 }
