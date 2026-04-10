@@ -34,7 +34,9 @@ PR B: Mechanical backfill (depends on PR A merged to staging + staging CI green)
   └── Task B5: Fix vacuous .every() test assertions (91 matches)
   └── Task B6: Fix untyped dynamic imports (44 matches)
   └── Task B7: Fix unguarded recordAction calls (8 matches)
-  └── Task B8: Upgrade PR A rules warn → error
+  └── Task B8: Backfill UPDATE/DELETE missing workspace_id scope (39 matches)
+  └── Task B9: Polish pr-check.ts from scaled-review findings (rationale, Record spacing, pathFilter, variable shadow, forEach)
+  └── Task B10: Upgrade PR A rules warn → error
   ──▶ [merge PR B to staging] ──▶ [verify staging CI green] ──▶ [STOP — do not touch main]
 
 PR C: CLAUDE.md split (depends on PR B merged to staging + staging CI green)
@@ -47,7 +49,7 @@ PR C: CLAUDE.md split (depends on PR B merged to staging + staging CI green)
 
 **None of these PRs merge to `main` directly.** The brand engine work (PR #162) is currently staging-only by design — `main` only gets updated when the full release (brand engine + audit fixes) is verified together. Once all three audit PRs are merged to staging and verified, a single `staging → main` release PR carries everything to production.
 
-**Parallelism within PR B:** Tasks B1–B7 are independent (disjoint file sets, different check targets) and can be executed in parallel subagent dispatches once the rules are stable in PR A.
+**Parallelism within PR B:** Tasks B1–B8 are independent (disjoint file sets, different check targets) and can be executed in parallel subagent dispatches once the rules are stable in PR A. B9 (pr-check.ts polish) is sequential after B1–B8 because it edits `scripts/pr-check.ts`, which several earlier tasks also touch via the exclusion lists. B10 (warn → error promotion) is sequential after B1–B9.
 
 **No parallelism within PR A or PR C.** These are small enough to execute inline.
 
@@ -68,7 +70,9 @@ PR C: CLAUDE.md split (depends on PR B merged to staging + staging CI green)
 | B5 (vacuous .every) | **haiku** | Mechanical — add `expect(arr.length).toBeGreaterThan(0)` before each `.every()`. |
 | B6 (untyped dynamic imports) | **sonnet** | Each dynamic import needs a matching `import type` and local type annotation. Requires reading the imported module's exports. |
 | B7 (recordAction guards) | **haiku** | Add `if (workspaceId)` wrapper around each call. |
-| B8 (warn → error upgrade) | **haiku** | Severity string swap in `scripts/pr-check.ts`. |
+| B8 (workspace_id backfill) | **opus** | SQL edits + caller threading + hatch judgment on 39 sites. Highest-stakes backfill task — a wrong hatch opens a cross-tenant read. |
+| B9 (pr-check.ts polish) | **sonnet** | Rule copy-edit, pattern tweak, variable rename, `.forEach` → `for...of` migration. All internal to `scripts/pr-check.ts`. |
+| B10 (warn → error upgrade) | **haiku** | Severity string swap in `scripts/pr-check.ts`. |
 | C1 (generator script) | **sonnet** | Parse `CHECKS` array, emit markdown table. Moderate TS authoring. |
 | C2 (CLAUDE.md split) | **sonnet** | Judgment on what stays philosophical vs. auto-enforced. Copy-edit. |
 
@@ -91,11 +95,13 @@ Every parallel task in PR B declares exactly which files it owns. A subagent dis
 | B5 | `tests/` files identified by B5 prelude grep | `scripts/pr-check.ts`, `server/`, `src/` |
 | B6 | `server/` files with `await import(` identified by B6 prelude grep | anything outside `server/` |
 | B7 | `server/outcome-backfill.ts`, `server/routes/insights.ts`, `server/routes/content-decay.ts`, and 2 other files | anything else |
-| B8 | `scripts/pr-check.ts` (severity field only) | — |
+| B8 | `server/` files identified by B8 prelude grep (workspace_id backfill call sites) | `scripts/pr-check.ts`, any test file, `src/` |
+| B9 | `scripts/pr-check.ts` (rule metadata + internal code quality only — do not touch severity fields) | everything else |
+| B10 | `scripts/pr-check.ts` (severity field only) | — |
 | C1 | `scripts/generate-rules-doc.ts` (new) | anything else |
 | C2 | `CLAUDE.md`, `docs/rules/automated-rules.md` (new) | anything else |
 
-**Diff review checkpoint:** after every parallel batch in PR B (after B1–B7 complete), run:
+**Diff review checkpoint:** after every parallel batch in PR B (after B1–B8 complete), run:
 
 ```bash
 git diff --stat origin/staging...HEAD     # confirm file ownership was respected
@@ -639,7 +645,7 @@ EOF
 
 **Branch:** `chore/pr-check-backfill` (branch from `origin/staging` after PR A merges).
 
-**Dispatch model:** tasks B1–B7 can be dispatched in parallel as subagents. Each owns its file set exclusively (see File Ownership section above). After all 7 complete, review diffs for overlap, run full suite, then sequentially commit B8.
+**Dispatch model:** tasks B1–B8 can be dispatched in parallel as subagents. Each owns its file set exclusively (see File Ownership section above). After all 8 complete, review diffs for overlap, run full suite, then sequentially commit B9 (pr-check.ts polish) and B10 (warn → error promotion).
 
 ### Task B1: Fix violet/indigo color violations (24 matches)
 
@@ -1209,12 +1215,183 @@ Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>"
 
 ---
 
-### Task B8: Promote PR A rules warn → error
+### Task B8: Backfill UPDATE/DELETE missing workspace_id scope (39 matches)
+
+> Added 2026-04-10 from the PR A scaled code review (low-signal finding #1). Post-PR-A fixes landed Rule 5 at 39 real matches; this is the largest remaining backfill and the reason Rule 5 must stay at `warn` until this task completes.
+
+**Files owned by this task:**
+- Identified by prelude grep. Expected includes `server/content-requests.ts`, `server/content-brief.ts`, `server/requests.ts`, `server/churn-signals.ts`, and up to 15 others.
+
+- [ ] **Step 1: Enumerate every violation**
+
+```bash
+npx tsx scripts/pr-check.ts --all 2>&1 | grep -B1 -A50 "UPDATE/DELETE missing workspace_id" | grep -E "server/.*\.ts:[0-9]+"
+```
+
+- [ ] **Step 2: Classify each match**
+
+For each match, decide between two outcomes:
+
+- **Add `AND workspace_id = ?` to the SQL**: default choice. The query string gains the clause; the call site gains the binding. This is the correct fix when the row key is not UUID-unique across workspaces (auto-increment IDs, composite keys, names).
+- **Add `// ws-scope-ok` hatch**: the row key is already workspace-unique (UUIDv4, nanoid, `crypto.randomUUID()`). Verify by reading the migration that created the column — if it's a UUID and the table has no foreign-key re-use across workspaces, the hatch is justified. Add a comment explaining why above the hatch.
+
+Document the decision per match in a scratch table before editing.
+
+- [ ] **Step 3: Apply SQL fixes (the common case)**
+
+For each UPDATE/DELETE that needs scoping:
+
+```ts
+// Before
+db.prepare('UPDATE foo SET status = ? WHERE id = ?').run(status, id);
+
+// After
+db.prepare('UPDATE foo SET status = ? WHERE id = ? AND workspace_id = ?').run(status, id, workspaceId);
+```
+
+If the function doesn't already take `workspaceId`, thread it through — do not invent a `getWorkspaceIdForFoo(id)` helper. A function that can't prove the caller's workspace context has no business writing to a workspace-scoped table.
+
+- [ ] **Step 4: Apply hatches for UUID-keyed rows**
+
+```ts
+// ws-scope-ok — churn_signals.id is a nanoid, unique across all workspaces
+dismiss: db.prepare('UPDATE churn_signals SET dismissed_at = ? WHERE id = ?'),
+```
+
+- [ ] **Step 5: Verify the category is clean**
+
+```bash
+npx tsx scripts/pr-check.ts --all 2>&1 | grep -A2 "UPDATE/DELETE missing workspace_id"
+```
+
+Expected: `✓ UPDATE/DELETE missing workspace_id scope`
+
+- [ ] **Step 6: Full verification**
+
+```bash
+npm run typecheck && npx vite build && npx vitest run
+```
+
+**Critical:** the test suite must catch any call site that was silently dropping the workspace filter. Any test that now fails with "row not found" where it previously passed is uncovering a real bug where the test fixture's `workspaceId` wasn't aligned with the row being updated — fix the fixture, not the query.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add server/  # specific files only
+git commit -m "fix(db): scope UPDATE/DELETE queries to workspace_id (39 sites)
+
+Threads workspace_id through every non-UUID-keyed UPDATE/DELETE in the
+server tree. UUID-keyed rows (nanoid/crypto.randomUUID) use the
+// ws-scope-ok hatch with a justification comment.
+
+Clears the 'UPDATE/DELETE missing workspace_id scope' pr-check rule.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+```
+
+---
+
+### Task B9: Polish pr-check.ts from scaled-review findings
+
+> Added 2026-04-10 from the PR A scaled code review (low-signal findings #2–#7). None block merge; all improve rule quality, consistency, or maintainability. Bundled into one commit because each edit is small and the blast radius is contained to `scripts/pr-check.ts`.
+
+**Files owned by this task:**
+- `scripts/pr-check.ts`
+
+- [ ] **Step 1: Collapse `message` ≈ `rationale` duplication (finding #2)**
+
+10 of the 11 PR A rules have a `message` and `rationale` that say nearly the same thing. The `message` is shown to developers on a hit; the `rationale` is shown in the generated docs. Either (a) make `rationale` strictly the one-sentence bug class (≤ 12 words) and keep `message` as the actionable remediation, or (b) delete `rationale` on rules where it adds no information beyond `message` and fall back to `message` in the generator.
+
+Pick option (a). For each rule, rewrite `rationale` to be a single noun phrase: the bug class prevented. Examples:
+
+```ts
+// Before
+rationale: 'A workspace-scoped broadcast via useGlobalAdminEvents results in dead-code handlers because the server only fans out to explicitly subscribed connections.',
+
+// After
+rationale: 'Silent dead-code handlers on misused hook.',
+```
+
+- [ ] **Step 2: Extend Record<string,unknown> pattern to tolerate spacing (finding #4)**
+
+The current pattern is `Record<string, unknown>` with a single space after the comma. A developer writing `Record<string,  unknown>` (double space) or `Record< string, unknown >` (padded brackets) would bypass the rule. Extend the regex:
+
+```ts
+pattern: 'Record<\\s*string\\s*,\\s*unknown\\s*>',
+```
+
+Verify full-scan output is unchanged (should still be zero matches after the shared-types exclusions).
+
+- [ ] **Step 3: Harden public-portal pathFilter (finding #5)**
+
+Current `pathFilter: 'server/routes/public-portal.ts'` is a file path. It works — `find <file> -name '*.ts'` returns the file — but is fragile if the rule runner is ever refactored to assume a directory prefix. Replace with:
+
+```ts
+pathFilter: 'server/routes/',
+exclude: [
+  // existing exclusions...
+  'server/routes/',  // restrict further via fileGlobs + customCheck path filter
+],
+```
+
+Or, more cleanly, keep the rule as a customCheck and early-return if `!file.endsWith('public-portal.ts')`. Pick the latter — explicit in code, no indirection through the glob engine.
+
+- [ ] **Step 4: Rename shadowed `window` variable (finding #6)**
+
+Rule 3's customCheck uses `window` as a local variable name for the sliding DB-write window. This shadows the global `window` in any context that cares. Rename to `txnWindow` or `writeWindow`:
+
+```ts
+const writeWindow = lines.slice(Math.max(0, a - 5), Math.min(lines.length, b + 5)).join('\n');
+if (/db\.transaction\s*\(/.test(writeWindow)) continue;
+```
+
+- [ ] **Step 5: Normalize `.forEach` → `for...of` (finding #7)**
+
+Five call sites in `scripts/pr-check.ts` still use `.forEach()` despite the rest of the file using `for...of`. Replace for consistency:
+
+```ts
+// Before
+files.forEach((file) => { ... });
+// After
+for (const file of files) { ... }
+```
+
+Skip this step if any `.forEach` callback uses `return` for early-exit — `for...of` needs `continue` instead, and the rewrite is non-trivial in that case. For those sites, leave a `// TODO: migrate when refactoring` comment instead.
+
+- [ ] **Step 6: Verify no regressions**
+
+```bash
+npm run typecheck && npx tsx scripts/pr-check.ts --all
+```
+
+Expected: identical error/warning counts to the pre-polish baseline. None of these edits should change any rule's match count.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add scripts/pr-check.ts
+git commit -m "chore(pr-check): polish from scaled-review findings
+
+- rationale collapsed to single-noun bug class on 10 rules
+- Record<string,unknown> pattern tolerates padded/wide spacing
+- public-portal rule uses explicit file guard instead of pathFilter hack
+- Rule 3 local shadowed variable renamed from 'window' → 'writeWindow'
+- .forEach call sites normalized to for...of where safe
+
+All changes are internal to pr-check.ts; full scan emits identical
+counts before and after.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```
+
+---
+
+### Task B10: Promote PR A rules warn → error
 
 **Files owned by this task:**
 - `scripts/pr-check.ts` (severity field edits only — do not touch any other fields)
 
-**Precondition:** Tasks B1–B7 complete. `npx tsx scripts/pr-check.ts --all` reports zero errors and zero warnings for all PR A rules.
+**Precondition:** Tasks B1–B9 complete. `npx tsx scripts/pr-check.ts --all` reports zero errors and zero warnings for all PR A rules.
 
 - [ ] **Step 1: Verify zero violations**
 
@@ -1263,7 +1440,7 @@ npm run typecheck && npx vite build && npx vitest run
 git add scripts/pr-check.ts
 git commit -m "chore(pr-check): promote 7 PR A rules from warn to error
 
-With the B1-B7 backfill complete, the codebase is clean against:
+With the B1-B9 backfill + polish complete, the codebase is clean against:
 - Global keydown missing isContentEditable guard
 - Multi-step DB writes outside db.transaction()
 - AI-call-before-DB-write race
@@ -1302,8 +1479,9 @@ Expected: all green. `pr-check --all` reports zero errors and zero warnings acro
 git push -u origin chore/pr-check-backfill
 gh pr create --base staging --title "chore(pr-check): mechanical backfill of existing violations (PR B of audit)" --body "$(cat <<'EOF'
 ## Summary
-- Backfills all 266+ existing pr-check violations identified by the PR A nightly full-scan
-- One commit per category: colors, studio-name, JSON.parse exclusions, source-sniffing tests, vacuous .every, dynamic imports, recordAction guards
+- Backfills all 300+ existing pr-check violations identified by the PR A nightly full-scan
+- One commit per category: colors, studio-name, JSON.parse exclusions, source-sniffing tests, vacuous .every, dynamic imports, recordAction guards, workspace_id scoping
+- Incorporates scaled-review polish (rationale copy, Record spacing, pathFilter hardening, variable shadow, forEach normalization)
 - Final commit promotes 7 PR A rules from warn → error
 
 This is PR B of 3 in the pr-check-audit-and-backfill plan. PR C
