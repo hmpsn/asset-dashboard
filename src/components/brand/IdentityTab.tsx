@@ -364,6 +364,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   if (!hasAnyDeliverable) {
     return (
       <EmptyState
+        icon={Sparkles}
         title="No brand deliverables yet"
         description="Generate your first brand deliverable to start building your identity."
         action={

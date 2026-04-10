@@ -190,26 +190,40 @@ export function buildSeoContext(
 
         if (intel.seoContext) {
           // Shadow-mode comparison: compare buildSeoContext() output against the
-          // intelligence assembler's seoContext slice. Both sides originate from the
-          // same source data. The assembler maps:
-          //   brandVoice  = getRawBrandVoice() (raw, no header)
+          // intelligence assembler's seoContext slice. Both sides originate from
+          // the same source data. The assembler maps:
+          //   brandVoice    = getRawBrandVoice() (raw, no header)
           //   knowledgeBase = getRawKnowledge() (raw, no header)
-          // So compare raw-to-raw (voiceParts.join vs intel.seoContext.brandVoice).
-          const comparisonFields = [
+          // So we compare raw-to-raw (getRawBrandVoice vs intel.seoContext.brandVoice)
+          // — this validates that the assembler reads from the same source data,
+          // NOT that it produces the effective brand voice that ultimately ends
+          // up in `result.brandVoiceBlock` / `fullContext`. When a calibrated
+          // voice profile exists, the effective voice is sourced from
+          // `buildVoiceProfileContext()` instead of the raw legacy block, and
+          // the intelligence assembler does not yet expose an equivalent field
+          // — so the raw-source check is skipped on those workspaces to avoid
+          // logging an unrelated parity issue as a real mismatch.
+          const voiceProfileActive = buildVoiceProfileContext(workspaceId).length > 0;
+          const comparisonFields: { name: string; match: boolean }[] = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
-            // Both are raw brand voice (no "BRAND VOICE & STYLE" header)
-            { name: 'brandVoice', match: getRawBrandVoice(workspaceId) === (intel.seoContext.brandVoice ?? '') },
             { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
             // Both are raw knowledge (no "BUSINESS KNOWLEDGE BASE" header)
             { name: 'knowledgeBase', match: getRawKnowledge(workspaceId) === (intel.seoContext.knowledgeBase ?? '') },
             // Personas: old path is prose string, new is structured array — compare presence as proxy
             { name: 'personas', match: (result.personasBlock ? 'present' : 'empty') === ((intel.seoContext.personas?.length ?? 0) > 0 ? 'present' : 'empty') },
           ];
+          if (!voiceProfileActive) {
+            // Both sides are raw legacy brand voice (no "BRAND VOICE & STYLE" header)
+            comparisonFields.push({
+              name: 'rawBrandVoice',
+              match: getRawBrandVoice(workspaceId) === (intel.seoContext.brandVoice ?? ''),
+            });
+          }
           const mismatches = comparisonFields.filter(f => !f.match).map(f => f.name);
           if (mismatches.length > 0) {
-            log.warn({ workspaceId, mismatches, totalFields: comparisonFields.length }, 'Intelligence shadow-mode mismatch detected');
+            log.warn({ workspaceId, mismatches, totalFields: comparisonFields.length, voiceProfileActive }, 'Intelligence shadow-mode mismatch detected');
           } else {
-            log.debug({ workspaceId, totalFields: comparisonFields.length }, 'Intelligence shadow-mode: all 5 fields match');
+            log.debug({ workspaceId, totalFields: comparisonFields.length, voiceProfileActive }, 'Intelligence shadow-mode: all fields match');
           }
         }
       } catch (err) {

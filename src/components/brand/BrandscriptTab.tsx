@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import {
@@ -195,11 +195,28 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  // Used by the Save button — disabled while local content matches the saved
+  // server value. Recomputed on every render against the *current* prop.
   const isDirty = content !== (section.content ?? '');
 
-  // Sync content from prop when the card is not dirty (e.g. after external WS update)
+  // Track the last prop value we synced into local state. This is the baseline
+  // for "did the user edit since the last sync?" — and it intentionally lags
+  // behind `section.content` until the effect below decides whether to copy
+  // the new prop into local state.
+  const lastSyncedRef = useRef(section.content ?? '');
+
+  // Sync content from prop on external updates (e.g. WebSocket-driven refetch)
+  // unless the user has typed something the parent doesn't yet know about.
+  // We compare against `lastSyncedRef.current`, NOT against the new prop:
+  // comparing against the new prop would always read as "dirty" the moment
+  // an external update arrives, and the sync would be skipped, leaving stale
+  // content in the textarea.
   useEffect(() => {
-    if (!isDirty) setContent(section.content ?? '');
+    const userHasUnsavedEdits = content !== lastSyncedRef.current;
+    if (!userHasUnsavedEdits) {
+      setContent(section.content ?? '');
+    }
+    lastSyncedRef.current = section.content ?? '';
   }, [section.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
