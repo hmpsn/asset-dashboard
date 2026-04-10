@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import {
   BookOpen, Plus, Trash2, Sparkles, ChevronDown, ChevronUp,
   Save, Loader2, FileText,
@@ -51,8 +52,9 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
       <h3 className="text-sm font-semibold text-zinc-200">New Brandscript</h3>
 
       <div className="space-y-1">
-        <label className="text-xs text-zinc-400">Name</label>
+        <label htmlFor="bs-name" className="text-xs text-zinc-400">Name</label>
         <input
+          id="bs-name"
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="e.g. StoryBrand 2024"
@@ -62,8 +64,9 @@ function CreateForm({ workspaceId, templates, onCreated, onCancel }: CreateFormP
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs text-zinc-400">Framework (optional)</label>
+        <label htmlFor="bs-framework" className="text-xs text-zinc-400">Framework (optional)</label>
         <select
+          id="bs-framework"
           value={frameworkType}
           onChange={e => setFrameworkType(e.target.value)}
           className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-teal-600"
@@ -136,8 +139,9 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
       </p>
 
       <div className="space-y-1">
-        <label className="text-xs text-zinc-400">Name (optional)</label>
+        <label htmlFor="import-name" className="text-xs text-zinc-400">Name (optional)</label>
         <input
+          id="import-name"
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="e.g. Imported v1"
@@ -146,8 +150,9 @@ function ImportForm({ workspaceId, onImported, onCancel }: ImportFormProps) {
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs text-zinc-400">Raw text</label>
+        <label htmlFor="import-raw-text" className="text-xs text-zinc-400">Raw text</label>
         <textarea
+          id="import-raw-text"
           value={rawText}
           onChange={e => setRawText(e.target.value)}
           placeholder="Paste your brandscript content here..."
@@ -191,6 +196,11 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
   const { toast } = useToast();
 
   const isDirty = content !== (section.content ?? '');
+
+  // Sync content from prop when the card is not dirty (e.g. after external WS update)
+  useEffect(() => {
+    if (!isDirty) setContent(section.content ?? '');
+  }, [section.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
     setSaving(true);
@@ -331,6 +341,7 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
         <button
           type="button"
           onClick={onBack}
+          aria-label="Back to all brandscripts"
           className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
         >
           ← All brandscripts
@@ -437,6 +448,7 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (!window.confirm('Delete this brandscript? This cannot be undone.')) return;
     setDeletingId(id);
     try {
       await brandscripts.remove(workspaceId, id);
@@ -561,19 +573,18 @@ export function BrandscriptTab({ workspaceId }: Props) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const createMutation = useMutation({
-    mutationFn: (bs: Brandscript) => Promise.resolve(bs),
-    onSuccess: (bs: Brandscript) => {
-      queryClient.setQueryData<Brandscript[]>(
-        ['admin-brandscripts', workspaceId],
-        prev => prev ? [bs, ...prev] : [bs],
-      );
-      setSelectedId(bs.id);
+  useWebSocket({
+    'brandscript:updated': () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-brandscripts', workspaceId] });
     },
   });
 
   const handleCreated = (bs: Brandscript) => {
-    createMutation.mutate(bs);
+    queryClient.setQueryData<Brandscript[]>(
+      ['admin-brandscripts', workspaceId],
+      (old) => [bs, ...(old ?? [])],
+    );
+    setSelectedId(bs.id);
   };
 
   const handleDeleted = (id: string) => {
