@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { Sparkles, Check, Download, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
@@ -272,7 +272,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
     queryFn: () => identity.list(workspaceId),
   });
 
-  useWebSocket({
+  useWorkspaceEvents(workspaceId, {
     [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] });
     },

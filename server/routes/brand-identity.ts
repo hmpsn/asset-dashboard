@@ -35,8 +35,9 @@ const refineDeliverableSchema = z.object({
 });
 
 // Toggleable between `approved` and `draft` — reverting lets admins walk back
-// an approval without deleting the deliverable. `setDeliverableStatus`
-// handles the auto-sample side-effect only on the approve→draft direction.
+// an approval without deleting the deliverable. `setDeliverableStatus` fires
+// the auto-sample side-effect only on the first draft→approved transition;
+// re-approvals and approved→draft reversions are no-ops for that side effect.
 const patchDeliverableSchema = z.object({
   status: z.enum(['approved', 'draft']),
 });

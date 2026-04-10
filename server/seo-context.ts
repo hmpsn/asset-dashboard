@@ -482,12 +482,21 @@ export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEm
  * When calibrated: returns only voice samples (safe at any status).
  * When not calibrated: returns the full DNA + samples + guardrails block.
  */
-export function buildVoiceProfileContext(workspaceId: string, _emphasis: ContextEmphasis = 'full'): string {
+export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   const profile = getVoiceProfile(workspaceId);
   if (!profile) return '';
 
   const isCalibrated = profile.status === 'calibrated';
   const parts: string[] = [];
+
+  // `minimal` returns only a one-line voice summary (used by lightweight prompts).
+  if (emphasis === 'minimal') {
+    if (!profile.voiceDNA) return '';
+    const dna = profile.voiceDNA;
+    return `\n\nBRAND VOICE: ${dna.personalityTraits.slice(0, 3).join(', ')} — ${dna.sentenceStyle}${dna.vocabularyLevel ? `, ${dna.vocabularyLevel} vocabulary` : ''}`;
+  }
+
+  const sampleLimit = emphasis === 'summary' ? 3 : 5;
 
   // Only inject DNA when not calibrated — Layer 2 handles it when calibrated
   if (!isCalibrated && profile.voiceDNA) {
@@ -495,6 +504,9 @@ export function buildVoiceProfileContext(workspaceId: string, _emphasis: Context
     parts.push(`  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}`);
     parts.push(`  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10`);
     parts.push(`  Sentence style: ${profile.voiceDNA.sentenceStyle}`);
+    if (profile.voiceDNA.vocabularyLevel) {
+      parts.push(`  Vocabulary: ${profile.voiceDNA.vocabularyLevel}`);
+    }
     if (profile.voiceDNA.humorStyle) {
       parts.push(`  Humor: ${profile.voiceDNA.humorStyle}`);
     }
@@ -503,13 +515,14 @@ export function buildVoiceProfileContext(workspaceId: string, _emphasis: Context
   // Voice samples are safe to include at any status
   if (profile.samples.length > 0) {
     parts.push(`\nVOICE SAMPLES (write like these):`);
-    for (const sample of profile.samples.slice(0, 5)) {
+    for (const sample of profile.samples.slice(0, sampleLimit)) {
       parts.push(`  [${sample.contextTag || 'general'}] "${sample.content}"`);
     }
   }
 
-  // Only inject guardrails when not calibrated — Layer 2 handles it when calibrated
-  if (!isCalibrated && profile.guardrails) {
+  // Only inject guardrails when not calibrated — Layer 2 handles it when calibrated.
+  // `summary` emphasis drops guardrails to keep the block compact.
+  if (emphasis === 'full' && !isCalibrated && profile.guardrails) {
     parts.push(`\nGUARDRAILS:`);
     if (profile.guardrails.forbiddenWords.length) parts.push(`  Never use: ${profile.guardrails.forbiddenWords.join(', ')}`);
     if (profile.guardrails.requiredTerminology.length) parts.push(`  Required: ${profile.guardrails.requiredTerminology.map(t => `"${t.use}" not "${t.insteadOf}"`).join(', ')}`);

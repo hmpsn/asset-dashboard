@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { Mic, Plus, Trash2, Sparkles, Loader2, Save } from 'lucide-react';
 import { voice } from '../../api/brand-engine';
 import type {
@@ -994,7 +994,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
     queryFn: () => voice.getProfile(workspaceId),
   });
 
-  useWebSocket({
+  useWorkspaceEvents(workspaceId, {
     'voice:updated': () => {
       queryClient.invalidateQueries({ queryKey: ['admin-voice-profile', workspaceId] });
     },

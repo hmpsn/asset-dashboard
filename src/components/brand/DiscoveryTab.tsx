@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import {
   Upload, FileText, Trash2, Cpu, CheckCircle, XCircle,
   Loader2, ChevronDown, Filter,
@@ -190,7 +190,7 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
 
-  // React Query prefix matching: the 2-segment invalidation key in useWebSocket
+  // React Query prefix matching: the 2-segment invalidation key in useWorkspaceEvents
   // covers this 3-segment key automatically — all source extractions are refreshed
   // when any discovery update is broadcast.
   const { data: extractions = [], isLoading } = useQuery({
@@ -793,7 +793,7 @@ export function DiscoveryTab({ workspaceId }: Props) {
   });
 
   // Invalidate on server-pushed discovery events
-  useWebSocket({
+  useWorkspaceEvents(workspaceId, {
     'discovery:updated': () => {
       queryClient.invalidateQueries({ queryKey: ['admin-discovery-sources', workspaceId] });
       queryClient.invalidateQueries({ queryKey: ['admin-discovery-extractions', workspaceId] });

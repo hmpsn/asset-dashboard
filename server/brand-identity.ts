@@ -302,12 +302,24 @@ export function setDeliverableStatus(
   const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
   if (!row) return null;
 
+  // Capture the pre-update status BEFORE writing — we need to know whether this
+  // is a first-time approval (draft → approved) vs a re-approval (already approved,
+  // no-op on status). The auto-sample side effect must only run on the transition.
+  const priorStatus = row.status;
   const now = new Date().toISOString();
   stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
   log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
 
   if (status !== 'approved') {
     return { ...rowToDeliverable(row), status, updatedAt: now };
+  }
+
+  // Re-approval of an already-approved deliverable must NOT duplicate the voice
+  // sample. Without this guard, every idempotent PATCH (e.g. a client retry, or
+  // an admin clicking "Approve" twice) inserts another copy of the same content
+  // into the voice samples table.
+  if (priorStatus === 'approved') {
+    return { ...rowToDeliverable(row), status: 'approved', updatedAt: now };
   }
 
   // Spec Addendum §5: auto-create voice sample for approved identity deliverables.

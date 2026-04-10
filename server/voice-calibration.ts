@@ -220,7 +220,7 @@ export function buildVoiceCalibrationContext(profile: VoiceProfile & { samples: 
   // Once calibrated, Layer 2 of buildSystemPrompt injects DNA + guardrails into
   // the system message. Only inline them when still draft/calibrating.
   const dnaText = !isCalibrated && profile.voiceDNA
-    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}${profile.voiceDNA.humorStyle ? `\n  Humor: ${profile.voiceDNA.humorStyle}` : ''}`
+    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}${profile.voiceDNA.vocabularyLevel ? `\n  Vocabulary: ${profile.voiceDNA.vocabularyLevel}` : ''}${profile.voiceDNA.humorStyle ? `\n  Humor: ${profile.voiceDNA.humorStyle}` : ''}`
     : '';
 
   const guardrailsText = !isCalibrated && profile.guardrails

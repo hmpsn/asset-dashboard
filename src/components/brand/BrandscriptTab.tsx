@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import {
   BookOpen, Plus, Trash2, Sparkles, ChevronDown, ChevronUp,
   Save, Loader2, FileText,
@@ -590,7 +590,7 @@ export function BrandscriptTab({ workspaceId }: Props) {
     staleTime: 5 * 60 * 1000,
   });
 
-  useWebSocket({
+  useWorkspaceEvents(workspaceId, {
     'brandscript:updated': () => {
       queryClient.invalidateQueries({ queryKey: ['admin-brandscripts', workspaceId] });
     },
