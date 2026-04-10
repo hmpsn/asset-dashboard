@@ -168,6 +168,27 @@ function readFileOrEmpty(file: string): string {
   try { return readFileSync(file, 'utf-8'); } catch { return ''; }
 }
 
+/**
+ * Check whether a `// <hatch>-ok` comment exists on `lines[i]` or on the
+ * immediately preceding line. Every customCheck rule that flags the opening
+ * line of a potentially multi-line statement (template-literal db.prepare
+ * calls, multi-line callOpenAI arguments, router.post callbacks, useEffect
+ * openers, etc.) MUST call this before pushing a hit.
+ *
+ * The global `excludeLines` post-filter in `formatCustomMatches` only matches
+ * the flagged line's text; for multi-line constructs the hatch can't be
+ * placed inline without breaking syntax, so developers place it on the line
+ * above. Without this lookbehind, those hatches are silently ignored.
+ *
+ * See docs/rules/pr-check-rule-authoring.md → "Common mistakes" for the
+ * explanation and the funcBoundaryRe / ws-scope-ok / ai-race-ok precedents.
+ */
+function hasHatch(lines: string[], i: number, hatch: string): boolean {
+  if (lines[i]?.includes(hatch)) return true;
+  if (i > 0 && lines[i - 1]?.includes(hatch)) return true;
+  return false;
+}
+
 const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -542,7 +563,7 @@ const CHECKS: Check[] = [
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!listenerRe.test(lines[i])) continue;
-          if (lines[i].includes('// keydown-ok')) continue;
+          if (hasHatch(lines, i, '// keydown-ok')) continue;
           // Locate the handler body and scan it for an isContentEditable guard.
           // Common shapes:
           //   addEventListener('keydown', (e) => { ... })       ← inline arrow
@@ -619,10 +640,7 @@ const CHECKS: Check[] = [
           // Skip stmts() cache definitions — these are always part of a
           // createStmtCache object literal where every value is a prepare.
           if (/:\s*db\.prepare/.test(lines[i])) continue;
-          // Respect the // txn-ok hatch on the current line OR on the preceding
-          // line (for multi-line template-literal db.prepare calls where the
-          // comment can't be placed inline).
-          if (lines[i].includes('// txn-ok') || (i > 0 && lines[i - 1].includes('// txn-ok'))) continue;
+          if (hasHatch(lines, i, '// txn-ok')) continue;
           writeIdx.push(i);
         }
         if (writeIdx.length < 2) continue;
@@ -685,6 +703,7 @@ const CHECKS: Check[] = [
         const aiRe = /\b(callOpenAI|callAnthropic|callCreativeAI)\s*\(/;
         for (let i = 0; i < lines.length; i++) {
           if (!aiRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ai-race-ok')) continue;
           const window = lines.slice(i + 1, i + 31);
           const hasWrite = window.some(l => /\bdb\.prepare\s*\(/.test(l) || /\bstmts\s*\(\s*\)\./.test(l));
           if (!hasWrite) continue;
@@ -717,6 +736,7 @@ const CHECKS: Check[] = [
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ws-scope-ok')) continue;
           // Grab the next ~25 lines to reconstruct the SQL string; stop at the
           // first line that closes the call with ).
           const chunk = lines.slice(i, Math.min(lines.length, i + 25)).join('\n');
@@ -782,7 +802,7 @@ const CHECKS: Check[] = [
         for (let i = 0; i < lines.length; i++) {
           const m = lines[i].match(declRe);
           if (!m) continue;
-          if (lines[i].includes('// getorcreate-nullable-ok')) continue;
+          if (hasHatch(lines, i, '// getorcreate-nullable-ok')) continue;
           // Heuristic: skip lines that look like plain call sites (no `:` or
           // `{` ahead). A declaration always has a return-type annotation or
           // an opening brace within ~10 lines.
@@ -871,6 +891,7 @@ const CHECKS: Check[] = [
       lines.forEach((l, i) => { if (routeRe.test(l)) routeIdx.push(i); });
       for (let k = 0; k < routeIdx.length; k++) {
         const start = routeIdx[k];
+        if (hasHatch(lines, start, '// activity-ok')) continue;
         const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
         const windowEnd = Math.min(nextStart, start + 60);
         const window = lines.slice(start, windowEnd).join('\n');
@@ -939,16 +960,19 @@ const CHECKS: Check[] = [
           const body = content.slice(bodyOpen, i + 1);
           if (!body.includes('broadcastToWorkspace(')) continue;
           // Report each broadcastToWorkspace line inside this body.
+          const fileLines = content.split('\n');
           const bodyStartLine = content.slice(0, bodyOpen).split('\n').length;
           const bodyLines = body.split('\n');
           bodyLines.forEach((bl, idx) => {
-            if (bl.includes('broadcastToWorkspace(')) {
-              hits.push({
-                file,
-                line: bodyStartLine + idx,
-                text: bl.trim(),
-              });
-            }
+            if (!bl.includes('broadcastToWorkspace(')) return;
+            const absLine = bodyStartLine + idx; // 1-indexed file line number
+            // hasHatch takes 0-indexed; fileLines[absLine - 1] is the match line.
+            if (hasHatch(fileLines, absLine - 1, '// bridge-broadcast-ok')) return;
+            hits.push({
+              file,
+              line: absLine,
+              text: bl.trim(),
+            });
           });
         }
       }
@@ -993,10 +1017,10 @@ const CHECKS: Check[] = [
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!/\buseEffect\s*\(/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// effect-layout-ok')) continue;
           const window = lines.slice(i + 1, Math.min(lines.length, i + 21));
           const hasLayoutSet = window.some(l => layoutSetterRe.test(l));
           if (!hasLayoutSet) continue;
-          if (lines[i].includes('// effect-layout-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }
