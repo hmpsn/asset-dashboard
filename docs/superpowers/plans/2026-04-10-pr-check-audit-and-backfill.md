@@ -24,9 +24,9 @@ PR A: Rule authoring + nightly scan
   └── Task A2: Add nightly full-scan GitHub Action
   └── Task A3: Write docs/rules/pr-check-rule-authoring.md
   └── Task A4: Add data/roadmap.json follow-up entry
-  ──▶ [merge PR A to staging] ──▶ [verify staging CI green] ──▶ [merge staging → main]
+  ──▶ [merge PR A to staging] ──▶ [verify staging CI green] ──▶ [STOP — do not touch main]
 
-PR B: Mechanical backfill (depends on PR A merged to main)
+PR B: Mechanical backfill (depends on PR A merged to staging + staging CI green)
   └── Task B1: Fix violet/indigo color violations (24 matches)
   └── Task B2: Fix hardcoded "hmpsn.studio" strings (6 matches)
   └── Task B3: Fix bare JSON.parse on disk files (5 real + 51 false positives — refine rule exclusions)
@@ -35,15 +35,17 @@ PR B: Mechanical backfill (depends on PR A merged to main)
   └── Task B6: Fix untyped dynamic imports (44 matches)
   └── Task B7: Fix unguarded recordAction calls (8 matches)
   └── Task B8: Upgrade PR A rules warn → error
-  ──▶ [merge PR B to staging] ──▶ [verify staging CI green] ──▶ [merge staging → main]
+  ──▶ [merge PR B to staging] ──▶ [verify staging CI green] ──▶ [STOP — do not touch main]
 
-PR C: CLAUDE.md split (depends on PR B merged to main)
+PR C: CLAUDE.md split (depends on PR B merged to staging + staging CI green)
   └── Task C1: Add rule-metadata generator script
   └── Task C2: Split CLAUDE.md → CLAUDE.md + docs/rules/automated-rules.md
-  ──▶ [merge PR C to staging] ──▶ [verify staging CI green] ──▶ [merge staging → main]
+  ──▶ [merge PR C to staging] ──▶ [verify staging CI green] ──▶ [release: cut ONE staging → main PR carrying brand engine + all 3 audit PRs]
 ```
 
-**Critical path:** PR A → PR B → PR C. These are **strictly sequential** to staging. Do not open PR B until PR A is merged to `main` (not just `staging`). PR A establishes new rule definitions that PR B's backfill diff references; if PR B lands first, the backfill commits touch files with no justification.
+**Critical path:** PR A → PR B → PR C. These are **strictly sequential** to `staging`. Do not open PR B until PR A is merged to `staging` **and** staging CI is green. PR A establishes new rule definitions that PR B's backfill diff references; if PR B lands first, the backfill commits touch files with no justification.
+
+**None of these PRs merge to `main` directly.** The brand engine work (PR #162) is currently staging-only by design — `main` only gets updated when the full release (brand engine + audit fixes) is verified together. Once all three audit PRs are merged to staging and verified, a single `staging → main` release PR carries everything to production.
 
 **Parallelism within PR B:** Tasks B1–B7 are independent (disjoint file sets, different check targets) and can be executed in parallel subagent dispatches once the rules are stable in PR A.
 
@@ -96,7 +98,7 @@ Every parallel task in PR B declares exactly which files it owns. A subagent dis
 **Diff review checkpoint:** after every parallel batch in PR B (after B1–B7 complete), run:
 
 ```bash
-git diff --stat origin/main...HEAD        # confirm file ownership was respected
+git diff --stat origin/staging...HEAD     # confirm file ownership was respected
 npx tsx scripts/pr-check.ts --all          # count must drop to zero for that category
 npm run typecheck                          # no regressions
 npx vitest run                             # full suite green
@@ -433,7 +435,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: staging  # staging is the release candidate branch; main is strictly
+                        # a lagging copy updated only on explicit releases. Scanning
+                        # staging catches regressions in the release candidate before
+                        # they ship; scanning main would miss everything in-flight.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -621,17 +626,18 @@ EOF
 ```
 
 - [ ] **Step 3: After staging CI green, merge to staging**
-- [ ] **Step 4: After staging verification, merge staging → main**
+- [ ] **Step 4: Verify staging deploy (asset-dashboard-staging.onrender.com) is healthy**
+- [ ] **Step 5: STOP. Do not touch main. Do not cut a staging → main release.**
 
-**PR A done.** Wait for main before starting PR B.
+**PR A done.** Wait for staging CI green + staging deploy verification before starting PR B. Main will only receive the final bundled release after PR C merges to staging.
 
 ---
 
 ## PR B — Mechanical Backfill
 
-**Precondition:** PR A is merged to `main`. The 11 new rules exist and are surfaced as warnings.
+**Precondition:** PR A is merged to `staging` and staging CI is green. The 11 new rules exist on staging and are surfaced as warnings. **Do not wait for main** — the brand engine release is staging-only by design until the full audit lands.
 
-**Branch:** `chore/pr-check-backfill` (branch from `origin/main` after PR A merges).
+**Branch:** `chore/pr-check-backfill` (branch from `origin/staging` after PR A merges).
 
 **Dispatch model:** tasks B1–B7 can be dispatched in parallel as subagents. Each owns its file set exclusively (see File Ownership section above). After all 7 complete, review diffs for overlap, run full suite, then sequentially commit B8.
 
@@ -1313,17 +1319,18 @@ EOF
 ```
 
 - [ ] **Step 3: After staging CI green, merge to staging**
-- [ ] **Step 4: After staging verification, merge staging → main**
+- [ ] **Step 4: Verify staging deploy (asset-dashboard-staging.onrender.com) is healthy — spot-check admin chat, brandscript tab, voice calibration tab; ensure no color regressions from B1**
+- [ ] **Step 5: STOP. Do not touch main.**
 
-**PR B done.** Wait for main before starting PR C.
+**PR B done.** Wait for staging verification before starting PR C. Main still does not get updated yet.
 
 ---
 
 ## PR C — CLAUDE.md Split
 
-**Precondition:** PR B is merged to `main`.
+**Precondition:** PR B is merged to `staging` and staging CI is green. **Do not wait for main** — see note in PR B precondition.
 
-**Branch:** `chore/claude-md-split` (branch from `origin/main` after PR B merges).
+**Branch:** `chore/claude-md-split` (branch from `origin/staging` after PR B merges).
 
 ### Task C1: Add rule-metadata generator script
 
@@ -1604,7 +1611,10 @@ EOF
 ```
 
 - [ ] **Step 3: After staging CI green, merge to staging**
-- [ ] **Step 4: After staging verification, merge staging → main**
+- [ ] **Step 4: Verify staging deploy end-to-end — brand engine full flow (brandscript creation, voice calibration, deliverables), admin chat, color regression spot-check**
+- [ ] **Step 5: Hand off to the user for the final `staging → main` release decision.**
+
+Do NOT cut the release PR autonomously. The user decides when the full bundle (PR #162 brand engine + PR A + PR B + PR C audit work) is ready to ship to production. When they give the go-ahead, a single PR from `staging` to `main` carries everything in one release.
 
 **Plan complete.**
 
