@@ -114,21 +114,44 @@ type Check = {
 
 // ─── Helpers used by customCheck rules ────────────────────────────────────────
 
-// Conservative allowlist of workspace-scoped tables. A dynamic scan of
-// migrations would be more accurate but this is the list the plan instructs us
-// to hard-code as a starting point — it can be made dynamic later.
-const WORKSPACE_SCOPED_TABLES = new Set([
-  'voice_profiles',
-  'discovery_sources',
-  'discovery_extractions',
-  'brand_identity_deliverables',
-  'brandscripts',
-  'workspaces',
-  'insights',
-  'content_items',
-  'tasks',
-  'approvals',
-]);
+// Dynamically build the set of workspace-scoped tables by scanning migration
+// SQL files. A table is considered workspace-scoped if its CREATE TABLE block
+// contains a `workspace_id` column (i.e. the column appears inside the DDL
+// parentheses, not just in an index or a later DML statement).
+// This is more accurate than a hard-coded list and auto-updates as new tables
+// are added via migrations.
+function buildWorkspaceScopedTables(): Set<string> {
+  const migrationsDir = path.join(ROOT, 'server/db/migrations');
+  const files = getFiles(migrationsDir, '*.sql');
+  const tables = new Set<string>();
+  const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(/i;
+
+  for (const file of files) {
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const m = lines[i].match(tableRe);
+      if (!m) { i++; continue; }
+      const tableName = m[1];
+      // Walk the block using paren depth to find the closing );
+      let depth = 0;
+      let hasWorkspaceId = false;
+      for (let j = i; j < lines.length; j++) {
+        const line = lines[j];
+        depth += (line.match(/\(/g) ?? []).length;
+        depth -= (line.match(/\)/g) ?? []).length;
+        if (/\bworkspace_id\b/i.test(line)) hasWorkspaceId = true;
+        if (depth <= 0) { i = j + 1; break; }
+      }
+      if (hasWorkspaceId) tables.add(tableName);
+    }
+  }
+  return tables;
+}
+
+const WORKSPACE_SCOPED_TABLES = buildWorkspaceScopedTables();
 
 function readFileOrEmpty(file: string): string {
   try { return readFileSync(file, 'utf-8'); } catch { return ''; }
