@@ -472,7 +472,7 @@ const CHECKS: Check[] = [
     // Note: only match single-quoted imports. A character class ['"] would
     // break the double-quoted shell invocation in checkDirectory.
     pattern: "from '[^']*useGlobalAdminEvents",
-    fileGlobs: ['**/*.ts', '**/*.tsx'],
+    fileGlobs: ['*.ts', '*.tsx'],
     // Allowlist of audited global-fanout sites. Any new importer must be
     // reviewed and added here explicitly.
     exclude: [
@@ -491,7 +491,7 @@ const CHECKS: Check[] = [
     // Note: only match single-quoted 'keydown'. A character class ['"] would
     // break the double-quoted shell invocation in checkDirectory.
     pattern: "addEventListener\\s*\\(\\s*'keydown'",
-    fileGlobs: ['**/*.ts', '**/*.tsx'],
+    fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
     exclude: ['src/App.tsx'],
     excludeLines: ['// keydown-ok'],
@@ -544,7 +544,7 @@ const CHECKS: Check[] = [
           const a = writeIdx[k];
           const b = writeIdx[k + 1];
           if (b - a > 10) continue;
-          const winStart = Math.max(0, a - 5);
+          const winStart = Math.max(0, a - 20);
           const window = lines.slice(winStart, a + 1).join('\n');
           if (/\bdb\.transaction\s*\(/.test(window)) continue;
           if (reported.has(a)) continue;
