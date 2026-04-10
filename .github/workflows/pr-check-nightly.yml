@@ -27,7 +27,7 @@ jobs:
           npx tsx scripts/pr-check.ts --all 2>&1 | tee pr-check-full-scan.txt
       - name: Upload scan output on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pr-check-full-scan
           path: pr-check-full-scan.txt

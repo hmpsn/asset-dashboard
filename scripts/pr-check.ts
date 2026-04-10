@@ -144,13 +144,18 @@ function buildWorkspaceScopedTables(): Set<string> {
       // Walk the block using paren depth to find the closing );
       let depth = 0;
       let hasWorkspaceId = false;
+      let nextI = lines.length; // guarantee forward progress even if the block never closes
+      let sawOpen = false;
       for (let j = i; j < lines.length; j++) {
         const line = lines[j];
-        depth += (line.match(/\(/g) ?? []).length;
-        depth -= (line.match(/\)/g) ?? []).length;
+        const opens = (line.match(/\(/g) ?? []).length;
+        const closes = (line.match(/\)/g) ?? []).length;
+        depth += opens - closes;
+        if (opens > 0) sawOpen = true;
         if (/\bworkspace_id\b/i.test(line)) hasWorkspaceId = true;
-        if (depth <= 0) { i = j + 1; break; }
+        if (sawOpen && depth <= 0) { nextI = j + 1; break; }
       }
+      i = nextI;
       if (hasWorkspaceId) tables.add(tableName);
     }
   }
@@ -676,7 +681,7 @@ const CHECKS: Check[] = [
   },
   {
     name: 'getOrCreate* function returns nullable',
-    pattern: 'function\\s+getOrCreate\\w+[^{\\n]*:\\s*[^{\\n]*\\|\\s*null',
+    pattern: 'function\\s+getOrCreate\\w+[^{]*:[^{]*\\|\\s*null',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     excludeLines: ['// getorcreate-nullable-ok'],
