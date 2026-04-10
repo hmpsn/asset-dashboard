@@ -50,7 +50,7 @@ export const discovery = {
 
 export const voice = {
   getProfile: (wsId: string) => get<VoiceProfile & { samples: VoiceSample[] }>(`/api/voice/${wsId}`),
-  updateProfile: (wsId: string, body: Record<string, unknown>) => patch<VoiceProfile>(`/api/voice/${wsId}`, body),
+  updateProfile: (wsId: string, body: Partial<Pick<VoiceProfile, 'voiceDNA' | 'guardrails' | 'contextModifiers'>>) => patch<VoiceProfile>(`/api/voice/${wsId}`, body),
   addSample: (wsId: string, body: { content: string; contextTag?: string; source?: string }) =>
     post<VoiceSample>(`/api/voice/${wsId}/samples`, body),
   deleteSample: (wsId: string, sampleId: string) => del(`/api/voice/${wsId}/samples/${sampleId}`),

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { Mic, Plus, Trash2, Sparkles, Loader2, Save } from 'lucide-react';
@@ -12,7 +12,7 @@ import type {
   VoiceSampleContext,
 } from '../../../shared/types/brand-engine';
 import { PROMPT_TYPE_TO_SECTION_TYPE } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton } from '../ui';
+import { SectionCard, EmptyState, Skeleton, TabBar } from '../ui';
 import { useToast } from '../Toast';
 
 type VoiceSection = 'samples' | 'dna' | 'guardrails' | 'calibration';
@@ -49,6 +49,23 @@ const CONTEXT_TAG_COLORS: Record<VoiceSampleContext, string> = {
   service: 'bg-zinc-700 text-zinc-300',
   social: 'bg-zinc-700 text-zinc-300',
   seo: 'bg-zinc-700 text-zinc-300',
+};
+
+// ─── Module-level defaults ────────────────────────────────────────────────────
+
+const defaultDNA: VoiceDNA = {
+  personalityTraits: [],
+  toneSpectrum: { formal_casual: 5, serious_playful: 5, technical_accessible: 5 },
+  sentenceStyle: '',
+  vocabularyLevel: '',
+  humorStyle: '',
+};
+
+const defaultGuardrails: VoiceGuardrails = {
+  forbiddenWords: [],
+  requiredTerminology: [],
+  toneBoundaries: [],
+  antiPatterns: [],
 };
 
 // ─── Context Tag Badge ────────────────────────────────────────────────────────
@@ -241,16 +258,12 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
 
-  const defaultDNA: VoiceDNA = {
-    personalityTraits: [],
-    toneSpectrum: { formal_casual: 5, serious_playful: 5, technical_accessible: 5 },
-    sentenceStyle: '',
-    vocabularyLevel: '',
-    humorStyle: '',
-  };
-
   const [dna, setDna] = useState<VoiceDNA>(() => voiceDNA ?? defaultDNA);
   const [newTrait, setNewTrait] = useState('');
+
+  useEffect(() => {
+    if (voiceDNA) setDna(voiceDNA);
+  }, [voiceDNA]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -427,16 +440,16 @@ interface GuardrailsSectionProps {
   onChanged: () => void;
 }
 
+function addToList(list: string[], setList: (v: string[]) => void, val: string, clearFn: () => void) {
+  const trimmed = val.trim();
+  if (!trimmed || list.includes(trimmed)) return;
+  setList([...list, trimmed]);
+  clearFn();
+}
+
 function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSectionProps) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-
-  const defaultGuardrails: VoiceGuardrails = {
-    forbiddenWords: [],
-    requiredTerminology: [],
-    toneBoundaries: [],
-    antiPatterns: [],
-  };
 
   const [gr, setGr] = useState<VoiceGuardrails>(() => guardrails ?? defaultGuardrails);
   const [newForbidden, setNewForbidden] = useState('');
@@ -444,6 +457,10 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
   const [newTermInsteadOf, setNewTermInsteadOf] = useState('');
   const [newToneBoundary, setNewToneBoundary] = useState('');
   const [newAntiPattern, setNewAntiPattern] = useState('');
+
+  useEffect(() => {
+    if (guardrails) setGr(guardrails);
+  }, [guardrails]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -491,11 +508,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                const trimmed = newForbidden.trim();
-                if (trimmed && !gr.forbiddenWords.includes(trimmed)) {
-                  setGr(prev => ({ ...prev, forbiddenWords: [...prev.forbiddenWords, trimmed] }));
-                  setNewForbidden('');
-                }
+                addToList(gr.forbiddenWords, list => setGr(prev => ({ ...prev, forbiddenWords: list })), newForbidden, () => setNewForbidden(''));
               }
             }}
             placeholder="e.g. synergy, leverage"
@@ -503,13 +516,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           />
           <button
             type="button"
-            onClick={() => {
-              const trimmed = newForbidden.trim();
-              if (trimmed && !gr.forbiddenWords.includes(trimmed)) {
-                setGr(prev => ({ ...prev, forbiddenWords: [...prev.forbiddenWords, trimmed] }));
-                setNewForbidden('');
-              }
-            }}
+            onClick={() => addToList(gr.forbiddenWords, list => setGr(prev => ({ ...prev, forbiddenWords: list })), newForbidden, () => setNewForbidden(''))}
             disabled={!newForbidden.trim()}
             className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
@@ -524,7 +531,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
         <h3 className="text-sm font-semibold text-zinc-200">Required Terminology</h3>
         <div className="space-y-2">
           {gr.requiredTerminology.map((term, i) => (
-            <div key={i} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+            <div key={`${term.use}::${term.insteadOf}`} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
               <span className="text-xs text-zinc-400 shrink-0">Use</span>
               <span className="text-sm text-teal-400 font-medium">{term.use}</span>
               <span className="text-xs text-zinc-500 shrink-0">instead of</span>
@@ -614,11 +621,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                const trimmed = newToneBoundary.trim();
-                if (trimmed && !gr.toneBoundaries.includes(trimmed)) {
-                  setGr(prev => ({ ...prev, toneBoundaries: [...prev.toneBoundaries, trimmed] }));
-                  setNewToneBoundary('');
-                }
+                addToList(gr.toneBoundaries, list => setGr(prev => ({ ...prev, toneBoundaries: list })), newToneBoundary, () => setNewToneBoundary(''));
               }
             }}
             placeholder="e.g. Never condescending"
@@ -626,13 +629,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           />
           <button
             type="button"
-            onClick={() => {
-              const trimmed = newToneBoundary.trim();
-              if (trimmed && !gr.toneBoundaries.includes(trimmed)) {
-                setGr(prev => ({ ...prev, toneBoundaries: [...prev.toneBoundaries, trimmed] }));
-                setNewToneBoundary('');
-              }
-            }}
+            onClick={() => addToList(gr.toneBoundaries, list => setGr(prev => ({ ...prev, toneBoundaries: list })), newToneBoundary, () => setNewToneBoundary(''))}
             disabled={!newToneBoundary.trim()}
             className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
@@ -673,11 +670,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                const trimmed = newAntiPattern.trim();
-                if (trimmed && !gr.antiPatterns.includes(trimmed)) {
-                  setGr(prev => ({ ...prev, antiPatterns: [...prev.antiPatterns, trimmed] }));
-                  setNewAntiPattern('');
-                }
+                addToList(gr.antiPatterns, list => setGr(prev => ({ ...prev, antiPatterns: list })), newAntiPattern, () => setNewAntiPattern(''));
               }
             }}
             placeholder="e.g. Starting every sentence with 'We'"
@@ -685,13 +678,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           />
           <button
             type="button"
-            onClick={() => {
-              const trimmed = newAntiPattern.trim();
-              if (trimmed && !gr.antiPatterns.includes(trimmed)) {
-                setGr(prev => ({ ...prev, antiPatterns: [...prev.antiPatterns, trimmed] }));
-                setNewAntiPattern('');
-              }
-            }}
+            onClick={() => addToList(gr.antiPatterns, list => setGr(prev => ({ ...prev, antiPatterns: list })), newAntiPattern, () => setNewAntiPattern(''))}
             disabled={!newAntiPattern.trim()}
             className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
@@ -725,7 +712,6 @@ interface CalibrationSectionProps {
 
 function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionProps) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [promptType, setPromptType] = useState(PROMPT_TYPE_OPTIONS[0]);
   const [generating, setGenerating] = useState(false);
@@ -794,7 +780,6 @@ function CalibrationSection({ workspaceId, onSampleSaved }: CalibrationSectionPr
         source: 'calibration_loop',
       });
       toast('Saved as sample');
-      queryClient.invalidateQueries({ queryKey: ['admin-voice-profile', workspaceId] });
       onSampleSaved();
     } catch {
       toast('Failed to save sample', 'error');
@@ -1020,7 +1005,7 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
     queryClient.invalidateQueries({ queryKey: ['admin-voice-profile', workspaceId] });
   };
 
-  const sections: { id: VoiceSection; label: string }[] = [
+  const sections: { id: string; label: string }[] = [
     { id: 'samples', label: 'Samples' },
     { id: 'dna', label: 'Voice DNA' },
     { id: 'guardrails', label: 'Guardrails' },
@@ -1048,22 +1033,12 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
       titleIcon={<Mic className="w-4 h-4 text-teal-400" />}
     >
       {/* Section tabs */}
-      <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1 w-fit mb-5">
-        {sections.map(s => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setActiveSection(s.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              activeSection === s.id
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        tabs={sections}
+        active={activeSection}
+        onChange={id => setActiveSection(id as VoiceSection)}
+        className="mb-5"
+      />
 
       {/* Section content */}
       {activeSection === 'samples' && (
