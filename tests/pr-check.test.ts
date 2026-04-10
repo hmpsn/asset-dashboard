@@ -287,6 +287,28 @@ describe('Rule: AI call before db.prepare without transaction guard', () => {
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
+
+  // Regression test for the CANONICAL correct pattern from
+  // docs/rules/ai-dispatch-patterns.md: the transaction is HOISTED above the
+  // AI call because you cannot await inside db.transaction(). Before the
+  // backward-scan fix, this false-positived on every correct implementation.
+  it('does not flag when db.transaction() is hoisted above the AI call (canonical pattern)', () => {
+    const file = write(
+      uniqPath('rule-04', 'server/negative-hoisted.ts'),
+      lines(
+        "import db from './db.js';",
+        "import { callOpenAI } from './openai-helpers.js';",
+        "export async function run() {",
+        "  const doWork = db.transaction((result: string) => {",
+        "    db.prepare('INSERT INTO a VALUES (?)').run(result);",
+        "  });",
+        "  const out = await callOpenAI({ prompt: 'hi' });",
+        "  doWork(out);",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -579,8 +601,11 @@ describe('Rule: broadcastToWorkspace inside bridge callback', () => {
 
 // ════════════════════════════════════════════════════════════════════════════
 // Rule 11: Layout-driving state set in useEffect
-// File must NOT contain `const effective\w* =` — that's the documented
-// correct-pattern escape hatch, and the rule skips any file that has it.
+// The escape hatch is a PER-STATE `const effective<X> = ... <stateName>`
+// declaration that references the state the flagged setter controls. A file
+// that derives `effectiveFocusMode` from `focusMode` still flags an unrelated
+// `setSidebarOpen` inside a useEffect — the old file-wide escape was too
+// permissive and let real bugs slip through.
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('Rule: Layout-driving state set in useEffect', () => {
@@ -656,5 +681,75 @@ describe('Rule: Layout-driving state set in useEffect', () => {
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // Regression test for the per-state escape scoping. Before the fix, one
+  // `effectiveFocusMode` const in the file would suppress EVERY layout-
+  // setting useEffect in that file, including unrelated ones that set
+  // different state variables. After the fix, only the useEffect whose
+  // setter maps to the escaped state is suppressed.
+  it('still flags an unrelated setSidebarOpen useEffect even when effectiveFocusMode exists', () => {
+    const file = write(
+      uniqPath('rule-11', 'src/per-state-scope.tsx'),
+      lines(
+        "import { useEffect, useState } from 'react';",                    // 1
+        "export function Foo({ tab }: { tab: string }) {",                  // 2
+        "  const [focusMode, setFocusMode] = useState(false);",             // 3
+        "  const [sidebarOpen, setSidebarOpen] = useState(true);",          // 4
+        "  const effectiveFocusMode = focusMode && tab === 'rewrite';",     // 5
+        "  useEffect(() => {",                                              // 6  ← focusMode branch, escaped
+        "    if (tab !== 'rewrite') setFocusMode(false);",                  // 7
+        "  }, [tab]);",                                                     // 8
+        "  useEffect(() => {",                                              // 9  ← sidebarOpen branch, NOT escaped
+        "    if (tab === 'rewrite') setSidebarOpen(false);",                // 10
+        "  }, [tab]);",                                                     // 11
+        "  return <div>{effectiveFocusMode ? 'F' : 'N'}{sidebarOpen}</div>;", // 12
+        "}",                                                                // 13
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    // Only the sidebarOpen useEffect (line 9) should be flagged — the
+    // focusMode useEffect (line 6) is escaped by the per-state check.
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(9);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Meta-test: pinned customCheck rule names
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Every rule this harness exercises is looked up by exact name string. A
+// silent rename in scripts/pr-check.ts would leave the test throwing
+// "Rule not found" but — more worryingly — would let new customCheck rules
+// ship with ZERO harness coverage. This meta-test pins the full set of
+// customCheck rule names so a reviewer of a new rule has to consciously
+// decide whether it needs a harness entry.
+//
+// Adding a customCheck rule? Add it to EXPECTED_CUSTOM_CHECK_RULES below AND
+// write trigger/hatch-inline/hatch-above/negative tests for it.
+// Removing a customCheck rule? Delete its describe block AND its entry here.
+describe('Meta: customCheck rule name registry', () => {
+  const EXPECTED_CUSTOM_CHECK_RULES = [
+    'Global keydown missing isContentEditable guard',
+    'Multi-step DB writes outside db.transaction()',
+    'AI call before db.prepare without transaction guard',
+    'UPDATE/DELETE missing workspace_id scope',
+    'getOrCreate* function returns nullable',
+    'Public-portal mutation without addActivity',
+    'broadcastToWorkspace inside bridge callback',
+    'Layout-driving state set in useEffect',
+  ].sort();
+
+  it('the set of customCheck rule names matches the harness exactly', () => {
+    const actual = CHECKS
+      .filter((c) => typeof c.customCheck === 'function')
+      .map((c) => c.name)
+      .sort();
+    // A mismatch means either: (a) a new customCheck rule was added to
+    // scripts/pr-check.ts without a harness entry, or (b) an existing rule
+    // was renamed/deleted without updating this registry. Both are
+    // regressions — the fix is to update both sides in the same commit.
+    expect(actual).toEqual(EXPECTED_CUSTOM_CHECK_RULES);
   });
 });

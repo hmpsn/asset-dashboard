@@ -10,7 +10,7 @@
 - **PR B — Mechanical backfill (1 PR, ~6 commits)** — walks the full-scan violation backlog category by category, cleaning each to zero. Color violations, studio-name hardcodes, source-sniffing tests, vacuous `.every()` tests, unguarded `recordAction`, untyped dynamic imports, bare JSON.parse on disk files. One commit per category; final commit upgrades the PR A rules from `warn` → `error` now that the codebase is clean.
 - **PR C — CLAUDE.md split (1 PR, 2 commits)** — splits `CLAUDE.md` into `CLAUDE.md` (philosophical, decision-framework, session protocol) + `docs/rules/automated-rules.md` (generated from `scripts/pr-check.ts` metadata — human-readable table of every enforced rule with its severity, file scope, and escape hatch). Adds a generator script so the table stays in sync.
 
-**Tech Stack:** TypeScript, Node 20, `tsx`, `scripts/pr-check.ts` (existing), GitHub Actions (existing `.github/workflows/`), better-sqlite3 (for grep scope — many new rules scan `server/`).
+**Tech Stack:** TypeScript, Node 24, `tsx`, `scripts/pr-check.ts` (existing), GitHub Actions (existing `.github/workflows/`), better-sqlite3 (for grep scope — many new rules scan `server/`).
 
 **Why this plan, not just "fix the bugs":** The last 6 brand-engine review rounds surfaced ~30 bug classes. ~8 were one-offs. The other ~22 are recurring patterns already documented in `CLAUDE.md` but invisible to pr-check. Every fix lands a new CLAUDE.md rule but no pr-check rule, so the next contributor repeats the bug. This plan closes the loop: every CLAUDE.md rule that can be mechanically checked becomes a pr-check rule, and the backlog of pre-existing violations hiding behind the diff-only scan is exhumed and fixed in one sustained pass.
 
@@ -439,15 +439,15 @@ jobs:
   full-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging  # staging is the release candidate branch; main is strictly
                         # a lagging copy updated only on explicit releases. Scanning
                         # staging catches regressions in the release candidate before
                         # they ship; scanning main would miss everything in-flight.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - run: npm ci
       - name: Run pr-check --all
@@ -457,7 +457,7 @@ jobs:
           npx tsx scripts/pr-check.ts --all 2>&1 | tee pr-check-full-scan.txt
       - name: Upload scan output on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pr-check-full-scan
           path: pr-check-full-scan.txt

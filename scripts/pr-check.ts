@@ -21,8 +21,9 @@
  */
 
 import { execSync, execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, realpathSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
@@ -83,10 +84,94 @@ function getChangedFiles(): string[] {
   }
 }
 
-const changedFiles = SCAN_ALL ? [] : getChangedFiles();
-const mode = SCAN_ALL ? 'full scan' : changedFiles.length > 0
-  ? `${changedFiles.length} changed file(s)`
-  : 'full scan (no diff detected)';
+// Lazy-memoised so that `import { CHECKS }` from the test harness does NOT
+// spawn a `git diff` subprocess at module-load time. Only `runCli()` (and any
+// future runner) reads `cachedChangedFiles()`; customCheck closures inside the
+// CHECKS array never reference changedFiles directly.
+let _changedFilesCache: string[] | null = null;
+function cachedChangedFiles(): string[] {
+  if (_changedFilesCache !== null) return _changedFilesCache;
+  _changedFilesCache = SCAN_ALL ? [] : getChangedFiles();
+  return _changedFilesCache;
+}
+
+// ─── Shared regexes ───────────────────────────────────────────────────────────
+
+/**
+ * Matches the *opener* of a function declaration or arrow function. Used by
+ * customCheck rules that need to determine whether two lines live inside the
+ * same function body. Must NOT be used for closing braces (`}`, `};`, `})`):
+ * those are ambiguous (they also close if/for/try/switch blocks) and produce
+ * false-negatives on legitimate violations. Any two statements separated by a
+ * real function boundary are also separated by the opener of the next
+ * function; the opener alone is always sufficient.
+ */
+const FUNC_BOUNDARY_RE =
+  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>)/;
+
+// ─── Rule window sizes ────────────────────────────────────────────────────────
+//
+// Every customCheck rule that scans a sliding window over file lines picks a
+// window size that balances false-negatives (too small, legitimate bugs
+// outside the window are missed) against false-positives + cost (too large,
+// unrelated code bleeds in and the scan gets slow). Collecting these as
+// named constants makes the tradeoffs reviewable in one place and lets the
+// rule bodies read as intent, not magic numbers. Changes to these values
+// directly affect rule sensitivity and MUST be re-tested via
+// `tests/pr-check.test.ts` before merging.
+
+/** Max lines to walk forward from a `window.addEventListener('keydown', ...)`
+ *  call looking for the end of the handler body. Enough for long inline
+ *  arrow bodies; small enough to stop at the next top-level declaration. */
+const KEYDOWN_BODY_LOOKAHEAD = 60;
+
+/** Max distance (in lines) between two `db.prepare().run()` calls for them
+ *  to be considered a *pair* in the multi-step txn rule. Function-opener
+ *  walkback already prevents cross-function pairing — this is a
+ *  belt-and-suspenders upper bound. */
+const TXN_PAIR_MAX_DISTANCE = 25;
+
+/** Max lines to scan on a single `db.prepare(` call line to accumulate its
+ *  full multi-line SQL body. Prepared statements rarely exceed 8 lines;
+ *  anything bigger is almost certainly a different construct. */
+const DB_PREPARE_MULTILINE_LOOKAHEAD = 8;
+
+/** How far *back* from a flagged write we search for an already-open
+ *  `db.transaction(` wrapper (multi-step txn rule). */
+const TXN_WRAPPER_LOOKBEHIND = 20;
+
+/** How far *forward* from a `callOpenAI`/`callClaude` call we scan for a
+ *  following `db.prepare()` write (AI-race rule). 30 lines covers the
+ *  typical "await AI → transform → write" pattern. */
+const AI_RACE_FORWARD_LOOKAHEAD = 30;
+
+/** How far *back* from an AI call we scan for a hoisted `db.transaction(`
+ *  declaration. The canonical correct pattern in
+ *  `docs/rules/ai-dispatch-patterns.md` hoists the txn above the await
+ *  because SQLite doesn't support async transactions. */
+const AI_RACE_BACKWARD_LOOKBEHIND = 20;
+
+/** Max lines to scan on a single `db.prepare(` call line to collect its
+ *  full SQL body for the ws-scope workspace_id check. Chosen higher than
+ *  `DB_PREPARE_MULTILINE_LOOKAHEAD` because some long UPDATEs span ~25
+ *  lines (multi-column updates with CASE expressions). */
+const WS_SCOPE_SQL_LOOKAHEAD = 25;
+
+/** Max lines to scan on a `function getOrCreate*` declaration to collect
+ *  its return-type annotation. Long generics + multi-line param lists
+ *  rarely push past 15. */
+const GETORCREATE_RETURN_TYPE_LOOKAHEAD = 15;
+
+/** Max lines to scan after a `router.post/put/patch/delete` call looking
+ *  for an `addActivity(` call before we flag the mutation as silent
+ *  (public-portal activity rule). Bounded to the next route declaration
+ *  so route bodies don't bleed into each other. */
+const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 60;
+
+/** Max lines to scan after a `useEffect(` call to brace-balance its body
+ *  for the layout-driving-state rule. Acts as a safety net if the brace
+ *  balancer never reaches zero (e.g. malformed input). */
+const USE_EFFECT_BODY_LOOKAHEAD = 60;
 
 // ─── Check definitions ────────────────────────────────────────────────────────
 
@@ -126,6 +211,12 @@ type Check = {
 // parentheses, not just in an index or a later DML statement).
 // This is more accurate than a hard-coded list and auto-updates as new tables
 // are added via migrations.
+//
+// TODO(pr-b): handle `ALTER TABLE <name> ADD COLUMN workspace_id ...`
+// migrations. A table created without workspace_id and later altered to add
+// one is currently invisible to the ws-scope rule. The backfill PR should
+// scan for `ALTER TABLE (\w+) ADD COLUMN[^;]*workspace_id` and union those
+// table names into `tables` before returning.
 function buildWorkspaceScopedTables(): Set<string> {
   const migrationsDir = path.join(ROOT, 'server/db/migrations');
   const files = getFiles(migrationsDir, '*.sql');
@@ -162,7 +253,16 @@ function buildWorkspaceScopedTables(): Set<string> {
   return tables;
 }
 
-const WORKSPACE_SCOPED_TABLES = buildWorkspaceScopedTables();
+// Lazy-memoised so that `import { CHECKS }` from the test harness doesn't
+// read every migration SQL file at module-load time. Consumers (the ws-scope
+// customCheck, runCli's diagnostic print) call workspaceScopedTables() which
+// builds the set on first access and caches it for the process lifetime.
+let _workspaceScopedTablesCache: Set<string> | null = null;
+function workspaceScopedTables(): Set<string> {
+  if (_workspaceScopedTablesCache !== null) return _workspaceScopedTablesCache;
+  _workspaceScopedTablesCache = buildWorkspaceScopedTables();
+  return _workspaceScopedTablesCache;
+}
 
 function readFileOrEmpty(file: string): string {
   try { return readFileSync(file, 'utf-8'); } catch { return ''; }
@@ -443,8 +543,13 @@ export const CHECKS: Check[] = [
     pattern: "SET\\s+(status|batch_status)\\s*=\\s*[?@]",
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    excludeLines: ['status-ok', 'validateTransition'],
-    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok if this is a non-state-machine column.',
+    // Accept both JS comment (`// status-ok`) and SQL comment (`-- status-ok`)
+    // forms since this rule fires on lines that are often inside backtick-SQL
+    // template literals where `//` would break the SQL. The comment prefix
+    // (`//` or `--`) is required so the hatch can't false-suppress via a bare
+    // `status-ok` substring inside an identifier, enum value, or string literal.
+    excludeLines: ['// status-ok', '-- status-ok', 'validateTransition'],
+    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) if this is a non-state-machine column.',
     severity: 'warn',
   },
   {
@@ -538,7 +643,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// global-events-ok'],
     message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it. Add // global-events-ok if this file is a legitimate global-fanout site.',
     severity: 'error',
-    rationale: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Only audited global-fanout sites may import it.',
+    rationale: 'Silent dead broadcast handlers: the frontend never receives the event and the UI appears stale until a manual refetch.',
     claudeMdRef: '#data-flow-rules-mandatory',
   },
   {
@@ -550,7 +655,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// keydown-ok'],
     message: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable. Use the pattern from src/App.tsx (check HTMLInputElement/HTMLTextAreaElement/HTMLSelectElement and isContentEditable). Add // keydown-ok if intentional.',
     severity: 'warn',
-    rationale: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable — otherwise Escape/Enter/arrows hijack typing.',
+    rationale: 'Escape/Enter/arrow keys hijack text fields, destroying the user\u2019s typing or closing modals from the wrong event.',
     claudeMdRef: '#uiux-rules-mandatory',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -571,7 +676,7 @@ export const CHECKS: Check[] = [
           // For the referenced form we fall back to a whole-file scan for
           // isContentEditable (low false-negative risk — the guard either
           // exists in the file or it doesn't).
-          const lookahead = lines.slice(i, Math.min(lines.length, i + 60)).join('\n');
+          const lookahead = lines.slice(i, Math.min(lines.length, i + KEYDOWN_BODY_LOOKAHEAD)).join('\n');
           const hasInlineBody = /=>\s*\{/.test(lookahead);
           let body: string;
           if (hasInlineBody) {
@@ -613,7 +718,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// txn-ok'],
     message: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption. Add // txn-ok on the first prepare line if the pair is intentionally non-atomic.',
     severity: 'warn',
-    rationale: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption.',
+    rationale: 'Partial failure leaves the DB in an inconsistent state; retries then hit PRIMARY KEY violations and permanently block the operation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -635,8 +740,8 @@ export const CHECKS: Check[] = [
           if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
           // Skip cache-style definitions: `  foo: db.prepare(...)` or
           // `const foo = db.prepare(...)` without an executing `.run(`.
-          const window = lines.slice(i, Math.min(lines.length, i + 8)).join('\n');
-          if (!/\.run\s*\(/.test(window)) continue;
+          const lookahead = lines.slice(i, Math.min(lines.length, i + DB_PREPARE_MULTILINE_LOOKAHEAD)).join('\n');
+          if (!/\.run\s*\(/.test(lookahead)) continue;
           // Skip stmts() cache definitions — these are always part of a
           // createStmtCache object literal where every value is a prepare.
           if (/:\s*db\.prepare/.test(lines[i])) continue;
@@ -645,30 +750,26 @@ export const CHECKS: Check[] = [
         }
         if (writeIdx.length < 2) continue;
         // A function boundary between two writes means they are in separate
-        // functions and are NOT a multi-step mutation. Detect by looking for
-        // a new function *opener* between the two write lines — any two writes
-        // separated by a boundary will also be separated by the opener of the
-        // second function. Do NOT match closing braces: `}`, `};`, `})` also
-        // close if/for/try blocks and would produce false-negative results on
-        // legitimate violations (e.g. a write, a try/catch, then another write
-        // inside the same function).
-        const funcBoundaryRe =
-          /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>)/;
+        // functions and are NOT a multi-step mutation. See FUNC_BOUNDARY_RE
+        // (module scope) for the rationale behind matching only openers.
         const reported = new Set<number>();
         for (let k = 0; k < writeIdx.length - 1; k++) {
           const a = writeIdx[k];
           const b = writeIdx[k + 1];
-          if (b - a > 10) continue;
+          // Belt-and-suspenders: the function-opener walkback below already
+          // prevents cross-function pairing, but a hard distance cap still
+          // bounds the worst-case window. See TXN_PAIR_MAX_DISTANCE.
+          if (b - a > TXN_PAIR_MAX_DISTANCE) continue;
           // Skip if a function boundary sits between the two writes — they
           // live in different scopes and a shared transaction is nonsensical.
           let boundaryBetween = false;
           for (let m = a + 1; m < b; m++) {
-            if (funcBoundaryRe.test(lines[m])) { boundaryBetween = true; break; }
+            if (FUNC_BOUNDARY_RE.test(lines[m])) { boundaryBetween = true; break; }
           }
           if (boundaryBetween) continue;
-          const winStart = Math.max(0, a - 20);
-          const window = lines.slice(winStart, a + 1).join('\n');
-          if (/\bdb\.transaction\s*\(/.test(window)) continue;
+          const winStart = Math.max(0, a - TXN_WRAPPER_LOOKBEHIND);
+          const lookbehind = lines.slice(winStart, a + 1).join('\n');
+          if (/\bdb\.transaction\s*\(/.test(lookbehind)) continue;
           if (reported.has(a)) continue;
           reported.add(a);
           hits.push({ file, line: a + 1, text: lines[a].trim() });
@@ -690,7 +791,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// ai-race-ok'],
     message: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put the existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE. Add // ai-race-ok if the handler is provably single-writer.',
     severity: 'warn',
-    rationale: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE.',
+    rationale: 'Two concurrent handlers both observe \u201cno existing row\u201d during the AI call and both INSERT, creating permanent duplicate rows on a logical natural key.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -704,11 +805,24 @@ export const CHECKS: Check[] = [
         for (let i = 0; i < lines.length; i++) {
           if (!aiRe.test(lines[i])) continue;
           if (hasHatch(lines, i, '// ai-race-ok')) continue;
-          const window = lines.slice(i + 1, i + 31);
-          const hasWrite = window.some(l => /\bdb\.prepare\s*\(/.test(l) || /\bstmts\s*\(\s*\)\./.test(l));
+          const lookahead = lines.slice(i + 1, i + 1 + AI_RACE_FORWARD_LOOKAHEAD);
+          const hasWrite = lookahead.some(l => /\bdb\.prepare\s*\(/.test(l) || /\bstmts\s*\(\s*\)\./.test(l));
           if (!hasWrite) continue;
-          const hasTxn = window.some(l => /\bdb\.transaction\s*\(/.test(l));
-          if (hasTxn) continue;
+          // Forward scan: txn declared AFTER the AI call (rare — requires an
+          // async txn, which SQLite doesn't support, so this is mostly a
+          // defensive check).
+          const hasTxnForward = lookahead.some(l => /\bdb\.transaction\s*\(/.test(l));
+          if (hasTxnForward) continue;
+          // Backward scan: the CANONICAL correct pattern hoists the txn above
+          // the AI call because you cannot `await` inside db.transaction():
+          //   const doWork = db.transaction(() => { existence-check + upsert });
+          //   const result = await callOpenAI(...);
+          //   doWork();
+          // Without this backward scan, the rule false-positives on every
+          // correct implementation of the ai-dispatch-patterns.md contract.
+          const before = lines.slice(Math.max(0, i - AI_RACE_BACKWARD_LOOKBEHIND), i);
+          const hasTxnBackward = before.some(l => /\bdb\.transaction\s*\(/.test(l));
+          if (hasTxnBackward) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }
@@ -724,7 +838,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// ws-scope-ok'],
     message: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests. Add // ws-scope-ok if the row key is already workspace-unique.',
     severity: 'warn',
-    rationale: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests.',
+    rationale: 'Cross-tenant read or write exposure: a forged row id or misrouted request can touch another workspace\u2019s data if the auth layer is ever compromised.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -737,9 +851,16 @@ export const CHECKS: Check[] = [
         for (let i = 0; i < lines.length; i++) {
           if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
           if (hasHatch(lines, i, '// ws-scope-ok')) continue;
-          // Grab the next ~25 lines to reconstruct the SQL string; stop at the
-          // first line that closes the call with ).
-          const chunk = lines.slice(i, Math.min(lines.length, i + 25)).join('\n');
+          // Grab the next WS_SCOPE_SQL_LOOKAHEAD lines to reconstruct the SQL
+          // string; stop at the first line that closes the call with ).
+          const chunk = lines.slice(i, Math.min(lines.length, i + WS_SCOPE_SQL_LOOKAHEAD)).join('\n');
+          // TODO(pr-b): use a proper tokenizer instead of `indexOf(');')`.
+          // The current scan truncates at the first `);` literal it sees,
+          // which is wrong when that sequence appears *inside* a SQL string
+          // literal (e.g. a CHECK (col IN ('a');b) constraint or a comment
+          // with `);`). No known false-positives today, but the next new
+          // complex UPDATE with a parenthesized sub-expression could
+          // silently drop half the statement and skip the workspace_id scan.
           const closeIdx = chunk.indexOf(');');
           const sqlBlob = closeIdx >= 0 ? chunk.slice(0, closeIdx) : chunk;
           // Normalise whitespace so regex patterns can match across newlines
@@ -761,7 +882,7 @@ export const CHECKS: Check[] = [
             tableName = tm?.[1] ?? null;
           }
           if (!tableName) continue;
-          if (!WORKSPACE_SCOPED_TABLES.has(tableName)) continue;
+          if (!workspaceScopedTables().has(tableName)) continue;
           if (/workspace_id/i.test(stmt)) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
@@ -781,7 +902,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// getorcreate-nullable-ok'],
     message: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null — callers would write dead guard branches. If it can genuinely fail, throw instead. Add // getorcreate-nullable-ok only if you have renamed the function and the "getOrCreate" name is misleading.',
     severity: 'error',
-    rationale: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null or callers write dead guard branches.',
+    rationale: 'Dead `if (!result)` guard branches lie to reviewers about the function\u2019s real shape and hide downstream assumptions that would fail on a genuine null.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -806,7 +927,7 @@ export const CHECKS: Check[] = [
           // Heuristic: skip lines that look like plain call sites (no `:` or
           // `{` ahead). A declaration always has a return-type annotation or
           // an opening brace within ~10 lines.
-          const joined = lines.slice(i, Math.min(lines.length, i + 15)).join('\n');
+          const joined = lines.slice(i, Math.min(lines.length, i + GETORCREATE_RETURN_TYPE_LOOKAHEAD)).join('\n');
           // Walk forward past the matching `)` that closes the parameter list
           // so object-typed params containing `{` don't fool us. Find the
           // first `(` on the line, then brace-walk.
@@ -846,7 +967,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// record-unknown-ok'],
     message: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern. See InsightDataMap for the discriminated-union pattern. Add // record-unknown-ok only for grandfathered escape-hatch fields (e.g. AnalyticsInsight.data).',
     severity: 'error',
-    rationale: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern.',
+    rationale: 'Producer/consumer drift: field renames and semantic changes compile silently until a runtime bug surfaces in production.',
     claudeMdRef: '#data-flow-rules-mandatory',
   },
   {
@@ -862,7 +983,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// patch-spread-ok'],
     message: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects. Add // patch-spread-ok if no nested objects exist.',
     severity: 'warn',
-    rationale: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects.',
+    rationale: 'Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn\u2019t mention.',
     claudeMdRef: '#code-conventions',
   },
   {
@@ -873,7 +994,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// activity-ok'],
     message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed. Add // activity-ok on the router line if this endpoint is intentionally silent (e.g. read-only health probe).',
     severity: 'warn',
-    rationale: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement.',
+    rationale: 'Admins lose visibility into client portal engagement \u2014 writes performed by clients leave no trace in the activity feed.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -893,9 +1014,9 @@ export const CHECKS: Check[] = [
         const start = routeIdx[k];
         if (hasHatch(lines, start, '// activity-ok')) continue;
         const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
-        const windowEnd = Math.min(nextStart, start + 60);
-        const window = lines.slice(start, windowEnd).join('\n');
-        if (/\baddActivity\s*\(/.test(window)) continue;
+        const routeBodyEnd = Math.min(nextStart, start + PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD);
+        const routeBody = lines.slice(start, routeBodyEnd).join('\n');
+        if (/\baddActivity\s*\(/.test(routeBody)) continue;
         hits.push({ file: target, line: start + 1, text: lines[start].trim() });
       }
       return hits;
@@ -916,7 +1037,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// bridge-broadcast-ok'],
     message: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires. Add // bridge-broadcast-ok if the broadcast is genuinely separate from the bridge result.',
     severity: 'warn',
-    rationale: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires.',
+    rationale: 'Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -987,7 +1108,7 @@ export const CHECKS: Check[] = [
     excludeLines: ['// effect-layout-ok'],
     message: 'Layout-driving state must be derived synchronously in the render body (const effective = state && syncCondition). useEffect runs after paint, causing a one-frame layout flash. Add // effect-layout-ok if the state is genuinely post-paint.',
     severity: 'warn',
-    rationale: 'Layout-driving state must be derived synchronously in the render body. useEffect runs after paint, causing a one-frame layout flash.',
+    rationale: 'One-frame layout flash: the browser paints with stale layout state, then the effect runs and re-lays-out, producing visible jitter.',
     claudeMdRef: '#uiux-rules-mandatory',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
@@ -1009,18 +1130,58 @@ export const CHECKS: Check[] = [
         if (!file.endsWith('.tsx')) continue;
         const content = readFileOrEmpty(file);
         if (!content || !content.includes('useEffect')) continue;
-        // Escape: file derives an `effective*` from state synchronously.
-        // This is the canonical correct pattern (see src/App.tsx
-        // effectiveFocusMode). Don't flag any useEffect in a file that
-        // already does this — it's the documented cleanup-effect half.
-        if (/\bconst\s+effective\w*\s*=/.test(content)) continue;
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!/\buseEffect\s*\(/.test(lines[i])) continue;
           if (hasHatch(lines, i, '// effect-layout-ok')) continue;
-          const window = lines.slice(i + 1, Math.min(lines.length, i + 21));
-          const hasLayoutSet = window.some(l => layoutSetterRe.test(l));
-          if (!hasLayoutSet) continue;
+          // Brace-balance the callback body so we don't bleed into an
+          // adjacent useEffect (small components often stack multiple
+          // useEffects within a few lines of each other). We start
+          // counting from the first `{` on or after the useEffect line and
+          // stop when the balance returns to 0. This is not lexer-perfect
+          // (ignores strings/comments) but is good enough for the 99% case
+          // and is bounded by MAX_LOOKAHEAD as a safety net.
+          let bodyStart = -1;
+          let bodyEnd = -1;
+          let depth = 0;
+          let started = false;
+          for (let j = i; j < Math.min(lines.length, i + USE_EFFECT_BODY_LOOKAHEAD); j++) {
+            for (const ch of lines[j]) {
+              if (ch === '{') { depth++; started = true; if (bodyStart === -1) bodyStart = j; }
+              else if (ch === '}') { depth--; }
+            }
+            if (started && depth <= 0) { bodyEnd = j; break; }
+          }
+          if (bodyStart === -1 || bodyEnd === -1) continue;
+          const effectBody = lines.slice(bodyStart, bodyEnd + 1);
+          // Collect every layout-setter called inside this useEffect body
+          // (not just "any match" — we need to know *which* states are set
+          // so the per-state escape check works).
+          const setterNames: string[] = [];
+          for (const l of effectBody) {
+            const m = l.match(/\bset([A-Z]\w*)\s*\(/);
+            if (m && layoutSetterRe.test(l)) setterNames.push(m[1]);
+          }
+          if (setterNames.length === 0) continue;
+          // Per-state escape: the CLAUDE.md rule says "derive it as
+          //   const effective = state && syncCondition"
+          // and use `effective` in JSX. The effect may still run to clean up
+          // backing state. We escape ONLY if EVERY setter called in this
+          // useEffect body has a matching `const effective<X> = ... <state>`
+          // declaration somewhere in the file that references the state
+          // corresponding to that setter. A file-wide escape (one effective*
+          // suppressing every useEffect) was previously too permissive.
+          const allEscaped = setterNames.every((setterName) => {
+            const stateName = setterName[0].toLowerCase() + setterName.slice(1);
+            // `const effective<Anything> = <expression containing stateName>`
+            // Match up to the first `;` or newline so we don't accidentally
+            // span into an unrelated declaration.
+            const escapeRe = new RegExp(
+              `\\bconst\\s+effective\\w*\\s*=[^;\\n]*\\b${stateName}\\b`
+            );
+            return escapeRe.test(content);
+          });
+          if (allEscaped) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }
@@ -1090,6 +1251,14 @@ function runCli() {
 let errors = 0;
 let warnings = 0;
 
+// Resolve changed files ONCE here so all consumers in runCli() share the same
+// snapshot. The lazy cache prevents the import in tests/pr-check.test.ts from
+// spawning git subprocesses at module-load time.
+const changedFiles = cachedChangedFiles();
+const mode = SCAN_ALL ? 'full scan' : changedFiles.length > 0
+  ? `${changedFiles.length} changed file(s)`
+  : 'full scan (no diff detected)';
+
 console.log(`\n🔍 Running PR checks (${mode})...\n`);
 
 // Resolve the file list a check would scan (either the diff slice or a full
@@ -1134,9 +1303,24 @@ for (const check of CHECKS) {
   let matches: string[] = [];
 
   if (check.customCheck) {
-    const files = resolveCheckFileList(check);
-    const raw = check.customCheck(files);
-    matches = formatCustomMatches(check, raw);
+    // Guard against a rule whose customCheck throws at runtime (regex bug on
+    // weird input, unexpected file shape, OOM on a huge file). Without this,
+    // one bad rule kills the whole runner mid-loop and every subsequent rule
+    // is silently skipped — the exact silent-false-negative class this audit
+    // is trying to eliminate. On throw we log, count as an error, set
+    // exitCode, and continue so remaining rules still run.
+    try {
+      const files = resolveCheckFileList(check);
+      const raw = check.customCheck(files);
+      matches = formatCustomMatches(check, raw);
+    } catch (err) {
+      const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
+      console.error(`\n  ✗ ${check.name}`);
+      console.error(`    customCheck threw: ${msg}`);
+      errors++;
+      process.exitCode = 1;
+      continue;
+    }
   } else if (!check.pattern) {
     // Defensive: a check with neither a customCheck nor a pattern is
     // misconfigured. Falling through to grep -E "" would match every line
@@ -1601,7 +1785,30 @@ if (errors > 0) {
 } // end runCli()
 
 // Run the CLI only when this file is executed directly. When imported from
-// tests (vitest), process.argv[1] is the vitest entry and this is a no-op.
-if (process.argv[1] && path.basename(process.argv[1]) === 'pr-check.ts') {
+// tests (vitest), import.meta.url is the module URL and process.argv[1] is
+// the vitest entry — the comparison below is false and this is a no-op.
+//
+// We use the ESM main-module idiom (resolve both sides to the same shape via
+// fileURLToPath + realpathSync) rather than a basename string match, because
+// a string match on 'pr-check.ts' breaks silently under symlinks, compiled
+// .js output, npm-run wrappers, and any other script in the project that
+// happens to share the basename. A mismatch here silently no-ops the whole
+// runner and exits 0, which is the worst possible failure mode for CI.
+function isMainModule(): boolean {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    const modulePath = realpathSync(fileURLToPath(import.meta.url));
+    const entryPath = realpathSync(argv1);
+    return modulePath === entryPath;
+  } catch {
+    // realpathSync throws on missing files — fall back to the looser
+    // basename check rather than silently no-op, so a developer running
+    // `tsx scripts/pr-check.ts` from an unusual CWD still gets a run.
+    return path.basename(argv1) === 'pr-check.ts';
+  }
+}
+
+if (isMainModule()) {
   runCli();
 }

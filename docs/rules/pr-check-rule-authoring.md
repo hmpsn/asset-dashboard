@@ -98,7 +98,14 @@ excludeLines: ['// keydown-ok']
 
 A rule without a hatch is a rule that will be deleted within 3 months.
 
-### Hatch reference (2026-04-10 audit)
+### Hatch reference (hatches introduced in the 2026-04-10 audit)
+
+> This table lists the hatches added during the 2026-04-10 pr-check audit. It
+> is **not** exhaustive — older hatches (`// bwi-all-ok`, `// bip-ok`,
+> `// recordAction-ok`, `// every-ok`, `// ws-event-ok`, etc.) predate the audit
+> and live in `scripts/pr-check.ts` directly. Treat the full rule array in that
+> file as the source of truth; this table is a quick reference for the rules
+> the audit introduced.
 
 | Rule | Hatch | When to use |
 |------|-------|-------------|
