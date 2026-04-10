@@ -133,21 +133,32 @@ export function updateVoiceProfile(
   return { ...profile, ...updates, updatedAt: now };
 }
 
-// Takes workspaceId (not profile.id) — resolves profile internally
+// Takes workspaceId (not profile.id) — resolves profile internally.
+// getOrCreateVoiceProfile may INSERT a voice_profiles row, and we then INSERT
+// a voice_samples row. Wrapping the two writes in a single transaction means a
+// failed sample insert rolls back the just-created profile (no orphaned empty
+// profile left behind) and satisfies CLAUDE.md's multi-step-mutation rule.
 export function addVoiceSample(
   workspaceId: string, content: string,
   contextTag?: VoiceSampleContext, source?: VoiceSampleSource,
 ): VoiceSample {
-  const profile = getOrCreateVoiceProfile(workspaceId);
   const id = `vs_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
-  const sortOrder = profile.samples.length;
-  stmts().insertSample.run({
-    id, voice_profile_id: profile.id, content,
-    context_tag: contextTag ?? null, source: source ?? 'manual',
-    sort_order: sortOrder, created_at: now,
+  const effectiveSource = source ?? 'manual';
+
+  const doAdd = db.transaction((): { voiceProfileId: string; sortOrder: number } => {
+    const profile = getOrCreateVoiceProfile(workspaceId);
+    const sortOrder = profile.samples.length;
+    stmts().insertSample.run({
+      id, voice_profile_id: profile.id, content,
+      context_tag: contextTag ?? null, source: effectiveSource,
+      sort_order: sortOrder, created_at: now,
+    });
+    return { voiceProfileId: profile.id, sortOrder };
   });
-  return { id, voiceProfileId: profile.id, content, contextTag, source: source ?? 'manual', sortOrder, createdAt: now };
+
+  const { voiceProfileId, sortOrder } = doAdd();
+  return { id, voiceProfileId, content, contextTag, source: effectiveSource, sortOrder, createdAt: now };
 }
 
 export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {
@@ -212,7 +223,7 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
   });
 
   const parsed = parseJsonFallback<{ variations: string[] }>(text, { variations: [] });
-  const variations: CalibrationVariation[] = (parsed.variations || []).map(text => ({ text }));
+  const variations: CalibrationVariation[] = (parsed.variations || []).map(variation => ({ text: variation }));
 
   const id = `cal_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();

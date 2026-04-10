@@ -242,7 +242,14 @@ export function approveDeliverable(workspaceId: string, id: string): BrandDelive
   stmts().updateStatus.run({ id, workspace_id: workspaceId, status: 'approved', updated_at: now });
   log.info({ workspaceId, deliverableType: row.deliverable_type }, 'deliverable approved');
 
-  // Spec Addendum §5: auto-create voice sample for approved identity deliverables
+  // Spec Addendum §5: auto-create voice sample for approved identity deliverables.
+  //
+  // Intentionally decoupled from the updateStatus write above — approval is the
+  // user-visible primary effect and must succeed even if the downstream sample
+  // insert fails (e.g. voice_profiles FK issues, unexpected table state). The
+  // per-call atomicity that CLAUDE.md wants lives inside `addVoiceSample`, which
+  // wraps its own profile-upsert + sample-insert in db.transaction(). If that
+  // fails we log and move on; the admin can manually seed the sample later.
   const type = row.deliverable_type as DeliverableType;
   const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
     tagline: 'headline',

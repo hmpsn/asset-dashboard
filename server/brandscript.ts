@@ -33,8 +33,9 @@ const stmts = createStmtCache(() => ({
   deleteById: db.prepare(`DELETE FROM brandscripts WHERE id = ? AND workspace_id = ?`),
   listSections: db.prepare(`SELECT * FROM brandscript_sections WHERE brandscript_id = ? ORDER BY sort_order`),
   insertSection: db.prepare(`INSERT INTO brandscript_sections (id, brandscript_id, title, purpose, content, sort_order, created_at) VALUES (@id, @brandscript_id, @title, @purpose, @content, @sort_order, @created_at)`),
-  updateSection: db.prepare(`UPDATE brandscript_sections SET title = @title, purpose = @purpose, content = @content, sort_order = @sort_order WHERE id = @id`),
-  deleteSection: db.prepare(`DELETE FROM brandscript_sections WHERE id = ?`),
+  // Section updates are intentionally implemented as delete-all + re-insert inside
+  // `updateBrandscriptSections` (simpler than per-field upserts for a batch UI).
+  // No single-section update/delete statement is needed.
   deleteSectionsByBrandscript: db.prepare(`DELETE FROM brandscript_sections WHERE brandscript_id = ?`),
   listTemplates: db.prepare(`SELECT * FROM brandscript_templates ORDER BY name`),
   getTemplate: db.prepare(`SELECT * FROM brandscript_templates WHERE id = ?`),
@@ -129,16 +130,23 @@ export function updateBrandscriptSections(
 
   const now = new Date().toISOString();
 
+  // Preserve original createdAt for sections that already exist — the batch
+  // update uses a delete-and-reinsert pattern internally, so without this the
+  // stored createdAt would be clobbered on every section edit even when the
+  // content is unchanged. Match on section id; new sections get `now`.
+  const existingCreatedAt = new Map(existing.sections.map(s => [s.id, s.createdAt]));
+
   const doUpdate = db.transaction((): BrandscriptSection[] => {
     stmts().deleteSectionsByBrandscript.run(brandscriptId);
     const inserted = sections.map((sec, i) => {
       const secId = sec.id || `bss_${randomUUID().slice(0, 8)}`;
+      const createdAt = (sec.id && existingCreatedAt.get(sec.id)) || now;
       stmts().insertSection.run({
         id: secId, brandscript_id: brandscriptId, title: sec.title,
         purpose: sec.purpose ?? null, content: sec.content ?? null,
-        sort_order: i, created_at: now,
+        sort_order: i, created_at: createdAt,
       });
-      return { id: secId, brandscriptId, title: sec.title, purpose: sec.purpose, content: sec.content, sortOrder: i, createdAt: now };
+      return { id: secId, brandscriptId, title: sec.title, purpose: sec.purpose, content: sec.content, sortOrder: i, createdAt };
     });
     stmts().update.run({ id: brandscriptId, workspace_id: workspaceId, name: existing.name, framework_type: existing.frameworkType, updated_at: now });
     return inserted;
