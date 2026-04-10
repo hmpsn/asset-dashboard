@@ -94,6 +94,7 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
   try {
     const result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
     if (!result) return res.status(404).json({ error: 'Not found' });
+    addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
     clearSeoContextCache(req.params.workspaceId);
     invalidateIntelligenceCache(req.params.workspaceId);
@@ -110,6 +111,7 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   addActivity(req.params.workspaceId, 'brand_deliverable_approved', `Approved ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status: 'approved' });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json(result);
 });
 

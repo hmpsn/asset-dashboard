@@ -34,7 +34,9 @@ const voiceDNASchema = z.object({
   toneSpectrum: toneSpectrumSchema,
   sentenceStyle: z.string(),
   vocabularyLevel: z.string(),
-  humorStyle: z.string(),
+  // Optional to match `VoiceDNA.humorStyle?: string` — clearing the field in
+  // the UI sends an empty string; allow both omission and empty.
+  humorStyle: z.string().optional(),
 });
 
 const voiceGuardrailsSchema = z.object({
@@ -124,7 +126,7 @@ router.post('/api/voice/:workspaceId/calibrate', requireWorkspaceAccess('workspa
     addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
     clearSeoContextCache(req.params.workspaceId);
-  invalidateIntelligenceCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Calibration failed' });
@@ -137,9 +139,10 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine', requireWorksp
   try {
     const session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
     if (!session) return res.status(404).json({ error: 'Session or variation not found' });
+    addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
     clearSeoContextCache(req.params.workspaceId);
-  invalidateIntelligenceCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
     res.json(session);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Refinement failed' });

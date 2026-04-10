@@ -67,6 +67,7 @@ export const queryKeys = {
 
     // Workspace / global
     workspaces: () => ['admin-workspaces'] as const,
+    workspaceDetail: (wsId: string) => ['admin-workspace-detail', wsId] as const,
     workspaceHome: (wsId: string) => ['admin-workspace-home', wsId] as const,
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     health: () => ['admin-health'] as const,

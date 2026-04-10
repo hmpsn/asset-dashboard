@@ -88,6 +88,7 @@ router.post('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceI
   addActivity(req.params.workspaceId, 'brandscript_created', `Created brandscript "${bs.name}"`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json(bs);
 });
 
@@ -103,15 +104,23 @@ router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess
   if (!result) return res.status(404).json({ error: 'Not found' });
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json(result);
 });
 
 router.delete('/api/brandscripts/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  // Read name before delete so the activity log can include it.
+  const existing = getBrandscript(req.params.workspaceId, req.params.id);
   const ok = deleteBrandscript(req.params.workspaceId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
-  addActivity(req.params.workspaceId, 'brandscript_deleted', 'Deleted brandscript');
+  addActivity(
+    req.params.workspaceId,
+    'brandscript_deleted',
+    existing ? `Deleted brandscript "${existing.name}"` : 'Deleted brandscript',
+  );
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id, deleted: true });
   clearSeoContextCache(req.params.workspaceId);
+  invalidateIntelligenceCache(req.params.workspaceId);
   res.json({ deleted: true });
 });
 

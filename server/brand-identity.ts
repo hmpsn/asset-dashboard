@@ -9,6 +9,8 @@ import { randomUUID } from 'crypto';
 import { addVoiceSample, getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listBrandscripts } from './brandscript.js';
 import { listExtractions } from './discovery-ingestion.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 import type {
   BrandDeliverable, DeliverableVersion, DeliverableType, DeliverableTier, DeliverableStatus,
   VoiceSampleContext,
@@ -35,7 +37,11 @@ const stmts = createStmtCache(() => ({
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
   updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`),
   updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
-  listVersions: db.prepare(`SELECT * FROM brand_identity_versions WHERE deliverable_id = ? ORDER BY version DESC`),
+  // Defense in depth: scope by workspace via a join on the parent deliverable
+  // even though `deliverable_id` is already a scoped FK. A bug in getDeliverable
+  // (or a future caller) that leaks a cross-workspace id shouldn't yield version
+  // rows. `brand_identity_versions` has no `workspace_id` column of its own.
+  listVersions: db.prepare(`SELECT v.* FROM brand_identity_versions v INNER JOIN brand_identity_deliverables d ON v.deliverable_id = d.id WHERE v.deliverable_id = ? AND d.workspace_id = ? ORDER BY v.version DESC`),
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
 
@@ -72,7 +78,7 @@ export function getDeliverable(workspaceId: string, id: string): (BrandDeliverab
   const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
   if (!row) return null;
   const deliverable = rowToDeliverable(row);
-  const versions = (stmts().listVersions.all(id) as VersionRow[]).map(rowToVersion);
+  const versions = (stmts().listVersions.all(id, workspaceId) as VersionRow[]).map(rowToVersion);
   return { ...deliverable, versions };
 }
 
@@ -229,13 +235,18 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
 }
 
 export async function refineDeliverable(workspaceId: string, id: string, direction: string): Promise<BrandDeliverable | null> {
-  const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
-  if (!existing) return null;
+  // Initial read (outside transaction) is only used to feed the AI call with
+  // the current content. The authoritative read that drives version numbering
+  // and the content snapshot happens *inside* the transaction below, to close
+  // the stale-read race where a concurrent generate/refine could bump the
+  // version between the AI call and our write.
+  const preload = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+  if (!preload) return null;
 
-  const userPrompt = `Refine this ${existing.deliverable_type.replace(/_/g, ' ')} based on the direction given.
+  const userPrompt = `Refine this ${preload.deliverable_type.replace(/_/g, ' ')} based on the direction given.
 
 CURRENT VERSION:
-${existing.content}
+${preload.content}
 
 REFINEMENT DIRECTION:
 ${direction}
@@ -252,20 +263,23 @@ Return only the refined content — no preamble.`;
     feature: 'brand-identity-refine',
     workspaceId,
   })).trim();
-  const now = new Date().toISOString();
-  const newVersion = existing.version + 1;
 
-  // Save current as version snapshot then update content atomically
-  const doRefine = db.transaction(() => {
+  // Re-read existing inside the transaction so the version snapshot and
+  // newVersion computation reflect any concurrent writes during the AI call.
+  const doRefine = db.transaction((): BrandDeliverable | null => {
+    const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+    if (!existing) return null;
+    const now = new Date().toISOString();
+    const newVersion = existing.version + 1;
     stmts().insertVersion.run({
       id: `biv_${randomUUID().slice(0, 8)}`,
       deliverable_id: id, content: existing.content,
       steering_notes: direction, version: existing.version, created_at: now,
     });
     stmts().updateContent.run({ id, workspace_id: workspaceId, content, status: 'draft', version: newVersion, tier: existing.tier, updated_at: now });
+    return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
   });
-  doRefine();
-  return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
+  return doRefine();
 }
 
 export function approveDeliverable(workspaceId: string, id: string): BrandDeliverable | null {
@@ -295,6 +309,9 @@ export function approveDeliverable(workspaceId: string, id: string): BrandDelive
     try {
       addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
       log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
+      // Tell any mounted VoiceTab to refetch — the auto-created sample would
+      // otherwise only appear after a manual reload.
+      broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { autoSampleFrom: type });
     } catch (err) {
       log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
     }

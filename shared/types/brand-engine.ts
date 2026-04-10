@@ -117,7 +117,10 @@ export interface VoiceDNA {
   toneSpectrum: ToneSpectrum;
   sentenceStyle: string;         // e.g., "Short punchy lines with occasional longer payoff"
   vocabularyLevel: string;       // e.g., "Conversational, 8th grade reading level"
-  humorStyle: string;            // e.g., "Self-deprecating, observational"
+  // Optional: not every brand defines a humor register. Consumers
+  // (seo-context, prompt-assembly, voice-calibration) all guard on presence
+  // before rendering it into prompts.
+  humorStyle?: string;           // e.g., "Self-deprecating, observational"
 }
 
 export interface VoiceGuardrails {

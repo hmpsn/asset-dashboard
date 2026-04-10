@@ -12,6 +12,23 @@ import {
   updateExtractionStatus, updateExtractionContent,
   SourceAlreadyProcessedError,
 } from '../discovery-ingestion.js';
+import { clearSeoContextCache } from '../seo-context.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+
+// Accept text and markdown MIME types. Browsers are inconsistent for .md files,
+// so we also accept application/octet-stream when the extension matches — the
+// extension + mimetype pair is validated together in the upload loop.
+const ACCEPTED_MIMETYPES = new Set<string>([
+  'text/plain',
+  'text/markdown',
+  'text/x-markdown',
+  'application/octet-stream',
+]);
+
+// Upper bound on user-pasted / user-edited text fields. Prevents DoS via
+// multi-megabyte JSON bodies. Extraction truncates to 12KB anyway; 1MB is a
+// generous ceiling for pasted transcripts.
+const MAX_TEXT_BYTES = 1 * 1024 * 1024;
 
 const router = Router();
 
@@ -22,18 +39,23 @@ const extractionStatusSchema = z.enum(['pending', 'accepted', 'dismissed']);
 const extractionDestinationSchema = z.enum(['voice_profile', 'brandscript', 'identity']);
 
 const pasteSourceSchema = z.object({
-  filename: z.string().optional(),
+  filename: z.string().max(255).optional(),
   sourceType: sourceTypeSchema.optional().default('brand_doc'),
-  rawContent: z.string().min(1),
+  rawContent: z.string().min(1).max(MAX_TEXT_BYTES),
 });
 
 const patchExtractionSchema = z.object({
   status: extractionStatusSchema.optional(),
   routedTo: extractionDestinationSchema.optional(),
-  content: z.string().min(1).optional(),
+  content: z.string().min(1).max(MAX_TEXT_BYTES).optional(),
 }).refine(
   (v) => v.status !== undefined || v.content !== undefined,
   { message: 'At least one of `content` or `status` is required' },
+).refine(
+  // `routedTo` is only meaningful alongside a status change — it records where
+  // the accepted extraction was routed. Without `status`, it would silently no-op.
+  (v) => v.routedTo === undefined || v.status !== undefined,
+  { message: '`routedTo` requires `status` to be provided' },
 );
 
 const processSourceSchema = z.object({
@@ -64,7 +86,9 @@ router.post('/api/discovery/:workspaceId/sources',
 
     for (const file of files) {
       const ext = file.originalname.split('.').pop()?.toLowerCase();
-      if (ext !== 'txt' && ext !== 'md') {
+      const extOk = ext === 'txt' || ext === 'md';
+      const mimeOk = ACCEPTED_MIMETYPES.has(file.mimetype);
+      if (!extOk || !mimeOk) {
         // Clean up disk temp file for rejected types — multer doesn't auto-delete
         if (file.path) { try { fs.unlinkSync(file.path); } catch { /* ignore cleanup errors */ } }
         rejected.push({ filename: file.originalname, reason: 'Unsupported file type (only .txt and .md are accepted)' });
@@ -137,12 +161,16 @@ router.post('/api/discovery/:workspaceId/sources/:id/process', requireWorkspaceA
       `${force ? 'Re-extracted' : 'Extracted'} ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`,
     );
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, extractionCount: extractions.length, replaced: !!force });
+    clearSeoContextCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
     res.json({ extractions });
   } catch (err) {
     if (err instanceof SourceAlreadyProcessedError) {
+      // Safe to surface: this error is a deliberate 409 with a fixed, non-sensitive message.
       return res.status(409).json({ error: err.message, code: 'source_already_processed' });
     }
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Processing failed' });
+    // Do not echo `err.message` — AI/DB errors can leak internal paths or secrets.
+    res.status(500).json({ error: 'Processing failed' });
   }
 });
 

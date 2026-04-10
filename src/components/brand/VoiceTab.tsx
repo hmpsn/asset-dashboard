@@ -408,7 +408,7 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
           <input
             id="dna-humor-style"
             type="text"
-            value={dna.humorStyle}
+            value={dna.humorStyle ?? ''}
             onChange={e => setDna(prev => ({ ...prev, humorStyle: e.target.value }))}
             placeholder="e.g. Self-deprecating, observational"
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"

@@ -21,7 +21,17 @@ const log = createLogger('seo-context');
 export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
-  /** Brand voice block for AI prompts */
+  /**
+   * Legacy brand voice block — composed from workspace.brandVoice and brand-docs files.
+   *
+   * When a calibrated voice_profile exists, the newer `voiceProfileBlock` is
+   * preferred and injected into the effective prompt context (see
+   * `effectiveBrandVoice = voiceProfileBlock || brandVoiceBlock` below).
+   *
+   * This field is retained on the `SeoContext` shape for backwards compatibility
+   * with legacy consumers that read it directly. New callers should rely on
+   * `fullContext` (which already selects the correct source) rather than this field.
+   */
   brandVoiceBlock: string;
   /** Business context string (industry, location, services) */
   businessContext: string;
@@ -468,7 +478,9 @@ export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextE
     parts.push(`  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}`);
     parts.push(`  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10`);
     parts.push(`  Sentence style: ${profile.voiceDNA.sentenceStyle}`);
-    parts.push(`  Humor: ${profile.voiceDNA.humorStyle}`);
+    if (profile.voiceDNA.humorStyle) {
+      parts.push(`  Humor: ${profile.voiceDNA.humorStyle}`);
+    }
   }
 
   // Voice samples are safe to include at any status
