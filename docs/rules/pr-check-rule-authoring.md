@@ -166,6 +166,7 @@ Open 3 random matches and confirm each is a genuine violation (not a comment, st
 - [ ] `claudeMdRef` points to a real CLAUDE.md anchor
 - [ ] Severity is `warn` unless the rule has zero current matches
 - [ ] `npm run typecheck` passes
+- [ ] If the PR adds any `customCheck` rule or complex boundary logic: invoke the `scaled-code-review` skill before merging. Self-review on rule logic reliably misses false-negatives that parallel adversarial review catches.
 - [ ] *(Once PR C lands)* `npm run rules:generate && git diff --exit-code docs/rules/automated-rules.md` passes. Until then, this step is a no-op — the generator script will be added by PR C of the 2026-04-10 audit.
 
 ---
