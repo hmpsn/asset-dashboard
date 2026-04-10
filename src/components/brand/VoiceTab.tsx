@@ -4,7 +4,6 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { Mic, Plus, Trash2, Sparkles, Loader2, Save } from 'lucide-react';
 import { voice } from '../../api/brand-engine';
 import type {
-  VoiceProfile,
   VoiceSample,
   VoiceDNA,
   VoiceGuardrails,

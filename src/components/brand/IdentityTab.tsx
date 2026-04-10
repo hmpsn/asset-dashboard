@@ -6,10 +6,11 @@ import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton } from '../ui';
 import { useToast } from '../Toast';
+import { WS_EVENTS } from '../../lib/wsEvents';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const DELIVERABLE_LABELS: Record<string, string> = {
+const DELIVERABLE_LABELS: Record<DeliverableType, string> = {
   mission: 'Mission Statement',
   vision: 'Vision Statement',
   values: 'Core Values',
@@ -272,7 +273,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   });
 
   useWebSocket({
-    'identity:updated': () => {
+    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] });
     },
   });

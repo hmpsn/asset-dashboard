@@ -10,7 +10,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   SourceType, ExtractionStatus,
 } from '../../../shared/types/brand-engine';
-import { SectionCard, EmptyState, Skeleton, Badge } from '../ui';
+import { SectionCard, EmptyState, Skeleton } from '../ui';
 import { useToast } from '../Toast';
 
 interface Props {
