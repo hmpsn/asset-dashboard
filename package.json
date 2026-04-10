@@ -9,6 +9,7 @@
     "dev:all": "concurrently -n server,ui -c blue,green \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "db:migrate": "tsx server/db/migrate-json.ts",
     "db:sync-staging": "tsx scripts/sync-staging-db.ts",

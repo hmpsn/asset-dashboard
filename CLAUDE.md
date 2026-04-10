@@ -43,7 +43,7 @@ Every completed task must include:
 1. **`FEATURE_AUDIT.md`** — add new entries or update existing ones for any feature work.
 2. **`data/roadmap.json`** — mark completed items `"pending"` → `"done"`, add `"notes"`. Run `npx tsx scripts/sort-roadmap.ts`.
 3. **`BRAND_DESIGN_LANGUAGE.md`** — update if any UI colors/components/patterns changed.
-4. **Build verify** — `npx tsc --noEmit --skipLibCheck && npx vite build`
+4. **Build verify** — `npm run typecheck && npx vite build`
 5. **Summarize** — what was done, what docs updated, what's next.
 6. **`data/features.json`** — if the completed feature is client-impactful or sales-relevant, add/update its entry. Not every feature belongs here — only ones you'd mention on a sales call.
 
@@ -68,14 +68,14 @@ Every completed task must include:
 | `npm run dev` | Vite dev server (frontend) |
 | `npm run dev:server` | Express server (backend) |
 | `npm run dev:all` | Both concurrently |
-| `npx tsc --noEmit --skipLibCheck` | Type-check |
+| `npm run typecheck` | Type-check (project-aware: `tsc -b --noEmit`, traverses both `tsconfig.app.json` and `tsconfig.node.json`). Plain `npx tsc --noEmit` against the root `tsconfig.json` checks **zero files** because the root config uses project references with `files: []` — always use the script. |
 | `npx vite build` | Production build |
 | `npx vitest run` | Unit + integration + component tests |
 | `npx playwright test` | E2E tests (requires server running) |
 | `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints |
 | `npx tsx scripts/pr-check.ts` | Automated pre-PR checklist (color violations, JSON.parse, hard-coded names) |
 
-**Always verify after changes:** `npx tsc --noEmit --skipLibCheck && npx vite build`
+**Always verify after changes:** `npm run typecheck && npx vite build`
 
 ---
 
@@ -300,7 +300,7 @@ Every plan must include: task dependency graph, model assignments (Haiku/Sonnet/
 
 Work is not done until ALL pass:
 
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors (uses `tsc -b` for project-aware checking)
 - [ ] `npx vite build` — builds successfully
 - [ ] `npx vitest run` — full test suite passes (not just new tests)
 - [ ] `FEATURE_AUDIT.md` updated (if feature work)

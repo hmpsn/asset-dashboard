@@ -773,6 +773,107 @@ if (shouldRunSliceCheck) {
   }
 }
 
+// ─── useEffect external-sync dirty guard against the live prop ───────────────
+//
+// Catches the BrandscriptTab SectionEditorCard pattern:
+//
+//   const [content, setContent] = useState(section.content ?? '');
+//   const isDirty = content !== (section.content ?? '');     // ← live prop
+//   useEffect(() => {
+//     if (!isDirty) setContent(section.content ?? '');       // ← never fires
+//   }, [section.content]);
+//
+// `isDirty` is recomputed against the *new* prop on every render. The moment
+// an external update arrives (e.g. via a WS-driven React Query refetch), the
+// new prop differs from the old local state, so `isDirty` is `true` and the
+// sync skips — leaving stale content in the textarea.
+//
+// Correct pattern: track the last-synced prop in a `useRef`, gate the sync on
+// `content !== lastSyncedRef.current`, and update the ref after each sync.
+// See `src/components/brand/BrandscriptTab.tsx`.
+//
+// Suppression: append `// sync-ok` to the `if (!isDirty)` line.
+{
+  const findings: string[] = [];
+  // We only need to look at .tsx files (the pattern requires React state).
+  const tsxFiles: string[] = SCAN_ALL
+    ? getFiles(path.join(ROOT, 'src'), '*.tsx')
+    : changedFiles
+        .filter(f => f.endsWith('.tsx') && !EXCLUDED_DIRS.some(d => f.startsWith(d + '/')))
+        .map(f => path.join(ROOT, f));
+
+  for (const file of tsxFiles) {
+    let content: string;
+    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+    if (!content.includes('useEffect') || !content.includes('isDirty')) continue;
+
+    // Walk every useEffect block and check whether its body contains `if (!isDirty)`
+    // (or a near-synonym) followed by a setState call. If so, also confirm the
+    // file defines `isDirty` as a comparison against a prop / state field — i.e.
+    // a recomputed-each-render value, not a ref.
+    const effectRegex = /useEffect\s*\(\s*\(\s*\)\s*=>\s*\{/g;
+    let match: RegExpExecArray | null;
+    while ((match = effectRegex.exec(content)) !== null) {
+      const start = match.index + match[0].length - 1; // position of '{'
+      // Walk braces to find the closing brace of the effect callback
+      let depth = 0;
+      let i = start;
+      while (i < content.length) {
+        const ch = content[i];
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) break;
+        }
+        i++;
+      }
+      if (i >= content.length) break;
+      const body = content.slice(start, i + 1);
+      // Look for `if (!isDirty) set...` or split-line variant. Allow alternate
+      // dirty-flag names (isDirty | isEdited | hasChanges | hasEdits | hasUnsavedChanges).
+      const guardRegex = /if\s*\(\s*!\s*(isDirty|isEdited|hasChanges|hasEdits|hasUnsavedChanges)\s*\)\s*\{?\s*set[A-Z]\w*\s*\(/;
+      const guardMatch = body.match(guardRegex);
+      if (!guardMatch) continue;
+
+      // Check the matched line for the suppression marker.
+      const lineStartInBody = body.lastIndexOf('\n', body.indexOf(guardMatch[0])) + 1;
+      const lineEndInBody = body.indexOf('\n', lineStartInBody);
+      const guardLine = body.slice(lineStartInBody, lineEndInBody === -1 ? body.length : lineEndInBody);
+      if (guardLine.includes('// sync-ok')) continue;
+
+      // Confirm the file defines the dirty flag as a recomputed expression
+      // against another state/prop (vs reading a ref). We look for
+      // `const isDirty = ` followed by a comparison and no `.current`.
+      const flagName = guardMatch[1];
+      const dirtyDefRegex = new RegExp(`const\\s+${flagName}\\s*=\\s*([^;\\n]+)`);
+      const dirtyDef = content.match(dirtyDefRegex);
+      if (!dirtyDef) continue;
+      if (dirtyDef[1].includes('.current')) continue; // already ref-based
+
+      // Compute file-relative line number for the guard line.
+      const absoluteIndex = start + lineStartInBody;
+      const lineNumber = content.slice(0, absoluteIndex).split('\n').length;
+      findings.push(`  ${path.relative(ROOT, file)}:${lineNumber}  → ${guardLine.trim()}`);
+    }
+  }
+
+  if (findings.length > 0) {
+    console.log(`\n  ✗ useEffect external-sync dirty guard against the live prop`);
+    console.log(`    The dirty check is recomputed against the new prop on every render,`);
+    console.log(`    so it always reads "dirty" the moment an external update arrives —`);
+    console.log(`    the sync skips and the user sees stale content.`);
+    console.log(`    Track the last-synced prop in a useRef and compare against ref.current.`);
+    console.log(`    See src/components/brand/BrandscriptTab.tsx for the canonical fix.`);
+    console.log(`    Suppress with // sync-ok on the guard line if intentional.`);
+    console.log(`    Matches (${findings.length}):`);
+    for (const f of findings.slice(0, 5)) console.log(f);
+    if (findings.length > 5) console.log(`      ... and ${findings.length - 5} more`);
+    errors++;
+  } else {
+    console.log(`  ✓ useEffect external-sync dirty guard against the live prop`);
+  }
+}
+
 // ─── Constants sync check ─────────────────────────────────────────────────────
 // STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and src/constants.ts.
 // They can't share a runtime module (different module resolution), so this check
@@ -822,6 +923,8 @@ const manualChecks = [
   'AI-generating endpoints (callCreativeAI/callOpenAI → db write): existence check + INSERT/UPDATE inside db.transaction() — not just the write, the check too',
   'New 1:1-per-workspace tables (e.g. one row per workspace+type): UNIQUE index on (workspace_id, natural_key) in migration; app code catches SQLITE_CONSTRAINT_UNIQUE and retries as update',
   'Batch save endpoints (delete-all + reinsert): Map<id, preserved> built before delete to restore created_at, sort_order, and approval state',
+  'Field semantics changed (not just renamed): grep every reader of `result.X` / `slice.X` / `intel.X`, every Zod schema, every test, and every JSDoc comment for the field. Update them in the same commit. The compiler will not catch a meaning change when the type stays `string` (see seo-context.brandVoiceBlock as the canonical example).',
+  'useEffect external-sync: when copying a prop into local state on update, the dirty check must compare local state to a `useRef` of the last-synced prop, never to the live prop. Comparing against the live prop guarantees the sync never fires after an external update (see BrandscriptTab.SectionEditorCard).',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);
