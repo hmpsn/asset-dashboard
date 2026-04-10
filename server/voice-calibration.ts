@@ -208,6 +208,7 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
     temperature: 0.85,
     feature: 'voice-calibration',
     workspaceId,
+    json: true,
   });
 
   const parsed = parseJsonFallback<{ variations: string[] }>(text, { variations: [] });
@@ -252,6 +253,7 @@ Return valid JSON: { "refined": "the refined text" }`;
     temperature: 0.75,
     feature: 'voice-refinement',
     workspaceId,
+    json: true,
   });
 
   const parsed = parseJsonFallback<{ refined: string }>(text, { refined: original.text });

@@ -10,6 +10,7 @@ import {
   listSources, addSource, deleteSource, processSource,
   listExtractions, listExtractionsBySource,
   updateExtractionStatus, updateExtractionContent,
+  SourceAlreadyProcessedError,
 } from '../discovery-ingestion.js';
 
 const router = Router();
@@ -34,6 +35,10 @@ const patchExtractionSchema = z.object({
   (v) => v.status !== undefined || v.content !== undefined,
   { message: 'At least one of `content` or `status` is required' },
 );
+
+const processSourceSchema = z.object({
+  force: z.boolean().optional(),
+});
 
 // List sources
 router.get('/api/discovery/:workspaceId/sources', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -119,14 +124,24 @@ router.delete('/api/discovery/:workspaceId/sources/:id', requireWorkspaceAccess(
   res.json({ deleted: true });
 });
 
-// Process source (AI extraction)
-router.post('/api/discovery/:workspaceId/sources/:id/process', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+// Process source (AI extraction). Idempotent by default — re-processing an
+// already-processed source returns 409 unless { force: true } is passed, in
+// which case existing extractions are deleted and replaced.
+router.post('/api/discovery/:workspaceId/sources/:id/process', requireWorkspaceAccess('workspaceId'), validate(processSourceSchema), async (req, res) => {
+  const { force } = req.body as { force?: boolean };
   try {
-    const extractions = await processSource(req.params.workspaceId, req.params.id);
-    addActivity(req.params.workspaceId, 'discovery_processed', `Extracted ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, extractionCount: extractions.length });
+    const extractions = await processSource(req.params.workspaceId, req.params.id, { force });
+    addActivity(
+      req.params.workspaceId,
+      'discovery_processed',
+      `${force ? 'Re-extracted' : 'Extracted'} ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`,
+    );
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, extractionCount: extractions.length, replaced: !!force });
     res.json({ extractions });
   } catch (err) {
+    if (err instanceof SourceAlreadyProcessedError) {
+      return res.status(409).json({ error: err.message, code: 'source_already_processed' });
+    }
     res.status(500).json({ error: err instanceof Error ? err.message : 'Processing failed' });
   }
 });
@@ -136,9 +151,9 @@ router.get('/api/discovery/:workspaceId/extractions', requireWorkspaceAccess('wo
   res.json(listExtractions(req.params.workspaceId));
 });
 
-// List extractions for a specific source
+// List extractions for a specific source (scoped to workspace to prevent cross-workspace leakage)
 router.get('/api/discovery/:workspaceId/sources/:id/extractions', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(listExtractionsBySource(req.params.id));
+  res.json(listExtractionsBySource(req.params.workspaceId, req.params.id));
 });
 
 // Update extraction status (accept/dismiss) and/or content (edit)

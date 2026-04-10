@@ -239,6 +239,7 @@ Return valid JSON: { "sections": [{ "title": "exact title from above", "content"
     temperature: 0.6,
     feature: 'brandscript-complete',
     workspaceId,
+    json: true,
   });
 
   const parsed = parseJsonFallback<{ sections: { title: string; content: string }[] }>(text, { sections: [] });

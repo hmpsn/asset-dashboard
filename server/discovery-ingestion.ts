@@ -30,7 +30,8 @@ const stmts = createStmtCache(() => ({
   markProcessed: db.prepare(`UPDATE discovery_sources SET processed_at = ? WHERE id = ?`),
   deleteSource: db.prepare(`DELETE FROM discovery_sources WHERE id = ? AND workspace_id = ?`),
   listExtractions: db.prepare(`SELECT * FROM discovery_extractions WHERE workspace_id = ? ORDER BY created_at DESC`),
-  listExtractionsBySource: db.prepare(`SELECT * FROM discovery_extractions WHERE source_id = ? ORDER BY extraction_type, category`),
+  listExtractionsBySource: db.prepare(`SELECT * FROM discovery_extractions WHERE workspace_id = ? AND source_id = ? ORDER BY extraction_type, category`),
+  deleteExtractionsBySource: db.prepare(`DELETE FROM discovery_extractions WHERE workspace_id = ? AND source_id = ?`),
   insertExtraction: db.prepare(`INSERT INTO discovery_extractions (id, source_id, workspace_id, extraction_type, category, content, source_quote, confidence, status, created_at) VALUES (@id, @source_id, @workspace_id, @extraction_type, @category, @content, @source_quote, @confidence, @status, @created_at)`),
   updateExtractionStatus: db.prepare(`UPDATE discovery_extractions SET status = @status, routed_to = @routed_to WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: extraction status is not a platform state machine column
   updateExtractionContent: db.prepare(`UPDATE discovery_extractions SET content = @content WHERE id = @id AND workspace_id = @workspace_id`),
@@ -76,8 +77,8 @@ export function listExtractions(workspaceId: string): DiscoveryExtraction[] {
   return (stmts().listExtractions.all(workspaceId) as ExtractionRow[]).map(rowToExtraction);
 }
 
-export function listExtractionsBySource(sourceId: string): DiscoveryExtraction[] {
-  return (stmts().listExtractionsBySource.all(sourceId) as ExtractionRow[]).map(rowToExtraction);
+export function listExtractionsBySource(workspaceId: string, sourceId: string): DiscoveryExtraction[] {
+  return (stmts().listExtractionsBySource.all(workspaceId, sourceId) as ExtractionRow[]).map(rowToExtraction);
 }
 
 export function addSource(workspaceId: string, filename: string, sourceType: SourceType, rawContent: string): DiscoverySource {
@@ -102,9 +103,32 @@ export function updateExtractionContent(workspaceId: string, id: string, content
   return stmts().updateExtractionContent.run({ id, workspace_id: workspaceId, content }).changes > 0;
 }
 
-export async function processSource(workspaceId: string, sourceId: string): Promise<DiscoveryExtraction[]> {
+/**
+ * Error thrown when processSource is called on a source that has already been
+ * processed and `force` was not set. The route handler translates this to 409.
+ */
+export class SourceAlreadyProcessedError extends Error {
+  constructor(sourceId: string) {
+    super(`Source ${sourceId} has already been processed. Pass { force: true } to re-process and replace existing extractions.`);
+    this.name = 'SourceAlreadyProcessedError';
+  }
+}
+
+export async function processSource(
+  workspaceId: string,
+  sourceId: string,
+  opts: { force?: boolean } = {},
+): Promise<DiscoveryExtraction[]> {
   const row = stmts().getSource.get(sourceId, workspaceId) as SourceRow | undefined;
   if (!row) throw new Error('Source not found');
+
+  // Refuse silent re-processing — it permanently duplicates extractions (no UNIQUE
+  // constraint on content) and burns AI credits. The caller must opt-in to replace
+  // existing extractions via `force`; the route handler translates the thrown error
+  // into a 409 so the UI can prompt the user.
+  if (row.processed_at && !opts.force) {
+    throw new SourceAlreadyProcessedError(sourceId);
+  }
 
   const source = rowToSource(row);
   const confidence = confidenceForSourceType(source.sourceType);
@@ -185,7 +209,14 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
   // (the retry would insert fresh UUIDs alongside the committed ones, creating permanent
   // duplicates). markProcessed runs inside the same transaction so the source is only
   // flagged processed when every extraction landed.
+  //
+  // On force re-process, delete existing extractions first — the user's explicit
+  // opt-in says "replace what's there". Done inside the transaction so a failure
+  // in the AI-insert loop doesn't leave the source with zero extractions.
   const persist = db.transaction((): DiscoveryExtraction[] => {
+    if (opts.force) {
+      stmts().deleteExtractionsBySource.run(workspaceId, sourceId);
+    }
     const inserted: DiscoveryExtraction[] = [];
     for (const ext of rawExtractions) {
       const id = `ext_${randomUUID().slice(0, 8)}`;
