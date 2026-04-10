@@ -1291,12 +1291,13 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
 ---
 
-### Task B9: Polish pr-check.ts from scaled-review findings
+### Task B9: Polish pr-check.ts and authoring guide from scaled-review findings
 
-> Added 2026-04-10 from the PR A scaled code review (low-signal findings #2–#7). None block merge; all improve rule quality, consistency, or maintainability. Bundled into one commit because each edit is small and the blast radius is contained to `scripts/pr-check.ts`.
+> Added 2026-04-10 from the PR A scaled code review (low-signal findings #2–#7) plus learnings from the funcBoundaryRe bug discovered post-merge. None block merge; all improve rule quality, consistency, or maintainability. Bundled into one commit.
 
 **Files owned by this task:**
 - `scripts/pr-check.ts`
+- `docs/rules/pr-check-rule-authoring.md` (message update for Rule 3 only)
 
 - [ ] **Step 1: Collapse `message` ≈ `rationale` duplication (finding #2)**
 
@@ -1345,7 +1346,15 @@ const writeWindow = lines.slice(Math.max(0, a - 5), Math.min(lines.length, b + 5
 if (/db\.transaction\s*\(/.test(writeWindow)) continue;
 ```
 
-- [ ] **Step 5: Normalize `.forEach` → `for...of` (finding #7)**
+- [ ] **Step 5: Update Rule 3 message to document preceding-line hatch placement**
+
+Rule 3's `// txn-ok` hatch is now honoured on the line *above* a `db.prepare` call in addition to the same line (necessary for multi-line template-literal calls). The rule's message should tell callers this:
+
+```ts
+message: '...Add // txn-ok on the db.prepare line or the line immediately above it if using a multi-line template literal.',
+```
+
+- [ ] **Step 6: Normalize `.forEach` → `for...of` (finding #7)**
 
 Five call sites in `scripts/pr-check.ts` still use `.forEach()` despite the rest of the file using `for...of`. Replace for consistency:
 
@@ -1358,7 +1367,7 @@ for (const file of files) { ... }
 
 Skip this step if any `.forEach` callback uses `return` for early-exit — `for...of` needs `continue` instead, and the rewrite is non-trivial in that case. For those sites, leave a `// TODO: migrate when refactoring` comment instead.
 
-- [ ] **Step 6: Verify no regressions**
+- [ ] **Step 7: Verify no regressions**
 
 ```bash
 npm run typecheck && npx tsx scripts/pr-check.ts --all
@@ -1366,17 +1375,20 @@ npm run typecheck && npx tsx scripts/pr-check.ts --all
 
 Expected: identical error/warning counts to the pre-polish baseline. None of these edits should change any rule's match count.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add scripts/pr-check.ts
-git commit -m "chore(pr-check): polish from scaled-review findings
+git add scripts/pr-check.ts docs/rules/pr-check-rule-authoring.md
+git commit -m "chore(pr-check): polish from scaled-review findings + authoring guide updates
 
 - rationale collapsed to single-noun bug class on 10 rules
 - Record<string,unknown> pattern tolerates padded/wide spacing
 - public-portal rule uses explicit file guard instead of pathFilter hack
 - Rule 3 local shadowed variable renamed from 'window' → 'writeWindow'
+- Rule 3 message updated to document preceding-line hatch placement
 - .forEach call sites normalized to for...of where safe
+- Authoring guide: Common Mistakes section (opener-not-closer boundary
+  detection, preceding-line hatch lookbehind for multi-line statements)
 
 All changes are internal to pr-check.ts; full scan emits identical
 counts before and after.

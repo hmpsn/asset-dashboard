@@ -197,3 +197,37 @@ See `docs/superpowers/plans/2026-04-10-pr-check-audit-and-backfill.md` for the c
 Delete a rule when: the bug class is now caught at compile time, the rule has >5 hatches in 6 months (too broad), the rule has not caught a bug in 12 months, or refactoring eliminated the bug class.
 
 To retire: delete the entry from `CHECKS`, delete its hatch comments (`rg '<rule>-ok' .`), regenerate `automated-rules.md` (once PR C lands), and commit with the reason.
+
+---
+
+## Common mistakes in customCheck rules
+
+### Use openers, not closers, to detect scope boundaries
+
+When a rule needs to confirm two patterns are in the **same** function, it's tempting to check for closing tokens (`}`, `};`, `})`) between them. Don't. Closing tokens are ambiguous — they close `if`, `for`, `try/catch`, and `switch` blocks as well as functions. A closing brace between two writes suppresses the warning even when both writes are inside the same function body.
+
+**Rule:** Use function-*opener* patterns exclusively:
+
+```ts
+const funcBoundaryRe =
+  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>)/;
+```
+
+Any two writes separated by a real function boundary are also separated by the opener of the second function. The opener is always sufficient; the closer is always a false-negative generator.
+
+### customCheck hatch placement: implement preceding-line lookbehind
+
+The global `excludeLines` mechanism works by checking whether the formatted match string `file:line:text` contains the hatch token. For single-line statements the hatch fits inline and this works automatically. For multi-line statements that open with a backtick or chained call (e.g. `` db.prepare(` `` or `foo\n  .bar(`), the flagged line can't carry an inline comment without breaking the syntax.
+
+**Rule:** Any customCheck that flags the opening line of a multi-line statement must also honour the hatch on the immediately preceding line:
+
+```ts
+// In the write-index builder loop:
+if (lines[i].includes('// txn-ok') || (i > 0 && lines[i - 1].includes('// txn-ok'))) continue;
+```
+
+Document this in the rule's `message` so callers know the comment can go above the statement:
+
+```ts
+message: '...Add // txn-ok on the db.prepare line or the line immediately above it.',
+```
