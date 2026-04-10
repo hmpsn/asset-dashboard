@@ -448,14 +448,22 @@ export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEm
 /**
  * Build a voice profile block for AI prompts from the workspace's calibrated voice profile.
  * Includes voice DNA, sample writing, and guardrails. Returns '' if no profile exists.
+ *
+ * Guards on `profile.status === 'calibrated'`: when calibrated, buildSystemPrompt's
+ * Layer 2 already injects DNA + guardrails into the system message. Re-injecting them
+ * here would duplicate instructions and waste tokens.
+ * When calibrated: returns only voice samples (safe at any status).
+ * When not calibrated: returns the full DNA + samples + guardrails block.
  */
 export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   const profile = getVoiceProfile(workspaceId);
   if (!profile) return '';
 
+  const isCalibrated = profile.status === 'calibrated';
   const parts: string[] = [];
 
-  if (profile.voiceDNA) {
+  // Only inject DNA when not calibrated — Layer 2 handles it when calibrated
+  if (!isCalibrated && profile.voiceDNA) {
     parts.push(`VOICE DNA:`);
     parts.push(`  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}`);
     parts.push(`  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10`);
@@ -463,6 +471,7 @@ export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextE
     parts.push(`  Humor: ${profile.voiceDNA.humorStyle}`);
   }
 
+  // Voice samples are safe to include at any status
   if (profile.samples.length > 0) {
     parts.push(`\nVOICE SAMPLES (write like these):`);
     for (const sample of profile.samples.slice(0, 5)) {
@@ -470,7 +479,8 @@ export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextE
     }
   }
 
-  if (profile.guardrails) {
+  // Only inject guardrails when not calibrated — Layer 2 handles it when calibrated
+  if (!isCalibrated && profile.guardrails) {
     parts.push(`\nGUARDRAILS:`);
     if (profile.guardrails.forbiddenWords.length) parts.push(`  Never use: ${profile.guardrails.forbiddenWords.join(', ')}`);
     if (profile.guardrails.requiredTerminology.length) parts.push(`  Required: ${profile.guardrails.requiredTerminology.map(t => `"${t.use}" not "${t.insteadOf}"`).join(', ')}`);

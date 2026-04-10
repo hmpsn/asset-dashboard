@@ -10,6 +10,7 @@ import {
   approveDeliverable, exportDeliverables,
 } from '../brand-identity.js';
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
+import { clearSeoContextCache } from '../seo-context.js';
 
 const router = Router();
 
@@ -78,6 +79,7 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
     const result = await generateDeliverable(req.params.workspaceId, deliverableType);
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
+    clearSeoContextCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Generation failed' });
@@ -91,6 +93,7 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
     const result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
     if (!result) return res.status(404).json({ error: 'Not found' });
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
+    clearSeoContextCache(req.params.workspaceId);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Refinement failed' });
@@ -103,6 +106,7 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   if (!result) return res.status(404).json({ error: 'Not found' });
   addActivity(req.params.workspaceId, 'brand_deliverable_approved', `Approved ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status: 'approved' });
+  clearSeoContextCache(req.params.workspaceId);
   res.json(result);
 });
 
