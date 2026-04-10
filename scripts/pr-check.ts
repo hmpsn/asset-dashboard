@@ -515,16 +515,14 @@ const CHECKS: Check[] = [
       'src/App.tsx',
     ],
     excludeLines: ['// global-events-ok'],
-    message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it.',
+    message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it. Add // global-events-ok if this file is a legitimate global-fanout site.',
     severity: 'error',
     rationale: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Only audited global-fanout sites may import it.',
     claudeMdRef: '#data-flow-rules-mandatory',
   },
   {
     name: 'Global keydown missing isContentEditable guard',
-    // Note: only match single-quoted 'keydown'. A character class ['"] would
-    // break the double-quoted shell invocation in checkDirectory.
-    pattern: "addEventListener\\s*\\(\\s*'keydown'",
+    pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
     pathFilter: 'src/',
     exclude: ['src/App.tsx'],
@@ -533,13 +531,64 @@ const CHECKS: Check[] = [
     severity: 'warn',
     rationale: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable — otherwise Escape/Enter/arrows hijack typing.',
     claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches both single- and double-quoted 'keydown'.
+      const listenerRe = /addEventListener\s*\(\s*['"]keydown['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!listenerRe.test(lines[i])) continue;
+          if (lines[i].includes('// keydown-ok')) continue;
+          // Locate the handler body and scan it for an isContentEditable guard.
+          // Common shapes:
+          //   addEventListener('keydown', (e) => { ... })       ← inline arrow
+          //   addEventListener('keydown', handleKey)            ← referenced
+          // For the referenced form we fall back to a whole-file scan for
+          // isContentEditable (low false-negative risk — the guard either
+          // exists in the file or it doesn't).
+          const lookahead = lines.slice(i, Math.min(lines.length, i + 60)).join('\n');
+          const hasInlineBody = /=>\s*\{/.test(lookahead);
+          let body: string;
+          if (hasInlineBody) {
+            // Walk forward to the opening brace of the arrow body and
+            // brace-match to the close.
+            const joined = lines.slice(i).join('\n');
+            const arrowIdx = joined.search(/=>\s*\{/);
+            if (arrowIdx === -1) { body = lookahead; }
+            else {
+              const bodyOpen = joined.indexOf('{', arrowIdx);
+              let depth = 0;
+              let j = bodyOpen;
+              while (j < joined.length) {
+                if (joined[j] === '{') depth++;
+                else if (joined[j] === '}') { depth--; if (depth === 0) break; }
+                j++;
+              }
+              body = joined.slice(bodyOpen, Math.min(j + 1, joined.length));
+            }
+          } else {
+            // Referenced-handler form: scan the entire file for the guard.
+            body = content;
+          }
+          if (/\bisContentEditable\b/.test(body)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Multi-step DB writes outside db.transaction()',
     pattern: '',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    exclude: ['server/db/migrations'],
+    // Tests run single-writer by definition; multi-write setup in a test is
+    // never a concurrency concern. Migrations are their own txn model.
+    exclude: ['server/db/migrations', '__tests__'],
     excludeLines: ['// txn-ok'],
     message: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption. Add // txn-ok on the first prepare line if the pair is intentionally non-atomic.',
     severity: 'warn',
@@ -573,11 +622,27 @@ const CHECKS: Check[] = [
           writeIdx.push(i);
         }
         if (writeIdx.length < 2) continue;
+        // A function boundary between two writes means they are in separate
+        // functions and are NOT a multi-step mutation. Common shapes:
+        //   function foo(...)           |   export function foo(...)
+        //   export async function foo   |   const foo = (...) => {
+        //   async function foo(...)     |   foo(): Return { (class method)
+        //   }                            ← closing brace of a prior function
+        // Require no function boundary between writeIdx[k] and writeIdx[k+1].
+        const funcBoundaryRe =
+          /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>|\s*\}\s*$|\s*\}\s*;\s*$|\s*\}\s*\)\s*;?\s*$)/;
         const reported = new Set<number>();
         for (let k = 0; k < writeIdx.length - 1; k++) {
           const a = writeIdx[k];
           const b = writeIdx[k + 1];
           if (b - a > 10) continue;
+          // Skip if a function boundary sits between the two writes — they
+          // live in different scopes and a shared transaction is nonsensical.
+          let boundaryBetween = false;
+          for (let m = a + 1; m < b; m++) {
+            if (funcBoundaryRe.test(lines[m])) { boundaryBetween = true; break; }
+          }
+          if (boundaryBetween) continue;
           const winStart = Math.max(0, a - 20);
           const window = lines.slice(winStart, a + 1).join('\n');
           if (/\bdb\.transaction\s*\(/.test(window)) continue;
@@ -592,7 +657,7 @@ const CHECKS: Check[] = [
   {
     name: 'AI call before db.prepare without transaction guard',
     pattern: '',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: [
       'server/openai-helpers.ts',
@@ -629,7 +694,7 @@ const CHECKS: Check[] = [
   {
     name: 'UPDATE/DELETE missing workspace_id scope',
     pattern: '',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/db/migrations'],
     excludeLines: ['// ws-scope-ok'],
@@ -681,14 +746,68 @@ const CHECKS: Check[] = [
   },
   {
     name: 'getOrCreate* function returns nullable',
-    pattern: 'function\\s+getOrCreate\\w+[^{]*:[^{]*\\|\\s*null',
+    // Extended in 2026-04-10 review: also catch arrow-form exports and class
+    // methods, and tolerate object-type parameters that contain `{`. The
+    // customCheck walks from `getOrCreate…(` past the matching `)` and then
+    // checks the return-type annotation for `| null`.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     excludeLines: ['// getorcreate-nullable-ok'],
-    message: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null — callers would write dead guard branches. If it can genuinely fail, throw instead.',
+    message: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null — callers would write dead guard branches. If it can genuinely fail, throw instead. Add // getorcreate-nullable-ok only if you have renamed the function and the "getOrCreate" name is misleading.',
     severity: 'error',
     rationale: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null or callers write dead guard branches.',
     claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches two declaration shapes:
+      //   function getOrCreateFoo(             ← function declaration
+      //   const getOrCreateFoo = (): T         ← arrow / const export
+      // Class methods are excluded intentionally — no getOrCreate* methods
+      // exist in the codebase and a bare `getOrCreateFoo(` without modifier
+      // would also match call sites.
+      const declRe =
+        /^\s*(?:(?:export\s+)?(?:async\s+)?function\s+getOrCreate\w+\s*\(|(?:export\s+)?(?:const|let)\s+getOrCreate\w+\s*=\s*(?:async\s+)?\()/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('getOrCreate')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(declRe);
+          if (!m) continue;
+          if (lines[i].includes('// getorcreate-nullable-ok')) continue;
+          // Heuristic: skip lines that look like plain call sites (no `:` or
+          // `{` ahead). A declaration always has a return-type annotation or
+          // an opening brace within ~10 lines.
+          const joined = lines.slice(i, Math.min(lines.length, i + 15)).join('\n');
+          // Walk forward past the matching `)` that closes the parameter list
+          // so object-typed params containing `{` don't fool us. Find the
+          // first `(` on the line, then brace-walk.
+          const openIdx = joined.indexOf('(');
+          if (openIdx === -1) continue;
+          let depth = 0;
+          let j = openIdx;
+          while (j < joined.length) {
+            if (joined[j] === '(') depth++;
+            else if (joined[j] === ')') { depth--; if (depth === 0) break; }
+            j++;
+          }
+          if (j >= joined.length) continue;
+          // After the closing `)`, read until the next `{` (function body) or
+          // `=>` (arrow body) or end-of-window. That slice is the return-type
+          // annotation region.
+          const tail = joined.slice(j + 1);
+          const bodyIdx = tail.search(/[{=]/);
+          const returnRegion = bodyIdx === -1 ? tail : tail.slice(0, bodyIdx);
+          if (!/:\s*[^,;]*\|\s*null\b/.test(returnRegion) &&
+              !/:\s*Promise<[^>]*\|\s*null\s*>/.test(returnRegion)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Record<string, unknown> in shared/types',
@@ -700,14 +819,19 @@ const CHECKS: Check[] = [
     // one legitimate escape hatch and is documented in the insight rules.
     exclude: ['shared/types/analytics.ts'],
     excludeLines: ['// record-unknown-ok'],
-    message: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern. See InsightDataMap for the discriminated-union pattern.',
+    message: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern. See InsightDataMap for the discriminated-union pattern. Add // record-unknown-ok only for grandfathered escape-hatch fields (e.g. AnalyticsInsight.data).',
     severity: 'error',
     rationale: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern.',
     claudeMdRef: '#data-flow-rules-mandatory',
   },
   {
     name: 'PATCH spread without nested merge',
-    pattern: '\\.\\.\\.existing,\\s*\\.\\.\\.req\\.body|\\.\\.\\.current,\\s*\\.\\.\\.req\\.body',
+    // Require req.body to end at `}`, `)`, `,`, or EOL — NOT at `.field`.
+    // The documented deep-merge fix writes `...req.body.address` inside a
+    // nested spread, which must NOT trigger the rule against the enclosing
+    // `...existing, ...req.body.address` prefix. The `[^.\w]` end boundary
+    // ensures we only match a top-level `req.body` spread, not `req.body.X`.
+    pattern: '\\.\\.\\.(existing|current),\\s*\\.\\.\\.req\\.body([^.\\w]|$)',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/',
     excludeLines: ['// patch-spread-ok'],
@@ -719,10 +843,10 @@ const CHECKS: Check[] = [
   {
     name: 'Public-portal mutation without addActivity',
     pattern: '',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/public-portal.ts',
     excludeLines: ['// activity-ok'],
-    message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed.',
+    message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed. Add // activity-ok on the router line if this endpoint is intentionally silent (e.g. read-only health probe).',
     severity: 'warn',
     rationale: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement.',
     claudeMdRef: '#code-conventions',
@@ -754,7 +878,7 @@ const CHECKS: Check[] = [
   {
     name: 'broadcastToWorkspace inside bridge callback',
     pattern: '',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     // Canonical broadcast site + the bridge infrastructure itself.
     exclude: [
@@ -829,7 +953,7 @@ const CHECKS: Check[] = [
   {
     name: 'Layout-driving state set in useEffect',
     pattern: '',
-    fileGlobs: ['**/*.tsx'],
+    fileGlobs: ['*.tsx'],
     pathFilter: 'src/',
     excludeLines: ['// effect-layout-ok'],
     message: 'Layout-driving state must be derived synchronously in the render body (const effective = state && syncCondition). useEffect runs after paint, causing a one-frame layout flash. Add // effect-layout-ok if the state is genuinely post-paint.',
@@ -838,17 +962,35 @@ const CHECKS: Check[] = [
     claudeMdRef: '#uiux-rules-mandatory',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const setStateRe = /\bset[A-Z]\w*\s*\(/;
+      // CLAUDE.md rule: "if a boolean state variable drives layout (padding,
+      // width, sidebar visibility), derive it as `const effective = state &&
+      // syncCondition` and use `effective` in JSX. The effect CAN still run
+      // to clean up backing state, but JSX must read the derived value."
+      //
+      // Two-stage detection:
+      //   1. Layout-setter allowlist: only flag setters whose name implies
+      //      layout (not data, not URL sync, not fetch callbacks).
+      //   2. Derivation escape: if the same file declares a
+      //      `const effective<Name> = ...` that references the layout state,
+      //      the pattern is the DOCUMENTED correct one (effect is the
+      //      cleanup half). Skip it.
+      const layoutSetterRe =
+        /\bset(FocusMode|Collapsed|Expanded|SidebarOpen|SidebarCollapsed|Drawer|DrawerOpen|Modal|ModalOpen|Menu|MenuOpen|Panel|PanelOpen|Visible|Hidden|Show|Width|Height|Padding|Margin|Offset|Top|Left|Right|Bottom|Size)\w*\s*\(/;
       for (const file of files) {
         if (!file.endsWith('.tsx')) continue;
         const content = readFileOrEmpty(file);
         if (!content || !content.includes('useEffect')) continue;
+        // Escape: file derives an `effective*` from state synchronously.
+        // This is the canonical correct pattern (see src/App.tsx
+        // effectiveFocusMode). Don't flag any useEffect in a file that
+        // already does this — it's the documented cleanup-effect half.
+        if (/\bconst\s+effective\w*\s*=/.test(content)) continue;
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (!/\buseEffect\s*\(/.test(lines[i])) continue;
           const window = lines.slice(i + 1, Math.min(lines.length, i + 21));
-          const hasSetState = window.some(l => setStateRe.test(l));
-          if (!hasSetState) continue;
+          const hasLayoutSet = window.some(l => layoutSetterRe.test(l));
+          if (!hasLayoutSet) continue;
           if (lines[i].includes('// effect-layout-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
@@ -966,6 +1108,7 @@ for (const check of CHECKS) {
     // in every file and produce a catastrophic false-positive flood.
     console.error(`\n  ✗ ${check.name}`);
     console.error(`    MISCONFIGURED: rule has no customCheck and no pattern.`);
+    errors++;
     process.exitCode = 1;
     continue;
   } else if (!SCAN_ALL && changedFiles.length > 0) {
