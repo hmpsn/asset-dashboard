@@ -69,7 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_discovery_extractions_source ON discovery_extract
 
 CREATE TABLE IF NOT EXISTS voice_profiles (
   id                      TEXT PRIMARY KEY,
-  workspace_id            TEXT NOT NULL,
+  workspace_id            TEXT NOT NULL UNIQUE,
   status                  TEXT NOT NULL DEFAULT 'draft',
   voice_dna_json          TEXT,
   guardrails_json         TEXT,
@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS voice_profiles (
   updated_at              TEXT NOT NULL
 );
 
+-- UNIQUE on workspace_id already creates an implicit index, but keep the
+-- named one for clarity and for any future query planner visibility.
 CREATE INDEX IF NOT EXISTS idx_voice_profiles_workspace ON voice_profiles(workspace_id);
 
 CREATE TABLE IF NOT EXISTS voice_samples (

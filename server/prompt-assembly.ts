@@ -75,7 +75,7 @@ export function voiceDNAToPromptInstructions(dna: VoiceDNA): string {
   ].filter(Boolean).join('\n');
 }
 
-function guardrailsToPromptInstructions(guardrails: VoiceGuardrails): string {
+export function guardrailsToPromptInstructions(guardrails: VoiceGuardrails): string {
   const parts: string[] = ['Voice guardrails:'];
   if (guardrails.forbiddenWords.length > 0) {
     parts.push(`- Never use: ${guardrails.forbiddenWords.join(', ')}`);

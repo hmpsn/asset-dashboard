@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
+import { validate, z } from '../middleware/validate.js';
 import { upload } from '../middleware.js';
 import fs from 'fs';
 import { addActivity } from '../activity-log.js';
@@ -10,9 +11,29 @@ import {
   listExtractions, listExtractionsBySource,
   updateExtractionStatus, updateExtractionContent,
 } from '../discovery-ingestion.js';
-import type { SourceType, ExtractionStatus, ExtractionDestination } from '../../shared/types/brand-engine.js';
 
 const router = Router();
+
+// ── Zod schemas ─────────────────────────────────────────────────────────────
+
+const sourceTypeSchema = z.enum(['transcript', 'brand_doc', 'competitor', 'existing_copy', 'website_crawl']);
+const extractionStatusSchema = z.enum(['pending', 'accepted', 'dismissed']);
+const extractionDestinationSchema = z.enum(['voice_profile', 'brandscript', 'identity']);
+
+const pasteSourceSchema = z.object({
+  filename: z.string().optional(),
+  sourceType: sourceTypeSchema.optional().default('brand_doc'),
+  rawContent: z.string().min(1),
+});
+
+const patchExtractionSchema = z.object({
+  status: extractionStatusSchema.optional(),
+  routedTo: extractionDestinationSchema.optional(),
+  content: z.string().min(1).optional(),
+}).refine(
+  (v) => v.status !== undefined || v.content !== undefined,
+  { message: 'At least one of `content` or `status` is required' },
+);
 
 // List sources
 router.get('/api/discovery/:workspaceId/sources', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -27,7 +48,12 @@ router.post('/api/discovery/:workspaceId/sources',
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) return res.status(400).json({ error: 'No files uploaded' });
 
-    const sourceType = (req.body.sourceType || 'brand_doc') as SourceType;
+    // Multipart form field — validated inline rather than via `validate()`
+    // because the `validate()` middleware runs before multer populates req.body.
+    const sourceTypeInput = typeof req.body.sourceType === 'string' ? req.body.sourceType : 'brand_doc';
+    const parsed = sourceTypeSchema.safeParse(sourceTypeInput);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid sourceType' });
+    const sourceType = parsed.data;
     const sources = [];
 
     for (const file of files) {
@@ -62,10 +88,9 @@ router.post('/api/discovery/:workspaceId/sources',
 );
 
 // Upload source from pasted text — MUST be before /:id routes to avoid shadowing
-router.post('/api/discovery/:workspaceId/sources/text', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/discovery/:workspaceId/sources/text', requireWorkspaceAccess('workspaceId'), validate(pasteSourceSchema), (req, res) => {
   const { filename, sourceType, rawContent } = req.body;
-  if (!rawContent) return res.status(400).json({ error: 'rawContent required' });
-  const source = addSource(req.params.workspaceId, filename || 'pasted-text.txt', (sourceType || 'brand_doc') as SourceType, rawContent);
+  const source = addSource(req.params.workspaceId, filename || 'pasted-text.txt', sourceType, rawContent);
   addActivity(req.params.workspaceId, 'discovery_source_added', `Added discovery source "${source.filename}"`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: source.id });
   res.json(source);
@@ -103,20 +128,25 @@ router.get('/api/discovery/:workspaceId/sources/:id/extractions', requireWorkspa
 });
 
 // Update extraction status (accept/dismiss) and/or content (edit)
-router.patch('/api/discovery/:workspaceId/extractions/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.patch('/api/discovery/:workspaceId/extractions/:id', requireWorkspaceAccess('workspaceId'), validate(patchExtractionSchema), (req, res) => {
   const { status, routedTo, content } = req.body;
+
+  let touched = false;
   if (content !== undefined) {
-    updateExtractionContent(req.params.workspaceId, req.params.id, content);
+    const ok = updateExtractionContent(req.params.workspaceId, req.params.id, content);
+    if (!ok) return res.status(404).json({ error: 'Extraction not found' });
+    touched = true;
   }
   if (status) {
-    updateExtractionStatus(
-      req.params.workspaceId, req.params.id,
-      status as ExtractionStatus,
-      routedTo as ExtractionDestination | undefined,
-    );
+    const ok = updateExtractionStatus(req.params.workspaceId, req.params.id, status, routedTo);
+    if (!ok) return res.status(404).json({ error: 'Extraction not found' });
+    touched = true;
   }
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { extractionId: req.params.id });
-  res.json({ updated: true });
+
+  if (touched) {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { extractionId: req.params.id });
+  }
+  res.json({ updated: touched });
 });
 
 export default router;

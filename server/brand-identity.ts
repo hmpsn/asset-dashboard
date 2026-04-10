@@ -1,7 +1,6 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -100,7 +99,7 @@ function buildBrandContext(workspaceId: string): string {
         parts.push(`VOICE DNA:\nPersonality: ${profile.voiceDNA.personalityTraits.join(', ')}\nTone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10`);
       }
       if (profile.samples && profile.samples.length > 0) {
-        parts.push(`VOICE SAMPLES:\n${profile.samples.slice(0, 3).map(s => `[${s.contextTag}] "${s.content}"`).join('\n')}`);
+        parts.push(`VOICE SAMPLES:\n${profile.samples.slice(0, 3).map(s => `[${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`);
       }
     }
   } catch { /* voice profile not yet available */ }
@@ -160,18 +159,14 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
 
   log.info({ workspaceId, deliverableType }, 'generating brand identity deliverable');
 
-  const useAnthropic = isAnthropicConfigured();
-  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
-    messages: [{ role: 'user', content: userPrompt }],
-    ...(useAnthropic ? { system } : {}),
-    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+  const content = (await callCreativeAI({
+    systemPrompt: system,
+    userPrompt,
     maxTokens: 2000,
     temperature: 0.7,
     feature: 'brand-identity-generate',
     workspaceId,
-  } as Parameters<typeof callAnthropic>[0]);
-
-  const content = result.text.trim();
+  })).trim();
   const tier = DEFAULT_TIER_MAP[deliverableType] || 'professional';
 
   // Check if one already exists — update it
@@ -190,7 +185,8 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
       stmts().updateContent.run({ id: existing.id, content, status: 'draft', version: newVersion, updated_at: now });
     });
     doUpdate();
-    return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
+    // Use fresh `tier` from DEFAULT_TIER_MAP — map values may have shifted since the row was created.
+    return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, tier, updatedAt: now };
   }
 
   const id = `bid_${randomUUID().slice(0, 8)}`;
@@ -214,18 +210,14 @@ Return only the refined content — no preamble.`;
 
   const system = buildSystemPrompt(workspaceId, `You are a brand strategist refining a deliverable based on feedback. Make the requested changes while preserving what's working.`);
 
-  const useAnthropic = isAnthropicConfigured();
-  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
-    messages: [{ role: 'user', content: userPrompt }],
-    ...(useAnthropic ? { system } : {}),
-    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+  const content = (await callCreativeAI({
+    systemPrompt: system,
+    userPrompt,
     maxTokens: 2000,
     temperature: 0.6,
     feature: 'brand-identity-refine',
     workspaceId,
-  } as Parameters<typeof callAnthropic>[0]);
-
-  const content = result.text.trim();
+  })).trim();
   const now = new Date().toISOString();
   const newVersion = existing.version + 1;
 

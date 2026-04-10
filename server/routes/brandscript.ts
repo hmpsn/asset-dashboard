@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
+import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -12,15 +13,51 @@ import {
 
 const router = Router();
 
+// ── Zod schemas ─────────────────────────────────────────────────────────────
+
+const templateSectionSchema = z.object({
+  title: z.string().min(1),
+  purpose: z.string().min(1),
+});
+
+const createTemplateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional().default(''),
+  sections: z.array(templateSectionSchema).min(1),
+});
+
+const brandscriptSectionInputSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(1),
+  purpose: z.string().optional(),
+  content: z.string().optional(),
+});
+
+const createBrandscriptSchema = z.object({
+  name: z.string().min(1),
+  frameworkType: z.string().optional().default('storybrand'),
+  sections: z.array(brandscriptSectionInputSchema).optional().default([]),
+});
+
+const updateSectionsSchema = z.object({
+  sections: z.array(brandscriptSectionInputSchema),
+});
+
+const importBrandscriptSchema = z.object({
+  name: z.string().optional(),
+  rawText: z.string().min(1),
+});
+
+// ── Routes ──────────────────────────────────────────────────────────────────
+
 // Templates
 router.get('/api/brandscript-templates', (_req, res) => {
   res.json(listTemplates());
 });
 
-router.post('/api/brandscript-templates', (req, res) => {
+router.post('/api/brandscript-templates', validate(createTemplateSchema), (req, res) => {
   const { name, description, sections } = req.body;
-  if (!name || !sections?.length) return res.status(400).json({ error: 'name and sections required' });
-  res.json(createTemplate(name, description || '', sections));
+  res.json(createTemplate(name, description, sections));
 });
 
 // CRUD — use :workspaceId everywhere
@@ -29,9 +66,8 @@ router.get('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceId
 });
 
 // AI: Import from text — MUST be before /:workspaceId/:id to avoid shadowing
-router.post('/api/brandscripts/:workspaceId/import', requireWorkspaceAccess('workspaceId'), async (req, res) => {
+router.post('/api/brandscripts/:workspaceId/import', requireWorkspaceAccess('workspaceId'), validate(importBrandscriptSchema), async (req, res) => {
   const { name, rawText } = req.body;
-  if (!rawText) return res.status(400).json({ error: 'rawText required' });
   try {
     const bs = await importBrandscript(req.params.workspaceId, name || 'Imported Brandscript', rawText);
     addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
@@ -42,10 +78,9 @@ router.post('/api/brandscripts/:workspaceId/import', requireWorkspaceAccess('wor
   }
 });
 
-router.post('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/brandscripts/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createBrandscriptSchema), (req, res) => {
   const { name, frameworkType, sections } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
-  const bs = createBrandscript(req.params.workspaceId, name, frameworkType || 'storybrand', sections || []);
+  const bs = createBrandscript(req.params.workspaceId, name, frameworkType, sections);
   addActivity(req.params.workspaceId, 'brandscript_created', `Created brandscript "${bs.name}"`);
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
   res.json(bs);
@@ -57,9 +92,8 @@ router.get('/api/brandscripts/:workspaceId/:id', requireWorkspaceAccess('workspa
   res.json(bs);
 });
 
-router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess('workspaceId'), validate(updateSectionsSchema), (req, res) => {
   const { sections } = req.body;
-  if (!sections) return res.status(400).json({ error: 'sections required' });
   const result = updateBrandscriptSections(req.params.workspaceId, req.params.id, sections);
   if (!result) return res.status(404).json({ error: 'Not found' });
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });

@@ -32,8 +32,11 @@ export async function callCreativeAI(opts: {
   maxTokens: number;
   feature: string;
   workspaceId: string;
+  /** Optional temperature override (default: 0.7 for both providers) */
+  temperature?: number;
 }): Promise<string> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
+  const temperature = opts.temperature ?? CLAUDE_TEMP;
 
   if (isAnthropicConfigured()) {
     try {
@@ -42,7 +45,7 @@ export async function callCreativeAI(opts: {
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens,
-        temperature: CLAUDE_TEMP,
+        temperature,
         feature,
         workspaceId,
         maxRetries: 3,      // patient retries — quality over speed
@@ -60,7 +63,7 @@ export async function callCreativeAI(opts: {
     model: CONTENT_MODEL,
     messages: [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }],
     maxTokens,
-    temperature: CONTENT_TEMP,
+    temperature,
     feature,
     workspaceId,
   });

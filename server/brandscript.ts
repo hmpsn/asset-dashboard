@@ -1,7 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import { callOpenAI } from './openai-helpers.js';
+import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -232,18 +232,16 @@ Return valid JSON: { "sections": [{ "title": "exact title from above", "content"
   const system = buildSystemPrompt(workspaceId, 'You are a brand strategist completing a brandscript. Write in a natural, compelling voice. Return only valid JSON as instructed.');
 
   log.info({ workspaceId, brandscriptId, emptySections: emptySections.length }, 'completing brandscript with AI');
-  const useAnthropic = isAnthropicConfigured();
-  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
-    messages: [{ role: 'user', content: userPrompt }],
-    ...(useAnthropic ? { system } : {}),
-    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+  const text = await callCreativeAI({
+    systemPrompt: system,
+    userPrompt,
     maxTokens: 4000,
     temperature: 0.6,
     feature: 'brandscript-complete',
     workspaceId,
-  } as Parameters<typeof callAnthropic>[0]);
+  });
 
-  const parsed = parseJsonFallback<{ sections: { title: string; content: string }[] }>(result.text, { sections: [] });
+  const parsed = parseJsonFallback<{ sections: { title: string; content: string }[] }>(text, { sections: [] });
   const updatedSections = bs.sections.map(sec => {
     if (sec.content?.trim()) return sec;
     const drafted = parsed.sections.find(d => d.title === sec.title);

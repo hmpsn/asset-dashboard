@@ -1,9 +1,8 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
-import { callOpenAI } from './openai-helpers.js';
+import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
-import { buildSystemPrompt } from './prompt-assembly.js';
+import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
@@ -32,7 +31,10 @@ interface SessionRow {
 
 const stmts = createStmtCache(() => ({
   getProfileByWorkspace: db.prepare(`SELECT * FROM voice_profiles WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT 1`),
-  insertProfile: db.prepare(`INSERT INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
+  // INSERT OR IGNORE so concurrent getOrCreateVoiceProfile() calls don't trip the
+  // UNIQUE(workspace_id) constraint — whichever inserts first wins, the loser falls
+  // through and re-selects the committed row.
+  insertProfile: db.prepare(`INSERT OR IGNORE INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
   updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id`), // status-ok: voice profile status is not a platform state machine column
   listSamples: db.prepare(`SELECT * FROM voice_samples WHERE voice_profile_id = ? ORDER BY sort_order`),
   insertSample: db.prepare(`INSERT INTO voice_samples (id, voice_profile_id, content, context_tag, source, sort_order, created_at) VALUES (@id, @voice_profile_id, @content, @context_tag, @source, @sort_order, @created_at)`),
@@ -97,12 +99,18 @@ export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { s
     { context: 'FAQ / educational', description: 'Accessible, helpful. Expertise without condescension.' },
   ];
 
-  stmts().insertProfile.run({
+  const result = stmts().insertProfile.run({
     id, workspace_id: workspaceId, status: 'draft',
     voice_dna_json: null, guardrails_json: null,
     context_modifiers_json: JSON.stringify(defaultModifiers),
     created_at: now, updated_at: now,
   });
+
+  // If another request inserted first, IGNORE returns 0 changes — re-read the committed row.
+  if (result.changes === 0) {
+    const winner = getVoiceProfile(workspaceId);
+    if (winner) return winner;
+  }
 
   log.info({ workspaceId, profileId: id }, 'created voice profile');
   return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
@@ -168,8 +176,10 @@ export async function generateCalibrationVariations(
     ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}\n  Humor: ${profile.voiceDNA.humorStyle}`
     : '';
 
+  // Reuse the shared helper so empty arrays don't render as ", , ," lists and the
+  // phrasing stays in sync with what buildSystemPrompt layers into the system message.
   const guardrailsText = profile.guardrails
-    ? `\nGUARDRAILS:\n  Forbidden: ${profile.guardrails.forbiddenWords.join(', ')}\n  Required terms: ${profile.guardrails.requiredTerminology.map(t => `"${t.use}" not "${t.insteadOf}"`).join(', ')}\n  Boundaries: ${profile.guardrails.toneBoundaries.join('. ')}`
+    ? `\n${guardrailsToPromptInstructions(profile.guardrails)}`
     : '';
 
   const modifierText = profile.contextModifiers
@@ -191,18 +201,16 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
   const system = buildSystemPrompt(workspaceId, 'You are a copywriter matching a specific brand voice. Generate copy that sounds like this brand, not generic marketing language.');
 
   log.info({ workspaceId, promptType }, 'generating calibration variations');
-  const useAnthropic = isAnthropicConfigured();
-  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
-    messages: [{ role: 'user', content: userPrompt }],
-    ...(useAnthropic ? { system } : {}),
-    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+  const text = await callCreativeAI({
+    systemPrompt: system,
+    userPrompt,
     maxTokens: 2000,
     temperature: 0.85,
     feature: 'voice-calibration',
     workspaceId,
-  } as Parameters<typeof callAnthropic>[0]);
+  });
 
-  const parsed = parseJsonFallback<{ variations: string[] }>(result.text, { variations: [] });
+  const parsed = parseJsonFallback<{ variations: string[] }>(text, { variations: [] });
   const variations: CalibrationVariation[] = (parsed.variations || []).map(text => ({ text }));
 
   const id = `cal_${randomUUID().slice(0, 8)}`;
@@ -237,18 +245,16 @@ Return valid JSON: { "refined": "the refined text" }`;
 
   const system = buildSystemPrompt(workspaceId, 'You are a copywriter refining copy based on feedback. Adjust precisely as directed.');
 
-  const useAnthropic = isAnthropicConfigured();
-  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
-    messages: [{ role: 'user', content: userPrompt }],
-    ...(useAnthropic ? { system } : {}),
-    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+  const text = await callCreativeAI({
+    systemPrompt: system,
+    userPrompt,
     maxTokens: 1000,
     temperature: 0.75,
     feature: 'voice-refinement',
     workspaceId,
-  } as Parameters<typeof callAnthropic>[0]);
+  });
 
-  const parsed = parseJsonFallback<{ refined: string }>(result.text, { refined: original.text });
+  const parsed = parseJsonFallback<{ refined: string }>(text, { refined: original.text });
   session.variations.push({ text: parsed.refined });
   const newNotes = `${session.steeringNotes || ''}\n[Refined #${variationIndex}]: ${direction}`.trim();
 
