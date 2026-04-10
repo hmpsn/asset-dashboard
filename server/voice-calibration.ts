@@ -35,7 +35,7 @@ const stmts = createStmtCache(() => ({
   // UNIQUE(workspace_id) constraint — whichever inserts first wins, the loser falls
   // through and re-selects the committed row.
   insertProfile: db.prepare(`INSERT OR IGNORE INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
-  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id`), // status-ok: voice profile status is not a platform state machine column
+  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: voice profile status is not a platform state machine column
   listSamples: db.prepare(`SELECT * FROM voice_samples WHERE voice_profile_id = ? ORDER BY sort_order`),
   insertSample: db.prepare(`INSERT INTO voice_samples (id, voice_profile_id, content, context_tag, source, sort_order, created_at) VALUES (@id, @voice_profile_id, @content, @context_tag, @source, @sort_order, @created_at)`),
   deleteSampleById: db.prepare(`DELETE FROM voice_samples WHERE id = ? AND voice_profile_id = ?`),
@@ -127,6 +127,7 @@ export function updateVoiceProfile(
   const now = new Date().toISOString();
   stmts().updateProfile.run({
     id: profile.id,
+    workspace_id: workspaceId,
     status: updates.status ?? profile.status,
     voice_dna_json: updates.voiceDNA !== undefined ? JSON.stringify(updates.voiceDNA) : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
     guardrails_json: updates.guardrails !== undefined ? JSON.stringify(updates.guardrails) : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),

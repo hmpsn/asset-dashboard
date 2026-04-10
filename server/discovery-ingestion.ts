@@ -27,7 +27,7 @@ const stmts = createStmtCache(() => ({
   listSources: db.prepare(`SELECT * FROM discovery_sources WHERE workspace_id = ? ORDER BY created_at DESC`),
   getSource: db.prepare(`SELECT * FROM discovery_sources WHERE id = ? AND workspace_id = ?`),
   insertSource: db.prepare(`INSERT INTO discovery_sources (id, workspace_id, filename, source_type, raw_content, created_at) VALUES (@id, @workspace_id, @filename, @source_type, @raw_content, @created_at)`),
-  markProcessed: db.prepare(`UPDATE discovery_sources SET processed_at = ? WHERE id = ?`),
+  markProcessed: db.prepare(`UPDATE discovery_sources SET processed_at = @processed_at WHERE id = @id AND workspace_id = @workspace_id`),
   deleteSource: db.prepare(`DELETE FROM discovery_sources WHERE id = ? AND workspace_id = ?`),
   listExtractions: db.prepare(`SELECT * FROM discovery_extractions WHERE workspace_id = ? ORDER BY created_at DESC`),
   listExtractionsBySource: db.prepare(`SELECT * FROM discovery_extractions WHERE workspace_id = ? AND source_id = ? ORDER BY extraction_type, category`),
@@ -246,7 +246,7 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
         confidence, status: 'pending' as ExtractionStatus, createdAt: now,
       });
     }
-    stmts().markProcessed.run(now, sourceId);
+    stmts().markProcessed.run({ processed_at: now, id: sourceId, workspace_id: workspaceId });
     return inserted;
   });
 

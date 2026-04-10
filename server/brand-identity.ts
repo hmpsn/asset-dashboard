@@ -6,7 +6,7 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
-import { addVoiceSample, getVoiceProfile } from './voice-calibration.js';
+import { addVoiceSample, getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listBrandscripts } from './brandscript.js';
 import { listExtractions } from './discovery-ingestion.js';
 import type {
@@ -91,16 +91,17 @@ function buildBrandContext(workspaceId: string): string {
     }
   } catch { /* brandscript not yet available */ }
 
-  // Voice profile context
+  // Voice profile context — use buildVoiceCalibrationContext so DNA/guardrails are
+  // only injected here when profile.status !== 'calibrated'. When calibrated,
+  // buildSystemPrompt() (Layer 2) already injects them via prompt-assembly.ts;
+  // duplicating them wastes tokens and over-weights voice constraints.
   try {
     const profile = getVoiceProfile(workspaceId);
     if (profile) {
-      if (profile.voiceDNA) {
-        parts.push(`VOICE DNA:\nPersonality: ${profile.voiceDNA.personalityTraits.join(', ')}\nTone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10`);
-      }
-      if (profile.samples && profile.samples.length > 0) {
-        parts.push(`VOICE SAMPLES:\n${profile.samples.slice(0, 3).map(s => `[${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`);
-      }
+      const { samplesText, dnaText, guardrailsText } = buildVoiceCalibrationContext(profile);
+      if (dnaText) parts.push(dnaText.trim());
+      if (samplesText) parts.push(samplesText.trim());
+      if (guardrailsText) parts.push(guardrailsText.trim());
     }
   } catch { /* voice profile not yet available */ }
 
