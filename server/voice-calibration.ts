@@ -2,7 +2,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
@@ -33,7 +33,7 @@ interface SessionRow {
 const stmts = createStmtCache(() => ({
   getProfileByWorkspace: db.prepare(`SELECT * FROM voice_profiles WHERE workspace_id = ? ORDER BY updated_at DESC LIMIT 1`),
   insertProfile: db.prepare(`INSERT INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
-  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id`),
+  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id`), // status-ok: voice profile status is not a platform state machine column
   listSamples: db.prepare(`SELECT * FROM voice_samples WHERE voice_profile_id = ? ORDER BY sort_order`),
   insertSample: db.prepare(`INSERT INTO voice_samples (id, voice_profile_id, content, context_tag, source, sort_order, created_at) VALUES (@id, @voice_profile_id, @content, @context_tag, @source, @sort_order, @created_at)`),
   deleteSampleById: db.prepare(`DELETE FROM voice_samples WHERE id = ? AND voice_profile_id = ?`),
@@ -158,7 +158,7 @@ export async function generateCalibrationVariations(
   workspaceId: string, promptType: string, steeringNotes?: string,
 ): Promise<CalibrationSession> {
   const profile = getOrCreateVoiceProfile(workspaceId);
-  const { fullContext } = buildSeoContext(workspaceId);
+  const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
 
   const samplesText = profile.samples.length > 0
     ? `\nVOICE SAMPLES (write like these):\n${profile.samples.map(s => `  [${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`

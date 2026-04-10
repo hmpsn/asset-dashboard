@@ -32,7 +32,11 @@ router.post('/api/discovery/:workspaceId/sources',
 
     for (const file of files) {
       const ext = file.originalname.split('.').pop()?.toLowerCase();
-      if (ext !== 'txt' && ext !== 'md') continue;
+      if (ext !== 'txt' && ext !== 'md') {
+        // Clean up disk temp file for rejected types — multer doesn't auto-delete
+        if (file.path) { try { fs.unlinkSync(file.path); } catch { /* ignore cleanup errors */ } }
+        continue;
+      }
 
       if (!file.path) continue;
 

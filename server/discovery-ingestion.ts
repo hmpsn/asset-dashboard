@@ -1,7 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildIntelPrompt } from './workspace-intelligence.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
@@ -32,7 +32,7 @@ const stmts = createStmtCache(() => ({
   listExtractions: db.prepare(`SELECT * FROM discovery_extractions WHERE workspace_id = ? ORDER BY created_at DESC`),
   listExtractionsBySource: db.prepare(`SELECT * FROM discovery_extractions WHERE source_id = ? ORDER BY extraction_type, category`),
   insertExtraction: db.prepare(`INSERT INTO discovery_extractions (id, source_id, workspace_id, extraction_type, category, content, source_quote, confidence, status, created_at) VALUES (@id, @source_id, @workspace_id, @extraction_type, @category, @content, @source_quote, @confidence, @status, @created_at)`),
-  updateExtractionStatus: db.prepare(`UPDATE discovery_extractions SET status = @status, routed_to = @routed_to WHERE id = @id AND workspace_id = @workspace_id`),
+  updateExtractionStatus: db.prepare(`UPDATE discovery_extractions SET status = @status, routed_to = @routed_to WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: extraction status is not a platform state machine column
   updateExtractionContent: db.prepare(`UPDATE discovery_extractions SET content = @content WHERE id = @id AND workspace_id = @workspace_id`),
 }));
 
@@ -108,7 +108,7 @@ export async function processSource(workspaceId: string, sourceId: string): Prom
 
   const source = rowToSource(row);
   const confidence = confidenceForSourceType(source.sourceType);
-  const { fullContext } = buildSeoContext(workspaceId);
+  const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
 
   const sourceLabel = source.sourceType === 'transcript'
     ? 'a discovery call transcript'

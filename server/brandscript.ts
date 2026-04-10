@@ -1,8 +1,8 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { callAnthropic } from './anthropic-helpers.js';
+import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
@@ -90,9 +90,20 @@ export function createBrandscript(
   const now = new Date().toISOString();
   const id = `bs_${randomUUID().slice(0, 8)}`;
 
+  // When no sections are provided, fall back to the seeded template for the framework type.
+  // The migration seeds 'tmpl_storybrand' — any registered framework uses tmpl_{frameworkType}.
+  let effectiveSections = sections;
+  if (effectiveSections.length === 0) {
+    const templateRow = stmts().getTemplate.get(`tmpl_${frameworkType}`) as TemplateRow | undefined;
+    if (templateRow) {
+      const tmpl = rowToTemplate(templateRow);
+      effectiveSections = tmpl.sections; // { title, purpose }[] — content will be filled by AI or user
+    }
+  }
+
   const doCreate = db.transaction((): BrandscriptSection[] => {
     stmts().insert.run({ id, workspace_id: workspaceId, name, framework_type: frameworkType, created_at: now, updated_at: now });
-    return sections.map((sec, i) => {
+    return effectiveSections.map((sec, i) => {
       const secId = `bss_${randomUUID().slice(0, 8)}`;
       stmts().insertSection.run({
         id: secId, brandscript_id: id, title: sec.title,
@@ -195,7 +206,7 @@ export async function completeBrandscript(
   const bs = getBrandscript(workspaceId, brandscriptId);
   if (!bs) return null;
 
-  const { fullContext } = buildSeoContext(workspaceId);
+  const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
   const filledSections = bs.sections.filter(sec => sec.content?.trim());
   const emptySections = bs.sections.filter(sec => !sec.content?.trim());
 
@@ -221,14 +232,16 @@ Return valid JSON: { "sections": [{ "title": "exact title from above", "content"
   const system = buildSystemPrompt(workspaceId, 'You are a brand strategist completing a brandscript. Write in a natural, compelling voice. Return only valid JSON as instructed.');
 
   log.info({ workspaceId, brandscriptId, emptySections: emptySections.length }, 'completing brandscript with AI');
-  const result = await callAnthropic({
+  const useAnthropic = isAnthropicConfigured();
+  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
     messages: [{ role: 'user', content: userPrompt }],
-    system,
+    ...(useAnthropic ? { system } : {}),
+    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
     maxTokens: 4000,
     temperature: 0.6,
     feature: 'brandscript-complete',
     workspaceId,
-  });
+  } as Parameters<typeof callAnthropic>[0]);
 
   const parsed = parseJsonFallback<{ sections: { title: string; content: string }[] }>(result.text, { sections: [] });
   const updatedSections = bs.sections.map(sec => {

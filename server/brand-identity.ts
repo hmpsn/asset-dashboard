@@ -2,7 +2,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { callAnthropic, isAnthropicConfigured } from './anthropic-helpers.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildSeoContext } from './seo-context.js';
+import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
@@ -35,7 +35,7 @@ const stmts = createStmtCache(() => ({
   getByType: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND deliverable_type = ? ORDER BY updated_at DESC LIMIT 1`),
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
   updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, updated_at = @updated_at WHERE id = @id`),
-  updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`),
+  updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
   listVersions: db.prepare(`SELECT * FROM brand_identity_versions WHERE deliverable_id = ? ORDER BY version DESC`),
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
@@ -143,7 +143,7 @@ function getDeliverableInstructions(type: DeliverableType): string {
 }
 
 export async function generateDeliverable(workspaceId: string, deliverableType: DeliverableType): Promise<BrandDeliverable> {
-  const { fullContext } = buildSeoContext(workspaceId);
+  const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
   const brandContext = buildBrandContext(workspaceId);
   const instructions = getDeliverableInstructions(deliverableType);
 
