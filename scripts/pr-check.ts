@@ -105,9 +105,17 @@ function cachedChangedFiles(): string[] {
  * false-negatives on legitimate violations. Any two statements separated by a
  * real function boundary are also separated by the opener of the next
  * function; the opener alone is always sufficient.
+ *
+ * The arrow-function alternative anchors `=>` at end-of-line (optionally
+ * followed by `{`) so we only match function *declarations* whose body starts
+ * on the same or the next line. Inline arrow *expressions* like
+ * `const ids = items.map(item => item.id)` are deliberately excluded — they
+ * are not function boundaries for multi-step write detection (Rule 3). A
+ * single-line arrow body (`const add = (a, b) => a + b;`) cannot contain
+ * multi-step writes, so ignoring it is safe.
  */
 const FUNC_BOUNDARY_RE =
-  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>)/;
+  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>\s*\{?\s*$)/;
 
 // ─── Rule window sizes ────────────────────────────────────────────────────────
 //
@@ -177,7 +185,7 @@ const USE_EFFECT_BODY_LOOKAHEAD = 60;
 
 export type CustomCheckMatch = { file: string; line: number; text: string };
 
-type Check = {
+export type Check = {
   name: string;
   /**
    * Ripgrep/grep pattern for the single-line scan path. Optional when
@@ -1222,9 +1230,19 @@ const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'te
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES = ['test-branding.ts'];
 
-function checkDirectory(dir: string, check: Check): string[] {
+// Exported for tests/pr-check.test.ts — see the 'pathFilter vs EXCLUDED_DIRS
+// collision' regression test. Not part of the public API; do not import from
+// anywhere except the test harness.
+export function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
-  const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
+  // If the rule opts into a normally-excluded directory via pathFilter (e.g.
+  // 'tests/'), that directory must NOT be in the grep --exclude-dir list.
+  // grep applies --exclude-dir against the starting directory too, so
+  // `grep -r --exclude-dir="tests" tests/` returns zero matches — the exact
+  // silent-false-negative class this audit prevents.
+  const pathFilterDir = check.pathFilter?.replace(/\/$/, '').split('/').pop() ?? null;
+  const effectiveExcludeDirs = EXCLUDED_DIRS.filter(d => d !== pathFilterDir);
+  const excludeDirs = effectiveExcludeDirs.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   try {
     const out = execSync(
@@ -1277,13 +1295,21 @@ function resolveCheckFileList(check: Check): string[] {
     ).map(f => path.join(ROOT, f));
   }
   // Full scan: walk the pathFilter dir (or project root) for each fileGlob.
+  // A rule that opts into a normally-excluded directory via pathFilter (e.g.
+  // `pathFilter: 'tests/'`) must still scan that directory on a full run. The
+  // diff-only branch above already has this carve-out; mirror it here so the
+  // `--all` path is a proper superset of the diff path.
   const baseDir = path.join(ROOT, check.pathFilter ?? '.');
+  // Basename of the pathFilter leaf (e.g. 'tests/' → 'tests', 'server/routes/'
+  // → 'routes'). Compared against EXCLUDED_DIRS basenames so a rule that opts
+  // into an excluded dir via pathFilter is actually scanned.
+  const pathFilterDir = check.pathFilter?.replace(/\/$/, '').split('/').pop() ?? null;
   const all = new Set<string>();
   for (const glob of check.fileGlobs) {
     const pattern = glob.replace('**/', '');
     for (const f of getFiles(baseDir, pattern)) {
       if (isExcluded(f, check.exclude)) continue;
-      if (EXCLUDED_DIRS.some(d => f.includes(`/${d}/`))) continue;
+      if (EXCLUDED_DIRS.some(d => d !== pathFilterDir && f.includes(`/${d}/`))) continue;
       if (EXCLUDED_FILES.some(ef => f.endsWith('/' + ef))) continue;
       all.add(f);
     }

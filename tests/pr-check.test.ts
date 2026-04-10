@@ -26,7 +26,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import { CHECKS, type CustomCheckMatch } from '../scripts/pr-check.js';
+import { CHECKS, checkDirectory, type Check, type CustomCheckMatch } from '../scripts/pr-check.js';
 
 let TMPDIR: string;
 
@@ -206,6 +206,47 @@ describe('Rule: Multi-step DB writes outside db.transaction()', () => {
         "  });",
         "  txn();",
         "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // Regression for FUNC_BOUNDARY_RE greedy `.*=>` bug: an inline arrow
+  // *expression* like `const ids = items.map(item => item.id)` is NOT a
+  // function boundary. Before the fix, the regex matched any `const ... =>`
+  // line, causing Rule 3 to stop its backward scan mid-function and silently
+  // miss real multi-step write violations.
+  it('flags multi-step writes separated by an inline arrow expression (FUNC_BOUNDARY_RE regression)', () => {
+    const file = write(
+      uniqPath('rule-03', 'server/arrow-expr.ts'),
+      lines(
+        "import db from './db.js';",                                      // 1
+        "export function save(rows: Array<{ id: string }>) {",            // 2
+        "  db.prepare('INSERT INTO a VALUES (?)').run('x');",             // 3
+        "  const ids = rows.map(r => r.id);",                             // 4 — inline arrow, NOT a boundary
+        "  db.prepare('INSERT INTO b VALUES (?)').run(ids[0]);",          // 5
+        "}",                                                              // 6
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  // Complementary negative: a REAL arrow function declaration between the
+  // two writes IS a boundary (the second write is inside a different
+  // function's body), so Rule 3 must NOT flag.
+  it('does not flag writes in separate arrow-function declarations', () => {
+    const file = write(
+      uniqPath('rule-03', 'server/arrow-decl.ts'),
+      lines(
+        "import db from './db.js';",
+        "export const first = () => {",
+        "  db.prepare('INSERT INTO a VALUES (?)').run('x');",
+        "};",
+        "export const second = () => {",
+        "  db.prepare('INSERT INTO b VALUES (?)').run('y');",
+        "};",
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
@@ -729,6 +770,79 @@ describe('Rule: Layout-driving state set in useEffect', () => {
 // Adding a customCheck rule? Add it to EXPECTED_CUSTOM_CHECK_RULES below AND
 // write trigger/hatch-inline/hatch-above/negative tests for it.
 // Removing a customCheck rule? Delete its describe block AND its entry here.
+// ════════════════════════════════════════════════════════════════════════════
+// Regression: full-scan pathFilter vs EXCLUDED_DIRS collision
+// ════════════════════════════════════════════════════════════════════════════
+//
+// A rule like `{ pathFilter: 'tests/', pattern: 'expect\\(true\\)' }` must
+// scan the `tests/` directory on a full run even though 'tests' is in
+// EXCLUDED_DIRS. Two silent-false-negative bugs were fixed here:
+//
+//   1. checkDirectory passed --exclude-dir="tests" to grep while invoking
+//      `grep -r ... tests/`. grep excludes the starting dir when it matches
+//      --exclude-dir, so the three `pathFilter: 'tests/'` rules caught zero
+//      matches on --all for the entire lifetime of PR A. The fix strips the
+//      pathFilter basename from the effective exclude list.
+//
+//   2. resolveCheckFileList's full-scan walker applied EXCLUDED_DIRS to every
+//      file under `tests/` in the same way, producing zero files for any
+//      customCheck rule with `pathFilter: 'tests/'` (none exist today, but
+//      the bug would silently bite the moment one was added).
+//
+// Both fixes key off the pathFilter leaf basename. Both branches now behave
+// as a proper superset of the diff-only branch (which already had the
+// carve-out).
+
+describe('Regression: pathFilter can opt into an EXCLUDED_DIRS directory', () => {
+  // Use a synthetic token for the fixture body so this test file does not
+  // itself trigger the real `Placeholder test assertion` rule on --all
+  // (that rule now correctly scans tests/ after the pathFilter fix).
+  const TOKEN = 'SYNTHETIC_PATHFILTER_REGRESSION_TOKEN_XYZ';
+  const PATTERN = TOKEN;
+
+  it('checkDirectory finds matches when pathFilter targets an otherwise-excluded dir', () => {
+    // Write a fixture under <TMPDIR>/pathfilter-regression/tests/foo.ts —
+    // the final path segment must literally be `tests` so grep's
+    // --exclude-dir="tests" would normally reject it.
+    write('pathfilter-regression/tests/foo.ts', `${TOKEN}\n`);
+    const scanDir = path.join(TMPDIR, 'pathfilter-regression', 'tests');
+    const fakeCheck: Check = {
+      name: '__regression_placeholder__',
+      pattern: PATTERN,
+      fileGlobs: ['*.ts'],
+      pathFilter: 'tests/',
+      message: 'test',
+      severity: 'error',
+    };
+    const matches = checkDirectory(scanDir, fakeCheck);
+    // Before the fix: matches.length === 0 (grep silently excluded the
+    // starting dir). After the fix: the violation is found.
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.some((m) => m.includes('foo.ts'))).toBe(true);
+  });
+
+  it('checkDirectory still honours EXCLUDED_DIRS for unrelated dirs', () => {
+    // Sanity: the fix removes ONLY the pathFilter basename from the exclude
+    // list. Other EXCLUDED_DIRS (node_modules, dist, etc.) must still be
+    // filtered out so a rule with pathFilter:'tests/' doesn't accidentally
+    // start scanning vendor code nested underneath tests/.
+    write('pathfilter-sanity/tests/node_modules/vendor.ts', `${TOKEN}\n`);
+    write('pathfilter-sanity/tests/real.ts', `${TOKEN}\n`);
+    const scanDir = path.join(TMPDIR, 'pathfilter-sanity', 'tests');
+    const fakeCheck: Check = {
+      name: '__regression_placeholder_sanity__',
+      pattern: PATTERN,
+      fileGlobs: ['*.ts'],
+      pathFilter: 'tests/',
+      message: 'test',
+      severity: 'error',
+    };
+    const matches = checkDirectory(scanDir, fakeCheck);
+    expect(matches.some((m) => m.includes('real.ts'))).toBe(true);
+    expect(matches.some((m) => m.includes('node_modules'))).toBe(false);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',

@@ -218,10 +218,12 @@ When a rule needs to confirm two patterns are in the **same** function, it's tem
 
 ```ts
 const funcBoundaryRe =
-  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>)/;
+  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>\s*\{?\s*$)/;
 ```
 
 Any two writes separated by a real function boundary are also separated by the opener of the second function. The opener is always sufficient; the closer is always a false-negative generator.
+
+Note the `=>\s*\{?\s*$` anchor on the arrow-function alternative. Without it, the regex greedy-matches any `const x = ... =>` line, including inline arrow *expressions* like `const ids = items.map(item => item.id)`. Those are not function boundaries — treating them as such causes Rule 3 to stop scanning backward mid-function and silently miss real multi-step write violations. Anchor the `=>` at end-of-line (optionally followed by `{`) so only real declarations match.
 
 ### customCheck hatch placement: implement preceding-line lookbehind
 
