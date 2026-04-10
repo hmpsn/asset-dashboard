@@ -94,7 +94,13 @@ type CustomCheckMatch = { file: string; line: number; text: string };
 
 type Check = {
   name: string;
-  pattern: string;
+  /**
+   * Ripgrep/grep pattern for the single-line scan path. Optional when
+   * `customCheck` is present — custom checks implement their own detection.
+   * A missing/empty pattern with no customCheck is a misconfiguration and
+   * the runner aborts to avoid `grep -E ""` matching every line.
+   */
+  pattern?: string;
   fileGlobs: string[];
   exclude?: string | string[];
   pathFilter?: string;  // only scan files under this path prefix
@@ -759,7 +765,10 @@ const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const bridgeRe = /\b(executeBridge|fireBridge)\s*\(/;
+      // Also matches debounceBridge — wrapper functions that accept bridge
+      // callbacks and apply rate limiting. A broadcast inside the callback
+      // body still double-fires once the debounced bridge runs.
+      const bridgeRe = /\b(executeBridge|fireBridge|debounceBridge)\s*\(/;
       for (const file of files) {
         if (!file.endsWith('.ts')) continue;
         if (/\/(broadcast|websocket|ws-events|bridge-infrastructure)\.ts$/.test(file)) continue;
@@ -946,6 +955,14 @@ for (const check of CHECKS) {
     const files = resolveCheckFileList(check);
     const raw = check.customCheck(files);
     matches = formatCustomMatches(check, raw);
+  } else if (!check.pattern) {
+    // Defensive: a check with neither a customCheck nor a pattern is
+    // misconfigured. Falling through to grep -E "" would match every line
+    // in every file and produce a catastrophic false-positive flood.
+    console.error(`\n  ✗ ${check.name}`);
+    console.error(`    MISCONFIGURED: rule has no customCheck and no pattern.`);
+    process.exitCode = 1;
+    continue;
   } else if (!SCAN_ALL && changedFiles.length > 0) {
     // Only check changed files that match the glob extensions
     const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
