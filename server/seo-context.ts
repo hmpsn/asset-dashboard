@@ -172,7 +172,7 @@ export function buildSeoContext(
   if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId && !internalOpts?._skipShadow) {
     void (async () => {
       try {
-        const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');
+        const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js'); // dynamic-import-ok — circular dep prevention in shadow-mode fire-and-forget
         const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath, learningsDomain });
 
         if (intel.seoContext) {
