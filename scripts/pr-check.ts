@@ -121,7 +121,12 @@ const CHECKS: Check[] = [
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],
-    // json-validation.ts is the implementation; the rest parse AI API response strings (not DB columns)
+    // This rule's INTENT is "server-side DB column parses must use parseJsonSafe".
+    // Narrowed to `server/` so it can't accidentally fire on frontend code
+    // (sessionStorage reads, WebSocket message handlers, etc.) which is a
+    // different class of parse. Adding a new server/ exclusion means the file
+    // parses non-DB data (AI response strings, file contents, WS messages).
+    pathFilter: 'server/',
     exclude: [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',

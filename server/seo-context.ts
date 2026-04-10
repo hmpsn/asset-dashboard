@@ -111,7 +111,14 @@ export function buildSeoContext(
     const brandscriptBlock = buildBrandscriptContext(workspaceId);
     const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
     const identityBlock = buildIdentityContext(workspaceId);
-    const effectiveBrandVoice = voiceProfileBlock || brandVoiceBlock;
+    // When ANY voice profile exists (even calibrated-but-empty), we must not
+    // fall back to the legacy `brandVoiceBlock` — that would put two
+    // potentially contradictory voice sources in front of the model
+    // simultaneously (the legacy block in the user prompt, the calibrated
+    // DNA/guardrails in the system prompt via Layer 2). The voice profile
+    // is the single source of truth once it exists.
+    const hasVoiceProfile = getVoiceProfile(workspaceId) !== null;
+    const effectiveBrandVoice = hasVoiceProfile ? voiceProfileBlock : brandVoiceBlock;
     const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
     // Inject workspace learnings if feature is enabled
     if (isFeatureEnabled('outcome-ai-injection')) {
@@ -162,7 +169,10 @@ export function buildSeoContext(
   const brandscriptBlock = buildBrandscriptContext(workspaceId);
   const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
   const identityBlock = buildIdentityContext(workspaceId);
-  const effectiveBrandVoice = voiceProfileBlock || brandVoiceBlock;
+  // See note above: a voice profile, once it exists, is the ONLY voice source.
+  // Legacy `brandVoiceBlock` is used solely when no profile exists at all.
+  const hasVoiceProfile = getVoiceProfile(workspaceId) !== null;
+  const effectiveBrandVoice = hasVoiceProfile ? voiceProfileBlock : brandVoiceBlock;
   const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
   // Inject workspace learnings if feature is enabled
   if (isFeatureEnabled('outcome-ai-injection')) {

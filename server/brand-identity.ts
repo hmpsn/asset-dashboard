@@ -299,57 +299,82 @@ export function setDeliverableStatus(
   id: string,
   status: 'approved' | 'draft',
 ): BrandDeliverable | null {
-  const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
-  if (!row) return null;
-
-  // Capture the pre-update status BEFORE writing — we need to know whether this
-  // is a first-time approval (draft → approved) vs a re-approval (already approved,
-  // no-op on status). The auto-sample side effect must only run on the transition.
-  const priorStatus = row.status;
-  const now = new Date().toISOString();
-  stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
-  log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
-
-  if (status !== 'approved') {
-    return { ...rowToDeliverable(row), status, updatedAt: now };
-  }
-
-  // Re-approval of an already-approved deliverable must NOT duplicate the voice
-  // sample. Without this guard, every idempotent PATCH (e.g. a client retry, or
-  // an admin clicking "Approve" twice) inserts another copy of the same content
-  // into the voice samples table.
-  if (priorStatus === 'approved') {
-    return { ...rowToDeliverable(row), status: 'approved', updatedAt: now };
-  }
-
-  // Spec Addendum §5: auto-create voice sample for approved identity deliverables.
+  // Read + write + side-effect decision MUST be atomic. Two concurrent
+  // `setDeliverableStatus(wsId, id, 'approved')` calls without a transaction
+  // can both observe `priorStatus = 'draft'`, both pass the re-approval
+  // short-circuit, and both insert a duplicate voice sample. SQLite serializes
+  // writes — wrapping this in `db.transaction()` means the second caller sees
+  // `priorStatus = 'approved'` and short-circuits correctly.
   //
-  // Intentionally decoupled from the updateStatus write above — approval is the
-  // user-visible primary effect and must succeed even if the downstream sample
-  // insert fails (e.g. voice_profiles FK issues, unexpected table state). The
-  // per-call atomicity that CLAUDE.md wants lives inside `addVoiceSample`, which
-  // wraps its own profile-upsert + sample-insert in db.transaction(). If that
-  // fails we log and move on; the admin can manually seed the sample later.
-  const type = row.deliverable_type as DeliverableType;
-  const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
-    tagline: 'headline',
-    elevator_pitch: 'body',
-    tone_examples: 'body',
-  };
-  const contextTag = voiceSampleMap[type];
-  if (contextTag) {
+  // `addVoiceSample` wraps its own writes in a transaction; better-sqlite3
+  // promotes nested transactions to SAVEPOINTs, so this composes cleanly.
+  //
+  // The broadcast is deliberately deferred to AFTER the transaction commits —
+  // a broadcast inside a transaction would fire even if a later statement
+  // rolled back, and WebSocket delivery is a visible side effect we cannot undo.
+  const txResult = db.transaction(() => {
+    const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+    if (!row) return null;
+
+    // Capture the pre-update status BEFORE writing — we need to know whether
+    // this is a first-time approval (draft → approved) vs a re-approval
+    // (already approved, no-op on status). The auto-sample side effect must
+    // only run on the transition.
+    const priorStatus = row.status;
+    const now = new Date().toISOString();
+    stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
+    log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
+
+    if (status !== 'approved') {
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
+    }
+
+    // Re-approval of an already-approved deliverable must NOT duplicate the
+    // voice sample. Without this guard, every idempotent PATCH (e.g. a client
+    // retry, or an admin clicking "Approve" twice) inserts another copy of
+    // the same content into the voice samples table. The transaction makes
+    // this check race-free: two concurrent callers are serialized and only
+    // one sees `priorStatus === 'draft'`.
+    if (priorStatus === 'approved') {
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
+    }
+
+    // Spec Addendum §5: auto-create voice sample for approved identity
+    // deliverables. `addVoiceSample` has its own transaction which becomes a
+    // nested SAVEPOINT here; if it throws we catch, log, and let the outer
+    // transaction commit — approval is the primary effect and must succeed
+    // even if the downstream sample insert fails.
+    const type = row.deliverable_type as DeliverableType;
+    const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
+      tagline: 'headline',
+      elevator_pitch: 'body',
+      tone_examples: 'body',
+    };
+    const contextTag = voiceSampleMap[type];
+    if (!contextTag) {
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
+    }
+
     try {
       addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
       log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
-      // Tell any mounted VoiceTab to refetch — the auto-created sample would
-      // otherwise only appear after a manual reload.
-      broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { autoSampleFrom: type });
+      return { row, now, autoSampleFrom: type };
     } catch (err) {
       log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
     }
+  })();
+
+  if (!txResult) return null;
+
+  // Post-commit side effect — a mounted VoiceTab refetches its sample list.
+  // Must be outside the transaction so we never broadcast a sample that got
+  // rolled back, and never hold the write lock across I/O.
+  if (txResult.autoSampleFrom) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { autoSampleFrom: txResult.autoSampleFrom });
   }
 
-  return { ...rowToDeliverable(row), status: 'approved', updatedAt: now };
+  return { ...rowToDeliverable(txResult.row), status, updatedAt: txResult.now };
 }
 
 export function exportDeliverables(workspaceId: string, tier?: DeliverableTier): string {
