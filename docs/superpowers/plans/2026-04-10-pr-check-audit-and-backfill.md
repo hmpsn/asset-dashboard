@@ -35,7 +35,7 @@ PR B: Mechanical backfill (depends on PR A merged to staging + staging CI green)
   └── Task B6: Fix untyped dynamic imports (44 matches)
   └── Task B7: Fix unguarded recordAction calls (8 matches)
   └── Task B8: Backfill UPDATE/DELETE missing workspace_id scope (39 matches)
-  └── Task B9: Polish pr-check.ts from scaled-review findings (rationale, Record spacing, pathFilter, variable shadow, forEach)
+  └── Task B9: Polish pr-check.ts from scaled-review findings (Record spacing, pathFilter, forEach, ws-scope SQL tokeniser, ALTER TABLE ADD COLUMN)
   └── Task B10: Upgrade PR A rules warn → error
   ──▶ [merge PR B to staging] ──▶ [verify staging CI green] ──▶ [STOP — do not touch main]
 
@@ -71,7 +71,7 @@ PR C: CLAUDE.md split (depends on PR B merged to staging + staging CI green)
 | B6 (untyped dynamic imports) | **sonnet** | Each dynamic import needs a matching `import type` and local type annotation. Requires reading the imported module's exports. |
 | B7 (recordAction guards) | **haiku** | Add `if (workspaceId)` wrapper around each call. |
 | B8 (workspace_id backfill) | **opus** | SQL edits + caller threading + hatch judgment on 39 sites. Highest-stakes backfill task — a wrong hatch opens a cross-tenant read. |
-| B9 (pr-check.ts polish) | **sonnet** | Rule copy-edit, pattern tweak, variable rename, `.forEach` → `for...of` migration. All internal to `scripts/pr-check.ts`. |
+| B9 (pr-check.ts polish) | **sonnet** | Rule copy-edit, pattern tweak, `.forEach` → `for...of` migration, ws-scope SQL tokeniser, ALTER TABLE ADD COLUMN support. All internal to `scripts/pr-check.ts`. |
 | B10 (warn → error upgrade) | **haiku** | Severity string swap in `scripts/pr-check.ts`. |
 | C1 (generator script) | **sonnet** | Parse `CHECKS` array, emit markdown table. Moderate TS authoring. |
 | C2 (CLAUDE.md split) | **sonnet** | Judgment on what stays philosophical vs. auto-enforced. Copy-edit. |
@@ -1294,10 +1294,16 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 ### Task B9: Polish pr-check.ts and authoring guide from scaled-review findings
 
 > Added 2026-04-10 from the PR A scaled code review (low-signal findings #2–#7) plus learnings from the funcBoundaryRe bug discovered post-merge. None block merge; all improve rule quality, consistency, or maintainability. Bundled into one commit.
+>
+> **Status as of commit a82e202 (PR A scaled-review polish — landed 2026-04-10):**
+> - Step 1 (rationale ≈ message collapse) — **DONE** in a82e202 across all 11 customCheck rules.
+> - Step 4 (rename shadowed `window` variable) — **DONE** in a82e202 at 5 sites (renamed to `lookahead` / `lookbehind` / `routeBody` / `effectBody` per context).
+> - Step 5 (Rule 3 preceding-line hatch message) — **DONE** in earlier commit (`fix(pr-check): remove closing-brace from funcBoundaryRe; handle txn-ok on preceding line`).
+> - Steps 2, 3, 6, 7, 8 remain pending and are the scope of B9.
 
 **Files owned by this task:**
 - `scripts/pr-check.ts`
-- `docs/rules/pr-check-rule-authoring.md` (message update for Rule 3 only)
+- `docs/rules/pr-check-rule-authoring.md` (message update for Rule 3 only, if Step 5 ever gets revisited)
 
 - [ ] **Step 1: Collapse `message` ≈ `rationale` duplication (finding #2)**
 
@@ -1367,31 +1373,130 @@ for (const file of files) { ... }
 
 Skip this step if any `.forEach` callback uses `return` for early-exit — `for...of` needs `continue` instead, and the rewrite is non-trivial in that case. For those sites, leave a `// TODO: migrate when refactoring` comment instead.
 
-- [ ] **Step 7: Verify no regressions**
+- [ ] **Step 7: Tokenise the ws-scope SQL blob extractor (deferred from PR A scaled review, finding #19)**
 
-```bash
-npm run typecheck && npx tsx scripts/pr-check.ts --all
+The `UPDATE/DELETE missing workspace_id scope` rule (`customCheck` body around `scripts/pr-check.ts:856`) currently reconstructs the SQL string for each `db.prepare()` call by slicing `WS_SCOPE_SQL_LOOKAHEAD` lines and truncating at the first `);` literal it finds:
+
+```ts
+const chunk = lines.slice(i, Math.min(lines.length, i + WS_SCOPE_SQL_LOOKAHEAD)).join('\n');
+// TODO(pr-b): see scripts/pr-check.ts
+const closeIdx = chunk.indexOf(');');
+const sqlBlob = closeIdx >= 0 ? chunk.slice(0, closeIdx) : chunk;
 ```
 
-Expected: identical error/warning counts to the pre-polish baseline. None of these edits should change any rule's match count.
+This is wrong when `);` appears *inside* a SQL string literal or comment (e.g. a `CHECK (col IN ('foo');'bar')` constraint, an inline SQL comment containing `);`, or a string fragment with `');`). No known false-positives today, but any new complex UPDATE with a parenthesised sub-expression could silently drop half the statement and skip the `workspace_id` scan, producing a false-*negative* that quietly loses rule coverage.
 
-- [ ] **Step 8: Commit**
+**Fix:** replace the `indexOf(');')` with a proper paren-depth tokeniser that walks character-by-character, tracks the current string-literal delimiter (`` ` ``, `'`, `"`), ignores `(` / `)` inside string literals, and stops when depth returns to zero. Roughly:
+
+```ts
+function extractDbPrepareArg(chunk: string): string {
+  const startIdx = chunk.search(/db\.prepare\s*\(/);
+  if (startIdx === -1) return chunk;
+  let i = chunk.indexOf('(', startIdx);
+  if (i === -1) return chunk;
+  i++; // step past the opening (
+  const argStart = i;
+  let depth = 1;
+  let quote: string | null = null;
+  while (i < chunk.length) {
+    const ch = chunk[i];
+    if (quote) {
+      // Backtick template literals honour ${...} interpolation but we
+      // don't care — we're tokenising for SQL extraction, not JS execution.
+      if (ch === '\\' && i + 1 < chunk.length) { i += 2; continue; }
+      if (ch === quote) quote = null;
+    } else {
+      if (ch === '`' || ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') { depth--; if (depth === 0) return chunk.slice(argStart, i); }
+    }
+    i++;
+  }
+  return chunk.slice(argStart); // never closed — fall through
+}
+```
+
+Then replace the `indexOf(');')` block with a single call to `extractDbPrepareArg(chunk)` and delete the `TODO(pr-b)` comment added in PR A.
+
+**Verification:**
 
 ```bash
-git add scripts/pr-check.ts docs/rules/pr-check-rule-authoring.md
-git commit -m "chore(pr-check): polish from scaled-review findings + authoring guide updates
+npx tsx scripts/pr-check.ts --all 2>&1 | grep -A3 "UPDATE/DELETE missing workspace_id"
+```
 
-- rationale collapsed to single-noun bug class on 10 rules
+Expected: match count identical to the pre-polish baseline (zero if B8 has already landed the backfill, or whatever the current backlog is). Any *increase* in matches means the tokeniser is correctly catching previously-truncated statements — verify each new match by hand before concluding the fix is correct. Any *decrease* means the tokeniser is too strict and is missing real violations; revert and retry.
+
+Add a regression test in `tests/pr-check.test.ts` under the `UPDATE/DELETE missing workspace_id scope` describe block: a fixture with a `db.prepare()` call whose SQL contains an inline `);` inside a string literal, asserting the rule still flags the missing `workspace_id`.
+
+- [ ] **Step 8: Detect workspace_id added via `ALTER TABLE` (deferred from PR A scaled review, finding #20)**
+
+The `buildWorkspaceScopedTables()` helper in `scripts/pr-check.ts` scans migration SQL files for `CREATE TABLE` statements and considers a table workspace-scoped if the `workspace_id` column appears inside the DDL parentheses:
+
+```ts
+const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(/i;
+// ... walks paren depth, checks for /\bworkspace_id\b/i
+```
+
+Tables created without `workspace_id` and later altered via `ALTER TABLE <name> ADD COLUMN workspace_id ...` are **invisible** to this scan, so UPDATE/DELETE queries on those tables are not flagged by the ws-scope rule — a silent coverage gap.
+
+**Fix:** after the `CREATE TABLE` scan completes, walk each migration file a second time looking for `ALTER TABLE ... ADD COLUMN ... workspace_id ...` statements and union those table names into the `tables` set.
+
+```ts
+// After the CREATE TABLE walk in buildWorkspaceScopedTables(), before returning.
+const alterRe = /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN[^;]*\bworkspace_id\b/i;
+for (const file of files) {
+  const content = readFileOrEmpty(file);
+  if (!content) continue;
+  for (const line of content.split('\n')) {
+    const m = line.match(alterRe);
+    if (m) tables.add(m[1]);
+  }
+}
+```
+
+Delete the `TODO(pr-b)` comment block above `buildWorkspaceScopedTables` added in PR A.
+
+**Prelude grep** before implementing: confirm whether any existing migration actually uses `ALTER TABLE ADD COLUMN workspace_id`. If zero, the fix is still correct (defence against future migrations) but the match count won't change. If non-zero, the rule will start flagging previously-invisible UPDATE/DELETE sites — those must be backfilled as part of this step, mirroring B8's approach (either add `AND workspace_id = ?` or a justified `// ws-scope-ok` hatch per site).
+
+```bash
+grep -rEn 'ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN[^;]*workspace_id' server/db/migrations/
+```
+
+**Verification:**
+
+```bash
+npx tsx scripts/pr-check.ts --all 2>&1 | grep -A3 "UPDATE/DELETE missing workspace_id"
+```
+
+Expected: match count ≥ pre-polish baseline. Any *new* matches are genuine coverage gains — fix them inline before committing B9. Add a regression test in `tests/pr-check.test.ts` with a fixture that simulates an `ALTER TABLE ... ADD COLUMN workspace_id` migration and asserts the table is included in `workspaceScopedTables()`.
+
+- [ ] **Step 9: Verify no regressions**
+
+```bash
+npm run typecheck && npx vitest run tests/pr-check.test.ts && npx tsx scripts/pr-check.ts --all
+```
+
+Expected: identical error/warning counts to the pre-polish baseline, except for ws-scope (Step 7) and workspace_id (Step 8) which may *increase* if the tokeniser or ALTER TABLE support surfaces previously-invisible violations. Any increase must be fixed inline (backfilled with `AND workspace_id = ?` or a justified hatch) before committing this task. Any *decrease* is a regression — stop and investigate.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add scripts/pr-check.ts tests/pr-check.test.ts docs/rules/pr-check-rule-authoring.md
+git commit -m "chore(pr-check): polish from scaled-review findings + ws-scope tokeniser + ALTER TABLE support
+
 - Record<string,unknown> pattern tolerates padded/wide spacing
 - public-portal rule uses explicit file guard instead of pathFilter hack
-- Rule 3 local shadowed variable renamed from 'window' → 'writeWindow'
-- Rule 3 message updated to document preceding-line hatch placement
 - .forEach call sites normalized to for...of where safe
+- ws-scope SQL blob extractor: paren-depth tokeniser replaces indexOf(');')
+  to handle ); inside string literals (deferred from PR A scaled review #19)
+- buildWorkspaceScopedTables: union tables gaining workspace_id via
+  ALTER TABLE ADD COLUMN (deferred from PR A scaled review #20)
+- Regression tests for both tokeniser and ALTER TABLE detection
 - Authoring guide: Common Mistakes section (opener-not-closer boundary
   detection, preceding-line hatch lookbehind for multi-line statements)
 
-All changes are internal to pr-check.ts; full scan emits identical
-counts before and after.
+Full scan emits identical counts before and after, modulo any genuinely
+new ws-scope/ALTER TABLE violations surfaced and backfilled inline.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```
