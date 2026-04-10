@@ -9,14 +9,15 @@ async function getSentryPlugin(): Promise<Plugin[]> {
   if (!process.env.SENTRY_AUTH_TOKEN) return [];
   try {
     const { sentryVitePlugin } = await import('@sentry/vite-plugin');
-    return [sentryVitePlugin({
+    const result = sentryVitePlugin({
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       authToken: process.env.SENTRY_AUTH_TOKEN,
       sourcemaps: {
         filesToDeleteAfterUpload: ['./dist/**/*.map'],
       },
-    })];
+    });
+    return Array.isArray(result) ? result : [result];
   } catch {
     return [];
   }

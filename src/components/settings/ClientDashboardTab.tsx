@@ -26,7 +26,7 @@ interface ClientDashboardTabProps {
   webflowSiteId?: string;
   ws: WorkspaceData | null;
   patchWorkspace: (patch: Record<string, unknown>) => Promise<unknown>;
-  toast: (msg: string, type?: string) => void;
+  toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorkspace, toast }: ClientDashboardTabProps) {

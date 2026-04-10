@@ -1,13 +1,13 @@
 import { TrendingUp, FileText, Zap } from 'lucide-react';
 import { useClientIntelligence } from '../../hooks/client/useClientIntelligence.js';
 import { SectionCard } from '../ui/SectionCard.js';
-import { TierGate } from '../ui/TierGate.js';
+import { TierGate, type Tier } from '../ui/TierGate.js';
 import { Skeleton } from '../ui/Skeleton.js';
 
 interface Props {
   workspaceId: string;
   /** Tier sourced from workspace data — not the intelligence response, which may fall back to 'free' on error */
-  tier: string;
+  tier: Tier;
 }
 
 export function IntelligenceSummaryCard({ workspaceId, tier }: Props) {

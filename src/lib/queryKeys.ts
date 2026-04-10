@@ -81,7 +81,7 @@ export const queryKeys = {
     outcomeOverview: () => ['admin-outcome-overview'] as const,
 
     // Intelligence
-    intelligence: (wsId: string, slices?: string[], pagePath?: string, learningsDomain?: string) =>
+    intelligence: (wsId: string, slices?: readonly string[], pagePath?: string, learningsDomain?: string) =>
       ['admin-intelligence', wsId, pagePath ?? '', learningsDomain ?? 'all', ...(slices ? [...slices].sort() : [])] as const,
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,

@@ -223,8 +223,9 @@ async function runChurnCheck() {
       const auditDir = path.join(UPLOAD_ROOT, ws.folder);
       const auditFiles = fs.readdirSync(auditDir).filter(f => f.startsWith('audit-') && f.endsWith('.json')).sort().reverse();
       if (auditFiles.length >= 2) {
-        const latest = parseJsonFallback(fs.readFileSync(path.join(auditDir, auditFiles[0]), 'utf-8'), null);
-        const previous = parseJsonFallback(fs.readFileSync(path.join(auditDir, auditFiles[1]), 'utf-8'), null);
+        type AuditFile = { audit?: { siteScore?: number }; siteScore?: number };
+        const latest = parseJsonFallback<AuditFile | null>(fs.readFileSync(path.join(auditDir, auditFiles[0]), 'utf-8'), null);
+        const previous = parseJsonFallback<AuditFile | null>(fs.readFileSync(path.join(auditDir, auditFiles[1]), 'utf-8'), null);
         if (!latest || !previous) throw new Error('Audit file parse failed');
         const latestScore = latest.audit?.siteScore ?? latest.siteScore;
         const prevScore = previous.audit?.siteScore ?? previous.siteScore;

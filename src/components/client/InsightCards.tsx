@@ -1,7 +1,7 @@
 import { TrendingUp, Target, Award, Code2, HeartPulse } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { Skeleton } from '../ui/Skeleton';
-import type { AnalyticsInsight, QuickWinData, ContentDecayData, PageHealthData, SiteHealthInsightData } from '../../../shared/types/analytics';
+import type { AnalyticsInsight, QuickWinData, ContentDecayData, SiteHealthInsightData } from '../../../shared/types/analytics';
 
 interface InsightCardsProps {
   workspaceId: string;

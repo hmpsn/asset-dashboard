@@ -172,8 +172,8 @@ export function computeDelta(
   current: BaselineSnapshot,
   primaryMetric: string,
 ): DeltaSummary {
-  const baselineValue = (baseline as Record<string, unknown>)[primaryMetric];
-  const currentValue = (current as Record<string, unknown>)[primaryMetric];
+  const baselineValue = (baseline as unknown as Record<string, unknown>)[primaryMetric];
+  const currentValue = (current as unknown as Record<string, unknown>)[primaryMetric];
 
   const bv = typeof baselineValue === 'number' ? baselineValue : 0;
   const cv = typeof currentValue === 'number' ? currentValue : 0;

@@ -120,7 +120,6 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
     }
 
     // ── Discover ALL pages: static (Webflow API) + CMS (sitemap) ──
-    const token = ws.webflowToken || process.env.WEBFLOW_API_TOKEN;
     const allPageUrls: { url: string; slug: string; name: string }[] = [];
 
     // 1. Static pages from Webflow API

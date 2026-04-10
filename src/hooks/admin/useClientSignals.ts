@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, patch, post } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
-import type { ClientSignal, ClientSignalStatus } from '../../../../shared/types/client-signals';
+import type { ClientSignal, ClientSignalStatus } from '../../../shared/types/client-signals';
 
 // ── Fetch all signals for a workspace ──
 

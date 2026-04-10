@@ -81,7 +81,11 @@ export default function OutcomePlaybooks({ workspaceId }: Props) {
   return (
     <SectionCard
       title="Action Playbooks"
-      subtitle={`${playbooks.length} pattern${playbooks.length === 1 ? '' : 's'} discovered`}
+      titleExtra={
+        <span className="text-xs text-zinc-500">
+          {`${playbooks.length} pattern${playbooks.length === 1 ? '' : 's'} discovered`}
+        </span>
+      }
     >
       <div className="space-y-3">
         {playbooks.map(p => (

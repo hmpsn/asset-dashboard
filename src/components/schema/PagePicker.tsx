@@ -2,7 +2,7 @@
  * PagePicker — Page picker modal for single-page schema generation.
  * Extracted from SchemaSuggester.tsx page picker rendering.
  */
-import { Search, Loader2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export interface PagePickerProps {
   availablePages: Array<{ id: string; title: string; slug: string }>;

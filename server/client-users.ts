@@ -276,14 +276,6 @@ export function hasClientUsers(workspaceId: string): boolean {
 
 // ── Password Reset ──
 
-interface ResetToken {
-  token: string;
-  userId: string;
-  workspaceId: string;
-  email: string;
-  expiresAt: number;
-}
-
 export function createResetToken(email: string, workspaceId: string): { token: string; user: SafeClientUser } | null {
   const user = getClientUserByEmail(email, workspaceId);
   if (!user) return null;

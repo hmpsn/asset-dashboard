@@ -21,7 +21,7 @@ const ROLE_OPTIONS: SchemaPageRole[] = [
   'comparison', 'generic',
 ];
 
-const ROLE_COLORS: Record<SchemaPageRole, string> = {
+const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   homepage: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   pillar: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
   service: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
@@ -38,6 +38,7 @@ const ROLE_COLORS: Record<SchemaPageRole, string> = {
   comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
   generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
 };
+const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';
 
 export function SchemaPlanPanel({ siteId }: Props) {
   const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
@@ -315,7 +316,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
             {Object.entries(roleCounts).sort((a, b) => b[1] - a[1]).map(([role, count]) => (
               <span
                 key={role}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] || ROLE_COLORS.generic}`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}
               >
                 {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({count})
               </span>
@@ -339,7 +340,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
                   return (
                     <div key={role} className="px-3 py-2 border-b border-zinc-800/50 last:border-b-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${ROLE_COLORS[role]}`}>
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${ROLE_COLORS[role] ?? DEFAULT_ROLE_COLOR}`}>
                           {SCHEMA_ROLE_LABELS[role]}
                         </span>
                       </div>
@@ -397,7 +398,7 @@ export function SchemaPlanPanel({ siteId }: Props) {
                   <select
                     value={pr.role}
                     onChange={e => handleRoleChange(pr.pagePath, e.target.value as SchemaPageRole)}
-                    className={`px-2 py-1 rounded text-[11px] font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 ${ROLE_COLORS[pr.role] || ROLE_COLORS.generic} bg-transparent`}
+                    className={`px-2 py-1 rounded text-[11px] font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 ${ROLE_COLORS[pr.role] ?? DEFAULT_ROLE_COLOR} bg-transparent`}
                   >
                     {ROLE_OPTIONS.map(role => (
                       <option key={role} value={role} className="bg-zinc-900 text-zinc-300">

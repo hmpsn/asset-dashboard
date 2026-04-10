@@ -5,7 +5,7 @@ import { Router } from 'express';
 
 const router = Router();
 
-import { validate, z } from '../middleware/validate.js';
+import { z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';

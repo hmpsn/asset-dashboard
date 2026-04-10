@@ -1,28 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useAnomalyAlerts } from '../hooks/admin';
-import { get, post } from '../api/client';
+import { post } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
-
-interface Anomaly {
-  id: string;
-  workspaceId: string;
-  workspaceName: string;
-  type: string;
-  severity: 'critical' | 'warning' | 'positive';
-  title: string;
-  description: string;
-  metric: string;
-  currentValue: number;
-  previousValue: number;
-  changePct: number;
-  aiSummary?: string;
-  detectedAt: string;
-  dismissedAt?: string;
-  acknowledgedAt?: string;
-  source: 'gsc' | 'ga4' | 'audit';
-}
 
 interface AnomalyAlertsProps {
   workspaceId: string;
@@ -80,7 +61,7 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
   const queryClient = useQueryClient();
 
   // React Query hook replaces manual useEffect fetching
-  const { data: anomalies = [], isLoading, error } = useAnomalyAlerts(workspaceId, isAdmin);
+  const { data: anomalies = [], isLoading } = useAnomalyAlerts(workspaceId, isAdmin);
 
   useWorkspaceEvents(workspaceId, {
     'anomalies:update': () => {

@@ -22,7 +22,6 @@ import type {
   TrailingHistory,
   ActionContext,
   DeltaSummary,
-  PlaybookStep,
   PlaybookOutcome,
   EarlySignal,
 } from '../../shared/types/outcome-tracking.js';

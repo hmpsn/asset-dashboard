@@ -482,7 +482,7 @@ export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEm
  * When calibrated: returns only voice samples (safe at any status).
  * When not calibrated: returns the full DNA + samples + guardrails block.
  */
-export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
+export function buildVoiceProfileContext(workspaceId: string, _emphasis: ContextEmphasis = 'full'): string {
   const profile = getVoiceProfile(workspaceId);
   if (!profile) return '';
 

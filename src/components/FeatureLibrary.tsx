@@ -11,7 +11,7 @@ type ViewMode = 'painPoint' | 'category';
 const TIER_STYLES: Record<FeatureTier, string> = {
   free: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20',
   growth: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
-  premium: 'bg-violet-500/15 text-violet-400 border-violet-500/20',
+  premium: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
   admin: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
 };
 
@@ -37,7 +37,9 @@ function FeatureCard({ feature }: { feature: Feature }) {
             <span className={`w-2 h-2 rounded-full ${IMPACT_DOT[feature.impact]}`} title={`${feature.impact} impact`} />
           )}
           {feature.clientFacing && (
-            <Eye className="w-3 h-3 text-zinc-500" title="Client-facing" />
+            <span title="Client-facing" className="inline-flex">
+              <Eye className="w-3 h-3 text-zinc-500" aria-label="Client-facing" />
+            </span>
           )}
         </div>
       </div>

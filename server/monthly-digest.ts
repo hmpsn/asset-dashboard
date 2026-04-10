@@ -172,7 +172,7 @@ async function computeDigest(
 
 function isPositiveMove(insight: AnalyticsInsight): boolean {
   if (insight.insightType !== 'ranking_mover') return false;
-  const data = insight.data as import('../shared/types/analytics.js').RankingMoverData;
+  const data = insight.data as unknown as import('../shared/types/analytics.js').RankingMoverData;
   return data.currentPosition < data.previousPosition
     && data.currentPosition > 0
     && (data.previousPosition - data.currentPosition) > 3;

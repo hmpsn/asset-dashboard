@@ -21,7 +21,7 @@ const router = Router();
 
 // GET /api/intelligence/health — cache stats for observability (§18)
 // MUST be registered BEFORE the :workspaceId param route to avoid shadowing
-router.get('/api/intelligence/health', (req, res) => {
+router.get('/api/intelligence/health', (_req, res) => {
   res.json({
     caches: {
       intelligence: getIntelligenceCacheStats(),

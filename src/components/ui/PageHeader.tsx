@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 interface PageHeaderProps {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   icon?: ReactNode;
   actions?: ReactNode;
   className?: string;

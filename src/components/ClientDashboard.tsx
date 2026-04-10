@@ -76,7 +76,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     overview, trend, audit, auditDetail,
     loading, setLoading, error, setError,
     strategyData, requestedTopics, setRequestedTopics,
-    requestingTopic, setRequestingTopic, // eslint-disable-line @typescript-eslint/no-unused-vars
+    requestingTopic: _requestingTopic, setRequestingTopic,
     days, customDateRange, showDatePicker, setShowDatePicker,
     ga4Overview, ga4Trend, ga4Pages, ga4Sources, ga4Devices,
     ga4Countries, ga4Events, ga4Conversions,

@@ -29,13 +29,10 @@ import type {
   ActionType,
   ActionPlaybook,
   OutcomeScorecard,
-  TopWin,
   WorkspaceOutcomeOverview,
   OutcomeWinEntry,
   LearningsTrend,
   TrackedAction,
-  ActionOutcome,
-  OutcomeScore,
 } from '../../shared/types/outcome-tracking.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
 

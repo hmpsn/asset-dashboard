@@ -3,7 +3,6 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';

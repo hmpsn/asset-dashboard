@@ -53,7 +53,7 @@ const stmts = createStmtCache(() => ({
 
 // ── Template loader (lazy import to avoid circular deps) ──
 
-let _getTemplate: ((workspaceId: string, templateId: string) => ContentTemplate | undefined) | null = null;
+let _getTemplate: ((workspaceId: string, templateId: string) => ContentTemplate | null) | null = null;
 async function loadGetTemplate(): Promise<typeof _getTemplate> {
   if (!_getTemplate) {
     const mod = await import('./content-templates.js'); // dynamic-import-ok: breaks circular dep with content-matrices

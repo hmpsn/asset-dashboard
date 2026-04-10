@@ -530,7 +530,7 @@ export async function assembleAdminContext(
               .slice(0, 8)
               .map(p => ({
                 page: p.page, slug: p.slug, score: p.score,
-                topIssues: p.issues?.slice(0, 3).map(i => `[${i.severity}] ${i.check || i.type}: ${i.message}`) || [],
+                topIssues: p.issues?.slice(0, 3).map(i => `[${i.severity}] ${i.check}: ${i.message}`) || [],
               })),
           };
           sections.push(`SITE HEALTH AUDIT:\n${JSON.stringify(auditSummary, null, 1)}`);

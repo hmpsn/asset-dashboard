@@ -11,7 +11,6 @@ import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
 import {
-  filterWritablePages,
   filterWritableItems,
   filterWritableIds,
   filterPagesNeedingFix,

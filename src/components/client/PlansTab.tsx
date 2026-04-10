@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STUDIO_NAME } from '../../constants';
 import type { Tier } from '../ui';
-import type { WorkspaceInfo, ClientTab } from './types';
+import type { WorkspaceInfo } from './types';
 import { clientPath } from '../../routes';
 import { useBetaMode } from './BetaContext';
 import { post } from '../../api/client';

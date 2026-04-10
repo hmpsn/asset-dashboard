@@ -18,8 +18,11 @@ interface CacheEntry<T> {
 
 export class LRUCache<T> {
   private cache = new Map<string, CacheEntry<T>>();
+  private maxEntries: number;
 
-  constructor(private maxEntries: number) {}
+  constructor(maxEntries: number) {
+    this.maxEntries = maxEntries;
+  }
 
   get(key: string): { data: T; stale: boolean } | null {
     const entry = this.cache.get(key);

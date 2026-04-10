@@ -13,7 +13,6 @@ import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import type { getActionsByPage, getOutcomesForAction } from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
 

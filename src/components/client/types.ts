@@ -21,8 +21,7 @@ export type {
 
 // ── Client-specific types (not shared with server) ──────────────
 
-import type { EventDisplayConfig } from '../../../shared/types/workspace.ts';
-import type { GA4Overview } from '../../../shared/types/analytics.ts';
+import type { EventDisplayConfig, EventGroup } from '../../../shared/types/workspace.ts';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }

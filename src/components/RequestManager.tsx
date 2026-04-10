@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { get, patch, post, del, getSafe, postForm } from '../api/client';
+import { patch, post, del, getSafe, postForm } from '../api/client';
 import { themeColor } from './ui/constants';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
@@ -120,7 +120,6 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
     if (!noteInput.trim() && noteFiles.length === 0) return;
     setSendingNote(true);
     try {
-      let res;
       let updated: ClientRequest;
       if (noteFiles.length > 0) {
         const fd = new FormData();

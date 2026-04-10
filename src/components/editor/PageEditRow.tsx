@@ -13,8 +13,11 @@ interface PageMeta {
   id: string;
   title: string;
   slug: string;
-  seo?: { title?: string; description?: string };
+  publishedPath?: string | null;
+  seo?: { title?: string | null; description?: string | null };
   openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
+  source?: 'static' | 'cms';
+  collectionId?: string;
 }
 
 interface EditState {

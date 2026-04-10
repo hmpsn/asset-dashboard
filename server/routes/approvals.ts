@@ -180,7 +180,7 @@ router.patch('/api/public/approvals/:workspaceId/:batchId/:itemId', requireClien
   if (req.body.status !== undefined) update.status = req.body.status;
   if (req.body.clientValue !== undefined) update.clientValue = req.body.clientValue;
   if (req.body.clientNote !== undefined) update.clientNote = req.body.clientNote;
-  const { status, clientValue, clientNote } = req.body;
+  const { status, clientNote } = req.body;
   let batch;
   try {
     batch = updateItem(req.params.workspaceId, req.params.batchId, req.params.itemId, update);

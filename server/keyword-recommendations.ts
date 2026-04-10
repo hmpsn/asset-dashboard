@@ -12,7 +12,6 @@ import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelli
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 import { isProgrammingError } from './errors.js';
-import type { getWorkspaceLearnings } from './workspace-learnings.js';
 
 const log = createLogger('keyword-recommendations');
 

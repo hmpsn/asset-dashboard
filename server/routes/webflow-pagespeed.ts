@@ -8,7 +8,7 @@ const router = Router();
 
 import { runSiteSpeed, runSinglePageSpeed } from '../pagespeed.js';
 import { savePageSpeed, getPageSpeed, saveSinglePageSpeed } from '../performance-store.js';
-import { listWorkspaces } from '../workspaces.js';
+import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-pagespeed');

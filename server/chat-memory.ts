@@ -6,6 +6,7 @@
 import db from './db/index.js';
 import { callOpenAI } from './openai-helpers.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -36,63 +37,28 @@ export interface SessionSummary {
 
 // ── Prepared statements (lazy) ──
 
-let _upsert: ReturnType<typeof db.prepare> | null = null;
-function upsertStmt() {
-  if (!_upsert) {
-    _upsert = db.prepare(`
-      INSERT OR REPLACE INTO chat_sessions
-        (id, workspace_id, channel, title, messages, summary, created_at, updated_at)
-      VALUES (@id, @workspace_id, @channel, @title, @messages, @summary, @created_at, @updated_at)
-    `);
-  }
-  return _upsert;
-}
-
-let _getSession: ReturnType<typeof db.prepare> | null = null;
-function getSessionStmt() {
-  if (!_getSession) {
-    _getSession = db.prepare(`SELECT * FROM chat_sessions WHERE id = ? AND workspace_id = ?`);
-  }
-  return _getSession;
-}
-
-let _deleteSession: ReturnType<typeof db.prepare> | null = null;
-function deleteSessionStmt() {
-  if (!_deleteSession) {
-    _deleteSession = db.prepare(`DELETE FROM chat_sessions WHERE id = ? AND workspace_id = ?`);
-  }
-  return _deleteSession;
-}
-
-let _listSessions: ReturnType<typeof db.prepare> | null = null;
-function listSessionsStmt() {
-  if (!_listSessions) {
-    _listSessions = db.prepare(`
-      SELECT * FROM chat_sessions WHERE workspace_id = ? ORDER BY updated_at DESC
-    `);
-  }
-  return _listSessions;
-}
-
-let _listSessionsByChannel: ReturnType<typeof db.prepare> | null = null;
-function listSessionsByChannelStmt() {
-  if (!_listSessionsByChannel) {
-    _listSessionsByChannel = db.prepare(`
-      SELECT * FROM chat_sessions WHERE workspace_id = ? AND channel = ? ORDER BY updated_at DESC
-    `);
-  }
-  return _listSessionsByChannel;
-}
-
-let _cleanupOldSessions: ReturnType<typeof db.prepare> | null = null;
-function cleanupOldSessionsStmt() {
-  if (!_cleanupOldSessions) {
-    _cleanupOldSessions = db.prepare(`
-      DELETE FROM chat_sessions WHERE updated_at < datetime('now', ? || ' days')
-    `);
-  }
-  return _cleanupOldSessions;
-}
+const stmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO chat_sessions
+      (id, workspace_id, channel, title, messages, summary, created_at, updated_at)
+    VALUES (@id, @workspace_id, @channel, @title, @messages, @summary, @created_at, @updated_at)
+  `),
+  getSession: db.prepare<[sessionId: string, workspaceId: string]>(
+    `SELECT * FROM chat_sessions WHERE id = ? AND workspace_id = ?`,
+  ),
+  deleteSession: db.prepare<[sessionId: string, workspaceId: string]>(
+    `DELETE FROM chat_sessions WHERE id = ? AND workspace_id = ?`,
+  ),
+  listSessions: db.prepare<[workspaceId: string]>(
+    `SELECT * FROM chat_sessions WHERE workspace_id = ? ORDER BY updated_at DESC`,
+  ),
+  listSessionsByChannel: db.prepare<[workspaceId: string, channel: string]>(
+    `SELECT * FROM chat_sessions WHERE workspace_id = ? AND channel = ? ORDER BY updated_at DESC`,
+  ),
+  cleanupOldSessions: db.prepare<[daysExpr: string]>(
+    `DELETE FROM chat_sessions WHERE updated_at < datetime('now', ? || ' days')`,
+  ),
+}));
 
 interface ChatRow {
   id: string;
@@ -121,17 +87,17 @@ function rowToSession(row: ChatRow): ChatSession {
 // ── CRUD ──
 
 export function cleanupOldChatSessions(maxAgeDays: number = 180): number {
-  const info = cleanupOldSessionsStmt().run(`-${maxAgeDays}`);
+  const info = stmts().cleanupOldSessions.run(`-${maxAgeDays}`);
   return info.changes;
 }
 
 export function getSession(workspaceId: string, sessionId: string): ChatSession | null {
-  const row = getSessionStmt().get(sessionId, workspaceId) as ChatRow | undefined;
+  const row = stmts().getSession.get(sessionId, workspaceId) as ChatRow | undefined;
   return row ? rowToSession(row) : null;
 }
 
 export function saveSession(session: ChatSession): void {
-  upsertStmt().run({
+  stmts().upsert.run({
     id: session.id,
     workspace_id: session.workspaceId,
     channel: session.channel,
@@ -144,14 +110,14 @@ export function saveSession(session: ChatSession): void {
 }
 
 export function deleteSession(workspaceId: string, sessionId: string): boolean {
-  const info = deleteSessionStmt().run(sessionId, workspaceId);
+  const info = stmts().deleteSession.run(sessionId, workspaceId);
   return info.changes > 0;
 }
 
 export function listSessions(workspaceId: string, channel?: string): SessionSummary[] {
   const rows = channel
-    ? listSessionsByChannelStmt().all(workspaceId, channel) as ChatRow[]
-    : listSessionsStmt().all(workspaceId) as ChatRow[];
+    ? stmts().listSessionsByChannel.all(workspaceId, channel) as ChatRow[]
+    : stmts().listSessions.all(workspaceId) as ChatRow[];
 
   return rows.map(row => {
     const messages: ChatMessage[] = parseJsonFallback<ChatMessage[]>(row.messages, []);

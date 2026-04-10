@@ -48,7 +48,7 @@ export interface AuditIssueRowProps {
 }
 
 export function AuditIssueRow({
-  page, issue, idx, workspaceId, siteId,
+  page, issue, idx, workspaceId, siteId: _siteId,
   applyingFix, appliedFixes, editedSuggestions, editingKey,
   sentForReview, sendingReview,
   createdTasks, creatingTask, flaggedIssues, flaggingKey, flagNote, flagSending, actionMenuKey,

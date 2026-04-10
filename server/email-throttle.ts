@@ -18,6 +18,7 @@
 import db from './db/index.js';
 import type { EmailEventType } from './email-templates.js';
 import { createLogger } from './logger.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 const log = createLogger('email-throttle');
 
@@ -56,6 +57,7 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   payment_received: 'internal',
   churn_signal: 'internal',
   feedback_new: 'internal',
+  client_signal: 'internal',
 };
 
 export function getThrottleCategory(type: EmailEventType): ThrottleCategory {
@@ -80,52 +82,35 @@ const GLOBAL_DAILY_CAP = 5; // max non-transactional emails per client per day
 
 // ── Prepared statements (lazy) ──
 
-let _insertStmt: ReturnType<typeof db.prepare> | null = null;
-let _countCatStmt: ReturnType<typeof db.prepare> | null = null;
-let _countGlobalStmt: ReturnType<typeof db.prepare> | null = null;
-let _lastSendStmt: ReturnType<typeof db.prepare> | null = null;
-let _cleanupStmt: ReturnType<typeof db.prepare> | null = null;
-
-function insertStmt() {
-  if (!_insertStmt) _insertStmt = db.prepare(
+const stmts = createStmtCache(() => ({
+  insert: db.prepare<[
+    recipient: string,
+    category: string,
+    emailType: string,
+    workspaceId: string,
+    eventCount: number,
+  ]>(
     `INSERT INTO email_sends (recipient, category, email_type, workspace_id, event_count, sent_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))`
-  );
-  return _insertStmt;
-}
-
-function countCatStmt() {
-  if (!_countCatStmt) _countCatStmt = db.prepare(
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+  ),
+  countCat: db.prepare<[recipient: string, category: string, windowArg: string]>(
     `SELECT COUNT(*) as cnt FROM email_sends
-     WHERE recipient = ? AND category = ? AND sent_at >= datetime('now', ?)`
-  );
-  return _countCatStmt;
-}
-
-function countGlobalStmt() {
-  if (!_countGlobalStmt) _countGlobalStmt = db.prepare(
+     WHERE recipient = ? AND category = ? AND sent_at >= datetime('now', ?)`,
+  ),
+  countGlobal: db.prepare<[recipient: string]>(
     `SELECT COUNT(*) as cnt FROM email_sends
      WHERE recipient = ? AND category NOT IN ('transactional','internal')
-     AND sent_at >= datetime('now', '-1 day')`
-  );
-  return _countGlobalStmt;
-}
-
-function lastSendStmt() {
-  if (!_lastSendStmt) _lastSendStmt = db.prepare(
+     AND sent_at >= datetime('now', '-1 day')`,
+  ),
+  lastSend: db.prepare<[recipient: string, category: string]>(
     `SELECT sent_at FROM email_sends
      WHERE recipient = ? AND category = ?
-     ORDER BY sent_at DESC LIMIT 1`
-  );
-  return _lastSendStmt;
-}
-
-function cleanupStmt() {
-  if (!_cleanupStmt) _cleanupStmt = db.prepare(
-    `DELETE FROM email_sends WHERE sent_at < datetime('now', '-30 days')`
-  );
-  return _cleanupStmt;
-}
+     ORDER BY sent_at DESC LIMIT 1`,
+  ),
+  cleanup: db.prepare(
+    `DELETE FROM email_sends WHERE sent_at < datetime('now', '-30 days')`,
+  ),
+}));
 
 // ── Public API ──
 
@@ -148,7 +133,7 @@ export function canSend(recipient: string, category: ThrottleCategory): Throttle
   const limit = LIMITS[category];
   if (limit) {
     const windowArg = `-${limit.windowDays} day${limit.windowDays > 1 ? 's' : ''}`;
-    const row = countCatStmt().get(recipient, category, windowArg) as { cnt: number };
+    const row = stmts().countCat.get(recipient, category, windowArg) as { cnt: number };
     if (row.cnt >= limit.maxPerWindow) {
       return {
         allowed: false,
@@ -158,7 +143,7 @@ export function canSend(recipient: string, category: ThrottleCategory): Throttle
   }
 
   // Global daily cap
-  const global = countGlobalStmt().get(recipient) as { cnt: number };
+  const global = stmts().countGlobal.get(recipient) as { cnt: number };
   if (global.cnt >= GLOBAL_DAILY_CAP) {
     return {
       allowed: false,
@@ -180,7 +165,7 @@ export function recordSend(
   eventCount: number = 1,
 ): void {
   try {
-    insertStmt().run(recipient, category, emailType, workspaceId, eventCount);
+    stmts().insert.run(recipient, category, emailType, workspaceId, eventCount);
   } catch (err) {
     log.error({ err }, 'Failed to record email send');
   }
@@ -190,7 +175,7 @@ export function recordSend(
  * Get the last time we sent an email of the given category to the recipient.
  */
 export function getLastSendTime(recipient: string, category: ThrottleCategory): Date | null {
-  const row = lastSendStmt().get(recipient, category) as { sent_at: string } | undefined;
+  const row = stmts().lastSend.get(recipient, category) as { sent_at: string } | undefined;
   return row ? new Date(row.sent_at + 'Z') : null;
 }
 
@@ -198,7 +183,7 @@ export function getLastSendTime(recipient: string, category: ThrottleCategory): 
  * Clean up old records (> 30 days). Call periodically.
  */
 export function cleanupOldSends(): number {
-  const result = cleanupStmt().run();
+  const result = stmts().cleanup.run();
   return result.changes;
 }
 

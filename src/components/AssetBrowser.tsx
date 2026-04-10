@@ -338,7 +338,7 @@ function AssetBrowser({ siteId }: Props) {
           displayName: data.newFileName,
         } : a));
         const cmsNote = data.cmsUpdates?.succeeded ? ` · ${data.cmsUpdates.succeeded} CMS ref${data.cmsUpdates.succeeded !== 1 ? 's' : ''} updated` : '';
-        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings)})${cmsNote}`);
+        setCompressResult(`Saved ${data.savingsPercent}% (${formatSize(data.savings ?? 0)})${cmsNote}`);
         setTimeout(() => setCompressResult(null), 4000);
       } else if (data.skipped) {
         setCompressResult(data.reason || 'Already optimized');
@@ -469,8 +469,12 @@ function AssetBrowser({ siteId }: Props) {
       const data = await get<{ error?: string; foldersToCreate?: string[]; moves?: Array<{ assetId: string; assetName: string; targetFolder: string }>; summary?: { totalAssets: number; assetsToMove: number; foldersToCreate: number; alreadyOrganized: number; unused: number; shared: number; ogImages: number } }>(`/api/webflow/organize-preview/${siteId}`);
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
-      } else {
-        setOrganizePreview(data);
+      } else if (data.moves && data.foldersToCreate && data.summary) {
+        setOrganizePreview({
+          moves: data.moves,
+          foldersToCreate: data.foldersToCreate,
+          summary: data.summary,
+        });
       }
     } catch (err) {
       console.error('AssetBrowser operation failed:', err);
@@ -489,7 +493,7 @@ function AssetBrowser({ siteId }: Props) {
       });
       if (data.error) {
         setAltError(`Organize failed: ${data.error}`);
-      } else {
+      } else if (data.summary) {
         setOrganizeResult(data.summary);
       }
     } catch (err) {

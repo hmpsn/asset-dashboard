@@ -11,7 +11,7 @@ interface IntelligenceProfile {
 interface IntelligenceProfileTabProps {
   workspaceId: string;
   intelligenceProfile?: IntelligenceProfile | null;
-  toast: (msg: string, type?: string) => void;
+  toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onSave: (profile: IntelligenceProfile) => void;
 }
 

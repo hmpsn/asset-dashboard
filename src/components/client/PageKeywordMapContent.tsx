@@ -32,7 +32,7 @@ interface PageKeywordMapContentProps {
   workspaceId?: string;
   setToast?: (msg: string) => void;
   onContentRequested?: () => void;
-  keywordFeedback?: Map<string, 'approved' | 'declined'>;
+  keywordFeedback?: Map<string, 'approved' | 'declined' | 'requested'>;
   onApproveKeyword?: (keyword: string, source: string) => void;
   onDeclineKeyword?: (keyword: string, source: string) => void;
   onUndoFeedback?: (keyword: string) => void;

@@ -385,6 +385,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   strategy_alignment: FileText,
   anomaly_digest: Shield,
   site_health: HeartPulse,
+  audit_finding: Shield,
 };
 
 const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {

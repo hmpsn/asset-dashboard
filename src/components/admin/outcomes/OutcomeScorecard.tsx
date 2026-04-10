@@ -12,7 +12,6 @@ import {
   scoreBgBarClass,
 } from '../../ui';
 import { useOutcomeScorecard } from '../../../hooks/admin/useOutcomes';
-import type { ActionType } from '../../../../shared/types/outcome-tracking';
 import { ACTION_TYPE_LABELS } from './outcomeConstants';
 
 interface Props {

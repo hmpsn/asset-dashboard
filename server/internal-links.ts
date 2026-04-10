@@ -11,7 +11,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';

@@ -11,8 +11,6 @@
  *   ongoing   — Content gaps, keyword opportunities, continuous optimization
  */
 
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -29,7 +27,7 @@ import { getDeclinedKeywords } from './routes/keyword-strategy.js';
 // ─── Types ────────────────────────────────────────────────────────
 
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
-import type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
+import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import { createLogger } from './logger.js';
 
 const log = createLogger('recommendations');
@@ -680,7 +678,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
       for (const dp of actionableDecay) {
         const pageSlug = dp.page.replace(/^\//, '');
-        const t = getTrafficForSlug(traffic, pageSlug);
         const isHighTraffic = dp.previousClicks >= 100; // Was a meaningful traffic page
 
         const priority: RecPriority = dp.severity === 'critical' ? 'fix_now' : 'fix_soon';
@@ -834,7 +831,6 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
   // ── Build summary (exclude auto-resolved from active counts) ──
   const activeRecs = recs.filter(r => r.status !== 'completed' && r.status !== 'dismissed');
   const totalTrafficAtRisk = activeRecs.reduce((s, r) => s + r.trafficAtRisk, 0);
-  const totalImpressionsAtRisk = activeRecs.reduce((s, r) => s + r.impressionsAtRisk, 0);
   // Conservative 12% recovery rate on traffic at risk (actionable issues only)
   const actionableRecs = activeRecs.filter(r => r.priority === 'fix_now' || r.priority === 'fix_soon');
   const actionableTraffic = actionableRecs.reduce((s, r) => s + r.trafficAtRisk, 0);

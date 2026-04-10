@@ -27,6 +27,7 @@ interface PageData {
   html: string;
   issues: SeoIssue[];
   slug: string;
+  url?: string;
   preamble?: string;
 }
 
@@ -471,7 +472,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
     if (!docBody) return paragraphs;
 
-    const headingLevel = (tag: string): HeadingLevel | null => {
+    const headingLevel = (tag: string): typeof HeadingLevel[keyof typeof HeadingLevel] | null => {
       if (tag === 'h1') return HeadingLevel.HEADING_1;
       if (tag === 'h2') return HeadingLevel.HEADING_2;
       if (tag === 'h3') return HeadingLevel.HEADING_3;

@@ -5,44 +5,23 @@
  */
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 // ── Prepared statements (lazy) ──
 
-let _upsert: ReturnType<typeof db.prepare> | null = null;
-function upsertStmt() {
-  if (!_upsert) {
-    _upsert = db.prepare(`
-      INSERT OR REPLACE INTO performance_snapshots
-        (sub, site_id, created_at, result)
-      VALUES (@sub, @site_id, @created_at, @result)
-    `);
-  }
-  return _upsert;
-}
-
-let _get: ReturnType<typeof db.prepare> | null = null;
-function getStmt() {
-  if (!_get) {
-    _get = db.prepare(`SELECT * FROM performance_snapshots WHERE sub = ? AND site_id = ?`);
-  }
-  return _get;
-}
-
-let _listBySub: ReturnType<typeof db.prepare> | null = null;
-function listBySubStmt() {
-  if (!_listBySub) {
-    _listBySub = db.prepare(`SELECT * FROM performance_snapshots WHERE sub = ? ORDER BY created_at DESC`);
-  }
-  return _listBySub;
-}
-
-let _listBySubPrefix: ReturnType<typeof db.prepare> | null = null;
-function listBySubPrefixStmt() {
-  if (!_listBySubPrefix) {
-    _listBySubPrefix = db.prepare(`SELECT * FROM performance_snapshots WHERE sub = ? ORDER BY created_at DESC`);
-  }
-  return _listBySubPrefix;
-}
+const stmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO performance_snapshots
+      (sub, site_id, created_at, result)
+    VALUES (@sub, @site_id, @created_at, @result)
+  `),
+  get: db.prepare<[sub: string, siteId: string]>(
+    `SELECT * FROM performance_snapshots WHERE sub = ? AND site_id = ?`,
+  ),
+  listBySub: db.prepare<[sub: string]>(
+    `SELECT * FROM performance_snapshots WHERE sub = ? ORDER BY created_at DESC`,
+  ),
+}));
 
 interface PerfRow {
   sub: string;
@@ -63,7 +42,7 @@ function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
     createdAt: new Date().toISOString(),
     result,
   };
-  upsertStmt().run({
+  stmts().upsert.run({
     sub,
     site_id: siteId,
     created_at: snapshot.createdAt,
@@ -73,7 +52,7 @@ function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
 }
 
 function load<T>(sub: string, siteId: string): Snapshot<T> | null {
-  const row = getStmt().get(sub, siteId) as PerfRow | undefined;
+  const row = stmts().get.get(sub, siteId) as PerfRow | undefined;
   if (!row) return null;
   const result = parseJsonFallback<T | null>(row.result, null);
   if (result === null) return null;
@@ -149,9 +128,15 @@ export function getCompetitorCompare(myUrl: string, competitorUrl: string) {
   return load('competitor', competitorKey(myUrl, competitorUrl));
 }
 
+interface CompetitorCompareResult {
+  mySite?: { url?: string };
+  competitor?: { url?: string };
+  [key: string]: unknown;
+}
+
 // Get latest comparison for a given myUrl (any competitor)
 export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: string; result: unknown } | null {
-  const rows = listBySubStmt().all('competitor') as PerfRow[];
+  const rows = stmts().listBySub.all('competitor') as PerfRow[];
   if (rows.length === 0) return null;
 
   const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
@@ -159,7 +144,7 @@ export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: s
   let latest: { createdAt: string; result: unknown } | null = null;
 
   for (const row of rows) {
-    const data = parseJsonFallback(row.result, null);
+    const data = parseJsonFallback<CompetitorCompareResult | null>(row.result, null);
     if (!data?.mySite?.url) continue; // skip corrupt/empty rows
     const snapMyUrl = normalize(data.mySite.url);
     if (snapMyUrl === myNorm || myNorm.includes(snapMyUrl) || snapMyUrl.includes(myNorm)) {
@@ -173,15 +158,15 @@ export function getLatestCompetitorCompareForSite(myUrl: string): { createdAt: s
 
 // List all saved competitor comparisons
 export function listCompetitorCompares(): Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }> {
-  const rows = listBySubStmt().all('competitor') as PerfRow[];
+  const rows = stmts().listBySub.all('competitor') as PerfRow[];
   return rows.map(row => {
-    const data = parseJsonFallback(row.result, null);
+    const data = parseJsonFallback<CompetitorCompareResult | null>(row.result, null);
     if (!data) return null; // skip corrupt rows
     return {
       key: row.site_id,
       createdAt: row.created_at,
-      myUrl: data?.mySite?.url,
-      competitorUrl: data?.competitor?.url,
+      myUrl: data.mySite?.url,
+      competitorUrl: data.competitor?.url,
     };
   }).filter(Boolean) as Array<{ key: string; createdAt: string; myUrl?: string; competitorUrl?: string }>;
 }

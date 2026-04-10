@@ -271,7 +271,7 @@ export function AnnotatedTrendChart({
   dateKey = 'date',
   height = 220,
   onCreateAnnotation,
-  onToggleLine,
+  onToggleLine: _onToggleLine,
   maxActiveLines: _maxActiveLines,
   callouts,
 }: AnnotatedTrendChartProps) {

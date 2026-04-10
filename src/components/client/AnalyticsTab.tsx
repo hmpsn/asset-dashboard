@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import SearchableSelect from '../SearchableSelect';
 import { OrganicInsight } from './DataSnapshots';
-import { get, getSafe } from '../../api/client';
+import { getSafe } from '../../api/client';
 import type {
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
   GA4DeviceBreakdown, GA4Event, GA4ConversionSummary,

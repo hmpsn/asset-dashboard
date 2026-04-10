@@ -43,21 +43,6 @@ const EXPORTS = [
   { key: 'strategy', label: 'Keyword Strategy' },
 ] as const;
 
-interface PipelineSummary {
-  briefs: number;
-  posts: number;
-  matrices: number;
-  cells: number;
-  published: number;
-}
-
-interface DecaySummary {
-  critical: number;
-  warning: number;
-  totalDecaying: number;
-  avgDeclinePct: number;
-}
-
 export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
   const [activeTab, setActiveTab] = useState<PipelineTab>('briefs');
   const [exportOpen, setExportOpen] = useState(false);
@@ -68,7 +53,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
   const queryClient = useQueryClient();
 
   // React Query hook replaces manual data fetching
-  const { data: pipelineData, isLoading } = useContentPipeline(workspaceId);
+  const { data: pipelineData } = useContentPipeline(workspaceId);
 
   // Invalidate AI suggested briefs when intelligence signals update
   useWorkspaceEvents(workspaceId, {

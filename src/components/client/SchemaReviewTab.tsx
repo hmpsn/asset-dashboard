@@ -34,7 +34,7 @@ interface Props {
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
-const ROLE_COLORS: Record<SchemaPageRole, string> = {
+const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   homepage: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   pillar: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
   service: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
@@ -51,6 +51,7 @@ const ROLE_COLORS: Record<SchemaPageRole, string> = {
   comparison: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
   generic: 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30',
 };
+const DEFAULT_ROLE_COLOR = 'bg-zinc-500/10 text-zinc-400 border-zinc-600/30';
 
 export function SchemaReviewTab({ workspaceId, setToast }: Props) {
   const [plan, setPlan] = useState<SchemaSitePlan | null>(null);
@@ -195,7 +196,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                 .map(([role, pages]) => (
                   <span
                     key={role}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] || ROLE_COLORS.generic}`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}
                   >
                     {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role} ({pages.length})
                   </span>
@@ -219,7 +220,7 @@ export function SchemaReviewTab({ workspaceId, setToast }: Props) {
                       {isExpanded
                         ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                         : <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] || ROLE_COLORS.generic}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${ROLE_COLORS[role as SchemaPageRole] ?? DEFAULT_ROLE_COLOR}`}>
                         {SCHEMA_ROLE_LABELS[role as SchemaPageRole] || role}
                       </span>
                       <span className="text-xs text-zinc-400 flex-1 min-w-0 truncate">{desc}</span>

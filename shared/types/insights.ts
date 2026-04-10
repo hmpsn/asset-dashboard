@@ -14,6 +14,7 @@ export interface FeedInsight {
   impactScore: number;      // for ranking (higher = show first)
   actions?: FeedAction[];   // "View in Strategy", "Create Brief", etc.
   details?: string[];       // expandable detail lines (e.g., competing page URLs for cannibalization)
+  detectedAt?: string;      // ISO timestamp when the insight was first detected (for chart callouts)
 }
 
 export interface FeedAction {
