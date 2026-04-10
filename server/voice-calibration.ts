@@ -176,33 +176,47 @@ export function listCalibrationSessions(workspaceId: string): CalibrationSession
   return (stmts().listSessions.all(profile.id) as SessionRow[]).map(rowToSession);
 }
 
+/**
+ * Assemble voice calibration context strings for inclusion in AI prompts.
+ *
+ * Guards on `profile.status !== 'calibrated'`: when calibrated, buildSystemPrompt's
+ * Layer 2 already injects DNA + guardrails into the system message — re-injecting
+ * them in the user prompt would duplicate instructions and waste tokens.
+ *
+ * Phase 2 (blueprint-generator.ts) and Phase 3 (copy-generation.ts) should import
+ * and call this helper rather than building their own inline voice context injection.
+ */
+export function buildVoiceCalibrationContext(profile: VoiceProfile & { samples: VoiceSample[] }): {
+  samplesText: string;
+  dnaText: string;
+  guardrailsText: string;
+} {
+  const isCalibrated = profile.status === 'calibrated';
+
+  const samplesText = profile.samples.length > 0
+    ? `\nVOICE SAMPLES (write like these):\n${profile.samples.map(s => `  [${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`
+    : '';
+
+  // Once calibrated, Layer 2 of buildSystemPrompt injects DNA + guardrails into
+  // the system message. Only inline them when still draft/calibrating.
+  const dnaText = !isCalibrated && profile.voiceDNA
+    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}\n  Humor: ${profile.voiceDNA.humorStyle}`
+    : '';
+
+  const guardrailsText = !isCalibrated && profile.guardrails
+    ? `\n${guardrailsToPromptInstructions(profile.guardrails)}`
+    : '';
+
+  return { samplesText, dnaText, guardrailsText };
+}
+
 export async function generateCalibrationVariations(
   workspaceId: string, promptType: string, steeringNotes?: string,
 ): Promise<CalibrationSession> {
   const profile = getOrCreateVoiceProfile(workspaceId);
   const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
 
-  const samplesText = profile.samples.length > 0
-    ? `\nVOICE SAMPLES (write like these):\n${profile.samples.map(s => `  [${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`
-    : '';
-
-  // Once the profile is 'calibrated', buildSystemPrompt's Layer 2 auto-injects the
-  // voice DNA + guardrails into the system message. Re-injecting them into the user
-  // prompt here would duplicate the instructions and waste tokens. Only inline them
-  // while the profile is still 'draft'/'calibrating' — that's when the system prompt
-  // doesn't know the DNA yet but the calibration loop still needs the AI to steer
-  // toward whatever partial DNA/guardrails have been captured so far.
-  const isCalibrated = profile.status === 'calibrated';
-
-  const dnaText = !isCalibrated && profile.voiceDNA
-    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}\n  Humor: ${profile.voiceDNA.humorStyle}`
-    : '';
-
-  // Reuse the shared helper so empty arrays don't render as ", , ," lists and the
-  // phrasing stays in sync with what buildSystemPrompt layers into the system message.
-  const guardrailsText = !isCalibrated && profile.guardrails
-    ? `\n${guardrailsToPromptInstructions(profile.guardrails)}`
-    : '';
+  const { samplesText, dnaText, guardrailsText } = buildVoiceCalibrationContext(profile);
 
   const modifierText = profile.contextModifiers
     ? (() => {

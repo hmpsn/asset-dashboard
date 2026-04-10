@@ -27,6 +27,14 @@ import path from 'path';
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
 
+function getFiles(dir: string, pattern: string): string[] {
+  try {
+    return execSync(`find "${dir}" -name "${pattern}" -type f 2>/dev/null`, {
+      cwd: ROOT, encoding: 'utf-8',
+    }).trim().split('\n').filter(Boolean);
+  } catch { return []; }
+}
+
 // ─── Determine changed files ──────────────────────────────────────────────────
 
 function getChangedFiles(): string[] {
@@ -687,6 +695,84 @@ if (shouldRunSliceCheck) {
   }
 }
 
+// ─── callCreativeAI json-mode consistency ────────────────────────────────────
+{
+  const findings: string[] = [];
+  const serverFiles = SCAN_ALL
+    ? getFiles(path.join(ROOT, 'server'), '*.ts')
+    : changedFiles
+        .filter(f => f.startsWith('server/') && f.endsWith('.ts'))
+        .map(f => path.join(ROOT, f));
+
+  // Files excluded from this check and why:
+  //   content-posts-ai.ts — definition file; callCreativeAI lives here, not a consumer
+  //   brand-identity.ts   — uses parseJsonFallback for DB column parsing, not AI output;
+  //                         its callCreativeAI calls correctly return prose (no json: needed)
+  const JSON_MODE_EXCLUSIONS = new Set([
+    path.join(ROOT, 'server/content-posts-ai.ts'),
+    path.join(ROOT, 'server/brand-identity.ts'),
+  ]);
+
+  for (const file of serverFiles) {
+    if (JSON_MODE_EXCLUSIONS.has(file)) continue;
+    let content: string;
+    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+    // Only flag files that call both callCreativeAI and parseJsonFallback
+    if (!content.includes('callCreativeAI') || !content.includes('parseJsonFallback')) continue;
+    // If every callCreativeAI invocation in the file includes json: true, we're fine.
+    // Flag if there are any callCreativeAI blocks that lack json: true or json: false.
+    const calls = content.split('callCreativeAI(').slice(1); // one entry per call
+    const unsafeCalls = calls.filter(block => {
+      const closeParen = block.indexOf(')');
+      const callBlock = closeParen > 0 ? block.slice(0, closeParen) : block.slice(0, 300);
+      return !callBlock.includes('json:');
+    });
+    if (unsafeCalls.length > 0) {
+      findings.push(`  ${path.relative(ROOT, file)} — ${unsafeCalls.length} callCreativeAI block(s) missing json: flag`);
+    }
+  }
+  if (findings.length > 0) {
+    console.log(`\n  ⚠ callCreativeAI without json: flag in files that use parseJsonFallback`);
+    console.log(`    Add json: true when the result is parsed as JSON, json: false when prose.`);
+    for (const f of findings) console.log(f);
+    warnings++;
+  } else {
+    console.log(`  ✓ callCreativeAI json-mode consistency`);
+  }
+}
+
+// ─── Brand-engine routes: requireWorkspaceAccess not requireAuth ──────────────
+{
+  const brandEngineRoutes = [
+    'server/routes/voice-calibration.ts',
+    'server/routes/discovery-ingestion.ts',
+    'server/routes/brand-identity.ts',
+    'server/routes/brandscript.ts',
+    'server/routes/page-strategy.ts',
+    'server/routes/copy-pipeline.ts',
+  ];
+  const findings: string[] = [];
+  for (const rel of brandEngineRoutes) {
+    const file = path.join(ROOT, rel);
+    let content: string;
+    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+    // requireAuth in brand-engine routes is wrong — admin panel uses HMAC token (global gate)
+    // and client access uses requireWorkspaceAccess. requireAuth (JWT-only) would 401 both.
+    if (content.includes('requireAuth(') && !content.includes('// auth-ok')) {
+      findings.push(`  ${rel}`);
+    }
+  }
+  if (findings.length > 0) {
+    console.log(`\n  ✗ requireAuth in brand-engine route files (should be requireWorkspaceAccess)`);
+    console.log(`    Admin panel uses HMAC token; requireAuth only accepts JWTs.`);
+    console.log(`    See Auth Conventions in CLAUDE.md.`);
+    for (const f of findings) console.log(f);
+    errors++;
+  } else {
+    console.log(`  ✓ Brand-engine routes: requireWorkspaceAccess (not requireAuth)`);
+  }
+}
+
 // ─── Constants sync check ─────────────────────────────────────────────────────
 // STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and src/constants.ts.
 // They can't share a runtime module (different module resolution), so this check
@@ -733,6 +819,9 @@ const manualChecks = [
   'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
   'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
   'Cross-cutting constraint (e.g. "never send X to API Y") — grep for ALL call sites before writing fix #1, guard them all in one commit. Never patch one site at a time as they are discovered.',
+  'AI-generating endpoints (callCreativeAI/callOpenAI → db write): existence check + INSERT/UPDATE inside db.transaction() — not just the write, the check too',
+  'New 1:1-per-workspace tables (e.g. one row per workspace+type): UNIQUE index on (workspace_id, natural_key) in migration; app code catches SQLITE_CONSTRAINT_UNIQUE and retries as update',
+  'Batch save endpoints (delete-all + reinsert): Map<id, preserved> built before delete to restore created_at, sort_order, and approval state',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);
