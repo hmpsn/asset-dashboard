@@ -22,15 +22,18 @@ export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
   /**
-   * Legacy brand voice block — composed from workspace.brandVoice and brand-docs files.
+   * Effective brand voice block. Always reflects the same source `fullContext`
+   * uses — i.e. when a calibrated voice profile exists, this is the voice
+   * profile block (formatted for AI prompt injection); otherwise it falls back
+   * to the legacy `workspace.brandVoice` + brand-docs concatenation.
    *
-   * When a calibrated voice_profile exists, the newer `voiceProfileBlock` is
-   * preferred and injected into the effective prompt context (see
-   * `effectiveBrandVoice = voiceProfileBlock || brandVoiceBlock` below).
+   * This field used to lag behind `fullContext` (it always returned the legacy
+   * source even when the voice profile took over). It is now kept consistent
+   * so that direct readers of `brandVoiceBlock` can never see a different brand
+   * voice than the one that was actually injected into the prompt.
    *
-   * This field is retained on the `SeoContext` shape for backwards compatibility
-   * with legacy consumers that read it directly. New callers should rely on
-   * `fullContext` (which already selects the correct source) rather than this field.
+   * New callers should still prefer `fullContext`, which is the canonical
+   * combined block.
    */
   brandVoiceBlock: string;
   /** Business context string (industry, location, services) */
@@ -118,7 +121,7 @@ export function buildSeoContext(
       }
     }
     const fullContext = baseParts.join('');
-    const result: SeoContext = { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    const result: SeoContext = { keywordBlock: '', brandVoiceBlock: effectiveBrandVoice, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
     seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
     return result;
   }
@@ -169,7 +172,7 @@ export function buildSeoContext(
     }
   }
   const fullContext = contextParts.join('');
-  const result: SeoContext = { keywordBlock, brandVoiceBlock, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
+  const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
 
   // Cache result
   if (workspaceId) {

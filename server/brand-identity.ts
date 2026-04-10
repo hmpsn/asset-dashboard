@@ -283,12 +283,33 @@ Return only the refined content — no preamble.`;
 }
 
 export function approveDeliverable(workspaceId: string, id: string): BrandDeliverable | null {
+  return setDeliverableStatus(workspaceId, id, 'approved');
+}
+
+/**
+ * Set a deliverable's status to either `approved` or `draft`.
+ *
+ * When transitioning to `approved`, auto-creates a voice sample for certain
+ * deliverable types (tagline/elevator_pitch/tone_examples) and broadcasts
+ * VOICE_PROFILE_UPDATED. Reverting to `draft` simply flips the status — it
+ * does NOT delete the auto-created voice sample, since the sample may have
+ * been manually edited since approval.
+ */
+export function setDeliverableStatus(
+  workspaceId: string,
+  id: string,
+  status: 'approved' | 'draft',
+): BrandDeliverable | null {
   const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
   if (!row) return null;
 
   const now = new Date().toISOString();
-  stmts().updateStatus.run({ id, workspace_id: workspaceId, status: 'approved', updated_at: now });
-  log.info({ workspaceId, deliverableType: row.deliverable_type }, 'deliverable approved');
+  stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
+  log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
+
+  if (status !== 'approved') {
+    return { ...rowToDeliverable(row), status, updatedAt: now };
+  }
 
   // Spec Addendum §5: auto-create voice sample for approved identity deliverables.
   //

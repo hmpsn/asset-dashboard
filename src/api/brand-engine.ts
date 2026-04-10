@@ -1,5 +1,5 @@
 // src/api/brand-engine.ts
-import { get, post, put, patch, del, postForm } from './client';
+import { get, getText, post, put, patch, del, postForm } from './client';
 import type {
   Brandscript, BrandscriptTemplate,
   DiscoverySource, DiscoveryExtraction,
@@ -68,8 +68,15 @@ export const identity = {
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/generate`, body),
   refine: (wsId: string, id: string, body: { direction: string }) =>
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}/refine`, body),
-  updateStatus: (wsId: string, id: string, status: string) =>
+  updateStatus: (wsId: string, id: string, status: 'approved' | 'draft') =>
     patch<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}`, { status }),
-  export: (wsId: string, tier?: string) =>
-    get<{ markdown: string }>(`/api/brand-identity/${wsId}/export${tier ? `?tier=${tier}` : ''}`),
+  /**
+   * Export approved deliverables. Server responds with raw `text/markdown`, not
+   * JSON — we wrap the string in `{ markdown }` here so callers keep a stable
+   * shape regardless of the server's response encoding.
+   */
+  export: async (wsId: string, tier?: string): Promise<{ markdown: string }> => {
+    const markdown = await getText(`/api/brand-identity/${wsId}/export${tier ? `?tier=${tier}` : ''}`);
+    return { markdown };
+  },
 };

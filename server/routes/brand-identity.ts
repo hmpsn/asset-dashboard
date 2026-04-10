@@ -7,7 +7,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import {
   listDeliverables, getDeliverable,
   generateDeliverable, refineDeliverable,
-  approveDeliverable, exportDeliverables,
+  setDeliverableStatus, exportDeliverables,
 } from '../brand-identity.js';
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
 import { clearSeoContextCache } from '../seo-context.js';
@@ -34,9 +34,11 @@ const refineDeliverableSchema = z.object({
   direction: z.string().min(1),
 });
 
-// Only `approved` is supported right now — narrow the schema to match.
+// Toggleable between `approved` and `draft` — reverting lets admins walk back
+// an approval without deleting the deliverable. `setDeliverableStatus`
+// handles the auto-sample side-effect only on the approve→draft direction.
 const patchDeliverableSchema = z.object({
-  status: z.literal('approved'),
+  status: z.enum(['approved', 'draft']),
 });
 
 // ── Routes ──────────────────────────────────────────────────────────────────
@@ -104,12 +106,18 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
   }
 });
 
-// Update status (approve / reset to draft)
+// Update status (approve / revert to draft)
 router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(patchDeliverableSchema), (req, res) => {
-  const result = approveDeliverable(req.params.workspaceId, req.params.id);
+  const { status } = req.body as { status: 'approved' | 'draft' };
+  const result = setDeliverableStatus(req.params.workspaceId, req.params.id, status);
   if (!result) return res.status(404).json({ error: 'Not found' });
-  addActivity(req.params.workspaceId, 'brand_deliverable_approved', `Approved ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status: 'approved' });
+  const typeLabel = result.deliverableType.replace(/_/g, ' ');
+  if (status === 'approved') {
+    addActivity(req.params.workspaceId, 'brand_deliverable_approved', `Approved ${typeLabel} deliverable`);
+  } else {
+    addActivity(req.params.workspaceId, 'brand_deliverable_reverted', `Reverted ${typeLabel} deliverable to draft`);
+  }
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id, status });
   clearSeoContextCache(req.params.workspaceId);
   invalidateIntelligenceCache(req.params.workspaceId);
   res.json(result);

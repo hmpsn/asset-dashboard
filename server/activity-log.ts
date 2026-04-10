@@ -77,9 +77,12 @@ export type ActivityType =
   | 'voice_sample_added'
   | 'voice_sample_deleted'
   | 'voice_calibrated'
+  | 'voice_refined'
   | 'voice_profile_updated'
   | 'brand_deliverable_generated'
-  | 'brand_deliverable_approved';
+  | 'brand_deliverable_refined'
+  | 'brand_deliverable_approved'
+  | 'brand_deliverable_reverted';
 
 export interface ActivityEntry {
   id: string;

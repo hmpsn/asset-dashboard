@@ -35,6 +35,21 @@ export async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   return handleResponse<T>(res);
 }
 
+/** GET that returns the raw response body as text (for markdown/csv/plaintext endpoints) */
+export async function getText(url: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) {
+    // Error responses are still JSON `{ error }` per the API error shape.
+    let body: unknown;
+    try { body = await res.json(); } catch { /* non-JSON error body — fall through */ }
+    const msg = (body && typeof body === 'object' && 'error' in body)
+      ? String((body as { error: unknown }).error)
+      : res.statusText || `HTTP ${res.status}`;
+    throw new ApiError(res.status, msg, body);
+  }
+  return res.text();
+}
+
 /** POST with JSON body */
 export async function post<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
