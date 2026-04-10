@@ -308,7 +308,6 @@ Work is not done until ALL pass:
 - [ ] `BRAND_DESIGN_LANGUAGE.md` updated (if UI changed)
 - [ ] No `violet` or `indigo` in `src/components/`
 - [ ] `npx tsx scripts/pr-check.ts` — zero errors
-- [ ] If subagents were used: invoke `scaled-code-review` skill for parallel batch output (10+ files), or `superpowers:requesting-code-review` for single-task output. Fix Critical/Important issues before proceeding.
-- [ ] If new `customCheck` rules or complex boundary/heuristic logic were authored (regardless of agent count): invoke `scaled-code-review` skill before merging. Static rule logic has the same false-negative risk as application logic — adversarial parallel review catches it; self-review usually doesn't.
+- [ ] If multiple/parallel agents were used for any part of this work: invoke `scaled-code-review` skill before merging. Fix Critical/Important issues before proceeding. (Single-agent work on a single domain: `superpowers:requesting-code-review` is sufficient.)
 - [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
