@@ -116,11 +116,10 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
   const displayContent = expanded ? contentPreview : contentLines.slice(0, 3).join('\n').slice(0, 240);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-zinc-200 leading-tight">{label}</h3>
-        {deliverable && (
+    <SectionCard
+      title={label}
+      action={
+        deliverable ? (
           <span
             className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
               isApproved
@@ -130,99 +129,101 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
           >
             {isApproved ? 'Approved' : 'Draft'}
           </span>
+        ) : undefined
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {/* Content preview */}
+        {hasContent && (
+          <div className="space-y-1">
+            <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
+            {showToggle && (
+              <button
+                type="button"
+                onClick={() => setExpanded(prev => !prev)}
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                {expanded ? (
+                  <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+                ) : (
+                  <><ChevronDown className="w-3.5 h-3.5" /> Show more</>
+                )}
+              </button>
+            )}
+          </div>
         )}
-      </div>
 
-      {/* Content preview */}
-      {hasContent && (
-        <div className="space-y-1">
-          <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">{displayContent}{!expanded && showToggle ? '…' : ''}</p>
-          {showToggle && (
+        {/* Refine form — only when content exists */}
+        {hasContent && (
+          <form onSubmit={handleRefine} className="flex gap-2">
+            <label htmlFor={`refine-${deliverableType}`} className="sr-only">
+              Refine direction for {label}
+            </label>
+            <input
+              id={`refine-${deliverableType}`}
+              type="text"
+              value={refineInput}
+              onChange={e => setRefineInput(e.target.value)}
+              disabled={isLoading}
+              placeholder="Refinement direction..."
+              className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"
+            />
             <button
-              type="button"
-              onClick={() => setExpanded(prev => !prev)}
-              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              type="submit"
+              disabled={!refineInput.trim() || isLoading}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {expanded ? (
-                <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
-              ) : (
-                <><ChevronDown className="w-3.5 h-3.5" /> Show more</>
-              )}
+              {refining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              Refine
             </button>
-          )}
-        </div>
-      )}
+          </form>
+        )}
 
-      {/* Refine form — only when content exists */}
-      {hasContent && (
-        <form onSubmit={handleRefine} className="flex gap-2">
-          <label htmlFor={`refine-${deliverableType}`} className="sr-only">
-            Refine direction for {label}
-          </label>
-          <input
-            id={`refine-${deliverableType}`}
-            type="text"
-            value={refineInput}
-            onChange={e => setRefineInput(e.target.value)}
-            disabled={isLoading}
-            placeholder="Refinement direction..."
-            className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={!refineInput.trim() || isLoading}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {refining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            Refine
-          </button>
-        </form>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {!hasContent ? (
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            Generate
-          </button>
-        ) : (
-          <>
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {!hasContent ? (
             <button
               type="button"
               onClick={handleGenerate}
               disabled={isLoading}
-              className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              Regenerate
+              Generate
             </button>
-            <button
-              type="button"
-              onClick={handleToggleApprove}
-              disabled={isLoading}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                isApproved
-                  ? 'bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'
-                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-              }`}
-            >
-              {approving ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Check className="w-3.5 h-3.5" />
-              )}
-              {isApproved ? 'Approved' : 'Approve'}
-            </button>
-          </>
-        )}
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isLoading}
+                className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                Regenerate
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleApprove}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                  isApproved
+                    ? 'bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                }`}
+              >
+                {approving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" />
+                )}
+                {isApproved ? 'Approved' : 'Approve'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </SectionCard>
   );
 }
 
