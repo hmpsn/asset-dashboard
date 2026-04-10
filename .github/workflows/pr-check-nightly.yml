@@ -9,13 +9,13 @@ jobs:
   full-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging  # staging is the release candidate branch; main is strictly
                         # a lagging copy updated only on explicit releases. Scanning
                         # staging catches regressions in the release candidate before
                         # they ship; scanning main would miss everything in-flight.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'

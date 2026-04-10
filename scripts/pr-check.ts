@@ -622,8 +622,10 @@ const CHECKS: Check[] = [
           const sql = sqlBlob.replace(/\s+/g, ' ');
           // Extract the SQL statement inside the template/quote — find the
           // first backtick/quote after db.prepare( and read up to its match.
-          const m = sql.match(/db\.prepare\s*\(\s*[`'"]([\s\S]*?)[`'"]/);
-          const stmt = (m?.[1] ?? '').trim();
+          // Capture the opening delimiter and use \1 backreference so embedded
+          // single quotes inside a backtick string don't truncate the match.
+          const m = sql.match(/db\.prepare\s*\(\s*([`'"])([\s\S]*?)\1/);
+          const stmt = (m?.[2] ?? '').trim();
           if (!stmt) continue;
           const upper = stmt.toUpperCase();
           let tableName: string | null = null;
@@ -693,8 +695,10 @@ const CHECKS: Check[] = [
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       // Only scan the one target file (if present).
-      const target = files.find(f => f.endsWith('server/routes/public-portal.ts'))
-        ?? path.join(ROOT, 'server/routes/public-portal.ts');
+      // In diff-only mode, files is scoped to changed files — if public-portal.ts
+      // wasn't changed, return early so we don't warn on every unrelated PR.
+      const target = files.find(f => f.endsWith('server/routes/public-portal.ts'));
+      if (!target) return hits;
       const content = readFileOrEmpty(target);
       if (!content) return hits;
       const lines = content.split('\n');
