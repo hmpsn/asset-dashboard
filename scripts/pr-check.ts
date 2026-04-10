@@ -90,7 +90,7 @@ const mode = SCAN_ALL ? 'full scan' : changedFiles.length > 0
 
 // ─── Check definitions ────────────────────────────────────────────────────────
 
-type CustomCheckMatch = { file: string; line: number; text: string };
+export type CustomCheckMatch = { file: string; line: number; text: string };
 
 type Check = {
   name: string;
@@ -189,7 +189,7 @@ function hasHatch(lines: string[], i: number, hatch: string): boolean {
   return false;
 }
 
-const CHECKS: Check[] = [
+export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
     pattern: 'purple-',
@@ -1081,6 +1081,12 @@ function checkDirectory(dir: string, check: Check): string[] {
   }
 }
 
+// ─── CLI runner (gated so `import { CHECKS }` from tests doesn't fire this) ──
+// Everything from here to EOF is wrapped in runCli() which is only invoked
+// when this file is executed directly (npx tsx scripts/pr-check.ts), not when
+// imported (e.g. from tests/pr-check.test.ts). The body is intentionally NOT
+// re-indented — keeps the diff minimal and the git history readable.
+function runCli() {
 let errors = 0;
 let warnings = 0;
 
@@ -1591,4 +1597,11 @@ if (errors > 0) {
   console.log(`\n  ⚠ 0 errors, ${warnings} warning(s). Review warnings before merging.\n`);
 } else {
   console.log(`\n  ✓ All automated checks passed.\n`);
+}
+} // end runCli()
+
+// Run the CLI only when this file is executed directly. When imported from
+// tests (vitest), process.argv[1] is the vitest entry and this is a no-op.
+if (process.argv[1] && path.basename(process.argv[1]) === 'pr-check.ts') {
+  runCli();
 }
