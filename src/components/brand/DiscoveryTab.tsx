@@ -27,6 +27,7 @@ const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
   website_crawl: 'Website Crawl',
 };
 
+// Note: 'website_crawl' is excluded — website crawl sources are created server-side only
 const SOURCE_TYPE_OPTIONS: { value: SourceType; label: string }[] = [
   { value: 'transcript', label: 'Transcript' },
   { value: 'brand_doc', label: 'Brand Doc' },
@@ -189,6 +190,9 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
 
+  // React Query prefix matching: the 2-segment invalidation key in useWebSocket
+  // covers this 3-segment key automatically — all source extractions are refreshed
+  // when any discovery update is broadcast.
   const { data: extractions = [], isLoading } = useQuery({
     queryKey: ['admin-discovery-extractions', workspaceId, source.id],
     queryFn: () => discovery.listExtractionsBySource(workspaceId, source.id),
@@ -527,10 +531,11 @@ interface SourceRowProps {
   onDelete: (source: DiscoverySource) => Promise<void>;
   onViewExtractions: (source: DiscoverySource) => void;
   processing: boolean;
+  anyProcessing: boolean;
   deletingId: string | null;
 }
 
-function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing, deletingId }: SourceRowProps) {
+function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing, anyProcessing, deletingId }: SourceRowProps) {
   const isDeleting = deletingId === source.id;
   const isProcessed = !!source.processedAt;
 
@@ -576,7 +581,7 @@ function SourceRow({ source, onProcess, onDelete, onViewExtractions, processing,
           <button
             type="button"
             onClick={() => onProcess(source)}
-            disabled={processing}
+            disabled={anyProcessing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {processing ? (
@@ -766,6 +771,7 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
               onDelete={handleDelete}
               onViewExtractions={onViewExtractions}
               processing={processingId === source.id}
+              anyProcessing={processingId !== null}
               deletingId={deletingId}
             />
           ))}
