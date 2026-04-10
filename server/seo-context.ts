@@ -6,6 +6,10 @@ import { getUploadRoot } from './data-dir.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { createLogger } from './logger.js';
+import { listBrandscripts } from './brandscript.js';
+import { getVoiceProfile } from './voice-calibration.js';
+import { listDeliverables } from './brand-identity.js';
+import type { ContextEmphasis } from '../shared/types/brand-engine.js';
 
 const log = createLogger('seo-context');
 
@@ -90,7 +94,11 @@ export function buildSeoContext(
   const knowledgeBlock = buildKnowledgeBase(workspaceId);
 
   if (!strategy) {
-    const baseParts = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
+    const brandscriptBlock = buildBrandscriptContext(workspaceId);
+    const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
+    const identityBlock = buildIdentityContext(workspaceId);
+    const effectiveBrandVoice = voiceProfileBlock || brandVoiceBlock;
+    const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
     // Inject workspace learnings if feature is enabled
     if (isFeatureEnabled('outcome-ai-injection')) {
       const learnings = getWorkspaceLearnings(workspaceId);
@@ -137,7 +145,11 @@ export function buildSeoContext(
     keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
   }
 
-  const contextParts = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
+  const brandscriptBlock = buildBrandscriptContext(workspaceId);
+  const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
+  const identityBlock = buildIdentityContext(workspaceId);
+  const effectiveBrandVoice = voiceProfileBlock || brandVoiceBlock;
+  const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
   // Inject workspace learnings if feature is enabled
   if (isFeatureEnabled('outcome-ai-injection')) {
     const learnings = getWorkspaceLearnings(workspaceId);
@@ -406,4 +418,91 @@ export function buildKeywordMapContext(workspaceId?: string): string {
   ).join('\n');
 
   return `\n\nEXISTING KEYWORD MAP (avoid cannibalization, suggest internal links where relevant):\n${mapStr}`;
+}
+
+/**
+ * Build a brand narrative block from the workspace's active brandscript.
+ * Uses the most recently created brandscript. Returns '' if none exists or no sections have content.
+ */
+export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
+  const scripts = listBrandscripts(workspaceId);
+  if (scripts.length === 0) return '';
+
+  const bs = scripts[0]; // Use most recent
+  const filledSections = bs.sections.filter(sec => sec.content?.trim());
+
+  if (filledSections.length === 0) return '';
+
+  if (emphasis === 'minimal') {
+    const first = filledSections[0];
+    return `\n\nBRAND NARRATIVE (${bs.frameworkType}): ${first.title} — ${first.content?.slice(0, 200)}...`;
+  }
+
+  const sections = (emphasis === 'summary' ? filledSections.slice(0, 3) : filledSections)
+    .map(sec => `  ${sec.title}: ${sec.content}`)
+    .join('\n');
+
+  return `\n\nBRAND NARRATIVE (${bs.frameworkType} framework):\n${sections}`;
+}
+
+/**
+ * Build a voice profile block for AI prompts from the workspace's calibrated voice profile.
+ * Includes voice DNA, sample writing, and guardrails. Returns '' if no profile exists.
+ */
+export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
+  const profile = getVoiceProfile(workspaceId);
+  if (!profile) return '';
+
+  const parts: string[] = [];
+
+  if (profile.voiceDNA) {
+    parts.push(`VOICE DNA:`);
+    parts.push(`  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}`);
+    parts.push(`  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10`);
+    parts.push(`  Sentence style: ${profile.voiceDNA.sentenceStyle}`);
+    parts.push(`  Humor: ${profile.voiceDNA.humorStyle}`);
+  }
+
+  if (profile.samples.length > 0) {
+    parts.push(`\nVOICE SAMPLES (write like these):`);
+    for (const sample of profile.samples.slice(0, 5)) {
+      parts.push(`  [${sample.contextTag || 'general'}] "${sample.content}"`);
+    }
+  }
+
+  if (profile.guardrails) {
+    parts.push(`\nGUARDRAILS:`);
+    if (profile.guardrails.forbiddenWords.length) parts.push(`  Never use: ${profile.guardrails.forbiddenWords.join(', ')}`);
+    if (profile.guardrails.requiredTerminology.length) parts.push(`  Required: ${profile.guardrails.requiredTerminology.map(t => `"${t.use}" not "${t.insteadOf}"`).join(', ')}`);
+    if (profile.guardrails.toneBoundaries.length) parts.push(`  Boundaries: ${profile.guardrails.toneBoundaries.join('. ')}`);
+  }
+
+  if (parts.length === 0) return '';
+  return `\n\nBRAND VOICE PROFILE (you MUST match this voice — do not deviate):\n${parts.join('\n')}`;
+}
+
+/**
+ * Build a brand identity block for AI prompts from approved brand identity deliverables.
+ * Only includes deliverables with status 'approved'. Returns '' if none exist.
+ */
+export function buildIdentityContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
+  const deliverables = listDeliverables(workspaceId).filter(d => d.status === 'approved');
+  if (deliverables.length === 0) return '';
+
+  if (emphasis === 'minimal') {
+    const mission = deliverables.find(d => d.deliverableType === 'mission');
+    return mission ? `\n\nBRAND MISSION: ${mission.content.slice(0, 200)}` : '';
+  }
+
+  const selected = emphasis === 'summary'
+    ? deliverables.filter(d => ['mission', 'messaging_pillars', 'tagline'].includes(d.deliverableType))
+    : deliverables;
+
+  const parts: string[] = [];
+  for (const d of selected) {
+    parts.push(`  ${d.deliverableType.replace(/_/g, ' ').toUpperCase()}: ${d.content.slice(0, 500)}`);
+  }
+
+  if (parts.length === 0) return '';
+  return `\n\nBRAND IDENTITY (approved deliverables):\n${parts.join('\n')}`;
 }
