@@ -80,7 +80,6 @@ router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (re
 // Update voice profile (DNA, guardrails, modifiers, status)
 router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(updateVoiceProfileSchema), (req, res) => {
   const result = updateVoiceProfile(req.params.workspaceId, req.body);
-  if (!result) return res.status(500).json({ error: 'Update failed' });
   addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
   res.json(result);

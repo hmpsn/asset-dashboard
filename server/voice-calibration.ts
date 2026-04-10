@@ -116,10 +116,13 @@ export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { s
   return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
 }
 
+// Always returns a profile — `getOrCreateVoiceProfile` creates one if missing,
+// so there is no null path. Typed as non-nullable so callers don't need a
+// dead-code guard.
 export function updateVoiceProfile(
   workspaceId: string,
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
-): (VoiceProfile & { samples: VoiceSample[] }) | null {
+): VoiceProfile & { samples: VoiceSample[] } {
   const profile = getOrCreateVoiceProfile(workspaceId);
   const now = new Date().toISOString();
   stmts().updateProfile.run({

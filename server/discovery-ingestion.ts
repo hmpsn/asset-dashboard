@@ -34,6 +34,7 @@ const stmts = createStmtCache(() => ({
   deleteExtractionsBySource: db.prepare(`DELETE FROM discovery_extractions WHERE workspace_id = ? AND source_id = ?`),
   insertExtraction: db.prepare(`INSERT INTO discovery_extractions (id, source_id, workspace_id, extraction_type, category, content, source_quote, confidence, status, created_at) VALUES (@id, @source_id, @workspace_id, @extraction_type, @category, @content, @source_quote, @confidence, @status, @created_at)`),
   updateExtractionStatus: db.prepare(`UPDATE discovery_extractions SET status = @status, routed_to = @routed_to WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: extraction status is not a platform state machine column
+  updateExtractionStatusOnly: db.prepare(`UPDATE discovery_extractions SET status = @status WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: extraction status is not a platform state machine column — preserves existing routed_to
   updateExtractionContent: db.prepare(`UPDATE discovery_extractions SET content = @content WHERE id = @id AND workspace_id = @workspace_id`),
 }));
 
@@ -93,10 +94,21 @@ export function deleteSource(workspaceId: string, id: string): boolean {
   return stmts().deleteSource.run(id, workspaceId).changes > 0;
 }
 
+/**
+ * Update extraction status and optionally the routing destination.
+ *
+ * IMPORTANT: `routedTo === undefined` means "do not touch the existing
+ * routed_to column" — we route the call to a status-only statement so a
+ * `{ status: 'accepted' }` PATCH never silently clears a previously-set
+ * destination. Pass `routedTo: null` explicitly to clear it.
+ */
 export function updateExtractionStatus(
-  workspaceId: string, id: string, status: ExtractionStatus, routedTo?: ExtractionDestination,
+  workspaceId: string, id: string, status: ExtractionStatus, routedTo?: ExtractionDestination | null,
 ): boolean {
-  return stmts().updateExtractionStatus.run({ id, workspace_id: workspaceId, status, routed_to: routedTo ?? null }).changes > 0;
+  if (routedTo === undefined) {
+    return stmts().updateExtractionStatusOnly.run({ id, workspace_id: workspaceId, status }).changes > 0;
+  }
+  return stmts().updateExtractionStatus.run({ id, workspace_id: workspaceId, status, routed_to: routedTo }).changes > 0;
 }
 
 export function updateExtractionContent(workspaceId: string, id: string, content: string): boolean {
