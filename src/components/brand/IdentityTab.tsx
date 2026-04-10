@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { Sparkles, Check, Download, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
 import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
-import { DEFAULT_TIER_MAP } from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton } from '../ui';
 import { useToast } from '../Toast';
 
@@ -265,11 +264,12 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
+  const [generatingMission, setGeneratingMission] = useState(false);
 
-  const { data: deliverables, isLoading } = useQuery(
-    ['admin-brand-identity', workspaceId],
-    () => identity.list(workspaceId),
-  );
+  const { data: deliverables, isLoading, isError } = useQuery({
+    queryKey: ['admin-brand-identity', workspaceId],
+    queryFn: () => identity.list(workspaceId),
+  });
 
   useWebSocket({
     'identity:updated': () => {
@@ -277,19 +277,23 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
     },
   });
 
-  const invalidate = () => {
+  const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] });
-  };
+  }, [queryClient, workspaceId]);
 
   // Build a fast-lookup map: deliverableType → BrandDeliverable
-  const deliverableMap = new Map<DeliverableType, BrandDeliverable>();
-  if (deliverables) {
-    for (const d of deliverables) {
-      deliverableMap.set(d.deliverableType, d);
+  const { deliverableMap, approvedCount } = useMemo(() => {
+    const map = new Map<DeliverableType, BrandDeliverable>();
+    let count = 0;
+    if (deliverables) {
+      for (const d of deliverables) {
+        map.set(d.deliverableType, d);
+        if (d.status === 'approved') count++;
+      }
     }
-  }
+    return { deliverableMap: map, approvedCount: count };
+  }, [deliverables]);
 
-  const approvedCount = deliverables?.filter(d => d.status === 'approved').length ?? 0;
   const hasAnyDeliverable = (deliverables?.length ?? 0) > 0;
 
   const handleExportAll = async () => {
@@ -312,12 +316,15 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   };
 
   const handleGenerateMission = async () => {
+    setGeneratingMission(true);
     try {
       await identity.generate(workspaceId, { deliverableType: 'mission' });
       toast('Mission Statement generated');
       invalidate();
     } catch {
       toast('Failed to generate Mission Statement', 'error');
+    } finally {
+      setGeneratingMission(false);
     }
   };
 
@@ -338,6 +345,21 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="text-sm text-zinc-500 py-8 text-center">
+        Failed to load brand deliverables.{' '}
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] })}
+          className="text-teal-400 hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   if (!hasAnyDeliverable) {
     return (
       <EmptyState
@@ -347,9 +369,10 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
           <button
             type="button"
             onClick={handleGenerateMission}
-            className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            disabled={generatingMission}
+            className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            <Sparkles className="w-4 h-4" />
+            {generatingMission ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Generate Mission
           </button>
         }
