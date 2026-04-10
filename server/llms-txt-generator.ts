@@ -23,6 +23,7 @@ import { createLogger } from './logger.js';
 import { callOpenAI } from './openai-helpers.js';
 import { STUDIO_BOT_UA } from './constants.js';
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import { randomUUID } from 'crypto';
 
 const log = createLogger('llms-txt');
@@ -53,48 +54,27 @@ interface PlannedPage {
 
 // ── Cache Store (SQLite) ──
 
-let _upsertStmt: ReturnType<typeof db.prepare> | null = null;
-let _getOneStmt: ReturnType<typeof db.prepare> | null = null;
-let _getAllStmt: ReturnType<typeof db.prepare> | null = null;
-let _deleteStmt: ReturnType<typeof db.prepare> | null = null;
-let _cleanupOldLlmsTxtStmt: ReturnType<typeof db.prepare> | null = null;
-
-function upsertCacheStmt() {
-  if (!_upsertStmt) {
-    _upsertStmt = db.prepare(`
-      INSERT INTO llms_txt_cache (id, workspace_id, page_url, summary)
-      VALUES (@id, @workspace_id, @page_url, @summary)
-      ON CONFLICT(workspace_id, page_url) DO UPDATE SET
-        summary = excluded.summary,
-        generated_at = datetime('now')
-    `);
-  }
-  return _upsertStmt;
-}
-function getOneCacheStmt() {
-  if (!_getOneStmt) {
-    _getOneStmt = db.prepare('SELECT * FROM llms_txt_cache WHERE workspace_id = ? AND page_url = ?');
-  }
-  return _getOneStmt;
-}
-function getAllCacheStmt() {
-  if (!_getAllStmt) {
-    _getAllStmt = db.prepare('SELECT * FROM llms_txt_cache WHERE workspace_id = ?');
-  }
-  return _getAllStmt;
-}
-function deleteCacheStmt() {
-  if (!_deleteStmt) {
-    _deleteStmt = db.prepare('DELETE FROM llms_txt_cache WHERE workspace_id = ? AND page_url = ?');
-  }
-  return _deleteStmt;
-}
-function cleanupOldLlmsTxtCacheStmt() {
-  if (!_cleanupOldLlmsTxtStmt) {
-    _cleanupOldLlmsTxtStmt = db.prepare(`DELETE FROM llms_txt_cache WHERE generated_at < datetime('now', ? || ' days')`);
-  }
-  return _cleanupOldLlmsTxtStmt;
-}
+const cacheStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT INTO llms_txt_cache (id, workspace_id, page_url, summary)
+    VALUES (@id, @workspace_id, @page_url, @summary)
+    ON CONFLICT(workspace_id, page_url) DO UPDATE SET
+      summary = excluded.summary,
+      generated_at = datetime('now')
+  `),
+  getOne: db.prepare<[workspaceId: string, pageUrl: string]>(
+    'SELECT * FROM llms_txt_cache WHERE workspace_id = ? AND page_url = ?',
+  ),
+  getAll: db.prepare<[workspaceId: string]>(
+    'SELECT * FROM llms_txt_cache WHERE workspace_id = ?',
+  ),
+  deleteOne: db.prepare<[workspaceId: string, pageUrl: string]>(
+    'DELETE FROM llms_txt_cache WHERE workspace_id = ? AND page_url = ?',
+  ),
+  cleanupOld: db.prepare<[daysExpr: string]>(
+    `DELETE FROM llms_txt_cache WHERE generated_at < datetime('now', ? || ' days')`,
+  ),
+}));
 
 interface CacheRow {
   id: string;
@@ -106,57 +86,47 @@ interface CacheRow {
 
 export function upsertSummary(workspaceId: string, pageUrl: string, summary: string) {
   const id = randomUUID();
-  upsertCacheStmt().run({ id, workspace_id: workspaceId, page_url: pageUrl, summary });
+  cacheStmts().upsert.run({ id, workspace_id: workspaceId, page_url: pageUrl, summary });
 }
 
 export function getSummary(workspaceId: string, pageUrl: string) {
-  const row = getOneCacheStmt().get(workspaceId, pageUrl) as CacheRow | undefined;
+  const row = cacheStmts().getOne.get(workspaceId, pageUrl) as CacheRow | undefined;
   if (!row) return null;
   return { summary: row.summary, generatedAt: row.generated_at };
 }
 
 export function getSummaries(workspaceId: string) {
-  const rows = getAllCacheStmt().all(workspaceId) as CacheRow[];
+  const rows = cacheStmts().getAll.all(workspaceId) as CacheRow[];
   return rows.map(r => ({ pageUrl: r.page_url, summary: r.summary, generatedAt: r.generated_at }));
 }
 
 export function deleteSummary(workspaceId: string, pageUrl: string): boolean {
-  const result = deleteCacheStmt().run(workspaceId, pageUrl);
+  const result = cacheStmts().deleteOne.run(workspaceId, pageUrl);
   return result.changes > 0;
 }
 
 export function cleanupOldLlmsTxt(maxAgeDays: number = 90): number {
-  const info = cleanupOldLlmsTxtCacheStmt().run(`-${maxAgeDays}`);
+  const info = cacheStmts().cleanupOld.run(`-${maxAgeDays}`);
   return info.changes;
 }
 
 // ── Freshness Tracking ──
 
-let _upsertFreshnessStmt: ReturnType<typeof db.prepare> | null = null;
-let _getFreshnessStmt: ReturnType<typeof db.prepare> | null = null;
-
-function upsertFreshnessStmt() {
-  if (!_upsertFreshnessStmt) {
-    _upsertFreshnessStmt = db.prepare(`
-      INSERT INTO llms_txt_freshness (workspace_id, last_generated_at, trigger)
-      VALUES (@workspace_id, @last_generated_at, @trigger)
-      ON CONFLICT(workspace_id) DO UPDATE SET
-        last_generated_at = excluded.last_generated_at,
-        trigger = excluded.trigger
-    `);
-  }
-  return _upsertFreshnessStmt;
-}
-
-function getFreshnessStmt() {
-  if (!_getFreshnessStmt) {
-    _getFreshnessStmt = db.prepare('SELECT last_generated_at FROM llms_txt_freshness WHERE workspace_id = ?');
-  }
-  return _getFreshnessStmt;
-}
+const freshnessStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT INTO llms_txt_freshness (workspace_id, last_generated_at, trigger)
+    VALUES (@workspace_id, @last_generated_at, @trigger)
+    ON CONFLICT(workspace_id) DO UPDATE SET
+      last_generated_at = excluded.last_generated_at,
+      trigger = excluded.trigger
+  `),
+  get: db.prepare<[workspaceId: string]>(
+    'SELECT last_generated_at FROM llms_txt_freshness WHERE workspace_id = ?',
+  ),
+}));
 
 export function setLastGenerated(workspaceId: string, trigger?: string) {
-  upsertFreshnessStmt().run({
+  freshnessStmts().upsert.run({
     workspace_id: workspaceId,
     last_generated_at: new Date().toISOString(),
     trigger: trigger || null,
@@ -164,7 +134,7 @@ export function setLastGenerated(workspaceId: string, trigger?: string) {
 }
 
 export function getLastGenerated(workspaceId: string): string | null {
-  const row = getFreshnessStmt().get(workspaceId) as { last_generated_at: string } | undefined;
+  const row = freshnessStmts().get.get(workspaceId) as { last_generated_at: string } | undefined;
   return row?.last_generated_at ?? null;
 }
 
@@ -522,7 +492,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
       const brief = r.briefId ? briefMap.get(r.briefId) : undefined;
       const title = brief?.suggestedTitle || r.topic || r.targetKeyword || 'Untitled';
       plannedPages.push({
-        url: r.targetUrl || '#',
+        url: r.targetPageSlug || '#',
         keyword: title,
         status: r.status,
       });

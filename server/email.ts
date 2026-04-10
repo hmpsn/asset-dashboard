@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { queueEmail, registerSendFn, restoreQueue } from './email-queue.js';
 import type { EmailEvent } from './email-templates.js';
 import { createLogger } from './logger.js';
-import { STUDIO_NAME, STUDIO_URL } from './constants.js';
+import { STUDIO_URL } from './constants.js';
 
 const log = createLogger('email');
 

@@ -3,12 +3,13 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
 import { addVoiceSample, getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listBrandscripts } from './brandscript.js';
 import { listExtractions } from './discovery-ingestion.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 import type {
   BrandDeliverable, DeliverableVersion, DeliverableType, DeliverableTier, DeliverableStatus,
   VoiceSampleContext,
@@ -35,7 +36,11 @@ const stmts = createStmtCache(() => ({
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
   updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`),
   updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
-  listVersions: db.prepare(`SELECT * FROM brand_identity_versions WHERE deliverable_id = ? ORDER BY version DESC`),
+  // Defense in depth: scope by workspace via a join on the parent deliverable
+  // even though `deliverable_id` is already a scoped FK. A bug in getDeliverable
+  // (or a future caller) that leaks a cross-workspace id shouldn't yield version
+  // rows. `brand_identity_versions` has no `workspace_id` column of its own.
+  listVersions: db.prepare(`SELECT v.* FROM brand_identity_versions v INNER JOIN brand_identity_deliverables d ON v.deliverable_id = d.id WHERE v.deliverable_id = ? AND d.workspace_id = ? ORDER BY v.version DESC`),
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
 
@@ -72,7 +77,7 @@ export function getDeliverable(workspaceId: string, id: string): (BrandDeliverab
   const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
   if (!row) return null;
   const deliverable = rowToDeliverable(row);
-  const versions = (stmts().listVersions.all(id) as VersionRow[]).map(rowToVersion);
+  const versions = (stmts().listVersions.all(id, workspaceId) as VersionRow[]).map(rowToVersion);
   return { ...deliverable, versions };
 }
 
@@ -229,13 +234,18 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
 }
 
 export async function refineDeliverable(workspaceId: string, id: string, direction: string): Promise<BrandDeliverable | null> {
-  const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
-  if (!existing) return null;
+  // Initial read (outside transaction) is only used to feed the AI call with
+  // the current content. The authoritative read that drives version numbering
+  // and the content snapshot happens *inside* the transaction below, to close
+  // the stale-read race where a concurrent generate/refine could bump the
+  // version between the AI call and our write.
+  const preload = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+  if (!preload) return null;
 
-  const userPrompt = `Refine this ${existing.deliverable_type.replace(/_/g, ' ')} based on the direction given.
+  const userPrompt = `Refine this ${preload.deliverable_type.replace(/_/g, ' ')} based on the direction given.
 
 CURRENT VERSION:
-${existing.content}
+${preload.content}
 
 REFINEMENT DIRECTION:
 ${direction}
@@ -252,55 +262,119 @@ Return only the refined content — no preamble.`;
     feature: 'brand-identity-refine',
     workspaceId,
   })).trim();
-  const now = new Date().toISOString();
-  const newVersion = existing.version + 1;
 
-  // Save current as version snapshot then update content atomically
-  const doRefine = db.transaction(() => {
+  // Re-read existing inside the transaction so the version snapshot and
+  // newVersion computation reflect any concurrent writes during the AI call.
+  const doRefine = db.transaction((): BrandDeliverable | null => {
+    const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+    if (!existing) return null;
+    const now = new Date().toISOString();
+    const newVersion = existing.version + 1;
     stmts().insertVersion.run({
       id: `biv_${randomUUID().slice(0, 8)}`,
       deliverable_id: id, content: existing.content,
       steering_notes: direction, version: existing.version, created_at: now,
     });
     stmts().updateContent.run({ id, workspace_id: workspaceId, content, status: 'draft', version: newVersion, tier: existing.tier, updated_at: now });
+    return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
   });
-  doRefine();
-  return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
+  return doRefine();
 }
 
 export function approveDeliverable(workspaceId: string, id: string): BrandDeliverable | null {
-  const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
-  if (!row) return null;
+  return setDeliverableStatus(workspaceId, id, 'approved');
+}
 
-  const now = new Date().toISOString();
-  stmts().updateStatus.run({ id, workspace_id: workspaceId, status: 'approved', updated_at: now });
-  log.info({ workspaceId, deliverableType: row.deliverable_type }, 'deliverable approved');
-
-  // Spec Addendum §5: auto-create voice sample for approved identity deliverables.
+/**
+ * Set a deliverable's status to either `approved` or `draft`.
+ *
+ * When transitioning to `approved`, auto-creates a voice sample for certain
+ * deliverable types (tagline/elevator_pitch/tone_examples) and broadcasts
+ * VOICE_PROFILE_UPDATED. Reverting to `draft` simply flips the status — it
+ * does NOT delete the auto-created voice sample, since the sample may have
+ * been manually edited since approval.
+ */
+export function setDeliverableStatus(
+  workspaceId: string,
+  id: string,
+  status: 'approved' | 'draft',
+): BrandDeliverable | null {
+  // Read + write + side-effect decision MUST be atomic. Two concurrent
+  // `setDeliverableStatus(wsId, id, 'approved')` calls without a transaction
+  // can both observe `priorStatus = 'draft'`, both pass the re-approval
+  // short-circuit, and both insert a duplicate voice sample. SQLite serializes
+  // writes — wrapping this in `db.transaction()` means the second caller sees
+  // `priorStatus = 'approved'` and short-circuits correctly.
   //
-  // Intentionally decoupled from the updateStatus write above — approval is the
-  // user-visible primary effect and must succeed even if the downstream sample
-  // insert fails (e.g. voice_profiles FK issues, unexpected table state). The
-  // per-call atomicity that CLAUDE.md wants lives inside `addVoiceSample`, which
-  // wraps its own profile-upsert + sample-insert in db.transaction(). If that
-  // fails we log and move on; the admin can manually seed the sample later.
-  const type = row.deliverable_type as DeliverableType;
-  const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
-    tagline: 'headline',
-    elevator_pitch: 'body',
-    tone_examples: 'body',
-  };
-  const contextTag = voiceSampleMap[type];
-  if (contextTag) {
+  // `addVoiceSample` wraps its own writes in a transaction; better-sqlite3
+  // promotes nested transactions to SAVEPOINTs, so this composes cleanly.
+  //
+  // The broadcast is deliberately deferred to AFTER the transaction commits —
+  // a broadcast inside a transaction would fire even if a later statement
+  // rolled back, and WebSocket delivery is a visible side effect we cannot undo.
+  const txResult = db.transaction(() => {
+    const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+    if (!row) return null;
+
+    // Capture the pre-update status BEFORE writing — we need to know whether
+    // this is a first-time approval (draft → approved) vs a re-approval
+    // (already approved, no-op on status). The auto-sample side effect must
+    // only run on the transition.
+    const priorStatus = row.status;
+    const now = new Date().toISOString();
+    stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
+    log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
+
+    if (status !== 'approved') {
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
+    }
+
+    // Re-approval of an already-approved deliverable must NOT duplicate the
+    // voice sample. Without this guard, every idempotent PATCH (e.g. a client
+    // retry, or an admin clicking "Approve" twice) inserts another copy of
+    // the same content into the voice samples table. The transaction makes
+    // this check race-free: two concurrent callers are serialized and only
+    // one sees `priorStatus === 'draft'`.
+    if (priorStatus === 'approved') {
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
+    }
+
+    // Spec Addendum §5: auto-create voice sample for approved identity
+    // deliverables. `addVoiceSample` has its own transaction which becomes a
+    // nested SAVEPOINT here; if it throws we catch, log, and let the outer
+    // transaction commit — approval is the primary effect and must succeed
+    // even if the downstream sample insert fails.
+    const type = row.deliverable_type as DeliverableType;
+    const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
+      tagline: 'headline',
+      elevator_pitch: 'body',
+      tone_examples: 'body',
+    };
+    const contextTag = voiceSampleMap[type];
+    if (!contextTag) {
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
+    }
+
     try {
       addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
       log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
+      return { row, now, autoSampleFrom: type };
     } catch (err) {
       log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
+      return { row, now, autoSampleFrom: null as DeliverableType | null };
     }
+  })();
+
+  if (!txResult) return null;
+
+  // Post-commit side effect — a mounted VoiceTab refetches its sample list.
+  // Must be outside the transaction so we never broadcast a sample that got
+  // rolled back, and never hold the write lock across I/O.
+  if (txResult.autoSampleFrom) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { autoSampleFrom: txResult.autoSampleFrom });
   }
 
-  return { ...rowToDeliverable(row), status: 'approved', updatedAt: now };
+  return { ...rowToDeliverable(txResult.row), status, updatedAt: txResult.now };
 }
 
 export function exportDeliverables(workspaceId: string, tier?: DeliverableTier): string {

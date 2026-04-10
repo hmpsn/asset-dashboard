@@ -133,7 +133,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
   };
 
   // Visible card/line keys based on connected integrations
-  const visibleKeys = new Set(
+  const visibleKeys = new Set<string>(
     ALL_CARDS
       .filter(card => {
         if (['clicks', 'impressions', 'ctr', 'position'].includes(card.key)) return overview.hasGsc;

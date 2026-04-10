@@ -48,20 +48,18 @@ import type { ContentSubscription, ContentMatrix, GeneratedPost } from '../share
 import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
-import type { ChurnSignal, listChurnSignals } from './churn-signals.js';
+import type { ChurnSignal } from './churn-signals.js';
 // Compile-time contracts for HIGH-risk dynamic-import modules — erased at runtime; tsc fails if these exports are renamed
-import type { Anomaly, listAnomalies } from './anomaly-detection.js';
+import type { Anomaly } from './anomaly-detection.js';
 // client-signals-store uses dynamic import inside try-catch (like other subsystems)
 // to degrade gracefully if the module or table is unavailable on older DBs.
 import type { DecayAnalysis } from './content-decay.js';
-import type { AuditSnapshot } from './reports.js';
 import type { ROIData } from './roi.js';
 import type { SeoChangeEvent } from './seo-change-tracker.js';
 import type { CannibalizationReport } from './cannibalization-detection.js';
 import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
 import type { Annotation as TimelineAnnotation } from './annotations.js';
 import type { ActionOutcome, ActionPlaybook, TopWin } from '../shared/types/outcome-tracking.js';
-import type { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions, getPendingActions, getActionsByPage } from './outcome-tracking.js';
 import type { SafeClientUser } from '../shared/types/users.js';
 import type { ClientRequest } from '../shared/types/requests.js';
 import type { ContentBrief } from '../shared/types/content.js';
@@ -74,7 +72,6 @@ import type { Job } from './jobs.js';
 import type { SchemaValidation } from './schema-validator.js';
 import type { SiteNode } from './site-architecture.js';
 import type { PageSeoResult, SeoIssue } from './audit-page.js';
-import type { Snapshot } from './performance-store.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -473,7 +470,7 @@ async function assembleLearnings(
   }
 
   return {
-    summary,
+    summary: summary ?? null,
     confidence: summary?.confidence ?? null,
     topActionTypes: summary?.overall.topActionTypes.slice(0, 5) ?? [],
     overallWinRate: summary?.overall.totalWinRate ?? 0,
@@ -562,7 +559,7 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
         for (const conflict of report.conflicts.slice(0, 10)) {
           cannibalizationWarnings.push({
             keyword: conflict.keyword ?? '',
-            pages: conflict.pages ?? [],
+            pages: [conflict.sourceId, conflict.conflictsWith?.identifier].filter((p): p is string => Boolean(p)),
             severity: conflict.severity ?? 'low',
           });
         }
@@ -850,7 +847,7 @@ async function assembleClientSignals(
   try {
     const row = stmts().clientBusinessPriorities.get(workspaceId) as { priorities: string } | undefined;
     if (row) {
-      businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), 'client_business_priorities') ?? [];
+      businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), [] as string[], { workspaceId, field: 'priorities', table: 'client_business_priorities' });
     }
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities table optional, degrading gracefully');
@@ -1229,7 +1226,9 @@ async function assembleOperational(
     const insights = getInsights(workspaceId);
     const totalShown = insights.length;
     const confirmed = insights.filter(i => i.resolutionStatus === 'resolved' || i.resolutionStatus === 'in_progress').length;
-    const dismissed = insights.filter(i => i.resolutionStatus === 'dismissed').length;
+    // `dismissed` is a runtime-only value written by legacy code paths; the strict
+    // `AnalyticsInsight['resolutionStatus']` union omits it, hence the string cast.
+    const dismissed = insights.filter(i => (i.resolutionStatus as string) === 'dismissed').length;
     if (totalShown > 0) {
       insightAcceptanceRate = {
         totalShown,
@@ -1374,7 +1373,7 @@ export function formatForPrompt(
  */
 export async function buildIntelPrompt(
   workspaceId: string,
-  slices: IntelligenceSlice[],
+  slices: readonly IntelligenceSlice[],
   opts?: Omit<IntelligenceOptions, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget' | 'learningsDomain'>,
 ): Promise<string> {
   const intel = await buildWorkspaceIntelligence(workspaceId, { ...opts, slices });

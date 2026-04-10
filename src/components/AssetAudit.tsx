@@ -155,13 +155,15 @@ function AssetAudit({ siteId }: Props) {
     setCompressing(prev => new Set(prev).add(issue.assetId));
     try {
       const data = await post<{ success?: boolean; newAssetId?: string; newSize?: number }>(`/api/webflow/compress/${issue.assetId}`, { imageUrl: issue.url, siteId, fileName: issue.fileName });
-      if (data.success && audit) {
+      if (data.success && audit && data.newAssetId) {
+        const newAssetId = data.newAssetId;
+        const newSize = data.newSize ?? issue.fileSize;
         setAudit({
           ...audit,
           oversized: Math.max(0, audit.oversized - 1),
           issues: audit.issues.map(i =>
             i.assetId === issue.assetId
-              ? { ...i, assetId: data.newAssetId, issues: i.issues.filter(x => x !== 'oversized' && x !== 'unoptimized-png'), fileSize: data.newSize }
+              ? { ...i, assetId: newAssetId, issues: i.issues.filter(x => x !== 'oversized' && x !== 'unoptimized-png'), fileSize: newSize }
               : i
           ),
         });

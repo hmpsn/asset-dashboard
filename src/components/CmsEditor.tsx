@@ -34,17 +34,6 @@ interface ApprovalItem {
   updatedAt: string;
 }
 
-interface ApprovalBatch {
-  id: string;
-  workspaceId: string;
-  siteId: string;
-  name: string;
-  items: ApprovalItem[];
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface CmsItem {
   id: string;
   fieldData: Record<string, unknown>;

@@ -17,7 +17,7 @@ import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
  */
 export function useWorkspaceIntelligence(
   workspaceId: string,
-  slices?: IntelligenceSlice[],
+  slices?: readonly IntelligenceSlice[],
   pagePath?: string,
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all',
 ) {

@@ -62,7 +62,7 @@ export function StripeSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProducts, setSavingProducts] = useState(false);
-  const { toast, setToast, clearToast } = useToast();
+  const { toast, setToast } = useToast();
   const showToast = useCallback((message: string, type: 'success' | 'error') => setToast({ message, type }), [setToast]);
 
   // Key inputs

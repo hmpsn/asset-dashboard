@@ -5,8 +5,7 @@ import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
-import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
-import type { PageKeywordMap } from '../../../shared/types/workspace';
+import type { ClientContentRequest, ClientRequest, ApprovalBatch, ClientKeywordStrategy } from './types';
 import type { ContentPlanReviewCell } from '../../hooks/useClientData';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
@@ -54,7 +53,7 @@ interface InboxTabProps {
   // Which section to show initially (for deep-linking from Overview actions)
   initialFilter?: InboxFilter;
   // Keyword strategy page map for approval card context chips
-  pageMap?: PageKeywordMap[];
+  pageMap?: ClientKeywordStrategy['pageMap'];
 }
 
 export function InboxTab({

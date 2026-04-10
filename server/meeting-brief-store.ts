@@ -3,7 +3,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { meetingBriefRecommendationSchema, meetingBriefMetricsSchema } from './schemas/meeting-brief-schemas.js';
 import { z } from 'zod';
-import type { MeetingBrief, MeetingBriefMetrics, MeetingBriefRecommendation } from '../shared/types/meeting-brief.js';
+import type { MeetingBrief } from '../shared/types/meeting-brief.js';
 
 interface BriefRow {
   workspace_id: string;

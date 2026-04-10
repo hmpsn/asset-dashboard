@@ -15,7 +15,6 @@ import type {
   InsightDataMap,
   PageHealthData,
   QuickWinData,
-  ContentDecayData,
   CannibalizationData,
   ConversionAttributionData,
   CompetitorGapData,
@@ -25,8 +24,7 @@ import type {
   SerpOpportunityData,
 } from '../shared/types/analytics.js';
 import type { GA4LandingPage } from './google-analytics.js';
-import { getAllGscPages, getQueryPageData, paginateGscQuery } from './search-console.js';
-import { getValidToken } from './google-auth.js';
+import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
 import { upsertInsight, getInsights, deleteStaleInsightsByType } from './analytics-insights-store.js';
@@ -895,7 +893,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   const previousDateRange: CustomDateRange = { startDate: fmt(prevStart), endDate: fmt(prevEnd) };
 
   // Fetch data in parallel, using the API cache
-  const [gscPages, queryPageData, ga4Pages, previousGscPages, previousQueryPageData] = await Promise.all([
+  const [gscPages, queryPageData, ga4Pages, _previousGscPages, previousQueryPageData] = await Promise.all([
     gscUrl && siteId
       ? apiCache.wrap(workspaceId, 'getAllGscPages', { range: currentDateRange }, () =>
           getAllGscPages(siteId, gscUrl, 30, currentDateRange),
@@ -929,7 +927,6 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   // (trailing slashes, query params, fragments) of the same logical page.
   // Cloning avoids mutating apiCache shared references.
   const normGscPages = deduplicatePages(gscPages);
-  const normPrevGscPages = deduplicatePages(previousGscPages);
   const normQueryPageData = deduplicateQueryPages(queryPageData);
   const normPrevQueryPageData = deduplicateQueryPages(previousQueryPageData);
 
@@ -951,16 +948,19 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     severity: InsightSeverity;
   }): void {
     const enrichment = enrichInsight(
-      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data as AnalyticsInsight['data'] },
+      { pageId: insight.pageId, insightType: insight.insightType, severity: insight.severity, data: insight.data as unknown as AnalyticsInsight['data'] },
       enrichCtx,
     );
+    // `enrichment` is Partial<AnalyticsInsight> so spreading it can introduce
+    // an untyped `data` field; strip it so the narrowly-typed `insight.data` wins.
+    const { data: _enrichedData, ...enrichmentRest } = enrichment;
     upsertInsight({
       workspaceId,
       pageId: insight.pageId,
       insightType: insight.insightType,
       data: insight.data,
       severity: insight.severity,
-      ...enrichment,
+      ...enrichmentRest,
     });
   }
 

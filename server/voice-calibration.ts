@@ -3,6 +3,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-assembly.js';
+import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
@@ -37,12 +38,21 @@ const stmts = createStmtCache(() => ({
   insertProfile: db.prepare(`INSERT OR IGNORE INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
   updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: voice profile status is not a platform state machine column
   listSamples: db.prepare(`SELECT * FROM voice_samples WHERE voice_profile_id = ? ORDER BY sort_order`),
+  // Compute next sort_order atomically inside the transaction. Reading
+  // profile.samples.length from an in-memory snapshot races: two concurrent
+  // addVoiceSample() calls both see length=N and both assign sort_order=N.
+  // COALESCE handles the empty-table case where SQLite's MAX() returns NULL.
+  maxSampleSortOrder: db.prepare(`SELECT COALESCE(MAX(sort_order), -1) AS max FROM voice_samples WHERE voice_profile_id = ?`),
   insertSample: db.prepare(`INSERT INTO voice_samples (id, voice_profile_id, content, context_tag, source, sort_order, created_at) VALUES (@id, @voice_profile_id, @content, @context_tag, @source, @sort_order, @created_at)`),
   deleteSampleById: db.prepare(`DELETE FROM voice_samples WHERE id = ? AND voice_profile_id = ?`),
   listSessions: db.prepare(`SELECT * FROM voice_calibration_sessions WHERE voice_profile_id = ? ORDER BY created_at DESC`),
   getSession: db.prepare(`SELECT * FROM voice_calibration_sessions WHERE id = ? AND voice_profile_id = ?`),
   insertSession: db.prepare(`INSERT INTO voice_calibration_sessions (id, voice_profile_id, prompt_type, variations_json, steering_notes, created_at) VALUES (@id, @voice_profile_id, @prompt_type, @variations_json, @steering_notes, @created_at)`),
-  updateSession: db.prepare(`UPDATE voice_calibration_sessions SET variations_json = @variations_json, steering_notes = @steering_notes WHERE id = @id`),
+  // Scope the UPDATE by voice_profile_id (not just session id) so a compromised
+  // or misrouted session id from another workspace can't clobber state in this
+  // one. The calling function already re-verifies ownership via getSession, but
+  // defense in depth — every write gets the scope in its WHERE clause.
+  updateSession: db.prepare(`UPDATE voice_calibration_sessions SET variations_json = @variations_json, steering_notes = @steering_notes WHERE id = @id AND voice_profile_id = @voice_profile_id`),
 }));
 
 function rowToProfile(row: ProfileRow): Omit<VoiceProfile, 'samples'> {
@@ -110,6 +120,12 @@ export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { s
   if (result.changes === 0) {
     const winner = getVoiceProfile(workspaceId);
     if (winner) return winner;
+    // Re-read after a lost race also returned null — the row we expected to
+    // exist is gone. Something external (manual delete, test teardown, FK
+    // cascade) is modifying the table. Throw rather than returning a ghost
+    // in-memory object that was never persisted — CLAUDE.md requires
+    // getOrCreate* to return a non-nullable value or throw.
+    throw new Error(`getOrCreateVoiceProfile: lost race and re-read also failed for workspace ${workspaceId}`);
   }
 
   log.info({ workspaceId, profileId: id }, 'created voice profile');
@@ -152,7 +168,11 @@ export function addVoiceSample(
 
   const doAdd = db.transaction((): { voiceProfileId: string; sortOrder: number } => {
     const profile = getOrCreateVoiceProfile(workspaceId);
-    const sortOrder = profile.samples.length;
+    // Read MAX(sort_order)+1 inside the transaction so concurrent adds can't
+    // assign duplicate sort_orders. `profile.samples.length` from the in-memory
+    // snapshot is stale as soon as another request commits between read and write.
+    const { max } = stmts().maxSampleSortOrder.get(profile.id) as { max: number };
+    const sortOrder = max + 1;
     stmts().insertSample.run({
       id, voice_profile_id: profile.id, content,
       context_tag: contextTag ?? null, source: effectiveSource,
@@ -200,8 +220,11 @@ export function buildVoiceCalibrationContext(profile: VoiceProfile & { samples: 
 
   // Once calibrated, Layer 2 of buildSystemPrompt injects DNA + guardrails into
   // the system message. Only inline them when still draft/calibrating.
+  // Shared renderer — see server/voice-dna-render.ts for the single source of
+  // truth. Every field in VoiceDNA is rendered here; adding a new field is a
+  // compile error in voice-dna-render.ts until handled.
   const dnaText = !isCalibrated && profile.voiceDNA
-    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}\n  Humor: ${profile.voiceDNA.humorStyle}`
+    ? `\nVOICE DNA:\n${renderVoiceDNAForPrompt(profile.voiceDNA)}`
     : '';
 
   const guardrailsText = !isCalibrated && profile.guardrails
@@ -265,13 +288,13 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
 export async function refineVariation(
   workspaceId: string, sessionId: string, variationIndex: number, direction: string,
 ): Promise<CalibrationSession | null> {
+  // Preload (outside the tx) only to feed the AI call with the original variation text.
   const profile = getVoiceProfile(workspaceId);
   if (!profile) return null;
-  const row = stmts().getSession.get(sessionId, profile.id) as SessionRow | undefined;
-  if (!row) return null;
-
-  const session = rowToSession(row);
-  const original = session.variations[variationIndex];
+  const preload = stmts().getSession.get(sessionId, profile.id) as SessionRow | undefined;
+  if (!preload) return null;
+  const preloadSession = rowToSession(preload);
+  const original = preloadSession.variations[variationIndex];
   if (!original) return null;
 
   const userPrompt = `Refine this copy based on the direction given. Keep the same general idea but adjust as directed.
@@ -294,14 +317,25 @@ Return valid JSON: { "refined": "the refined text" }`;
   });
 
   const parsed = parseJsonFallback<{ refined: string }>(text, { refined: original.text });
-  session.variations.push({ text: parsed.refined });
-  const newNotes = `${session.steeringNotes || ''}\n[Refined #${variationIndex}]: ${direction}`.trim();
 
-  stmts().updateSession.run({
-    id: sessionId,
-    variations_json: JSON.stringify(session.variations),
-    steering_notes: newNotes,
+  // Re-read the session INSIDE the transaction and mutate against the fresh
+  // state — a concurrent refine on the same session during our AI call would
+  // otherwise be lost (classic lost-update anomaly). SQLite serialises writes
+  // so only one transaction runs at a time, guaranteeing the append is atomic.
+  const doRefine = db.transaction((): CalibrationSession | null => {
+    const freshRow = stmts().getSession.get(sessionId, profile.id) as SessionRow | undefined;
+    if (!freshRow) return null;
+    const freshSession = rowToSession(freshRow);
+    freshSession.variations.push({ text: parsed.refined });
+    const newNotes = `${freshSession.steeringNotes || ''}\n[Refined #${variationIndex}]: ${direction}`.trim();
+    stmts().updateSession.run({
+      id: sessionId,
+      voice_profile_id: profile.id,
+      variations_json: JSON.stringify(freshSession.variations),
+      steering_notes: newNotes,
+    });
+    return { ...freshSession, steeringNotes: newNotes };
   });
 
-  return { ...session, variations: session.variations, steeringNotes: newNotes };
+  return doRefine();
 }

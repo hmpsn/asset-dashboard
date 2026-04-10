@@ -106,7 +106,7 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
     anomalyLinked: row.anomaly_linked != null ? row.anomaly_linked !== 0 : undefined,
     impactScore: row.impact_score ?? undefined,
     domain: (row.domain as InsightDomain) ?? undefined,
-    resolutionStatus: row.resolution_status ?? null,
+    resolutionStatus: (row.resolution_status as AnalyticsInsight['resolutionStatus']) ?? null,
     resolutionNote: row.resolution_note ?? null,
     resolvedAt: row.resolved_at ?? null,
     resolutionSource: row.resolution_source ?? null,

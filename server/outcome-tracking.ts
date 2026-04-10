@@ -326,7 +326,7 @@ export function recordOutcome(params: {
                   workspaceId: insight.workspaceId,
                   pageId: insight.pageId,
                   insightType: insight.insightType,
-                  data: newData,
+                  data: newData as never,
                   severity: insight.severity,
                   pageTitle: insight.pageTitle,
                   strategyKeyword: insight.strategyKeyword,

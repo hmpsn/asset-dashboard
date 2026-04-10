@@ -4,7 +4,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machines.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
-import type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
+import type { ContentTopicRequest } from '../shared/types/content.ts';
 
 // ── SQLite row shape ──
 

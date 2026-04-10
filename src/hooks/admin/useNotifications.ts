@@ -48,8 +48,8 @@ async function fetchNotifications(): Promise<NotificationItem[]> {
     anomaliesApi.listAll().catch(() => []),
   ]);
 
-  const workspaces: WorkspaceSummary[] = Array.isArray(overviewRes) ? overviewRes : [];
-  const anomalies: AnomalySummary[] = (Array.isArray(anomalyRes) ? anomalyRes : []).filter((a: AnomalySummary) => !a.dismissedAt);
+  const workspaces: WorkspaceSummary[] = (Array.isArray(overviewRes) ? overviewRes : []) as WorkspaceSummary[];
+  const anomalies: AnomalySummary[] = ((Array.isArray(anomalyRes) ? anomalyRes : []) as AnomalySummary[]).filter((a) => !a.dismissedAt);
 
   const notifications: NotificationItem[] = [];
 

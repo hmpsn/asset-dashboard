@@ -22,7 +22,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
 
   useEffect(() => {
     annotationsApi.list(workspaceId)
-      .then(d => { if (Array.isArray(d)) setAnnotations(d); })
+      .then(d => { if (Array.isArray(d)) setAnnotations(d as Annotation[]); })
       .catch((err) => { console.error('Annotations operation failed:', err); })
       .finally(() => setLoading(false));
   }, [workspaceId]);

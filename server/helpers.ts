@@ -10,7 +10,6 @@ import type { CustomDateRange } from './google-analytics.js';
 import { listWorkspaces } from './workspaces.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
-import { getUploadRoot } from './data-dir.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { PageHealthData } from '../shared/types/analytics.js';

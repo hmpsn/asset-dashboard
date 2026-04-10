@@ -4,7 +4,6 @@ import {
   Copy, Download, Search, Target, MessageSquare, BarChart3,
   BookOpen, Users, TrendingUp, Check, ExternalLink, Link2,
 } from 'lucide-react';
-import { BriefDetail } from './BriefDetail';
 
 interface ContentBrief {
   id: string;

@@ -1,6 +1,6 @@
 import type {
   GA4Overview, GA4DailyTrend, GA4TopPage, GA4TopSource,
-  GA4DeviceBreakdown, GA4CountryBreakdown, GA4Event, GA4ConversionSummary,
+  GA4DeviceBreakdown, GA4CountryBreakdown, GA4ConversionSummary,
   GA4Comparison, GA4NewVsReturning, GA4OrganicOverview, GA4LandingPage,
 } from '../../../shared/types/analytics';
 import { useGA4Base } from '../shared/useGA4Base';

@@ -5,8 +5,7 @@ import {
 import { TierGate, EmptyState, LoadingState, type Tier } from '../ui';
 import { StatusBadge } from '../ui/StatusBadge';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
-import type { ApprovalBatch, ApprovalItem } from './types';
-import type { PageKeywordMap } from '../../../shared/types/workspace.js';
+import type { ApprovalBatch, ApprovalItem, ClientKeywordStrategy } from './types';
 import { patch, post } from '../../api/client';
 
 interface ApprovalsTabProps {
@@ -18,7 +17,7 @@ interface ApprovalsTabProps {
   setApprovalBatches: React.Dispatch<React.SetStateAction<ApprovalBatch[]>>;
   loadApprovals: (wsId: string) => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
-  pageMap?: PageKeywordMap[];
+  pageMap?: ClientKeywordStrategy['pageMap'];
 }
 
 export function ApprovalsTab({

@@ -81,7 +81,7 @@ export function BriefList({
   sendingToClient,
   onSetExpanded,
   onSetBriefSearch,
-  onSetBriefSort,
+  onSetBriefSort: _onSetBriefSort,
   onCopyAsMarkdown,
   onExportClientHTML,
   onSendToClient,

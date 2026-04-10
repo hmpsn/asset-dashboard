@@ -43,7 +43,7 @@ Every completed task must include:
 1. **`FEATURE_AUDIT.md`** — add new entries or update existing ones for any feature work.
 2. **`data/roadmap.json`** — mark completed items `"pending"` → `"done"`, add `"notes"`. Run `npx tsx scripts/sort-roadmap.ts`.
 3. **`BRAND_DESIGN_LANGUAGE.md`** — update if any UI colors/components/patterns changed.
-4. **Build verify** — `npx tsc --noEmit --skipLibCheck && npx vite build`
+4. **Build verify** — `npm run typecheck && npx vite build`
 5. **Summarize** — what was done, what docs updated, what's next.
 6. **`data/features.json`** — if the completed feature is client-impactful or sales-relevant, add/update its entry. Not every feature belongs here — only ones you'd mention on a sales call.
 
@@ -68,14 +68,14 @@ Every completed task must include:
 | `npm run dev` | Vite dev server (frontend) |
 | `npm run dev:server` | Express server (backend) |
 | `npm run dev:all` | Both concurrently |
-| `npx tsc --noEmit --skipLibCheck` | Type-check |
+| `npm run typecheck` | Type-check (project-aware: `tsc -b --noEmit`, traverses both `tsconfig.app.json` and `tsconfig.node.json`). Plain `npx tsc --noEmit` against the root `tsconfig.json` checks **zero files** because the root config uses project references with `files: []` — always use the script. |
 | `npx vite build` | Production build |
 | `npx vitest run` | Unit + integration + component tests |
 | `npx playwright test` | E2E tests (requires server running) |
 | `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints |
 | `npx tsx scripts/pr-check.ts` | Automated pre-PR checklist (color violations, JSON.parse, hard-coded names) |
 
-**Always verify after changes:** `npx tsc --noEmit --skipLibCheck && npx vite build`
+**Always verify after changes:** `npm run typecheck && npx vite build`
 
 ---
 
@@ -113,7 +113,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 ## Data Flow Rules (mandatory)
 
 1. **Broadcast after mutation** — every POST/PUT/PATCH/DELETE that changes workspace data must call `broadcastToWorkspace()` with an appropriate event.
-2. **Frontend must handle broadcasts** — every `useWebSocket` handler must invalidate relevant React Query caches.
+2. **Frontend must handle broadcasts** — every workspace-scoped broadcast needs a `useWorkspaceEvents(workspaceId, ...)` handler that invalidates the relevant React Query caches. For workspace-scoped events (anything broadcast via `broadcastToWorkspace()`) ALWAYS use `useWorkspaceEvents`, never `useGlobalAdminEvents`. The latter does NOT send a `subscribe` action, so the server's workspace filter excludes the connection and your handler is dead code. `useGlobalAdminEvents` is reserved for the ~2 legitimate global-fanout events (`ADMIN_EVENTS.*`, `presence:update`) and is forbidden elsewhere.
 3. **Delete operations** — always read data before delete (for activity log context).
 4. **Activity logging** — all significant operations must call `addActivity()`.
 5. **STUDIO_NAME constant** — use the constant from `server/constants.ts`, never hard-code "hmpsn.studio".
@@ -206,7 +206,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, write path (`upsertX()`), AND the public endpoint serialization list in `public-portal.ts` if the field is client-facing, all in the same commit. TypeScript will not catch a mapper that silently ignores a new column, and the public endpoint's explicit field list will silently omit it.
 - **Integration tests must cover the actual read path** — when a feature gates client-facing behavior on a field from `GET /api/public/workspace/:id`, the integration test must exercise that endpoint, not the admin GET. A test that only verifies the admin route gives false confidence; a regression in the public serialization goes undetected.
 - **Enrichment field fallbacks** — optional fields computed at insight-store time must have explicit fallbacks. `pageTitle` must always resolve to something (cleaned slug if all else fails) — never render a raw URL. Enrichment failure must degrade gracefully, not block insight storage.
-- **Feedback loop completeness** — every cross-system write (e.g. insights → strategy, insights → pipeline) requires both halves: server `broadcastToWorkspace()` AND frontend `useWebSocket` handler that invalidates the correct React Query key. Neither half alone is sufficient.
+- **Feedback loop completeness** — every cross-system write (e.g. insights → strategy, insights → pipeline) requires both halves: server `broadcastToWorkspace()` AND frontend `useWorkspaceEvents` handler that invalidates the correct React Query key. Neither half alone is sufficient.
 - **Bridge authoring rules** — all bridges must follow these patterns. Violations produce recurring bugs:
   1. **Stale-cleanup immunity**: pass `bridgeSource: '<bridge_flag>'` to `upsertInsight()` when creating bridge insights. When re-upserting an existing insight (e.g., score adjustments), pass `bridgeSource: insight.bridgeSource` to preserve the original value — omitting it defaults to `null` and strips protection. Never call `resolveInsight('in_progress')` as a cleanup-protection hack — it overwrites admin resolutions.
   2. **Score adjustments**: use `applyScoreAdjustment()` from `server/insight-score-adjustments.ts`. Never store independent `_*BaseScore` fields — they don't compose across bridges.
@@ -300,7 +300,7 @@ Every plan must include: task dependency graph, model assignments (Haiku/Sonnet/
 
 Work is not done until ALL pass:
 
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors (uses `tsc -b` for project-aware checking)
 - [ ] `npx vite build` — builds successfully
 - [ ] `npx vitest run` — full test suite passes (not just new tests)
 - [ ] `FEATURE_AUDIT.md` updated (if feature work)

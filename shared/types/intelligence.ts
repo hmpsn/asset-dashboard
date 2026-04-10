@@ -30,7 +30,7 @@ export type IntelligenceSlice =
 
 export interface IntelligenceOptions {
   /** Which slices to include (default: all available) */
-  slices?: IntelligenceSlice[];
+  slices?: readonly IntelligenceSlice[];
   /** Page-specific context (triggers per-page enrichment) */
   pagePath?: string;
   /** Domain filter for learnings */
@@ -407,7 +407,7 @@ export interface InsightAcceptanceRate {
 export type PromptVerbosity = 'compact' | 'standard' | 'detailed';
 
 export interface PromptFormatOptions {
-  sections?: IntelligenceSlice[];
+  sections?: readonly IntelligenceSlice[];
   verbosity?: PromptVerbosity;
   tokenBudget?: number;
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';

@@ -14,7 +14,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   const start = Date.now();
 
   // Attach to request for downstream consumers
-  (req as Record<string, unknown>).requestId = requestId;
+  (req as unknown as Record<string, unknown>).requestId = requestId;
 
   // Set response header so callers can correlate
   res.setHeader('x-request-id', requestId);

@@ -82,7 +82,7 @@ export async function executeBridge(
   const timeoutMs = opts?.timeoutMs ?? 5000;
 
   try {
-    let bridgeResult: BridgeResult | void;
+    let bridgeResult: BridgeResult | void = undefined;
     const result = fn();
     if (result && typeof (result as Promise<unknown>).then === 'function') {
       // Async bridge — race against timeout, clear timer on settle to avoid leaks.

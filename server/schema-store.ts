@@ -7,6 +7,7 @@ import type { SchemaSitePlan, CanonicalEntity, PageRoleAssignment } from '../sha
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 const log = createLogger('schema-store');
 
@@ -21,25 +22,19 @@ export interface SchemaSnapshot {
 
 // ── Prepared statements (lazy) ──
 
-let _upsert: ReturnType<typeof db.prepare> | null = null;
-function upsertStmt() {
-  if (!_upsert) {
-    _upsert = db.prepare(`
-      INSERT OR REPLACE INTO schema_snapshots
-        (id, site_id, workspace_id, created_at, results, page_count)
-      VALUES (@id, @site_id, @workspace_id, @created_at, @results, @page_count)
-    `);
-  }
-  return _upsert;
-}
-
-let _getBySite: ReturnType<typeof db.prepare> | null = null;
-function getBySiteStmt() {
-  if (!_getBySite) {
-    _getBySite = db.prepare(`SELECT * FROM schema_snapshots WHERE site_id = ? ORDER BY created_at DESC LIMIT 1`);
-  }
-  return _getBySite;
-}
+const snapshotStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO schema_snapshots
+      (id, site_id, workspace_id, created_at, results, page_count)
+    VALUES (@id, @site_id, @workspace_id, @created_at, @results, @page_count)
+  `),
+  getBySite: db.prepare<[siteId: string]>(
+    `SELECT * FROM schema_snapshots WHERE site_id = ? ORDER BY created_at DESC LIMIT 1`,
+  ),
+  deleteBySite: db.prepare<[siteId: string]>(
+    'DELETE FROM schema_snapshots WHERE site_id = ?',
+  ),
+}));
 
 interface SchemaRow {
   id: string;
@@ -70,7 +65,7 @@ export function saveSchemaSnapshot(siteId: string, workspaceId: string, results:
     results,
     pageCount: results.length,
   };
-  upsertStmt().run({
+  snapshotStmts().upsert.run({
     id: snapshot.id,
     site_id: siteId,
     workspace_id: workspaceId,
@@ -83,7 +78,7 @@ export function saveSchemaSnapshot(siteId: string, workspaceId: string, results:
 }
 
 export function getSchemaSnapshot(siteId: string): SchemaSnapshot | null {
-  const row = getBySiteStmt().get(siteId) as SchemaRow | undefined;
+  const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
   return row ? rowToSnapshot(row) : null;
 }
 
@@ -109,10 +104,10 @@ export function updatePageSchemaInSnapshot(
   }
 
   // Re-save the full snapshot with updated results
-  const row = getBySiteStmt().get(siteId) as SchemaRow | undefined;
+  const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
   if (!row) return false;
 
-  upsertStmt().run({
+  snapshotStmts().upsert.run({
     id: row.id,
     site_id: siteId,
     workspace_id: row.workspace_id,
@@ -144,25 +139,16 @@ interface TemplateRow {
   updated_at: string;
 }
 
-let _upsertTemplate: ReturnType<typeof db.prepare> | null = null;
-function upsertTemplateStmt() {
-  if (!_upsertTemplate) {
-    _upsertTemplate = db.prepare(`
-      INSERT OR REPLACE INTO schema_site_templates
-        (site_id, workspace_id, organization_node, website_node, created_at, updated_at)
-      VALUES (@site_id, @workspace_id, @organization_node, @website_node, @created_at, @updated_at)
-    `);
-  }
-  return _upsertTemplate;
-}
-
-let _getTemplate: ReturnType<typeof db.prepare> | null = null;
-function getTemplateStmt() {
-  if (!_getTemplate) {
-    _getTemplate = db.prepare(`SELECT * FROM schema_site_templates WHERE site_id = ?`);
-  }
-  return _getTemplate;
-}
+const templateStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO schema_site_templates
+      (site_id, workspace_id, organization_node, website_node, created_at, updated_at)
+    VALUES (@site_id, @workspace_id, @organization_node, @website_node, @created_at, @updated_at)
+  `),
+  getBySite: db.prepare<[siteId: string]>(
+    `SELECT * FROM schema_site_templates WHERE site_id = ?`,
+  ),
+}));
 
 export function saveSiteTemplate(
   siteId: string,
@@ -171,8 +157,8 @@ export function saveSiteTemplate(
   websiteNode: Record<string, unknown>,
 ): SchemaSiteTemplate {
   const now = new Date().toISOString();
-  const existing = getTemplateStmt().get(siteId) as TemplateRow | undefined;
-  upsertTemplateStmt().run({
+  const existing = templateStmts().getBySite.get(siteId) as TemplateRow | undefined;
+  templateStmts().upsert.run({
     site_id: siteId,
     workspace_id: workspaceId,
     organization_node: JSON.stringify(organizationNode),
@@ -192,7 +178,7 @@ export function saveSiteTemplate(
 }
 
 export function getSiteTemplate(siteId: string): SchemaSiteTemplate | null {
-  const row = getTemplateStmt().get(siteId) as TemplateRow | undefined;
+  const row = templateStmts().getBySite.get(siteId) as TemplateRow | undefined;
   if (!row) return null;
   return {
     siteId: row.site_id,
@@ -225,8 +211,8 @@ export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): Sch
   // Parse the schema and extract Organization + WebSite nodes
   try {
     const schemaObj = typeof homepage.suggestedSchemas[0].template === 'string'
-      ? parseJsonFallback(homepage.suggestedSchemas[0].template as unknown as string, {})
-      : homepage.suggestedSchemas[0].template;
+      ? parseJsonFallback<Record<string, unknown>>(homepage.suggestedSchemas[0].template as unknown as string, {})
+      : (homepage.suggestedSchemas[0].template as Record<string, unknown>);
     const graph = schemaObj?.['@graph'] as Record<string, unknown>[] | undefined;
     if (!Array.isArray(graph)) return null;
 
@@ -269,25 +255,19 @@ interface PlanRow {
   updated_at: string;
 }
 
-let _planUpsert: ReturnType<typeof db.prepare> | null = null;
-function planUpsertStmt() {
-  if (!_planUpsert) {
-    _planUpsert = db.prepare(`
-      INSERT OR REPLACE INTO schema_site_plans
-        (id, site_id, workspace_id, site_url, canonical_entities, page_roles, status, client_preview_batch_id, generated_at, updated_at)
-      VALUES (@id, @site_id, @workspace_id, @site_url, @canonical_entities, @page_roles, @status, @client_preview_batch_id, @generated_at, @updated_at)
-    `);
-  }
-  return _planUpsert;
-}
-
-let _planGetBySite: ReturnType<typeof db.prepare> | null = null;
-function planGetBySiteStmt() {
-  if (!_planGetBySite) {
-    _planGetBySite = db.prepare('SELECT * FROM schema_site_plans WHERE site_id = ? ORDER BY updated_at DESC LIMIT 1');
-  }
-  return _planGetBySite;
-}
+const planStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO schema_site_plans
+      (id, site_id, workspace_id, site_url, canonical_entities, page_roles, status, client_preview_batch_id, generated_at, updated_at)
+    VALUES (@id, @site_id, @workspace_id, @site_url, @canonical_entities, @page_roles, @status, @client_preview_batch_id, @generated_at, @updated_at)
+  `),
+  getBySite: db.prepare<[siteId: string]>(
+    'SELECT * FROM schema_site_plans WHERE site_id = ? ORDER BY updated_at DESC LIMIT 1',
+  ),
+  deleteBySite: db.prepare<[siteId: string]>(
+    'DELETE FROM schema_site_plans WHERE site_id = ?',
+  ),
+}));
 
 function rowToPlan(row: PlanRow): SchemaSitePlan {
   return {
@@ -305,7 +285,7 @@ function rowToPlan(row: PlanRow): SchemaSitePlan {
 }
 
 export function saveSchemaPlan(plan: SchemaSitePlan): SchemaSitePlan {
-  planUpsertStmt().run({
+  planStmts().upsert.run({
     id: plan.id,
     site_id: plan.siteId,
     workspace_id: plan.workspaceId,
@@ -322,7 +302,7 @@ export function saveSchemaPlan(plan: SchemaSitePlan): SchemaSitePlan {
 }
 
 export function getSchemaPlan(siteId: string): SchemaSitePlan | null {
-  const row = planGetBySiteStmt().get(siteId) as PlanRow | undefined;
+  const row = planStmts().getBySite.get(siteId) as PlanRow | undefined;
   if (!row) return null;
   return rowToPlan(row);
 }
@@ -340,30 +320,14 @@ export function updateSchemaPlanStatus(
   return saveSchemaPlan(plan);
 }
 
-let _planDeleteBySite: ReturnType<typeof db.prepare> | null = null;
-function planDeleteBySiteStmt() {
-  if (!_planDeleteBySite) {
-    _planDeleteBySite = db.prepare('DELETE FROM schema_site_plans WHERE site_id = ?');
-  }
-  return _planDeleteBySite;
-}
-
 export function deleteSchemaPlan(siteId: string): boolean {
-  const result = planDeleteBySiteStmt().run(siteId);
+  const result = planStmts().deleteBySite.run(siteId);
   log.info(`Deleted schema plan for site ${siteId} (${result.changes} rows)`);
   return result.changes > 0;
 }
 
-let _snapshotDeleteBySite: ReturnType<typeof db.prepare> | null = null;
-function snapshotDeleteBySiteStmt() {
-  if (!_snapshotDeleteBySite) {
-    _snapshotDeleteBySite = db.prepare('DELETE FROM schema_snapshots WHERE site_id = ?');
-  }
-  return _snapshotDeleteBySite;
-}
-
 export function deleteSchemaSnapshot(siteId: string): boolean {
-  const result = snapshotDeleteBySiteStmt().run(siteId);
+  const result = snapshotStmts().deleteBySite.run(siteId);
   log.info(`Deleted schema snapshot for site ${siteId} (${result.changes} rows)`);
   return result.changes > 0;
 }
@@ -375,10 +339,10 @@ export function removePageFromSnapshot(siteId: string, pageId: string): boolean 
   const filtered = snapshot.results.filter(r => r.pageId !== pageId);
   if (filtered.length === snapshot.results.length) return false;
 
-  const row = getBySiteStmt().get(siteId) as SchemaRow | undefined;
+  const row = snapshotStmts().getBySite.get(siteId) as SchemaRow | undefined;
   if (!row) return false;
 
-  upsertStmt().run({
+  snapshotStmts().upsert.run({
     id: row.id,
     site_id: siteId,
     workspace_id: row.workspace_id,
@@ -405,28 +369,19 @@ export function updateSchemaPlanRoles(
 
 // ── Schema Page Types persistence ──
 
-let _pageTypeUpsert: ReturnType<typeof db.prepare> | null = null;
-function pageTypeUpsertStmt() {
-  if (!_pageTypeUpsert) {
-    _pageTypeUpsert = db.prepare(`
-      INSERT OR REPLACE INTO schema_page_types (site_id, page_id, page_type, updated_at)
-      VALUES (@site_id, @page_id, @page_type, @updated_at)
-    `);
-  }
-  return _pageTypeUpsert;
-}
-
-let _pageTypeGetBySite: ReturnType<typeof db.prepare> | null = null;
-function pageTypeGetBySiteStmt() {
-  if (!_pageTypeGetBySite) {
-    _pageTypeGetBySite = db.prepare('SELECT page_id, page_type FROM schema_page_types WHERE site_id = ?');
-  }
-  return _pageTypeGetBySite;
-}
+const pageTypeStmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT OR REPLACE INTO schema_page_types (site_id, page_id, page_type, updated_at)
+    VALUES (@site_id, @page_id, @page_type, @updated_at)
+  `),
+  getBySite: db.prepare<[siteId: string]>(
+    'SELECT page_id, page_type FROM schema_page_types WHERE site_id = ?',
+  ),
+}));
 
 /** Persist a single page type selection for a site. */
 export function savePageType(siteId: string, pageId: string, pageType: string): void {
-  pageTypeUpsertStmt().run({
+  pageTypeStmts().upsert.run({
     site_id: siteId,
     page_id: pageId,
     page_type: pageType,
@@ -436,14 +391,14 @@ export function savePageType(siteId: string, pageId: string, pageType: string): 
 
 /** Get all persisted page types for a site as a pageId → pageType map. */
 export function getPageTypes(siteId: string): Record<string, string> {
-  const rows = pageTypeGetBySiteStmt().all(siteId) as Array<{ page_id: string; page_type: string }>;
+  const rows = pageTypeStmts().getBySite.all(siteId) as Array<{ page_id: string; page_type: string }>;
   return Object.fromEntries(rows.map(r => [r.page_id, r.page_type]));
 }
 
 /** Bulk-upsert page types from a Record<pageId, pageType> map. */
 export function savePageTypes(siteId: string, updates: Record<string, string>): void {
   const now = new Date().toISOString();
-  const upsert = pageTypeUpsertStmt();
+  const upsert = pageTypeStmts().upsert;
   const entries = Object.entries(updates);
   if (entries.length === 0) return;
   const runMany = db.transaction(() => {
@@ -474,50 +429,27 @@ interface PublishHistoryRow {
   published_at: string;
 }
 
-let _historyInsert: ReturnType<typeof db.prepare> | null = null;
-function historyInsertStmt() {
-  if (!_historyInsert) {
-    _historyInsert = db.prepare(`
-      INSERT INTO schema_publish_history (id, site_id, page_id, workspace_id, schema_json, published_at)
-      VALUES (@id, @site_id, @page_id, @workspace_id, @schema_json, @published_at)
-    `);
-  }
-  return _historyInsert;
-}
-
-let _historyByPage: ReturnType<typeof db.prepare> | null = null;
-function historyByPageStmt() {
-  if (!_historyByPage) {
-    _historyByPage = db.prepare(`
-      SELECT * FROM schema_publish_history
-      WHERE site_id = ? AND page_id = ?
-      ORDER BY published_at DESC
-      LIMIT ?
-    `);
-  }
-  return _historyByPage;
-}
-
-let _historyById: ReturnType<typeof db.prepare> | null = null;
-function historyByIdStmt() {
-  if (!_historyById) {
-    _historyById = db.prepare('SELECT * FROM schema_publish_history WHERE id = ?');
-  }
-  return _historyById;
-}
-
-let _latestPublishDates: ReturnType<typeof db.prepare> | null = null;
-function latestPublishDatesStmt() {
-  if (!_latestPublishDates) {
-    _latestPublishDates = db.prepare(`
-      SELECT page_id, MAX(published_at) as published_at
-      FROM schema_publish_history
-      WHERE site_id = ?
-      GROUP BY page_id
-    `);
-  }
-  return _latestPublishDates;
-}
+const historyStmts = createStmtCache(() => ({
+  insert: db.prepare(`
+    INSERT INTO schema_publish_history (id, site_id, page_id, workspace_id, schema_json, published_at)
+    VALUES (@id, @site_id, @page_id, @workspace_id, @schema_json, @published_at)
+  `),
+  byPage: db.prepare<[siteId: string, pageId: string, limit: number]>(`
+    SELECT * FROM schema_publish_history
+    WHERE site_id = ? AND page_id = ?
+    ORDER BY published_at DESC
+    LIMIT ?
+  `),
+  byId: db.prepare<[id: string]>(
+    'SELECT * FROM schema_publish_history WHERE id = ?',
+  ),
+  latestPublishDates: db.prepare<[siteId: string]>(`
+    SELECT page_id, MAX(published_at) as published_at
+    FROM schema_publish_history
+    WHERE site_id = ?
+    GROUP BY page_id
+  `),
+}));
 
 function rowToPublishEntry(row: PublishHistoryRow): SchemaPublishEntry {
   return {
@@ -543,7 +475,7 @@ export function recordSchemaPublish(
     schemaJson: schema,
     publishedAt: new Date().toISOString(),
   };
-  historyInsertStmt().run({
+  historyStmts().insert.run({
     id: entry.id,
     site_id: siteId,
     page_id: pageId,
@@ -557,19 +489,19 @@ export function recordSchemaPublish(
 
 /** Get version history for a specific page (newest first). */
 export function getSchemaPublishHistory(siteId: string, pageId: string, limit = 10): SchemaPublishEntry[] {
-  const rows = historyByPageStmt().all(siteId, pageId, limit) as PublishHistoryRow[];
+  const rows = historyStmts().byPage.all(siteId, pageId, limit) as PublishHistoryRow[];
   return rows.map(rowToPublishEntry);
 }
 
 /** Get a specific publish entry by ID. */
 export function getSchemaPublishEntry(id: string): SchemaPublishEntry | null {
-  const row = historyByIdStmt().get(id) as PublishHistoryRow | undefined;
+  const row = historyStmts().byId.get(id) as PublishHistoryRow | undefined;
   return row ? rowToPublishEntry(row) : null;
 }
 
 /** Get latest publish date per page for a site (for stale schema detection). */
 export function getPublishDatesForSite(siteId: string): Record<string, string> {
-  const rows = latestPublishDatesStmt().all(siteId) as Array<{ page_id: string; published_at: string }>;
+  const rows = historyStmts().latestPublishDates.all(siteId) as Array<{ page_id: string; published_at: string }>;
   return Object.fromEntries(rows.map(r => [r.page_id, r.published_at]));
 }
 

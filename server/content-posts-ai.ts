@@ -18,7 +18,6 @@ const log = createLogger('content-posts-ai');
 // Claude produces more natural, less formulaic writing. GPT excels at
 // JSON output, unification editing, and SEO meta generation.
 const CONTENT_MODEL = 'gpt-4.1';         // fallback + structured tasks
-const CONTENT_TEMP = 0.7;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514' as const;
 const CLAUDE_TEMP = 0.7;
 

@@ -178,10 +178,17 @@ function collectServerBroadcasts(wsEventsMap: Map<string, string>): Map<string, 
 // ---------------------------------------------------------------------------
 
 /**
- * Scan all frontend .ts/.tsx files for useWebSocket / useWorkspaceEvents
+ * Scan all frontend .ts/.tsx files for useWorkspaceEvents / useGlobalAdminEvents
  * handler registrations and extract the event name keys.  Handles both:
  *   - [WS_EVENTS.SOME_KEY]: ...  (resolved via the frontend constants mirror)
  *   - 'literal-string': ...      (used directly)
+ *
+ * We also track per-file which hook is used so the test can enforce that
+ * workspace-scoped events are only registered via `useWorkspaceEvents`. The
+ * legacy `useGlobalAdminEvents` hook (formerly `useWebSocket`) does NOT send
+ * a `subscribe` action and therefore silently drops workspace-scoped events.
+ * This is the root-cause fix for the bug that shipped in PR #162 across the
+ * four brand-engine tabs.
  */
 function parseFrontendWsEvents(): Map<string, string> {
   const filePath = path.join(ROOT, 'src', 'lib', 'wsEvents.ts');
@@ -201,18 +208,32 @@ function parseFrontendWsEvents(): Map<string, string> {
   return events;
 }
 
-function collectFrontendHandlers(frontendWsEventsMap: Map<string, string>): Map<string, string[]> {
+/**
+ * Per-file handler registration tracked with which hook was used.
+ * Used by the workspace-hook-correctness test below.
+ */
+interface HandlerRegistration {
+  eventName: string;
+  file: string;
+  hook: 'useWorkspaceEvents' | 'useGlobalAdminEvents' | 'useWsInvalidation' | 'unknown';
+}
+
+function collectFrontendHandlers(
+  frontendWsEventsMap: Map<string, string>,
+): { handlers: Map<string, string[]>; registrations: HandlerRegistration[] } {
   const srcDir = path.join(ROOT, 'src');
   const files = collectFiles(srcDir, ['.ts', '.tsx']);
 
   // event name → list of source files that handle it
   const handlers = new Map<string, string[]>();
+  const registrations: HandlerRegistration[] = [];
 
-  const record = (eventName: string, file: string) => {
+  const record = (eventName: string, file: string, hook: HandlerRegistration['hook']) => {
     const rel = path.relative(ROOT, file);
     const existing = handlers.get(eventName) ?? [];
     existing.push(rel);
     handlers.set(eventName, existing);
+    registrations.push({ eventName, file: rel, hook });
   };
 
   // Pattern 1: computed key with WS_EVENTS constant
@@ -224,15 +245,26 @@ function collectFrontendHandlers(frontendWsEventsMap: Map<string, string>): Map<
   // We look for quoted strings that precede a colon (object key syntax).
   const literalKeyRe = /['"]([a-z][a-z0-9_:-]+)['"]\s*:/g;
 
-  // Files that contain useWebSocket or useWorkspaceEvents calls
+  // Files that contain useWorkspaceEvents / useGlobalAdminEvents / useWsInvalidation calls
   for (const file of files) {
     const content = readFile(file);
-    const usesWsHook =
-      content.includes('useWebSocket') ||
-      content.includes('useWorkspaceEvents') ||
-      content.includes('useWsInvalidation');
+    const usesWorkspaceEvents = content.includes('useWorkspaceEvents');
+    const usesGlobalAdminEvents = content.includes('useGlobalAdminEvents');
+    const usesWsInvalidation = content.includes('useWsInvalidation');
+    const usesWsHook = usesWorkspaceEvents || usesGlobalAdminEvents || usesWsInvalidation;
 
     if (!usesWsHook) continue;
+
+    // Determine the hook used. If a file uses multiple, we prefer useWorkspaceEvents
+    // for correctness tracking since that's the "correct" workspace hook. Files that
+    // use only useGlobalAdminEvents are tracked as such so we can enforce the rule.
+    const hook: HandlerRegistration['hook'] = usesWorkspaceEvents
+      ? 'useWorkspaceEvents'
+      : usesGlobalAdminEvents
+        ? 'useGlobalAdminEvents'
+        : usesWsInvalidation
+          ? 'useWsInvalidation'
+          : 'unknown';
 
     // Collect computed WS_EVENTS key references
     computedKeyRe.lastIndex = 0;
@@ -241,9 +273,9 @@ function collectFrontendHandlers(frontendWsEventsMap: Map<string, string>): Map<
       const key = match[1];
       const value = frontendWsEventsMap.get(key);
       if (value) {
-        record(value, file);
+        record(value, file, hook);
       } else {
-        record(`UNRESOLVED:WS_EVENTS.${key}`, file);
+        record(`UNRESOLVED:WS_EVENTS.${key}`, file, hook);
       }
     }
 
@@ -260,12 +292,12 @@ function collectFrontendHandlers(frontendWsEventsMap: Map<string, string>): Map<
     while ((match = literalKeyRe.exec(content)) !== null) {
       const literal = match[1];
       if (literal.includes(':') && !literal.endsWith(':') && !literal.startsWith('/')) {
-        record(literal, file);
+        record(literal, file, hook);
       }
     }
   }
 
-  return handlers;
+  return { handlers, registrations };
 }
 
 // ---------------------------------------------------------------------------
@@ -303,15 +335,6 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:updated',
   'content-subscription:renewed',
 
-  // Brand Engine Phase 1 events — server-side services and routes are complete
-  // (Tasks 3-6, Batch B).  Frontend tabs (BrandscriptTab, DiscoveryTab, VoiceTab,
-  // IdentityTab) and their useWebSocket handlers are Tasks 10-13 (Batch C).
-  // These events will be wired to React Query cache invalidation once the frontend
-  // components exist.
-  'brandscript:updated',
-  'discovery:updated',
-  'voice:updated',
-  'brand-identity:updated',
 ]);
 
 /**
@@ -345,7 +368,20 @@ const KNOWN_UNHANDLED_HANDLERS = new Set<string>([
 const serverWsEventsMap = parseServerWsEvents();
 const frontendWsEventsMap = parseFrontendWsEvents();
 const serverBroadcasts = collectServerBroadcasts(serverWsEventsMap);
-const frontendHandlers = collectFrontendHandlers(frontendWsEventsMap);
+const { handlers: frontendHandlers, registrations: frontendRegistrations } = collectFrontendHandlers(frontendWsEventsMap);
+
+/**
+ * Workspace-scoped events: the subset of WS_EVENTS values that are broadcast
+ * via `broadcastToWorkspace()` (as opposed to the global `_broadcast()`). Any
+ * handler for a workspace-scoped event MUST use `useWorkspaceEvents`, NOT
+ * `useGlobalAdminEvents`.
+ *
+ * We derive this dynamically: an event is "workspace-scoped" iff the server
+ * scan found it inside a `broadcastToWorkspace` call. Events that only ever
+ * appear in the WS_EVENTS constants map (or in a global `_broadcast`) are not
+ * in this set and are legal targets for `useGlobalAdminEvents`.
+ */
+const workspaceScopedEventNames = new Set(serverBroadcasts.keys());
 
 describe('broadcast ↔ handler pairing audit', () => {
   // ── Preconditions ──────────────────────────────────────────────────────────
@@ -518,6 +554,43 @@ describe('broadcast ↔ handler pairing audit', () => {
       throw new Error(
         `KNOWN_UNHANDLED_HANDLERS is stale — these events are now broadcast by the server:\n\n` +
         falsePositives.join('\n'),
+      );
+    }
+  });
+
+  // ── Workspace-scoped events must use useWorkspaceEvents ────────────────────
+  //
+  // Root-cause regression guard for PR #162. Four brand-engine tabs registered
+  // handlers for `brandscript:updated` / `discovery:updated` / `voice:updated`
+  // / `brand-identity:updated` via `useWebSocket` (the global-events hook,
+  // since renamed to `useGlobalAdminEvents`). That hook never sends a
+  // `subscribe` action, so the server's `_broadcastToWorkspace` filter
+  // excluded the connection and every handler was dead code. This test makes
+  // that mistake impossible to repeat: any file that handles a workspace-
+  // scoped event via the global hook fails the test.
+
+  it('workspace-scoped events are handled via useWorkspaceEvents, not useGlobalAdminEvents', () => {
+    const violations: string[] = [];
+    for (const reg of frontendRegistrations) {
+      // Only check events the server actually broadcasts as workspace-scoped.
+      // A handler for a global-only or unknown event is this test's blind spot
+      // and is covered by the other tests above.
+      if (!workspaceScopedEventNames.has(reg.eventName)) continue;
+      if (reg.hook === 'useGlobalAdminEvents') {
+        violations.push(
+          `  '${reg.eventName}' — handled via useGlobalAdminEvents in ${reg.file}\n` +
+          `    Switch to useWorkspaceEvents(workspaceId, { ... }). useGlobalAdminEvents\n` +
+          `    never sends a 'subscribe' action, so this handler will never fire.`,
+        );
+      }
+    }
+
+    if (violations.length > 0) {
+      throw new Error(
+        `Found ${violations.length} workspace-scoped event handler(s) registered via\n` +
+        `useGlobalAdminEvents. This hook is reserved for non-workspace events\n` +
+        `(ADMIN_EVENTS.*, presence:update) and does NOT subscribe to any workspace.\n\n` +
+        violations.join('\n'),
       );
     }
   });

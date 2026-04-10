@@ -7,7 +7,7 @@ import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
 import { useAuth } from './hooks/useAuth';
-import { useWebSocket } from './hooks/useWebSocket';
+import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';
 import { useWsInvalidation } from './hooks/useWsInvalidation';
 import { ADMIN_EVENTS } from './lib/wsEvents';
 import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY, useHealthCheck, useQueue, QUEUE_KEY } from './hooks/admin';
@@ -301,7 +301,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (urlWorkspaceId === id) navigate('/');
   }, [queryClient, urlWorkspaceId, navigate]);
 
-  useWebSocket({
+  useGlobalAdminEvents({
     [ADMIN_EVENTS.QUEUE_UPDATE]: handleQueueUpdate,
     [ADMIN_EVENTS.WORKSPACE_CREATED]: handleWorkspaceCreated,
     [ADMIN_EVENTS.WORKSPACE_DELETED]: handleWorkspaceDeleted,

@@ -11,7 +11,6 @@ import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
 import {
-  filterWritablePages,
   filterWritableItems,
   filterWritableIds,
   filterPagesNeedingFix,
@@ -893,6 +892,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       <div className="space-y-2">
         {showCmsOnly && filteredPages.length === 0 && (
           <EmptyState
+            icon={AlertCircle}
             title="No CMS pages found"
             description="No CMS collection pages were discovered via sitemap. Static pages are hidden while this filter is active."
           />

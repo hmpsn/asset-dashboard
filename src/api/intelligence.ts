@@ -9,7 +9,7 @@ export const intelligenceApi = {
   /** Fetch workspace intelligence with optional slice filtering */
   getIntelligence(
     workspaceId: string,
-    slices?: IntelligenceSlice[],
+    slices?: readonly IntelligenceSlice[],
     pagePath?: string,
     learningsDomain?: 'content' | 'strategy' | 'technical' | 'all',
     signal?: AbortSignal,

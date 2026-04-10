@@ -59,7 +59,7 @@ export function WorkspaceSelector({ workspaces, selected, onSelect, onCreate, on
     try {
       const data = await webflow.sites(token.trim());
       if (Array.isArray(data) && data.length > 0) {
-        setSites(data);
+        setSites(data as WebflowSite[]);
       } else {
         setTokenError('No sites found. Check token permissions.');
       }

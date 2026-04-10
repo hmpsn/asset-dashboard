@@ -9,6 +9,7 @@
 import db from './db/index.js';
 import { randomUUID } from 'crypto';
 import { parseJsonFallback } from './db/json-validation.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 // ── Types ──
 
@@ -39,47 +40,28 @@ interface ConsistencyResult {
 
 // ── Validation Store (CRUD) ──
 
-let _upsert: ReturnType<typeof db.prepare> | null = null;
-function upsertStmt() {
-  if (!_upsert) {
-    _upsert = db.prepare(`
-      INSERT INTO schema_validations (id, workspace_id, page_id, status, rich_results, errors, warnings, validated_at)
-      VALUES (@id, @workspace_id, @page_id, @status, @rich_results, @errors, @warnings, datetime('now'))
-      ON CONFLICT(workspace_id, page_id) DO UPDATE SET
-        id = @id,
-        status = @status,
-        rich_results = @rich_results,
-        errors = @errors,
-        warnings = @warnings,
-        validated_at = datetime('now')
-    `);
-  }
-  return _upsert;
-}
-
-let _getOne: ReturnType<typeof db.prepare> | null = null;
-function getOneStmt() {
-  if (!_getOne) {
-    _getOne = db.prepare(`SELECT * FROM schema_validations WHERE workspace_id = ? AND page_id = ?`);
-  }
-  return _getOne;
-}
-
-let _getAll: ReturnType<typeof db.prepare> | null = null;
-function getAllStmt() {
-  if (!_getAll) {
-    _getAll = db.prepare(`SELECT * FROM schema_validations WHERE workspace_id = ?`);
-  }
-  return _getAll;
-}
-
-let _delete: ReturnType<typeof db.prepare> | null = null;
-function deleteStmt() {
-  if (!_delete) {
-    _delete = db.prepare(`DELETE FROM schema_validations WHERE workspace_id = ? AND page_id = ?`);
-  }
-  return _delete;
-}
+const stmts = createStmtCache(() => ({
+  upsert: db.prepare(`
+    INSERT INTO schema_validations (id, workspace_id, page_id, status, rich_results, errors, warnings, validated_at)
+    VALUES (@id, @workspace_id, @page_id, @status, @rich_results, @errors, @warnings, datetime('now'))
+    ON CONFLICT(workspace_id, page_id) DO UPDATE SET
+      id = @id,
+      status = @status,
+      rich_results = @rich_results,
+      errors = @errors,
+      warnings = @warnings,
+      validated_at = datetime('now')
+  `),
+  getOne: db.prepare<[workspaceId: string, pageId: string]>(
+    `SELECT * FROM schema_validations WHERE workspace_id = ? AND page_id = ?`,
+  ),
+  getAll: db.prepare<[workspaceId: string]>(
+    `SELECT * FROM schema_validations WHERE workspace_id = ?`,
+  ),
+  delete: db.prepare<[workspaceId: string, pageId: string]>(
+    `DELETE FROM schema_validations WHERE workspace_id = ? AND page_id = ?`,
+  ),
+}));
 
 interface ValidationRow {
   id: string;
@@ -123,7 +105,7 @@ export function upsertValidation(opts: {
   warnings: Array<{ type: string; message: string }>;
 }) {
   const id = randomUUID();
-  upsertStmt().run({
+  stmts().upsert.run({
     id,
     workspace_id: opts.workspaceId,
     page_id: opts.pageId,
@@ -136,18 +118,18 @@ export function upsertValidation(opts: {
 }
 
 export function getValidation(workspaceId: string, pageId: string) {
-  const row = getOneStmt().get(workspaceId, pageId) as ValidationRow | undefined;
+  const row = stmts().getOne.get(workspaceId, pageId) as ValidationRow | undefined;
   if (!row) return null;
   return rowToValidation(row);
 }
 
 export function getValidations(workspaceId: string) {
-  const rows = getAllStmt().all(workspaceId) as ValidationRow[];
+  const rows = stmts().getAll.all(workspaceId) as ValidationRow[];
   return rows.map(rowToValidation);
 }
 
 export function deleteValidation(workspaceId: string, pageId: string): boolean {
-  const result = deleteStmt().run(workspaceId, pageId);
+  const result = stmts().delete.run(workspaceId, pageId);
   return result.changes > 0;
 }
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auditSchedules, anomalies } from '../api';
 import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
-  Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
+  Target, Code2, Clipboard, Image, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
   Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy, BookOpen,
 } from 'lucide-react';

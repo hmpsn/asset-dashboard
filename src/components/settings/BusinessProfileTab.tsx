@@ -21,7 +21,7 @@ interface BusinessProfile {
 interface BusinessProfileTabProps {
   workspaceId: string;
   businessProfile?: BusinessProfile | null;
-  toast: (msg: string, type?: string) => void;
+  toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onSave: (profile: BusinessProfile) => void;
 }
 
