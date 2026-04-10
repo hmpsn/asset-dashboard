@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react';
 import { useToast } from './Toast';
 import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check,
+  Plus, Pencil, Trash2, Check, Upload, Mic, Award,
 } from 'lucide-react';
-import { PageHeader } from './ui';
+import { PageHeader, TabBar } from './ui';
 import { themeColor } from './ui/constants';
 import { workspaces } from '../api';
+import { BrandscriptTab } from './brand/BrandscriptTab';
+import { DiscoveryTab } from './brand/DiscoveryTab';
+import { VoiceTab } from './brand/VoiceTab';
+import { IdentityTab } from './brand/IdentityTab';
 
 interface AudiencePersona {
   id: string;
@@ -32,8 +36,13 @@ interface Props {
   webflowSiteId?: string;
 }
 
+type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity';
+
 export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const { toast } = useToast();
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState<BrandHubTab>('overview');
 
   // Workspace data
   const [ws, setWs] = useState<WorkspaceData | null>(null);
@@ -87,6 +96,24 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         icon={<Sparkles className="w-5 h-5 text-teal-400" />}
       />
 
+      <TabBar
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as BrandHubTab)}
+        tabs={[
+          { id: 'overview', label: 'Overview', icon: Sparkles },
+          { id: 'brandscript', label: 'Brandscript', icon: BookOpen },
+          { id: 'discovery', label: 'Discovery', icon: Upload },
+          { id: 'voice', label: 'Voice', icon: Mic },
+          { id: 'identity', label: 'Identity', icon: Award },
+        ]}
+      />
+
+      {activeTab === 'brandscript' && <BrandscriptTab workspaceId={workspaceId} />}
+      {activeTab === 'discovery' && <DiscoveryTab workspaceId={workspaceId} />}
+      {activeTab === 'voice' && <VoiceTab workspaceId={workspaceId} />}
+      {activeTab === 'identity' && <IdentityTab workspaceId={workspaceId} />}
+
+      {activeTab === 'overview' && <>
       {/* ═══ BRAND VOICE ═══ */}
       <section className="overflow-hidden bg-zinc-900 border border-zinc-800" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
@@ -398,6 +425,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           </div>
         </div>
       </div>
+      </>}
     </div>
   );
 }
