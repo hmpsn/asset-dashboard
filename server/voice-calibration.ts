@@ -3,6 +3,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-assembly.js';
+import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
@@ -219,8 +220,11 @@ export function buildVoiceCalibrationContext(profile: VoiceProfile & { samples: 
 
   // Once calibrated, Layer 2 of buildSystemPrompt injects DNA + guardrails into
   // the system message. Only inline them when still draft/calibrating.
+  // Shared renderer — see server/voice-dna-render.ts for the single source of
+  // truth. Every field in VoiceDNA is rendered here; adding a new field is a
+  // compile error in voice-dna-render.ts until handled.
   const dnaText = !isCalibrated && profile.voiceDNA
-    ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}${profile.voiceDNA.vocabularyLevel ? `\n  Vocabulary: ${profile.voiceDNA.vocabularyLevel}` : ''}${profile.voiceDNA.humorStyle ? `\n  Humor: ${profile.voiceDNA.humorStyle}` : ''}`
+    ? `\nVOICE DNA:\n${renderVoiceDNAForPrompt(profile.voiceDNA)}`
     : '';
 
   const guardrailsText = !isCalibrated && profile.guardrails

@@ -42,7 +42,29 @@ export function getCustomPromptNotes(workspaceId: string): string | null {
   }
 }
 
+/**
+ * Layer 2 renderer: converts a VoiceDNA into a semantic-translation block that
+ * goes into the calibrated system prompt. This is a *different* format from
+ * the raw renderer in server/voice-dna-render.ts — this one translates the
+ * numeric tone spectrum into natural-language directives ("playful — humor
+ * welcome"), whereas the raw renderer shows the numbers directly.
+ *
+ * Both renderers MUST cover every field in VoiceDNA. See the `_coverage`
+ * exhaustive-field guard below and in voice-dna-render.ts.
+ */
 export function voiceDNAToPromptInstructions(dna: VoiceDNA): string {
+  // ── Exhaustive field coverage ────────────────────────────────────────────
+  // Typechecked against `Record<keyof VoiceDNA, true>`. Adding a field to
+  // VoiceDNA without handling it below breaks the build here.
+  const _coverage: Record<keyof VoiceDNA, true> = {
+    personalityTraits: true,
+    toneSpectrum: true,
+    sentenceStyle: true,
+    vocabularyLevel: true,
+    humorStyle: true,
+  };
+  void _coverage;
+
   const formalCasual = dna.toneSpectrum.formal_casual >= 7
     ? 'conversational and casual'
     : dna.toneSpectrum.formal_casual <= 3

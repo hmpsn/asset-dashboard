@@ -8,6 +8,7 @@ import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-lea
 import { createLogger } from './logger.js';
 import { listBrandscripts } from './brandscript.js';
 import { getVoiceProfile } from './voice-calibration.js';
+import { renderVoiceDNAForPrompt, renderVoiceDNASummary } from './voice-dna-render.js';
 import { listDeliverables } from './brand-identity.js';
 import type { ContextEmphasis } from '../shared/types/brand-engine.js';
 
@@ -492,24 +493,19 @@ export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextE
   // `minimal` returns only a one-line voice summary (used by lightweight prompts).
   if (emphasis === 'minimal') {
     if (!profile.voiceDNA) return '';
-    const dna = profile.voiceDNA;
-    return `\n\nBRAND VOICE: ${dna.personalityTraits.slice(0, 3).join(', ')} — ${dna.sentenceStyle}${dna.vocabularyLevel ? `, ${dna.vocabularyLevel} vocabulary` : ''}`;
+    return `\n\nBRAND VOICE: ${renderVoiceDNASummary(profile.voiceDNA)}`;
   }
 
   const sampleLimit = emphasis === 'summary' ? 3 : 5;
 
-  // Only inject DNA when not calibrated — Layer 2 handles it when calibrated
+  // Only inject DNA when not calibrated — Layer 2 handles it when calibrated.
+  // Uses the shared `renderVoiceDNAForPrompt` helper so this path cannot drift
+  // from voice-calibration.ts or prompt-assembly.ts. Adding a field to VoiceDNA
+  // is a single-file change in voice-dna-render.ts; the compile fails here if
+  // someone forgets.
   if (!isCalibrated && profile.voiceDNA) {
     parts.push(`VOICE DNA:`);
-    parts.push(`  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}`);
-    parts.push(`  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10, technical↔accessible ${profile.voiceDNA.toneSpectrum.technical_accessible}/10`);
-    parts.push(`  Sentence style: ${profile.voiceDNA.sentenceStyle}`);
-    if (profile.voiceDNA.vocabularyLevel) {
-      parts.push(`  Vocabulary: ${profile.voiceDNA.vocabularyLevel}`);
-    }
-    if (profile.voiceDNA.humorStyle) {
-      parts.push(`  Humor: ${profile.voiceDNA.humorStyle}`);
-    }
+    parts.push(renderVoiceDNAForPrompt(profile.voiceDNA));
   }
 
   // Voice samples are safe to include at any status

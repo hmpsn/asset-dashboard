@@ -297,24 +297,21 @@ type DetailMode = 'edit' | 'import';
 function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: BrandscriptDetailProps) {
   const { toast } = useToast();
   const [mode, setMode] = useState<DetailMode>('edit');
-  const [localSections, setLocalSections] = useState<BrandscriptSection[]>(brandscript.sections);
   const [completing, setCompleting] = useState(false);
 
-  // Keep local sections in sync if brandscript prop changes (after complete)
-  const [lastBsId, setLastBsId] = useState(brandscript.id);
-  if (brandscript.id !== lastBsId) {
-    setLastBsId(brandscript.id);
-    setLocalSections(brandscript.sections);
-  }
-  // Also sync when sections array changes length (after AI complete)
-  const [lastSectionCount, setLastSectionCount] = useState(brandscript.sections.length);
-  if (brandscript.sections.length !== lastSectionCount) {
-    setLastSectionCount(brandscript.sections.length);
-    setLocalSections(brandscript.sections);
-  }
+  // NOTE: we intentionally do NOT mirror `brandscript.sections` into local state.
+  // React Query's cache is the single source of truth — the parent calls
+  // `handleUpdated(result)` after every mutation, which writes through `setQueryData`
+  // and flows a new `brandscript` prop down. Maintaining a parallel local copy is a
+  // known anti-pattern (see CLAUDE.md rule 11): it drops external updates whenever
+  // the sync effect's deps don't include content (e.g. a concurrent admin editing
+  // the same brandscript triggers a WS refetch — same id, same count, different
+  // content → stale local state). Per-section dirty tracking still lives in
+  // `SectionEditorCard` via its own `lastSyncedRef`, which is where it belongs.
+  const sections = brandscript.sections;
 
   const handleSaveSection = async (updated: BrandscriptSection) => {
-    const newSections = localSections.map(s => s.id === updated.id ? updated : s);
+    const newSections = sections.map(s => s.id === updated.id ? updated : s);
     const result = await brandscripts.updateSections(
       workspaceId,
       brandscript.id,
@@ -325,7 +322,6 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
         content: s.content,
       })),
     );
-    setLocalSections(result.sections);
     onUpdated(result);
   };
 
@@ -333,7 +329,6 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
     setCompleting(true);
     try {
       const result = await brandscripts.complete(workspaceId, brandscript.id);
-      setLocalSections(result.sections);
       onUpdated(result);
       toast('Sections completed by AI');
     } catch {
@@ -344,12 +339,11 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
   };
 
   const handleImported = (bs: Brandscript) => {
-    setLocalSections(bs.sections);
     onUpdated(bs);
     setMode('edit');
   };
 
-  const emptySectionCount = localSections.filter(s => !s.content?.trim()).length;
+  const emptySectionCount = sections.filter(s => !s.content?.trim()).length;
 
   return (
     <div className="space-y-5">
@@ -425,12 +419,12 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
         />
       ) : (
         <div className="space-y-3">
-          {localSections.length === 0 ? (
+          {sections.length === 0 ? (
             <div className="text-sm text-zinc-500 text-center py-8">
               No sections yet.
             </div>
           ) : (
-            localSections
+            sections
               .slice()
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map(section => (
