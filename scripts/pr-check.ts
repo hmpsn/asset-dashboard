@@ -284,7 +284,7 @@ const CHECKS: Check[] = [
     // Catches formatForPrompt( calls that pass a literal array for sections, e.g. sections: ['seoContext', 'learnings']
     // These are dangerous because the literal can diverge from the slices array.
     pattern: 'formatForPrompt\\(.*sections:\\s*\\[',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/workspace-intelligence.ts', 'tests/'],
     excludeLines: ['// bip-ok'],
@@ -646,7 +646,7 @@ const CHECKS: Check[] = [
   {
     name: 'getOrCreate* function returns nullable',
     pattern: 'function\\s+getOrCreate\\w+[^{\\n]*:\\s*[^{\\n]*\\|\\s*null',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     excludeLines: ['// getorcreate-nullable-ok'],
     message: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null — callers would write dead guard branches. If it can genuinely fail, throw instead.',
@@ -657,7 +657,7 @@ const CHECKS: Check[] = [
   {
     name: 'Record<string, unknown> in shared/types',
     pattern: 'Record<string,\\s*unknown>',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'shared/types/',
     // Grandfather exception: AnalyticsInsight.data is the discriminated-union
     // container (InsightDataMap narrows it at the read boundary). This is the
@@ -672,7 +672,7 @@ const CHECKS: Check[] = [
   {
     name: 'PATCH spread without nested merge',
     pattern: '\\.\\.\\.existing,\\s*\\.\\.\\.req\\.body|\\.\\.\\.current,\\s*\\.\\.\\.req\\.body',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/',
     excludeLines: ['// patch-spread-ok'],
     message: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects. Add // patch-spread-ok if no nested objects exist.',
