@@ -186,13 +186,21 @@ export async function generateCalibrationVariations(
     ? `\nVOICE SAMPLES (write like these):\n${profile.samples.map(s => `  [${s.contextTag || 'general'}] "${s.content}"`).join('\n')}`
     : '';
 
-  const dnaText = profile.voiceDNA
+  // Once the profile is 'calibrated', buildSystemPrompt's Layer 2 auto-injects the
+  // voice DNA + guardrails into the system message. Re-injecting them into the user
+  // prompt here would duplicate the instructions and waste tokens. Only inline them
+  // while the profile is still 'draft'/'calibrating' — that's when the system prompt
+  // doesn't know the DNA yet but the calibration loop still needs the AI to steer
+  // toward whatever partial DNA/guardrails have been captured so far.
+  const isCalibrated = profile.status === 'calibrated';
+
+  const dnaText = !isCalibrated && profile.voiceDNA
     ? `\nVOICE DNA:\n  Personality: ${profile.voiceDNA.personalityTraits.join('. ')}\n  Tone: formal↔casual ${profile.voiceDNA.toneSpectrum.formal_casual}/10, serious↔playful ${profile.voiceDNA.toneSpectrum.serious_playful}/10\n  Sentence style: ${profile.voiceDNA.sentenceStyle}\n  Humor: ${profile.voiceDNA.humorStyle}`
     : '';
 
   // Reuse the shared helper so empty arrays don't render as ", , ," lists and the
   // phrasing stays in sync with what buildSystemPrompt layers into the system message.
-  const guardrailsText = profile.guardrails
+  const guardrailsText = !isCalibrated && profile.guardrails
     ? `\n${guardrailsToPromptInstructions(profile.guardrails)}`
     : '';
 

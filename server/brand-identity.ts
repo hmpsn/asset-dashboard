@@ -168,30 +168,63 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
     workspaceId,
   })).trim();
   const tier = DEFAULT_TIER_MAP[deliverableType] || 'professional';
-
-  // Check if one already exists — update it
-  const existing = stmts().getByType.get(workspaceId, deliverableType) as DeliverableRow | undefined;
   const now = new Date().toISOString();
 
-  if (existing) {
-    const newVersion = existing.version + 1;
-    const doUpdate = db.transaction(() => {
-      // Save version snapshot then update content atomically
+  // Concurrent-safe upsert: re-read the existing row INSIDE the transaction so
+  // two parallel generateDeliverable() calls for the same (workspaceId, type)
+  // can't both observe "no existing row" at check time and both INSERT. The
+  // AI call above is ~5s long — plenty of time for a racing request to land in
+  // that window. Migration 056 adds a UNIQUE index on (workspace_id, deliverable_type)
+  // that would hard-fail the second INSERT anyway; this transaction takes a
+  // write lock on the row-to-be so the loser retries as an update cleanly.
+  //
+  // If the UNIQUE index fires despite the in-transaction re-read (e.g. migration
+  // not yet applied on a legacy DB), we catch the SQLITE_CONSTRAINT_UNIQUE error
+  // and retry once via the update path — the committed row is guaranteed visible
+  // after the failed INSERT returns.
+  const upsert = db.transaction((): BrandDeliverable => {
+    const existing = stmts().getByType.get(workspaceId, deliverableType) as DeliverableRow | undefined;
+    if (existing) {
+      const newVersion = existing.version + 1;
       stmts().insertVersion.run({
         id: `biv_${randomUUID().slice(0, 8)}`,
         deliverable_id: existing.id, content: existing.content,
         steering_notes: null, version: existing.version, created_at: now,
       });
       stmts().updateContent.run({ id: existing.id, workspace_id: workspaceId, content, status: 'draft', version: newVersion, tier, updated_at: now });
-    });
-    doUpdate();
-    // Use fresh `tier` from DEFAULT_TIER_MAP — map values may have shifted since the row was created.
-    return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, tier, updatedAt: now };
-  }
+      // Use fresh `tier` from DEFAULT_TIER_MAP — map values may have shifted since the row was created.
+      return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, tier, updatedAt: now };
+    }
 
-  const id = `bid_${randomUUID().slice(0, 8)}`;
-  stmts().insert.run({ id, workspace_id: workspaceId, deliverable_type: deliverableType, content, status: 'draft', version: 1, tier, created_at: now, updated_at: now });
-  return { id, workspaceId, deliverableType, content, status: 'draft', version: 1, tier, createdAt: now, updatedAt: now };
+    const id = `bid_${randomUUID().slice(0, 8)}`;
+    stmts().insert.run({ id, workspace_id: workspaceId, deliverable_type: deliverableType, content, status: 'draft', version: 1, tier, created_at: now, updated_at: now });
+    return { id, workspaceId, deliverableType, content, status: 'draft', version: 1, tier, createdAt: now, updatedAt: now };
+  });
+
+  try {
+    return upsert();
+  } catch (err) {
+    // SQLITE_CONSTRAINT_UNIQUE — another request inserted between our existence
+    // check and our INSERT. Re-read the winner and apply our generated content
+    // as an update so the user still gets the fresh AI output they waited for.
+    const code = (err as { code?: string } | null)?.code;
+    if (code !== 'SQLITE_CONSTRAINT_UNIQUE') throw err;
+    log.warn({ workspaceId, deliverableType }, 'brand identity UNIQUE race — retrying as update');
+    const retryAsUpdate = db.transaction((): BrandDeliverable => {
+      const winner = stmts().getByType.get(workspaceId, deliverableType) as DeliverableRow | undefined;
+      if (!winner) throw new Error(`UNIQUE violation on brand_identity_deliverables but no row found for ${workspaceId}/${deliverableType}`);
+      const retryNow = new Date().toISOString();
+      const newVersion = winner.version + 1;
+      stmts().insertVersion.run({
+        id: `biv_${randomUUID().slice(0, 8)}`,
+        deliverable_id: winner.id, content: winner.content,
+        steering_notes: null, version: winner.version, created_at: retryNow,
+      });
+      stmts().updateContent.run({ id: winner.id, workspace_id: workspaceId, content, status: 'draft', version: newVersion, tier, updated_at: retryNow });
+      return { ...rowToDeliverable(winner), content, status: 'draft', version: newVersion, tier, updatedAt: retryNow };
+    });
+    return retryAsUpdate();
+  }
 }
 
 export async function refineDeliverable(workspaceId: string, id: string, direction: string): Promise<BrandDeliverable | null> {

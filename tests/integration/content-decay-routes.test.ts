@@ -379,7 +379,12 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     expect(body.error).toBe('Run decay analysis first');
   });
 
-  it('returns 200 with fallback recommendations when AI call fails (FM-2: graceful degradation)', { timeout: 30_000 }, async () => {
+  // Timeout bumped to 60s: the OpenAI SDK retries the fake key through several
+  // auth-failure backoffs before surfacing the error, and the original 30s
+  // boundary was brushing right up against the deadline (observed 29951ms in
+  // one run, 30004ms in the next). Same rationale applies to the shape test
+  // below — both hit the same retry path.
+  it('returns 200 with fallback recommendations when AI call fails (FM-2: graceful degradation)', { timeout: 60_000 }, async () => {
     // generateBatchRecommendations catches OpenAI errors per-page and sets a
     // meaningful fallback string — it never throws. The route returns 200 with
     // the analysis object containing fallback text instead of empty/garbage data.
@@ -399,7 +404,7 @@ describe('POST /api/content-decay/:workspaceId/recommendations', () => {
     }
   });
 
-  it('recommendations response preserves DecayAnalysis shape', { timeout: 30_000 }, async () => {
+  it('recommendations response preserves DecayAnalysis shape', { timeout: 60_000 }, async () => {
     const res = await postJson(`/api/content-decay/${wsWithData}/recommendations`, { maxPages: 1 });
     expect(res.status).toBe(200);
     const body = (await res.json()) as DecayAnalysis;
