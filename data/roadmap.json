@@ -4168,6 +4168,15 @@
           "sprint": "D",
           "status": "pending",
           "notes": "When DataForSEO is selected as seoDataProvider, all keyword/domain intelligence should route through it. Capabilities DataForSEO does not natively support (backlinks, SERP feature codes) should automatically fall back to SEMRush if both providers are configured. Current state: getBacklinksProvider() already does this reactively for backlinks — DataForSEO marks the capability disabled after a 403, then falls back. What's missing: (1) Proactive capability declarations — DataForSEO registers unsupported capabilities at init rather than waiting for a failure. (2) SERP features fallback — hasSerpOpportunity() currently parses SEMRush-specific Fk codes; needs a getSerPFeaturesProvider() path so DataForSEO workspaces can still capture SERP signals via SEMRush fallback. (3) Generalize getBacklinksProvider() into getCapableProvider(capability) to handle both cases and any future gaps cleanly. (4) Workspace settings UI — show which provider is serving which data type (e.g. 'Keywords: DataForSEO | Backlinks: SEMRush (fallback)') so admins have visibility. Architecture: seo-data-provider.ts already has the capability flag system (markCapabilityDisabled / isCapabilityDisabled) — this feature expands it from reactive-only to proactive + generalized."
+        },
+        {
+          "id": 586,
+          "title": "Audit docs/rules/*.md for staleness and coverage gaps",
+          "source": "PR-check audit follow-up (2026-04-10)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up from the pr-check-audit-and-backfill plan. Walk every file in docs/rules/*.md and (a) verify it references current file paths and type names, (b) cross-check each rule against CLAUDE.md for drift, (c) flag any rule that could be mechanized into a pr-check check.",
+          "status": "pending"
         }
       ]
     }
