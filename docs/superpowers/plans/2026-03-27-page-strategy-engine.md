@@ -2228,32 +2228,101 @@ If no code changes were needed, skip this commit.
 
 ---
 
-## Task 13: Final Verification
+## Task 13: Integration Tests
 
-- [ ] **Step 1: Start the dev server**
+**File:** `tests/integration/page-strategy-routes.test.ts` (new, port 13318)
 
-Run: `cd /Users/joshuahampson/CascadeProjects/asset-dashboard && npm run dev`
-Expected: Server starts without errors, migration 027 runs successfully.
+Phase 1 integration tests caught a critical production bug (routes never registered in `app.ts`) that no other verification surface would have caught. Phase 2 must have the same coverage.
 
-- [ ] **Step 2: Test blueprint CRUD via API**
-
-```bash
-# Create a blueprint
-curl -X POST http://localhost:3000/api/page-strategy/YOUR_WORKSPACE_ID \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Test Blueprint", "industryType": "dental practice"}'
-
-# List blueprints
-curl http://localhost:3000/api/page-strategy/YOUR_WORKSPACE_ID
-
-# Get default section plan
-curl http://localhost:3000/api/page-strategy/section-plan-defaults/service
+**Import the shared factories from helpers:**
+```typescript
+import { createTestContext, assertWorkspaceIsolation, assertIdempotentGenerate } from './helpers.js';
 ```
 
-Expected: 201 response with blueprint JSON, 200 with array, 200 with section plan array.
+**Required test cases (use `describe` blocks per endpoint group):**
 
-- [ ] **Step 3: Verify UI renders**
+- [ ] **Blueprint CRUD**
+  - `POST /api/page-strategy/:wsId` — creates blueprint, returns 201 with id/name/status
+  - `GET /api/page-strategy/:wsId` — returns array (includes the created blueprint)
+  - `GET /api/page-strategy/:wsId/:blueprintId` — returns correct blueprint by id
+  - `PUT /api/page-strategy/:wsId/:blueprintId` — updates name, returns 200
+  - `DELETE /api/page-strategy/:wsId/:blueprintId` — returns 204, subsequent GET returns 404
 
+- [ ] **Workspace isolation** — use `assertWorkspaceIsolation`:
+  ```typescript
+  await assertWorkspaceIsolation({
+    ctx,
+    wsA: wsIdA, wsB: wsIdB,
+    endpoint: (wsId) => `/api/page-strategy/${wsId}`,
+    extractIds: (body) => (body as SiteBlueprint[]).map(b => b.id),
+    seedAIds: [blueprintA.id], seedBIds: [blueprintB.id],
+  });
+  ```
+  Also verify cross-workspace GET by id returns 404 (not the other workspace's data).
+
+- [ ] **Entry CRUD**
+  - `POST /api/page-strategy/:wsId/:blueprintId/entries` — adds entry, returns 201 with pageType/slug
+  - `PUT /api/page-strategy/:wsId/:blueprintId/entries/:entryId` — updates entry
+  - `DELETE /api/page-strategy/:wsId/:blueprintId/entries/:entryId` — removes entry
+  - `PUT /api/page-strategy/:wsId/:blueprintId/entries/reorder` — reorders entry list
+
+- [ ] **Section plan defaults**
+  - `GET /api/page-strategy/section-plan-defaults/service` — returns array of `SectionPlanItem`
+  - `GET /api/page-strategy/section-plan-defaults/location` — non-empty array
+  - Verify this route is NOT shadowed by `/:blueprintId` (regression guard for route ordering)
+
+- [ ] **Versioning**
+  - `POST /api/page-strategy/:wsId/:blueprintId/versions` — creates version snapshot
+  - `GET /api/page-strategy/:wsId/:blueprintId/versions` — lists versions (includes the created one)
+  - `GET /api/page-strategy/:wsId/:blueprintId/versions/:versionId` — gets specific version
+
+- [ ] **Generate endpoint 409 guard** — use `assertIdempotentGenerate`:
+  ```typescript
+  // Seed a blueprint with entries first, then:
+  await assertIdempotentGenerate({
+    ctx,
+    endpoint: `/api/page-strategy/${wsId}/generate`,
+    body: { industryType: 'dental', targetCity: 'Austin' },
+    expectedStatus: 409,
+  });
+  ```
+  Note: if the generate endpoint doesn't have a 409 guard yet, add it as part of this task (consistent with the ai-dispatch-patterns.md Pattern 2).
+
+- [ ] **Zod validation** — bad payloads return 400:
+  - `POST /api/page-strategy/:wsId` with missing `name` → 400
+  - `POST .../entries` with missing required `pageType` or `slug` → 400
+
+- [ ] **App registration smoke test** — if this test file returns 404 for any endpoint, the route was never registered in `app.ts`. This is a copy of the Phase 1 critical bug. Add a comment in the test file: `// 404 on any of these means the route wasn't registered in app.ts`.
+
+- [ ] **Commit:**
+  ```bash
+  git add tests/integration/page-strategy-routes.test.ts
+  git commit -m "test: add page-strategy route integration tests"
+  ```
+
+---
+
+## Task 14: Final Verification
+
+- [ ] **Step 1: Run integration tests**
+
+```bash
+npx vitest run tests/integration/page-strategy-routes.test.ts
+```
+
+Expected: all tests pass.
+
+- [ ] **Step 2: Run full suite**
+
+```bash
+npx vitest run
+```
+
+Expected: all tests pass (no regressions).
+
+- [ ] **Step 3: Start the dev server and verify UI renders**
+
+Run: `cd /Users/joshuahampson/CascadeProjects/asset-dashboard && npm run dev`
 Navigate to the Brand Hub page in the browser. The Page Strategy section should appear with the "New Blueprint" button.
 
 - [ ] **Step 4: Final commit (if any adjustments needed)**
