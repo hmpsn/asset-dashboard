@@ -81,6 +81,18 @@ Do not use customCheck for single-line violations — ripgrep is 10× faster.
 
 ---
 
+## False-positive allowlist pattern
+
+Two mechanisms control which matches are reported.
+
+**`exclude: string[]`** — file paths (relative to the project root) to skip entirely. The runner tests each resolved file path against every entry using `file.includes(entry)`, so a partial path like `server/db/migrations` skips every file under that directory. Use `exclude` for well-understood exceptions that apply to an entire file: the definition site of the hook being restricted, a migration directory, or a module that legitimately does the thing the rule prohibits (e.g. `server/db/json-validation.ts` for the bare `JSON.parse` rule).
+
+**`excludeLines: string[]`** — inline comment tokens that suppress a single matched line. If a line contains any string in `excludeLines`, the runner filters it out before reporting. Use `excludeLines` for per-call overrides where the violation is deliberate at that exact site (see the escape hatch convention below).
+
+**Keep `exclude` as short as possible.** Every entry in `exclude` is a blanket bypass — it suppresses all future violations in that file, including ones that haven't been written yet. Prefer `excludeLines` for site-specific overrides. Only add a file to `exclude` when the entire file is a structurally different context that the rule was never intended to cover.
+
+---
+
 ## Escape hatch convention: `// <short-name>-ok`
 
 **Every rule must provide an escape hatch.** No exceptions.
@@ -114,6 +126,24 @@ message: 'State machine transitions must use validateTransition(). Direct SET st
 No rule is perfect. Every rule has cases where the "violation" is deliberate (a test fixture, a migration guard, a legacy integration). Without a hatch, contributors either disable the rule entirely (losing coverage) or work around it with creative refactors (losing readability). The hatch is a pressure valve that lets the rule stay strict while acknowledging reality.
 
 **A rule without a hatch is a rule that will be deleted within 3 months of landing.** Design for the long term.
+
+### Hatch reference table (2026-04-10 audit)
+
+All eleven rules added in the 2026-04-10 audit and their corresponding hatches:
+
+| Rule | Hatch | When to use |
+|------|-------|-------------|
+| useGlobalAdminEvents import restriction | `// global-events-ok` | Only if the import is to the hook definition itself or a verified global-fanout site |
+| Global keydown missing isContentEditable guard | `// keydown-ok` | The handler has been reviewed and does include the isContentEditable guard, or it intentionally does not intercept editing keys |
+| Multi-step DB writes outside db.transaction() | `// txn-ok` | The two writes are idempotent or the partial-failure case is explicitly handled |
+| AI call before db.prepare without transaction guard | `// ai-race-ok` | The handler is rate-limited to one concurrent request or the DB write is an upsert with ON CONFLICT REPLACE |
+| UPDATE/DELETE missing workspace_id scope | `// ws-scope-ok` | Rare admin-cross-workspace bulk operations with explicit authorization |
+| getOrCreate* function returns nullable | `// getorcreate-nullable-ok` | The function genuinely needs to return null and throws on fatal errors |
+| Record<string, unknown> in shared/types | `// record-unknown-ok` | The type is a discriminated union leaf and a specific type is not yet known |
+| PATCH spread without nested merge | `// patch-spread-ok` | The PATCH endpoint operates only on flat (non-nested) JSON columns |
+| Public-portal mutation without addActivity | `// activity-ok` | The endpoint is a GET-as-POST or the activity is logged by the caller |
+| broadcastToWorkspace inside bridge callback | `// bridge-broadcast-ok` | The broadcast is intentional and the bridge does not return `{ modified: N }` |
+| Layout-driving state set in useEffect | `// effect-layout-ok` | The useEffect is not driving layout (data fetch, event listener, animation) |
 
 ---
 
