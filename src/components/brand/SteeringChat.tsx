@@ -19,6 +19,7 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
   const [error, setError] = useState('');
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedVersionIndex, setSelectedVersionIndex] = useState<number>(() => versions.length - 1);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const exchangesEndRef = useRef<HTMLDivElement>(null);
@@ -29,6 +30,11 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
       exchangesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [exchanges]);
+
+  // Reset to latest version when a new version is added
+  useEffect(() => {
+    setSelectedVersionIndex(versions.length - 1);
+  }, [versions.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +57,6 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
   };
 
   const recentExchanges = exchanges.slice(-3);
-  const activeVersionIndex = versions.length - 1;
 
   return (
     <div className="flex flex-col gap-4">
@@ -155,13 +160,13 @@ export function SteeringChat({ content, onRefine, versions, onSelectVersion }: S
               className="mt-2 flex flex-col gap-1"
             >
               {versions.map((v, idx) => {
-                const isActive = idx === activeVersionIndex;
+                const isActive = idx === selectedVersionIndex;
                 return (
                   <li key={idx} role="option" aria-selected={isActive}>
                     <button
                       type="button"
-                      onClick={() => onSelectVersion(idx)}
-                      title={v.steeringNotes ?? undefined}
+                      onClick={() => { onSelectVersion(idx); setSelectedVersionIndex(idx); }}
+                      title={v.steeringNotes}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-start gap-3 ${
                         isActive
                           ? 'bg-teal-600/20 border border-teal-600/40 text-teal-300'
