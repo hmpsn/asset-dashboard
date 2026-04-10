@@ -619,18 +619,23 @@ const CHECKS: Check[] = [
           // Skip stmts() cache definitions — these are always part of a
           // createStmtCache object literal where every value is a prepare.
           if (/:\s*db\.prepare/.test(lines[i])) continue;
+          // Respect the // txn-ok hatch on the current line OR on the preceding
+          // line (for multi-line template-literal db.prepare calls where the
+          // comment can't be placed inline).
+          if (lines[i].includes('// txn-ok') || (i > 0 && lines[i - 1].includes('// txn-ok'))) continue;
           writeIdx.push(i);
         }
         if (writeIdx.length < 2) continue;
         // A function boundary between two writes means they are in separate
-        // functions and are NOT a multi-step mutation. Common shapes:
-        //   function foo(...)           |   export function foo(...)
-        //   export async function foo   |   const foo = (...) => {
-        //   async function foo(...)     |   foo(): Return { (class method)
-        //   }                            ← closing brace of a prior function
-        // Require no function boundary between writeIdx[k] and writeIdx[k+1].
+        // functions and are NOT a multi-step mutation. Detect by looking for
+        // a new function *opener* between the two write lines — any two writes
+        // separated by a boundary will also be separated by the opener of the
+        // second function. Do NOT match closing braces: `}`, `};`, `})` also
+        // close if/for/try blocks and would produce false-negative results on
+        // legitimate violations (e.g. a write, a try/catch, then another write
+        // inside the same function).
         const funcBoundaryRe =
-          /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>|\s*\}\s*$|\s*\}\s*;\s*$|\s*\}\s*\)\s*;?\s*$)/;
+          /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>)/;
         const reported = new Set<number>();
         for (let k = 0; k < writeIdx.length - 1; k++) {
           const a = writeIdx[k];

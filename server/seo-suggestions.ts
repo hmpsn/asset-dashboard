@@ -145,6 +145,7 @@ export function markApplied(suggestionIds: string[]): void {
 export function dismissSuggestions(workspaceId: string, suggestionIds?: string[]): number {
   if (suggestionIds?.length) {
     const placeholders = suggestionIds.map(() => '?').join(',');
+    // txn-ok — if-branch returns early; the two writes are in mutually exclusive paths
     const result = db.prepare(`
       UPDATE seo_suggestions SET status = 'dismissed', updated_at = datetime('now')
       WHERE workspace_id = ? AND id IN (${placeholders})
