@@ -90,6 +90,8 @@ const mode = SCAN_ALL ? 'full scan' : changedFiles.length > 0
 
 // ─── Check definitions ────────────────────────────────────────────────────────
 
+type CustomCheckMatch = { file: string; line: number; text: string };
+
 type Check = {
   name: string;
   pattern: string;
@@ -99,7 +101,38 @@ type Check = {
   excludeLines?: string[];  // grep -v patterns — lines matching any of these are filtered out
   message: string;
   severity: 'error' | 'warn';
+  // Metadata consumed by rule-metadata generator (PR C of the pr-check audit)
+  rationale?: string;     // 1-sentence explanation of the bug class this prevents
+  claudeMdRef?: string;   // anchor/heading in CLAUDE.md, e.g. '#code-conventions'
+  // Optional custom detection function. When present, runCheck uses this
+  // instead of the ripgrep path. It receives the resolved file list (absolute
+  // or repo-relative paths — matching what the ripgrep path would scan) and
+  // returns an array of { file, line, text } matches. The runner formats
+  // these into the same `file:line:text` string shape the ripgrep path emits.
+  customCheck?: (files: string[]) => CustomCheckMatch[];
 };
+
+// ─── Helpers used by customCheck rules ────────────────────────────────────────
+
+// Conservative allowlist of workspace-scoped tables. A dynamic scan of
+// migrations would be more accurate but this is the list the plan instructs us
+// to hard-code as a starting point — it can be made dynamic later.
+const WORKSPACE_SCOPED_TABLES = new Set([
+  'voice_profiles',
+  'discovery_sources',
+  'discovery_extractions',
+  'brand_identity_deliverables',
+  'brandscripts',
+  'workspaces',
+  'insights',
+  'content_items',
+  'tasks',
+  'approvals',
+]);
+
+function readFileOrEmpty(file: string): string {
+  try { return readFileSync(file, 'utf-8'); } catch { return ''; }
+}
 
 const CHECKS: Check[] = [
   {
@@ -432,6 +465,356 @@ const CHECKS: Check[] = [
     message: 'Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum.',
     severity: 'error',
   },
+
+  // ─── New rules (2026-04-10 audit) ───
+  {
+    name: 'useGlobalAdminEvents import restriction',
+    // Note: only match single-quoted imports. A character class ['"] would
+    // break the double-quoted shell invocation in checkDirectory.
+    pattern: "from '[^']*useGlobalAdminEvents",
+    fileGlobs: ['**/*.ts', '**/*.tsx'],
+    // Allowlist of audited global-fanout sites. Any new importer must be
+    // reviewed and added here explicitly.
+    exclude: [
+      'src/hooks/useGlobalAdminEvents.ts',
+      'src/components/WorkspaceOverview.tsx',
+      'src/App.tsx',
+    ],
+    excludeLines: ['// global-events-ok'],
+    message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it.',
+    severity: 'error',
+    rationale: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Only audited global-fanout sites may import it.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+  },
+  {
+    name: 'Global keydown missing isContentEditable guard',
+    // Note: only match single-quoted 'keydown'. A character class ['"] would
+    // break the double-quoted shell invocation in checkDirectory.
+    pattern: "addEventListener\\s*\\(\\s*'keydown'",
+    fileGlobs: ['**/*.ts', '**/*.tsx'],
+    pathFilter: 'src/',
+    exclude: ['src/App.tsx'],
+    excludeLines: ['// keydown-ok'],
+    message: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable. Use the pattern from src/App.tsx (check HTMLInputElement/HTMLTextAreaElement/HTMLSelectElement and isContentEditable). Add // keydown-ok if intentional.',
+    severity: 'warn',
+    rationale: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable — otherwise Escape/Enter/arrows hijack typing.',
+    claudeMdRef: '#uiux-rules-mandatory',
+  },
+  {
+    name: 'Multi-step DB writes outside db.transaction()',
+    pattern: '',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/migrations'],
+    excludeLines: ['// txn-ok'],
+    message: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption. Add // txn-ok on the first prepare line if the pair is intentionally non-atomic.',
+    severity: 'warn',
+    rationale: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // A "write" is a prepare immediately chained with .run(...) on the same
+      // or next few lines. Module-level `stmts = createStmtCache({ foo:
+      // db.prepare(...) })` blocks prepare statements as reusable handles, not
+      // as executed writes, and must not trigger this rule. We detect an
+      // executed write by looking for `.run(` within 8 lines after prepare(
+      // (handles SQL strings that span multiple lines) but not on a line that
+      // is clearly a cache definition (contains `: db.prepare`).
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (file.includes('/server/db/migrations/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const writeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
+          // Skip cache-style definitions: `  foo: db.prepare(...)` or
+          // `const foo = db.prepare(...)` without an executing `.run(`.
+          const window = lines.slice(i, Math.min(lines.length, i + 8)).join('\n');
+          if (!/\.run\s*\(/.test(window)) continue;
+          // Skip stmts() cache definitions — these are always part of a
+          // createStmtCache object literal where every value is a prepare.
+          if (/:\s*db\.prepare/.test(lines[i])) continue;
+          writeIdx.push(i);
+        }
+        if (writeIdx.length < 2) continue;
+        const reported = new Set<number>();
+        for (let k = 0; k < writeIdx.length - 1; k++) {
+          const a = writeIdx[k];
+          const b = writeIdx[k + 1];
+          if (b - a > 10) continue;
+          const winStart = Math.max(0, a - 5);
+          const window = lines.slice(winStart, a + 1).join('\n');
+          if (/\bdb\.transaction\s*\(/.test(window)) continue;
+          if (reported.has(a)) continue;
+          reported.add(a);
+          hits.push({ file, line: a + 1, text: lines[a].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'AI call before db.prepare without transaction guard',
+    pattern: '',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    exclude: [
+      'server/openai-helpers.ts',
+      'server/anthropic-helpers.ts',
+      'server/prompt-assembly.ts',
+    ],
+    excludeLines: ['// ai-race-ok'],
+    message: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put the existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE. Add // ai-race-ok if the handler is provably single-writer.',
+    severity: 'warn',
+    rationale: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (/\/(openai-helpers|anthropic-helpers|prompt-assembly)\.ts$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const aiRe = /\b(callOpenAI|callAnthropic|callCreativeAI)\s*\(/;
+        for (let i = 0; i < lines.length; i++) {
+          if (!aiRe.test(lines[i])) continue;
+          const window = lines.slice(i + 1, i + 31);
+          const hasWrite = window.some(l => /\bdb\.prepare\s*\(/.test(l) || /\bstmts\s*\(\s*\)\./.test(l));
+          if (!hasWrite) continue;
+          const hasTxn = window.some(l => /\bdb\.transaction\s*\(/.test(l));
+          if (hasTxn) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'UPDATE/DELETE missing workspace_id scope',
+    pattern: '',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/migrations'],
+    excludeLines: ['// ws-scope-ok'],
+    message: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests. Add // ws-scope-ok if the row key is already workspace-unique.',
+    severity: 'warn',
+    rationale: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (file.includes('/server/db/migrations/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
+          // Grab the next ~25 lines to reconstruct the SQL string; stop at the
+          // first line that closes the call with ).
+          const chunk = lines.slice(i, Math.min(lines.length, i + 25)).join('\n');
+          const closeIdx = chunk.indexOf(');');
+          const sqlBlob = closeIdx >= 0 ? chunk.slice(0, closeIdx) : chunk;
+          // Normalise whitespace so regex patterns can match across newlines
+          const sql = sqlBlob.replace(/\s+/g, ' ');
+          // Extract the SQL statement inside the template/quote — find the
+          // first backtick/quote after db.prepare( and read up to its match.
+          const m = sql.match(/db\.prepare\s*\(\s*[`'"]([\s\S]*?)[`'"]/);
+          const stmt = (m?.[1] ?? '').trim();
+          if (!stmt) continue;
+          const upper = stmt.toUpperCase();
+          let tableName: string | null = null;
+          if (upper.startsWith('UPDATE')) {
+            const tm = stmt.match(/UPDATE\s+(\w+)/i);
+            tableName = tm?.[1] ?? null;
+          } else if (upper.startsWith('DELETE FROM')) {
+            const tm = stmt.match(/DELETE\s+FROM\s+(\w+)/i);
+            tableName = tm?.[1] ?? null;
+          }
+          if (!tableName) continue;
+          if (!WORKSPACE_SCOPED_TABLES.has(tableName)) continue;
+          if (/workspace_id/i.test(stmt)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'getOrCreate* function returns nullable',
+    pattern: 'function\\s+getOrCreate\\w+[^{\\n]*:\\s*[^{\\n]*\\|\\s*null',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// getorcreate-nullable-ok'],
+    message: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null — callers would write dead guard branches. If it can genuinely fail, throw instead.',
+    severity: 'error',
+    rationale: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null or callers write dead guard branches.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    name: 'Record<string, unknown> in shared/types',
+    pattern: 'Record<string,\\s*unknown>',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'shared/types/',
+    // Grandfather exception: AnalyticsInsight.data is the discriminated-union
+    // container (InsightDataMap narrows it at the read boundary). This is the
+    // one legitimate escape hatch and is documented in the insight rules.
+    exclude: ['shared/types/analytics.ts'],
+    excludeLines: ['// record-unknown-ok'],
+    message: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern. See InsightDataMap for the discriminated-union pattern.',
+    severity: 'error',
+    rationale: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+  },
+  {
+    name: 'PATCH spread without nested merge',
+    pattern: '\\.\\.\\.existing,\\s*\\.\\.\\.req\\.body|\\.\\.\\.current,\\s*\\.\\.\\.req\\.body',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// patch-spread-ok'],
+    message: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects. Add // patch-spread-ok if no nested objects exist.',
+    severity: 'warn',
+    rationale: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    name: 'Public-portal mutation without addActivity',
+    pattern: '',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/routes/public-portal.ts',
+    excludeLines: ['// activity-ok'],
+    message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed.',
+    severity: 'warn',
+    rationale: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Only scan the one target file (if present).
+      const target = files.find(f => f.endsWith('server/routes/public-portal.ts'))
+        ?? path.join(ROOT, 'server/routes/public-portal.ts');
+      const content = readFileOrEmpty(target);
+      if (!content) return hits;
+      const lines = content.split('\n');
+      // Find all router.<method>( lines.
+      const routeIdx: number[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      lines.forEach((l, i) => { if (routeRe.test(l)) routeIdx.push(i); });
+      for (let k = 0; k < routeIdx.length; k++) {
+        const start = routeIdx[k];
+        const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+        const windowEnd = Math.min(nextStart, start + 60);
+        const window = lines.slice(start, windowEnd).join('\n');
+        if (/\baddActivity\s*\(/.test(window)) continue;
+        hits.push({ file: target, line: start + 1, text: lines[start].trim() });
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'broadcastToWorkspace inside bridge callback',
+    pattern: '',
+    fileGlobs: ['**/*.ts'],
+    pathFilter: 'server/',
+    // Canonical broadcast site + the bridge infrastructure itself.
+    exclude: [
+      'server/broadcast.ts',
+      'server/websocket.ts',
+      'server/ws-events.ts',
+      'server/bridge-infrastructure.ts',
+    ],
+    excludeLines: ['// bridge-broadcast-ok'],
+    message: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires. Add // bridge-broadcast-ok if the broadcast is genuinely separate from the bridge result.',
+    severity: 'warn',
+    rationale: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const bridgeRe = /\b(executeBridge|fireBridge)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (/\/(broadcast|websocket|ws-events|bridge-infrastructure)\.ts$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !bridgeRe.test(content) || !content.includes('broadcastToWorkspace')) continue;
+        // Walk every bridge call, locate the arrow function body, and scan the
+        // body for broadcastToWorkspace( calls. We find the `async () =>` or
+        // `() =>` opening brace by walking forward from the bridge call site,
+        // then brace-match to find the matching close brace.
+        let cursor = 0;
+        while (cursor < content.length) {
+          const match = bridgeRe.exec(content.slice(cursor));
+          if (!match) break;
+          const absStart = cursor + match.index;
+          cursor = absStart + match[0].length;
+          // Find the start of the callback body within the next ~300 chars.
+          // Pattern: ... , async () => { ... }  or  , () => { ... }
+          const lookAhead = content.slice(cursor, cursor + 400);
+          const arrowMatch = lookAhead.match(/=>\s*\{/);
+          if (!arrowMatch || arrowMatch.index === undefined) continue;
+          const bodyOpen = cursor + arrowMatch.index + arrowMatch[0].length - 1; // position of '{'
+          let depth = 0;
+          let i = bodyOpen;
+          while (i < content.length) {
+            const ch = content[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            i++;
+          }
+          if (i >= content.length) continue;
+          const body = content.slice(bodyOpen, i + 1);
+          if (!body.includes('broadcastToWorkspace(')) continue;
+          // Report each broadcastToWorkspace line inside this body.
+          const bodyStartLine = content.slice(0, bodyOpen).split('\n').length;
+          const bodyLines = body.split('\n');
+          bodyLines.forEach((bl, idx) => {
+            if (bl.includes('broadcastToWorkspace(')) {
+              hits.push({
+                file,
+                line: bodyStartLine + idx,
+                text: bl.trim(),
+              });
+            }
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Layout-driving state set in useEffect',
+    pattern: '',
+    fileGlobs: ['**/*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// effect-layout-ok'],
+    message: 'Layout-driving state must be derived synchronously in the render body (const effective = state && syncCondition). useEffect runs after paint, causing a one-frame layout flash. Add // effect-layout-ok if the state is genuinely post-paint.',
+    severity: 'warn',
+    rationale: 'Layout-driving state must be derived synchronously in the render body. useEffect runs after paint, causing a one-frame layout flash.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const setStateRe = /\bset[A-Z]\w*\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('useEffect')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\buseEffect\s*\(/.test(lines[i])) continue;
+          const window = lines.slice(i + 1, Math.min(lines.length, i + 21));
+          const hasSetState = window.some(l => setStateRe.test(l));
+          if (!hasSetState) continue;
+          if (lines[i].includes('// effect-layout-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -491,10 +874,52 @@ let warnings = 0;
 
 console.log(`\n🔍 Running PR checks (${mode})...\n`);
 
+// Resolve the file list a check would scan (either the diff slice or a full
+// directory walk). Used by customCheck-based rules so they can operate on the
+// same file set the ripgrep path would have scanned.
+function resolveCheckFileList(check: Check): string[] {
+  if (!SCAN_ALL && changedFiles.length > 0) {
+    const exts = check.fileGlobs.map(g => g.replace('*.', '.').replace('**/', ''));
+    return changedFiles.filter(f =>
+      exts.some(ext => f.endsWith(ext)) &&
+      !isExcluded(f, check.exclude) &&
+      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
+      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
+       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
+      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
+    ).map(f => path.join(ROOT, f));
+  }
+  // Full scan: walk the pathFilter dir (or project root) for each fileGlob.
+  const baseDir = path.join(ROOT, check.pathFilter ?? '.');
+  const all = new Set<string>();
+  for (const glob of check.fileGlobs) {
+    const pattern = glob.replace('**/', '');
+    for (const f of getFiles(baseDir, pattern)) {
+      if (isExcluded(f, check.exclude)) continue;
+      if (EXCLUDED_DIRS.some(d => f.includes(`/${d}/`))) continue;
+      if (EXCLUDED_FILES.some(ef => f.endsWith('/' + ef))) continue;
+      all.add(f);
+    }
+  }
+  return Array.from(all);
+}
+
+function formatCustomMatches(check: Check, matches: CustomCheckMatch[]): string[] {
+  const lines = matches.map(m => {
+    const rel = path.isAbsolute(m.file) ? path.relative(ROOT, m.file) : m.file;
+    return `${rel}:${m.line}:${m.text}`;
+  });
+  return applyExcludeLines(lines, check.excludeLines);
+}
+
 for (const check of CHECKS) {
   let matches: string[] = [];
 
-  if (!SCAN_ALL && changedFiles.length > 0) {
+  if (check.customCheck) {
+    const files = resolveCheckFileList(check);
+    const raw = check.customCheck(files);
+    matches = formatCustomMatches(check, raw);
+  } else if (!SCAN_ALL && changedFiles.length > 0) {
     // Only check changed files that match the glob extensions
     const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
     const relevant = changedFiles.filter(f =>
