@@ -307,6 +307,7 @@ function DNASection({ workspaceId, voiceDNA, onChanged }: DNASectionProps) {
           ))}
         </div>
         <div className="flex gap-2">
+          <label htmlFor="dna-new-trait" className="sr-only">New trait</label>
           <input
             id="dna-new-trait"
             type="text"
@@ -481,6 +482,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           ))}
         </div>
         <div className="flex gap-2">
+          <label htmlFor="gr-forbidden-word" className="sr-only">New forbidden word</label>
           <input
             id="gr-forbidden-word"
             type="text"
@@ -603,6 +605,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           ))}
         </div>
         <div className="flex gap-2">
+          <label htmlFor="gr-tone-boundary" className="sr-only">New tone boundary</label>
           <input
             id="gr-tone-boundary"
             type="text"
@@ -661,6 +664,7 @@ function GuardrailsSection({ workspaceId, guardrails, onChanged }: GuardrailsSec
           ))}
         </div>
         <div className="flex gap-2">
+          <label htmlFor="gr-anti-pattern" className="sr-only">New anti-pattern</label>
           <input
             id="gr-anti-pattern"
             type="text"
