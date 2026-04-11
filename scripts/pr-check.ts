@@ -425,6 +425,11 @@ export const CHECKS: Check[] = [
     pattern: 'hmpsn[ .]studio',
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: ['server/constants.ts', 'src/constants.ts'],
+    excludeLines: [
+      'hmpsn-studio-logo-wordmark-white.svg',
+      'alt="hmpsn studio"',
+      'alt="hmpsn.studio"',
+    ],
     message: 'Use the STUDIO_NAME / STUDIO_URL constant from src/constants.ts (frontend) or server/constants.ts (backend).',
     severity: 'error',
   },
