@@ -483,6 +483,116 @@ describe('Rule: getOrCreate* function returns nullable', () => {
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
+
+  // ── Silent-failure Category C regression tests ──────────────────────────
+  //
+  // The original customCheck used `tail.search(/[{=]/)` to find the end of
+  // the return-type annotation region. That search hit the first `{` or
+  // `=` inside the return type itself (e.g. object-literal types,
+  // `Promise<T | null>` generics, default param values in later params),
+  // truncating `returnRegion` before the `| null` clause and letting every
+  // such declaration slip past an `error`-severity gate.
+  //
+  // Round 2 P1.2 replaced the `.search(...)` with a depth-tracked walker.
+  // These tests pin the exact shapes that used to bypass the rule.
+
+  it('flags object-literal return type with | null (bypassed the original .search(/[{=]/))', () => {
+    const file = write(
+      uniqPath('rule-06', 'server/object-literal-nullable.ts'),
+      lines(
+        "interface Foo { id: string }",                                          // 1
+        "export function getOrCreateFoo(id: string): { id: string } | null {", // 2
+        "  return null;",                                                        // 3
+        "}",                                                                     // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags Promise<{ shape } | null> return type', () => {
+    const file = write(
+      uniqPath('rule-06', 'server/promise-object-nullable.ts'),
+      lines(
+        "export async function getOrCreateFoo(id: string): Promise<{ id: string } | null> {", // 1
+        "  return null;",                                                                       // 2
+        "}",                                                                                    // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags Array<{ shape } | null> return type', () => {
+    const file = write(
+      uniqPath('rule-06', 'server/array-object-nullable.ts'),
+      lines(
+        "export function getOrCreateFoo(id: string): Array<{ x: number } | null> {", // 1
+        "  return [null];",                                                             // 2
+        "}",                                                                            // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags arrow-form declaration with object-literal nullable return type', () => {
+    const file = write(
+      uniqPath('rule-06', 'server/arrow-object-nullable.ts'),
+      lines(
+        "export const getOrCreateFoo = (id: string): { id: string } | null => {", // 1
+        "  return null;",                                                            // 2
+        "};",                                                                        // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('does not flag a non-nullable object-literal return type', () => {
+    const file = write(
+      uniqPath('rule-06', 'server/object-literal-non-null.ts'),
+      lines(
+        "export function getOrCreateFoo(id: string): { id: string } {", // 1
+        "  return { id };",                                                // 2
+        "}",                                                               // 3
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag an intersection return type containing an object literal (VoiceProfile & { samples })', () => {
+    // Mirrors server/voice-calibration.ts:getOrCreateVoiceProfile — the
+    // canonical non-nullable object-literal-in-intersection case.
+    const file = write(
+      uniqPath('rule-06', 'server/intersection-non-null.ts'),
+      lines(
+        "interface Foo { id: string }",                                                            // 1
+        "interface Sample { content: string }",                                                    // 2
+        "export function getOrCreateFoo(id: string): Foo & { samples: Sample[] } {",              // 3
+        "  return { id, samples: [] };",                                                           // 4
+        "}",                                                                                       // 5
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a param with object-literal type (object-type params must not fool the walker)', () => {
+    const file = write(
+      uniqPath('rule-06', 'server/object-param-non-null.ts'),
+      lines(
+        "interface Foo { id: string }",                                                 // 1
+        "export function getOrCreateFoo(opts: { id: string; name: string }): Foo {",   // 2
+        "  return { id: opts.id };",                                                    // 3
+        "}",                                                                            // 4
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════

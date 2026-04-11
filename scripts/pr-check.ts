@@ -297,6 +297,88 @@ function hasHatch(lines: string[], i: number, hatch: string): boolean {
   return false;
 }
 
+/**
+ * Find the end of a function's return-type annotation region given `tail`
+ * — the substring starting immediately after the closing `)` of the
+ * parameter list. Returns the index of the function-body opener (a `{`
+ * followed only by whitespace to end-of-line) or the arrow marker (`=>`),
+ * whichever comes first at outer depth.
+ *
+ * Tracks brace, angle, paren, and bracket depth so structural characters
+ * that appear *inside* the return type itself — object-literal types like
+ * `{ id: string }`, generic arguments like `Promise<{ x } | null>`, tuple
+ * types like `[number, string]` — are not mistaken for body markers.
+ * Skips over string literals so string-literal unions (`'a' | 'b'`) and
+ * template literals cannot introduce stray structural characters.
+ *
+ * Replaces the original `tail.search(/[{=]/)` which truncated the return
+ * region at the first `{` or `=` it saw, silently bypassing the
+ * getOrCreate* nullable-return rule for every declaration whose return
+ * type contained an object-literal or generic argument — the exact
+ * silent-false-negative class documented as Category C in the 2026-04-10
+ * audit Round 2 plan.
+ */
+function findReturnRegionEnd(tail: string): number {
+  let angle = 0;
+  let brace = 0;
+  let paren = 0;
+  let bracket = 0;
+  let k = 0;
+  while (k < tail.length) {
+    const c = tail[k];
+    // Skip over string literals — return types can carry string-literal
+    // unions like `'a' | 'b'` whose contents must not be counted.
+    if (c === "'" || c === '"' || c === '`') {
+      const q = c;
+      k++;
+      while (k < tail.length && tail[k] !== q) {
+        if (tail[k] === '\\') k += 2;
+        else k++;
+      }
+      k++;
+      continue;
+    }
+    // Skip `// line comments` (rare in signatures but possible).
+    if (c === '/' && tail[k + 1] === '/') {
+      while (k < tail.length && tail[k] !== '\n') k++;
+      continue;
+    }
+
+    // Arrow body marker — the first `=>` at outer depth wins.
+    if (c === '=' && tail[k + 1] === '>' && angle === 0 && paren === 0 && brace === 0 && bracket === 0) {
+      return k;
+    }
+
+    if (c === '<') { angle++; k++; continue; }
+    if (c === '>') {
+      if (angle > 0) angle--;
+      k++;
+      continue;
+    }
+    if (c === '(') { paren++; k++; continue; }
+    if (c === ')') { if (paren > 0) paren--; k++; continue; }
+    if (c === '[') { bracket++; k++; continue; }
+    if (c === ']') { if (bracket > 0) bracket--; k++; continue; }
+    if (c === '{') {
+      if (angle === 0 && paren === 0 && brace === 0 && bracket === 0) {
+        // Body-opener heuristic: the signature's body `{` is followed by
+        // only whitespace until the next newline (or end-of-tail). An
+        // object-literal type `{` always carries members immediately
+        // after, so it fails this test and falls through to brace++.
+        let j = k + 1;
+        while (j < tail.length && (tail[j] === ' ' || tail[j] === '\t')) j++;
+        if (j >= tail.length || tail[j] === '\n') return k;
+      }
+      brace++;
+      k++;
+      continue;
+    }
+    if (c === '}') { if (brace > 0) brace--; k++; continue; }
+    k++;
+  }
+  return tail.length;
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -977,12 +1059,17 @@ export const CHECKS: Check[] = [
             j++;
           }
           if (j >= joined.length) continue;
-          // After the closing `)`, read until the next `{` (function body) or
-          // `=>` (arrow body) or end-of-window. That slice is the return-type
-          // annotation region.
+          // After the closing `)`, read until the body opener — either the
+          // function-body `{` (followed only by whitespace to EOL) or the
+          // arrow `=>`. `findReturnRegionEnd` tracks brace/angle/paren/
+          // bracket depth so object-literal types, `Promise<...>` generics,
+          // and tuple types inside the return annotation are NOT mistaken
+          // for the body opener. Without depth tracking, `tail.search(/[{=]/)`
+          // truncated `returnRegion` at the first `{` it saw, silently
+          // bypassing every declaration whose return type contained `{`.
           const tail = joined.slice(j + 1);
-          const bodyIdx = tail.search(/[{=]/);
-          const returnRegion = bodyIdx === -1 ? tail : tail.slice(0, bodyIdx);
+          const bodyIdx = findReturnRegionEnd(tail);
+          const returnRegion = tail.slice(0, bodyIdx);
           if (!/:\s*[^,;]*\|\s*null\b/.test(returnRegion) &&
               !/:\s*Promise<[^>]*\|\s*null\s*>/.test(returnRegion)) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
