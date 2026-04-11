@@ -20,11 +20,14 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+      # Invokes `tsx scripts/pr-check.ts --all` via the npm script so CI
+      # and nightly stay lockstep — any future tweak to the command
+      # (flags, env, wrapper) lives in one place. See Round 2 Task P3.3.
       - name: Run pr-check --all
         id: scan
         run: |
           set -o pipefail
-          npx tsx scripts/pr-check.ts --all 2>&1 | tee pr-check-full-scan.txt
+          npm run pr-check:all 2>&1 | tee pr-check-full-scan.txt
       - name: Upload scan output on failure
         if: failure()
         uses: actions/upload-artifact@v5

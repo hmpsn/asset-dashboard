@@ -29,14 +29,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Use the npm script, which invokes `tsc -b --noEmit` (project-aware).
+      # Plain `tsc --noEmit` against the root tsconfig checks ZERO files
+      # because the root config uses project references with `files: []`.
+      # See CLAUDE.md "Commands" table for the full explanation.
       - name: Type check
-        run: npx tsc --noEmit --skipLibCheck
+        run: npm run typecheck
 
       - name: Run tests
-        run: npx vitest run
+        run: npm test
 
       - name: Build
         run: npm run build
 
       - name: PR checks
-        run: npx tsx scripts/pr-check.ts
+        run: npm run pr-check
