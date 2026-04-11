@@ -61,6 +61,13 @@ function describeMethod(check: Check): string {
 }
 
 function renderTable(checks: readonly Check[]): string {
+  // Defensive: callers (`renderBySeverity`) already gate on `length === 0`
+  // and substitute a placeholder, so this branch is unreachable today.
+  // Guard anyway so a future caller that forgets the gate gets a valid
+  // placeholder instead of the malformed `| |` row the join below would
+  // produce on an empty array.
+  if (checks.length === 0) return '_(none)_';
+
   const header =
     '| # | Rule | Severity | Method | Scope | Escape hatch | Rationale |\n' +
     '|---|------|----------|--------|-------|--------------|-----------|';
