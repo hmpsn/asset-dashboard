@@ -430,10 +430,44 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'Raw fetch() in components',
-    pattern: '(?<![a-zA-Z])fetch\\(',
-    fileGlobs: ['*.ts', '*.tsx'],
-    message: 'Use typed API client modules from src/api/ — no raw fetch() in components.',
+    // customCheck (was regex) — see Round 2 Task P1.5. The original pattern
+    // `(?<![a-zA-Z])fetch\\(` uses a lookbehind assertion. BSD `grep -E`
+    // does not support lookbehind; running it errored with
+    // `grep: repetition-operator operand invalid` and `|| true` in the
+    // shell invocation silently swallowed the failure. The runner then
+    // reported ✓ while 6 real violations existed in src/components.
+    // Silent-failure Category B/D hybrid (regex feature unsupported by the
+    // shell tool). Fix: run the regex in-process as a JS regex where
+    // lookbehind is supported natively.
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/components/',
+    excludeLines: ['// fetch-ok'],
+    message: 'Use typed API client modules from src/api/ — no raw fetch() in components. Add // fetch-ok on the fetch line or the line immediately above if intentional (e.g., uploading FormData where api/ has no helper).',
     severity: 'warn',
+    rationale: 'Raw fetch() bypasses typed API wrappers, error normalization, and auth headers — the #1 source of untyped response bugs in UI code.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // JS regex — lookbehind is supported here even though BSD grep -E
+      // chokes on it. Matches bare `fetch(` but not `.fetch(` (method calls
+      // like `client.fetch()` or `queryClient.fetchQuery()`) or `refetch(`
+      // (React Query). The char before `fetch` must not be a letter or `.`.
+      const fetchRe = /(?<![a-zA-Z.])fetch\s*\(/;
+      for (const file of files) {
+        if (!file.includes('/src/components/')) continue;
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('fetch(')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!fetchRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// fetch-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Local prepared statement caching',

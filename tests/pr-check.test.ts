@@ -1162,6 +1162,106 @@ describe('Rule: Raw string literal in broadcast() event arg', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Raw fetch() in components
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Round 2 Task P1.5. The original rule used a regex pattern
+// `(?<![a-zA-Z])fetch\(` — a lookbehind assertion. BSD `grep -E` does not
+// support lookbehind; it errored with `repetition-operator operand invalid`
+// and the shell's `|| true` swallowed the failure. The runner reported ✓
+// while 6 real violations existed in src/components (DropZone, AssetBrowser,
+// KeywordStrategy, PostEditor, ContentBriefs, client/ContentTab).
+//
+// Silent-failure Category B/D hybrid — regex feature unsupported by the
+// shell tool. Fix: in-process JS regex, which supports lookbehind natively.
+
+describe('Rule: Raw fetch() in components', () => {
+  const RULE = 'Raw fetch() in components';
+
+  it('flags a bare fetch() call inside src/components/', () => {
+    const file = write(
+      uniqPath('rule-fetch', 'src/components/Trigger.tsx'),
+      lines(
+        "export async function load() {",                         // 1
+        "  const res = await fetch('/api/things');",              // 2
+        "  return res.json();",                                   // 3
+        "}",                                                      // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('does not flag .fetch() method calls (preceded by a letter)', () => {
+    const file = write(
+      uniqPath('rule-fetch', 'src/components/DotMethod.tsx'),
+      lines(
+        "export async function load() {",                         // 1
+        "  const res = await client.fetch('/api/things');",       // 2
+        "  return res.json();",                                   // 3
+        "}",                                                      // 4
+      )
+    );
+    // `.fetch(` is preceded by `t` — the lookbehind excludes it.
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag refetch() calls (preceded by a letter)', () => {
+    const file = write(
+      uniqPath('rule-fetch', 'src/components/Refetch.tsx'),
+      lines(
+        "export function Foo({ refetch }: { refetch: () => void }) {", // 1
+        "  return <button onClick={() => refetch()}>reload</button>;", // 2
+        "}",                                                            // 3
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag fetch() calls outside src/components/ (pathFilter)', () => {
+    const file = write(
+      uniqPath('rule-fetch', 'src/hooks/useThings.ts'),
+      lines(
+        "export async function load() {",                         // 1
+        "  const res = await fetch('/api/things');",              // 2
+        "  return res.json();",                                   // 3
+        "}",                                                      // 4
+      )
+    );
+    // The customCheck gates on `/src/components/`; a src/hooks/ file is
+    // filtered out even when passed in the file list.
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // fetch-ok inline and on preceding line', () => {
+    const inline = write(
+      uniqPath('rule-fetch', 'src/components/HatchInline.tsx'),
+      lines(
+        "export async function load() {",                                    // 1
+        "  const res = await fetch('/api/things'); // fetch-ok — FormData", // 2
+        "}",                                                                  // 3
+      )
+    );
+    expect(runRule(RULE, [inline])).toHaveLength(0);
+
+    const above = write(
+      uniqPath('rule-fetch', 'src/components/HatchAbove.tsx'),
+      lines(
+        "export async function load() {",                         // 1
+        "  // fetch-ok — no api/ helper for FormData uploads",    // 2
+        "  const res = await fetch('/api/upload', {",             // 3
+        "    method: 'POST', body: formData,",                    // 4
+        "  });",                                                  // 5
+        "}",                                                      // 6
+      )
+    );
+    expect(runRule(RULE, [above])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Meta-test: pinned customCheck rule names
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -1261,6 +1361,7 @@ describe('Meta: customCheck rule name registry', () => {
     'useGlobalAdminEvents import restriction',
     'Raw string literal in broadcastToWorkspace() event arg',
     'Raw string literal in broadcast() event arg',
+    'Raw fetch() in components',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -1308,4 +1409,181 @@ describe('Meta: customCheck rule name registry', () => {
       );
     }
   });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Meta-test: pr-check --all status parity with verified-clean allowlist
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Round 2 Task P1.5. This is the load-bearing gate that catches silent
+// rule failures — the four categories enumerated in
+// `docs/rules/verified-clean-rules.md`:
+//
+//   A. file-list — resolveCheckFileList filters out all files before
+//      customCheck runs, so the callback sees nothing.
+//   B. regex-too-narrow — pattern only matches one quote/letter variant.
+//   C. parser-lite — hand-rolled string scan truncates on legal syntax.
+//   D. shell-quoting — embedded `"` or lookbehind collides with
+//      `grep -E "${pattern}"` and `|| true` swallows the error.
+//
+// How it works: spawn `npx tsx scripts/pr-check.ts --all` as a subprocess,
+// parse each status line (`  ✓ <name>`, `  ⚠ <name>`, `  ✗ <name>`), and
+// require that the SET of rules reporting `✓` exactly matches the rows
+// in `docs/rules/verified-clean-rules.md`. Any mismatch — a new rule
+// silently landing at ✓, or an existing rule dropping from ⚠ to ✓ after
+// an inadvertent break — fails the test with an explicit diff.
+//
+// Why this matters: Round 2 discovered FIVE simultaneous silent-failure
+// rules (useGlobalAdminEvents, both broadcast* rules, getOrCreate*, and
+// Raw fetch()) that had been reporting ✓ for weeks while the codebase
+// carried 50+ real violations. A green CI line is worthless if the
+// rules behind it are broken. This test makes "silently broken" as
+// noisy as "legitimately clean" — a reviewer has to consciously accept
+// every ✓ by adding a row to the allowlist.
+//
+// Performance: pr-check --all takes ~5s on the full repo. The test has
+// a 30s timeout to absorb CI variance.
+
+describe('Meta: pr-check --all status parity with verified-clean allowlist', () => {
+  it('every rule reporting ✓ is listed in docs/rules/verified-clean-rules.md', async () => {
+    const { execFileSync } = await import('child_process');
+    const { readFileSync } = await import('fs');
+    const { fileURLToPath } = await import('url');
+
+    // 1. Spawn pr-check --all as a subprocess and capture stdout.
+    //    We use execFileSync with the tsx binary directly to avoid
+    //    shell interpretation of stdout (which contains box-drawing
+    //    characters and ANSI status symbols).
+    // vitest rewrites import.meta.url to a `file:///@fs/...` URL that
+    // `new URL('..').pathname` cannot decode as a real filesystem path.
+    // `fileURLToPath` handles both the native and vite-rewritten forms.
+    // Fall back to process.cwd() (the repo root when tests run) if
+    // fileURLToPath returns an obviously-wrong path.
+    let repoRoot: string;
+    try {
+      const testFilePath = fileURLToPath(import.meta.url);
+      repoRoot = path.resolve(path.dirname(testFilePath), '..');
+      if (repoRoot.includes('@fs') || !repoRoot.startsWith('/')) {
+        repoRoot = process.cwd();
+      }
+    } catch {
+      repoRoot = process.cwd();
+    }
+    const tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+    let out: string;
+    try {
+      // Invoke tsx directly via node_modules/.bin — vitest's child
+      // environment does not always inherit a PATH that resolves `npx`.
+      out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
+        cwd: repoRoot,
+        encoding: 'utf-8',
+        timeout: 30_000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+    } catch (err: unknown) {
+      // execFileSync throws on non-zero exit; the subprocess output is
+      // still attached to the error object. pr-check exits 1 when errors
+      // exist — swallow that; we only care about the status lines in
+      // stdout.
+      const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; status?: number; message?: string };
+      out = e.stdout ? e.stdout.toString() : '';
+      if (!out.trim()) {
+        const stderrStr = e.stderr ? e.stderr.toString() : '';
+        throw new Error(
+          `pr-check --all produced no stdout.\n` +
+          `  status: ${e.status}\n` +
+          `  message: ${e.message}\n` +
+          `  stderr: ${stderrStr.slice(0, 500)}`,
+        );
+      }
+    }
+
+    if (!out.trim()) {
+      throw new Error('pr-check --all produced no stdout — subprocess failed to start?');
+    }
+
+    // 2. Parse status lines. Format is `  <symbol> <name>` where symbol
+    //    is one of ✓ / ⚠ / ✗. Exclude the summary line
+    //    `  ✗ 3 error(s), 14 warning(s). ...` which starts with ✗ but
+    //    is not a rule name.
+    const cleanRules: string[] = [];
+    for (const line of out.split('\n')) {
+      const match = line.match(/^\s+([✓⚠✗])\s+(.+?)\s*$/);
+      if (!match) continue;
+      const [, symbol, name] = match;
+      // Skip the summary line — it contains digits immediately after ✗.
+      if (/^\d+\s+error/.test(name)) continue;
+      if (symbol === '✓') cleanRules.push(name);
+    }
+
+    if (cleanRules.length === 0) {
+      throw new Error(
+        'pr-check --all produced no ✓ status lines. Either the output format changed (update the regex in this test) or every rule is now reporting matches (verify and update the allowlist).',
+      );
+    }
+
+    // 3. Read the allowlist and extract rule names from the markdown table.
+    //    Table format: `| Rule Name | Verified By | Justification |`
+    //    We match rows that start with `| ` and skip the header/separator.
+    const allowlistPath = path.resolve(repoRoot, 'docs/rules/verified-clean-rules.md');
+    const allowlistSrc = readFileSync(allowlistPath, 'utf-8');
+    const allowedRules: string[] = [];
+    let inTable = false;
+    for (const line of allowlistSrc.split('\n')) {
+      // Header row starts the table; stop at next blank after data rows.
+      if (/^\|\s*Rule Name\s*\|/.test(line)) { inTable = true; continue; }
+      if (/^\|[\s-]+\|[\s-]+\|[\s-]+\|\s*$/.test(line)) continue; // separator
+      if (inTable) {
+        if (!line.startsWith('|')) { inTable = false; continue; }
+        const cells = line.split('|').map(c => c.trim());
+        // Expect 5 cells: ['', ruleName, verifiedBy, justification, '']
+        if (cells.length >= 4 && cells[1]) allowedRules.push(cells[1]);
+      }
+    }
+
+    if (allowedRules.length === 0) {
+      throw new Error(
+        `No rule entries parsed from ${allowlistPath}. Check the table format — expected \`| Rule Name | Verified By | Justification |\` rows.`,
+      );
+    }
+
+    // 4. Compute the set difference in both directions and fail loudly
+    //    if either side has extras.
+    const cleanSet = new Set(cleanRules);
+    const allowedSet = new Set(allowedRules);
+
+    const unlisted = cleanRules.filter(r => !allowedSet.has(r));
+    const stale = allowedRules.filter(r => !cleanSet.has(r));
+
+    const errors: string[] = [];
+    if (unlisted.length > 0) {
+      errors.push(
+        `The following rules report ✓ in pr-check --all but are NOT in ` +
+        `docs/rules/verified-clean-rules.md:\n  - ${unlisted.join('\n  - ')}\n\n` +
+        `This is the silent-failure gate doing its job. For each rule, either:\n` +
+        `  (a) manually verify it's genuinely clean (run its regex against src/, ` +
+        `confirm the shell invocation works, spot-check 3 matches on a synthetic ` +
+        `trigger), then add a row to docs/rules/verified-clean-rules.md, or\n` +
+        `  (b) add a fixture describe block to tests/pr-check.test.ts so a ` +
+        `regression in the rule's callback is caught by the harness directly ` +
+        `(preferred for customCheck rules).\n\n` +
+        `Do NOT add a row to the allowlist without verification. The whole point ` +
+        `of this gate is that a ✓ without proof is indistinguishable from a ` +
+        `silently-broken rule.`,
+      );
+    }
+    if (stale.length > 0) {
+      errors.push(
+        `The following rules are listed in docs/rules/verified-clean-rules.md ` +
+        `but are NOT currently reporting ✓ (they either moved to ⚠/✗ or were ` +
+        `deleted):\n  - ${stale.join('\n  - ')}\n\n` +
+        `Remove the stale rows from the allowlist in the same commit as the ` +
+        `state change.`,
+      );
+    }
+
+    if (errors.length > 0) {
+      throw new Error(errors.join('\n\n─────\n\n'));
+    }
+  }, 30_000);
 });

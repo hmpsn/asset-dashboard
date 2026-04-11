@@ -1940,7 +1940,7 @@ Naming them makes the residual audit work grep-able.
 | C | **Parser-lite string walking** | customCheck uses `.indexOf` / `.search` / `.includes` on a structural character (`{`, `}`, `=`, `=>`, `)`) without tracking brace/paren/angle depth or quote state. Works on the author's happy-path fixture; fails on anything nested. | Replace with a depth-tracked walker. |
 | D | **Shell quoting / command injection** | Regex pattern contains a character the shell interprets before `grep -E` sees it. `grep` errors; `|| true` swallows the error; runner reports ✓. | Convert rule to customCheck (bypasses the shell entirely). |
 
-### Confirmed silent-failure rules (5 total, ranked by severity)
+### Confirmed silent-failure rules (6 total, ranked by severity)
 
 | # | Rule | Category | Severity | Real violations hidden | Status |
 |---|------|----------|----------|------------------------|--------|
@@ -1951,8 +1951,9 @@ Naming them makes the residual audit work grep-able.
 | 5 | `getOrCreate* function returns nullable` | C | warn | Unknown — any object-literal return type truncates extraction | **Open** → Task P1.2 |
 | 6 | `Raw string literal in broadcastToWorkspace() event arg` | D | warn | 50+ confirmed (`server/feedback.ts`, `server/routes/workspaces.ts`, etc.) | **Open** → Task P1.3 |
 | 7 | `Raw string literal in broadcast() event arg` | D | warn | Unknown, likely similar | **Open** → Task P1.3 |
+| 8 | `Raw fetch() in components` | B/D hybrid | warn | 6 confirmed in `src/components/` | **Discovered during P1.5 spot-check**; fixed in P1.5 |
 
-**Silent-failure rate: 5 / 45 = 11% of rules**. Rule #4 in particular ships
+**Silent-failure rate: 6 / 45 = 13% of rules**. Rule #4 in particular ships
 at `error` severity — our most-trusted gate — and is trivially bypassed by
 writing `from "../hooks/useGlobalAdminEvents"` instead of `'...'`.
 
@@ -2297,6 +2298,41 @@ _(Empty. Any spec changes discovered during execution must be recorded here with
   P3.1–P3.3); PR B extended with 4 new tasks (B10–B13). No tasks removed
   or renumbered. Existing Task A1 deviation (useGlobalAdminEvents
   single-quote-only regex vs. spec'd dual-quote) documented in Task P1.1.
+
+### 2026-04-10 — Round 2 P1.5 expanded: 6th silent-failure rule discovered
+
+- **Rationale:** while spot-checking the 30+ rules reporting `✓` in
+  preparation for building the `docs/rules/verified-clean-rules.md`
+  allowlist, I found a sixth silent-failure rule: `Raw fetch() in
+  components` (scripts/pr-check.ts:432). The original pattern
+  `(?<![a-zA-Z])fetch\(` uses a lookbehind assertion, which BSD `grep -E`
+  does not support. The shell invocation errored with
+  `grep: repetition-operator operand invalid`; the `|| true` in
+  `checkDirectory` swallowed the failure; the runner reported `✓` while
+  6 real violations lived in `src/components/` (DropZone.tsx:34,
+  AssetBrowser.tsx:245, KeywordStrategy.tsx:146, PostEditor.tsx:210,
+  ContentBriefs.tsx:283, client/ContentTab.tsx:474). This is a hybrid
+  Category B/D failure (unsupported regex feature → shell error).
+- **Scope:** the discovery happened *during* the execution of P1.5 —
+  exactly the load-bearing gate that is supposed to catch this class.
+  Fixing the rule is in-scope for the P1.5 commit (the gate must
+  demonstrate its value on its own discovery). Since both P1.3
+  (broadcast rules) and P1.5 (fetch rule) converted regex rules to
+  customCheck, the Part 1 pattern is consistent: anywhere `grep -E`
+  semantics diverge from JS regex, the rule must run in-process.
+- **Affected tasks:** P1.5 amended to include the fetch rule fix as a
+  prerequisite step before building the allowlist. The fetch rule is
+  also added to `EXPECTED_CUSTOM_CHECK_RULES` and gets a fixture describe
+  block with 5 tests (trigger, .fetch exclusion, refetch exclusion,
+  pathFilter exclusion, inline/above-line hatch). The silent-failure
+  count in the "Confirmed silent-failure rules" table is now 6 (was 5).
+- **Follow-up:** the pattern-level audit of remaining `✓` rules should
+  look specifically for lookbehind/lookahead assertions and for
+  embedded double-quotes inside outer-shell double-quoted interpolation.
+  A scan ruled out further lookbehind/lookahead uses; one embedded
+  double-quote pattern remains (SVG with hardcoded dark fill/stroke),
+  verified manually to survive shell escape, flagged in
+  verified-clean-rules.md as "Fragile — prefer customCheck if edited."
 
 ---
 
