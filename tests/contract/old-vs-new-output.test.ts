@@ -305,13 +305,11 @@ describe('OLD path vs NEW path — data preservation contracts', () => {
     expect(result).toContain('case studies');
   });
 
-  it('formatBrandVoiceForPrompt matches old brandVoiceBlock header', async () => {
-    const { formatBrandVoiceForPrompt } = await import('../../server/workspace-intelligence.js');
-    const result = formatBrandVoiceForPrompt('Professional, data-driven, and authoritative.');
-    expect(result).toContain('BRAND VOICE & STYLE');
-    expect(result).toContain('MUST match');
-    expect(result).toContain('Professional, data-driven, and authoritative.');
-  });
+  // NOTE: there is no formatBrandVoiceForPrompt contract test. The raw brandVoice
+  // field bypasses voice-profile authority, so there is no helper that wraps it
+  // with a standalone header — callers inject `seo?.effectiveBrandVoiceBlock`
+  // directly, which `buildSeoContext` already formats with the emphatic BRAND
+  // VOICE header when non-empty. See PR #167.
 
   it('formatKnowledgeBaseForPrompt matches old knowledgeBlock header', async () => {
     const { formatKnowledgeBaseForPrompt } = await import('../../server/workspace-intelligence.js');

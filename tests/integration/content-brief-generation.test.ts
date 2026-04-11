@@ -49,8 +49,9 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
         ],
       },
       brandVoice: 'Professional but approachable. Data-driven.',
-      // Pre-formatted block with voice-authority applied. content-brief.ts now reads
-      // this directly instead of calling formatBrandVoiceForPrompt on the raw brandVoice.
+      // Pre-formatted block with voice-authority applied. content-brief.ts reads this
+      // directly — it is the single source of truth for brand voice injection on the
+      // intelligence path (see PR #167).
       effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional but approachable. Data-driven.',
       knowledgeBase: 'We serve small to mid-size businesses.',
       businessContext: 'Digital agency specializing in SEO and web design',

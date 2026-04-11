@@ -235,17 +235,18 @@ async function assembleSeoContext(
     // Store RAW brand voice value (no headers) for legacy read-only consumers that need
     // the raw workspace.brandVoice text — NOT for prompt injection. Prompt callers MUST
     // use `effectiveBrandVoiceBlock` below (which already applies voice-profile authority).
-    // The raw `brandVoice` field is NOT passed through `formatBrandVoiceForPrompt` anymore:
-    // that helper is deprecated because it bypasses voice-profile authority (see the
-    // function's JSDoc and PR #167). For knowledge base, callers still use
-    // `formatKnowledgeBaseForPrompt()` because knowledge has no authority-layered variant.
+    // There is intentionally no helper that adds the "BRAND VOICE & STYLE" header to this
+    // raw field: any such helper would bypass voice-profile authority and silently drop
+    // the entire voice profile feature on calibrated workspaces. For knowledge base,
+    // callers still use `formatKnowledgeBaseForPrompt()` because knowledge has no
+    // authority-layered variant (it's the same raw text everywhere).
     brandVoice: getRawBrandVoice(workspaceId),
     // Pre-formatted block with voice-profile authority applied. Source of truth:
     // buildSeoContext().brandVoiceBlock, which honors the rule that voice profile
     // replaces legacy brandVoice only when (a) status === 'calibrated' (Layer 2 system
     // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is non-empty.
-    // Intelligence-path callers inject this DIRECTLY — do NOT pass through
-    // formatBrandVoiceForPrompt, it already carries the emphatic BRAND VOICE header.
+    // Intelligence-path callers inject this DIRECTLY — it already carries the emphatic
+    // BRAND VOICE header when non-empty.
     effectiveBrandVoiceBlock: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
@@ -1483,10 +1484,10 @@ function pct(rate: number | null | undefined): string {
  * helpers instead: formatKeywordsForPrompt(), formatPersonasForPrompt(),
  * formatKnowledgeBaseForPrompt(). For BRAND VOICE specifically, standalone callers
  * must read `seo?.effectiveBrandVoiceBlock` directly — it is already pre-formatted
- * by `buildSeoContext` with full voice-profile authority applied. Do NOT pass the raw
- * `seo?.brandVoice` field through `formatBrandVoiceForPrompt` — that helper is
- * deprecated (see its JSDoc) because it bypasses voice-profile authority and creates
- * silent-drop bugs on calibrated workspaces.
+ * by `buildSeoContext` with full voice-profile authority applied. There is
+ * intentionally no equivalent standalone helper for raw `seo?.brandVoice`: any such
+ * helper would bypass voice-profile authority and create silent-drop bugs on
+ * calibrated workspaces.
  *
  * These standalone helpers intentionally produce DIFFERENT output (emphatic standalone
  * headers) compared to this function's compact inline labels within the ## SEO Context
@@ -2292,26 +2293,6 @@ export function getIntelligenceCacheStats() {
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
 // These produce prompt-ready text from intelligence slice data, matching the
 // output format of the legacy mini-builders in seo-context.ts.
-
-/**
- * Format raw brand voice text into a prompt block matching buildSeoContext().brandVoiceBlock format.
- *
- * ⚠️ DO NOT CALL THIS WITH `seo?.brandVoice` FROM A SLICE.
- * The intelligence slice's `brandVoice` field is the RAW legacy value and bypasses voice
- * profile authority (calibrated DNA/samples/guardrails). Calling
- * `formatBrandVoiceForPrompt(seo?.brandVoice)` silently drops the entire voice profile
- * feature on non-calibrated workspaces and creates contradictory voice sources on
- * calibrated workspaces. Use `seo?.effectiveBrandVoiceBlock ?? ''` instead — it is the
- * pre-formatted, authority-applied block from `buildSeoContext`.
- *
- * This helper remains exported only for (a) tests of the header format itself and
- * (b) edge-case callers that have raw voice text from somewhere other than an
- * intelligence slice. New production code should not need it.
- */
-export function formatBrandVoiceForPrompt(brandVoice: string | null | undefined): string {
-  if (!brandVoice?.trim()) return '';
-  return `\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${brandVoice}`;
-}
 
 /**
  * Format raw knowledge base text into a prompt block matching buildSeoContext().knowledgeBlock format.

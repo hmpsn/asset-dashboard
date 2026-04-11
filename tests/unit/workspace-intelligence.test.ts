@@ -116,15 +116,17 @@ describe('assembleSeoContext — voice profile authority on intelligence path', 
    * Before the fix: `SeoContextSlice.brandVoice` held the raw legacy `workspace.brandVoice`
    * via `getRawBrandVoice()`. 12 caller sites across content-brief, internal-links,
    * aeo-page-review, webflow-seo, rewrite-chat, jobs, and admin-chat-context formatted
-   * it via `formatBrandVoiceForPrompt(seo?.brandVoice)` — completely bypassing the voice
-   * profile authority logic in `buildSeoContext`. Result: for non-calibrated workspaces
-   * the entire voice profile feature (DNA, samples, guardrails) was invisible to the AI
-   * on those code paths; for calibrated workspaces the legacy block contradicted Layer 2.
+   * it via a `formatBrandVoiceForPrompt(seo?.brandVoice)` helper — completely bypassing
+   * the voice profile authority logic in `buildSeoContext`. Result: for non-calibrated
+   * workspaces the entire voice profile feature (DNA, samples, guardrails) was invisible
+   * to the AI on those code paths; for calibrated workspaces the legacy block
+   * contradicted Layer 2.
    *
    * Fix: `assembleSeoContext` now also sets `effectiveBrandVoiceBlock` from
    * `ctx.brandVoiceBlock`, which is the already-computed authority-applied block from
-   * `buildSeoContext`. Callers migrate from `formatBrandVoiceForPrompt(seo?.brandVoice)`
-   * to `seo?.effectiveBrandVoiceBlock ?? ''`.
+   * `buildSeoContext`. Callers migrate to `seo?.effectiveBrandVoiceBlock ?? ''`, and the
+   * legacy `formatBrandVoiceForPrompt` helper has been DELETED (PR #167 follow-up) so
+   * no one can reintroduce the bypass.
    *
    * This test asserts the wiring at the assembler layer. The authority logic itself is
    * covered by tests/unit/seo-context-voice-profile.test.ts against a real DB.

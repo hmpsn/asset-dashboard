@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  formatBrandVoiceForPrompt,
   formatKnowledgeBaseForPrompt,
   formatKeywordsForPrompt,
   formatPersonasForPrompt,
@@ -8,20 +7,14 @@ import {
 } from '../../server/workspace-intelligence.js';
 import { RICH_SEO_CONTEXT } from '../fixtures/rich-intelligence.js';
 
-describe('formatBrandVoiceForPrompt', () => {
-  it('returns empty string for null/undefined/empty', () => {
-    expect(formatBrandVoiceForPrompt(null)).toBe('');
-    expect(formatBrandVoiceForPrompt(undefined)).toBe('');
-    expect(formatBrandVoiceForPrompt('')).toBe('');
-  });
-
-  it('wraps brand voice in emphatic header', () => {
-    const result = formatBrandVoiceForPrompt('Professional and data-driven.');
-    expect(result).toContain('BRAND VOICE');
-    expect(result).toContain('MUST match');
-    expect(result).toContain('Professional and data-driven.');
-  });
-});
+// NOTE: There is intentionally no formatBrandVoiceForPrompt helper. The raw
+// `seo?.brandVoice` field bypasses voice-profile authority and must NEVER be
+// injected into prompts through a generic header-wrapping helper. Prompt callers
+// use `seo?.effectiveBrandVoiceBlock` directly — it is pre-formatted by
+// `buildSeoContext` with voice-profile authority applied (calibrated DNA via
+// buildSystemPrompt Layer 2, or the voice-samples block, or the legacy block,
+// depending on the workspace's calibration status). See PR #167 for the
+// regression that removing this helper prevents.
 
 describe('formatKnowledgeBaseForPrompt', () => {
   it('returns empty string for null/undefined/empty', () => {
