@@ -95,42 +95,12 @@ describe('isProgrammingError utility', () => {
   });
 });
 
-// Escalation test skipped — assembler mock graph requires isolated worktree to test reliably.
-// vi.mock() inside a test body cannot override top-level vi.mock() hoisted calls already
-// resolved in this module's cache; the outcome-tracking mock throws but the logger mock
-// that was wired at module-load time is a different instance than the one workspace-intelligence
-// captured. Needs a fresh Vitest worker with no prior module resolution.
-describe.skip('assembler catch block escalation', () => {
-  beforeEach(() => {
-    mockWarn.mockClear();
-    mockDebug.mockClear();
-  });
-
-  it('assembleLearnings: TypeError in outcome-tracking surfaces as log.warn', async () => {
-    // Simulate getTopWinsFromActions renamed — calling getActionsByWorkspace throws TypeError
-    vi.mock('../server/outcome-tracking.js', () => ({
-      getActionsByWorkspace: vi.fn(() => { throw new TypeError('getTopWinsFromActions is not a function'); }),
-      getOutcomesForAction: vi.fn(() => []),
-      getTopWinsFromActions: undefined,
-      getPendingActions: vi.fn(() => []),
-      getActionsByPage: vi.fn(() => []),
-    }));
-    vi.mock('../server/roi-attribution.js', () => ({
-      getROIAttributionsRaw: vi.fn(() => []),
-    }));
-
-    const { invalidateIntelligenceCache, buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');
-    invalidateIntelligenceCache('ws-test');
-
-    const result = await buildWorkspaceIntelligence('ws-test', { slices: ['learnings'] });
-
-    // Must still return a result (graceful degradation preserved)
-    expect(result).toBeDefined();
-    expect(result.learnings).toBeDefined();
-
-    // Programming error must surface as warn, not silent debug
-    expect(mockWarn.mock.calls.length).toBeGreaterThan(0);
-    const warnCalls = mockWarn.mock.calls.map((c: unknown[]) => JSON.stringify(c));
-    expect(warnCalls.some((m: string) => m.includes('programming error'))).toBe(true);
-  });
-});
+// The assembler-escalation test that used to live here as a
+// `describe.skip` block was extracted in Round 2 Task P3.2 to
+// `tests/assembler-escalation.test.ts`. The reason: `vi.mock()` inside
+// a test body cannot override a top-level `vi.mock()` that was already
+// hoisted during module-graph resolution. Giving the escalation test
+// its own file provides a clean module graph where the throwing
+// `outcome-tracking` mock is hoisted from the start, so
+// `buildWorkspaceIntelligence` captures the throwing version on import.
+// That test now runs on every CI build — no skip remains.
