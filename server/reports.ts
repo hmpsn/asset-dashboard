@@ -200,6 +200,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
                 domain: 'cross',
                 pageTitle: page.page ?? undefined,
                 resolutionSource: 'bridge_12_audit_page_health',
+                bridgeSource: 'bridge-audit-page-health',
               });
               modified++;
             }
@@ -240,6 +241,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
               impactScore: Math.max(0, 100 - audit.siteScore),
               domain: 'cross',
               resolutionSource: 'bridge_15_audit_site_health',
+              bridgeSource: 'bridge-audit-site-health',
             });
           });
           return { modified: 1 };
