@@ -14,11 +14,19 @@ export function NotificationBell({ onSelectWorkspace }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const { data: items = [] } = useNotifications();
 
-  // Keyboard close (Escape)
+  // Keyboard close (Escape) — guards against hijacking text input.
+  // The drawer can be opened via mouse click while focus is still in an
+  // unrelated input/textarea elsewhere on the page; in that scenario,
+  // pressing Escape to clear the input would unintentionally close the
+  // drawer. The isContentEditable guard early-returns when the user is
+  // typing, leaving Escape free to do its native dismiss-input job.
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      const target = e.target as HTMLElement | null;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable) return;
+      setOpen(false);
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);

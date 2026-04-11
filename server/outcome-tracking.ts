@@ -180,6 +180,13 @@ export function recordAction(params: RecordActionParams): TrackedAction {
       category: 'site_change',
       createdBy: 'bridge:action-annotation',
     });
+    // This bridge dispatches a domain-specific ANNOTATION_BRIDGE_CREATED
+    // event, not the generic INSIGHT_BRIDGE_UPDATED that executeBridge()
+    // auto-broadcasts when a BridgeResult is returned. The event payload
+    // includes the date and label for the analytics chart annotation
+    // marker, which the auto path doesn't carry. Keeping the inline
+    // broadcast is intentional.
+    // bridge-broadcast-ok
     broadcastToWorkspace(params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
       bridge: 'bridge_13_action_annotation',
       date,

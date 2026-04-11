@@ -38,6 +38,13 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
         });
       }
       if (topDecaying.length > 0) {
+        // This bridge dispatches a domain-specific SUGGESTED_BRIEF_UPDATED
+        // event, not the generic INSIGHT_BRIDGE_UPDATED that
+        // executeBridge() auto-broadcasts when a BridgeResult is returned.
+        // The event payload carries `count` so the suggested-briefs panel
+        // can refresh its specific list without invalidating every
+        // insight cache. Keeping the inline broadcast is intentional.
+        // bridge-broadcast-ok
         broadcastToWorkspace(ws.id, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, {
           bridge: 'bridge_2_decay_suggested_brief',
           count: topDecaying.length,
