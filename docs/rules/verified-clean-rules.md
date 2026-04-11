@@ -68,6 +68,7 @@ explicit justification.
 | Forbidden hues (violet/indigo) in components | regex-shell | Pattern `(violet-\|indigo-)`; grep succeeds; zero hits in `src/components/` confirmed via manual grep. |
 | Bare JSON.parse on server | regex-shell | Pattern `JSON\.parse\(`; pathFilter `server/`; 22 exclusions for legitimate non-DB parse sites; zero remaining hits confirmed via manual grep. |
 | Hard-coded studio name | regex-shell | Pattern `hmpsn[ .]studio`; two excludes (`server/constants.ts`, `src/constants.ts`); three excludeLines for SVG alt text; `tests/` dir in EXCLUDED_DIRS so test fixtures don't count; zero hits in scanned dirs. |
+| Unguarded recordAction() call | regex-shell | Pattern `recordAction\s*\(\s*\{`; pathFilter `server/`; `server/outcome-tracking.ts` excluded as the definition site; zero remaining hits confirmed via manual grep. |
 | Local prepared statement caching | regex-shell | Literal `let stmt`; grep succeeds; zero hits outside `server/db/`. |
 | z.array(z.unknown()) on server | regex-shell | Fully-escaped literal `z\.array\(z\.unknown\(\)\)`; exclude list `server/db/json-validation.ts`; grep succeeds. |
 | Bare SUM() without COALESCE in db.prepare | regex-shell | Pattern `(^\|[^(])SUM\(`; standard alternation; grep succeeds; zero hits outside `server/`. |
@@ -98,7 +99,7 @@ explicit justification.
 | Source-sniffing in tests (readFileSync on .ts/.tsx source) | backfill-complete | 37 violations hatched in B4 backfill task with per-hatch justifications; rule now reports ✓ on full-repo scan. |
 | Vacuous .every() in tests (no length guard) | backfill-complete | 91 violations fixed in B5 backfill task. Default fix wrapped each `arr.every(predicate)` in `arr.length > 0 && arr.every(predicate)` so the assertion fails on an empty array instead of vacuously passing. One `// every-ok` hatch in `tests/integration/client-signals-routes.test.ts:57` where vacuous-truthy is intentional. Rule now reports ✓ on full-repo scan. |
 
-**Count: 33 verified-clean rules.**
+**Count: 34 verified-clean rules.**
 
 ---
 

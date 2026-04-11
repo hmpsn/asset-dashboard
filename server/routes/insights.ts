@@ -39,9 +39,9 @@ router.put(
     broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });
     // Record for outcome tracking — only on resolved, not in_progress; idempotent
     try {
-      if (status === 'resolved' && !getActionBySource('insight', req.params.insightId)) {
+      if (workspaceId && status === 'resolved' && !getActionBySource('insight', req.params.insightId)) {
         const insightData = updated.data as Record<string, unknown> | undefined;
-        recordAction({
+        recordAction({ // recordAction-ok: workspaceId guarded by if condition at line 42
           workspaceId,
           actionType: 'insight_acted_on',
           sourceType: 'insight',

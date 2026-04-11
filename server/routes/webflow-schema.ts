@@ -205,7 +205,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     try {
       if (!pubWs) throw new Error('no workspace');
       if (getActionByWorkspaceAndSource(pubWs.id, 'schema', pageId)) throw new Error('already tracked');
-      const schemaAction = recordAction({
+      const schemaAction = recordAction({ // recordAction-ok: pubWs guaranteed non-null by throw guard at line 206
         workspaceId: pubWs.id,
         actionType: 'schema_deployed',
         sourceType: 'schema',

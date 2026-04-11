@@ -74,16 +74,18 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
         const sourceId = rec.page ?? null;
         if (!sourceId) continue;
         if (getActionByWorkspaceAndSource(req.params.workspaceId, 'content_decay', sourceId)) continue;
-        recordAction({
-          workspaceId: req.params.workspaceId,
-          actionType: 'content_refreshed',
-          sourceType: 'content_decay',
-          sourceId,
-          pageUrl: sourceId,
-          targetKeyword: null,
-          baselineSnapshot: { captured_at: new Date().toISOString() },
-          attribution: 'not_acted_on',
-        });
+        if (req.params.workspaceId) {
+          recordAction({ // recordAction-ok: workspaceId guarded by if (req.params.workspaceId)
+            workspaceId: req.params.workspaceId,
+            actionType: 'content_refreshed',
+            sourceType: 'content_decay',
+            sourceId,
+            pageUrl: sourceId,
+            targetKeyword: null,
+            baselineSnapshot: { captured_at: new Date().toISOString() },
+            attribution: 'not_acted_on',
+          });
+        }
       }
     } catch (err) {
       log.warn({ err }, 'Failed to record outcome actions for decay recommendations');
