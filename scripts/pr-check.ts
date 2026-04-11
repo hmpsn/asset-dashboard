@@ -637,22 +637,50 @@ export const CHECKS: Check[] = [
   // ─── New rules (2026-04-10 audit) ───
   {
     name: 'useGlobalAdminEvents import restriction',
-    // Note: only match single-quoted imports. A character class ['"] would
-    // break the double-quoted shell invocation in checkDirectory.
-    pattern: "from '[^']*useGlobalAdminEvents",
+    // customCheck (was regex) — see Round 2 postmortem in
+    // docs/superpowers/plans/2026-04-10-pr-check-audit-and-backfill.md.
+    // The original `pattern: "from '[^']*useGlobalAdminEvents"` caught only
+    // single-quoted imports; a double-quoted importer silently bypassed an
+    // error-severity gate (silent-failure Category B). A regex with
+    // `['"]` can't be passed through `grep -E "..."` because the `"` closes
+    // the outer shell quote, so the only safe fix is a customCheck that
+    // runs the detection as a JS regex in-process.
+    pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
     // Allowlist of audited global-fanout sites. Any new importer must be
-    // reviewed and added here explicitly.
+    // reviewed and added here explicitly. Enforced by resolveCheckFileList.
     exclude: [
       'src/hooks/useGlobalAdminEvents.ts',
       'src/components/WorkspaceOverview.tsx',
       'src/App.tsx',
     ],
     excludeLines: ['// global-events-ok'],
-    message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it. Add // global-events-ok if this file is a legitimate global-fanout site.',
+    message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it. Add // global-events-ok on the import line or the line immediately above if this file is a legitimate global-fanout site.',
     severity: 'error',
     rationale: 'Silent dead broadcast handlers: the frontend never receives the event and the UI appears stale until a manual refetch.',
     claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Match `from '...useGlobalAdminEvents...'` OR
+      //        `from "...useGlobalAdminEvents..."`
+      // Anchoring on `from ['"]` ensures we only flag actual import
+      // statements — bare identifier references, string-literal mentions,
+      // and comments do not trigger. The quote-style class is the whole
+      // point of this fix.
+      const importRe = /from\s+['"][^'"]*useGlobalAdminEvents/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!importRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// global-events-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Global keydown missing isContentEditable guard',

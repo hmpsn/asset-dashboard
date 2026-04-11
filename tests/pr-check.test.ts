@@ -757,6 +757,105 @@ describe('Rule: Layout-driving state set in useEffect', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: useGlobalAdminEvents import restriction
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Silent-failure Category B (regex too narrow). The original regex rule used
+// `from '[^']*useGlobalAdminEvents`, catching only single-quoted imports. A
+// double-quoted import (`from "../hooks/useGlobalAdminEvents"`) slipped past
+// an `error`-severity gate — the exact class of silent false-negative this
+// audit exists to prevent. Round 2 converts the rule to a customCheck so the
+// detection is quote-style-agnostic and cannot be re-broken by a future
+// regex tweak.
+
+describe('Rule: useGlobalAdminEvents import restriction', () => {
+  const RULE = 'useGlobalAdminEvents import restriction';
+
+  it('flags a single-quoted import', () => {
+    const file = write(
+      uniqPath('rule-global-events', 'single-quote.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",  // 1
+        "export function Foo() { useGlobalAdminEvents([]); return null; }",       // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('flags a double-quoted import (the bug being fixed)', () => {
+    // This is the specific silent-failure case: the original regex-only rule
+    // did not match `from "..."` and let every double-quoted importer through.
+    const file = write(
+      uniqPath('rule-global-events', 'double-quote.tsx'),
+      lines(
+        'import { useGlobalAdminEvents } from "../hooks/useGlobalAdminEvents";',  // 1
+        'export function Foo() { useGlobalAdminEvents([]); return null; }',       // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects inline // global-events-ok hatch on the import line', () => {
+    const file = write(
+      uniqPath('rule-global-events', 'hatch-inline.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents'; // global-events-ok",  // 1
+        "export function Foo() { return null; }",                                                     // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('respects // global-events-ok on the preceding line', () => {
+    // Multi-line imports can't fit the hatch inline without breaking syntax,
+    // so the rule must honour a hatch comment on the line immediately above.
+    const file = write(
+      uniqPath('rule-global-events', 'hatch-above.tsx'),
+      lines(
+        "// global-events-ok — audited global-fanout site",                                  // 1
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",             // 2
+        "export function Foo() { return null; }",                                             // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does not flag useWorkspaceEvents imports', () => {
+    const file = write(
+      uniqPath('rule-global-events', 'workspace-events.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",                  // 1
+        "export function Foo({ id }: { id: string }) { useWorkspaceEvents(id, []); return null; }", // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does not flag comments that merely mention useGlobalAdminEvents', () => {
+    // The rule is anchored on `from '/"..."` so a comment or identifier
+    // reference that isn't part of an import statement should not trigger.
+    const file = write(
+      uniqPath('rule-global-events', 'mention-only.tsx'),
+      lines(
+        "// Prefer useWorkspaceEvents over useGlobalAdminEvents in workspace-scoped components.", // 1
+        "const kind: string = 'useGlobalAdminEvents';",                                           // 2
+        "export function Foo() { return null; }",                                                  // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Meta-test: pinned customCheck rule names
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -853,6 +952,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Public-portal mutation without addActivity',
     'broadcastToWorkspace inside bridge callback',
     'Layout-driving state set in useEffect',
+    'useGlobalAdminEvents import restriction',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
