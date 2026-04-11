@@ -979,7 +979,7 @@ export const CHECKS: Check[] = [
     exclude: ['src/App.tsx'],
     excludeLines: ['// keydown-ok'],
     message: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable. Use the pattern from src/App.tsx (check HTMLInputElement/HTMLTextAreaElement/HTMLSelectElement and isContentEditable). Add // keydown-ok if intentional.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Escape/Enter/arrow keys hijack text fields, destroying the user\u2019s typing or closing modals from the wrong event.',
     claudeMdRef: '#uiux-rules-mandatory',
     customCheck: (files) => {
@@ -1042,7 +1042,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/migrations', '__tests__'],
     excludeLines: ['// txn-ok'],
     message: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption. Add // txn-ok on the first prepare line if the pair is intentionally non-atomic.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Partial failure leaves the DB in an inconsistent state; retries then hit PRIMARY KEY violations and permanently block the operation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1115,7 +1115,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// ai-race-ok'],
     message: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put the existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE. Add // ai-race-ok if the handler is provably single-writer.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Two concurrent handlers both observe \u201cno existing row\u201d during the AI call and both INSERT, creating permanent duplicate rows on a logical natural key.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1162,7 +1162,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/migrations'],
     excludeLines: ['// ws-scope-ok'],
     message: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests. Add // ws-scope-ok if the row key is already workspace-unique.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Cross-tenant read or write exposure: a forged row id or misrouted request can touch another workspace\u2019s data if the auth layer is ever compromised.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1316,7 +1316,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/routes/',
     excludeLines: ['// patch-spread-ok'],
     message: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects. Add // patch-spread-ok if no nested objects exist.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn\u2019t mention.',
     claudeMdRef: '#code-conventions',
   },
@@ -1332,7 +1332,7 @@ export const CHECKS: Check[] = [
     // ✓. Self-filtering keeps the rule independent of the file-list pipeline.
     excludeLines: ['// activity-ok'],
     message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed. Add // activity-ok on the router line if this endpoint is intentionally silent (e.g. read-only health probe).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Admins lose visibility into client portal engagement \u2014 writes performed by clients leave no trace in the activity feed.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1377,7 +1377,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// bridge-broadcast-ok'],
     message: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires. Add // bridge-broadcast-ok if the broadcast is genuinely separate from the bridge result.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
