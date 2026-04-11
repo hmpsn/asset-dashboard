@@ -105,7 +105,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
   const actionButton = hasGsc && !showImpact ? (
     <button
       onClick={loadImpact}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-violet-400 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 transition-all"
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-teal-400 bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/20 transition-all"
     >
       <TrendingUp className="w-3 h-3" /> Compare GSC Impact
     </button>
@@ -125,7 +125,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
         <div className="space-y-2">
           {loading ? (
             <div className="flex items-center justify-center py-8 gap-2 text-zinc-500 text-xs">
-              <div className="w-4 h-4 border-2 border-zinc-600 border-t-violet-400 rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-zinc-600 border-t-teal-400 rounded-full animate-spin" />
               Fetching GSC data for comparison...
             </div>
           ) : impact && impact.length > 0 ? (
@@ -181,7 +181,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
         <div className="space-y-1">
           {changes.slice(0, 5).map(c => (
             <div key={c.id} className="flex items-center gap-3 py-1.5">
-              <Pencil className="w-3 h-3 text-violet-400/60 flex-shrink-0" />
+              <Pencil className="w-3 h-3 text-teal-400/60 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <span className="text-[11px] text-zinc-300 truncate block">
                   {c.pageTitle || `/${c.pageSlug}`}
@@ -210,7 +210,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
       <div className="border-t border-zinc-800/50 px-4 pt-3 pb-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
-            <Pencil className="w-3 h-3 text-violet-400" /> SEO Change Tracker
+            <Pencil className="w-3 h-3 text-teal-400" /> SEO Change Tracker
           </span>
           {actionButton}
         </div>
@@ -222,7 +222,7 @@ export function SeoChangeImpact({ workspaceId, hasGsc, embedded }: SeoChangeImpa
   return (
     <SectionCard
       title="SEO Change Tracker"
-      titleIcon={<Pencil className="w-4 h-4 text-violet-400" />}
+      titleIcon={<Pencil className="w-4 h-4 text-teal-400" />}
       action={actionButton}
     >
       {innerContent}

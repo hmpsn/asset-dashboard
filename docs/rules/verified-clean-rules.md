@@ -65,6 +65,7 @@ explicit justification.
 | Rule Name | Verified By | Justification |
 |-----------|-------------|---------------|
 | Purple in client components | regex-shell | Simple literal `purple-`; grep succeeds; zero hits in `src/components/client/` confirmed. |
+| Forbidden hues (violet/indigo) in components | regex-shell | Pattern `(violet-\|indigo-)`; grep succeeds; zero hits in `src/components/` confirmed via manual grep. |
 | Local prepared statement caching | regex-shell | Literal `let stmt`; grep succeeds; zero hits outside `server/db/`. |
 | z.array(z.unknown()) on server | regex-shell | Fully-escaped literal `z\.array\(z\.unknown\(\)\)`; exclude list `server/db/json-validation.ts`; grep succeeds. |
 | Bare SUM() without COALESCE in db.prepare | regex-shell | Pattern `(^\|[^(])SUM\(`; standard alternation; grep succeeds; zero hits outside `server/`. |
@@ -93,7 +94,7 @@ explicit justification.
 | useEffect external-sync dirty guard against the live prop | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Constants in sync (STUDIO_NAME, STUDIO_URL) | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 
-**Count: 28 verified-clean rules.**
+**Count: 29 verified-clean rules.**
 
 ---
 

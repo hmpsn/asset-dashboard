@@ -327,7 +327,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               <button onClick={exportPDF} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors">
                 <Download className="w-3 h-3" /> Export PDF
               </button>
-              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${showVersions ? 'bg-violet-600/20 border-violet-500/30 text-violet-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
+              <button onClick={() => setShowVersions(!showVersions)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${showVersions ? 'bg-teal-600/20 border-teal-500/30 text-teal-300' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
                 <History className="w-3 h-3" /> History
               </button>
               {hasPublishTarget && (post.status === 'approved' || post.status === 'draft' || post.status === 'review') && (
