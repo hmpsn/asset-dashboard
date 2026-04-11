@@ -226,6 +226,12 @@ export type Check = {
   // Metadata consumed by rule-metadata generator (PR C of the pr-check audit)
   rationale?: string;     // 1-sentence explanation of the bug class this prevents
   claudeMdRef?: string;   // anchor/heading in CLAUDE.md, e.g. '#code-conventions'
+  // Optional override for the scope column in docs/rules/automated-rules.md.
+  // Set this when a customCheck self-narrows to a more specific path than
+  // `pathFilter`/`fileGlobs` implies (e.g. public-portal.ts only), so the
+  // generated docs show the actual scan scope instead of the broader
+  // file-resolution scope. Does NOT affect runtime file resolution.
+  displayScope?: string;
   // Optional custom detection function. When present, runCheck uses this
   // instead of the ripgrep path. It receives the resolved file list (absolute
   // or repo-relative paths — matching what the ripgrep path would scan) and
@@ -1335,6 +1341,11 @@ export const CHECKS: Check[] = [
     severity: 'error',
     rationale: 'Admins lose visibility into client portal engagement \u2014 writes performed by clients leave no trace in the activity feed.',
     claudeMdRef: '#code-conventions',
+    // Doc-only: the customCheck below self-filters to this one file via
+    // `endsWith('server/routes/public-portal.ts')`. Without `displayScope`
+    // the generated docs would show `*.ts` (the file-resolution glob),
+    // which is technically accurate but misleading to readers.
+    displayScope: 'server/routes/public-portal.ts',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       // Only scan the one target file (if present).

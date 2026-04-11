@@ -36,7 +36,7 @@ advisory but tracked.
 | 18 | getOrCreate* function returns nullable | error | custom | `server/` | `// getorcreate-nullable-ok` | Dead `if (!result)` guard branches lie to reviewers about the function’s real shape and hide downstream assumptions that would fail on a genuine null. |
 | 19 | Record<string, unknown> in shared/types | error | pattern | `shared/types/` | `// record-unknown-ok` | Producer/consumer drift: field renames and semantic changes compile silently until a runtime bug surfaces in production. |
 | 20 | PATCH spread without nested merge | error | pattern | `server/routes/` | `// patch-spread-ok` | Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn’t mention. |
-| 21 | Public-portal mutation without addActivity | error | custom | `*.ts` | `// activity-ok` | Admins lose visibility into client portal engagement — writes performed by clients leave no trace in the activity feed. |
+| 21 | Public-portal mutation without addActivity | error | custom | `server/routes/public-portal.ts` | `// activity-ok` | Admins lose visibility into client portal engagement — writes performed by clients leave no trace in the activity feed. |
 | 22 | broadcastToWorkspace inside bridge callback | error | custom | `server/` | `// bridge-broadcast-ok` | Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards. |
 
 ---

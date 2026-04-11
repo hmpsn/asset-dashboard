@@ -40,10 +40,19 @@ function describeHatch(check: Check): string {
 }
 
 /**
- * Describe the scope a rule runs against: the pathFilter when present,
- * otherwise the fileGlobs list.
+ * Describe the scope a rule runs against.
+ *
+ * Precedence:
+ *   1. `displayScope` — explicit doc override for customCheck rules that
+ *      self-narrow beyond what pathFilter/fileGlobs imply. This prevents
+ *      the generated docs from showing misleadingly broad scopes like
+ *      `*.ts` when the customCheck only looks at one file.
+ *   2. `pathFilter` — runtime file-list narrowing applied by the runner.
+ *   3. `fileGlobs` — the raw glob list. Fallback when neither override is
+ *      set; accurate for simple pattern-based rules.
  */
 function describeScope(check: Check): string {
+  if (check.displayScope) return check.displayScope;
   if (check.pathFilter) return check.pathFilter;
   return check.fileGlobs.join(', ');
 }
