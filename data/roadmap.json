@@ -711,6 +711,15 @@
           "status": "pending"
         },
         {
+          "id": 586,
+          "title": "Voice authority review follow-ups (5 deferred items from PR #166 review)",
+          "source": "PR #166 scaled-code-review (2026-04-11)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Five deferred findings from the PR #166 scaled code review. Tracked together because they all touch the voice profile subsystem and should be batched: (1) Add try/catch around getVoiceProfile() in buildSeoContext so a read failure doesn't crash the entire prompt-assembly hot path — currently an exception there propagates through every AI endpoint. (2) BrandscriptTab stale-content toast: when a workspace's brandscript is modified in a second tab, the first tab's editor silently clobbers the newer version on save. Needs a last-updated timestamp check + toast offering reload-vs-overwrite. (3) Remove vacuous `if (workspaceId)` guards in seo-context.ts — workspaceId is typed as string and non-null at all call sites, so these guards are dead code that misleads readers into thinking the parameter is optional. (4) Shadow-mode voice parity check is currently skipped when the voice profile is authoritative (see comment in seo-context.ts line ~232) — add a dedicated voice-profile parity field so shadow-mode covers the whole prompt surface. (5) Voice profile auto-creation UX: first GET /api/voice/:id creates a draft profile as a side effect. Move this to an explicit POST on the voice calibration page so the UX is intentional rather than surprising. Full finding text preserved in the PR #166 review thread.",
+          "status": "pending"
+        },
+        {
           "id": 537,
           "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
           "source": "PIE Group 3 code review",
