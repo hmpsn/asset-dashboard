@@ -42,7 +42,7 @@ const MOCK_BRIEF = {
 };
 
 vi.mock('../meeting-brief-generator.js', async () => {
-  const { upsertMeetingBrief } = await import('../meeting-brief-store.js');
+  const { upsertMeetingBrief } = await import('../meeting-brief-store.js'); // dynamic-import-ok
   return {
     generateMeetingBrief: vi.fn(async (workspaceId: string) => {
       const brief = { ...MOCK_BRIEF, workspaceId };
@@ -66,7 +66,7 @@ async function startTestServer(): Promise<{
   baseUrl: string;
   stop: () => void;
 }> {
-  const { createApp } = await import('../app.js');
+  const { createApp } = await import('../app.js'); // dynamic-import-ok
   const app = createApp();
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -138,7 +138,7 @@ describe('Meeting Brief routes', () => {
   });
 
   it('POST /generate returns cached brief with unchanged:true when data has not changed', async () => {
-    const { upsertMeetingBrief } = await import('../meeting-brief-store.js');
+    const { upsertMeetingBrief } = await import('../meeting-brief-store.js'); // dynamic-import-ok
     // Pre-seed a brief so the route has something to return
     const cached = { ...MOCK_BRIEF, workspaceId, situationSummary: 'Cached summary.' };
     upsertMeetingBrief(cached);

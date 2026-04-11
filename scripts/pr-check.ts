@@ -30,10 +30,26 @@ const SCAN_ALL = process.argv.includes('--all');
 
 function getFiles(dir: string, pattern: string): string[] {
   try {
+    // maxBuffer: 50MB. The default 1MB is not enough for `find <repo-root>
+    // -name '*.ts'` which on this codebase returns ~11k absolute paths
+    // totalling ~900KB+ — right at the boundary where ENOBUFS would silently
+    // throw and the catch would return []. That is itself a Category A
+    // silent-failure mode (rule reports ✓ because it received zero files).
+    // 50MB is comfortably above any plausible repo-walk output.
     return execSync(`find "${dir}" -name "${pattern}" -type f 2>/dev/null`, {
-      cwd: ROOT, encoding: 'utf-8',
+      cwd: ROOT,
+      encoding: 'utf-8',
+      maxBuffer: 50 * 1024 * 1024,
     }).trim().split('\n').filter(Boolean);
-  } catch { return []; }
+  } catch (err) {
+    // Surface the error to stderr so silent file-list collapses are visible.
+    // The previous bare `return []` made every getFiles failure look identical
+    // to "directory exists but contains no matches" — the exact silent-failure
+    // class the 2026-04-10 audit was built to catch.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[pr-check] getFiles("${dir}", "${pattern}") failed: ${msg}`);
+    return [];
+  }
 }
 
 // ─── Determine changed files ──────────────────────────────────────────────────
@@ -173,8 +189,15 @@ const GETORCREATE_RETURN_TYPE_LOOKAHEAD = 15;
 /** Max lines to scan after a `router.post/put/patch/delete` call looking
  *  for an `addActivity(` call before we flag the mutation as silent
  *  (public-portal activity rule). Bounded to the next route declaration
- *  so route bodies don't bleed into each other. */
-const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 60;
+ *  so route bodies don't bleed into each other. The 250-line cap is a
+ *  defensive limit for unusually long handlers — public-portal route
+ *  bodies in the wild range from 5 to ~110 lines, with the onboarding
+ *  handler topping out at 101 lines from `router.post(...)` to its
+ *  `addActivity(...)`. The previous 60-line cap silently false-flagged
+ *  it (reported a "silent mutation" even though the call was right
+ *  there, just past the window). 250 leaves comfortable headroom for
+ *  any reasonable future handler. */
+const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 250;
 
 /** Max lines to scan after a `useEffect(` call to brace-balance its body
  *  for the layout-driving-state rule. Acts as a safety net if the brace
@@ -216,20 +239,24 @@ export type Check = {
 // Dynamically build the set of workspace-scoped tables by scanning migration
 // SQL files. A table is considered workspace-scoped if its CREATE TABLE block
 // contains a `workspace_id` column (i.e. the column appears inside the DDL
-// parentheses, not just in an index or a later DML statement).
-// This is more accurate than a hard-coded list and auto-updates as new tables
-// are added via migrations.
-//
-// TODO(pr-b): handle `ALTER TABLE <name> ADD COLUMN workspace_id ...`
-// migrations. A table created without workspace_id and later altered to add
-// one is currently invisible to the ws-scope rule. The backfill PR should
-// scan for `ALTER TABLE (\w+) ADD COLUMN[^;]*workspace_id` and union those
-// table names into `tables` before returning.
-function buildWorkspaceScopedTables(): Set<string> {
-  const migrationsDir = path.join(ROOT, 'server/db/migrations');
+// parentheses, not just in an index or a later DML statement) OR if a later
+// `ALTER TABLE <name> ADD COLUMN workspace_id ...` adds the column after the
+// fact. This is more accurate than a hard-coded list and auto-updates as new
+// tables are added via migrations.
+// Exported so tests can drive it against a fixture migrations dir without
+// polluting the real `server/db/migrations` tree. Production callers go
+// through the cached `workspaceScopedTables()` wrapper which always uses
+// the default `server/db/migrations` location.
+export function buildWorkspaceScopedTables(migrationsDirOverride?: string): Set<string> {
+  const migrationsDir = migrationsDirOverride ?? path.join(ROOT, 'server/db/migrations');
   const files = getFiles(migrationsDir, '*.sql');
   const tables = new Set<string>();
   const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(/i;
+  // Detects `ALTER TABLE <name> ADD COLUMN ... workspace_id ...`. The
+  // `[^;]*` is bounded by the statement terminator so we don't bleed into
+  // a following statement on the same line. `\bworkspace_id\b` ensures
+  // `workspace_id_idx` and similar do not falsely match.
+  const alterRe = /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN[^;]*\bworkspace_id\b/i;
 
   for (const file of files) {
     const content = readFileOrEmpty(file);
@@ -258,6 +285,22 @@ function buildWorkspaceScopedTables(): Set<string> {
       if (hasWorkspaceId) tables.add(tableName);
     }
   }
+
+  // Second-pass: union tables that gain a workspace_id column via
+  // `ALTER TABLE ... ADD COLUMN workspace_id`. A table created without the
+  // column and altered later is otherwise invisible to the ws-scope rule.
+  // No existing migration uses this shape today (verified via prelude grep
+  // in 2026-04-10 audit B9), but the scan is defence-in-depth against
+  // future migrations.
+  for (const file of files) {
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    for (const line of content.split('\n')) {
+      const am = line.match(alterRe);
+      if (am) tables.add(am[1]);
+    }
+  }
+
   return tables;
 }
 
@@ -379,6 +422,57 @@ function findReturnRegionEnd(tail: string): number {
   return tail.length;
 }
 
+/**
+ * Extract the argument substring of the first `db.prepare(...)` call inside
+ * `chunk`. Walks character-by-character starting after the opening `(`,
+ * tracks paren depth, and respects string-literal delimiters (backtick,
+ * single quote, double quote) so a `)` appearing *inside* a SQL string
+ * literal does not prematurely close the call.
+ *
+ * Returns the substring between the opening `(` and the matching `)`. If
+ * no `db.prepare(` is found, returns the original chunk unchanged. If the
+ * call is never closed inside `chunk` (e.g. because the lookahead window
+ * was too short), returns from `(` to end-of-chunk so the downstream regex
+ * still has something to match.
+ *
+ * Replaces the prior `chunk.indexOf(');')` truncation, which silently
+ * dropped half of any SQL containing an inline `);` inside a string
+ * literal — a CHECK constraint, an inline SQL comment, or any string
+ * fragment with `');` would all skip the workspace_id scan and produce
+ * a silent false-negative. The exact failure class documented as
+ * Category C in the 2026-04-10 audit plan.
+ */
+export function extractDbPrepareArg(chunk: string): string {
+  const startIdx = chunk.search(/db\.prepare\s*\(/);
+  if (startIdx === -1) return chunk;
+  let i = chunk.indexOf('(', startIdx);
+  if (i === -1) return chunk;
+  i++; // step past the opening (
+  const argStart = i;
+  let depth = 1;
+  let quote: string | null = null;
+  while (i < chunk.length) {
+    const ch = chunk[i];
+    if (quote) {
+      // Inside a string literal: handle backslash-escapes (\' \" \\ etc.)
+      // and the closing delimiter. We don't parse template-literal
+      // ${...} interpolation — the SQL we care about is plain text and
+      // any embedded JS is irrelevant to paren depth.
+      if (ch === '\\' && i + 1 < chunk.length) { i += 2; continue; }
+      if (ch === quote) quote = null;
+    } else {
+      if (ch === '`' || ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') {
+        depth--;
+        if (depth === 0) return chunk.slice(argStart, i);
+      }
+    }
+    i++;
+  }
+  return chunk.slice(argStart); // never closed within chunk — fall through
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -416,6 +510,19 @@ export const CHECKS: Check[] = [
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
+      'server/semrush.ts', // disk files: SEMRush API usage log + credit log files (not DB columns)
+      'server/providers/dataforseo-provider.ts', // disk files: DataForSEO credit log files (not DB columns)
+      'server/monthly-report.ts', // disk files: sent-report tracking + report output files (not DB columns)
+      'server/competitor-schema.ts', // HTTP fetch response (JSON-LD from HTML) + disk cache file (not DB columns)
+      'server/storage-stats.ts', // disk files: workspace storage stat files (not DB columns)
+      'server/db/migrate-json.ts', // disk files: one-time migration tool reads legacy flat-file JSON stores (not DB columns)
+      'server/db/json-column.ts', // safe JSON column helper — implements the wrapper, not a raw DB read
+      'server/email-queue.ts', // disk file: email queue persistence file (not DB columns)
+      'server/routes/semrush.ts', // disk cache files: SEMRush response cache (not DB columns)
+      'server/routes/reports.ts', // disk files: report output files served via API (not DB columns)
+      'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
+      'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
+      'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -425,6 +532,11 @@ export const CHECKS: Check[] = [
     pattern: 'hmpsn[ .]studio',
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: ['server/constants.ts', 'src/constants.ts'],
+    excludeLines: [
+      'hmpsn-studio-logo-wordmark-white.svg',
+      'alt="hmpsn studio"',
+      'alt="hmpsn.studio"',
+    ],
     message: 'Use the STUDIO_NAME / STUDIO_URL constant from src/constants.ts (frontend) or server/constants.ts (backend).',
     severity: 'error',
   },
@@ -867,7 +979,7 @@ export const CHECKS: Check[] = [
     exclude: ['src/App.tsx'],
     excludeLines: ['// keydown-ok'],
     message: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable. Use the pattern from src/App.tsx (check HTMLInputElement/HTMLTextAreaElement/HTMLSelectElement and isContentEditable). Add // keydown-ok if intentional.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Escape/Enter/arrow keys hijack text fields, destroying the user\u2019s typing or closing modals from the wrong event.',
     claudeMdRef: '#uiux-rules-mandatory',
     customCheck: (files) => {
@@ -930,7 +1042,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/migrations', '__tests__'],
     excludeLines: ['// txn-ok'],
     message: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption. Add // txn-ok on the first prepare line if the pair is intentionally non-atomic.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Partial failure leaves the DB in an inconsistent state; retries then hit PRIMARY KEY violations and permanently block the operation.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1003,7 +1115,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// ai-race-ok'],
     message: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put the existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE. Add // ai-race-ok if the handler is provably single-writer.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Two concurrent handlers both observe \u201cno existing row\u201d during the AI call and both INSERT, creating permanent duplicate rows on a logical natural key.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1050,7 +1162,7 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/migrations'],
     excludeLines: ['// ws-scope-ok'],
     message: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests. Add // ws-scope-ok if the row key is already workspace-unique.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Cross-tenant read or write exposure: a forged row id or misrouted request can touch another workspace\u2019s data if the auth layer is ever compromised.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1065,24 +1177,25 @@ export const CHECKS: Check[] = [
           if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
           if (hasHatch(lines, i, '// ws-scope-ok')) continue;
           // Grab the next WS_SCOPE_SQL_LOOKAHEAD lines to reconstruct the SQL
-          // string; stop at the first line that closes the call with ).
+          // string; the paren-depth tokeniser walks the chunk and returns the
+          // substring inside `db.prepare(...)`, respecting string-literal
+          // delimiters so an inline `);` inside a SQL CHECK constraint or
+          // string fragment does not prematurely close the call. Replaces
+          // the prior `chunk.indexOf(');')` truncation — see
+          // `extractDbPrepareArg` doc comment for the failure class avoided.
           const chunk = lines.slice(i, Math.min(lines.length, i + WS_SCOPE_SQL_LOOKAHEAD)).join('\n');
-          // TODO(pr-b): use a proper tokenizer instead of `indexOf(');')`.
-          // The current scan truncates at the first `);` literal it sees,
-          // which is wrong when that sequence appears *inside* a SQL string
-          // literal (e.g. a CHECK (col IN ('a');b) constraint or a comment
-          // with `);`). No known false-positives today, but the next new
-          // complex UPDATE with a parenthesized sub-expression could
-          // silently drop half the statement and skip the workspace_id scan.
-          const closeIdx = chunk.indexOf(');');
-          const sqlBlob = closeIdx >= 0 ? chunk.slice(0, closeIdx) : chunk;
+          // The tokeniser returns the substring strictly inside the
+          // `db.prepare(` parens — i.e. it has already stripped `db.prepare(`
+          // and the matching `)`. The first non-whitespace character of the
+          // result should therefore be the opening string delimiter.
+          const sqlBlob = extractDbPrepareArg(chunk);
           // Normalise whitespace so regex patterns can match across newlines
           const sql = sqlBlob.replace(/\s+/g, ' ');
-          // Extract the SQL statement inside the template/quote — find the
-          // first backtick/quote after db.prepare( and read up to its match.
-          // Capture the opening delimiter and use \1 backreference so embedded
-          // single quotes inside a backtick string don't truncate the match.
-          const m = sql.match(/db\.prepare\s*\(\s*([`'"])([\s\S]*?)\1/);
+          // Extract the SQL statement inside the template/quote — the arg
+          // begins with a backtick/quote, so anchor at the start of the
+          // (whitespace-stripped) blob. Capture the opening delimiter and use
+          // \1 so embedded different-quote characters don't truncate.
+          const m = sql.match(/^\s*([`'"])([\s\S]*?)\1/);
           const stmt = (m?.[2] ?? '').trim();
           if (!stmt) continue;
           const upper = stmt.toUpperCase();
@@ -1175,7 +1288,10 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'Record<string, unknown> in shared/types',
-    pattern: 'Record<string,\\s*unknown>',
+    // Tolerate flexible spacing: `Record<string,unknown>`, `Record< string , unknown >`,
+    // and `Record<string,  unknown>` all match. A developer using extra
+    // whitespace (or none) must not bypass the rule.
+    pattern: 'Record<\\s*string\\s*,\\s*unknown\\s*>',
     fileGlobs: ['*.ts'],
     pathFilter: 'shared/types/',
     // Grandfather exception: AnalyticsInsight.data is the discriminated-union
@@ -1200,7 +1316,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'server/routes/',
     excludeLines: ['// patch-spread-ok'],
     message: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects. Add // patch-spread-ok if no nested objects exist.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn\u2019t mention.',
     claudeMdRef: '#code-conventions',
   },
@@ -1208,10 +1324,15 @@ export const CHECKS: Check[] = [
     name: 'Public-portal mutation without addActivity',
     pattern: '',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/routes/public-portal.ts',
+    // No `pathFilter` — the customCheck self-filters via an explicit
+    // `endsWith('public-portal.ts')` guard below. A `pathFilter` here would
+    // be a Category A failure waiting to happen: if the resolveCheckFileList
+    // logic ever drifts (e.g. matches by directory prefix instead of full
+    // suffix), the customCheck silently receives an empty array and reports
+    // ✓. Self-filtering keeps the rule independent of the file-list pipeline.
     excludeLines: ['// activity-ok'],
     message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed. Add // activity-ok on the router line if this endpoint is intentionally silent (e.g. read-only health probe).',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Admins lose visibility into client portal engagement \u2014 writes performed by clients leave no trace in the activity feed.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1227,7 +1348,9 @@ export const CHECKS: Check[] = [
       // Find all router.<method>( lines.
       const routeIdx: number[] = [];
       const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
-      lines.forEach((l, i) => { if (routeRe.test(l)) routeIdx.push(i); });
+      for (let i = 0; i < lines.length; i++) {
+        if (routeRe.test(lines[i])) routeIdx.push(i);
+      }
       for (let k = 0; k < routeIdx.length; k++) {
         const start = routeIdx[k];
         if (hasHatch(lines, start, '// activity-ok')) continue;
@@ -1254,7 +1377,7 @@ export const CHECKS: Check[] = [
     ],
     excludeLines: ['// bridge-broadcast-ok'],
     message: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires. Add // bridge-broadcast-ok if the broadcast is genuinely separate from the bridge result.',
-    severity: 'warn',
+    severity: 'error',
     rationale: 'Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards.',
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
@@ -1302,6 +1425,10 @@ export const CHECKS: Check[] = [
           const fileLines = content.split('\n');
           const bodyStartLine = content.slice(0, bodyOpen).split('\n').length;
           const bodyLines = body.split('\n');
+          // TODO: migrate to for...of when refactoring — uses early-exit
+          // returns (`return` inside forEach) which need translating to
+          // `continue`. Mechanically trivial but kept as-is per B9 Step 6's
+          // "skip if early-exit" guidance to minimise risk in this commit.
           bodyLines.forEach((bl, idx) => {
             if (!bl.includes('broadcastToWorkspace(')) return;
             const absLine = bodyStartLine + idx; // 1-indexed file line number

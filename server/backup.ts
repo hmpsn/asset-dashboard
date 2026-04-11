@@ -16,6 +16,7 @@ import Database from 'better-sqlite3';
 import { DATA_BASE, getUploadRoot } from './data-dir.js';
 import db from './db/index.js';
 import { createLogger } from './logger.js';
+import type * as S3Mod from '@aws-sdk/client-s3';
 
 const log = createLogger('backup');
 
@@ -136,7 +137,7 @@ async function uploadToS3(backupDir: string, timestamp: string): Promise<void> {
   const prefix = process.env.BACKUP_S3_PREFIX || 'backups';
 
   // Dynamically import to avoid requiring @aws-sdk/client-s3 when S3 is not configured
-  const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+  const { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand }: typeof S3Mod = await import('@aws-sdk/client-s3'); // dynamic-import-ok
 
   const client = new S3Client({ region });
 

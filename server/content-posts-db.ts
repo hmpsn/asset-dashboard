@@ -161,7 +161,7 @@ const stmts = createStmtCache(() => ({
            published_at = @published_at, published_slug = @published_slug,
            voice_score = @voice_score, voice_feedback = @voice_feedback,
            updated_at = @updated_at
-         WHERE id = @id`,
+         WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
     `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,

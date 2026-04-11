@@ -54,6 +54,9 @@ const stmts = createStmtCache(() => ({
   selectById: db.prepare(
     'SELECT * FROM payments WHERE id = ? AND workspace_id = ?',
   ),
+  selectByIdGlobal: db.prepare(
+    'SELECT * FROM payments WHERE id = ?',
+  ),
   selectBySession: db.prepare(
     'SELECT * FROM payments WHERE workspace_id = ? AND stripe_session_id = ?',
   ),
@@ -74,6 +77,14 @@ const stmts = createStmtCache(() => ({
           paid_at = @paid_at
         WHERE id = @id AND workspace_id = @workspace_id
       `),
+  deleteById: db.prepare(
+    'DELETE FROM payments WHERE id = ? AND workspace_id = ?',
+  ),
+  // Admin-only purge endpoint for revenue analytics: deliberately deletes all
+  // payments across all workspaces to wipe historical data. Scoping to a single
+  // workspace would defeat the purpose.
+  // ws-scope-ok
+  deleteAll: db.prepare('DELETE FROM payments'),
 }));
 
 // --- CRUD ---
@@ -151,12 +162,14 @@ export function listAllPayments(): PaymentRecord[] {
 }
 
 export function deletePayment(id: string): boolean {
-  const result = db.prepare('DELETE FROM payments WHERE id = ?').run(id);
+  const row = stmts().selectByIdGlobal.get(id) as PaymentRow | undefined;
+  if (!row) return false;
+  const result = stmts().deleteById.run(id, row.workspace_id);
   return result.changes > 0;
 }
 
 export function deleteAllPayments(): number {
-  const result = db.prepare('DELETE FROM payments').run();
+  const result = stmts().deleteAll.run();
   return result.changes;
 }
 

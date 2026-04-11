@@ -588,18 +588,27 @@ router.post('/api/public/content-gap-vote/:workspaceId', (req, res) => {
 
   const kw = keyword.toLowerCase().trim();
 
-  if (vote === 'none') {
-    db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ? AND keyword = ?').run(wsId, kw);
-  } else {
-    db.prepare(`
-      INSERT INTO content_gap_votes (workspace_id, keyword, vote, voted_by, updated_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(workspace_id, keyword) DO UPDATE SET
-        vote = excluded.vote,
-        voted_by = excluded.voted_by,
-        updated_at = datetime('now')
-    `).run(wsId, kw, vote, clientPayload?.email || 'client');
-  }
+  // The two write paths below (DELETE for "clear" + INSERT/UPDATE for
+  // "set") are mutually exclusive — only one runs per request — but the
+  // multi-step-txn rule scans by line proximity and can't know that.
+  // Wrapping the if/else in a single db.transaction() satisfies the rule
+  // AND adds defence-in-depth: any future expansion of either branch
+  // (e.g. an audit-log INSERT) inherits atomicity automatically.
+  const recordVote = db.transaction(() => {
+    if (vote === 'none') {
+      db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ? AND keyword = ?').run(wsId, kw);
+    } else {
+      db.prepare(`
+        INSERT INTO content_gap_votes (workspace_id, keyword, vote, voted_by, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(workspace_id, keyword) DO UPDATE SET
+          vote = excluded.vote,
+          voted_by = excluded.voted_by,
+          updated_at = datetime('now')
+      `).run(wsId, kw, vote, clientPayload?.email || 'client');
+    }
+  });
+  recordVote();
 
   addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${kw}`, 'Via client portal');
   res.json({ ok: true });

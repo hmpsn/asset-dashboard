@@ -2013,13 +2013,27 @@ Rules:
       },
       generatedAt: new Date().toISOString(),
     };
-    // Save previous strategy to history (keep last 5)
-    if (ws.keywordStrategy?.generatedAt) {
-      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
-        ws.id, JSON.stringify(ws.keywordStrategy), JSON.stringify(prevPageMapForHistory), ws.keywordStrategy.generatedAt
-      );
-      // Prune old entries, keep last 5
-      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+    // Save previous strategy to history (keep last 5).
+    // Wrapped in db.transaction() so that the INSERT and the prune-DELETE
+    // are atomic — without it, an INSERT that succeeds followed by a
+    // DELETE that fails would leave the table over-quota and the next
+    // generation would re-attempt the same prune on a stale snapshot,
+    // potentially corrupting history ordering for the workspace.
+    // Capture into a local so the closure inside db.transaction() preserves
+    // the narrowed type from the if-guard above (TS can't propagate the
+    // narrowing through the closure boundary on its own).
+    const previousStrategy = ws.keywordStrategy;
+    if (previousStrategy?.generatedAt) {
+      const previousStrategyJson = JSON.stringify(previousStrategy);
+      const previousGeneratedAt = previousStrategy.generatedAt;
+      const saveStrategyHistory = db.transaction(() => {
+        db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
+          ws.id, previousStrategyJson, JSON.stringify(prevPageMapForHistory), previousGeneratedAt
+        );
+        // Prune old entries, keep last 5
+        db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+      });
+      saveStrategyHistory();
     }
 
     updateWorkspace(ws.id, { keywordStrategy });

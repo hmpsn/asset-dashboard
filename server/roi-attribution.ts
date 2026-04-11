@@ -48,6 +48,9 @@ const stmts = createStmtCache(() => ({
     (id, workspace_id, action_type, action_date, page_url, description,
      clicks_before, impressions_before, position_before, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+  // roi_attributions.id is randomUUID() (122-bit entropy) — globally unique, no
+  // cross-workspace collision is possible.
+  // ws-scope-ok
   updateOutcome: db.prepare(`UPDATE roi_attributions
     SET clicks_after = ?, impressions_after = ?, position_after = ?, measured_at = datetime('now')
     WHERE id = ?`),

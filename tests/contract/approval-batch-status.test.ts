@@ -83,8 +83,7 @@ describe('recalcBatchStatus — exhaustive item combinations', () => {
     expect(batch).not.toBeUndefined();
 
     expect(batch!.status).toBe('pending');
-    expect(batch!.items.length).toBeGreaterThan(0);
-    expect(batch!.items.every(i => i.status === 'pending')).toBe(true);
+    expect(batch!.items.length > 0 && batch!.items.every(i => i.status === 'pending')).toBe(true);
   });
 
   // ── 2. [A, P, P] → partial ─────────────────────────────────────────────
@@ -139,8 +138,7 @@ describe('recalcBatchStatus — exhaustive item combinations', () => {
 
     const batch = getBatch(workspaceId, batchId)!;
     expect(batch.status).toBe('approved');
-    expect(batch.items.length).toBeGreaterThan(0);
-    expect(batch.items.every(i => i.status === 'approved')).toBe(true);
+    expect(batch.items.length > 0 && batch.items.every(i => i.status === 'approved')).toBe(true);
   });
 
   // ── 6. [R, R, R] → rejected ────────────────────────────────────────────
@@ -152,8 +150,7 @@ describe('recalcBatchStatus — exhaustive item combinations', () => {
 
     const batch = getBatch(workspaceId, batchId)!;
     expect(batch.status).toBe('rejected');
-    expect(batch.items.length).toBeGreaterThan(0);
-    expect(batch.items.every(i => i.status === 'rejected')).toBe(true);
+    expect(batch.items.length > 0 && batch.items.every(i => i.status === 'rejected')).toBe(true);
   });
 
   // ── 7. [A, R, R] → partial ─────────────────────────────────────────────
@@ -182,8 +179,7 @@ describe('recalcBatchStatus — exhaustive item combinations', () => {
 
     const batch = getBatch(workspaceId, batchId)!;
     expect(batch.status).toBe('applied');
-    expect(batch.items.length).toBeGreaterThan(0);
-    expect(batch.items.every(i => i.status === 'applied')).toBe(true);
+    expect(batch.items.length > 0 && batch.items.every(i => i.status === 'applied')).toBe(true);
   });
 
   // ── 9. [A, App, P] → partial ───────────────────────────────────────────

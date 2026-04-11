@@ -104,11 +104,11 @@ export function listSuggestions(workspaceId: string, field?: 'title' | 'descript
 }
 
 /** Select a variation for a suggestion. */
-export function selectVariation(suggestionId: string, selectedIndex: number): boolean {
+export function selectVariation(workspaceId: string, suggestionId: string, selectedIndex: number): boolean {
   const result = db.prepare(`
     UPDATE seo_suggestions SET selected_index = ?, updated_at = datetime('now')
-    WHERE id = ? AND status = 'pending'
-  `).run(selectedIndex, suggestionId);
+    WHERE id = ? AND workspace_id = ? AND status = 'pending'
+  `).run(selectedIndex, suggestionId, workspaceId);
   return result.changes > 0;
 }
 
@@ -132,13 +132,13 @@ export function getSelectedSuggestions(workspaceId: string): SeoSuggestion[] {
 }
 
 /** Mark suggestions as applied after pushing to Webflow. */
-export function markApplied(suggestionIds: string[]): void {
+export function markApplied(workspaceId: string, suggestionIds: string[]): void {
   if (!suggestionIds.length) return;
   const placeholders = suggestionIds.map(() => '?').join(',');
   db.prepare(`
     UPDATE seo_suggestions SET status = 'applied', updated_at = datetime('now')
-    WHERE id IN (${placeholders})
-  `).run(...suggestionIds);
+    WHERE workspace_id = ? AND id IN (${placeholders})
+  `).run(workspaceId, ...suggestionIds);
 }
 
 /** Dismiss (discard) suggestions. */

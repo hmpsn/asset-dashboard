@@ -115,14 +115,12 @@ describe('isSyntheticCmsId', () => {
 
   it('all CMS test fixtures are synthetic', () => {
     const cmsPages = ALL_PAGES.filter(p => p.source === 'cms');
-    expect(cmsPages.length).toBeGreaterThan(0);
-    expect(cmsPages.every(p => isSyntheticCmsId(p.id))).toBe(true);
+    expect(cmsPages.length > 0 && cmsPages.every(p => isSyntheticCmsId(p.id))).toBe(true);
   });
 
   it('no static test fixtures are synthetic', () => {
     const staticPages = ALL_PAGES.filter(p => p.source !== 'cms');
-    expect(staticPages.length).toBeGreaterThan(0);
-    expect(staticPages.every(p => !isSyntheticCmsId(p.id))).toBe(true);
+    expect(staticPages.length > 0 && staticPages.every(p => !isSyntheticCmsId(p.id))).toBe(true);
   });
 });
 
@@ -131,8 +129,7 @@ describe('isSyntheticCmsId', () => {
 describe('filterWritablePages', () => {
   it('excludes all CMS pages', () => {
     const result = filterWritablePages(ALL_PAGES);
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every(p => p.source !== 'cms')).toBe(true);
+    expect(result.length > 0 && result.every(p => p.source !== 'cms')).toBe(true);
     expect(result.some(p => p.id.startsWith('cms-'))).toBe(false);
   });
 

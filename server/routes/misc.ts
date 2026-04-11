@@ -8,6 +8,9 @@ const router = Router();
 import fs from 'fs';
 import path from 'path';
 import { broadcast } from '../broadcast.js';
+import type * as OpenAIMod from 'openai';
+import type { default as SharpConstructor } from 'sharp';
+import type { execFileSync as ExecFileSyncFn } from 'child_process';
 import { getUploadRoot } from '../data-dir.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { upload, moveUploadedFiles } from '../middleware.js';
@@ -118,7 +121,7 @@ router.post('/api/smart-name', async (req, res) => {
   if (!originalName) return res.status(400).json({ error: 'originalName required' });
 
   try {
-    const OpenAI = (await import('openai')).default;
+    const OpenAI: typeof OpenAIMod.default = (await import('openai')).default; // dynamic-import-ok
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const ext = originalName.split('.').pop()?.toLowerCase() || 'jpg';
@@ -185,7 +188,7 @@ Just output the filename slug, nothing else.`;
     if (imageUrl && !contentType?.includes('svg')) {
       try {
         // Download and prepare image for vision
-        const sharp = (await import('sharp')).default;
+        const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
         const imgRes = await fetch(imageUrl);
         if (imgRes.ok) {
           const imgBuf = Buffer.from(await imgRes.arrayBuffer());
@@ -248,7 +251,7 @@ router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (
 
   try {
     // Resize to 2x for HDPI: halve dimensions so it's crisp at 2x
-    const { execFileSync } = await import('child_process');
+    const { execFileSync }: { execFileSync: typeof ExecFileSyncFn } = await import('child_process'); // dynamic-import-ok
     // Get current dimensions
     const sipsInfo = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', file.path], { encoding: 'utf-8' });
     const widthMatch = sipsInfo.match(/pixelWidth:\s*(\d+)/);

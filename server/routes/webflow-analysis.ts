@@ -249,7 +249,7 @@ router.get('/api/webflow/internal-links/:siteId', requireWorkspaceAccessFromQuer
           const sourceId = suggestion.toPage ?? null;
           if (!sourceId) continue;
           if (getActionByWorkspaceAndSource(workspaceId, 'internal_link', sourceId)) continue;
-          recordAction({
+          recordAction({ // recordAction-ok: workspaceId guarded by if (workspaceId) at line 246
             workspaceId,
             actionType: 'internal_link_added',
             sourceType: 'internal_link',

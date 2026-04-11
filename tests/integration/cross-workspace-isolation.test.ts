@@ -108,8 +108,7 @@ describe('Analytics Insights — cross-workspace isolation', () => {
 
   it('getInsights(wsA) returns the seeded insight', () => {
     const results = getInsights(wsAId);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(i => i.workspaceId === wsAId)).toBe(true);
+    expect(results.length > 0 && results.every(i => i.workspaceId === wsAId)).toBe(true);
   });
 
   it('getInsights(wsB) never contains wsA insight id', () => {
@@ -136,11 +135,9 @@ describe('Analytics Insights — cross-workspace isolation', () => {
     const wsAResults = getInsights(wsAId);
     const wsBResults = getInsights(wsBId);
 
-    expect(wsAResults.length).toBeGreaterThan(0);
-    expect(wsAResults.every(i => i.workspaceId === wsAId)).toBe(true);
+    expect(wsAResults.length > 0 && wsAResults.every(i => i.workspaceId === wsAId)).toBe(true);
 
-    expect(wsBResults.length).toBeGreaterThan(0);
-    expect(wsBResults.every(i => i.workspaceId === wsBId)).toBe(true);
+    expect(wsBResults.length > 0 && wsBResults.every(i => i.workspaceId === wsBId)).toBe(true);
 
     // Workspace IDs must not cross over
     const wsAIds = new Set(wsAResults.map(i => i.id));
@@ -164,8 +161,7 @@ describe('Approval Batches — cross-workspace isolation', () => {
 
   it('listBatches(wsA) returns the seeded batch', () => {
     const results = listBatches(wsAId);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(b => b.workspaceId === wsAId)).toBe(true);
+    expect(results.length > 0 && results.every(b => b.workspaceId === wsAId)).toBe(true);
   });
 
   it('listBatches(wsB) never contains wsA batch id', () => {
@@ -201,8 +197,7 @@ describe('Content Requests — cross-workspace isolation', () => {
 
   it('listContentRequests(wsA) returns the seeded content request', () => {
     const results = listContentRequests(wsAId);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.workspaceId === wsAId)).toBe(true);
+    expect(results.length > 0 && results.every(r => r.workspaceId === wsAId)).toBe(true);
   });
 
   it('listContentRequests(wsB) never contains wsA content request id', () => {
@@ -235,9 +230,8 @@ describe('GET /api/public/insights/:workspaceId — HTTP isolation', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
-    expect(body.length).toBeGreaterThan(0);
     // Every returned insight must belong to wsA
-    expect(body.every((i: { workspaceId: string }) => i.workspaceId === wsAId)).toBe(true);
+    expect(body.length > 0 && body.every((i: { workspaceId: string }) => i.workspaceId === wsAId)).toBe(true);
   });
 
   it('returns 200 and does NOT include wsA insight when querying wsB', async () => {

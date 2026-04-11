@@ -77,7 +77,7 @@ describe('getInsights', () => {
 
     const insights = getInsights(wsId);
     expect(insights.length).toBe(2);
-    expect(insights.every(i => i.workspaceId === wsId)).toBe(true);
+    expect(insights.length > 0 && insights.every(i => i.workspaceId === wsId)).toBe(true);
   });
 
   it('can filter by insightType', () => {

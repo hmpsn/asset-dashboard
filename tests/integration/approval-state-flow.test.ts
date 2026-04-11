@@ -44,8 +44,7 @@ describe('approval state flow — full lifecycle', () => {
     const batch = getBatch(workspaceId, batchId);
     expect(batch).not.toBeNull();
     expect(batch!.status).toBe('pending');
-    expect(batch!.items.length).toBeGreaterThan(0);
-    expect(batch!.items.every(i => i.status === 'pending')).toBe(true);
+    expect(batch!.items.length > 0 && batch!.items.every(i => i.status === 'pending')).toBe(true);
   });
 
   it('approving item 1 sets its status to approved, batch becomes partial', () => {
@@ -163,8 +162,7 @@ describe('approval state flow — batch status derivation', () => {
   it('all pending → batch status is pending', () => {
     const batch = getBatch(workspaceId, batchId);
     expect(batch).not.toBeNull();
-    expect(batch!.items.length).toBeGreaterThan(0);
-    expect(batch!.items.every(i => i.status === 'pending')).toBe(true);
+    expect(batch!.items.length > 0 && batch!.items.every(i => i.status === 'pending')).toBe(true);
     expect(batch!.status).toBe('pending');
   });
 
@@ -210,8 +208,7 @@ describe('approval state flow — batch status derivation', () => {
     // Mark all applied
     const updated = markBatchApplied(workspaceId, batchId, itemIds);
     expect(updated).not.toBeNull();
-    expect(updated!.items.length).toBeGreaterThan(0);
-    expect(updated!.items.every(i => i.status === 'applied')).toBe(true);
+    expect(updated!.items.length > 0 && updated!.items.every(i => i.status === 'applied')).toBe(true);
     expect(updated!.status).toBe('applied');
   });
 
@@ -278,16 +275,14 @@ describe('approval state flow — markBatchApplied', () => {
   it('batch recalculates to applied when all items are applied', () => {
     const updated = markBatchApplied(workspaceId, batchId, [itemIds[2]]);
     expect(updated).not.toBeNull();
-    expect(updated!.items.length).toBeGreaterThan(0);
-    expect(updated!.items.every(i => i.status === 'applied')).toBe(true);
+    expect(updated!.items.length > 0 && updated!.items.every(i => i.status === 'applied')).toBe(true);
     expect(updated!.status).toBe('applied');
   });
 
   it('changes persist across getBatch reads', () => {
     const fresh = getBatch(workspaceId, batchId);
     expect(fresh).not.toBeNull();
-    expect(fresh!.items.length).toBeGreaterThan(0);
-    expect(fresh!.items.every(i => i.status === 'applied')).toBe(true);
+    expect(fresh!.items.length > 0 && fresh!.items.every(i => i.status === 'applied')).toBe(true);
     expect(fresh!.status).toBe('applied');
   });
 });
@@ -350,8 +345,7 @@ describe('approval state flow — concurrent batch isolation', () => {
     expect(batchA!.status).toBe('partial');
     // Batch B should be untouched
     expect(batchB!.status).toBe('pending');
-    expect(batchB!.items.length).toBeGreaterThan(0);
-    expect(batchB!.items.every(i => i.status === 'pending')).toBe(true);
+    expect(batchB!.items.length > 0 && batchB!.items.every(i => i.status === 'pending')).toBe(true);
   });
 
   it('marking batch A applied does not affect batch B', () => {
@@ -365,8 +359,7 @@ describe('approval state flow — concurrent batch isolation', () => {
     expect(batchA!.status).toBe('applied');
     // Batch B must remain untouched
     expect(batchB!.status).toBe('pending');
-    expect(batchB!.items.length).toBeGreaterThan(0);
-    expect(batchB!.items.every(i => i.status === 'pending')).toBe(true);
+    expect(batchB!.items.length > 0 && batchB!.items.every(i => i.status === 'pending')).toBe(true);
   });
 
   it('item IDs from batch A cannot be used to mutate batch B', () => {
@@ -376,7 +369,6 @@ describe('approval state flow — concurrent batch isolation', () => {
 
     // Batch B items remain pending
     const batchB = getBatch(workspaceId, batchIdB);
-    expect(batchB!.items.length).toBeGreaterThan(0);
-    expect(batchB!.items.every(i => i.status === 'pending')).toBe(true);
+    expect(batchB!.items.length > 0 && batchB!.items.every(i => i.status === 'pending')).toBe(true);
   });
 });

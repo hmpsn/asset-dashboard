@@ -74,9 +74,9 @@ const stmts = createStmtCache(() => ({
           priority = @priority, status = @status, submitted_by = @submitted_by,
           page_url = @page_url, page_id = @page_id, attachments = @attachments,
           notes = @notes, updated_at = @updated_at
-        WHERE id = @id
+        WHERE id = @id AND workspace_id = @workspace_id
       `),
-  deleteById: db.prepare('DELETE FROM requests WHERE id = ?'),
+  deleteById: db.prepare('DELETE FROM requests WHERE id = ? AND workspace_id = ?'),
 }));
 
 // ── CRUD ──
@@ -142,9 +142,9 @@ export function createRequest(workspaceId: string, data: {
   return request;
 }
 
-export function updateRequest(id: string, updates: Partial<Pick<ClientRequest, 'status' | 'priority' | 'category'>>): ClientRequest | null {
+export function updateRequest(workspaceId: string, id: string, updates: Partial<Pick<ClientRequest, 'status' | 'priority' | 'category'>>): ClientRequest | null {
   const existing = getRequest(id);
-  if (!existing) return null;
+  if (!existing || existing.workspaceId !== workspaceId) return null;
 
   // Filter out undefined values so we don't overwrite existing fields with NULL
   const cleanUpdates: Record<string, unknown> = {};
@@ -155,6 +155,7 @@ export function updateRequest(id: string, updates: Partial<Pick<ClientRequest, '
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: workspaceId,
     title: merged.title,
     description: merged.description,
     category: merged.category,
@@ -177,9 +178,9 @@ export function getAttachmentsDir(): string {
   return dir;
 }
 
-export function addAttachmentsToRequest(requestId: string, attachments: RequestAttachment[]): ClientRequest | null {
+export function addAttachmentsToRequest(workspaceId: string, requestId: string, attachments: RequestAttachment[]): ClientRequest | null {
   const existing = getRequest(requestId);
-  if (!existing) return null;
+  if (!existing || existing.workspaceId !== workspaceId) return null;
 
   if (!existing.attachments) existing.attachments = [];
   existing.attachments.push(...attachments);
@@ -187,6 +188,7 @@ export function addAttachmentsToRequest(requestId: string, attachments: RequestA
 
   stmts().update.run({
     id: existing.id,
+    workspace_id: workspaceId,
     title: existing.title,
     description: existing.description,
     category: existing.category,
@@ -203,9 +205,9 @@ export function addAttachmentsToRequest(requestId: string, attachments: RequestA
   return existing;
 }
 
-export function addNote(requestId: string, author: 'client' | 'team', content: string, attachments?: RequestAttachment[]): ClientRequest | null {
+export function addNote(workspaceId: string, requestId: string, author: 'client' | 'team', content: string, attachments?: RequestAttachment[]): ClientRequest | null {
   const existing = getRequest(requestId);
-  if (!existing) return null;
+  if (!existing || existing.workspaceId !== workspaceId) return null;
 
   const note: RequestNote = {
     id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -220,6 +222,7 @@ export function addNote(requestId: string, author: 'client' | 'team', content: s
 
   stmts().update.run({
     id: existing.id,
+    workspace_id: workspaceId,
     title: existing.title,
     description: existing.description,
     category: existing.category,
@@ -236,7 +239,7 @@ export function addNote(requestId: string, author: 'client' | 'team', content: s
   return existing;
 }
 
-export function deleteRequest(id: string): boolean {
-  const info = stmts().deleteById.run(id);
+export function deleteRequest(workspaceId: string, id: string): boolean {
+  const info = stmts().deleteById.run(id, workspaceId);
   return info.changes > 0;
 }

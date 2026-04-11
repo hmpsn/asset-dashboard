@@ -28,7 +28,14 @@ import { tmpdir } from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { CHECKS, checkDirectory, type Check, type CustomCheckMatch } from '../scripts/pr-check.js';
+import {
+  CHECKS,
+  checkDirectory,
+  buildWorkspaceScopedTables,
+  extractDbPrepareArg,
+  type Check,
+  type CustomCheckMatch,
+} from '../scripts/pr-check.js';
 
 let TMPDIR: string;
 
@@ -420,6 +427,57 @@ describe('Rule: UPDATE/DELETE missing workspace_id scope', () => {
       )
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  // ── Step 7 regression: paren-depth tokeniser ────────────────────────────
+  //
+  // The original SQL extractor truncated at the first literal `);` it saw,
+  // which is wrong when `);` appears inside a string literal (a CHECK
+  // constraint, an inline SQL fragment, etc.). Replaced in B9 Step 7 with
+  // `extractDbPrepareArg` — a paren-depth tokeniser that respects backtick,
+  // single-quote, and double-quote string boundaries. These tests pin the
+  // exact failure shapes the new tokeniser must handle.
+
+  it('flags UPDATE on a workspace-scoped table even when the SQL contains an inline `);` inside a string literal', () => {
+    // The string fragment "value with ); inside" used to truncate the SQL
+    // blob at the first `);`, leaving only `UPDATE brandscripts SET note = '`
+    // which contains no UPDATE/DELETE keyword and silently bypassed the rule.
+    const file = write(
+      uniqPath('rule-05', 'server/inline-paren.ts'),
+      lines(
+        "import db from './db.js';",
+        "export function update(id: string, note: string) {",
+        "  db.prepare(\"UPDATE brandscripts SET note = 'value with ); inside' WHERE id = ?\").run(id);",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('extractDbPrepareArg returns the full arg when SQL contains nested parens and inline `);`', () => {
+    // Pure-function unit test on the tokeniser itself: assert it walks past
+    // an embedded `);` inside a single-quoted string without prematurely
+    // returning. The arg should be the entire string-literal substring.
+    const chunk = "db.prepare('UPDATE t SET note = '');value('' WHERE id = ?').run(id)";
+    const arg = extractDbPrepareArg(chunk);
+    // The tokeniser should walk past the `);` inside the doubled-single-quote
+    // SQL string and return the full arg up to the matching outer `)`.
+    // We assert the returned slice contains the post-`);` content `value(`,
+    // not just the truncated prefix.
+    expect(arg).toContain('value(');
+    expect(arg).toContain('WHERE id');
+  });
+
+  it('extractDbPrepareArg respects backtick template literals containing `);`', () => {
+    // Backtick templates are the most common multi-line db.prepare shape.
+    // The tokeniser must treat the backtick as a string delimiter so an
+    // embedded `);` inside the SQL does not close the call.
+    const chunk = "db.prepare(`UPDATE t SET note = ');' WHERE id = ?`).run(id)";
+    const arg = extractDbPrepareArg(chunk);
+    expect(arg).toContain('WHERE id');
+    expect(arg.startsWith('`')).toBe(true);
   });
 });
 
@@ -1347,6 +1405,88 @@ describe('Regression: pathFilter can opt into an EXCLUDED_DIRS directory', () =>
     const matches = checkDirectory(scanDir, fakeCheck);
     expect(matches.some((m) => m.includes('real.ts'))).toBe(true);
     expect(matches.some((m) => m.includes('node_modules'))).toBe(false);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// buildWorkspaceScopedTables ALTER TABLE detection (B9 Step 8)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// A table created without `workspace_id` and later altered to add the column
+// is workspace-scoped, but the original CREATE TABLE walker missed it. B9
+// Step 8 added a second-pass scan for `ALTER TABLE ... ADD COLUMN
+// workspace_id ...` statements. These tests pin the contract: the helper
+// must include the altered table in its returned set.
+
+describe('buildWorkspaceScopedTables ALTER TABLE workspace_id detection', () => {
+  it('includes a table that gains workspace_id via ALTER TABLE ADD COLUMN', () => {
+    // Synthetic migrations dir under TMPDIR. The first migration creates a
+    // table without workspace_id; the second adds it via ALTER TABLE.
+    const dir = path.join(TMPDIR, 'alter-table-fixture-1', 'migrations');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, '001_create.sql'),
+      'CREATE TABLE projects (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL\n);\n',
+      'utf-8',
+    );
+    writeFileSync(
+      path.join(dir, '002_alter.sql'),
+      'ALTER TABLE projects ADD COLUMN workspace_id TEXT NOT NULL DEFAULT \'\';\n',
+      'utf-8',
+    );
+    const tables = buildWorkspaceScopedTables(dir);
+    expect(tables.has('projects')).toBe(true);
+  });
+
+  it('does not falsely include tables that have an unrelated ALTER TABLE', () => {
+    const dir = path.join(TMPDIR, 'alter-table-fixture-2', 'migrations');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, '001_create.sql'),
+      'CREATE TABLE logs (\n  id TEXT PRIMARY KEY,\n  message TEXT\n);\n',
+      'utf-8',
+    );
+    writeFileSync(
+      path.join(dir, '002_alter_unrelated.sql'),
+      'ALTER TABLE logs ADD COLUMN level TEXT;\n',
+      'utf-8',
+    );
+    const tables = buildWorkspaceScopedTables(dir);
+    expect(tables.has('logs')).toBe(false);
+  });
+
+  it('does not falsely match `workspace_id_idx` or other token-prefix collisions', () => {
+    // The regex uses \bworkspace_id\b so a column whose name starts with
+    // workspace_id (e.g. workspace_id_legacy) would match, but a different
+    // identifier like workspace_idx must not.
+    const dir = path.join(TMPDIR, 'alter-table-fixture-3', 'migrations');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, '001_create.sql'),
+      'CREATE TABLE events (\n  id TEXT PRIMARY KEY\n);\n',
+      'utf-8',
+    );
+    writeFileSync(
+      path.join(dir, '002_alter_idx.sql'),
+      'ALTER TABLE events ADD COLUMN workspace_idx TEXT;\n',
+      'utf-8',
+    );
+    const tables = buildWorkspaceScopedTables(dir);
+    expect(tables.has('events')).toBe(false);
+  });
+
+  it('still includes tables whose CREATE TABLE block already contains workspace_id', () => {
+    // Sanity: the second-pass ALTER TABLE walk must not regress the
+    // first-pass CREATE TABLE behaviour.
+    const dir = path.join(TMPDIR, 'alter-table-fixture-4', 'migrations');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, '001_create_with_ws.sql'),
+      'CREATE TABLE assets (\n  id TEXT PRIMARY KEY,\n  workspace_id TEXT NOT NULL\n);\n',
+      'utf-8',
+    );
+    const tables = buildWorkspaceScopedTables(dir);
+    expect(tables.has('assets')).toBe(true);
   });
 });
 

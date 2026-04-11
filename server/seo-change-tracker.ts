@@ -61,7 +61,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM seo_changes WHERE workspace_id = ? AND page_id = ? AND changed_at > ? ORDER BY changed_at DESC LIMIT 1`,
   ),
   updateById: db.prepare(
-    `UPDATE seo_changes SET fields = @fields, changed_at = @changed_at WHERE id = @id`,
+    `UPDATE seo_changes SET fields = @fields, changed_at = @changed_at WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   countByWorkspace: db.prepare(
     `SELECT COUNT(*) as cnt FROM seo_changes WHERE workspace_id = ?`,
@@ -118,6 +118,7 @@ export function recordSeoChange(
     event.id = recent.id; // keep original id
     stmts().updateById.run({
       id: event.id,
+      workspace_id: workspaceId,
       fields: JSON.stringify(event.fields),
       changed_at: event.changedAt,
     });

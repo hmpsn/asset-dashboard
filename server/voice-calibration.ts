@@ -260,7 +260,14 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
 
   const system = buildSystemPrompt(workspaceId, 'You are a copywriter matching a specific brand voice. Generate copy that sounds like this brand, not generic marketing language.');
 
+  // This handler is provably single-writer per request. Each call
+  // generates a fresh `cal_<randomUUID>` primary key AFTER the AI
+  // returns, with no existence check beforehand. Two concurrent requests
+  // create two distinct sessions (different random IDs) — there is no
+  // shared natural-key INSERT to race on, so the AI-race pattern doesn't
+  // apply. Sessions are intentionally append-only per call.
   log.info({ workspaceId, promptType }, 'generating calibration variations');
+  // ai-race-ok: see rationale above — single-writer per request via randomUUID PK.
   const text = await callCreativeAI({
     systemPrompt: system,
     userPrompt,

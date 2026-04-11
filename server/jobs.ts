@@ -42,6 +42,9 @@ function insertStmt() {
 let _updateStmt: ReturnType<typeof db.prepare> | null = null;
 function updateStmt() {
   if (!_updateStmt) {
+    // jobs.workspace_id is nullable (some jobs are global). The id is a
+    // randomUUID() (122-bit entropy), so cross-workspace collision is impossible.
+    // ws-scope-ok
     _updateStmt = db.prepare(`
       UPDATE jobs SET status = @status, progress = @progress, total = @total, message = @message, -- status-ok: job progress tracker
         result = @result, error = @error, updated_at = @updatedAt
@@ -54,6 +57,7 @@ function updateStmt() {
 let _deleteStmt: ReturnType<typeof db.prepare> | null = null;
 function deleteStmt() {
   if (!_deleteStmt) {
+    // ws-scope-ok — jobs.id is a randomUUID() (122-bit entropy, globally unique).
     _deleteStmt = db.prepare(`DELETE FROM jobs WHERE id = ?`);
   }
   return _deleteStmt;
@@ -112,6 +116,10 @@ function jobToParams(job: Job) {
 function loadJobsFromDb(): void {
   // Mark any 'running' or 'pending' jobs as interrupted (they can't be resumed after restart)
   const now = new Date().toISOString();
+  // Startup recovery: intentionally global across all workspaces.
+  // Any job left in 'running'/'pending' across the whole DB is unreachable after a
+  // server restart and must be marked as errored regardless of which workspace owns it.
+  // ws-scope-ok
   db.prepare(
     `UPDATE jobs SET status = 'error', error = 'Server restarted — job interrupted', updated_at = ? WHERE status IN ('running', 'pending')`
   ).run(now);

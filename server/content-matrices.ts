@@ -313,10 +313,10 @@ export function updateMatrixCell(
 
   // D7: Mark pending schemas as stale if keyword changes after pre-generation
   if (updates.targetKeyword && updates.targetKeyword !== cell.targetKeyword) {
-    markSchemaStale(cellId);
+    markSchemaStale(workspaceId, cellId);
   }
   if (updates.customKeyword && updates.customKeyword !== cell.customKeyword) {
-    markSchemaStale(cellId);
+    markSchemaStale(workspaceId, cellId);
   }
 
   // D7: Queue schema pre-generation on status transition to brief_generated or approved

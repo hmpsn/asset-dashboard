@@ -54,7 +54,8 @@ describe('GET /api/client-signals/:workspaceId', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
-    expect(body.every((s: { workspaceId: string }) => s.workspaceId !== 'ws-isolation-routes-X')).toBe(true);
+    // every-ok: we're verifying isolation — if body is empty, vacuous truth is correct (no signals from wrong workspace)
+    expect(body.every((s: { workspaceId: string }) => s.workspaceId !== 'ws-isolation-routes-X')).toBe(true); // every-ok
   });
 });
 

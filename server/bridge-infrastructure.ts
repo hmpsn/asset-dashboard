@@ -12,6 +12,8 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import type { FeatureFlagKey } from '../shared/types/feature-flags.js';
+import type * as Broadcast from './broadcast.js';
+import type * as WsEvents from './ws-events.js';
 
 const log = createLogger('bridge-infrastructure');
 
@@ -115,8 +117,8 @@ export async function executeBridge(
     // Auto-broadcast when bridge reports modifications
     if (bridgeResult && typeof bridgeResult === 'object' && 'modified' in bridgeResult && bridgeResult.modified > 0) {
       try {
-        const { broadcastToWorkspace } = await import('./broadcast.js');
-        const { WS_EVENTS } = await import('./ws-events.js');
+        const { broadcastToWorkspace }: typeof Broadcast = await import('./broadcast.js'); // dynamic-import-ok
+        const { WS_EVENTS }: typeof WsEvents = await import('./ws-events.js'); // dynamic-import-ok
         broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: flag });
       } catch (bcErr) {
         log.warn({ flag, workspaceId, err: bcErr }, 'Bridge auto-broadcast failed');

@@ -38,7 +38,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM work_orders WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id`, // status-ok: validateTransition guard in updateWorkOrder()
+    `UPDATE work_orders SET status = @status, assigned_to = @assigned_to, notes = @notes, completed_at = @completed_at, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: validateTransition guard in updateWorkOrder()
   ),
 }));
 
@@ -138,6 +138,7 @@ export function updateWorkOrder(
 
   stmts().update.run({
     id: order.id,
+    workspace_id: workspaceId,
     status: order.status,
     assigned_to: order.assignedTo ?? null,
     notes: order.notes ?? null,

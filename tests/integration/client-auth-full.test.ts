@@ -456,7 +456,7 @@ describe('listClientUsers', () => {
     expect(ids).toContain(b.id);
 
     // SafeClientUser — no passwordHash
-    expect(users.every(u => (u as Record<string, unknown>).passwordHash === undefined)).toBe(true);
+    expect(users.length > 0 && users.every(u => (u as Record<string, unknown>).passwordHash === undefined)).toBe(true);
 
     // Cleanup
     deleteClientUser(a.id);
@@ -483,11 +483,8 @@ describe('listClientUsers', () => {
     const usersA = listClientUsers(wsA);
     const usersB = listClientUsers(wsB);
 
-    expect(usersA.length).toBeGreaterThan(0);
-    expect(usersB.length).toBeGreaterThan(0);
-
-    expect(usersA.every(u => u.workspaceId === wsA)).toBe(true);
-    expect(usersB.every(u => u.workspaceId === wsB)).toBe(true);
+    expect(usersA.length > 0 && usersA.every(u => u.workspaceId === wsA)).toBe(true);
+    expect(usersB.length > 0 && usersB.every(u => u.workspaceId === wsB)).toBe(true);
 
     expect(usersA.find(u => u.id === userB.id)).toBeUndefined();
     expect(usersB.find(u => u.id === userA.id)).toBeUndefined();

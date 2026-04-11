@@ -11,6 +11,7 @@ import {
   dismissAnomaly,
   acknowledgeAnomaly,
   runAnomalyDetection,
+  getAnomalyById,
 } from '../anomaly-detection.js';
 
 // --- Anomaly Detection ---
@@ -28,13 +29,17 @@ router.get('/api/public/anomalies/:workspaceId', (req, res) => {
 });
 
 router.post('/api/anomalies/:anomalyId/dismiss', (req, res) => {
-  const ok = dismissAnomaly(req.params.anomalyId);
+  const anomaly = getAnomalyById(req.params.anomalyId);
+  if (!anomaly) return res.status(404).json({ error: 'Anomaly not found' });
+  const ok = dismissAnomaly(anomaly.workspaceId, req.params.anomalyId);
   if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
   res.json({ dismissed: true });
 });
 
 router.post('/api/anomalies/:anomalyId/acknowledge', (req, res) => {
-  const ok = acknowledgeAnomaly(req.params.anomalyId);
+  const anomaly = getAnomalyById(req.params.anomalyId);
+  if (!anomaly) return res.status(404).json({ error: 'Anomaly not found' });
+  const ok = acknowledgeAnomaly(anomaly.workspaceId, req.params.anomalyId);
   if (!ok) return res.status(404).json({ error: 'Anomaly not found' });
   res.json({ acknowledged: true });
 });

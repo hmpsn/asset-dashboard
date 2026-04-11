@@ -583,7 +583,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         };
         const newStatus = statusMap[subscription.status] || contentSub.status;
         if (newStatus !== contentSub.status) {
-          updateContentSubscription(contentSub.id, { status: newStatus });
+          updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: newStatus });
           _broadcastFn?.(workspaceId, 'content-subscription:updated', { id: contentSub.id, status: newStatus });
         }
       }
@@ -598,7 +598,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       // Check if this is a content subscription
       const contentSub = getContentSubscriptionByStripeId(subscription.id);
       if (contentSub) {
-        updateContentSubscription(contentSub.id, { status: 'cancelled' });
+        updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: 'cancelled' });
         _broadcastFn?.(workspaceId, 'content-subscription:updated', { id: contentSub.id, status: 'cancelled' });
         addActivity(workspaceId, 'content_subscription', 'Content subscription cancelled', '', { subscriptionId: contentSub.id });
         log.info(`Content subscription cancelled: workspace=${workspaceId} sub=${subscription.id}`);
@@ -623,8 +623,8 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (contentSub) {
         const periodStart = new Date().toISOString();
         const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        resetPeriod(contentSub.id, periodStart, periodEnd);
-        updateContentSubscription(contentSub.id, { status: 'active' });
+        resetPeriod(contentSub.workspaceId, contentSub.id, periodStart, periodEnd);
+        updateContentSubscription(contentSub.workspaceId, contentSub.id, { status: 'active' });
         _broadcastFn?.(workspaceId, 'content-subscription:renewed', { id: contentSub.id });
         log.info(`Content subscription renewed: workspace=${workspaceId} sub=${subId}`);
       }

@@ -44,7 +44,14 @@ describe('Admin storage stats', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('totalBytes');
-  }, 15_000); // getStorageReport() recursively scans the data directory
+    // 60s timeout: getStorageReport() does ~20k synchronous stat() syscalls on
+    // a typical dev machine's ~/.asset-dashboard (1GB+ across 20k+ files). The
+    // previous 15s bound passed in CI (empty data dir) but tripped on real dev
+    // machines. The route itself is genuinely slow — the long-term fix is to
+    // make `getStorageReport()` async or to expose a `?lite=true` summary mode
+    // that skips the per-category breakdown. Until then, this generous bound
+    // keeps the smoke test stable for any contributor running locally.
+  }, 60_000);
 });
 
 describe('Admin storage pruning', () => {

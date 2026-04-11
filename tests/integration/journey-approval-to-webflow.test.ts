@@ -165,17 +165,16 @@ describe('Journey: Approval-to-Webflow Publish', () => {
 
     // Step 1: Create batch with 3 SEO title items
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Titles Batch', makeItems(3));
+    expect(batch.items.length > 0 && batch.items.every(i => i.status === 'pending')).toBe(true);
     expect(batch.items).toHaveLength(3);
     expect(batch.status).toBe('pending');
-    expect(batch.items.every(i => i.status === 'pending')).toBe(true);
 
     // Step 2: Approve all 3 items
     for (const item of batch.items) {
       updateItem(ws.workspaceId, batch.id, item.id, { status: 'approved' });
     }
     const afterApprove = getBatch(ws.workspaceId, batch.id)!;
-    expect(afterApprove.items.length).toBeGreaterThan(0);
-    expect(afterApprove.items.every(i => i.status === 'approved')).toBe(true);
+    expect(afterApprove.items.length > 0 && afterApprove.items.every(i => i.status === 'approved')).toBe(true);
     expect(afterApprove.status).toBe('approved');
 
     // Step 3: Run apply loop
@@ -185,13 +184,13 @@ describe('Journey: Approval-to-Webflow Publish', () => {
 
     // Step 4: Verify all 3 succeeded
     expect(appliedIds).toHaveLength(3);
+    expect(results.length > 0 && results.every(r => r.success)).toBe(true);
     expect(results).toHaveLength(3);
-    expect(results.every(r => r.success)).toBe(true);
 
     // Step 5: DB verification — all items 'applied', batch status 'applied'
     const final = getBatch(ws.workspaceId, batch.id)!;
+    expect(final.items.length > 0 && final.items.every(i => i.status === 'applied')).toBe(true);
     expect(final.items).toHaveLength(3);
-    expect(final.items.every(i => i.status === 'applied')).toBe(true);
     expect(final.status).toBe('applied');
   });
 
@@ -295,14 +294,12 @@ describe('Journey: Approval-to-Webflow Publish', () => {
     );
 
     expect(appliedIds).toHaveLength(0);
+    expect(results.length > 0 && results.every(r => r.success === false)).toBe(true);
     expect(results).toHaveLength(3);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.success === false)).toBe(true);
 
     // DB: no items applied
     const final = getBatch(ws.workspaceId, batch.id)!;
-    expect(final.items.length).toBeGreaterThan(0);
-    expect(final.items.every(i => i.status === 'approved')).toBe(true);
+    expect(final.items.length > 0 && final.items.every(i => i.status === 'approved')).toBe(true);
     expect(final.status).not.toBe('applied');
   });
 

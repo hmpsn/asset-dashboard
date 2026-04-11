@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 const loadSource = async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  return fs.readFileSync(
+  return fs.readFileSync( // readFile-ok — wiring guard: asserts slice assemblers reference the required modules (cannibalization-detection, content-decay, site-architecture, page-keywords, schema-validator) so mini-builder functions receive correct data.
     path.resolve(import.meta.dirname, '../server/workspace-intelligence.ts'),
     'utf-8',
   );

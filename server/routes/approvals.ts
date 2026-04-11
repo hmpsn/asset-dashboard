@@ -4,6 +4,8 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import type * as EmailTemplates from '../email-templates.js';
+import type * as Email from '../email.js';
 const router = Router();
 
 import { addActivity } from '../activity-log.js';
@@ -149,8 +151,8 @@ router.post('/api/approvals/:workspaceId/:batchId/remind', requireWorkspaceAcces
   }
 
   try {
-    const { renderApprovalReminder } = await import('../email-templates.js');
-    const { isEmailConfigured, sendEmail } = await import('../email.js');
+    const { renderApprovalReminder }: typeof EmailTemplates = await import('../email-templates.js'); // dynamic-import-ok
+    const { isEmailConfigured, sendEmail }: typeof Email = await import('../email.js'); // dynamic-import-ok
     if (!isEmailConfigured()) return res.status(400).json({ error: 'Email not configured' });
     const { subject, html } = renderApprovalReminder({ workspaceName: ws.name, batchName: batch.name, pendingCount: pendingItems.length, staleDays, dashboardUrl: dashUrl });
     await sendEmail(ws.clientEmail, subject, html);

@@ -65,6 +65,9 @@ const stmts = createStmtCache(() => ({
   selectById: db.prepare(`
     SELECT * FROM client_signals WHERE id = ?
   `),
+  // client_signals.id is randomUUID() (122-bit entropy) — globally unique, no
+  // cross-workspace collision is possible.
+  // ws-scope-ok
   updateStatus: db.prepare(`
     UPDATE client_signals
     SET status = ?, updated_at = ? -- status-ok: simple new/acknowledged/resolved lifecycle

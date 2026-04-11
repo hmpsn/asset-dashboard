@@ -99,7 +99,7 @@ describe('getWorkspaceAllPages', () => {
     ] as any);
     const pages = await getWorkspaceAllPages('ws-1', 'site-1');
     expect(pages).toHaveLength(2);
-    expect(pages.every((p: any) => p.draft !== true)).toBe(true);
+    expect(pages.length > 0 && pages.every((p: any) => p.draft !== true)).toBe(true);
   });
 
   it('excludes archived pages', async () => {

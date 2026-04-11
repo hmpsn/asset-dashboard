@@ -18,6 +18,11 @@ import type { PageKeywordMap } from '../shared/types/workspace.js';
 import type { ContentBrief, GeneratedPost } from '../shared/types/content.js';
 import type { SeoIssue } from './audit-page.js';
 import { getValidation } from './schema-validator.js';
+import type * as Workspaces from './workspaces.js';
+import type * as Reports from './reports.js';
+import type * as PageKeywords from './page-keywords.js';
+import type * as ContentBriefMod from './content-brief.js';
+import type * as ContentPostsDb from './content-posts-db.js';
 
 const log = createLogger('insight-enrichment');
 
@@ -411,8 +416,8 @@ async function buildAuditIssuesMap(workspaceId: string): Promise<Map<string, str
 
   try {
     // Dynamic imports to avoid circular deps
-    const { getWorkspace } = await import('./workspaces.js');
-    const { getLatestSnapshot } = await import('./reports.js');
+    const { getWorkspace }: typeof Workspaces = await import('./workspaces.js'); // dynamic-import-ok
+    const { getLatestSnapshot }: typeof Reports = await import('./reports.js'); // dynamic-import-ok
 
     const workspace = getWorkspace(workspaceId);
     if (!workspace?.webflowSiteId) return map;
@@ -484,7 +489,7 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
 
   // Load page keywords (title map + strategy page map)
   try {
-    const { listPageKeywords } = await import('./page-keywords.js');
+    const { listPageKeywords }: typeof PageKeywords = await import('./page-keywords.js'); // dynamic-import-ok
     const entries = listPageKeywords(workspaceId);
     for (const entry of entries) {
       if (entry.pageTitle) {
@@ -498,7 +503,7 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
 
   // Load briefs using dynamic import to avoid circular deps
   try {
-    const briefMod = await import('./content-brief.js');
+    const briefMod: typeof ContentBriefMod = await import('./content-brief.js'); // dynamic-import-ok
     briefs = briefMod.listBriefs(workspaceId);
   } catch (err) {
     log.warn({ workspaceId, err }, 'content-brief unavailable for enrichment context');
@@ -506,7 +511,7 @@ export async function buildEnrichmentContext(workspaceId: string): Promise<Enric
 
   // Load posts using dynamic import to avoid circular deps
   try {
-    const postsMod = await import('./content-posts-db.js');
+    const postsMod: typeof ContentPostsDb = await import('./content-posts-db.js'); // dynamic-import-ok
     posts = postsMod.listPosts(workspaceId);
   } catch (err) {
     log.warn({ workspaceId, err }, 'content-posts-db unavailable for enrichment context');
