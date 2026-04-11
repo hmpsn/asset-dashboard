@@ -1274,4 +1274,38 @@ describe('Meta: customCheck rule name registry', () => {
     // regressions — the fix is to update both sides in the same commit.
     expect(actual).toEqual(EXPECTED_CUSTOM_CHECK_RULES);
   });
+
+  // P1.4 load-bearing gate: the hardcoded EXPECTED_CUSTOM_CHECK_RULES list
+  // above pins rule names, but it doesn't verify that a `describe('Rule: X',
+  // ...)` block actually exists for each one. Without this check, a
+  // reviewer could add a rule name to the registry without writing the
+  // fixture tests, and the harness would silently pass on an empty
+  // expectation. This test reads the test file and grep-matches for a
+  // describe heading per customCheck rule, failing with an explicit
+  // missing-rule list if any rule lacks coverage.
+  it('every customCheck rule has a `describe(\'Rule: <name>\', ...)` block in this file', async () => {
+    const { readFileSync } = await import('fs');
+    const selfPath = new URL(import.meta.url).pathname;
+    const src = readFileSync(selfPath, 'utf-8');
+    const customCheckRules = CHECKS
+      .filter((c) => typeof c.customCheck === 'function')
+      .map((c) => c.name);
+    const missing: string[] = [];
+    for (const name of customCheckRules) {
+      // Match `describe('Rule: <name>'` with either quote style. The
+      // single/double quote is an author preference; neither is wrong.
+      const singleQ = `describe('Rule: ${name}'`;
+      const doubleQ = `describe("Rule: ${name}"`;
+      if (!src.includes(singleQ) && !src.includes(doubleQ)) {
+        missing.push(name);
+      }
+    }
+    if (missing.length > 0) {
+      throw new Error(
+        `The following customCheck rules have no fixture describe block:\n  - ${missing.join('\n  - ')}\n\n` +
+        `Fix: add \`describe('Rule: <name>', () => { ... })\` in tests/pr-check.test.ts with at least ` +
+        `a trigger, a negative, an inline hatch, and an above-line hatch test.`,
+      );
+    }
+  });
 });
