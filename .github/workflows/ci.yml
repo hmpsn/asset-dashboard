@@ -44,3 +44,15 @@ jobs:
 
       - name: PR checks
         run: npm run pr-check
+
+      # Regenerate docs/rules/automated-rules.md from the CHECKS array in
+      # scripts/pr-check.ts and fail if the committed file drifts. This is
+      # how CLAUDE.md stays de-duped from the rule engine — see PR C of the
+      # 2026-04-10 pr-check audit plan.
+      - name: Verify automated-rules.md is in sync
+        run: |
+          npm run rules:generate
+          if ! git diff --exit-code docs/rules/automated-rules.md; then
+            echo "::error::docs/rules/automated-rules.md is out of sync. Run 'npm run rules:generate' and commit the result."
+            exit 1
+          fi
