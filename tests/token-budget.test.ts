@@ -16,6 +16,7 @@ function makeLargeIntelligence(): WorkspaceIntelligence {
     seoContext: {
       strategy: undefined,
       brandVoice: 'Professional and authoritative voice that conveys expertise in all digital marketing areas.',
+      effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional and authoritative voice that conveys expertise in all digital marketing areas.',
       businessContext: 'Enterprise B2B SaaS company serving Fortune 500 marketing teams with comprehensive analytics.',
       personas: [
         { name: 'Marketing Maya', role: 'CMO', description: 'C-level executive focused on brand growth and market positioning' },

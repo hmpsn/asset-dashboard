@@ -30,7 +30,7 @@ import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './seo-context.js';
-import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -329,7 +329,8 @@ export async function assembleAdminContext(
 
   const keywordBlock = formatKeywordsForPrompt(seoCtx);
   const strategy = seoCtx?.strategy;
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seoCtx?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seoCtx?.effectiveBrandVoiceBlock ?? '';
   const bizCtx = seoCtx?.businessContext ?? '';
   const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
   const personasContext = formatPersonasForPrompt(seoCtx?.personas);

@@ -111,14 +111,22 @@ export function buildSeoContext(
     const brandscriptBlock = buildBrandscriptContext(workspaceId);
     const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
     const identityBlock = buildIdentityContext(workspaceId);
-    // When ANY voice profile exists (even calibrated-but-empty), we must not
-    // fall back to the legacy `brandVoiceBlock` — that would put two
-    // potentially contradictory voice sources in front of the model
-    // simultaneously (the legacy block in the user prompt, the calibrated
-    // DNA/guardrails in the system prompt via Layer 2). The voice profile
-    // is the single source of truth once it exists.
-    const hasVoiceProfile = getVoiceProfile(workspaceId) !== null;
-    const effectiveBrandVoice = hasVoiceProfile ? voiceProfileBlock : brandVoiceBlock;
+    // A voice profile is "authoritative" (replaces the legacy brandVoiceBlock)
+    // only when either:
+    //   (a) status === 'calibrated' — buildSystemPrompt Layer 2 injects voice
+    //       DNA + guardrails into the SYSTEM prompt, and we must not also
+    //       emit the legacy block in the USER prompt (two contradictory
+    //       voice sources in front of the model), OR
+    //   (b) the rendered voiceProfileBlock is non-empty — the profile has
+    //       real content (DNA/samples/guardrails while not yet calibrated)
+    //       and should take over from the legacy block.
+    // A fresh draft profile auto-created on GET /api/voice/:id produces an
+    // empty block and is NOT calibrated, so it correctly falls through to
+    // the legacy block — admins keep their existing brand voice text + uploaded
+    // brand-docs until they actually configure the new profile.
+    const profile = getVoiceProfile(workspaceId);
+    const voiceProfileActive = profile !== null && (profile.status === 'calibrated' || voiceProfileBlock.length > 0);
+    const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
     const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
     // Inject workspace learnings if feature is enabled
     if (isFeatureEnabled('outcome-ai-injection')) {
@@ -169,10 +177,14 @@ export function buildSeoContext(
   const brandscriptBlock = buildBrandscriptContext(workspaceId);
   const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
   const identityBlock = buildIdentityContext(workspaceId);
-  // See note above: a voice profile, once it exists, is the ONLY voice source.
-  // Legacy `brandVoiceBlock` is used solely when no profile exists at all.
-  const hasVoiceProfile = getVoiceProfile(workspaceId) !== null;
-  const effectiveBrandVoice = hasVoiceProfile ? voiceProfileBlock : brandVoiceBlock;
+  // See authority rules on the `!strategy` branch above — same logic applies
+  // here: calibrated profile OR non-empty voiceProfileBlock replaces legacy;
+  // everything else falls through to the legacy brandVoiceBlock so admins
+  // with existing brand voice content keep seeing it until the new profile
+  // has real configuration.
+  const profile = getVoiceProfile(workspaceId);
+  const voiceProfileActive = profile !== null && (profile.status === 'calibrated' || voiceProfileBlock.length > 0);
+  const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
   const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
   // Inject workspace learnings if feature is enabled
   if (isFeatureEnabled('outcome-ai-injection')) {
@@ -208,13 +220,19 @@ export function buildSeoContext(
           // So we compare raw-to-raw (getRawBrandVoice vs intel.seoContext.brandVoice)
           // — this validates that the assembler reads from the same source data,
           // NOT that it produces the effective brand voice that ultimately ends
-          // up in `result.brandVoiceBlock` / `fullContext`. When a calibrated
-          // voice profile exists, the effective voice is sourced from
-          // `buildVoiceProfileContext()` instead of the raw legacy block, and
-          // the intelligence assembler does not yet expose an equivalent field
-          // — so the raw-source check is skipped on those workspaces to avoid
-          // logging an unrelated parity issue as a real mismatch.
-          const voiceProfileActive = buildVoiceProfileContext(workspaceId).length > 0;
+          // up in `result.brandVoiceBlock` / `fullContext`. When the voice
+          // profile is authoritative (calibrated, OR non-empty block), the
+          // effective voice is sourced from `buildVoiceProfileContext()` instead
+          // of the raw legacy block, and the intelligence assembler does not yet
+          // expose an equivalent field — so the raw-source check is skipped on
+          // those workspaces to avoid logging an unrelated parity issue as a
+          // real mismatch. The derivation matches the prompt-path check above
+          // so shadow-mode and prompt-assembly stay in sync on what "voice
+          // profile active" means.
+          const shadowProfile = getVoiceProfile(workspaceId);
+          const voiceProfileActive =
+            shadowProfile !== null &&
+            (shadowProfile.status === 'calibrated' || buildVoiceProfileContext(workspaceId).length > 0);
           const comparisonFields: { name: string; match: boolean }[] = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
             { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },

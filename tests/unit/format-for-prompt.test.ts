@@ -15,6 +15,7 @@ const richIntelligence: WorkspaceIntelligence = {
   seoContext: {
     strategy: undefined,
     brandVoice: 'Professional, authoritative, data-driven',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional, authoritative, data-driven',
     businessContext: 'SEO agency serving mid-market B2B companies',
     personas: [],
     knowledgeBase: 'We specialize in technical SEO and content strategy.',

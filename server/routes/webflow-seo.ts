@@ -15,7 +15,7 @@ import {
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
 import {
@@ -75,7 +75,8 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
   const rewriteIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext', 'pageProfile'], pagePath: pagePath || undefined });
   const rewriteSeo = rewriteIntel.seoContext;
   const keywordContext = formatKeywordsForPrompt(rewriteSeo);
-  const brandVoiceBlock = formatBrandVoiceForPrompt(rewriteSeo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = rewriteSeo?.effectiveBrandVoiceBlock ?? '';
   const personasBlock = formatPersonasForPrompt(rewriteSeo?.personas ?? []);
   const knowledgeBlock = formatKnowledgeBaseForPrompt(rewriteSeo?.knowledgeBase);
 
@@ -461,7 +462,8 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
         if (kw) bulkFixSeo.pageKeywords = kw;
       }
       const keywordBlock = formatKeywordsForPrompt(bulkFixSeo);
-      const bvBlock = formatBrandVoiceForPrompt(bulkFixSeo?.brandVoice);
+      // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+      const bvBlock = bulkFixSeo?.effectiveBrandVoiceBlock ?? '';
       const bulkPersonasBlock = formatPersonasForPrompt(bulkFixSeo?.personas ?? []);
       const bulkKnowledgeBlock = formatKnowledgeBaseForPrompt(bulkFixSeo?.knowledgeBase);
 
@@ -686,7 +688,8 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
         if (kw) rwSeo.pageKeywords = kw;
       }
       const keywordBlock = formatKeywordsForPrompt(rwSeo);
-      const bvBlock = formatBrandVoiceForPrompt(rwSeo?.brandVoice);
+      // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+      const bvBlock = rwSeo?.effectiveBrandVoiceBlock ?? '';
       const rwPersonasBlock = formatPersonasForPrompt(rwSeo?.personas ?? []);
       const rwKnowledgeBlock = formatKnowledgeBaseForPrompt(rwSeo?.knowledgeBase);
       // pageProfile is page-specific — assemble per page then merge with hoisted intel
@@ -1008,7 +1011,8 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
   const copyIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath });
   const copySeo = copyIntel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(copySeo);
-  const brandVoiceBlock = formatBrandVoiceForPrompt(copySeo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = copySeo?.effectiveBrandVoiceBlock ?? '';
   const kwMapContext = formatPageMapForPrompt(copySeo);
 
   // If no page content was passed, try to fetch it from the live site

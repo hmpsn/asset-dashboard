@@ -108,3 +108,94 @@ describe('buildWorkspaceIntelligence', () => {
     expect(result.insights!.all[0].impactScore).toBe(149);
   });
 });
+
+describe('assembleSeoContext — voice profile authority on intelligence path', () => {
+  /**
+   * Regression test for the "intelligence path is blind to voice profiles" bug.
+   *
+   * Before the fix: `SeoContextSlice.brandVoice` held the raw legacy `workspace.brandVoice`
+   * via `getRawBrandVoice()`. 12 caller sites across content-brief, internal-links,
+   * aeo-page-review, webflow-seo, rewrite-chat, jobs, and admin-chat-context formatted
+   * it via `formatBrandVoiceForPrompt(seo?.brandVoice)` — completely bypassing the voice
+   * profile authority logic in `buildSeoContext`. Result: for non-calibrated workspaces
+   * the entire voice profile feature (DNA, samples, guardrails) was invisible to the AI
+   * on those code paths; for calibrated workspaces the legacy block contradicted Layer 2.
+   *
+   * Fix: `assembleSeoContext` now also sets `effectiveBrandVoiceBlock` from
+   * `ctx.brandVoiceBlock`, which is the already-computed authority-applied block from
+   * `buildSeoContext`. Callers migrate from `formatBrandVoiceForPrompt(seo?.brandVoice)`
+   * to `seo?.effectiveBrandVoiceBlock ?? ''`.
+   *
+   * This test asserts the wiring at the assembler layer. The authority logic itself is
+   * covered by tests/unit/seo-context-voice-profile.test.ts against a real DB.
+   */
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetInsights.mockReturnValue([]);
+    mockGetLearnings.mockReturnValue(null);
+  });
+
+  it('copies buildSeoContext.brandVoiceBlock into seoContext.effectiveBrandVoiceBlock', async () => {
+    const AUTHORITY_BLOCK = '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nSentinel legacy voice for wiring check';
+    mockBuildSeoContext.mockReturnValue({
+      strategy: undefined,
+      brandVoiceBlock: AUTHORITY_BLOCK,
+      businessContext: '',
+      personasBlock: '',
+      knowledgeBlock: '',
+      keywordBlock: '',
+      fullContext: '',
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-voice-1', { slices: ['seoContext'] });
+
+    expect(result.seoContext).toBeDefined();
+    expect(result.seoContext!.effectiveBrandVoiceBlock).toBe(AUTHORITY_BLOCK);
+  });
+
+  it('returns empty effectiveBrandVoiceBlock when buildSeoContext returns empty (no legacy, no profile)', async () => {
+    // Silent-drop regression guard: when the whole voice system is empty the field must
+    // still exist as a string — not undefined, not missing — so caller sites can safely
+    // do `seo?.effectiveBrandVoiceBlock ?? ''` without TypeScript gymnastics.
+    mockBuildSeoContext.mockReturnValue({
+      strategy: undefined,
+      brandVoiceBlock: '',
+      businessContext: '',
+      personasBlock: '',
+      knowledgeBlock: '',
+      keywordBlock: '',
+      fullContext: '',
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-voice-2', { slices: ['seoContext'] });
+
+    expect(result.seoContext).toBeDefined();
+    expect(typeof result.seoContext!.effectiveBrandVoiceBlock).toBe('string');
+    expect(result.seoContext!.effectiveBrandVoiceBlock).toBe('');
+  });
+
+  it('passes buildSeoContext.brandVoiceBlock through unchanged (no re-formatting at assembler layer)', async () => {
+    // This test verifies the assembler's passthrough contract only — it does NOT
+    // exercise the calibration authority logic itself. buildSeoContext is fully
+    // mocked here, so whatever it returns (calibrated or legacy format) must reach
+    // the slice byte-for-byte. Real calibration authority is covered end-to-end in
+    // tests/unit/seo-context-voice-profile.test.ts against a real DB.
+    const CALIBRATED_BLOCK = '\n\nBRAND VOICE REFERENCE (samples):\n- Sentinel calibrated sample';
+    mockBuildSeoContext.mockReturnValue({
+      strategy: undefined,
+      brandVoiceBlock: CALIBRATED_BLOCK,
+      businessContext: '',
+      personasBlock: '',
+      knowledgeBlock: '',
+      keywordBlock: '',
+      fullContext: '',
+    } as any);
+
+    const result = await buildWorkspaceIntelligence('ws-voice-3', { slices: ['seoContext'] });
+
+    expect(result.seoContext!.effectiveBrandVoiceBlock).toBe(CALIBRATED_BLOCK);
+    // And the raw brandVoice field (which used to be the only field) is still separate
+    // — callers that need the pre-authority text can still reach it.
+    expect(result.seoContext!.brandVoice).toBe('');
+  });
+});

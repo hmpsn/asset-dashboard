@@ -42,6 +42,7 @@ function makeSeoContext(): SeoContextSlice {
   return {
     strategy: undefined,
     brandVoice: 'Bold and data-driven',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nBold and data-driven',
     businessContext: 'B2B SaaS analytics company',
     personas: [
       { id: 'p1', name: 'Marketing Maya', description: 'Growth marketer', painPoints: ['attribution'], goals: ['ROI'], objections: [] },

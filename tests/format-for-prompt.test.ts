@@ -18,6 +18,7 @@ function makeSeoContext(): SeoContextSlice {
   return {
     strategy: undefined,
     brandVoice: 'Professional and authoritative',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional and authoritative',
     businessContext: 'Enterprise SaaS analytics platform',
     personas: [
       { name: 'Marketing Maya', description: 'Experienced marketer focused on growth', id: 'p1', painPoints: [], goals: [], objections: [] },
@@ -316,6 +317,7 @@ describe('formatForPrompt', () => {
         seoContext: {
           strategy: undefined,
           brandVoice: '',
+          effectiveBrandVoiceBlock: '',
           businessContext: '',
           personas: [],
           knowledgeBase: '',
