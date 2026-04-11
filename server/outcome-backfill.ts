@@ -94,9 +94,8 @@ export function backfillPublishedContent(workspaceId: string): number {
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
         });
+        count++;
       }
-
-      count++;
     } catch (err) {
       log.warn(
         { err, workspaceId, postId: post.id },
@@ -137,9 +136,8 @@ export function backfillResolvedInsights(workspaceId: string): number {
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
         });
+        count++;
       }
-
-      count++;
     } catch (err) {
       log.warn(
         { err, workspaceId, insightId: insight.id },
@@ -197,9 +195,8 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
         });
+        count++;
       }
-
-      count++;
     } catch (err) {
       log.warn(
         { err, workspaceId, recId: rec.id },
