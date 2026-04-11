@@ -1915,9 +1915,388 @@ Do NOT cut the release PR autonomously. The user decides when the full bundle (P
 
 ---
 
+## PR A Round 2 — Silent-Rule Fixes and Test-Infrastructure Hardening
+
+**Added 2026-04-10 after scaled review.** This section was not in the original
+plan — it is the response to a discovery made during PR A's final review:
+**five of the ~45 rules in `scripts/pr-check.ts` had been reporting `✓` (zero
+matches) despite the codebase containing real violations**. The audit that was
+designed to eliminate silent false-negatives was itself suffering from the
+same bug class.
+
+The Round 2 fixes ship on the same branch (`chore/pr-check-audit-and-backfill`)
+as a continuation of PR A. Part 2 extends PR B's task list. Part 3 adds
+general test-infrastructure hardening.
+
+### Context — the four silent-failure categories
+
+Every confirmed bug in this audit and its Round 2 fits one of four shapes.
+Naming them makes the residual audit work grep-able.
+
+| # | Category | Pattern | Fix shape |
+|---|----------|---------|-----------|
+| A | **File-list resolution** | Rule's file list is empty because of a path-filter / exclude collision. The rule runs but scans nothing. | Fix the resolver (`checkDirectory` + `resolveCheckFileList`). *Closed by commit 75cb67a.* |
+| B | **Regex too narrow** | Pattern looks right but misses a variant: quote style, whitespace, Unicode, template literal, escape. | Rewrite regex to cover both variants OR convert to customCheck. |
+| C | **Parser-lite string walking** | customCheck uses `.indexOf` / `.search` / `.includes` on a structural character (`{`, `}`, `=`, `=>`, `)`) without tracking brace/paren/angle depth or quote state. Works on the author's happy-path fixture; fails on anything nested. | Replace with a depth-tracked walker. |
+| D | **Shell quoting / command injection** | Regex pattern contains a character the shell interprets before `grep -E` sees it. `grep` errors; `|| true` swallows the error; runner reports ✓. | Convert rule to customCheck (bypasses the shell entirely). |
+
+### Confirmed silent-failure rules (5 total, ranked by severity)
+
+| # | Rule | Category | Severity | Real violations hidden | Status |
+|---|------|----------|----------|------------------------|--------|
+| 1 | `Placeholder test assertion — expect(true).toBe(true)` | A | error | 0 today | **Fixed in 75cb67a** |
+| 2 | `Source-sniffing in tests (readFileSync on .ts/.tsx source)` | A | warn | 37 | **Fixed in 75cb67a**; backfill → Task B4 |
+| 3 | `Vacuous .every() in tests (no length guard)` | A | warn | 91 | **Fixed in 75cb67a**; backfill → Task B5 |
+| 4 | `useGlobalAdminEvents import restriction` | B | **error** | 0 today — trivial to bypass with `"` | **Open** → Task P1.1 |
+| 5 | `getOrCreate* function returns nullable` | C | warn | Unknown — any object-literal return type truncates extraction | **Open** → Task P1.2 |
+| 6 | `Raw string literal in broadcastToWorkspace() event arg` | D | warn | 50+ confirmed (`server/feedback.ts`, `server/routes/workspaces.ts`, etc.) | **Open** → Task P1.3 |
+| 7 | `Raw string literal in broadcast() event arg` | D | warn | Unknown, likely similar | **Open** → Task P1.3 |
+
+**Silent-failure rate: 5 / 45 = 11% of rules**. Rule #4 in particular ships
+at `error` severity — our most-trusted gate — and is trivially bypassed by
+writing `from "../hooks/useGlobalAdminEvents"` instead of `'...'`.
+
+Meta-failure: the original PR A spec at line 221 correctly prescribed
+`from ['\"][^'\"]*useGlobalAdminEvents` (dual-quote). The implementer
+deviated to `from '[^']*useGlobalAdminEvents` with an inline comment
+blaming shell quoting, and the deviation was not recorded in the
+Amendments section. Neither the regex-rule-authoring checklist nor the
+scaled code review caught it. The meta-test in Task P1.5 is designed to
+catch this exact class of deviation mechanically, so no future reviewer
+has to notice it by hand.
+
+### Anti-recurrence mechanisms (the six disciplines)
+
+Every fix in Round 2 follows all six. The final one (P1.5) is the
+mechanical backstop; the others are process disciplines enforced by
+self-review during implementation and by scaled-code-review before push.
+
+1. **Fixture-first, per fix.** Write the positive fixture test BEFORE
+   touching the rule. Confirm it fails. Apply the fix. Confirm it passes.
+   No batching multiple fixes before the first test.
+2. **Baseline-diff gate.** `/tmp/rule-baseline-round2.txt` captured before
+   any Round 2 work. After every fix, re-run `pr-check --all` and diff.
+   Every `✓ → ⚠` is an expected surface (record it). Every `⚠ → ✓` is a
+   regression in the fix (investigate immediately).
+3. **Adversarial regex checklist.** For every regex: single-quote?
+   double-quote? template literal? whitespace variant? Unicode? shell
+   metacharacter? nested structural char? Each gets a yes/no + test.
+4. **Depth-tracked string walking.** Any customCheck that looks for `{`,
+   `}`, `(`, `)`, `=`, `;`, `>`, or `<` must track depth. Never
+   `.search(/[{=]/)` or equivalent on a slice of real source code.
+5. **Meta-test gate (Task P1.5).** Every rule must report `>0` matches on
+   `--all` OR appear in `docs/rules/verified-clean-rules.md` with a
+   justification. CI red on any silent `✓`.
+6. **Scaled code review before push.** Invoked explicitly at the end of
+   Round 2 with a brief to the review agents naming the four silent-
+   failure categories, so reviewers test each changed rule against all
+   four.
+
+---
+
+### Part 1 — Silent rule fixes (this branch, 5 tasks)
+
+**Task P1.1: Convert `useGlobalAdminEvents import restriction` to customCheck (dual-quote)**
+
+- **Files:** `scripts/pr-check.ts`, `tests/pr-check.test.ts`
+- **Current bug:** regex `from '[^']*useGlobalAdminEvents` misses
+  double-quoted imports. At `error` severity — the most trusted gate.
+- **Category:** B
+- **Fix:** Replace the regex rule with a customCheck that walks each
+  `.ts`/`.tsx` file for `/from ['"][^'"]*useGlobalAdminEvents/` matches.
+  Preserve the existing `exclude` allowlist (audited global-fanout sites).
+  Preserve the `// global-events-ok` hatch via `hasHatch()`.
+- **Fixture test:** positive — a file importing with `"..."` triggers;
+  hatch-inline — same file with `// global-events-ok` does not; hatch-above
+  — comment on the preceding line also suppresses; negative — an audited
+  allowlist file with the double-quote import does not trigger.
+- **Baseline diff after fix:** rule stays `✓` today (no double-quote
+  importers exist in the codebase). Add to `verified-clean-rules.md` with
+  justification "All importers use single quotes today; rule now covers
+  both styles so a double-quote regression would be caught."
+- **Commit message:** `fix(pr-check): dual-quote detection in useGlobalAdminEvents rule (Category B)`
+
+---
+
+**Task P1.2: Replace `getOrCreate*` return-type extraction with depth-tracked walker**
+
+- **Files:** `scripts/pr-check.ts`, `tests/pr-check.test.ts`
+- **Current bug:** `tail.search(/[{=]/)` at `scripts/pr-check.ts:956`
+  finds the first `{` regardless of whether it's the function body opener
+  or a `{` inside an object-literal return type. For
+  `function getOrCreateFoo(): { id: string } | null {`, the search returns
+  the type opener, truncating `returnRegion` to `: ` which doesn't match
+  the `| null` regex, so the rule skips the violation.
+- **Category:** C
+- **Fix:** Replace the `.search(/[{=]/)` call with a depth-tracked walker
+  that tracks `<`/`>` angle depth and `{`/`}` brace depth. The body opener
+  is the first `{` at `braceDepth === 0 && angleDepth === 0` whose
+  rest-of-line (ignoring whitespace) is empty. Arrow body is the first
+  `=>` at depth 0. Handles `): { id: string } | null {`,
+  `): Promise<{ id } | null>`, and `): Array<{ x: number } | null>`.
+- **Fixture tests:** (1) object-literal return type with `| null` triggers,
+  (2) `Promise<{ id } | null>` triggers, (3) `Array<{ x } | null>`
+  triggers, (4) plain `: Foo` non-nullable does not, (5) `: Foo | null`
+  triggers, (6) `: { id: string }` non-nullable does not.
+- **Baseline diff after fix:** unknown — may reveal a small number of
+  real violations. Each is a bug in its own right (getOrCreate should not
+  return null). Backfill each in Task B13 if >0.
+- **Commit message:** `fix(pr-check): depth-tracked return-type extraction in getOrCreate rule (Category C)`
+
+---
+
+**Task P1.3: Convert both `Raw string literal in broadcast*` rules to customCheck**
+
+- **Files:** `scripts/pr-check.ts`, `tests/pr-check.test.ts`
+- **Current bug:** both rules' regex contains `[\'"]`. When interpolated
+  into `` grep -E "${pattern}" ``, the `"` closes the outer double-quote,
+  mangling the shell command. grep errors; `|| true` swallows; runner
+  reports `✓`. Real violations at `server/feedback.ts:148`,
+  `server/routes/workspaces.ts:231`, `server/routes/content-requests.ts:112`,
+  and ~47 others.
+- **Category:** D
+- **Fix:** Convert both rules to customCheck. Detect
+  `/broadcastToWorkspace\s*\([^,]+,\s*['"][^'"]+['"]/` and
+  `/(^|[^a-zA-Z_])broadcast\s*\(\s*['"][^'"]+['"]/` via JS regex in the
+  callback (no shell). Preserve the `exclude: ['server/broadcast.ts']`
+  list and the `// ws-event-ok` hatch via `hasHatch()`.
+- **Fixture tests:** both quote styles trigger; `WS_EVENTS.FOO` constant
+  does not; the allowlisted `server/broadcast.ts` definition site does
+  not; `// ws-event-ok` hatch suppresses both inline and on preceding line.
+- **Baseline diff after fix:** both rules move `✓ → ⚠` with expected
+  match counts ~50 each. Record the expected counts in the commit message.
+  Backfill scheduled as Task B12.
+- **Commit message:** `fix(pr-check): convert raw-string broadcast rules to customCheck (Category D — surfaces ~100 hidden violations)`
+
+---
+
+**Task P1.4: Meta-test — every customCheck rule has fixture coverage**
+
+- **Files:** `tests/pr-check.test.ts`
+- **Purpose:** Extend the existing `Meta: customCheck rule name registry`
+  test to assert that every rule with `typeof check.customCheck === 'function'`
+  has a describe block in `tests/pr-check.test.ts` whose name matches the
+  rule's `name` field. If a new customCheck rule is added without a
+  fixture test, the meta-test fails loudly.
+- **Approach:** Parse the test file at runtime (read the file, grep for
+  `describe('Rule: <name>'...`) and cross-reference against `CHECKS`
+  filtered to customCheck. Pure runtime check; no test-file AST needed.
+  The existing registry list becomes the gate — any new rule missing
+  from the list fails the test.
+- **Note on regex rules:** Extending fixture coverage to the ~35 regex
+  rules is deferred to Part 2 (Task B10). Part 1 covers customCheck +
+  the 4 specific regex rules being fixed in P1.1 and P1.3 (both fixes
+  convert the regex rules to customCheck, so they will automatically be
+  under the meta-test's scope).
+- **Commit message:** `test(pr-check): enforce customCheck rule fixture coverage via meta-test`
+
+---
+
+**Task P1.5: Meta-test — every rule reports >0 matches or is in `verified-clean-rules.md`**
+
+- **Files:** `tests/pr-check.test.ts`, `docs/rules/verified-clean-rules.md` (new)
+- **Purpose:** The load-bearing anti-recurrence gate. Spawns
+  `npx tsx scripts/pr-check.ts --all` as a subprocess, parses the per-
+  rule status (`✓` / `⚠` / `✗`), and fails if any rule reports `✓` and
+  isn't on the allowlist.
+- **Allowlist file:** `docs/rules/verified-clean-rules.md` lists each
+  rule that is legitimately clean today with a one-sentence justification.
+  Format:
+  ```markdown
+  | Rule name | Verified by | Justification |
+  |-----------|------------|----------------|
+  | `Bare SUM() without COALESCE in db.prepare` | grep audit 2026-04-10 | All `SUM()` calls in server/ are wrapped in `COALESCE`. Rule is the gate preventing future regressions. |
+  | `Purple in client components` | grep audit 2026-04-10 | No purple classes in `src/components/client/`. Enforces Three Laws of Color. |
+  | ... | | |
+  ```
+- **Initial allowlist population:** every rule currently at `✓` in
+  `/tmp/rule-baseline-round2.txt` gets an entry, each with a justification
+  derived from spot-grepping the relevant pattern against the codebase
+  during this task. If a rule reports `✓` but a spot-grep finds real
+  violations, it is NOT added to the allowlist — it is a newly-discovered
+  silent-failure rule and goes into Part 2 as Task B10 sub-item.
+- **Test execution cost:** `pr-check --all` takes ~5s. Runs once per
+  `npx vitest run` invocation. Acceptable.
+- **Interaction with warn-severity rules:** a rule at `warn` with zero
+  matches is fine — warn rules are aspirational and do not need an
+  allowlist entry. The gate only applies to `error`-severity rules and
+  to `warn` rules whose comment claims "~N pre-existing violations"
+  (which would be a silent failure).
+
+  *Decision:* simplify to "every rule must report >0 or be in the
+  allowlist, regardless of severity." Forces explicit "yes, this is
+  clean" commitment per rule.
+- **Commit message:** `test(pr-check): add silent-rule detection gate (meta-test + verified-clean-rules.md)`
+
+---
+
+### Part 3 — Test-infrastructure hardening (this branch, 3 tasks)
+
+**Task P3.1: Port collision meta-test across integration tests**
+
+- **Files:** `tests/pr-check.test.ts` (or new `tests/meta-port-uniqueness.test.ts`)
+- **Purpose:** CLAUDE.md requires each integration test using
+  `createTestContext()` to use a unique port in the 13201–13316 range.
+  Today this is enforced by grep-before-PR convention. Convert to a
+  mechanical test.
+- **Approach:** Glob `tests/**/*.test.ts`, read each file, regex-extract
+  `createTestContext\(\s*(\d+)/g`, assert uniqueness across all files.
+  Report the conflicting files if duplicates found.
+- **Commit message:** `test(meta): assert unique ports across createTestContext integration tests`
+
+---
+
+**Task P3.2: `describe.skip` audit**
+
+- **File:** `tests/assembler-programming-error-surfacing.test.ts:103`
+- **Current state:** a `describe.skip('assembler catch block escalation', ...)`
+  block with no justification comment. Could be intentional quarantine,
+  could be forgotten.
+- **Action:** Read the file and the associated assembler code. Decide:
+  - **Keep and justify** — add a one-line comment above the `.skip`
+    explaining why it's skipped and when it should be re-enabled.
+  - **Delete** — if the test is obsolete.
+  - **Re-enable** — if the skip is no longer necessary.
+- **Follow-up rule:** add a pr-check rule in Task B11 (Part 2) that
+  flags any `.skip` / `.todo` / `.only` in tests that lacks a preceding
+  comment line. For now, just fix the one known case.
+- **Commit message:** `test: justify describe.skip in assembler-programming-error-surfacing.test.ts` (or delete/re-enable as appropriate)
+
+---
+
+**Task P3.3: CI / nightly `pr-check` parity**
+
+- **Files:** `.github/workflows/ci.yml`, `.github/workflows/pr-check-nightly.yml`, `package.json`
+- **Purpose:** Confirm the PR CI workflow and the nightly workflow run
+  `pr-check.ts` with compatible flags. If they drift, a bug found only
+  on `--all` (like all 5 silent rules) ships to `main` before nightly
+  catches it.
+- **Check:** grep both workflow files for `pr-check`. Expected pattern:
+  CI runs diff-only (no `--all`), nightly runs `--all`. Both should use
+  the same npm script.
+- **Fix if drifted:** add `"pr-check": "tsx scripts/pr-check.ts"` and
+  `"pr-check:all": "tsx scripts/pr-check.ts --all"` to `package.json`;
+  both workflows invoke the npm scripts.
+- **Expected outcome:** likely no change if workflows already align; adds
+  npm-script indirection as future-proofing.
+- **Commit message:** `ci(pr-check): centralize pr-check invocation via npm scripts` (if changes needed) or skip commit (if already aligned)
+
+---
+
+### Part 2 extensions to PR B (task list additions only, no implementation in Round 2)
+
+**Task B10: Systematic regex-rule audit (Categories B and D)**
+
+- Audit the ~35 remaining regex rules in `CHECKS` against Category B
+  (narrowness) and Category D (shell quoting).
+- For each rule: (a) spot-check regex handles both quote styles where
+  relevant, (b) confirm pattern does not contain shell metacharacters
+  that could break the `checkDirectory` invocation, (c) run the rule's
+  positive grep manually and compare against `--all` output.
+- Expected outcome: 2–5 additional silent rules discovered. Each gets a
+  fix + fixture test in the same task.
+- **File:** `scripts/pr-check.ts`, `tests/pr-check.test.ts`
+- **Verification:** after fixes, baseline-diff shows all previously-silent
+  rules moving `✓ → ⚠` or explicitly added to `verified-clean-rules.md`.
+
+**Task B11: Systematic customCheck-rule audit (Category C)**
+
+- Read each of the 9+ customCheck callbacks (the 2 in P1.1 and P1.3
+  converted from regex rules, plus the 7 pre-existing). For each: list
+  every `.indexOf` / `.search` / `.match` / `.includes` on a structural
+  character. Verify depth tracking is present, or replace with a
+  depth-tracked walker.
+- Expected outcome: 1–2 additional bugs (Rule 6 `getOrCreate*` already
+  covered by P1.2; others unknown).
+- Also: add a pr-check rule that flags any `.skip` / `.todo` / `.only`
+  in test files without a justification comment on the preceding line.
+- **File:** `scripts/pr-check.ts`, `tests/pr-check.test.ts`
+
+**Task B12: Backfill ~100 raw-string broadcast violations surfaced by P1.3**
+
+- Replace all raw string literals in `broadcastToWorkspace()` and
+  `broadcast()` calls with `WS_EVENTS.*` / `ADMIN_EVENTS.*` constants
+  from `server/ws-events.ts`.
+- If a required constant doesn't exist yet, add it to
+  `shared/types/ws-events.ts` first (cross-phase contract). Frontend
+  handlers that use the matching raw string must be updated in the
+  same commit.
+- Promote both rules from `warn` → `error` after backfill is clean.
+- **Files:** `server/**/*.ts` (broadcast callers), `src/hooks/**/*.ts`
+  (frontend listeners), `shared/types/ws-events.ts`, `scripts/pr-check.ts`
+- **Verification:** `pr-check --all` reports both rules at `✓` and
+  `error` severity.
+
+**Task B13: Backfill any new violations surfaced by P1.1 / P1.2**
+
+- Expected small (P1.1 rule has 0 current violations; P1.2 may surface
+  a handful).
+- For each violation: fix the nullable return type (never return null
+  from a `getOrCreate*` function) or rename the function if it genuinely
+  can fail.
+- **Files:** `server/**/*.ts`
+
+---
+
+### Verification Strategy for Round 2
+
+Each task is verified by the same four-gate check:
+
+1. **Typecheck:** `npm run typecheck` — zero errors.
+2. **Unit tests:** `npx vitest run tests/pr-check.test.ts` — all existing
+   tests still pass, plus new fixture tests for the task.
+3. **Baseline diff:** `npx tsx scripts/pr-check.ts --all > /tmp/rule-after-<task>.txt`,
+   then `diff /tmp/rule-baseline-round2.txt /tmp/rule-after-<task>.txt`.
+   Every line change is expected and recorded in the commit body.
+4. **Full-suite smoke:** `npx vitest run` — no unrelated regressions.
+
+Before push:
+5. **Scaled code review:** invoke `scaled-code-review` skill on the
+   full Round 2 diff with an explicit brief naming the four silent-
+   failure categories. Review agents are instructed to test each changed
+   rule against all four categories.
+
+### Round 2 task dependency graph
+
+```
+  P1.1 ──┐
+  P1.2 ──┼── P1.4 ── P1.5 ── P3.1 ── P3.2 ── P3.3 ── scaled-review ── push
+  P1.3 ──┘
+```
+
+P1.1, P1.2, P1.3 are parallelizable in principle but run sequentially
+in Round 2 to keep commits small and baseline-diff signal clean. P1.4
+and P1.5 depend on P1.1–P1.3 because they need the fixture test entries
+and the post-fix baseline to populate the allowlist. P3.1–P3.3 are
+independent of Part 1 and could ship in a separate PR, but are kept on
+this branch to minimize review churn.
+
+### Round 2 ownership
+
+Single-agent (Claude) execution, no parallel subagents. The silent-
+failure rate was itself caused by insufficient verification discipline;
+adding agent-coordination overhead to the fix would compound the problem.
+Each task is a self-contained commit with its own test + baseline diff.
+
+---
+
 ## Amendments
 
 _(Empty. Any spec changes discovered during execution must be recorded here with date + rationale + affected tasks, per docs/rules/multi-agent-coordination.md.)_
+
+### 2026-04-10 — Round 2 added
+
+- **Rationale:** post-review discovery of 5 silent-failure rules in the
+  existing `CHECKS` array. Original plan had no mechanism to detect
+  silent rules — the rule-authoring guide prescribed a "full-codebase
+  match count" step but did not enforce it. Round 2 closes the known
+  holes (Part 1), adds a mechanical enforcement gate (Task P1.5), hardens
+  adjacent test infrastructure (Part 3), and queues systematic audit of
+  remaining rules (Part 2 extensions to PR B).
+- **Affected tasks:** PR A extended with 8 new tasks (P1.1–P1.5 +
+  P3.1–P3.3); PR B extended with 4 new tasks (B10–B13). No tasks removed
+  or renumbered. Existing Task A1 deviation (useGlobalAdminEvents
+  single-quote-only regex vs. spec'd dual-quote) documented in Task P1.1.
 
 ---
 
