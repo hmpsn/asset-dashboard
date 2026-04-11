@@ -10,7 +10,7 @@ import { listBrandscripts } from './brandscript.js';
 import { getVoiceProfile } from './voice-calibration.js';
 import { renderVoiceDNAForPrompt, renderVoiceDNASummary } from './voice-dna-render.js';
 import { listDeliverables } from './brand-identity.js';
-import type { ContextEmphasis } from '../shared/types/brand-engine.js';
+import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../shared/types/brand-engine.js';
 
 const log = createLogger('seo-context');
 
@@ -109,7 +109,15 @@ export function buildSeoContext(
 
   if (!strategy) {
     const brandscriptBlock = buildBrandscriptContext(workspaceId);
-    const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
+    // Read the voice profile ONCE and reuse for both the authority check below
+    // and the voice-profile block rendering. Passing it into
+    // buildVoiceProfileContext avoids a second DB read on the hot prompt-assembly
+    // path. Before this optimization, each buildSeoContext invocation read the
+    // voice_profiles table twice (once here, once inside buildVoiceProfileContext)
+    // — that's also a TOCTOU risk: a calibration transition landing between the
+    // two reads could produce a mixed snapshot. One read = one snapshot.
+    const profile = getVoiceProfile(workspaceId);
+    const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
     const identityBlock = buildIdentityContext(workspaceId);
     // A voice profile is "authoritative" (replaces the legacy brandVoiceBlock)
     // only when either:
@@ -124,7 +132,6 @@ export function buildSeoContext(
     // empty block and is NOT calibrated, so it correctly falls through to
     // the legacy block — admins keep their existing brand voice text + uploaded
     // brand-docs until they actually configure the new profile.
-    const profile = getVoiceProfile(workspaceId);
     const voiceProfileActive = profile !== null && (profile.status === 'calibrated' || voiceProfileBlock.length > 0);
     const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
     const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
@@ -175,14 +182,15 @@ export function buildSeoContext(
   }
 
   const brandscriptBlock = buildBrandscriptContext(workspaceId);
-  const voiceProfileBlock = buildVoiceProfileContext(workspaceId);
+  // Read the voice profile ONCE — see the `!strategy` branch above for rationale.
+  const profile = getVoiceProfile(workspaceId);
+  const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
   const identityBlock = buildIdentityContext(workspaceId);
   // See authority rules on the `!strategy` branch above — same logic applies
   // here: calibrated profile OR non-empty voiceProfileBlock replaces legacy;
   // everything else falls through to the legacy brandVoiceBlock so admins
   // with existing brand voice content keep seeing it until the new profile
   // has real configuration.
-  const profile = getVoiceProfile(workspaceId);
   const voiceProfileActive = profile !== null && (profile.status === 'calibrated' || voiceProfileBlock.length > 0);
   const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
   const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
@@ -229,10 +237,19 @@ export function buildSeoContext(
           // real mismatch. The derivation matches the prompt-path check above
           // so shadow-mode and prompt-assembly stay in sync on what "voice
           // profile active" means.
+          //
+          // NOTE: shadow mode reads the profile FRESH here rather than reusing the
+          // profile read on the main path above. This is intentional — shadow mode
+          // runs asynchronously after the main result is already returned and
+          // cached, so the main-path snapshot may be stale by the time this block
+          // runs (e.g. a calibration transition landed in the meantime). Using the
+          // current DB state is the whole point of a parity check. The profile IS
+          // still passed into buildVoiceProfileContext below to avoid a fourth read
+          // inside that helper.
           const shadowProfile = getVoiceProfile(workspaceId);
           const voiceProfileActive =
             shadowProfile !== null &&
-            (shadowProfile.status === 'calibrated' || buildVoiceProfileContext(workspaceId).length > 0);
+            (shadowProfile.status === 'calibrated' || buildVoiceProfileContext(workspaceId, 'full', shadowProfile).length > 0);
           const comparisonFields: { name: string; match: boolean }[] = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
             { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
@@ -510,9 +527,25 @@ export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEm
  * here would duplicate instructions and waste tokens.
  * When calibrated: returns only voice samples (safe at any status).
  * When not calibrated: returns the full DNA + samples + guardrails block.
+ *
+ * Hot-path optimization: callers that have already read the profile (e.g. `buildSeoContext`
+ * which needs the profile independently for the authority rule) can pass it as `profileArg`
+ * to avoid a second DB read. If omitted, the profile is fetched internally. Both paths
+ * produce identical output — the parameter is a pure optimization, never a semantic change.
+ *
+ * Sentinel semantics: `profileArg === undefined` means "caller did not supply — fetch it";
+ * `profileArg === null` means "caller already checked, no profile exists — skip the fetch
+ * and return empty." We use `!== undefined` (strict) rather than a truthiness check because
+ * `getVoiceProfile()` returns `VoiceProfile | null`, so `null` is a legitimate caller-supplied
+ * value that must NOT trigger a re-read. A truthy check would re-read the DB for every caller
+ * that correctly passed `null`, defeating the optimization.
  */
-export function buildVoiceProfileContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
-  const profile = getVoiceProfile(workspaceId);
+export function buildVoiceProfileContext(
+  workspaceId: string,
+  emphasis: ContextEmphasis = 'full',
+  profileArg?: (VoiceProfile & { samples: VoiceSample[] }) | null,
+): string {
+  const profile = profileArg !== undefined ? profileArg : getVoiceProfile(workspaceId);
   if (!profile) return '';
 
   const isCalibrated = profile.status === 'calibrated';

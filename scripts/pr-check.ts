@@ -547,6 +547,32 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
+    // Do-not-reintroduce rule. `formatBrandVoiceForPrompt` was deleted in PR #168
+    // because it bypassed voice-profile authority: any caller that grabbed the
+    // helper and wrapped the raw `seo?.brandVoice` field silently dropped the
+    // calibrated DNA/samples/guardrails layers that `buildSeoContext` applies
+    // via `effectiveBrandVoiceBlock`. The TypeScript signature didn't change
+    // when voice profiles were added, so the compiler couldn't catch the bypass
+    // — that's why we mechanize the ban here. See CLAUDE.md
+    // "Authority-layered fields — expose one resolved representation, never raw
+    // + format helper" for the general principle.
+    //
+    // Tests and auto-generated codesight files are excluded because they
+    // legitimately reference the deleted name when explaining why it's gone.
+    name: 'formatBrandVoiceForPrompt reintroduction',
+    pattern: '\\bformatBrandVoiceForPrompt\\b',
+    fileGlobs: ['*.ts', '*.tsx'],
+    exclude: [
+      'tests/',
+      '.codesight/',
+      'scripts/pr-check.ts', // this rule itself references the name
+    ],
+    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by buildSeoContext with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    severity: 'error',
+    rationale: 'A generic format helper that wraps a raw authority-layered field bypasses the authority chain silently — the compiler cannot catch it because the raw field type is still `string`.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
     name: 'Raw fetch() in components',
     // customCheck (was regex) — see Round 2 Task P1.5. The original pattern
     // `(?<![a-zA-Z])fetch\\(` uses a lookbehind assertion. BSD `grep -E`
