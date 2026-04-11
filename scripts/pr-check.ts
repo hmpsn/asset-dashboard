@@ -479,6 +479,226 @@ export function extractDbPrepareArg(chunk: string): string {
   return chunk.slice(argStart); // never closed within chunk — fall through
 }
 
+// ─── Slice field rendering helpers ────────────────────────────────────────────
+//
+// Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
+// declared in *Slice interfaces (shared/types/intelligence.ts) but never referenced
+// in their corresponding format*Section function (server/workspace-intelligence.ts).
+// Must live at module scope because the rule lives in the CHECKS array and its
+// customCheck closure looks these up by lexical binding at invocation time.
+
+/** Map of slice interface name → formatter function name. */
+const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> = [
+  { sliceName: 'SeoContextSlice', formatterName: 'formatSeoContextSection' },
+  { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
+  { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
+  { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
+  { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
+  { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
+  { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
+  { sliceName: 'OperationalSlice', formatterName: 'formatOperationalSection' },
+];
+
+/** Fields intentionally not rendered (complex nested types, metadata, or
+ *  rendering handled differently — e.g. destructured `const { bySeverity } = ...`
+ *  which the property-access regex can't catch). */
+const KNOWN_UNRENDERED_FIELDS = new Set([
+  // SeoContextSlice
+  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
+  // InsightsSlice
+  'byType', 'forPage',
+  // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
+  'bySeverity',
+  // LearningsSlice
+  'forPage', 'topWins', 'winRateByActionType',
+  // ContentPipelineSlice
+  'rewritePlaybook', 'suggestedBriefs',
+  // SiteHealthSlice
+  'aeoReadiness', 'redirectDetails',
+  // PageProfileSlice
+  // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
+  'searchIntent',
+  // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
+  'insights',
+  // ClientSignalsSlice — these are rendered but may not appear by field name
+  // OperationalSlice
+  // none
+]);
+
+function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
+  // Find the interface declaration — use brace-depth counting to handle nested object types
+  const declStart = typeFileContent.search(new RegExp(`interface ${interfaceName}\\s*\\{`));
+  if (declStart === -1) return [];
+
+  const braceStart = typeFileContent.indexOf('{', declStart);
+  if (braceStart === -1) return [];
+
+  // Walk forward counting braces to find the matching closing brace of the interface itself
+  let depth = 0;
+  let i = braceStart;
+  while (i < typeFileContent.length) {
+    if (typeFileContent[i] === '{') depth++;
+    else if (typeFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) break;
+    }
+    i++;
+  }
+  const body = typeFileContent.slice(braceStart + 1, i);
+
+  // Extract only top-level field names (depth=0 within the body, lines like `  fieldName:`)
+  // Walk the body tracking nested depth so we only extract interface-level keys
+  const fields: string[] = [];
+  let nestedDepth = 0;
+  for (const line of body.split('\n')) {
+    for (const ch of line) {
+      if (ch === '{') nestedDepth++;
+      else if (ch === '}') nestedDepth--;
+    }
+    if (nestedDepth === 0) {
+      const m = line.match(/^\s+(\w+)\??:/);
+      if (m) fields.push(m[1]);
+    }
+  }
+  return fields;
+}
+
+function extractFormatterBody(formatterFileContent: string, formatterName: string): string {
+  // Find the function body start
+  const fnStart = formatterFileContent.indexOf(`function ${formatterName}(`);
+  if (fnStart === -1) return '';
+
+  // Find the opening brace
+  const braceStart = formatterFileContent.indexOf('{', fnStart);
+  if (braceStart === -1) return '';
+
+  // Walk forward counting braces to find the closing brace
+  let depth = 0;
+  let i = braceStart;
+  while (i < formatterFileContent.length) {
+    if (formatterFileContent[i] === '{') depth++;
+    else if (formatterFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        return formatterFileContent.slice(braceStart, i + 1);
+      }
+    }
+    i++;
+  }
+  return '';
+}
+
+/**
+ * Pure helper for the 'Assembled-but-never-rendered slice fields' rule.
+ *
+ * Exported so the harness can exercise it directly without monkeypatching ROOT.
+ * Takes both file contents as strings plus the paths to cite in hits, so a
+ * test can pass synthetic fixtures while production uses the real repo files.
+ *
+ * Returns a list of matches for fields declared in any *Slice interface in
+ * `typesContent` but never referenced in the corresponding format*Section
+ * function in `serverContent`. Fields in KNOWN_UNRENDERED_FIELDS are skipped.
+ */
+export function findUnrenderedSliceFields(
+  typesContent: string,
+  serverContent: string,
+  typesPath: string,
+  serverPath: string,
+): CustomCheckMatch[] {
+  if (!typesContent || !serverContent) return [];
+  const hits: CustomCheckMatch[] = [];
+  for (const { sliceName, formatterName } of SLICE_FORMATTER_MAP) {
+    const fields = extractInterfaceFields(typesContent, sliceName);
+    const formatterBody = extractFormatterBody(serverContent, formatterName);
+    if (!formatterBody) {
+      hits.push({
+        file: serverPath,
+        line: 1,
+        text: `${sliceName}: formatter ${formatterName} not found`,
+      });
+      continue;
+    }
+    for (const field of fields) {
+      if (KNOWN_UNRENDERED_FIELDS.has(field)) continue;
+      if (
+        !formatterBody.includes(`.${field}`) &&
+        !formatterBody.includes(`['${field}']`) &&
+        !formatterBody.includes(`["${field}"]`)
+      ) {
+        // Locate the field's declaration line in the types file for
+        // actionable output. Falls back to line 1 if not found.
+        const typeLines = typesContent.split('\n');
+        const fieldLineIdx = typeLines.findIndex(l => new RegExp(`^\\s+${field}\\??:`).test(l));
+        hits.push({
+          file: typesPath,
+          line: fieldLineIdx >= 0 ? fieldLineIdx + 1 : 1,
+          text: `${sliceName}.${field} → not referenced in ${formatterName}`,
+        });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * Pure helper for the 'Constants in sync (STUDIO_NAME, STUDIO_URL)' rule.
+ *
+ * Exported so the harness can exercise it directly without monkeypatching ROOT.
+ * Takes both file contents as strings plus the server path to cite in hits.
+ *
+ * Returns a list of matches for each STUDIO_* constant whose value differs
+ * between `serverSrc` and `frontendSrc`. The `serverConstPath` is the jump
+ * target written into each hit so clicking takes you to the server file's
+ * declaration line.
+ */
+export function compareStudioConstants(
+  serverSrc: string,
+  frontendSrc: string,
+  serverConstPath: string,
+): CustomCheckMatch[] {
+  if (!serverSrc || !frontendSrc) return [];
+  const extract = (src: string, name: string): string | null => {
+    const m = src.match(new RegExp(`export const ${name}\\s*=\\s*['"]([^'"]+)['"]`));
+    return m?.[1] ?? null;
+  };
+  const hits: CustomCheckMatch[] = [];
+  for (const name of ['STUDIO_NAME', 'STUDIO_URL']) {
+    const sv = extract(serverSrc, name);
+    const fv = extract(frontendSrc, name);
+    if (sv !== fv) {
+      // Point at the server file's declaration line for a useful jump target.
+      const lines = serverSrc.split('\n');
+      const lineIdx = lines.findIndex(l => l.includes(`export const ${name}`));
+      hits.push({
+        file: serverConstPath,
+        line: lineIdx >= 0 ? lineIdx + 1 : 1,
+        text: `${name}: server='${sv}' vs frontend='${fv}'`,
+      });
+    }
+  }
+  return hits;
+}
+
+// ─── Brand-engine route list ──────────────────────────────────────────────────
+// Used by the 'requireAuth in brand-engine routes' rule. These routes must use
+// `requireWorkspaceAccess` — the admin panel authenticates via HMAC (global gate)
+// and `requireAuth` (JWT-only) would 401 every admin call. See Auth Conventions
+// in CLAUDE.md.
+//
+// Stored as a Set of *basenames* so the rule can be exercised against fixture
+// files under tmpdir (where the relative path is `rule-33/case-1/...`, not
+// `server/routes/...`). Basename matching is safe because Express mounts these
+// routes under specific, unambiguous filenames — there is no other
+// `voice-calibration.ts` in the repo that could shadow them.
+export const BRAND_ENGINE_ROUTE_BASENAMES: ReadonlySet<string> = new Set([
+  'voice-calibration.ts',
+  'discovery-ingestion.ts',
+  'brand-identity.ts',
+  'brandscript.ts',
+  'page-strategy.ts',
+  'copy-pipeline.ts',
+]);
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -1570,6 +1790,261 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Detects fields declared in a *Slice interface whose corresponding
+    // format*Section function never references them. Those fields are
+    // assembled at query time and silently dropped at prompt time — they
+    // never reach the AI. Add to KNOWN_UNRENDERED_FIELDS if intentional.
+    //
+    // Scope: diff-mode fires when either `shared/types/intelligence.ts` or
+    // `server/workspace-intelligence.ts` changes; the customCheck always
+    // reads both from disk. The fileGlobs include both basenames so that
+    // the diff-mode filter matches whichever file triggered the run; the
+    // customCheck then operates on the fixed pair.
+    name: 'Assembled-but-never-rendered slice fields',
+    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts'],
+    exclude: ['.test.ts'],
+    displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts',
+    message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
+    severity: 'warn',
+    rationale: 'A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      // Diff-mode: only run if one of the two source files is in the diff set.
+      // Full-scan mode: resolveCheckFileList returns the files + possible test
+      // variants — non-empty, so the check runs.
+      if (files.length === 0) return [];
+      const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
+      const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
+      return findUnrenderedSliceFields(
+        readFileOrEmpty(typesPath),
+        readFileOrEmpty(serverPath),
+        typesPath,
+        serverPath,
+      );
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Detects `callCreativeAI(...)` calls that lack the `json:` flag in
+    // files that also use `parseJsonFallback`. Mixing the two is a strong
+    // signal that the caller expects JSON back but forgot to opt into the
+    // model's json-mode response format — prompt may succeed on one model
+    // but drift on another.
+    name: 'callCreativeAI without json: flag in files that use parseJsonFallback',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message: 'Add json: true when the result is parsed as JSON, json: false when prose. See docs/rules/ai-dispatch-patterns.md.',
+    severity: 'warn',
+    rationale: 'callCreativeAI without an explicit json: flag silently drifts between models that return valid JSON and ones that wrap it in prose.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Files excluded from this check and why:
+      //   content-posts-ai.ts — definition file; callCreativeAI lives here, not a consumer
+      //   brand-identity.ts   — uses parseJsonFallback for DB column parsing, not AI output;
+      //                         its callCreativeAI calls correctly return prose (no json: needed)
+      const JSON_MODE_EXCLUSIONS = new Set([
+        path.join(ROOT, 'server/content-posts-ai.ts'),
+        path.join(ROOT, 'server/brand-identity.ts'),
+      ]);
+      for (const file of files) {
+        if (JSON_MODE_EXCLUSIONS.has(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Only flag files that call both callCreativeAI AND parseJsonFallback.
+        if (!content.includes('callCreativeAI') || !content.includes('parseJsonFallback')) continue;
+        // Walk each callCreativeAI block. If ANY call lacks `json:`, flag the
+        // file at its first such call's line so the developer has a jump target.
+        const lines = content.split('\n');
+        let unsafeCount = 0;
+        let firstUnsafeLine = -1;
+        const calls = content.split('callCreativeAI(').slice(1); // one entry per call
+        let cursor = 0;
+        for (const block of calls) {
+          // Advance cursor past this call's opening paren to find its line
+          cursor = content.indexOf('callCreativeAI(', cursor);
+          if (cursor === -1) break;
+          const lineNum = content.slice(0, cursor).split('\n').length;
+          cursor += 'callCreativeAI('.length;
+          const closeParen = block.indexOf(')');
+          const callBlock = closeParen > 0 ? block.slice(0, closeParen) : block.slice(0, 300);
+          if (!callBlock.includes('json:')) {
+            unsafeCount++;
+            if (firstUnsafeLine === -1) firstUnsafeLine = lineNum;
+          }
+        }
+        if (unsafeCount > 0) {
+          hits.push({
+            file,
+            line: firstUnsafeLine > 0 ? firstUnsafeLine : 1,
+            text: `${unsafeCount} callCreativeAI block(s) missing json: flag — ${lines[firstUnsafeLine - 1]?.trim() ?? ''}`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Brand-engine routes must use `requireWorkspaceAccess`, not
+    // `requireAuth`. The admin panel authenticates via HMAC token (global
+    // gate); `requireAuth` only accepts JWTs and would 401 every admin
+    // call. See Auth Conventions in CLAUDE.md. Suppress with `// auth-ok`
+    // if you intentionally want JWT-only access on a specific handler.
+    name: 'requireAuth in brand-engine route files (should be requireWorkspaceAccess)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    // Doc-only: the customCheck below filters hatches via `hasHatch(lines, i,
+    // '// auth-ok')` — this `excludeLines` entry is a no-op at runtime but
+    // drives the `Escape hatch` column of docs/rules/automated-rules.md via
+    // `generate-rules-doc.ts::describeHatch`.
+    excludeLines: ['// auth-ok'],
+    message: 'Admin panel uses HMAC token; requireAuth only accepts JWTs. Use requireWorkspaceAccess. See Auth Conventions in CLAUDE.md. Suppress with // auth-ok if intentionally JWT-only.',
+    severity: 'error',
+    rationale: 'requireAuth on brand-engine routes 401s every admin call because the admin panel authenticates via HMAC, not JWT.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        // Match by basename so the harness can test this rule against fixture
+        // files under tmpdir. The six brand-engine routes have unique,
+        // unambiguous filenames — there is no other `voice-calibration.ts`
+        // (or siblings) anywhere in the repo that could shadow them.
+        if (!BRAND_ENGINE_ROUTE_BASENAMES.has(path.basename(file))) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Match `requireAuth` as an identifier reference (middleware chain),
+          // not just as a function call. Express middleware is passed by
+          // reference: `router.get(path, requireAuth, handler)`.
+          if (!/\brequireAuth\b/.test(line)) continue;
+          // Skip import statements and JSDoc comments — the rule only flags
+          // actual usage sites, not the import line itself.
+          if (/^\s*import\b/.test(line)) continue;
+          if (/^\s*\*/.test(line)) continue;
+          // Skip the function definition line (shouldn't exist in routes, but
+          // defensive — if auth.ts is ever misplaced, don't flag its declaration).
+          if (/\bfunction\s+requireAuth\b/.test(line)) continue;
+          if (hasHatch(lines, i, '// auth-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Catches the BrandscriptTab SectionEditorCard pattern where a dirty
+    // check recomputed against the live prop prevents an external-sync
+    // useEffect from ever firing. Correct pattern uses a useRef to track
+    // the last-synced prop. Suppress with `// sync-ok` on the guard line.
+    name: 'useEffect external-sync dirty guard against the live prop',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    // Doc-only: the customCheck below filters hatches via `hasHatch(fileLines,
+    // lineIdx, '// sync-ok')` — this `excludeLines` entry is a no-op at
+    // runtime but drives the `Escape hatch` column of
+    // docs/rules/automated-rules.md via `generate-rules-doc.ts::describeHatch`.
+    excludeLines: ['// sync-ok'],
+    message: 'The dirty check is recomputed against the new prop on every render, so it always reads "dirty" the moment an external update arrives — the sync skips and the user sees stale content. Track the last-synced prop in a useRef. See src/components/brand/BrandscriptTab.tsx. Suppress with // sync-ok on the guard line.',
+    severity: 'error',
+    rationale: 'Comparing a dirty flag against the live prop (not a ref) prevents external-sync useEffects from ever firing after an update arrives — classic stale-state bug.',
+    claudeMdRef: '#ui-ux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('useEffect') || !content.includes('isDirty')) continue;
+
+        // Walk every useEffect block and check whether its body contains
+        // `if (!isDirty)` (or a near-synonym) followed by a setState call.
+        // If so, also confirm the file defines `isDirty` as a comparison
+        // against a prop/state field — i.e. a recomputed-each-render value,
+        // not a ref.
+        const fileLines = content.split('\n');
+        const effectRegex = /useEffect\s*\(\s*\(\s*\)\s*=>\s*\{/g;
+        let match: RegExpExecArray | null;
+        while ((match = effectRegex.exec(content)) !== null) {
+          const start = match.index + match[0].length - 1; // position of '{'
+          let depth = 0;
+          let i = start;
+          while (i < content.length) {
+            const ch = content[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            i++;
+          }
+          if (i >= content.length) break;
+          const body = content.slice(start, i + 1);
+          const guardRegex = /if\s*\(\s*!\s*(isDirty|isEdited|hasChanges|hasEdits|hasUnsavedChanges)\s*\)\s*\{?\s*set[A-Z]\w*\s*\(/;
+          const guardMatch = body.match(guardRegex);
+          if (!guardMatch) continue;
+
+          // Compute file-relative line index (0-based) for the guard line.
+          const lineStartInBody = body.lastIndexOf('\n', body.indexOf(guardMatch[0])) + 1;
+          const absoluteIndex = start + lineStartInBody;
+          const lineNumber = content.slice(0, absoluteIndex).split('\n').length;
+          const lineIdx = lineNumber - 1;
+
+          // Check the matched line AND the preceding line for the suppression
+          // marker. hasHatch gives inline + one-line-above semantics matching
+          // every other hatch-ok hatch in this file.
+          if (hasHatch(fileLines, lineIdx, '// sync-ok')) continue;
+
+          const flagName = guardMatch[1];
+          const dirtyDefRegex = new RegExp(`const\\s+${flagName}\\s*=\\s*([^;\\n]+)`);
+          const dirtyDef = content.match(dirtyDefRegex);
+          if (!dirtyDef) continue;
+          if (dirtyDef[1].includes('.current')) continue; // already ref-based
+
+          hits.push({ file, line: lineNumber, text: (fileLines[lineIdx] ?? '').trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and
+    // src/constants.ts. They can't share a runtime module (different
+    // module resolution), so this check verifies the two files declare
+    // identical values. A drift means the studio name/URL shown in the
+    // admin UI disagrees with the one the server uses in emails, AI
+    // prompts, etc.
+    name: 'Constants in sync (STUDIO_NAME, STUDIO_URL)',
+    fileGlobs: ['constants.ts'],
+    exclude: ['.test.ts'],
+    displayScope: 'server/constants.ts + src/constants.ts',
+    message: 'Keep STUDIO_NAME and STUDIO_URL identical in server/constants.ts and src/constants.ts. The two files cannot share a runtime module due to differing module resolution, so drift is the only failure mode.',
+    severity: 'error',
+    rationale: 'STUDIO_NAME/STUDIO_URL drift silently desynchronizes the studio branding between the admin UI (src/) and server-generated content like emails and AI prompts (server/).',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      // Diff-mode: only run if either constants.ts is in scope.
+      // Full-scan: resolveCheckFileList returns any `constants.ts` it finds.
+      if (files.length === 0) return [];
+      const serverConst = path.join(ROOT, 'server/constants.ts');
+      const frontendConst = path.join(ROOT, 'src/constants.ts');
+      return compareStudioConstants(
+        readFileOrEmpty(serverConst),
+        readFileOrEmpty(frontendConst),
+        serverConst,
+      );
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -1769,384 +2244,6 @@ for (const check of CHECKS) {
 
   if (check.severity === 'error') errors++;
   else warnings++;
-}
-
-// ─── Assembled-but-never-rendered slice field check ───────────────────────────
-//
-// Warns if a field is present in a *Slice interface in shared/types/intelligence.ts
-// but not referenced in the corresponding format*Section function in
-// server/workspace-intelligence.ts. These fields are assembled at query time but
-// silently dropped at format time — they never reach the AI prompt.
-//
-// Map of slice interface name → formatter function name
-const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> = [
-  { sliceName: 'SeoContextSlice', formatterName: 'formatSeoContextSection' },
-  { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
-  { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
-  { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
-  { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
-  { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
-  { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
-  { sliceName: 'OperationalSlice', formatterName: 'formatOperationalSection' },
-];
-
-// Fields intentionally not rendered (complex nested types, metadata, or rendering handled differently)
-// Also includes fields that ARE rendered but accessed via destructuring or local variable
-// (e.g. `const { bySeverity } = insights`) which the property-access regex won't catch.
-const KNOWN_UNRENDERED_FIELDS = new Set([
-  // SeoContextSlice
-  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
-  // InsightsSlice
-  'byType', 'forPage',
-  // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
-  'bySeverity',
-  // LearningsSlice
-  'forPage', 'topWins', 'winRateByActionType',
-  // ContentPipelineSlice
-  'rewritePlaybook', 'suggestedBriefs',
-  // SiteHealthSlice
-  'aeoReadiness', 'redirectDetails',
-  // PageProfileSlice
-  // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
-  'searchIntent',
-  // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
-  'insights',
-  // ClientSignalsSlice — these are rendered but may not appear by field name
-  // OperationalSlice
-  // none
-]);
-
-function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
-  // Find the interface declaration — use brace-depth counting to handle nested object types
-  const declStart = typeFileContent.search(new RegExp(`interface ${interfaceName}\\s*\\{`));
-  if (declStart === -1) return [];
-
-  const braceStart = typeFileContent.indexOf('{', declStart);
-  if (braceStart === -1) return [];
-
-  // Walk forward counting braces to find the matching closing brace of the interface itself
-  let depth = 0;
-  let i = braceStart;
-  while (i < typeFileContent.length) {
-    if (typeFileContent[i] === '{') depth++;
-    else if (typeFileContent[i] === '}') {
-      depth--;
-      if (depth === 0) break;
-    }
-    i++;
-  }
-  const body = typeFileContent.slice(braceStart + 1, i);
-
-  // Extract only top-level field names (depth=0 within the body, lines like `  fieldName:`)
-  // Walk the body tracking nested depth so we only extract interface-level keys
-  const fields: string[] = [];
-  let nestedDepth = 0;
-  for (const line of body.split('\n')) {
-    for (const ch of line) {
-      if (ch === '{') nestedDepth++;
-      else if (ch === '}') nestedDepth--;
-    }
-    if (nestedDepth === 0) {
-      const m = line.match(/^\s+(\w+)\??:/);
-      if (m) fields.push(m[1]);
-    }
-  }
-  return fields;
-}
-
-function extractFormatterBody(formatterFileContent: string, formatterName: string): string {
-  // Find the function body start
-  const fnStart = formatterFileContent.indexOf(`function ${formatterName}(`);
-  if (fnStart === -1) return '';
-
-  // Find the opening brace
-  const braceStart = formatterFileContent.indexOf('{', fnStart);
-  if (braceStart === -1) return '';
-
-  // Walk forward counting braces to find the closing brace
-  let depth = 0;
-  let i = braceStart;
-  while (i < formatterFileContent.length) {
-    if (formatterFileContent[i] === '{') depth++;
-    else if (formatterFileContent[i] === '}') {
-      depth--;
-      if (depth === 0) {
-        return formatterFileContent.slice(braceStart, i + 1);
-      }
-    }
-    i++;
-  }
-  return '';
-}
-
-// Only run this check when scanning the whole codebase (--all) or when workspace-intelligence.ts changed
-const shouldRunSliceCheck = SCAN_ALL || changedFiles.some(f =>
-  f.includes('workspace-intelligence.ts') || f.includes('intelligence.ts'),
-);
-
-if (shouldRunSliceCheck) {
-  const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
-  const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
-  let typesContent = '';
-  let serverContent = '';
-  try {
-    typesContent = readFileSync(typesPath, 'utf-8');
-    serverContent = readFileSync(serverPath, 'utf-8');
-  } catch {
-    // Files not found — skip
-  }
-
-  if (typesContent && serverContent) {
-    const unrenderedFindings: string[] = [];
-
-    for (const { sliceName, formatterName } of SLICE_FORMATTER_MAP) {
-      const fields = extractInterfaceFields(typesContent, sliceName);
-      const formatterBody = extractFormatterBody(serverContent, formatterName);
-
-      if (!formatterBody) {
-        unrenderedFindings.push(`  ${sliceName}: formatter ${formatterName} not found`);
-        continue;
-      }
-
-      for (const field of fields) {
-        if (KNOWN_UNRENDERED_FIELDS.has(field)) continue;
-        // Check if the field name appears in the formatter body (as a property access)
-        if (!formatterBody.includes(`.${field}`) && !formatterBody.includes(`['${field}']`) && !formatterBody.includes(`["${field}"]`)) {
-          unrenderedFindings.push(`  ${sliceName}.${field} → not referenced in ${formatterName}`);
-        }
-      }
-    }
-
-    if (unrenderedFindings.length > 0) {
-      console.log(`\n  ⚠ Assembled-but-never-rendered slice fields`);
-      console.log(`    These fields are assembled in *Slice types but not referenced in their format*Section formatter.`);
-      console.log(`    The data is assembled at query time but never reaches the AI prompt.`);
-      console.log(`    Add to KNOWN_UNRENDERED_FIELDS if intentionally omitted.`);
-      console.log(`    Fields (${unrenderedFindings.length}):`);
-      for (const finding of unrenderedFindings.slice(0, 10)) {
-        console.log(`      ${finding}`);
-      }
-      if (unrenderedFindings.length > 10) {
-        console.log(`      ... and ${unrenderedFindings.length - 10} more`);
-      }
-      warnings++;
-    } else {
-      console.log(`  ✓ Assembled-but-never-rendered slice fields`);
-    }
-  }
-}
-
-// ─── callCreativeAI json-mode consistency ────────────────────────────────────
-{
-  const findings: string[] = [];
-  const serverFiles = SCAN_ALL
-    ? getFiles(path.join(ROOT, 'server'), '*.ts')
-    : changedFiles
-        .filter(f => f.startsWith('server/') && f.endsWith('.ts'))
-        .map(f => path.join(ROOT, f));
-
-  // Files excluded from this check and why:
-  //   content-posts-ai.ts — definition file; callCreativeAI lives here, not a consumer
-  //   brand-identity.ts   — uses parseJsonFallback for DB column parsing, not AI output;
-  //                         its callCreativeAI calls correctly return prose (no json: needed)
-  const JSON_MODE_EXCLUSIONS = new Set([
-    path.join(ROOT, 'server/content-posts-ai.ts'),
-    path.join(ROOT, 'server/brand-identity.ts'),
-  ]);
-
-  for (const file of serverFiles) {
-    if (JSON_MODE_EXCLUSIONS.has(file)) continue;
-    let content: string;
-    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
-    // Only flag files that call both callCreativeAI and parseJsonFallback
-    if (!content.includes('callCreativeAI') || !content.includes('parseJsonFallback')) continue;
-    // If every callCreativeAI invocation in the file includes json: true, we're fine.
-    // Flag if there are any callCreativeAI blocks that lack json: true or json: false.
-    const calls = content.split('callCreativeAI(').slice(1); // one entry per call
-    const unsafeCalls = calls.filter(block => {
-      const closeParen = block.indexOf(')');
-      const callBlock = closeParen > 0 ? block.slice(0, closeParen) : block.slice(0, 300);
-      return !callBlock.includes('json:');
-    });
-    if (unsafeCalls.length > 0) {
-      findings.push(`  ${path.relative(ROOT, file)} — ${unsafeCalls.length} callCreativeAI block(s) missing json: flag`);
-    }
-  }
-  if (findings.length > 0) {
-    console.log(`\n  ⚠ callCreativeAI without json: flag in files that use parseJsonFallback`);
-    console.log(`    Add json: true when the result is parsed as JSON, json: false when prose.`);
-    for (const f of findings) console.log(f);
-    warnings++;
-  } else {
-    console.log(`  ✓ callCreativeAI json-mode consistency`);
-  }
-}
-
-// ─── Brand-engine routes: requireWorkspaceAccess not requireAuth ──────────────
-{
-  const brandEngineRoutes = [
-    'server/routes/voice-calibration.ts',
-    'server/routes/discovery-ingestion.ts',
-    'server/routes/brand-identity.ts',
-    'server/routes/brandscript.ts',
-    'server/routes/page-strategy.ts',
-    'server/routes/copy-pipeline.ts',
-  ];
-  const findings: string[] = [];
-  for (const rel of brandEngineRoutes) {
-    const file = path.join(ROOT, rel);
-    let content: string;
-    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
-    // requireAuth in brand-engine routes is wrong — admin panel uses HMAC token (global gate)
-    // and client access uses requireWorkspaceAccess. requireAuth (JWT-only) would 401 both.
-    if (content.includes('requireAuth(') && !content.includes('// auth-ok')) {
-      findings.push(`  ${rel}`);
-    }
-  }
-  if (findings.length > 0) {
-    console.log(`\n  ✗ requireAuth in brand-engine route files (should be requireWorkspaceAccess)`);
-    console.log(`    Admin panel uses HMAC token; requireAuth only accepts JWTs.`);
-    console.log(`    See Auth Conventions in CLAUDE.md.`);
-    for (const f of findings) console.log(f);
-    errors++;
-  } else {
-    console.log(`  ✓ Brand-engine routes: requireWorkspaceAccess (not requireAuth)`);
-  }
-}
-
-// ─── useEffect external-sync dirty guard against the live prop ───────────────
-//
-// Catches the BrandscriptTab SectionEditorCard pattern:
-//
-//   const [content, setContent] = useState(section.content ?? '');
-//   const isDirty = content !== (section.content ?? '');     // ← live prop
-//   useEffect(() => {
-//     if (!isDirty) setContent(section.content ?? '');       // ← never fires
-//   }, [section.content]);
-//
-// `isDirty` is recomputed against the *new* prop on every render. The moment
-// an external update arrives (e.g. via a WS-driven React Query refetch), the
-// new prop differs from the old local state, so `isDirty` is `true` and the
-// sync skips — leaving stale content in the textarea.
-//
-// Correct pattern: track the last-synced prop in a `useRef`, gate the sync on
-// `content !== lastSyncedRef.current`, and update the ref after each sync.
-// See `src/components/brand/BrandscriptTab.tsx`.
-//
-// Suppression: append `// sync-ok` to the `if (!isDirty)` line.
-{
-  const findings: string[] = [];
-  // We only need to look at .tsx files (the pattern requires React state).
-  const tsxFiles: string[] = SCAN_ALL
-    ? getFiles(path.join(ROOT, 'src'), '*.tsx')
-    : changedFiles
-        .filter(f => f.endsWith('.tsx') && !EXCLUDED_DIRS.some(d => f.startsWith(d + '/')))
-        .map(f => path.join(ROOT, f));
-
-  for (const file of tsxFiles) {
-    let content: string;
-    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
-    if (!content.includes('useEffect') || !content.includes('isDirty')) continue;
-
-    // Walk every useEffect block and check whether its body contains `if (!isDirty)`
-    // (or a near-synonym) followed by a setState call. If so, also confirm the
-    // file defines `isDirty` as a comparison against a prop / state field — i.e.
-    // a recomputed-each-render value, not a ref.
-    const effectRegex = /useEffect\s*\(\s*\(\s*\)\s*=>\s*\{/g;
-    let match: RegExpExecArray | null;
-    while ((match = effectRegex.exec(content)) !== null) {
-      const start = match.index + match[0].length - 1; // position of '{'
-      // Walk braces to find the closing brace of the effect callback
-      let depth = 0;
-      let i = start;
-      while (i < content.length) {
-        const ch = content[i];
-        if (ch === '{') depth++;
-        else if (ch === '}') {
-          depth--;
-          if (depth === 0) break;
-        }
-        i++;
-      }
-      if (i >= content.length) break;
-      const body = content.slice(start, i + 1);
-      // Look for `if (!isDirty) set...` or split-line variant. Allow alternate
-      // dirty-flag names (isDirty | isEdited | hasChanges | hasEdits | hasUnsavedChanges).
-      const guardRegex = /if\s*\(\s*!\s*(isDirty|isEdited|hasChanges|hasEdits|hasUnsavedChanges)\s*\)\s*\{?\s*set[A-Z]\w*\s*\(/;
-      const guardMatch = body.match(guardRegex);
-      if (!guardMatch) continue;
-
-      // Check the matched line for the suppression marker.
-      const lineStartInBody = body.lastIndexOf('\n', body.indexOf(guardMatch[0])) + 1;
-      const lineEndInBody = body.indexOf('\n', lineStartInBody);
-      const guardLine = body.slice(lineStartInBody, lineEndInBody === -1 ? body.length : lineEndInBody);
-      if (guardLine.includes('// sync-ok')) continue;
-
-      // Confirm the file defines the dirty flag as a recomputed expression
-      // against another state/prop (vs reading a ref). We look for
-      // `const isDirty = ` followed by a comparison and no `.current`.
-      const flagName = guardMatch[1];
-      const dirtyDefRegex = new RegExp(`const\\s+${flagName}\\s*=\\s*([^;\\n]+)`);
-      const dirtyDef = content.match(dirtyDefRegex);
-      if (!dirtyDef) continue;
-      if (dirtyDef[1].includes('.current')) continue; // already ref-based
-
-      // Compute file-relative line number for the guard line.
-      const absoluteIndex = start + lineStartInBody;
-      const lineNumber = content.slice(0, absoluteIndex).split('\n').length;
-      findings.push(`  ${path.relative(ROOT, file)}:${lineNumber}  → ${guardLine.trim()}`);
-    }
-  }
-
-  if (findings.length > 0) {
-    console.log(`\n  ✗ useEffect external-sync dirty guard against the live prop`);
-    console.log(`    The dirty check is recomputed against the new prop on every render,`);
-    console.log(`    so it always reads "dirty" the moment an external update arrives —`);
-    console.log(`    the sync skips and the user sees stale content.`);
-    console.log(`    Track the last-synced prop in a useRef and compare against ref.current.`);
-    console.log(`    See src/components/brand/BrandscriptTab.tsx for the canonical fix.`);
-    console.log(`    Suppress with // sync-ok on the guard line if intentional.`);
-    console.log(`    Matches (${findings.length}):`);
-    for (const f of findings.slice(0, 5)) console.log(f);
-    if (findings.length > 5) console.log(`      ... and ${findings.length - 5} more`);
-    errors++;
-  } else {
-    console.log(`  ✓ useEffect external-sync dirty guard against the live prop`);
-  }
-}
-
-// ─── Constants sync check ─────────────────────────────────────────────────────
-// STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and src/constants.ts.
-// They can't share a runtime module (different module resolution), so this check
-// verifies they declare identical values.
-
-{
-  const serverConst = path.join(ROOT, 'server/constants.ts');
-  const frontendConst = path.join(ROOT, 'src/constants.ts');
-  try {
-    const serverSrc = readFileSync(serverConst, 'utf-8');
-    const frontendSrc = readFileSync(frontendConst, 'utf-8');
-    const extract = (src: string, name: string) => {
-      const m = src.match(new RegExp(`export const ${name}\\s*=\\s*['"]([^'"]+)['"]`));
-      return m?.[1] ?? null;
-    };
-    const mismatches: string[] = [];
-    for (const name of ['STUDIO_NAME', 'STUDIO_URL']) {
-      const sv = extract(serverSrc, name);
-      const fv = extract(frontendSrc, name);
-      if (sv !== fv) mismatches.push(`${name}: server='${sv}' vs frontend='${fv}'`);
-    }
-    if (mismatches.length > 0) {
-      console.log(`\n  ✗ Constants out of sync (server/constants.ts vs src/constants.ts)`);
-      console.log(`    Keep STUDIO_NAME and STUDIO_URL identical in both files.`);
-      for (const m of mismatches) console.log(`      ${m}`);
-      errors++;
-    } else {
-      console.log(`  ✓ Constants in sync (STUDIO_NAME, STUDIO_URL)`);
-    }
-  } catch {
-    // If either file is missing, the import checks will catch the real problem
-  }
 }
 
 // ─── Manual checklist ─────────────────────────────────────────────────────────

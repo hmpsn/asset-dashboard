@@ -33,6 +33,9 @@ import {
   checkDirectory,
   buildWorkspaceScopedTables,
   extractDbPrepareArg,
+  findUnrenderedSliceFields,
+  compareStudioConstants,
+  BRAND_ENGINE_ROUTE_BASENAMES,
   type Check,
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
@@ -1322,6 +1325,433 @@ describe('Rule: Raw fetch() in components', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Assembled-but-never-rendered slice fields
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Structural difference from the other rule harnesses: this rule's customCheck
+// always reads two hardcoded ROOT-relative files (`shared/types/intelligence.ts`
+// and `server/workspace-intelligence.ts`). A fixture-based runRule() test would
+// bypass the files parameter entirely. Instead, we test the pure helper
+// `findUnrenderedSliceFields(typesContent, serverContent, typesPath, serverPath)`
+// directly — the customCheck is a thin wrapper that reads from disk and forwards
+// to this helper.
+
+describe('Rule: Assembled-but-never-rendered slice fields', () => {
+  // Minimal synthetic types file. The helper walks SLICE_FORMATTER_MAP which
+  // includes 'SeoContextSlice' → 'formatSeoContextSection'; we provide a
+  // matching slice/formatter pair with exactly ONE field that the formatter
+  // does not reference. Other slices in the map are absent from the types
+  // string and produce "formatter not found" hits — we filter to the
+  // SeoContextSlice.widgetCount line for the trigger assertion.
+
+  it('flags a field declared in a Slice type but never referenced in its formatter', () => {
+    const typesSrc = lines(
+      "export interface SeoContextSlice {", //                         1
+      "  brandVoice: string;", //                                       2
+      "  widgetCount: number; // unused — silently dropped", //          3
+      "}", //                                                           4
+    );
+    const serverSrc = lines(
+      "function formatSeoContextSection(slice: SeoContextSlice) {",
+      "  return `Brand voice: ${slice.brandVoice}`;",
+      "}",
+    );
+    const hits = findUnrenderedSliceFields(typesSrc, serverSrc, 'types.ts', 'server.ts');
+    // widgetCount is the only unreferenced field on the slice we declared;
+    // SeoContextSlice otherwise has fields we don't emit in the types stub,
+    // so we expect exactly one hit on the widgetCount line.
+    const widgetCountHit = hits.find(h => h.text.includes('widgetCount'));
+    expect(widgetCountHit).toBeDefined();
+    expect(widgetCountHit?.line).toBe(3);
+    expect(widgetCountHit?.file).toBe('types.ts');
+  });
+
+  it('does not flag fields the formatter references via dot access', () => {
+    const typesSrc = lines(
+      "export interface SeoContextSlice {",
+      "  brandVoice: string;",
+      "  siteHealth: number;",
+      "}",
+    );
+    const serverSrc = lines(
+      "function formatSeoContextSection(slice: SeoContextSlice) {",
+      "  return [slice.brandVoice, slice.siteHealth].join('\\n');",
+      "}",
+    );
+    const hits = findUnrenderedSliceFields(typesSrc, serverSrc, 'types.ts', 'server.ts');
+    expect(hits.some(h => h.text.includes('brandVoice'))).toBe(false);
+    expect(hits.some(h => h.text.includes('siteHealth'))).toBe(false);
+  });
+
+  it('does not flag fields the formatter references via bracket access', () => {
+    const typesSrc = lines(
+      "export interface SeoContextSlice {",
+      "  brandVoice: string;",
+      "}",
+    );
+    const serverSrc = lines(
+      "function formatSeoContextSection(slice: SeoContextSlice) {",
+      "  return slice['brandVoice'];",
+      "}",
+    );
+    const hits = findUnrenderedSliceFields(typesSrc, serverSrc, 'types.ts', 'server.ts');
+    expect(hits.some(h => h.text.includes('brandVoice'))).toBe(false);
+  });
+
+  it('emits a "formatter not found" hit when the format*Section function is missing', () => {
+    const typesSrc = lines(
+      "export interface SeoContextSlice {",
+      "  brandVoice: string;",
+      "}",
+    );
+    // Empty server file — formatSeoContextSection is never declared.
+    const serverSrc = '';
+    const hits = findUnrenderedSliceFields(typesSrc, serverSrc, 'types.ts', 'server.ts');
+    // Empty serverSrc short-circuits the helper to [], confirming we don't
+    // blow up on a blank formatter file (the normal diff-mode fast-path).
+    expect(hits).toEqual([]);
+  });
+
+  it('returns [] when both inputs are empty (diff-mode short-circuit)', () => {
+    const hits = findUnrenderedSliceFields('', '', 'types.ts', 'server.ts');
+    expect(hits).toEqual([]);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: callCreativeAI without json: flag in files that use parseJsonFallback
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: callCreativeAI without json: flag in files that use parseJsonFallback', () => {
+  const RULE = 'callCreativeAI without json: flag in files that use parseJsonFallback';
+
+  it('flags a callCreativeAI call that lacks json: in a file that also uses parseJsonFallback', () => {
+    const file = write(
+      uniqPath('rule-cai-json', 'server/feature.ts'),
+      lines(
+        "import { callCreativeAI } from './openai-helpers.js';", //             1
+        "import { parseJsonFallback } from './db/json-validation.js';", //      2
+        "export async function run() {", //                                     3
+        "  const out = await callCreativeAI({ prompt: 'hi' });", //             4
+        "  return parseJsonFallback(out, {});", //                              5
+        "}", //                                                                 6
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('does not flag callCreativeAI when json: is present', () => {
+    const file = write(
+      uniqPath('rule-cai-json', 'server/with-json.ts'),
+      lines(
+        "import { callCreativeAI } from './openai-helpers.js';",
+        "import { parseJsonFallback } from './db/json-validation.js';",
+        "export async function run() {",
+        "  const out = await callCreativeAI({ prompt: 'hi', json: true });",
+        "  return parseJsonFallback(out, {});",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag callCreativeAI in a file that never uses parseJsonFallback', () => {
+    const file = write(
+      uniqPath('rule-cai-json', 'server/prose-only.ts'),
+      lines(
+        "import { callCreativeAI } from './openai-helpers.js';",
+        "export async function run() {",
+        "  const out = await callCreativeAI({ prompt: 'Write a tagline' });",
+        "  return out.trim();",
+        "}",
+      )
+    );
+    // Without parseJsonFallback in the same file, the rule does not fire —
+    // prose-mode callers are correct to omit `json:`.
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags mixed calls (some with json: true, some without)', () => {
+    // Only the second call is unsafe — the helper tracks an unsafeCount and
+    // flags the file on the FIRST unsafe line.
+    const file = write(
+      uniqPath('rule-cai-json', 'server/mixed.ts'),
+      lines(
+        "import { callCreativeAI } from './openai-helpers.js';", //           1
+        "import { parseJsonFallback } from './db/json-validation.js';", //    2
+        "export async function run() {", //                                   3
+        "  const a = await callCreativeAI({ prompt: 'one', json: true });", //4
+        "  const b = await callCreativeAI({ prompt: 'two' });", //            5 ← flagged
+        "  return [parseJsonFallback(a, {}), parseJsonFallback(b, {})];", //  6
+        "}", //                                                               7
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+    expect(hits[0].text).toContain('1 callCreativeAI');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: requireAuth in brand-engine route files (should be requireWorkspaceAccess)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: requireAuth in brand-engine route files (should be requireWorkspaceAccess)', () => {
+  const RULE = 'requireAuth in brand-engine route files (should be requireWorkspaceAccess)';
+  // Pick any basename from the canonical set so the test stays in sync if
+  // the brand-engine route list changes membership.
+  const BASENAME = [...BRAND_ENGINE_ROUTE_BASENAMES][0];
+
+  it('flags requireAuth in a brand-engine route file', () => {
+    const file = write(
+      uniqPath('rule-req-auth', `server/routes/${BASENAME}`),
+      lines(
+        "import { requireAuth } from '../auth.js';", //                     1
+        "import { Router } from 'express';", //                             2
+        "const router = Router();", //                                      3
+        "router.get('/api/voice/:id', requireAuth, (req, res) => {});", //  4
+        "export default router;", //                                        5
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('respects inline // auth-ok hatch on the route line', () => {
+    const file = write(
+      uniqPath('rule-req-auth', `server/routes/${BASENAME}`),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "import { Router } from 'express';",
+        "const router = Router();",
+        "router.get('/api/voice/:id', requireAuth, (req, res) => {}); // auth-ok",
+        "export default router;",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // auth-ok hatch on the line above the router.get call', () => {
+    const file = write(
+      uniqPath('rule-req-auth', `server/routes/${BASENAME}`),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "import { Router } from 'express';",
+        "const router = Router();",
+        "// auth-ok — intentionally JWT-only",
+        "router.get('/api/voice/:id', requireAuth, (req, res) => {});",
+        "export default router;",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a non-brand-engine route file that uses requireAuth', () => {
+    // Files whose basename is NOT in BRAND_ENGINE_ROUTE_BASENAMES are
+    // allowed to use requireAuth — e.g. users.ts and auth.ts are the
+    // canonical JWT-auth routes.
+    const file = write(
+      uniqPath('rule-req-auth', 'server/routes/users.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "import { Router } from 'express';",
+        "const router = Router();",
+        "router.get('/api/users/me', requireAuth, (req, res) => {});",
+        "export default router;",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a brand-engine route file that uses requireWorkspaceAccess', () => {
+    const file = write(
+      uniqPath('rule-req-auth', `server/routes/${BASENAME}`),
+      lines(
+        "import { requireWorkspaceAccess } from '../auth.js';",
+        "import { Router } from 'express';",
+        "const router = Router();",
+        "router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {});",
+        "export default router;",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: useEffect external-sync dirty guard against the live prop
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: useEffect external-sync dirty guard against the live prop', () => {
+  const RULE = 'useEffect external-sync dirty guard against the live prop';
+
+  it('flags a useEffect whose guard recomputes isDirty against the live prop', () => {
+    const file = write(
+      uniqPath('rule-sync-prop', 'src/components/EditorCard.tsx'),
+      lines(
+        "import { useEffect, useState } from 'react';", //                           1
+        "export function EditorCard(props: { value: string }) {", //                 2
+        "  const [local, setLocal] = useState(props.value);", //                     3
+        "  const isDirty = local !== props.value;", //                               4
+        "  useEffect(() => {", //                                                    5
+        "    if (!isDirty) setLocal(props.value);", //                               6
+        "  }, [props.value]);", //                                                   7
+        "  return null;", //                                                         8
+        "}", //                                                                      9
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(6);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('respects inline // sync-ok hatch on the guard line', () => {
+    const file = write(
+      uniqPath('rule-sync-prop', 'src/components/HatchInline.tsx'),
+      lines(
+        "import { useEffect, useState } from 'react';",
+        "export function EditorCard(props: { value: string }) {",
+        "  const [local, setLocal] = useState(props.value);",
+        "  const isDirty = local !== props.value;",
+        "  useEffect(() => {",
+        "    if (!isDirty) setLocal(props.value); // sync-ok",
+        "  }, [props.value]);",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // sync-ok hatch on the line above the guard', () => {
+    const file = write(
+      uniqPath('rule-sync-prop', 'src/components/HatchAbove.tsx'),
+      lines(
+        "import { useEffect, useState } from 'react';",
+        "export function EditorCard(props: { value: string }) {",
+        "  const [local, setLocal] = useState(props.value);",
+        "  const isDirty = local !== props.value;",
+        "  useEffect(() => {",
+        "    // sync-ok — parent never updates after mount",
+        "    if (!isDirty) setLocal(props.value);",
+        "  }, [props.value]);",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a useEffect whose dirty flag is tracked via a useRef', () => {
+    const file = write(
+      uniqPath('rule-sync-prop', 'src/components/RefBased.tsx'),
+      lines(
+        "import { useEffect, useRef, useState } from 'react';",
+        "export function EditorCard(props: { value: string }) {",
+        "  const [local, setLocal] = useState(props.value);",
+        "  const lastSynced = useRef(props.value);",
+        "  const isDirty = local !== lastSynced.current;",
+        "  useEffect(() => {",
+        "    if (!isDirty) {",
+        "      setLocal(props.value);",
+        "      lastSynced.current = props.value;",
+        "    }",
+        "  }, [props.value]);",
+        "  return null;",
+        "}",
+      )
+    );
+    // The isDirty definition contains `.current` — the rule skips it.
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Constants in sync (STUDIO_NAME, STUDIO_URL)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Structural difference from the other rule harnesses: this rule's customCheck
+// always reads two hardcoded ROOT-relative files (`server/constants.ts` and
+// `src/constants.ts`). A fixture-based runRule() test would bypass the files
+// parameter entirely. Instead, we test the pure helper
+// `compareStudioConstants(serverSrc, frontendSrc, serverPath)` directly — the
+// customCheck is a thin wrapper that reads from disk and forwards to this helper.
+
+describe('Rule: Constants in sync (STUDIO_NAME, STUDIO_URL)', () => {
+  it('flags a STUDIO_NAME drift between server and frontend constants', () => {
+    const serverSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn.studio';", //                1
+      "export const STUDIO_URL = 'https://hmpsn.studio';", //         2
+    );
+    const frontendSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn-studio';", // different!    1
+      "export const STUDIO_URL = 'https://hmpsn.studio';", //         2
+    );
+    const hits = compareStudioConstants(serverSrc, frontendSrc, 'server/constants.ts');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+    expect(hits[0].file).toBe('server/constants.ts');
+    expect(hits[0].text).toContain('STUDIO_NAME');
+    expect(hits[0].text).toContain("server='hmpsn.studio'");
+    expect(hits[0].text).toContain("frontend='hmpsn-studio'");
+  });
+
+  it('flags a STUDIO_URL drift between server and frontend constants', () => {
+    const serverSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn.studio';", //                1
+      "export const STUDIO_URL = 'https://hmpsn.studio';", //         2
+    );
+    const frontendSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn.studio';",
+      "export const STUDIO_URL = 'https://staging.hmpsn.studio';", // different!
+    );
+    const hits = compareStudioConstants(serverSrc, frontendSrc, 'server/constants.ts');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+    expect(hits[0].text).toContain('STUDIO_URL');
+  });
+
+  it('flags both constants when both drift', () => {
+    const serverSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn.studio';",
+      "export const STUDIO_URL = 'https://hmpsn.studio';",
+    );
+    const frontendSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn-studio';",
+      "export const STUDIO_URL = 'https://other.studio';",
+    );
+    const hits = compareStudioConstants(serverSrc, frontendSrc, 'server/constants.ts');
+    expect(hits).toHaveLength(2);
+    expect(hits.some(h => h.text.includes('STUDIO_NAME'))).toBe(true);
+    expect(hits.some(h => h.text.includes('STUDIO_URL'))).toBe(true);
+  });
+
+  it('does not flag when both constants match exactly', () => {
+    const serverSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn.studio';",
+      "export const STUDIO_URL = 'https://hmpsn.studio';",
+    );
+    const frontendSrc = lines(
+      "export const STUDIO_NAME = 'hmpsn.studio';",
+      "export const STUDIO_URL = 'https://hmpsn.studio';",
+    );
+    expect(compareStudioConstants(serverSrc, frontendSrc, 'server/constants.ts')).toEqual([]);
+  });
+
+  it('returns [] when either input is empty (diff-mode short-circuit)', () => {
+    expect(compareStudioConstants('', 'anything', 'server/constants.ts')).toEqual([]);
+    expect(compareStudioConstants('anything', '', 'server/constants.ts')).toEqual([]);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Meta-test: pinned customCheck rule names
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -1504,6 +1934,12 @@ describe('Meta: customCheck rule name registry', () => {
     'Raw string literal in broadcastToWorkspace() event arg',
     'Raw string literal in broadcast() event arg',
     'Raw fetch() in components',
+    // Migrated from inline blocks (PR #168 scaled-review I17)
+    'Assembled-but-never-rendered slice fields',
+    'callCreativeAI without json: flag in files that use parseJsonFallback',
+    'requireAuth in brand-engine route files (should be requireWorkspaceAccess)',
+    'useEffect external-sync dirty guard against the live prop',
+    'Constants in sync (STUDIO_NAME, STUDIO_URL)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **41** — 23 error, 18 warn.
+Total rules: **46** — 26 error, 20 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -39,6 +39,9 @@ advisory but tracked.
 | 21 | PATCH spread without nested merge | error | pattern | `server/routes/` | `// patch-spread-ok` | Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn’t mention. |
 | 22 | Public-portal mutation without addActivity | error | custom | `server/routes/public-portal.ts` | `// activity-ok` | Admins lose visibility into client portal engagement — writes performed by clients leave no trace in the activity feed. |
 | 23 | broadcastToWorkspace inside bridge callback | error | custom | `server/` | `// bridge-broadcast-ok` | Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards. |
+| 24 | requireAuth in brand-engine route files (should be requireWorkspaceAccess) | error | custom | `server/routes/` | `// auth-ok` | requireAuth on brand-engine routes 401s every admin call because the admin panel authenticates via HMAC, not JWT. |
+| 25 | useEffect external-sync dirty guard against the live prop | error | custom | `src/` | `// sync-ok` | Comparing a dirty flag against the live prop (not a ref) prevents external-sync useEffects from ever firing after an update arrives — classic stale-state bug. |
+| 26 | Constants in sync (STUDIO_NAME, STUDIO_URL) | error | custom | `server/constants.ts + src/constants.ts` | — | STUDIO_NAME/STUDIO_URL drift silently desynchronizes the studio branding between the admin UI (src/) and server-generated content like emails and AI prompts (server/). |
 
 ---
 
@@ -64,6 +67,8 @@ advisory but tracked.
 | 16 | Raw bulk_lookup string outside keywords type file | warn | pattern | `*.ts, *.tsx` | — | Use the 'bulk_lookup' literal only from shared/types/workspace.ts (PageKeywordMap.metricsSource). Raw string references in other files create undiscoverable magic values. |
 | 17 | Raw ai_estimate string in server files | warn | pattern | `server/` | — | The 'ai_estimate' metricsSource value must only be referenced from shared/types/workspace.ts. Use the shared type, not a raw string literal. |
 | 18 | Layout-driving state set in useEffect | warn | custom | `src/` | `// effect-layout-ok` | One-frame layout flash: the browser paints with stale layout state, then the effect runs and re-lays-out, producing visible jitter. |
+| 19 | Assembled-but-never-rendered slice fields | warn | custom | `shared/types/intelligence.ts + server/workspace-intelligence.ts` | — | A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss. |
+| 20 | callCreativeAI without json: flag in files that use parseJsonFallback | warn | custom | `server/` | — | callCreativeAI without an explicit json: flag silently drifts between models that return valid JSON and ones that wrap it in prose. |
 
 ---
 
