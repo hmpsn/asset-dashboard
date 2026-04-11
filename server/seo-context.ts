@@ -237,6 +237,15 @@ export function buildSeoContext(
           // real mismatch. The derivation matches the prompt-path check above
           // so shadow-mode and prompt-assembly stay in sync on what "voice
           // profile active" means.
+          //
+          // NOTE: shadow mode reads the profile FRESH here rather than reusing the
+          // profile read on the main path above. This is intentional — shadow mode
+          // runs asynchronously after the main result is already returned and
+          // cached, so the main-path snapshot may be stale by the time this block
+          // runs (e.g. a calibration transition landed in the meantime). Using the
+          // current DB state is the whole point of a parity check. The profile IS
+          // still passed into buildVoiceProfileContext below to avoid a fourth read
+          // inside that helper.
           const shadowProfile = getVoiceProfile(workspaceId);
           const voiceProfileActive =
             shadowProfile !== null &&
@@ -523,6 +532,13 @@ export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEm
  * which needs the profile independently for the authority rule) can pass it as `profileArg`
  * to avoid a second DB read. If omitted, the profile is fetched internally. Both paths
  * produce identical output — the parameter is a pure optimization, never a semantic change.
+ *
+ * Sentinel semantics: `profileArg === undefined` means "caller did not supply — fetch it";
+ * `profileArg === null` means "caller already checked, no profile exists — skip the fetch
+ * and return empty." We use `!== undefined` (strict) rather than a truthiness check because
+ * `getVoiceProfile()` returns `VoiceProfile | null`, so `null` is a legitimate caller-supplied
+ * value that must NOT trigger a re-read. A truthy check would re-read the DB for every caller
+ * that correctly passed `null`, defeating the optimization.
  */
 export function buildVoiceProfileContext(
   workspaceId: string,

@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **40** — 22 error, 18 warn.
+Total rules: **41** — 23 error, 18 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -20,24 +20,25 @@ advisory but tracked.
 | 2 | Forbidden hues (violet/indigo) in components | error | pattern | `*.ts, *.tsx` | — | violet- and indigo- are forbidden. Use teal, blue, or purple (admin only). |
 | 3 | Bare JSON.parse on server | error | pattern | `server/` | — | Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts. |
 | 4 | Hard-coded studio name | error | pattern | `*.ts, *.tsx` | — | Use the STUDIO_NAME / STUDIO_URL constant from src/constants.ts (frontend) or server/constants.ts (backend). |
-| 5 | z.array(z.unknown()) on server | error | pattern | `*.ts` | — | Use parseJsonSafeArray(raw, typedItemSchema, context) — z.unknown() bypasses per-item validation and requires unsafe casts. |
-| 6 | Direct listPages() outside workspace-data | error | pattern | `server/` | — | Use getWorkspacePages() from workspace-data.ts instead of calling listPages() directly. |
-| 7 | Direct buildSeoContext() call | error | pattern | `server/` | — | Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext(). |
-| 8 | Placeholder test assertion — expect(true).toBe(true) | error | pattern | `tests/` | — | expect(true).toBe(true) always passes and documents nothing. Replace with a real assertion that can actually fail. |
-| 9 | Bare JSON.parse on DB row column | error | pattern | `server/` | — | Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data. |
-| 10 | replaceAllPageKeywords called outside keyword-strategy route | error | pattern | `server/` | — | replaceAllPageKeywords() is a destructive bulk operation. Only call it from server/routes/keyword-strategy.ts. For incremental updates use upsertPageKeyword(). |
-| 11 | getBacklinksOverview called outside workspace-intelligence | error | pattern | `server/` | — | getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced. |
-| 12 | Silent bare catch in workspace-intelligence assemblers | error | pattern | `server/workspace-intelligence.ts` | — | Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum. |
-| 13 | useGlobalAdminEvents import restriction | error | custom | `*.ts, *.tsx` | `// global-events-ok` | Silent dead broadcast handlers: the frontend never receives the event and the UI appears stale until a manual refetch. |
-| 14 | Global keydown missing isContentEditable guard | error | custom | `src/` | `// keydown-ok` | Escape/Enter/arrow keys hijack text fields, destroying the user’s typing or closing modals from the wrong event. |
-| 15 | Multi-step DB writes outside db.transaction() | error | custom | `server/` | `// txn-ok` | Partial failure leaves the DB in an inconsistent state; retries then hit PRIMARY KEY violations and permanently block the operation. |
-| 16 | AI call before db.prepare without transaction guard | error | custom | `server/` | `// ai-race-ok` | Two concurrent handlers both observe “no existing row” during the AI call and both INSERT, creating permanent duplicate rows on a logical natural key. |
-| 17 | UPDATE/DELETE missing workspace_id scope | error | custom | `server/` | `// ws-scope-ok` | Cross-tenant read or write exposure: a forged row id or misrouted request can touch another workspace’s data if the auth layer is ever compromised. |
-| 18 | getOrCreate* function returns nullable | error | custom | `server/` | `// getorcreate-nullable-ok` | Dead `if (!result)` guard branches lie to reviewers about the function’s real shape and hide downstream assumptions that would fail on a genuine null. |
-| 19 | Record<string, unknown> in shared/types | error | pattern | `shared/types/` | `// record-unknown-ok` | Producer/consumer drift: field renames and semantic changes compile silently until a runtime bug surfaces in production. |
-| 20 | PATCH spread without nested merge | error | pattern | `server/routes/` | `// patch-spread-ok` | Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn’t mention. |
-| 21 | Public-portal mutation without addActivity | error | custom | `server/routes/public-portal.ts` | `// activity-ok` | Admins lose visibility into client portal engagement — writes performed by clients leave no trace in the activity feed. |
-| 22 | broadcastToWorkspace inside bridge callback | error | custom | `server/` | `// bridge-broadcast-ok` | Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards. |
+| 5 | formatBrandVoiceForPrompt reintroduction | error | pattern | `*.ts, *.tsx` | — | A generic format helper that wraps a raw authority-layered field bypasses the authority chain silently — the compiler cannot catch it because the raw field type is still `string`. |
+| 6 | z.array(z.unknown()) on server | error | pattern | `*.ts` | — | Use parseJsonSafeArray(raw, typedItemSchema, context) — z.unknown() bypasses per-item validation and requires unsafe casts. |
+| 7 | Direct listPages() outside workspace-data | error | pattern | `server/` | — | Use getWorkspacePages() from workspace-data.ts instead of calling listPages() directly. |
+| 8 | Direct buildSeoContext() call | error | pattern | `server/` | — | Use buildWorkspaceIntelligence({ slices: ["seoContext"] }) instead of buildSeoContext(). |
+| 9 | Placeholder test assertion — expect(true).toBe(true) | error | pattern | `tests/` | — | expect(true).toBe(true) always passes and documents nothing. Replace with a real assertion that can actually fail. |
+| 10 | Bare JSON.parse on DB row column | error | pattern | `server/` | — | Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data. |
+| 11 | replaceAllPageKeywords called outside keyword-strategy route | error | pattern | `server/` | — | replaceAllPageKeywords() is a destructive bulk operation. Only call it from server/routes/keyword-strategy.ts. For incremental updates use upsertPageKeyword(). |
+| 12 | getBacklinksOverview called outside workspace-intelligence | error | pattern | `server/` | — | getBacklinksOverview() is an expensive external API call. Only call it from server/workspace-intelligence.ts where caching and rate-limiting are enforced. |
+| 13 | Silent bare catch in workspace-intelligence assemblers | error | pattern | `server/workspace-intelligence.ts` | — | Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum. |
+| 14 | useGlobalAdminEvents import restriction | error | custom | `*.ts, *.tsx` | `// global-events-ok` | Silent dead broadcast handlers: the frontend never receives the event and the UI appears stale until a manual refetch. |
+| 15 | Global keydown missing isContentEditable guard | error | custom | `src/` | `// keydown-ok` | Escape/Enter/arrow keys hijack text fields, destroying the user’s typing or closing modals from the wrong event. |
+| 16 | Multi-step DB writes outside db.transaction() | error | custom | `server/` | `// txn-ok` | Partial failure leaves the DB in an inconsistent state; retries then hit PRIMARY KEY violations and permanently block the operation. |
+| 17 | AI call before db.prepare without transaction guard | error | custom | `server/` | `// ai-race-ok` | Two concurrent handlers both observe “no existing row” during the AI call and both INSERT, creating permanent duplicate rows on a logical natural key. |
+| 18 | UPDATE/DELETE missing workspace_id scope | error | custom | `server/` | `// ws-scope-ok` | Cross-tenant read or write exposure: a forged row id or misrouted request can touch another workspace’s data if the auth layer is ever compromised. |
+| 19 | getOrCreate* function returns nullable | error | custom | `server/` | `// getorcreate-nullable-ok` | Dead `if (!result)` guard branches lie to reviewers about the function’s real shape and hide downstream assumptions that would fail on a genuine null. |
+| 20 | Record<string, unknown> in shared/types | error | pattern | `shared/types/` | `// record-unknown-ok` | Producer/consumer drift: field renames and semantic changes compile silently until a runtime bug surfaces in production. |
+| 21 | PATCH spread without nested merge | error | pattern | `server/routes/` | `// patch-spread-ok` | Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn’t mention. |
+| 22 | Public-portal mutation without addActivity | error | custom | `server/routes/public-portal.ts` | `// activity-ok` | Admins lose visibility into client portal engagement — writes performed by clients leave no trace in the activity feed. |
+| 23 | broadcastToWorkspace inside bridge callback | error | custom | `server/` | `// bridge-broadcast-ok` | Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards. |
 
 ---
 
