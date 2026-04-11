@@ -548,33 +548,89 @@ export const CHECKS: Check[] = [
   },
   {
     name: 'Raw string literal in broadcastToWorkspace() event arg',
-    // Matches: broadcastToWorkspace(anything, 'some:event', ...) or broadcastToWorkspace(anything, "some:event", ...)
-    // Does NOT match: broadcastToWorkspace(wsId, WS_EVENTS.FOO, data) — no quote after the second comma
-    pattern: 'broadcastToWorkspace\\([^,]+,\\s*[\'"]',
+    // customCheck (was regex) — see Round 2 Task P1.3. The original pattern
+    // `broadcastToWorkspace\\([^,]+,\\s*[\'"]` embedded a literal `"`
+    // which, when interpolated into the outer `grep -E "${pattern}"`
+    // invocation in `checkDirectory`, closed the outer double-quote and
+    // mangled the shell command. `grep` errored; `|| true` swallowed the
+    // error; the runner reported ✓ while 36+ real violations existed
+    // (server/feedback.ts, server/routes/workspaces.ts, etc.).
+    // Silent-failure Category D (shell quoting). Fix: run the regex
+    // in-process as a JS regex — the shell never sees it.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/broadcast.ts'],
     excludeLines: ['// ws-event-ok'],
-    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
-    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
-    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add // ws-event-ok on the broadcast line or the line immediately above if intentional.',
+    // warn not error: ~36 pre-existing violations in unchanged files;
+    // new code is blocked by the changed-files scan. Upgrade to error
+    // once the Task B12 backfill is done.
     severity: 'warn',
+    rationale: 'Silent drift between broadcast emitter and frontend handler when an event string is typo\u2019d or renamed on one side only.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches `broadcastToWorkspace(anything, 'event', ...)` or the
+      // double-quoted variant. Does NOT match
+      // `broadcastToWorkspace(wsId, WS_EVENTS.FOO, data)` because the
+      // second arg does not start with a quote.
+      const bcastRe = /broadcastToWorkspace\s*\([^,]+,\s*['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('broadcastToWorkspace')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!bcastRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ws-event-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Raw string literal in broadcast() event arg',
-    // Matches standalone broadcast('event') but NOT _broadcast('event') or _broadcastToWorkspace('event').
-    // Uses (^|[^a-zA-Z_]) to require broadcast() is not preceded by a letter/underscore,
-    // excluding private wrappers like websocket.ts's _broadcast() which use string literals.
-    // Note: grep -E does not support lookbehind, so we use a character class exclusion instead.
-    pattern: '(^|[^a-zA-Z_])broadcast\\(\\s*[\'"]',
+    // customCheck (was regex) — same Category D shell-quoting bug as the
+    // broadcastToWorkspace rule above. Original pattern was
+    // `(^|[^a-zA-Z_])broadcast\\(\\s*[\'"]`. Preserves the original
+    // exclusion semantics: `broadcast(` is flagged only when not preceded
+    // by a letter or underscore, so private wrappers like
+    // `_broadcast()` and `websocket._broadcast()` do not trigger.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/broadcast.ts'],
     excludeLines: ['// ws-event-ok'],
-    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
-    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
-    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add // ws-event-ok on the broadcast line or the line immediately above if intentional.',
     severity: 'warn',
+    rationale: 'Silent drift between broadcast emitter and frontend handler when an event string is typo\u2019d or renamed on one side only.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Note the non-capturing group — we only care that `broadcast` is
+      // the call being made, not what precedes it. The `(?:^|[^a-zA-Z_])`
+      // lookbehind-equivalent preserves the original rule's exclusion of
+      // `_broadcast(` and `foo.broadcast(` — the latter would match the
+      // `.` and be rejected. JS regex doesn't need shell escaping so
+      // both quote styles work directly.
+      const bcastRe = /(?:^|[^a-zA-Z_])broadcast\s*\(\s*['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('broadcast(')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!bcastRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ws-event-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     // Catches always-true placeholder test assertions committed as real tests.

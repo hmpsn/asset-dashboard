@@ -966,6 +966,202 @@ describe('Rule: useGlobalAdminEvents import restriction', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Raw string literal in broadcastToWorkspace() event arg
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Silent-failure Category D (shell quoting). The original regex contained
+// `[\'"]` which, when interpolated into `grep -E "${pattern}" "${file}"`,
+// closed the outer double-quote and mangled the shell command. grep errored;
+// `|| true` swallowed the error; the runner reported ✓ while the codebase
+// contained 36+ real violations (server/feedback.ts:148 et al). Round 2
+// converts the rule to a customCheck so the JS regex runs in-process and
+// the shell never sees the pattern.
+
+describe('Rule: Raw string literal in broadcastToWorkspace() event arg', () => {
+  const RULE = 'Raw string literal in broadcastToWorkspace() event arg';
+
+  it('flags a single-quoted event string', () => {
+    const file = write(
+      uniqPath('rule-bcast-ws', 'server/trigger-single.ts'),
+      lines(
+        "import { broadcastToWorkspace } from './broadcast.js';",                 // 1
+        "export function notify(wsId: string) {",                                  // 2
+        "  broadcastToWorkspace(wsId, 'feedback:new', { id: 1 });",                // 3
+        "}",                                                                        // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags a double-quoted event string (the Category D bug)', () => {
+    const file = write(
+      uniqPath('rule-bcast-ws', 'server/trigger-double.ts'),
+      lines(
+        'import { broadcastToWorkspace } from "./broadcast.js";',                  // 1
+        'export function notify(wsId: string) {',                                   // 2
+        '  broadcastToWorkspace(wsId, "feedback:new", { id: 1 });',                 // 3
+        '}',                                                                         // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag WS_EVENTS.* constant references', () => {
+    const file = write(
+      uniqPath('rule-bcast-ws', 'server/negative-constant.ts'),
+      lines(
+        "import { broadcastToWorkspace } from './broadcast.js';",                  // 1
+        "import { WS_EVENTS } from './ws-events.js';",                              // 2
+        "export function notify(wsId: string) {",                                   // 3
+        "  broadcastToWorkspace(wsId, WS_EVENTS.FEEDBACK_NEW, { id: 1 });",         // 4
+        "}",                                                                         // 5
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // ws-event-ok hatch on the broadcast line', () => {
+    const file = write(
+      uniqPath('rule-bcast-ws', 'server/hatch-inline.ts'),
+      lines(
+        "import { broadcastToWorkspace } from './broadcast.js';",                                // 1
+        "export function notify(wsId: string) {",                                                 // 2
+        "  broadcastToWorkspace(wsId, 'feedback:new', { id: 1 }); // ws-event-ok",                // 3
+        "}",                                                                                       // 4
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // ws-event-ok on the line immediately above (multi-line calls)', () => {
+    // Multi-line broadcastToWorkspace calls can't fit the hatch inline
+    // without breaking syntax. The rule must honour a hatch on the line above.
+    const file = write(
+      uniqPath('rule-bcast-ws', 'server/hatch-above.ts'),
+      lines(
+        "import { broadcastToWorkspace } from './broadcast.js';",   // 1
+        "export function notify(wsId: string) {",                    // 2
+        "  // ws-event-ok — legacy event name, scheduled for rename", // 3
+        "  broadcastToWorkspace(wsId, 'feedback:new', { id: 1 });",  // 4
+        "}",                                                          // 5
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Raw string literal in broadcast() event arg
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Same Category D shell-quoting bug as the broadcastToWorkspace() rule. The
+// pattern `(^|[^a-zA-Z_])broadcast\(\s*[\'"]` also collides with the outer
+// double-quoted shell invocation. Converted to customCheck for the same
+// reason, and the `(^|[^a-zA-Z_])` exclusion is preserved so private
+// wrappers like `_broadcast()` and any future `.broadcast()` method calls
+// do not trigger.
+
+describe('Rule: Raw string literal in broadcast() event arg', () => {
+  const RULE = 'Raw string literal in broadcast() event arg';
+
+  it('flags standalone broadcast() with a single-quoted event', () => {
+    const file = write(
+      uniqPath('rule-bcast-global', 'server/trigger-single.ts'),
+      lines(
+        "import { broadcast } from './broadcast.js';",     // 1
+        "export function notify() {",                       // 2
+        "  broadcast('workspace:created', { id: 1 });",     // 3
+        "}",                                                 // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags standalone broadcast() with a double-quoted event', () => {
+    const file = write(
+      uniqPath('rule-bcast-global', 'server/trigger-double.ts'),
+      lines(
+        'import { broadcast } from "./broadcast.js";',      // 1
+        'export function notify() {',                        // 2
+        '  broadcast("workspace:created", { id: 1 });',      // 3
+        '}',                                                  // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag private wrappers like _broadcast()', () => {
+    const file = write(
+      uniqPath('rule-bcast-global', 'server/private-wrapper.ts'),
+      lines(
+        "function _broadcast(event: string, data: unknown) {", // 1
+        "  _broadcast('admin:raw', data);",                     // 2 ← should NOT trigger (leading underscore)
+        "}",                                                     // 3
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag broadcastToWorkspace() calls (different function)', () => {
+    const file = write(
+      uniqPath('rule-bcast-global', 'server/scoped-variant.ts'),
+      lines(
+        "import { broadcastToWorkspace } from './broadcast.js';",          // 1
+        "export function notify(wsId: string) {",                           // 2
+        "  broadcastToWorkspace(wsId, 'feedback:new', { id: 1 });",         // 3
+        "}",                                                                 // 4
+      )
+    );
+    // The rule is scoped to standalone `broadcast(` — the `broadcastToWorkspace`
+    // rule catches the scoped variant separately.
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag ADMIN_EVENTS.* constant references', () => {
+    const file = write(
+      uniqPath('rule-bcast-global', 'server/negative-constant.ts'),
+      lines(
+        "import { broadcast } from './broadcast.js';",                 // 1
+        "import { ADMIN_EVENTS } from './ws-events.js';",               // 2
+        "export function notify() {",                                    // 3
+        "  broadcast(ADMIN_EVENTS.WORKSPACE_CREATED, { id: 1 });",       // 4
+        "}",                                                              // 5
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // ws-event-ok inline and on preceding line', () => {
+    const inline = write(
+      uniqPath('rule-bcast-global', 'server/hatch-inline.ts'),
+      lines(
+        "import { broadcast } from './broadcast.js';",                            // 1
+        "broadcast('workspace:created', { id: 1 }); // ws-event-ok",              // 2
+      )
+    );
+    expect(runRule(RULE, [inline])).toHaveLength(0);
+
+    const above = write(
+      uniqPath('rule-bcast-global', 'server/hatch-above.ts'),
+      lines(
+        "import { broadcast } from './broadcast.js';",                            // 1
+        "// ws-event-ok",                                                          // 2
+        "broadcast('workspace:created', { id: 1 });",                              // 3
+      )
+    );
+    expect(runRule(RULE, [above])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Meta-test: pinned customCheck rule names
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -1063,6 +1259,8 @@ describe('Meta: customCheck rule name registry', () => {
     'broadcastToWorkspace inside bridge callback',
     'Layout-driving state set in useEffect',
     'useGlobalAdminEvents import restriction',
+    'Raw string literal in broadcastToWorkspace() event arg',
+    'Raw string literal in broadcast() event arg',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
