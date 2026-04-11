@@ -132,6 +132,36 @@ export function getOrCreateVoiceProfile(workspaceId: string): VoiceProfile & { s
   return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
 }
 
+// Legal status transitions for the voice profile state machine. The critical
+// constraint is that `draft → calibrated` is FORBIDDEN — the only way to reach
+// `calibrated` is through `calibrating`, which runs the calibration pipeline
+// that populates voiceDNA + guardrails. Skipping it would let a caller flip
+// the status without any calibration data, breaking Layer 2 buildSystemPrompt
+// (which branches on `status === 'calibrated'` to inject DNA/guardrails and
+// would then inject `undefined`/`null` values). See PR #168 scaled-review
+// finding I5. Same-state "transitions" (e.g. draft → draft) are always legal
+// no-ops.
+const LEGAL_STATUS_TRANSITIONS: Record<VoiceProfileStatus, ReadonlySet<VoiceProfileStatus>> = {
+  draft: new Set<VoiceProfileStatus>(['draft', 'calibrating']),
+  calibrating: new Set<VoiceProfileStatus>(['calibrating', 'draft', 'calibrated']),
+  calibrated: new Set<VoiceProfileStatus>(['calibrated', 'draft', 'calibrating']),
+};
+
+/**
+ * Thrown when a caller attempts an illegal voice profile status transition.
+ * Callers should catch this and return a 400 to the client rather than 500.
+ */
+export class VoiceProfileStateTransitionError extends Error {
+  readonly from: VoiceProfileStatus;
+  readonly to: VoiceProfileStatus;
+  constructor(from: VoiceProfileStatus, to: VoiceProfileStatus) {
+    super(`Illegal voice profile transition: ${from} → ${to}. Legal transitions from ${from}: ${[...LEGAL_STATUS_TRANSITIONS[from]].filter(s => s !== from).join(', ') || '(none)'}`);
+    this.name = 'VoiceProfileStateTransitionError';
+    this.from = from;
+    this.to = to;
+  }
+}
+
 // Always returns a profile — `getOrCreateVoiceProfile` creates one if missing,
 // so there is no null path. Typed as non-nullable so callers don't need a
 // dead-code guard.
@@ -140,6 +170,16 @@ export function updateVoiceProfile(
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
 ): VoiceProfile & { samples: VoiceSample[] } {
   const profile = getOrCreateVoiceProfile(workspaceId);
+  // Enforce state-machine at the write boundary. Any caller — route handler,
+  // internal flow, test harness — flows through here, so the guard catches
+  // every path without depending on Zod-schema discipline at the edge.
+  if (updates.status !== undefined && updates.status !== profile.status) {
+    const legal = LEGAL_STATUS_TRANSITIONS[profile.status];
+    if (!legal.has(updates.status)) {
+      log.warn({ workspaceId, from: profile.status, to: updates.status }, 'rejected illegal voice profile state transition');
+      throw new VoiceProfileStateTransitionError(profile.status, updates.status);
+    }
+  }
   const now = new Date().toISOString();
   stmts().updateProfile.run({
     id: profile.id,

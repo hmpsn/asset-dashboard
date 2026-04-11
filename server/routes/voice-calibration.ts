@@ -6,6 +6,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import {
   getOrCreateVoiceProfile, updateVoiceProfile,
+  VoiceProfileStateTransitionError,
   addVoiceSample, deleteVoiceSample,
   listCalibrationSessions,
   generateCalibrationVariations, refineVariation,
@@ -83,12 +84,22 @@ router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (re
 
 // Update voice profile (DNA, guardrails, modifiers, status)
 router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(updateVoiceProfileSchema), (req, res) => {
-  const result = updateVoiceProfile(req.params.workspaceId, req.body);
-  addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
-  clearSeoContextCache(req.params.workspaceId);
-  invalidateIntelligenceCache(req.params.workspaceId);
-  res.json(result);
+  try {
+    const result = updateVoiceProfile(req.params.workspaceId, req.body);
+    addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
+    clearSeoContextCache(req.params.workspaceId);
+    invalidateIntelligenceCache(req.params.workspaceId);
+    res.json(result);
+  } catch (err) {
+    // Illegal status transitions (e.g. draft → calibrated) are user-input errors,
+    // not server failures. Return 400 with a descriptive message so the client
+    // can surface "finish calibration first" rather than a generic 500.
+    if (err instanceof VoiceProfileStateTransitionError) {
+      return res.status(400).json({ error: err.message, from: err.from, to: err.to });
+    }
+    throw err;
+  }
 });
 
 // List calibration sessions

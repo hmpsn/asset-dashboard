@@ -24,7 +24,12 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import db from '../../server/db/index.js';
 import { buildSeoContext, clearSeoContextCache } from '../../server/seo-context.js';
-import { getOrCreateVoiceProfile, addVoiceSample, updateVoiceProfile } from '../../server/voice-calibration.js';
+import {
+  getOrCreateVoiceProfile,
+  addVoiceSample,
+  updateVoiceProfile,
+  VoiceProfileStateTransitionError,
+} from '../../server/voice-calibration.js';
 import type { VoiceDNA, VoiceGuardrails } from '../../shared/types/brand-engine.js';
 
 const LEGACY_VOICE_TEXT = 'Professional but warm. Active voice. No filler.';
@@ -108,6 +113,8 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     seeded = seedWorkspaceWithLegacyVoice();
     getOrCreateVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
+    // State machine enforces draft → calibrating → calibrated — cannot skip calibrating.
+    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
       status: 'calibrated',
       voiceDNA: SENTINEL_DNA,
@@ -135,6 +142,8 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     // legacy block in the USER prompt alongside calibrated Layer 2 content.
     seeded = seedWorkspaceWithLegacyVoice();
     getOrCreateVoiceProfile(seeded.workspaceId);
+    // State machine enforces draft → calibrating → calibrated — cannot skip calibrating.
+    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
       status: 'calibrated',
       voiceDNA: SENTINEL_DNA,
@@ -147,5 +156,107 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     // Legacy is NOT in the user-prompt context — calibrated Layer 2 owns voice.
     expect(ctx.fullContext).not.toContain(LEGACY_VOICE_TEXT);
     expect(ctx.brandVoiceBlock).not.toContain(LEGACY_VOICE_TEXT);
+  });
+});
+
+/**
+ * State-machine guard tests for `updateVoiceProfile`. PR #168 review I5:
+ * the admin UI (and any future caller) must never be able to jump a profile
+ * directly from `draft` to `calibrated`, because `buildSystemPrompt` layer-2
+ * voice injection branches on `status === 'calibrated'` and will emit empty
+ * DNA/guardrails blocks if those fields weren't populated during the skipped
+ * `calibrating` phase.
+ *
+ * The guard lives inside `updateVoiceProfile` so every write path — route
+ * handler, internal flow, test — flows through it.
+ */
+describe('updateVoiceProfile — state machine guard', () => {
+  let seeded: SeededWs | null = null;
+
+  afterEach(() => {
+    seeded?.cleanup();
+    seeded = null;
+  });
+
+  it('rejects illegal draft → calibrated transition', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId); // creates draft
+
+    expect(() =>
+      updateVoiceProfile(seeded!.workspaceId, {
+        status: 'calibrated',
+        voiceDNA: SENTINEL_DNA,
+        guardrails: SENTINEL_GUARDRAILS,
+      }),
+    ).toThrow(VoiceProfileStateTransitionError);
+  });
+
+  it('error carries structured from/to fields for 400 response mapping', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+
+    try {
+      updateVoiceProfile(seeded.workspaceId, { status: 'calibrated' });
+      expect.fail('should have thrown VoiceProfileStateTransitionError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(VoiceProfileStateTransitionError);
+      const transitionErr = err as VoiceProfileStateTransitionError;
+      expect(transitionErr.from).toBe('draft');
+      expect(transitionErr.to).toBe('calibrated');
+    }
+  });
+
+  it('allows legal draft → calibrating', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+
+    const result = updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
+    expect(result.status).toBe('calibrating');
+  });
+
+  it('allows legal calibrating → calibrated', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
+
+    const result = updateVoiceProfile(seeded.workspaceId, {
+      status: 'calibrated',
+      voiceDNA: SENTINEL_DNA,
+      guardrails: SENTINEL_GUARDRAILS,
+    });
+    expect(result.status).toBe('calibrated');
+  });
+
+  it('allows calibrated → draft reset', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
+    updateVoiceProfile(seeded.workspaceId, {
+      status: 'calibrated',
+      voiceDNA: SENTINEL_DNA,
+      guardrails: SENTINEL_GUARDRAILS,
+    });
+
+    const result = updateVoiceProfile(seeded.workspaceId, { status: 'draft' });
+    expect(result.status).toBe('draft');
+  });
+
+  it('allows same-state no-op updates (no status change)', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+
+    // No status in the update — pure field edit. Must not throw.
+    const result = updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
+    expect(result.status).toBe('draft');
+    expect(result.voiceDNA).toEqual(SENTINEL_DNA);
+  });
+
+  it('allows redundant same-status update (draft → draft)', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+
+    // Admin UI may send the current status unchanged — must be a legal no-op.
+    const result = updateVoiceProfile(seeded.workspaceId, { status: 'draft' });
+    expect(result.status).toBe('draft');
   });
 });
