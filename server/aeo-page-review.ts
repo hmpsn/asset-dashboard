@@ -10,7 +10,7 @@
  */
 
 import { callOpenAI } from './openai-helpers.js';
-import { buildWorkspaceIntelligence, formatBrandVoiceForPrompt, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
 
@@ -157,7 +157,8 @@ export async function reviewPage(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const businessContext = seo?.businessContext ?? '';
   const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
   const personasBlock = formatPersonasForPrompt(seo?.personas ?? []);

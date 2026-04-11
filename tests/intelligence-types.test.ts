@@ -33,6 +33,7 @@ describe('Intelligence types', () => {
     const ctx: SeoContextSlice = {
       strategy: undefined,
       brandVoice: 'Professional',
+      effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional',
       businessContext: 'SaaS',
       personas: [],
       knowledgeBase: '',

@@ -67,8 +67,25 @@ export interface WorkspaceIntelligence {
 export interface SeoContextSlice {
   strategy: KeywordStrategy | undefined;
   /** Raw text — no headers. Use formatBrandVoiceForPrompt() before injecting into prompts.
-   *  formatSeoContextSection renders this with an emphatic BRAND VOICE header automatically. */
+   *  formatSeoContextSection renders this with an emphatic BRAND VOICE header automatically.
+   *
+   *  NOTE: Prefer `effectiveBrandVoiceBlock` for AI prompt injection — it honors the voice
+   *  profile authority rule (calibrated profile → DNA/samples/guardrails, else legacy).
+   *  This raw field remains for callers that need the pre-authority text (diagnostics, UI). */
   brandVoice: string;
+  /**
+   *  Pre-formatted prompt block with voice-authority applied. Inject DIRECTLY into prompts
+   *  (do NOT pass through formatBrandVoiceForPrompt — it already has the BRAND VOICE header
+   *  when non-empty). Source of truth: buildSeoContext(workspaceId).brandVoiceBlock.
+   *
+   *  Authority rule:
+   *    - profile.status === 'calibrated' → voice profile block (Layer 2 system prompt covers DNA)
+   *    - profile has real content (samples/examples) → voice profile block
+   *    - otherwise → legacy workspace.brandVoice + readBrandDocs() block
+   *
+   *  Empty string means "no brand voice configured" — render nothing.
+   */
+  effectiveBrandVoiceBlock: string;
   businessContext: string;
   personas: AudiencePersona[];
   /** Raw text — no headers. Use formatKnowledgeBaseForPrompt() before injecting into prompts.

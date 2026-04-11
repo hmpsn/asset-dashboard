@@ -11,7 +11,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
@@ -276,7 +276,8 @@ export async function analyzeInternalLinks(
     ? await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] })
     : null;
   const seo = intel?.seoContext;
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const brandCtx = brandVoiceBlock || (wsObj?.brandVoice ? `\nBrand voice: ${wsObj.brandVoice}` : '');
 
   // Build the page summary for AI analysis

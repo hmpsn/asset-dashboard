@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import { getWorkspace } from '../workspaces.js';
 import { callOpenAI } from '../openai-helpers.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
 import { getLatestSnapshot } from '../reports.js';
 import {
   addMessage,
@@ -231,7 +231,7 @@ Answer Engine Optimization (AEO) principles:
 - Include citations and data points
 - Use definition-style sentences that AI systems can extract
 - Avoid hidden content, dark patterns, and clickbait
-${formatKeywordsForPrompt(seo)}${formatBrandVoiceForPrompt(seo?.brandVoice)}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`; // bip-ok: intel used for raw seo field access above
+${formatKeywordsForPrompt(seo)}${seo?.effectiveBrandVoiceBlock ?? ''}${formatPersonasForPrompt(seo?.personas ?? [])}${knowledgeBase}${formatForPrompt(intel, { verbosity: 'detailed', sections: ['pageProfile'] })}${playbookBlock}${pageContextBlock}${issuesBlock}${priorContext ? `\n\nPREVIOUS CONVERSATION SUMMARY:\n${priorContext}` : ''}`; // bip-ok: intel used for raw seo field access above — effectiveBrandVoiceBlock honors voice profile authority
 
     const systemPrompt = buildSystemPrompt(workspaceId, baseInstructions);
 

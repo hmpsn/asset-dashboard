@@ -23,6 +23,7 @@ export const RICH_SEO_CONTEXT: SeoContextSlice = {
     generatedAt: '2026-03-15T00:00:00Z',
   },
   brandVoice: 'Professional, data-driven, and authoritative. No fluff or filler content.',
+  effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional, data-driven, and authoritative. No fluff or filler content.',
   businessContext: 'Enterprise SEO analytics platform serving Fortune 500 companies',
   personas: [
     {

@@ -49,6 +49,9 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
         ],
       },
       brandVoice: 'Professional but approachable. Data-driven.',
+      // Pre-formatted block with voice-authority applied. content-brief.ts now reads
+      // this directly instead of calling formatBrandVoiceForPrompt on the raw brandVoice.
+      effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional but approachable. Data-driven.',
       knowledgeBase: 'We serve small to mid-size businesses.',
       businessContext: 'Digital agency specializing in SEO and web design',
       personas: null,
@@ -59,7 +62,6 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatKeywordsForPrompt: vi.fn(() => '\n\nKEYWORD STRATEGY (incorporate these naturally):\nSite target keywords: seo, web design'),
   formatPersonasForPrompt: vi.fn(() => ''),
   formatPageMapForPrompt: vi.fn(() => ''),
-  formatBrandVoiceForPrompt: vi.fn(() => '\n\nBRAND VOICE & STYLE:\nProfessional but approachable.'),
   formatKnowledgeBaseForPrompt: vi.fn(() => '\n\nBUSINESS KNOWLEDGE BASE:\nWe serve small to mid-size businesses.'),
 }));
 

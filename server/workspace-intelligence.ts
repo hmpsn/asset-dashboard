@@ -236,6 +236,13 @@ async function assembleSeoContext(
     // formatBrandVoiceForPrompt() / formatKnowledgeBaseForPrompt() from this module.
     // This prevents double-formatting when formatSeoContextSection adds its own prefixes.
     brandVoice: getRawBrandVoice(workspaceId),
+    // Pre-formatted block with voice-profile authority applied. Source of truth:
+    // buildSeoContext().brandVoiceBlock, which honors the rule that voice profile
+    // replaces legacy brandVoice only when (a) status === 'calibrated' (Layer 2 system
+    // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is non-empty.
+    // Intelligence-path callers inject this DIRECTLY — do NOT pass through
+    // formatBrandVoiceForPrompt, it already carries the emphatic BRAND VOICE header.
+    effectiveBrandVoiceBlock: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
     knowledgeBase: getRawKnowledge(workspaceId),
@@ -1477,8 +1484,19 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   const lines: string[] = ['## SEO Context'];
 
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
-  // Emphatic brand voice directive — AI models respond to capitalized instructional headers
-  if (ctx.brandVoice) lines.push(`BRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${ctx.brandVoice}`);
+  // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it was
+  // already computed by `buildSeoContext` with full voice authority (calibrated profile
+  // → voice samples block; else legacy brandVoice + brand-docs block; else empty). An
+  // empty string means "render nothing here" and is INTENTIONAL when the workspace is
+  // calibrated with no samples — `buildSystemPrompt` Layer 2 handles DNA + guardrails
+  // via the system message. Injecting raw `ctx.brandVoice` as a fallback would bypass
+  // the authority rule and produce two contradictory voice sources (see the bug from
+  // PR #167 where the `else if` fallback re-injected legacy voice on calibrated empty
+  // profiles). `.trim()` strips the leading `\n\n` from buildSeoContext's output.
+  const voiceBlock = (ctx.effectiveBrandVoiceBlock ?? '').trim();
+  if (voiceBlock) {
+    lines.push(voiceBlock);
+  }
 
   // Personas — always include when present
   // Must match formatPersonasForPrompt (standalone helper) for content parity
@@ -2265,7 +2283,18 @@ export function getIntelligenceCacheStats() {
 
 /**
  * Format raw brand voice text into a prompt block matching buildSeoContext().brandVoiceBlock format.
- * Required because seoContext.brandVoice stores the RAW voice text (no header).
+ *
+ * ⚠️ DO NOT CALL THIS WITH `seo?.brandVoice` FROM A SLICE.
+ * The intelligence slice's `brandVoice` field is the RAW legacy value and bypasses voice
+ * profile authority (calibrated DNA/samples/guardrails). Calling
+ * `formatBrandVoiceForPrompt(seo?.brandVoice)` silently drops the entire voice profile
+ * feature on non-calibrated workspaces and creates contradictory voice sources on
+ * calibrated workspaces. Use `seo?.effectiveBrandVoiceBlock ?? ''` instead — it is the
+ * pre-formatted, authority-applied block from `buildSeoContext`.
+ *
+ * This helper remains exported only for (a) tests of the header format itself and
+ * (b) edge-case callers that have raw voice text from somewhere other than an
+ * intelligence slice. New production code should not need it.
  */
 export function formatBrandVoiceForPrompt(brandVoice: string | null | undefined): string {
   if (!brandVoice?.trim()) return '';
