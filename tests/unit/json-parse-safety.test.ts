@@ -309,8 +309,7 @@ describe('parseJsonSafeArray — complex item schemas', () => {
       { heading: 'Also good', level: 3 },
     ];
     const result = parseJsonSafeArray(JSON.stringify(data), outlineItemSchema);
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every((item) => typeof item.level === 'number')).toBe(true);
+    expect(result.length > 0 && result.every((item) => typeof item.level === 'number')).toBe(true);
     expect(result).toHaveLength(2);
     expect(result[0].heading).toBe('Good heading');
     expect(result[1].heading).toBe('Also good');

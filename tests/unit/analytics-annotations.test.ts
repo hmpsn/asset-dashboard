@@ -61,14 +61,12 @@ describe('analytics annotations store', () => {
       category: 'algorithm_update',
     });
     const filtered = store.getAnnotations('ws1', { startDate: '2026-03-01', endDate: '2026-03-31' });
-    expect(filtered.length).toBeGreaterThan(0);
-    expect(filtered.every(a => a.date >= '2026-03-01' && a.date <= '2026-03-31')).toBe(true);
+    expect(filtered.length > 0 && filtered.every(a => a.date >= '2026-03-01' && a.date <= '2026-03-31')).toBe(true);
   });
 
   it('getAnnotations filters by category', () => {
     const filtered = store.getAnnotations('ws1', { category: 'site_change' });
-    expect(filtered.length).toBeGreaterThan(0);
-    expect(filtered.every(a => a.category === 'site_change')).toBe(true);
+    expect(filtered.length > 0 && filtered.every(a => a.category === 'site_change')).toBe(true);
   });
 
   it('getAnnotations scopes to workspace', () => {
@@ -79,8 +77,7 @@ describe('analytics annotations store', () => {
       category: 'campaign',
     });
     const ws1 = store.getAnnotations('ws1');
-    expect(ws1.length).toBeGreaterThan(0);
-    expect(ws1.every(a => a.workspaceId === 'ws1')).toBe(true);
+    expect(ws1.length > 0 && ws1.every(a => a.workspaceId === 'ws1')).toBe(true);
   });
 
   it('updateAnnotation modifies fields', () => {

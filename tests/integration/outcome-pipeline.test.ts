@@ -79,8 +79,7 @@ describe('Outcome actions — record and read', () => {
     const res = await api(`/api/outcomes/${testWsId}/actions?type=meta_updated`);
     expect(res.status).toBe(200);
     const actions = await res.json();
-    expect(actions.length).toBeGreaterThan(0);
-    expect(actions.every((a: { actionType: string }) => a.actionType === 'meta_updated')).toBe(true);
+    expect(actions.length > 0 && actions.every((a: { actionType: string }) => a.actionType === 'meta_updated')).toBe(true);
   });
 
   it('GET /api/outcomes/:wsId/actions?type=BOGUS returns all (graceful fallback)', async () => {

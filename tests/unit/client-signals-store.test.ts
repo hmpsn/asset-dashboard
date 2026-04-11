@@ -47,8 +47,7 @@ describe('client-signals-store', () => {
       triggerMessage: 'Can I talk to someone?',
     });
     const results = listClientSignals('ws-isolation-A');
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(s => s.workspaceId === 'ws-isolation-A')).toBe(true);
+    expect(results.length > 0 && results.every(s => s.workspaceId === 'ws-isolation-A')).toBe(true);
   });
 
   it('updateSignalStatus persists the new status', () => {

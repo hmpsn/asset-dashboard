@@ -144,8 +144,8 @@ describe('client user read operations', () => {
 
     const list = listClientUsers(wsId);
     expect(list).toHaveLength(2);
-    expect(list.every(u => u.workspaceId === wsId)).toBe(true);
-    expect(list.every(u => !('passwordHash' in u))).toBe(true);
+    expect(list.length > 0 && list.every(u => u.workspaceId === wsId)).toBe(true);
+    expect(list.length > 0 && list.every(u => !('passwordHash' in u))).toBe(true);
   });
 });
 

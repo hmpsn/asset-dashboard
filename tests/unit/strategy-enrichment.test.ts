@@ -283,8 +283,7 @@ describe('question keyword matching logic', () => {
       },
     ];
     const result = matchQuestionKeywords('technical seo', questionKws);
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every(r => r.toLowerCase().includes('technical'))).toBe(true);
+    expect(result.length > 0 && result.every(r => r.toLowerCase().includes('technical'))).toBe(true);
   });
 
   it('does not match questions unrelated to the first word', () => {
@@ -336,8 +335,7 @@ describe('question keyword matching logic', () => {
       },
     ];
     const result = matchQuestionKeywords('content strategy', questionKws);
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every(r => r.toLowerCase().includes('content'))).toBe(true);
+    expect(result.length > 0 && result.every(r => r.toLowerCase().includes('content'))).toBe(true);
   });
 
   it('uses only the first word of a multi-word target keyword for matching', () => {
@@ -352,8 +350,7 @@ describe('question keyword matching logic', () => {
     ];
     // Target is "local seo services" — first word is "local"
     const result = matchQuestionKeywords('local seo services', questionKws);
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every(r => r.toLowerCase().includes('local'))).toBe(true);
+    expect(result.length > 0 && result.every(r => r.toLowerCase().includes('local'))).toBe(true);
   });
 
   it('is case-insensitive', () => {
@@ -410,7 +407,7 @@ describe('cannibalization detection rules', () => {
 
     if (positionsClose && secondaryHasTraffic) return 'differentiate';
     if (secondaryHasTraffic) return 'canonical_tag';
-    if (otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) return 'redirect_301';
+    if (otherPages.length > 0 && otherPages.every(p => !p.clicks && (p.impressions ?? 0) < 50)) return 'redirect_301';
     return 'canonical_tag';
   }
 

@@ -184,8 +184,7 @@ describe('Tree helpers — pure unit tests', () => {
   it('flattenTree excludes root by default', () => {
     const tree = buildTestTree();
     const nodes = flattenTree(tree);
-    expect(nodes.length).toBeGreaterThan(0);
-    expect(nodes.every((n: SiteNode) => n.path !== '/')).toBe(true);
+    expect(nodes.length > 0 && nodes.every((n: SiteNode) => n.path !== '/')).toBe(true);
   });
 
   it('flattenTree includes root when includeRoot = true', () => {
@@ -279,8 +278,7 @@ describe('Tree helpers — pure unit tests', () => {
   it('getChildNodes returns direct children with content', () => {
     const tree = buildTestTree();
     const children = getChildNodes(tree, '/services');
-    expect(children.length).toBeGreaterThan(0);
-    expect(children.every((n: SiteNode) => n.hasContent)).toBe(true);
+    expect(children.length > 0 && children.every((n: SiteNode) => n.hasContent)).toBe(true);
     const paths = children.map((n: SiteNode) => n.path);
     expect(paths).toContain('/services/web-design');
     expect(paths).toContain('/services/seo');
@@ -362,8 +360,7 @@ describe('Gap detection logic', () => {
   it('getChildNodes on a gap parent returns only children with content', () => {
     const tree = buildGapTree();
     const children = getChildNodes(tree, '/products');
-    expect(children.length).toBeGreaterThan(0);
-    expect(children.every((n: SiteNode) => n.hasContent)).toBe(true);
+    expect(children.length > 0 && children.every((n: SiteNode) => n.hasContent)).toBe(true);
     expect(children).toHaveLength(3);
   });
 });

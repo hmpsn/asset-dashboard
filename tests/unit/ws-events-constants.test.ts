@@ -52,14 +52,12 @@ describe('ADMIN_EVENTS contract', () => {
 describe('WS_EVENTS completeness', () => {
   it('all values in WS_EVENTS are strings', () => {
     const values = Object.values(WS_EVENTS);
-    expect(values.length).toBeGreaterThan(0);
-    expect(values.every(v => typeof v === 'string')).toBe(true);
+    expect(values.length > 0 && values.every(v => typeof v === 'string')).toBe(true);
   });
 
   it('all values in ADMIN_EVENTS are strings', () => {
     const values = Object.values(ADMIN_EVENTS);
-    expect(values.length).toBeGreaterThan(0);
-    expect(values.every(v => typeof v === 'string')).toBe(true);
+    expect(values.length > 0 && values.every(v => typeof v === 'string')).toBe(true);
   });
 });
 

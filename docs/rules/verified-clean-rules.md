@@ -96,8 +96,9 @@ explicit justification.
 | useEffect external-sync dirty guard against the live prop | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Constants in sync (STUDIO_NAME, STUDIO_URL) | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Source-sniffing in tests (readFileSync on .ts/.tsx source) | backfill-complete | 37 violations hatched in B4 backfill task with per-hatch justifications; rule now reports ✓ on full-repo scan. |
+| Vacuous .every() in tests (no length guard) | backfill-complete | 91 violations fixed in B5 backfill task. Default fix wrapped each `arr.every(predicate)` in `arr.length > 0 && arr.every(predicate)` so the assertion fails on an empty array instead of vacuously passing. One `// every-ok` hatch in `tests/integration/client-signals-routes.test.ts:57` where vacuous-truthy is intentional. Rule now reports ✓ on full-repo scan. |
 
-**Count: 32 verified-clean rules.**
+**Count: 33 verified-clean rules.**
 
 ---
 
