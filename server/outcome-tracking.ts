@@ -42,9 +42,13 @@ const stmts = createStmtCache(() => ({
   getByWorkspaceAndSource: db.prepare(`SELECT * FROM tracked_actions WHERE workspace_id = ? AND source_type = ? AND source_id = ?`),
   getPendingMeasurement: db.prepare(`SELECT * FROM tracked_actions WHERE measurement_complete = 0`),
   getNotActedOn: db.prepare(`SELECT * FROM tracked_actions WHERE attribution = 'not_acted_on' AND measurement_complete = 0`),
+  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
   updateAttribution: db.prepare(`UPDATE tracked_actions SET attribution = ?, updated_at = datetime('now') WHERE id = ?`),
+  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
   markComplete: db.prepare(`UPDATE tracked_actions SET measurement_complete = 1, updated_at = datetime('now') WHERE id = ?`),
+  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
   updateContext: db.prepare(`UPDATE tracked_actions SET context = ?, updated_at = datetime('now') WHERE id = ?`),
+  // ws-scope-ok — tracked_actions.id is crypto.randomUUID() (122-bit entropy), set in recordAction()
   updateBaseline: db.prepare(`UPDATE tracked_actions SET baseline_snapshot = ?, updated_at = datetime('now') WHERE id = ?`),
   insertOutcome: db.prepare(`
     INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at)
@@ -73,6 +77,9 @@ const stmts = createStmtCache(() => ({
     FROM tracked_actions
     WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
   `),
+  // Global retention sweep paired with archiveOld; intentionally
+  // operates across all workspaces to enforce the 24-month archive policy.
+  // ws-scope-ok
   deleteArchived: db.prepare(`
     DELETE FROM tracked_actions
     WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')

@@ -231,7 +231,7 @@ describe('Content Subscription — active → renewal flow', () => {
     });
 
     // Advance some posts to simulate a mid-period state
-    incrementDeliveredPosts(sub.id, 1);
+    incrementDeliveredPosts(ws.workspaceId, sub.id, 1);
     const beforeRenewal = getContentSubscription(sub.id);
     expect(beforeRenewal!.postsDeliveredThisPeriod).toBe(1);
 
@@ -442,13 +442,13 @@ describe('Content Subscription — cancellation', () => {
     const sub = seedSubscription(ws.workspaceId);
     expect(getContentSubscription(sub.id)).not.toBeNull();
 
-    const deleted = deleteContentSubscription(sub.id);
+    const deleted = deleteContentSubscription(ws.workspaceId, sub.id);
     expect(deleted).toBe(true);
     expect(getContentSubscription(sub.id)).toBeNull();
   });
 
   it('deleteContentSubscription returns false for non-existent id', () => {
-    const result = deleteContentSubscription('csub-does-not-exist');
+    const result = deleteContentSubscription(ws.workspaceId, 'csub-does-not-exist');
     expect(result).toBe(false);
   });
 });
@@ -600,8 +600,6 @@ describe('Content Subscription — past_due and expiration', () => {
 
     const activeSubs = listActiveContentSubscriptions();
 
-    expect(activeSubs.length).toBeGreaterThan(0);
-
     const ids = activeSubs.map(s => s.id);
     expect(ids).toContain(active.id);
     expect(ids).toContain(pastDue.id);
@@ -609,7 +607,7 @@ describe('Content Subscription — past_due and expiration', () => {
     expect(ids).not.toContain(cancelled.id);
 
     // All returned subs must have active or past_due status
-    expect(activeSubs.every(s => s.status === 'active' || s.status === 'past_due')).toBe(true);
+    expect(activeSubs.length > 0 && activeSubs.every(s => s.status === 'active' || s.status === 'past_due')).toBe(true);
   });
 });
 
@@ -1060,7 +1058,7 @@ describe('Content Subscription — period management', () => {
     const sub = seedSubscription(ws.workspaceId, { status: 'active' });
     expect(sub.postsDeliveredThisPeriod).toBe(0);
 
-    incrementDeliveredPosts(sub.id);
+    incrementDeliveredPosts(ws.workspaceId, sub.id);
 
     const updated = getContentSubscription(sub.id);
     expect(updated!.postsDeliveredThisPeriod).toBe(1);
@@ -1068,7 +1066,7 @@ describe('Content Subscription — period management', () => {
 
   it('incrementDeliveredPosts increments by custom count', () => {
     const sub = seedSubscription(ws.workspaceId, { status: 'active' });
-    incrementDeliveredPosts(sub.id, 3);
+    incrementDeliveredPosts(ws.workspaceId, sub.id, 3);
 
     const updated = getContentSubscription(sub.id);
     expect(updated!.postsDeliveredThisPeriod).toBe(3);
@@ -1076,8 +1074,8 @@ describe('Content Subscription — period management', () => {
 
   it('incrementDeliveredPosts accumulates across multiple calls', () => {
     const sub = seedSubscription(ws.workspaceId, { status: 'active' });
-    incrementDeliveredPosts(sub.id, 1);
-    incrementDeliveredPosts(sub.id, 2);
+    incrementDeliveredPosts(ws.workspaceId, sub.id, 1);
+    incrementDeliveredPosts(ws.workspaceId, sub.id, 2);
 
     const updated = getContentSubscription(sub.id);
     expect(updated!.postsDeliveredThisPeriod).toBe(3);
@@ -1085,11 +1083,11 @@ describe('Content Subscription — period management', () => {
 
   it('resetPeriod zeroes postsDeliveredThisPeriod and updates period dates', () => {
     const sub = seedSubscription(ws.workspaceId, { status: 'active' });
-    incrementDeliveredPosts(sub.id, 2);
+    incrementDeliveredPosts(ws.workspaceId, sub.id, 2);
 
     const newStart = '2026-05-01T00:00:00.000Z';
     const newEnd = '2026-05-31T00:00:00.000Z';
-    resetPeriod(sub.id, newStart, newEnd);
+    resetPeriod(ws.workspaceId, sub.id, newStart, newEnd);
 
     const updated = getContentSubscription(sub.id);
     expect(updated!.postsDeliveredThisPeriod).toBe(0);
@@ -1100,7 +1098,7 @@ describe('Content Subscription — period management', () => {
   it('updateContentSubscription updates plan fields', () => {
     const sub = seedSubscription(ws.workspaceId, { status: 'active' });
 
-    const updated = updateContentSubscription(sub.id, {
+    const updated = updateContentSubscription(ws.workspaceId, sub.id, {
       plan: 'content_growth',
       postsPerMonth: 4,
       priceUsd: 900,
@@ -1113,7 +1111,7 @@ describe('Content Subscription — period management', () => {
   });
 
   it('updateContentSubscription returns null for a non-existent id', () => {
-    const updated = updateContentSubscription('csub-does-not-exist', { status: 'active' });
+    const updated = updateContentSubscription(ws.workspaceId, 'csub-does-not-exist', { status: 'active' });
     expect(updated).toBeNull();
   });
 

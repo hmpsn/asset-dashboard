@@ -156,6 +156,10 @@ const stmts = createStmtCache(() => ({
     `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
   ),
   countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
+  // Global retention policy: prune the N oldest rows across all workspaces
+  // to enforce the global activity-log size cap. Scoping to a single workspace
+  // here would defeat the purpose of the global cap.
+  // ws-scope-ok
   pruneOldest: db.prepare(`
         DELETE FROM activity_log WHERE id IN (
           SELECT id FROM activity_log ORDER BY created_at ASC LIMIT ?

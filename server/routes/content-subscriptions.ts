@@ -71,6 +71,9 @@ router.post('/api/content-subscriptions/:workspaceId', requireWorkspaceAccess('w
 // Update a subscription (admin)
 router.patch('/api/content-subscription/:id', (req, res) => {
   try {
+    const existing = getContentSubscription(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Subscription not found' });
+
     const { status, plan, topicSource, preferredPageTypes, notes } = req.body;
     const updates: Record<string, unknown> = {};
     if (status) updates.status = status;
@@ -87,7 +90,7 @@ router.patch('/api/content-subscription/:id', (req, res) => {
       updates.priceUsd = planConfig.priceUsd;
     }
 
-    const sub = updateContentSubscription(req.params.id, updates);
+    const sub = updateContentSubscription(existing.workspaceId, req.params.id, updates);
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
     res.json(sub);
   } catch (err) {
@@ -99,7 +102,9 @@ router.patch('/api/content-subscription/:id', (req, res) => {
 // Delete a subscription (admin)
 router.delete('/api/content-subscription/:id', (req, res) => {
   try {
-    const ok = deleteContentSubscription(req.params.id);
+    const existing = getContentSubscription(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Subscription not found' });
+    const ok = deleteContentSubscription(existing.workspaceId, req.params.id);
     if (!ok) return res.status(404).json({ error: 'Subscription not found' });
     res.json({ ok: true });
   } catch (err) {
@@ -111,8 +116,10 @@ router.delete('/api/content-subscription/:id', (req, res) => {
 // Increment delivered posts count (admin — when a post is delivered)
 router.post('/api/content-subscription/:id/delivered', (req, res) => {
   try {
+    const existing = getContentSubscription(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Subscription not found' });
     const count = req.body.count || 1;
-    incrementDeliveredPosts(req.params.id, count);
+    incrementDeliveredPosts(existing.workspaceId, req.params.id, count);
     const sub = getContentSubscription(req.params.id);
     res.json(sub);
   } catch (err) {

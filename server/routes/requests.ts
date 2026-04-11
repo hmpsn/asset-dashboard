@@ -65,7 +65,12 @@ router.patch('/api/requests/bulk', (req, res) => {
   const updates: Record<string, string> = {};
   if (status) updates.status = status;
   if (priority) updates.priority = priority;
-  const results = ids.map(id => updateRequest(id, updates));
+  // Look up each request's workspace before mutating so the update is workspace-scoped.
+  const results = ids.map(id => {
+    const existing = getRequest(id);
+    if (!existing) return null;
+    return updateRequest(existing.workspaceId, id, updates);
+  });
   const succeeded = results.filter(Boolean).length;
   broadcast('request:bulk_updated', { count: succeeded, status });
   // Broadcast to each affected workspace
@@ -91,7 +96,8 @@ router.get('/api/requests/:id', (req, res) => {
 router.patch('/api/requests/:id', (req, res) => {
   const { status, priority, category } = req.body;
   const prev = getRequest(req.params.id);
-  const updated = updateRequest(req.params.id, { status, priority, category });
+  if (!prev) return res.status(404).json({ error: 'Not found' });
+  const updated = updateRequest(prev.workspaceId, req.params.id, { status, priority, category });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
   broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id, status: updated.status });
@@ -119,7 +125,9 @@ router.patch('/api/requests/:id', (req, res) => {
 router.post('/api/requests/:id/notes', (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'content required' });
-  const updated = addNote(req.params.id, 'team', content);
+  const existing = getRequest(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const updated = addNote(existing.workspaceId, req.params.id, 'team', content);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
   broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id });
@@ -135,10 +143,11 @@ router.post('/api/requests/:id/notes', (req, res) => {
 // Internal: delete request
 router.delete('/api/requests/:id', (req, res) => {
   const existing = getRequest(req.params.id);
-  const ok = deleteRequest(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const ok = deleteRequest(existing.workspaceId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
   broadcast('request:deleted', { id: req.params.id });
-  if (existing) broadcastToWorkspace(existing.workspaceId, 'request:update', { id: req.params.id, deleted: true });
+  broadcastToWorkspace(existing.workspaceId, 'request:update', { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
 
@@ -155,7 +164,9 @@ router.post('/api/requests/:id/notes-with-files', upload.array('files', 5), (req
   const files = req.files as Express.Multer.File[];
   if (!content && !files?.length) return res.status(400).json({ error: 'content or files required' });
   const atts = files?.length ? processUploadedAttachments(files) : undefined;
-  const updated = addNote(req.params.id, 'team', content, atts);
+  const existing = getRequest(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const updated = addNote(existing.workspaceId, req.params.id, 'team', content, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
   broadcastToWorkspace(updated.workspaceId, 'request:update', { id: updated.id });

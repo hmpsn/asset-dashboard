@@ -9,6 +9,9 @@ import { resolvePagePath } from './helpers.js';
 import { webflowFetch, getToken } from './webflow-client.js';
 import { getWorkspacePages, getWorkspaceAllPages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
+import type * as WebflowPages from './webflow-pages.js';
+import type * as WebflowCms from './webflow-cms.js';
+import type { createHash as CreateHashFn } from 'crypto';
 
 const log = createLogger('webflow-assets');
 
@@ -181,8 +184,8 @@ export async function deleteAsset(assetId: string, tokenOverride?: string): Prom
 // --- Scan site for asset usage across published HTML and CMS ---
 export async function scanAssetUsage(siteId: string, tokenOverride?: string): Promise<Map<string, string[]>> {
   // Import page/CMS functions to avoid circular deps — they live in sibling modules
-  const { getSiteSubdomain } = await import('./webflow-pages.js');
-  const { listCollections, listCollectionItems, getCollectionSchema } = await import('./webflow-cms.js');
+  const { getSiteSubdomain }: typeof WebflowPages = await import('./webflow-pages.js'); // dynamic-import-ok
+  const { listCollections, listCollectionItems, getCollectionSchema }: typeof WebflowCms = await import('./webflow-cms.js'); // dynamic-import-ok
 
   const usageMap = new Map<string, string[]>();
 
@@ -372,7 +375,7 @@ export async function uploadAsset(
   };
   const mimeType = mimeMap[ext] || 'application/octet-stream';
 
-  const { createHash } = await import('crypto');
+  const { createHash }: { createHash: typeof CreateHashFn } = await import('crypto'); // dynamic-import-ok
   const fileHash = createHash('md5').update(fileBuffer).digest('hex');
 
   try {

@@ -13,6 +13,7 @@ import type { Workspace } from './workspaces.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
+import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
 
@@ -171,7 +172,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
     // ── Bridge #8: Check for repeat_decay ─────────────────────────────
     // If a prior content_refresh action for this page scored 'loss', tag as repeat_decay
     try {
-      const { getActionsByPage, getOutcomesForAction } = await import('./outcome-tracking.js');
+      const { getActionsByPage, getOutcomesForAction }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
       const priorActions = getActionsByPage(ws.id, pagePath);
       const refreshActions = priorActions.filter(a => a.actionType === 'content_refreshed');
       if (refreshActions.length > 0) {

@@ -189,7 +189,7 @@ const stmts = createStmtCache(() => ({
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
            keyword_validation = @keyword_validation, template_id = @template_id,
            title_variants = @title_variants, meta_desc_variants = @meta_desc_variants
-         WHERE id = @id`,
+         WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
     `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,

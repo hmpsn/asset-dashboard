@@ -6,6 +6,8 @@ import { Router } from 'express';
 const router = Router();
 
 import bcrypt from 'bcryptjs';
+import type * as WebScraper from '../web-scraper.js';
+import type * as OpenAIHelpers from '../openai-helpers.js';
 import express from 'express';
 import { listBatches } from '../approvals.js';
 import { validate, z } from '../middleware/validate.js';
@@ -241,7 +243,7 @@ router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
 
 // --- Shared: scrape website pages for AI analysis ---
 async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPage[]; pagesSummary: string }> {
-  const { scrapeUrls } = await import('../web-scraper.js');
+  const { scrapeUrls }: typeof WebScraper = await import('../web-scraper.js'); // dynamic-import-ok
 
   const token = getTokenForSite(ws.webflowSiteId!) || undefined;
   const subdomain = await getSiteSubdomain(ws.webflowSiteId!, token);
@@ -597,7 +599,7 @@ Rules:
     // Parse the AI response as JSON
     let personas;
     try {
-      const { parseAIJson } = await import('../openai-helpers.js');
+      const { parseAIJson }: typeof OpenAIHelpers = await import('../openai-helpers.js'); // dynamic-import-ok
       personas = parseAIJson<Array<{
         name: string; description: string; painPoints: string[]; goals: string[];
         objections: string[]; preferredContentFormat?: string; buyingStage?: string;

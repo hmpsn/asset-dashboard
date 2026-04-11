@@ -97,9 +97,11 @@ explicit justification.
 | useEffect external-sync dirty guard against the live prop | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Constants in sync (STUDIO_NAME, STUDIO_URL) | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Source-sniffing in tests (readFileSync on .ts/.tsx source) | backfill-complete | 37 violations hatched in B4 backfill task with per-hatch justifications; rule now reports ✓ on full-repo scan. |
+| Untyped dynamic import (missing import type) | backfill-complete | 44 violations fixed in B6 backfill task: `import type * as ModName` added at file top for each imported module; `: typeof ModName` annotation added at each `await import()`; `// dynamic-import-ok` comment on every typed line; sharp module typed via `import type { default as SharpConstructor } from 'sharp'`. Rule now reports ✓ on full-repo scan. |
+| UPDATE/DELETE missing workspace_id scope | backfill-complete | 39 violations fixed in B8 backfill task. Default fix threaded `workspaceId` through callers and added `AND workspace_id = ?` to UPDATE/DELETE WHERE clauses (defence-in-depth multi-tenancy). UUID-unique row IDs (`randomUUID()`, `crypto.randomBytes(32)`) and global retention sweeps (`cleanupOldSends`, `pruneOldest`, `deleteExpiredTokens`, etc.) hatched with `// ws-scope-ok` and an inline justification comment. Rule now reports ✓ on full-repo scan. |
 | Vacuous .every() in tests (no length guard) | backfill-complete | 91 violations fixed in B5 backfill task. Default fix wrapped each `arr.every(predicate)` in `arr.length > 0 && arr.every(predicate)` so the assertion fails on an empty array instead of vacuously passing. One `// every-ok` hatch in `tests/integration/client-signals-routes.test.ts:57` where vacuous-truthy is intentional. Rule now reports ✓ on full-repo scan. |
 
-**Count: 34 verified-clean rules.**
+**Count: 36 verified-clean rules.**
 
 ---
 

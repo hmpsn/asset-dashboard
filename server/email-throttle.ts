@@ -107,6 +107,8 @@ const stmts = createStmtCache(() => ({
      WHERE recipient = ? AND category = ?
      ORDER BY sent_at DESC LIMIT 1`,
   ),
+  // Global retention sweep: prune email_sends older than 30 days across all workspaces.
+  // ws-scope-ok
   cleanup: db.prepare(
     `DELETE FROM email_sends WHERE sent_at < datetime('now', '-30 days')`,
   ),

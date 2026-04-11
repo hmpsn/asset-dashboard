@@ -877,12 +877,12 @@ router.get('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
 
 // --- SEO Suggestions: Select a variation ---
 router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', async (req, res) => {
-  const { suggestionId } = req.params;
+  const { workspaceId, suggestionId } = req.params;
   const { selectedIndex } = req.body as { selectedIndex: number };
   if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
     return res.status(400).json({ error: 'selectedIndex must be 0, 1, or 2' });
   }
-  const ok = selectVariation(suggestionId, selectedIndex);
+  const ok = selectVariation(workspaceId, suggestionId, selectedIndex);
   if (!ok) return res.status(404).json({ error: 'Suggestion not found or already applied' });
   res.json({ ok: true });
 });
@@ -928,7 +928,7 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) 
 
   // Mark applied suggestions
   const appliedIds = results.filter(r => r.applied).map(r => toApply.find(s => s.pageId === r.pageId)?.id).filter(Boolean) as string[];
-  if (appliedIds.length) markApplied(appliedIds);
+  if (appliedIds.length) markApplied(workspaceId, appliedIds);
 
   log.info(`Applied ${appliedIds.length}/${toApply.length} SEO suggestions for workspace ${workspaceId}`);
   res.json({ results, applied: appliedIds.length, total: toApply.length });

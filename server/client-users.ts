@@ -74,16 +74,21 @@ const stmts = createStmtCache(() => ({
         UPDATE client_users SET email = @email, name = @name, password_hash = @password_hash,
           role = @role, avatar_url = @avatar_url, last_login_at = @last_login_at,
           updated_at = @updated_at
-        WHERE id = @id
+        WHERE id = @id AND workspace_id = @workspace_id
       `),
-  deleteById: db.prepare('DELETE FROM client_users WHERE id = ?'),
+  deleteById: db.prepare('DELETE FROM client_users WHERE id = ? AND workspace_id = ?'),
   selectToken: db.prepare('SELECT * FROM reset_tokens WHERE token = ?'),
   insertToken: db.prepare(`
         INSERT INTO reset_tokens (token, user_id, workspace_id, email, expires_at)
         VALUES (@token, @user_id, @workspace_id, @email, @expires_at)
       `),
+  // reset_tokens.token is crypto.randomBytes(32).toString('hex') (256-bit entropy);
+  // globally unique by construction, so single-row delete by token cannot collide.
+  // ws-scope-ok
   deleteToken: db.prepare('DELETE FROM reset_tokens WHERE token = ?'),
   deleteTokensByUserWs: db.prepare('DELETE FROM reset_tokens WHERE user_id = ? AND workspace_id = ?'),
+  // Global retention sweep: prune expired reset_tokens across all workspaces.
+  // ws-scope-ok
   deleteExpiredTokens: db.prepare('DELETE FROM reset_tokens WHERE expires_at <= ?'),
 }));
 
@@ -171,6 +176,7 @@ export async function updateClientUser(
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: merged.workspaceId,
     email: merged.email,
     name: merged.name,
     password_hash: merged.passwordHash,
@@ -195,6 +201,7 @@ export async function changeClientPassword(id: string, newPassword: string): Pro
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: merged.workspaceId,
     email: merged.email,
     name: merged.name,
     password_hash: merged.passwordHash,
@@ -208,7 +215,9 @@ export async function changeClientPassword(id: string, newPassword: string): Pro
 }
 
 export function deleteClientUser(id: string): boolean {
-  const info = stmts().deleteById.run(id);
+  const existing = getClientUserById(id);
+  if (!existing) return false;
+  const info = stmts().deleteById.run(id, existing.workspaceId);
   return info.changes > 0;
 }
 
@@ -220,6 +229,7 @@ export function recordClientLogin(id: string): void {
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: merged.workspaceId,
     email: merged.email,
     name: merged.name,
     password_hash: merged.passwordHash,

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from './logger.js';
+import type { default as SharpConstructor } from 'sharp';
 
 const log = createLogger('alt-text');
 
@@ -56,7 +57,7 @@ async function callWithRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T
 
 // Use sharp for cross-platform image conversion (works on Linux/Render + handles AVIF/HEIC)
 async function prepareImageForApi(filePath: string): Promise<string> {
-  const sharp = (await import('sharp')).default;
+  const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
   const tmp = `/tmp/alttext_small_${Date.now()}.jpg`;
   await sharp(filePath)
     .resize(512, 512, { fit: 'inside', withoutEnlargement: true })

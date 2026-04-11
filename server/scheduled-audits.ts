@@ -9,6 +9,7 @@ import { applySuppressionsToAudit } from './helpers.js';
 import { createLogger } from './logger.js';
 import { fireBridge } from './bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 
 const log = createLogger('scheduled-audit');
 
@@ -140,7 +141,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #12: Audit → page_health insights ──────────────────────
     fireBridge('bridge-audit-page-health', ws.id, async () => {
-      const { upsertInsight, getInsights } = await import('./analytics-insights-store.js');
+      const { upsertInsight, getInsights }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
       const existing = getInsights(ws.id);
 
       // Map critical/warning audit issues to audit_finding insights
@@ -181,7 +182,7 @@ async function runScheduledAudit(schedule: AuditSchedule) {
 
     // ── Bridge #15: Audit → site-level audit_finding insight ─────────
     fireBridge('bridge-audit-site-health', ws.id, async () => {
-      const { upsertInsight } = await import('./analytics-insights-store.js');
+      const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
 
       // Create site-level insight from aggregate audit findings
       const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;

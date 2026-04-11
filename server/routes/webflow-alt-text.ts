@@ -5,6 +5,8 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { generateAltText } from '../alttext.js';
+import type { default as SharpConstructor } from 'sharp';
+import type * as SvgoMod from 'svgo';
 import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import {
   listSites,
@@ -333,7 +335,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
   const compressToken = getTokenForSite(siteId) || undefined;
 
   try {
-    const sharp = (await import('sharp')).default;
+    const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
 
     const response = await fetch(imageUrl);
     const originalBuffer = Buffer.from(await response.arrayBuffer());
@@ -345,7 +347,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
     const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
 
     if (ext === 'svg') {
-      const svgo = await import('svgo');
+      const svgo: typeof SvgoMod = await import('svgo'); // dynamic-import-ok
       let compressedSvg: Buffer;
       try {
         const svgString = originalBuffer.toString('utf-8');

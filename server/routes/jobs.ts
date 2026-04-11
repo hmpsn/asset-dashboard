@@ -58,6 +58,8 @@ import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPage
 import { createLogger } from '../logger.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt, formatBrandVoiceForPrompt } from '../workspace-intelligence.js';
+import type { default as SharpConstructor } from 'sharp';
+import type * as SvgoMod from 'svgo';
 
 const log = createLogger('jobs');
 
@@ -204,7 +206,7 @@ router.post('/api/jobs', async (req, res) => {
         (async () => {
           try {
             updateJob(job.id, { status: 'running' });
-            const sharp = (await import('sharp')).default;
+            const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
             const response = await fetch(imageUrl);
             const originalBuffer = Buffer.from(await response.arrayBuffer());
             const originalSize = originalBuffer.length;
@@ -214,7 +216,7 @@ router.post('/api/jobs', async (req, res) => {
             const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
 
             if (ext === 'svg') {
-              const svgo = await import('svgo');
+              const svgo: typeof SvgoMod = await import('svgo'); // dynamic-import-ok
               const svgString = originalBuffer.toString('utf-8');
               const svgResult = svgo.optimize(svgString, { multipass: true, plugins: ['preset-default'] } as Parameters<typeof svgo.optimize>[1]);
               compressed = Buffer.from(svgResult.data, 'utf-8');

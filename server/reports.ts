@@ -6,6 +6,9 @@ import { fireBridge, withWorkspaceLock } from './bridge-infrastructure.js';
 import { listWorkspaces } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { STUDIO_NAME, STUDIO_URL } from './constants.js';
+import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
+import type * as WsEvents from './ws-events.js';
+import type * as Broadcast from './broadcast.js';
 
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';
@@ -162,7 +165,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
       if (isFeatureEnabled('bridge-audit-page-health')) {
         fireBridge('bridge-audit-page-health', ws.id, async () => {
           await withWorkspaceLock(ws.id, async () => {
-            const { upsertInsight } = await import('./analytics-insights-store.js');
+            const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             for (const page of audit.pages.slice(0, 50)) {
               const issues = page.issues ?? [];
               const errorCount = issues.filter(i => i.severity === 'error').length;
@@ -198,8 +201,8 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
               });
             }
           });
-          const { WS_EVENTS } = await import('./ws-events.js');
-          const { broadcastToWorkspace } = await import('./broadcast.js');
+          const { WS_EVENTS }: typeof WsEvents = await import('./ws-events.js'); // dynamic-import-ok
+          const { broadcastToWorkspace }: typeof Broadcast = await import('./broadcast.js'); // dynamic-import-ok
           broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-page-health' });
         });
       }
@@ -208,7 +211,7 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
       if (isFeatureEnabled('bridge-audit-site-health')) {
         fireBridge('bridge-audit-site-health', ws.id, async () => {
           await withWorkspaceLock(ws.id, async () => {
-            const { upsertInsight } = await import('./analytics-insights-store.js');
+            const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             const delta = previousScore != null ? audit.siteScore - previousScore : null;
             const severity =
               audit.siteScore < 50 ? 'critical' :
@@ -235,8 +238,8 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
               resolutionSource: 'bridge_15_audit_site_health',
             });
           });
-          const { WS_EVENTS } = await import('./ws-events.js');
-          const { broadcastToWorkspace } = await import('./broadcast.js');
+          const { WS_EVENTS }: typeof WsEvents = await import('./ws-events.js'); // dynamic-import-ok
+          const { broadcastToWorkspace }: typeof Broadcast = await import('./broadcast.js'); // dynamic-import-ok
           broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-site-health' });
         });
       }
