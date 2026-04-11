@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath } from '../routes';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 
 interface PaletteItem {
   id: string;
@@ -87,6 +88,8 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Copy Engine (Brand Hub) is dark-launched; filter the 'brand' nav item out until the flag flips on.
+  const copyEngineEnabled = useFeatureFlag('copy-engine');
 
   // ⌘K / Ctrl+K to toggle
   // keydown-ok: this handler intentionally fires from input fields. The
@@ -130,6 +133,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
 
     // Navigation items
     for (const nav of NAV_ITEMS) {
+      if (nav.id === 'brand' && !copyEngineEnabled) continue;
       result.push({
         id: `nav:${nav.id}`,
         label: nav.label,
@@ -205,7 +209,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, copyEngineEnabled]);
 
   // Filter items by query
   const filtered = useMemo(() => {

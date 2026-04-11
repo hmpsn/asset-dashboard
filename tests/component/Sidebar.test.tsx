@@ -17,6 +17,12 @@ vi.mock('../../src/hooks/admin/useClientSignals', () => ({
 vi.mock('../../src/hooks/admin/useNotifications', () => ({
   useNotifications: () => ({ data: [], isLoading: false }),
 }));
+// useFeatureFlag also uses React Query (fetches /api/feature-flags). Stub it to
+// return `true` so the Copy Engine ('brand') nav item renders in legacy tests;
+// dedicated feature-flag rendering tests live in their own file.
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => true,
+}));
 
 const WORKSPACES: Workspace[] = [
   { id: 'ws-1', name: 'Acme', webflowSiteId: 'site-1', webflowSiteName: 'acme.com', folder: 'acme', createdAt: '2025-01-01' },
