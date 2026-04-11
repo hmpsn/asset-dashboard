@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { classifyQuestion } from '../server/admin-chat-context.js';
 
-const src = readFileSync(join(import.meta.dirname, '../server/admin-chat-context.ts'), 'utf-8');
+const src = readFileSync(join(import.meta.dirname, '../server/admin-chat-context.ts'), 'utf-8'); // readFile-ok — migration guard: asserts Task 8 migration removed direct listChurnSignals/listActivity imports and wires intel slices correctly in admin-chat-context.
 
 // ── Structural: verify removed imports / preserved wiring ────────────────────
 

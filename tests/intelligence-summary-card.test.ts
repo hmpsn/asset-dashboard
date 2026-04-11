@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 
 describe('IntelligenceSummaryCard component contract', () => {
-  const src = readFileSync('src/components/client/IntelligenceSummaryCard.tsx', 'utf-8');
+  const src = readFileSync('src/components/client/IntelligenceSummaryCard.tsx', 'utf-8'); // readFile-ok — UI contract guard: asserts IntelligenceSummaryCard follows Three Laws of Color (blue data, no purple), uses useClientIntelligence, and gates Growth+ content in TierGate.
 
   it('uses useClientIntelligence hook', () => {
     expect(src).toMatch(/useClientIntelligence/);

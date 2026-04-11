@@ -95,8 +95,9 @@ explicit justification.
 | Brand-engine routes: requireWorkspaceAccess (not requireAuth) | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | useEffect external-sync dirty guard against the live prop | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Constants in sync (STUDIO_NAME, STUDIO_URL) | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
+| Source-sniffing in tests (readFileSync on .ts/.tsx source) | backfill-complete | 37 violations hatched in B4 backfill task with per-hatch justifications; rule now reports ✓ on full-repo scan. |
 
-**Count: 31 verified-clean rules.**
+**Count: 32 verified-clean rules.**
 
 ---
 

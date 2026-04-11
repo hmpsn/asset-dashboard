@@ -23,11 +23,11 @@ const serverDir = resolve(import.meta.dirname, '../server');
 const routesDir = resolve(serverDir, 'routes');
 
 function read(rel: string) {
-  return readFileSync(resolve(serverDir, rel), 'utf-8');
+  return readFileSync(resolve(serverDir, rel), 'utf-8'); // readFile-ok — migration contract: verifies Phase 3B callers request the correct slices/sections (seoContext, learnings) and follow the slices-var pattern to prevent silent slice/section mismatch.
 }
 
 function readRoute(rel: string) {
-  return readFileSync(resolve(routesDir, rel), 'utf-8');
+  return readFileSync(resolve(routesDir, rel), 'utf-8'); // readFile-ok — migration contract: verifies Phase 3B route callers request the correct slices/sections (seoContext, learnings) and follow the slices-var pattern to prevent silent slice/section mismatch.
 }
 
 /**
@@ -367,7 +367,7 @@ describe('slices/sections consistency — learnings section requires learnings s
 
 describe('assembleLearnings feature flag gate', () => {
   it('workspace-intelligence.ts: assembleLearnings checks outcome-ai-injection flag before assembling', () => {
-    const src = readFileSync(resolve(serverDir, 'workspace-intelligence.ts'), 'utf-8');
+    const src = readFileSync(resolve(serverDir, 'workspace-intelligence.ts'), 'utf-8'); // readFile-ok — contract guard: asserts assembleLearnings checks the outcome-ai-injection feature flag before expensive DB calls, preserving behavioral parity with the old buildSeoContext() gate.
     // Feature flag gate must appear INSIDE assembleLearnings, before the expensive DB calls.
     // This ensures behavioral parity with old buildSeoContext() which also gated on this flag.
     const fnStart = src.indexOf('async function assembleLearnings(');
