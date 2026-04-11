@@ -232,9 +232,13 @@ async function assembleSeoContext(
     strategy: ctx.strategy
       ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
       : ctx.strategy,
-    // Store RAW values (no headers). Callers that need formatted blocks use
-    // formatBrandVoiceForPrompt() / formatKnowledgeBaseForPrompt() from this module.
-    // This prevents double-formatting when formatSeoContextSection adds its own prefixes.
+    // Store RAW brand voice value (no headers) for legacy read-only consumers that need
+    // the raw workspace.brandVoice text — NOT for prompt injection. Prompt callers MUST
+    // use `effectiveBrandVoiceBlock` below (which already applies voice-profile authority).
+    // The raw `brandVoice` field is NOT passed through `formatBrandVoiceForPrompt` anymore:
+    // that helper is deprecated because it bypasses voice-profile authority (see the
+    // function's JSDoc and PR #167). For knowledge base, callers still use
+    // `formatKnowledgeBaseForPrompt()` because knowledge has no authority-layered variant.
     brandVoice: getRawBrandVoice(workspaceId),
     // Pre-formatted block with voice-profile authority applied. Source of truth:
     // buildSeoContext().brandVoiceBlock, which honors the rule that voice profile
@@ -1475,10 +1479,18 @@ function pct(rate: number | null | undefined): string {
  * Renders SeoContextSlice as a `## SEO Context` summary block for formatForPrompt().
  *
  * TWO-PATH FORMAT SPLIT: Callers using formatForPrompt() get this combined block.
- * Callers that need individual fields at different prompt positions use the standalone
- * helpers instead: formatBrandVoiceForPrompt(), formatKeywordsForPrompt(), etc.
- * These intentionally produce DIFFERENT output (standalone helpers add emphatic standalone
- * headers; this function renders compact inline labels within the ## SEO Context block).
+ * Callers that need individual fields at different prompt positions use standalone
+ * helpers instead: formatKeywordsForPrompt(), formatPersonasForPrompt(),
+ * formatKnowledgeBaseForPrompt(). For BRAND VOICE specifically, standalone callers
+ * must read `seo?.effectiveBrandVoiceBlock` directly — it is already pre-formatted
+ * by `buildSeoContext` with full voice-profile authority applied. Do NOT pass the raw
+ * `seo?.brandVoice` field through `formatBrandVoiceForPrompt` — that helper is
+ * deprecated (see its JSDoc) because it bypasses voice-profile authority and creates
+ * silent-drop bugs on calibrated workspaces.
+ *
+ * These standalone helpers intentionally produce DIFFERENT output (emphatic standalone
+ * headers) compared to this function's compact inline labels within the ## SEO Context
+ * block.
  */
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = ['## SEO Context'];
