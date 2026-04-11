@@ -702,6 +702,15 @@
           "status": "pending"
         },
         {
+          "id": 585,
+          "title": "Audit docs/rules/*.md for staleness and coverage gaps",
+          "source": "pr-check-audit-and-backfill plan (2026-04-10)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "Follow-up from the pr-check-audit-and-backfill plan. Walk every file in docs/rules/*.md and (a) verify it references current file paths and type names, (b) cross-check each rule against CLAUDE.md for drift, (c) flag any rule that could be mechanized into a pr-check rule. User explicitly requested this be tracked separately from the main audit plan so the follow-up doesn't get lost. Blocked on the audit plan landing (PRs A/B/C).",
+          "status": "pending"
+        },
+        {
           "id": 537,
           "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
           "source": "PIE Group 3 code review",

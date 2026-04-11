@@ -14,7 +14,9 @@
     "db:migrate": "tsx server/db/migrate-json.ts",
     "db:sync-staging": "tsx scripts/sync-staging-db.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "pr-check": "tsx scripts/pr-check.ts",
+    "pr-check:all": "tsx scripts/pr-check.ts --all"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
