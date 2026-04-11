@@ -66,6 +66,7 @@ explicit justification.
 |-----------|-------------|---------------|
 | Purple in client components | regex-shell | Simple literal `purple-`; grep succeeds; zero hits in `src/components/client/` confirmed. |
 | Forbidden hues (violet/indigo) in components | regex-shell | Pattern `(violet-\|indigo-)`; grep succeeds; zero hits in `src/components/` confirmed via manual grep. |
+| Bare JSON.parse on server | regex-shell | Pattern `JSON\.parse\(`; pathFilter `server/`; 22 exclusions for legitimate non-DB parse sites; zero remaining hits confirmed via manual grep. |
 | Hard-coded studio name | regex-shell | Pattern `hmpsn[ .]studio`; two excludes (`server/constants.ts`, `src/constants.ts`); three excludeLines for SVG alt text; `tests/` dir in EXCLUDED_DIRS so test fixtures don't count; zero hits in scanned dirs. |
 | Local prepared statement caching | regex-shell | Literal `let stmt`; grep succeeds; zero hits outside `server/db/`. |
 | z.array(z.unknown()) on server | regex-shell | Fully-escaped literal `z\.array\(z\.unknown\(\)\)`; exclude list `server/db/json-validation.ts`; grep succeeds. |
@@ -95,7 +96,7 @@ explicit justification.
 | useEffect external-sync dirty guard against the live prop | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 | Constants in sync (STUDIO_NAME, STUDIO_URL) | customCheck-fixture | customCheck; describe block in tests/pr-check.test.ts. |
 
-**Count: 30 verified-clean rules.**
+**Count: 31 verified-clean rules.**
 
 ---
 

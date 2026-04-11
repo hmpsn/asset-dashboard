@@ -416,6 +416,19 @@ export const CHECKS: Check[] = [
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
+      'server/semrush.ts', // disk files: SEMRush API usage log + credit log files (not DB columns)
+      'server/providers/dataforseo-provider.ts', // disk files: DataForSEO credit log files (not DB columns)
+      'server/monthly-report.ts', // disk files: sent-report tracking + report output files (not DB columns)
+      'server/competitor-schema.ts', // HTTP fetch response (JSON-LD from HTML) + disk cache file (not DB columns)
+      'server/storage-stats.ts', // disk files: workspace storage stat files (not DB columns)
+      'server/db/migrate-json.ts', // disk files: one-time migration tool reads legacy flat-file JSON stores (not DB columns)
+      'server/db/json-column.ts', // safe JSON column helper — implements the wrapper, not a raw DB read
+      'server/email-queue.ts', // disk file: email queue persistence file (not DB columns)
+      'server/routes/semrush.ts', // disk cache files: SEMRush response cache (not DB columns)
+      'server/routes/reports.ts', // disk files: report output files served via API (not DB columns)
+      'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
+      'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
+      'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',

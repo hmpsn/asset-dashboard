@@ -6,6 +6,7 @@
  * Acts as an L1 cache checked before the per-workspace file cache in semrush.ts.
  */
 import db from './db/index.js';
+import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('keyword-metrics-cache');
@@ -74,7 +75,7 @@ function rowToMetrics(r: MetricRow): CachedKeywordMetrics {
     cpc: r.cpc,
     competition: r.competition,
     results: r.results,
-    trend: JSON.parse(r.trend || '[]'),
+    trend: parseJsonFallback(r.trend, [] as number[]),
   };
 }
 
