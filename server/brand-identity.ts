@@ -100,12 +100,18 @@ function buildBrandContext(workspaceId: string): string {
   // only injected here when profile.status !== 'calibrated'. When calibrated,
   // buildSystemPrompt() (Layer 2) already injects them via prompt-assembly.ts;
   // duplicating them wastes tokens and over-weights voice constraints.
+  //
+  // IMPORTANT: samplesText is DELIBERATELY dropped here — `buildIntelPrompt(['seoContext'])`
+  // in `generateDeliverable` (below) already emits a VOICE SAMPLES block via
+  // `buildVoiceProfileContext` in seo-context.ts, which runs for every status including
+  // calibrated. Pushing samplesText a second time would duplicate every sample in the
+  // prompt, burning tokens and over-weighting the sample distribution. See PR #168
+  // scaled-review finding I4.
   try {
     const profile = getVoiceProfile(workspaceId);
     if (profile) {
-      const { samplesText, dnaText, guardrailsText } = buildVoiceCalibrationContext(profile);
+      const { dnaText, guardrailsText } = buildVoiceCalibrationContext(profile);
       if (dnaText) parts.push(dnaText.trim());
-      if (samplesText) parts.push(samplesText.trim());
       if (guardrailsText) parts.push(guardrailsText.trim());
     }
   } catch { /* voice profile not yet available */ }
