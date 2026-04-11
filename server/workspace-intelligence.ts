@@ -1318,8 +1318,11 @@ export function formatForPrompt(
     // not a misleading "newly onboarded" message about the workspace.
     if (include !== null && !include.has('seoContext')) return '';
     sections.push('This workspace is newly onboarded. Limited data available.');
-    if (intelligence.seoContext?.brandVoice) {
-      sections.push(`Brand voice: ${intelligence.seoContext.brandVoice}`);
+    // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback.
+    // Pre-formatted with its own header; inject directly rather than wrapping the raw field.
+    const bvBlock = intelligence.seoContext?.effectiveBrandVoiceBlock ?? '';
+    if (bvBlock) {
+      sections.push(bvBlock);
     }
     sections.push('Recommendation: Focus on establishing baseline data before making optimization decisions.');
     return sections.join('\n');

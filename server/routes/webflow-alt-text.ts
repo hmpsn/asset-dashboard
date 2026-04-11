@@ -80,16 +80,19 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     if (resolvedWsId) {
       const altIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
       const altBizCtx = altIntel.seoContext?.businessContext ?? '';
+      // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+      const bvBlock = altIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
       const ws = getWorkspace(resolvedWsId);
-      const brandVoice = ws?.brandVoice;
       const kwParts: string[] = [];
       if (altBizCtx) kwParts.push(`Business: ${altBizCtx}`);
-      if (brandVoice) kwParts.push(`Brand voice: ${brandVoice}`);
       if (ws?.keywordStrategy?.siteKeywords?.length) {
         kwParts.push(`Site keywords: ${ws.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
       }
       if (kwParts.length > 0) {
         context = context ? `${context}\n${kwParts.join('. ')}` : kwParts.join('. ');
+      }
+      if (bvBlock) {
+        context = context ? `${context}${bvBlock}` : bvBlock;
       }
     }
 
@@ -140,15 +143,19 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   if (bulkWsId) {
     const bulkIntel = await buildWorkspaceIntelligence(bulkWsId, { slices: ['seoContext'] });
     const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
+    // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+    const bvBlock = bulkIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
     const bulkWs = getWorkspace(bulkWsId);
     const kwParts: string[] = [];
     if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
-    if (bulkWs?.brandVoice) kwParts.push(`Brand voice: ${bulkWs.brandVoice}`);
     if (bulkWs?.keywordStrategy?.siteKeywords?.length) {
       kwParts.push(`Site keywords: ${bulkWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
     }
     if (kwParts.length > 0) {
       siteContext = siteContext ? `${siteContext}. ${kwParts.join('. ')}` : kwParts.join('. ');
+    }
+    if (bvBlock) {
+      siteContext = siteContext ? `${siteContext}${bvBlock}` : bvBlock;
     }
   }
 

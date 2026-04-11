@@ -328,6 +328,20 @@ router.post('/api/jobs', async (req, res) => {
           try {
             updateJob(job.id, { status: 'running', progress: 0 });
             const token = altSiteId ? (getTokenForSite(altSiteId) || undefined) : undefined;
+            // Resolve workspace + intelligence ONCE per job (not per asset) — the context doesn't change across assets.
+            const jobWsId = params.workspaceId as string | undefined;
+            const jobWs = jobWsId ? getWorkspace(jobWsId) : (altSiteId ? listWorkspaces().find(w => w.webflowSiteId === altSiteId) : undefined);
+            let jobAltContext = '';
+            if (jobWs) {
+              const resolvedJobWsId = jobWsId || jobWs.id;
+              const jobIntel = await buildWorkspaceIntelligence(resolvedJobWsId, { slices: ['seoContext'] });
+              // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+              const bvBlock = jobIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
+              const parts: string[] = [];
+              if (jobWs.keywordStrategy?.siteKeywords?.length) parts.push(`Site keywords: ${jobWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
+              if (parts.length > 0) jobAltContext = parts.join('. ');
+              if (bvBlock) jobAltContext = jobAltContext ? `${jobAltContext}${bvBlock}` : bvBlock;
+            }
             const results: Array<{ assetId: string; altText?: string; updated: boolean; error?: string }> = [];
             for (let i = 0; i < altAssets.length; i++) {
               const asset = altAssets[i];
@@ -338,16 +352,6 @@ router.post('/api/jobs', async (req, res) => {
                 const imgExt = path.extname(asset.imageUrl).split('?')[0] || '.jpg';
                 const tmpPath = `/tmp/bulk_alt_${Date.now()}${imgExt}`;
                 fs.writeFileSync(tmpPath, buffer);
-                // Build context from workspace keyword strategy
-                const jobWsId = params.workspaceId as string | undefined;
-                const jobWs = jobWsId ? getWorkspace(jobWsId) : (altSiteId ? listWorkspaces().find(w => w.webflowSiteId === altSiteId) : undefined);
-                let jobAltContext = '';
-                if (jobWs) {
-                  const parts: string[] = [];
-                  if (jobWs.brandVoice) parts.push(`Brand voice: ${jobWs.brandVoice}`);
-                  if (jobWs.keywordStrategy?.siteKeywords?.length) parts.push(`Site keywords: ${jobWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
-                  if (parts.length > 0) jobAltContext = parts.join('. ');
-                }
                 const altTextResult = await generateAltText(tmpPath, jobAltContext || undefined);
                 try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
                 if (altTextResult) {
@@ -362,7 +366,6 @@ router.post('/api/jobs', async (req, res) => {
               updateJob(job.id, { progress: i + 1, message: `Generated ${i + 1}/${altAssets.length} alt texts` });
             }
             updateJob(job.id, { status: 'done', result: results, progress: altAssets.length, message: `Done — ${results.filter(r => r.updated).length}/${altAssets.length} updated` });
-            const jobWsId = params.workspaceId as string;
             if (jobWsId) {
               addActivity(jobWsId, 'images_optimized',
                 `Bulk alt text: ${results.filter(r => r.updated).length} images updated`,
