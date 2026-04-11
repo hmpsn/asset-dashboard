@@ -644,12 +644,17 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      // Note the non-capturing group — we only care that `broadcast` is
-      // the call being made, not what precedes it. The `(?:^|[^a-zA-Z_])`
-      // lookbehind-equivalent preserves the original rule's exclusion of
-      // `_broadcast(` and `foo.broadcast(` — the latter would match the
-      // `.` and be rejected. JS regex doesn't need shell escaping so
-      // both quote styles work directly.
+      // The `(?:^|[^a-zA-Z_])` prefix preserves the original rule's
+      // exclusion of `_broadcast(` (private wrappers in websocket.ts).
+      // Note: `.` IS in `[^a-zA-Z_]`, so `foo.broadcast('literal')` WILL
+      // be flagged — this is intentional. There are currently no
+      // legitimate method-call `.broadcast('literal')` sites in server/
+      // (only the global helper and the `_broadcast` private wrappers),
+      // so no false-positive carve-out is needed. If one is ever added,
+      // extend the exclusion to `[^a-zA-Z_.]` and annotate the exception.
+      // JS regex doesn't need shell escaping so both quote styles work
+      // directly (the original regex-in-shell version couldn't use `['"]`
+      // without closing the outer shell quote — Category D).
       const bcastRe = /(?:^|[^a-zA-Z_])broadcast\s*\(\s*['"]/;
       for (const file of files) {
         if (!file.endsWith('.ts')) continue;

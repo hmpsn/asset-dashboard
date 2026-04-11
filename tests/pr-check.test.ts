@@ -23,9 +23,11 @@
  * Fixtures never live in the real tree so they cannot pollute `pr-check --all`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import { CHECKS, checkDirectory, type Check, type CustomCheckMatch } from '../scripts/pr-check.js';
 
 let TMPDIR: string;
@@ -1384,9 +1386,8 @@ describe('Meta: customCheck rule name registry', () => {
   // expectation. This test reads the test file and grep-matches for a
   // describe heading per customCheck rule, failing with an explicit
   // missing-rule list if any rule lacks coverage.
-  it('every customCheck rule has a `describe(\'Rule: <name>\', ...)` block in this file', async () => {
-    const { readFileSync } = await import('fs');
-    const selfPath = new URL(import.meta.url).pathname;
+  it('every customCheck rule has a `describe(\'Rule: <name>\', ...)` block in this file', () => {
+    const selfPath = fileURLToPath(import.meta.url);
     const src = readFileSync(selfPath, 'utf-8');
     const customCheckRules = CHECKS
       .filter((c) => typeof c.customCheck === 'function')
@@ -1445,11 +1446,7 @@ describe('Meta: customCheck rule name registry', () => {
 // a 30s timeout to absorb CI variance.
 
 describe('Meta: pr-check --all status parity with verified-clean allowlist', () => {
-  it('every rule reporting ✓ is listed in docs/rules/verified-clean-rules.md', async () => {
-    const { execFileSync } = await import('child_process');
-    const { readFileSync } = await import('fs');
-    const { fileURLToPath } = await import('url');
-
+  it('every rule reporting ✓ is listed in docs/rules/verified-clean-rules.md', () => {
     // 1. Spawn pr-check --all as a subprocess and capture stdout.
     //    We use execFileSync with the tsx binary directly to avoid
     //    shell interpretation of stdout (which contains box-drawing
@@ -1526,7 +1523,19 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     //    Table format: `| Rule Name | Verified By | Justification |`
     //    We match rows that start with `| ` and skip the header/separator.
     const allowlistPath = path.resolve(repoRoot, 'docs/rules/verified-clean-rules.md');
-    const allowlistSrc = readFileSync(allowlistPath, 'utf-8');
+    let allowlistSrc: string;
+    try {
+      allowlistSrc = readFileSync(allowlistPath, 'utf-8');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Failed to read allowlist at ${allowlistPath}.\n` +
+        `  ${msg}\n\n` +
+        `This file is the load-bearing gate for pr-check silent-failure detection. ` +
+        `If it was deleted or renamed, restore it (see Round 2 Task P1.5) before ` +
+        `this test can run.`,
+      );
+    }
     const allowedRules: string[] = [];
     let inTable = false;
     for (const line of allowlistSrc.split('\n')) {

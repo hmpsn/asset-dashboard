@@ -16,7 +16,7 @@
  * updated to walk the constant table.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { readFileSync, readdirSync, lstatSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -35,7 +35,12 @@ function walkTestFiles(dir: string): string[] {
   const results: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
-    const s = statSync(full);
+    // Use `lstatSync` (not `statSync`) so symlinks are not followed —
+    // prevents infinite recursion if a symlink inside tests/ ever points
+    // upward (e.g. an accidental `tests/self -> ../`). Symlinked test
+    // files are intentionally skipped: fixtures are real files.
+    const s = lstatSync(full);
+    if (s.isSymbolicLink()) continue;
     if (s.isDirectory()) {
       // Skip node_modules / fixtures / snapshots — tests only.
       if (entry === 'node_modules' || entry === '__snapshots__') continue;

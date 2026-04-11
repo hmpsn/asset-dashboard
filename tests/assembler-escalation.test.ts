@@ -87,10 +87,19 @@ vi.mock('../server/ws-events.js', () => ({
 //     resolves its import of `outcome-tracking`. Simulates a renamed
 //     helper (`getTopWinsFromActions`) that callers try to access and
 //     hit `undefined is not a function` — a textbook programming error.
-vi.mock('../server/outcome-tracking.js', () => ({
-  getActionsByWorkspace: vi.fn(() => {
+// Hoisted so the test body can assert that the throwing fn was actually
+// invoked (separating "wrong mock wiring" from "escalation contract
+// broken"). Without this sanity check both failure modes produce the
+// same `expect(mockWarn.calls.length).toBeGreaterThan(0)` assertion
+// failure, making regressions ambiguous to diagnose.
+const { throwingGetActionsByWorkspace } = vi.hoisted(() => ({
+  throwingGetActionsByWorkspace: vi.fn(() => {
     throw new TypeError('getTopWinsFromActions is not a function');
   }),
+}));
+
+vi.mock('../server/outcome-tracking.js', () => ({
+  getActionsByWorkspace: throwingGetActionsByWorkspace,
   getOutcomesForAction: vi.fn(() => []),
   getTopWinsFromActions: undefined,
   getPendingActions: vi.fn(() => []),
@@ -105,6 +114,7 @@ describe('assembler catch block escalation', () => {
   beforeEach(() => {
     mockWarn.mockClear();
     mockDebug.mockClear();
+    throwingGetActionsByWorkspace.mockClear();
   });
 
   it('assembleLearnings: TypeError in outcome-tracking surfaces as log.warn (not silent)', async () => {
@@ -121,12 +131,19 @@ describe('assembler catch block escalation', () => {
     expect(result).toBeDefined();
     expect(result.learnings).toBeDefined();
 
+    // Sanity: the throwing mock was actually reached. If this fails but
+    // the log.warn assertion below also fails, the regression is in the
+    // mock wiring (feature flag, dynamic import path), NOT in the
+    // assembler escalation contract. Without this check both failures
+    // look identical.
+    expect(throwingGetActionsByWorkspace).toHaveBeenCalled();
+
     // Programming error must surface as warn, not silent debug. The
     // exact log shape is `log.warn({ err, ... }, 'programming error in
     // assembler X')` — any mock call containing 'programming error'
     // satisfies the contract.
     expect(mockWarn.mock.calls.length).toBeGreaterThan(0);
-    const warnCalls = mockWarn.mock.calls.map((c: unknown[]) => JSON.stringify(c));
-    expect(warnCalls.some((m: string) => m.includes('programming error'))).toBe(true);
+    const warnCalls = mockWarn.mock.calls.map((c) => JSON.stringify(c));
+    expect(warnCalls.some((m) => m.includes('programming error'))).toBe(true);
   });
 });
