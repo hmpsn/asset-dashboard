@@ -7,6 +7,7 @@ import type { SiteBlueprint, BlueprintGenerationInput } from '../../../shared/ty
 import { useToast } from '../Toast';
 import { useBlueprints } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
+import { EmptyState } from '../ui/EmptyState';
 
 interface Props {
   workspaceId: string;
@@ -19,6 +20,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState('');
   const [industryType, setIndustryType] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: blueprintList, isLoading } = useBlueprints(workspaceId);
 
@@ -61,8 +63,12 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.blueprints(workspaceId) });
       toast('Blueprint deleted');
+      setDeletingId(null);
     },
-    onError: () => toast('Failed to delete blueprint', 'error'),
+    onError: () => {
+      toast('Failed to delete blueprint', 'error');
+      setDeletingId(null);
+    },
   });
 
   function resetForm() {
@@ -183,9 +189,20 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
           Loading blueprints...
         </div>
       ) : !blueprintList || blueprintList.length === 0 ? (
-        <div className="text-zinc-500 text-sm py-4">
-          No blueprints yet. Create one to start planning your site strategy.
-        </div>
+        <EmptyState
+          icon={Map}
+          title="No blueprints yet"
+          description="Create one to start planning your site strategy."
+          action={
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-4 h-4" />
+              New Blueprint
+            </button>
+          }
+        />
       ) : (
         <div className="space-y-2">
           {blueprintList.map(bp => (
@@ -207,12 +224,17 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
               <button
                 onClick={e => {
                   e.stopPropagation();
+                  setDeletingId(bp.id);
                   deleteMutation.mutate(bp.id);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-400 transition-all"
+                disabled={deletingId === bp.id}
+                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label={`Delete ${bp.name}`}
               >
-                <Trash2 className="w-4 h-4" />
+                {deletingId === bp.id
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Trash2 className="w-4 h-4" />
+                }
               </button>
 
               <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
