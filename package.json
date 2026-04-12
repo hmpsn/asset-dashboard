@@ -17,7 +17,8 @@
     "test:e2e": "playwright test",
     "pr-check": "tsx scripts/pr-check.ts",
     "pr-check:all": "tsx scripts/pr-check.ts --all",
-    "rules:generate": "tsx scripts/generate-rules-doc.ts"
+    "rules:generate": "tsx scripts/generate-rules-doc.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -90,6 +91,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "typescript-eslint": "^8.48.0",
     "vitest": "^4.0.18"
