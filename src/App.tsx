@@ -22,7 +22,8 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { FeatureFlag } from './components/ui/FeatureFlag';
-import { Clipboard, Globe } from 'lucide-react';
+import { EmptyState } from './components/ui/EmptyState';
+import { Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -387,7 +388,22 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return (
-      <FeatureFlag flag="copy-engine">
+      // Double-gated: Sidebar already hides the nav entry when the flag is
+      // off, but a user who deep-links to /ws/:id/brand directly would hit
+      // this route. Without a fallback, `<FeatureFlag>` renders null and the
+      // content pane goes blank with no explanation. Ship an EmptyState so
+      // the deep-link path degrades gracefully instead of looking broken.
+      // (PR #168 scaled-review UX polish.)
+      <FeatureFlag
+        flag="copy-engine"
+        fallback={
+          <EmptyState
+            icon={Sparkles}
+            title="Brand Hub is rolling out"
+            description="The Copy & Brand Engine is still rolling out to workspaces. Check back soon, or reach out if you'd like early access."
+          />
+        }
+      >
         <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />
       </FeatureFlag>
     );
