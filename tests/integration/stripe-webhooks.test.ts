@@ -324,6 +324,10 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
   });
 
   it('customer.subscription.deleted — missing workspaceId silently returns', async () => {
+    // Set workspace to 'growth' so the assertion proves the handler truly
+    // no-op'd, rather than vacuously passing because the default is 'free'.
+    updateWorkspace(ws.workspaceId, { tier: 'growth' });
+
     const event = createWebhookEvent('customer.subscription.deleted', {
       id: 'sub_test_no_ws',
       metadata: {},
@@ -332,9 +336,9 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
 
     await handleWebhookEvent(event as never);
 
-    // Workspace unchanged
+    // Workspace unchanged — handler should not downgrade without workspaceId
     const wsCurrent = getWorkspace(ws.workspaceId);
-    expect(wsCurrent?.tier).toBe('free'); // was already free
+    expect(wsCurrent?.tier).toBe('growth');
   });
 
   // ── Unknown event ──
