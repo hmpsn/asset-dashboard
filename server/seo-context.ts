@@ -112,7 +112,7 @@ function isVoiceProfileAuthoritative(profile: VoiceProfile | null, voiceProfileB
   // "configured" and activate the authority override — exactly the scenario
   // the samples-only draft fix in 964b3ff was meant to prevent.
   const hasExplicitConfig = profile.voiceDNA != null || profile.guardrails != null;
-  return hasExplicitConfig && voiceProfileBlock.length > 0;
+  return hasExplicitConfig && voiceProfileBlock.length > 0; // voice-authority-ok — helper body is the canonical authority site
 }
 
 export interface SeoContext {
@@ -327,8 +327,14 @@ export function buildSeoContext(
           // runs (e.g. a calibration transition landed in the meantime). Using the
           // current DB state is the whole point of a parity check. The profile IS
           // still passed into buildVoiceProfileContext below to avoid a fourth read
-          // inside that helper.
-          const shadowProfile = getVoiceProfile(workspaceId);
+          // inside that helper. Wrapped in `safeBrandEngineRead` for consistency
+          // with the main path — the outer try/catch in this shadow-mode block
+          // catches EVERYTHING and only warn-logs, which would silently swallow
+          // a real programming bug as a "shadow-mode comparison failed" warning.
+          // The narrow wrapper re-throws non-schema-missing errors so the outer
+          // catch still logs them, but the main path stays on the same gentle
+          // degradation path it uses in production.
+          const shadowProfile = safeBrandEngineRead('buildSeoContext.shadowMode.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
           const shadowVoiceBlock = buildVoiceProfileContext(workspaceId, 'full', shadowProfile);
           // Use the same authority helper as the main path so shadow-mode's
           // decision to skip the raw brand voice parity check mirrors what
@@ -634,7 +640,14 @@ export function buildVoiceProfileContext(
   emphasis: ContextEmphasis = 'full',
   profileArg?: (VoiceProfile & { samples: VoiceSample[] }) | null,
 ): string {
-  const profile = profileArg !== undefined ? profileArg : getVoiceProfile(workspaceId);
+  // Fallback fetch when the caller did not pre-fetch — wrapped in
+  // `safeBrandEngineRead` so a missing `voice_profiles` table in test envs
+  // degrades to the empty-voice path rather than crashing the entire
+  // prompt-assembly call tree. Consistent with the wrapped reads inside
+  // `buildSeoContext` / `buildBrandscriptContext` / `buildIdentityContext`.
+  const profile = profileArg !== undefined
+    ? profileArg
+    : safeBrandEngineRead('buildVoiceProfileContext.fallback.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
   if (!profile) return '';
 
   const isCalibrated = profile.status === 'calibrated';

@@ -1,0 +1,9 @@
+# Project-wide gates — these check the full project, not just staged files.
+# typecheck: ~5-10s, pr-check: ~3-5s (diffs against remote branch)
+npm run typecheck
+npm run pr-check
+
+# Run only tests affected by staged changes (fast subset of full 35s suite).
+# Full suite runs in CI; this catches the obvious local regressions.
+# Exits 0 cleanly when no test files are affected by the changes.
+npx vitest run --changed HEAD
