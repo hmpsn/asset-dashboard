@@ -19,6 +19,29 @@ const log = createLogger('seo-context');
  * Ensures every AI prompt gets consistent strategy + business context.
  */
 
+/**
+ * Graceful wrapper around brand-engine table reads (voice_profiles,
+ * brandscripts, brand_identity_deliverables). In production these tables
+ * always exist because migrations run at startup, but test environments may
+ * skip migrations entirely and a missing table throws from `db.prepare()`
+ * inside the stmt-cache initializer — crashing the entire `buildSeoContext`
+ * call tree. Mirrors the pattern used in `server/prompt-assembly.ts` where
+ * the same concern led to an explicit try/catch around `getVoiceProfile`.
+ *
+ * The `context` argument is only used for the warn-log so we can distinguish
+ * which call site degraded on the dashboard. The fallback value is what the
+ * caller would have received from an empty-state read (null / empty array /
+ * empty string).
+ */
+function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch (err) {
+    log.warn({ context, workspaceId, error: err instanceof Error ? err.message : String(err) }, 'brand-engine read failed — graceful degradation to legacy path');
+    return fallback;
+  }
+}
+
 export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
@@ -116,7 +139,7 @@ export function buildSeoContext(
     // voice_profiles table twice (once here, once inside buildVoiceProfileContext)
     // — that's also a TOCTOU risk: a calibration transition landing between the
     // two reads could produce a mixed snapshot. One read = one snapshot.
-    const profile = getVoiceProfile(workspaceId);
+    const profile = safeBrandEngineRead('buildSeoContext.noStrategy.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
     const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
     const identityBlock = buildIdentityContext(workspaceId);
     // A voice profile is "authoritative" (replaces the legacy brandVoiceBlock)
@@ -125,14 +148,27 @@ export function buildSeoContext(
     //       DNA + guardrails into the SYSTEM prompt, and we must not also
     //       emit the legacy block in the USER prompt (two contradictory
     //       voice sources in front of the model), OR
-    //   (b) the rendered voiceProfileBlock is non-empty — the profile has
-    //       real content (DNA/samples/guardrails while not yet calibrated)
-    //       and should take over from the legacy block.
-    // A fresh draft profile auto-created on GET /api/voice/:id produces an
-    // empty block and is NOT calibrated, so it correctly falls through to
-    // the legacy block — admins keep their existing brand voice text + uploaded
-    // brand-docs until they actually configure the new profile.
-    const voiceProfileActive = profile !== null && (profile.status === 'calibrated' || voiceProfileBlock.length > 0);
+    //   (b) the profile has explicit DNA or guardrails saved AND the rendered
+    //       voiceProfileBlock is non-empty — the admin has made a deliberate
+    //       configuration commitment while still in draft.
+    //
+    // Samples ALONE no longer trigger the override. A draft profile with
+    // only voice samples is a "preparing to calibrate" state (the admin
+    // uploaded source material but hasn't saved any DNA or guardrails yet) —
+    // we must NOT silently drop the legacy brandVoice + brand-docs they
+    // previously configured. The legacy block stays in place until the
+    // admin explicitly commits to the new profile by saving DNA, saving
+    // guardrails, or running calibration through to `calibrated`.
+    // (PR #168 scaled-review finding flagged during staging hardening.)
+    //
+    // A fresh draft profile auto-created on GET /api/voice/:id has neither
+    // DNA nor guardrails nor samples, so it correctly falls through to the
+    // legacy block as before.
+    const hasExplicitConfig = profile !== null && (profile.voiceDNA !== undefined || profile.guardrails !== undefined);
+    const voiceProfileActive = profile !== null && (
+      profile.status === 'calibrated' ||
+      (hasExplicitConfig && voiceProfileBlock.length > 0)
+    );
     const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
     const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
     // Inject workspace learnings if feature is enabled
@@ -183,15 +219,20 @@ export function buildSeoContext(
 
   const brandscriptBlock = buildBrandscriptContext(workspaceId);
   // Read the voice profile ONCE — see the `!strategy` branch above for rationale.
-  const profile = getVoiceProfile(workspaceId);
+  const profile = safeBrandEngineRead('buildSeoContext.withStrategy.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
   const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
   const identityBlock = buildIdentityContext(workspaceId);
   // See authority rules on the `!strategy` branch above — same logic applies
-  // here: calibrated profile OR non-empty voiceProfileBlock replaces legacy;
-  // everything else falls through to the legacy brandVoiceBlock so admins
-  // with existing brand voice content keep seeing it until the new profile
-  // has real configuration.
-  const voiceProfileActive = profile !== null && (profile.status === 'calibrated' || voiceProfileBlock.length > 0);
+  // here: calibrated OR (explicit DNA/guardrails + non-empty voiceProfileBlock)
+  // replaces legacy. Samples alone do NOT trigger the override — a draft
+  // profile with just uploaded samples is "preparing to calibrate", not a
+  // configuration commitment. Admins with existing brand voice content keep
+  // seeing it until they save DNA, save guardrails, or finish calibration.
+  const hasExplicitConfig = profile !== null && (profile.voiceDNA !== undefined || profile.guardrails !== undefined);
+  const voiceProfileActive = profile !== null && (
+    profile.status === 'calibrated' ||
+    (hasExplicitConfig && voiceProfileBlock.length > 0)
+  );
   const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
   const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
   // Inject workspace learnings if feature is enabled
@@ -498,7 +539,8 @@ export function buildKeywordMapContext(workspaceId?: string): string {
  * Uses the most recently created brandscript. Returns '' if none exists or no sections have content.
  */
 export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
-  const scripts = listBrandscripts(workspaceId);
+  // Graceful degradation if brandscripts table doesn't exist (test envs).
+  const scripts = safeBrandEngineRead('buildBrandscriptContext.listBrandscripts', workspaceId, () => listBrandscripts(workspaceId), []);
   if (scripts.length === 0) return '';
 
   const bs = scripts[0]; // Use most recent
@@ -595,7 +637,9 @@ export function buildVoiceProfileContext(
  * Only includes deliverables with status 'approved'. Returns '' if none exist.
  */
 export function buildIdentityContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
-  const deliverables = listDeliverables(workspaceId).filter(d => d.status === 'approved');
+  // Graceful degradation if brand_identity_deliverables table doesn't exist (test envs).
+  const deliverables = safeBrandEngineRead('buildIdentityContext.listDeliverables', workspaceId, () => listDeliverables(workspaceId), [])
+    .filter(d => d.status === 'approved');
   if (deliverables.length === 0) return '';
 
   if (emphasis === 'minimal') {

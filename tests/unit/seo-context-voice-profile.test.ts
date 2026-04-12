@@ -157,6 +157,49 @@ describe('buildSeoContext — voice profile authority vs legacy brand voice', ()
     expect(ctx.fullContext).not.toContain(LEGACY_VOICE_TEXT);
     expect(ctx.brandVoiceBlock).not.toContain(LEGACY_VOICE_TEXT);
   });
+
+  it('preserves legacy brand voice when draft profile has only samples (no DNA, no guardrails)', () => {
+    // Regression for the post-PR-#168 review flag: an admin who opens the
+    // Voice tab and uploads a single sample should NOT silently lose their
+    // previously-configured legacy `workspace.brandVoice` text. Samples
+    // alone are "preparing to calibrate" — they express intent to use the
+    // new voice system, but the admin hasn't committed to any DNA or
+    // guardrails yet. Dropping the legacy block at that moment is a one-way,
+    // invisible transition that leaves the prompt noticeably weaker.
+    //
+    // Post-fix: only calibrated OR explicit DNA/guardrails activate the
+    // override. Samples-only drafts keep the legacy block in the prompt.
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+    addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
+    // No DNA, no guardrails, no status change — pure "uploaded one sample".
+    clearSeoContextCache(seeded.workspaceId);
+
+    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+
+    // Legacy MUST still be present — the admin hasn't committed to the new path yet.
+    expect(ctx.fullContext).toContain(LEGACY_VOICE_TEXT);
+    expect(ctx.brandVoiceBlock).toContain(LEGACY_VOICE_TEXT);
+  });
+
+  it('activates override when draft profile has DNA saved (even before calibration)', () => {
+    // Symmetric to the samples-only test: once the admin has committed to
+    // the new voice system by saving actual DNA (e.g. via the calibration
+    // wizard that persists DNA mid-flow), the override DOES activate and
+    // the legacy block is dropped. Same for guardrails.
+    seeded = seedWorkspaceWithLegacyVoice();
+    getOrCreateVoiceProfile(seeded.workspaceId);
+    addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
+    updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
+    clearSeoContextCache(seeded.workspaceId);
+
+    const ctx = buildSeoContext(seeded.workspaceId, undefined, 'strategy', { _skipShadow: true });
+
+    // Legacy is gone — the admin's DNA save was the commitment signal.
+    expect(ctx.fullContext).not.toContain(LEGACY_VOICE_TEXT);
+    // The voice profile block is now active and contains the sample text.
+    expect(ctx.fullContext).toContain(SAMPLE_TEXT);
+  });
 });
 
 /**
