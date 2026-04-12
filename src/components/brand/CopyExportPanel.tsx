@@ -1,5 +1,4 @@
-import { useState, Component } from 'react';
-import type { ReactNode, ErrorInfo } from 'react';
+import { useState } from 'react';
 import {
   Download,
   FileText,
@@ -13,6 +12,7 @@ import { useExportCopy, useCopyPipelineEvents } from '../../hooks/admin/useCopyP
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
+import { ErrorBoundary } from '../ErrorBoundary';
 import type { ExportFormat, ExportScope } from '../../../shared/types/copy-pipeline';
 import type { BlueprintEntry } from '../../../shared/types/page-strategy';
 
@@ -22,49 +22,6 @@ interface Props {
   workspaceId: string;
   blueprintId: string;
   entries: BlueprintEntry[];
-}
-
-// ─── Error Boundary ───────────────────────────────────────────────────────────
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  message: string;
-}
-
-class CopyExportErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, message: '' };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, message: error.message };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[CopyExportPanel] Error boundary caught:', error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="bg-zinc-900 border border-red-900/40 rounded-xl p-6 text-center">
-          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
-          <p className="text-sm font-medium text-zinc-200 mb-1">Something went wrong</p>
-          <p className="text-xs text-zinc-500 mb-4">
-            {this.state.message || 'An unexpected error occurred in the export panel.'}
-          </p>
-          <button
-            onClick={() => this.setState({ hasError: false, message: '' })}
-            className="px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity"
-          >
-            Try again
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 // ─── Format option config ─────────────────────────────────────────────────────
@@ -486,8 +443,8 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
 
 export function CopyExportPanel(props: Props) {
   return (
-    <CopyExportErrorBoundary>
+    <ErrorBoundary label="Copy Export">
       <CopyExportPanelInner {...props} />
-    </CopyExportErrorBoundary>
+    </ErrorBoundary>
   );
 }
