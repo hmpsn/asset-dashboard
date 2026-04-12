@@ -167,8 +167,8 @@ router.get(
   '/api/copy/:workspaceId/entry/:entryId/sections',
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
-    const { entryId } = req.params;
-    const sections = getSectionsForEntry(entryId);
+    const { workspaceId, entryId } = req.params;
+    const sections = getSectionsForEntry(entryId, workspaceId);
     return res.json(sections);
   },
 );
@@ -178,8 +178,8 @@ router.get(
   '/api/copy/:workspaceId/entry/:entryId/status',
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
-    const { entryId } = req.params;
-    const status = getEntryCopyStatus(entryId);
+    const { workspaceId, entryId } = req.params;
+    const status = getEntryCopyStatus(entryId, workspaceId);
     return res.json(status);
   },
 );
@@ -189,8 +189,8 @@ router.get(
   '/api/copy/:workspaceId/entry/:entryId/metadata',
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
-    const { entryId } = req.params;
-    const metadata = getMetadata(entryId);
+    const { workspaceId, entryId } = req.params;
+    const metadata = getMetadata(entryId, workspaceId);
     if (!metadata) return res.status(404).json({ error: 'Metadata not found' });
     return res.json(metadata);
   },
@@ -293,9 +293,19 @@ router.post(
       let generated = 0;
       let failed = 0;
 
+      // Read accumulated_steering from the job record so it's passed to every
+      // generation call (allows pre-seeded steering to influence all entries).
+      const jobRow = db.prepare(
+        `SELECT accumulated_steering FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
+      ).get(batchId, workspaceId) as { accumulated_steering: string } | undefined;
+      const accumulatedSteering = parseJsonFallback<string[]>(
+        jobRow?.accumulated_steering ?? '[]',
+        [],
+      );
+
       for (const entryId of entryIds) {
         try {
-          await generateCopyForEntry(workspaceId, blueprintId, entryId);
+          await generateCopyForEntry(workspaceId, blueprintId, entryId, accumulatedSteering);
           generated++;
         } catch (err) {
           log.error({ err, workspaceId, blueprintId, entryId }, 'Batch entry generation failed');

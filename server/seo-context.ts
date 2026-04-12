@@ -756,7 +756,7 @@ export function buildBlueprintContext(workspaceId: string, _pagePath?: string, p
     }
 
     // Include approved copy from this entry for consistency
-    const sections = getSectionsForEntry(matchedEntry.id);
+    const sections = getSectionsForEntry(matchedEntry.id, workspaceId);
     const approvedSections = sections.filter(s => s.status === 'approved');
     if (approvedSections.length > 0) {
       lines.push('APPROVED COPY SAMPLES (maintain consistency):');

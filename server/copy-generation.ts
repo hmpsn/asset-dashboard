@@ -150,7 +150,7 @@ export async function regenerateSection(
 ): Promise<CopySection | null> {
   const blueprint = getBlueprint(wsId, blueprintId);
   const entry = getEntry(wsId, blueprintId, entryId);
-  const sections = getSectionsForEntry(entryId);
+  const sections = getSectionsForEntry(entryId, wsId);
   const targetSection = sections.find(s => s.id === sectionId);
   if (!blueprint || !entry || !targetSection) return null;
 
@@ -429,7 +429,7 @@ export async function buildCopyGenerationContext(
       if (!bp.entries) continue;
       for (const e of bp.entries) {
         if (e.id === entry.id) continue; // skip current entry
-        const entrySections = getSectionsForEntry(e.id);
+        const entrySections = getSectionsForEntry(e.id, wsId);
         const approved = entrySections.filter(s => s.status === 'approved' && s.generatedCopy);
         for (const sec of approved.slice(0, 2)) {
           // Pull section plan item for context

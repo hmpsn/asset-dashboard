@@ -62,10 +62,10 @@ const stmts = createStmtCache(() => ({
      VALUES (@id, @workspace_id, @entry_id, @section_plan_item_id, @generated_copy, @status, @ai_annotation, @ai_reasoning, @steering_history, @client_suggestions, @quality_flags, @version, @created_at, @updated_at)`,
   ),
   selectSectionsByEntry: db.prepare(
-    `SELECT * FROM copy_sections WHERE entry_id = ? ORDER BY rowid ASC`,
+    `SELECT * FROM copy_sections WHERE entry_id = ? AND workspace_id = ? ORDER BY rowid ASC`,
   ),
   selectSectionById: db.prepare(
-    `SELECT * FROM copy_sections WHERE id = ?`,
+    `SELECT * FROM copy_sections WHERE id = ? AND workspace_id = ?`,
   ),
   deleteSectionsByEntry: db.prepare(
     `DELETE FROM copy_sections WHERE entry_id = ? AND workspace_id = ?`,
@@ -108,7 +108,7 @@ const stmts = createStmtCache(() => ({
        updated_at = excluded.updated_at`,
   ),
   selectMetadataByEntry: db.prepare(
-    `SELECT * FROM copy_metadata WHERE entry_id = ?`,
+    `SELECT * FROM copy_metadata WHERE entry_id = ? AND workspace_id = ?`,
   ),
 }));
 
@@ -171,13 +171,13 @@ function isValidTransition(from: CopySectionStatus, to: CopySectionStatus): bool
 
 // ── Section CRUD ──
 
-export function getSectionsForEntry(entryId: string): CopySection[] {
-  const rows = stmts().selectSectionsByEntry.all(entryId) as CopySectionRow[];
+export function getSectionsForEntry(entryId: string, workspaceId: string): CopySection[] {
+  const rows = stmts().selectSectionsByEntry.all(entryId, workspaceId) as CopySectionRow[];
   return rows.map(r => rowToSection(r));
 }
 
-export function getSection(sectionId: string): CopySection | null {
-  const row = stmts().selectSectionById.get(sectionId) as CopySectionRow | undefined;
+export function getSection(sectionId: string, workspaceId: string): CopySection | null {
+  const row = stmts().selectSectionById.get(sectionId, workspaceId) as CopySectionRow | undefined;
   if (!row) return null;
   return rowToSection(row);
 }
@@ -241,13 +241,9 @@ export function saveGeneratedCopy(
   workspaceId: string,
   data: { generatedCopy: string; aiAnnotation: string; aiReasoning: string; qualityFlags?: QualityFlag[] },
 ): CopySection | null {
-  const existing = getSection(sectionId);
+  const existing = getSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'saveGeneratedCopy: section not found');
-    return null;
-  }
-  if (existing.workspaceId !== workspaceId) {
-    log.warn({ sectionId, workspaceId }, 'saveGeneratedCopy: workspace mismatch');
     return null;
   }
 
@@ -273,7 +269,7 @@ export function saveGeneratedCopy(
     updated_at: now,
   });
 
-  return getSection(sectionId);
+  return getSection(sectionId, workspaceId);
 }
 
 // Status management
@@ -282,13 +278,9 @@ export function updateSectionStatus(
   workspaceId: string,
   status: CopySectionStatus,
 ): CopySection | null {
-  const existing = getSection(sectionId);
+  const existing = getSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'updateSectionStatus: section not found');
-    return null;
-  }
-  if (existing.workspaceId !== workspaceId) {
-    log.warn({ sectionId, workspaceId }, 'updateSectionStatus: workspace mismatch');
     return null;
   }
   if (!isValidTransition(existing.status, status)) {
@@ -304,7 +296,7 @@ export function updateSectionStatus(
     updated_at: now,
   });
 
-  return getSection(sectionId);
+  return getSection(sectionId, workspaceId);
 }
 
 // Steering (appends to steering_history JSON array)
@@ -313,13 +305,9 @@ export function addSteeringEntry(
   workspaceId: string,
   entry: Omit<SteeringEntry, 'timestamp'>,
 ): CopySection | null {
-  const existing = getSection(sectionId);
+  const existing = getSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'addSteeringEntry: section not found');
-    return null;
-  }
-  if (existing.workspaceId !== workspaceId) {
-    log.warn({ sectionId, workspaceId }, 'addSteeringEntry: workspace mismatch');
     return null;
   }
 
@@ -338,7 +326,7 @@ export function addSteeringEntry(
     updated_at: now,
   });
 
-  return getSection(sectionId);
+  return getSection(sectionId, workspaceId);
 }
 
 // Client suggestions (appends, sets status to 'revision_requested')
@@ -347,13 +335,9 @@ export function addClientSuggestion(
   workspaceId: string,
   suggestion: Omit<ClientSuggestion, 'timestamp' | 'status'>,
 ): CopySection | null {
-  const existing = getSection(sectionId);
+  const existing = getSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'addClientSuggestion: section not found');
-    return null;
-  }
-  if (existing.workspaceId !== workspaceId) {
-    log.warn({ sectionId, workspaceId }, 'addClientSuggestion: workspace mismatch');
     return null;
   }
 
@@ -382,7 +366,7 @@ export function addClientSuggestion(
     updated_at: now,
   });
 
-  return getSection(sectionId);
+  return getSection(sectionId, workspaceId);
 }
 
 // Manual edit (status → 'draft', version++)
@@ -391,13 +375,9 @@ export function updateCopyText(
   workspaceId: string,
   newCopy: string,
 ): CopySection | null {
-  const existing = getSection(sectionId);
+  const existing = getSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'updateCopyText: section not found');
-    return null;
-  }
-  if (existing.workspaceId !== workspaceId) {
-    log.warn({ sectionId, workspaceId }, 'updateCopyText: workspace mismatch');
     return null;
   }
 
@@ -413,13 +393,13 @@ export function updateCopyText(
     updated_at: now,
   });
 
-  return getSection(sectionId);
+  return getSection(sectionId, workspaceId);
 }
 
 // ── Metadata ──
 
-export function getMetadata(entryId: string): CopyMetadata | null {
-  const row = stmts().selectMetadataByEntry.get(entryId) as CopyMetadataRow | undefined;
+export function getMetadata(entryId: string, workspaceId: string): CopyMetadata | null {
+  const row = stmts().selectMetadataByEntry.get(entryId, workspaceId) as CopyMetadataRow | undefined;
   if (!row) return null;
   return rowToMetadata(row);
 }
@@ -444,14 +424,14 @@ export function saveMetadata(
     updated_at: now,
   });
 
-  const row = stmts().selectMetadataByEntry.get(entryId) as CopyMetadataRow;
+  const row = stmts().selectMetadataByEntry.get(entryId, workspaceId) as CopyMetadataRow;
   return rowToMetadata(row);
 }
 
 // ── Derived status ──
 
-export function getEntryCopyStatus(entryId: string): EntryCopyStatus {
-  const sections = getSectionsForEntry(entryId);
+export function getEntryCopyStatus(entryId: string, workspaceId: string): EntryCopyStatus {
+  const sections = getSectionsForEntry(entryId, workspaceId);
   const total = sections.length;
   const pending = sections.filter(s => s.status === 'pending').length;
   const draft = sections.filter(s => s.status === 'draft').length;
