@@ -89,7 +89,13 @@ export type ActivityType =
   | 'blueprint_generated'
   | 'blueprint_entry_added'
   | 'blueprint_entry_updated'
-  | 'blueprint_entry_deleted';
+  | 'blueprint_entry_deleted'
+  | 'copy_generated'
+  | 'copy_approved'
+  | 'copy_batch_started'
+  | 'copy_batch_complete'
+  | 'copy_exported'
+  | 'copy_suggestion_added';
 
 export interface ActivityEntry {
   id: string;
