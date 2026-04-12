@@ -335,13 +335,6 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:updated',
   'content-subscription:renewed',
 
-  // blueprint:updated / blueprint:generated — Page Strategy Engine (Phase 2).
-  // Server broadcasts land in PR 2 (server routes); frontend handlers land in
-  // PR 3 (PageStrategyTab component). These events are intentionally unhandled
-  // until the frontend tab is implemented.
-  'blueprint:updated',
-  'blueprint:generated',
-
 ]);
 
 /**

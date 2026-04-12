@@ -11,7 +11,6 @@ import type {
   BlueprintEntry,
   BlueprintVersion,
   BlueprintGenerationInput,
-  SectionPlanItem,
 } from '../../shared/types/page-strategy';
 
 // ═══ BRANDSCRIPT ═══
@@ -100,7 +99,7 @@ export const blueprints = {
   create: (wsId: string, body: { name: string; brandscriptId?: string; industryType?: string; notes?: string }) =>
     post<SiteBlueprint>(`/api/page-strategy/${wsId}`, body),
 
-  update: (wsId: string, blueprintId: string, body: Partial<SiteBlueprint>) =>
+  update: (wsId: string, blueprintId: string, body: Partial<Pick<SiteBlueprint, 'name' | 'status' | 'brandscriptId' | 'industryType' | 'notes'>>) =>
     put<SiteBlueprint>(`/api/page-strategy/${wsId}/${blueprintId}`, body),
 
   remove: (wsId: string, blueprintId: string) =>
@@ -142,9 +141,6 @@ export const blueprintEntries = {
 
   reorder: (wsId: string, blueprintId: string, orderedIds: string[]) =>
     put<{ reordered: boolean }>(`/api/page-strategy/${wsId}/${blueprintId}/entries/reorder`, { orderedIds }),
-
-  getDefaultSectionPlan: (pageType: string) =>
-    get<SectionPlanItem[]>(`/api/page-strategy/section-plan-defaults/${pageType}`),
 };
 
 export const blueprintVersions = {

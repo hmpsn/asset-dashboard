@@ -160,9 +160,11 @@ function EntryCard({
                     {section.sectionType.replace(/-/g, ' ')}
                   </span>
                   {/* narrative role — purple (admin-only) */}
-                  <span className="px-1.5 py-0.5 text-xs bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
-                    {section.narrativeRole.replace(/-/g, ' ')}
-                  </span>
+                  {section.narrativeRole && (
+                    <span className="px-1.5 py-0.5 text-xs bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
+                      {section.narrativeRole.replace(/-/g, ' ')}
+                    </span>
+                  )}
                   {section.wordCountTarget > 0 && (
                     <span className="text-xs text-zinc-500">
                       ~{section.wordCountTarget} words
@@ -212,7 +214,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: blueprint, isLoading } = useBlueprint(workspaceId, blueprintId);
+  const { data: blueprint, isLoading, isError } = useBlueprint(workspaceId, blueprintId);
 
   // Live invalidation on server push
   useWorkspaceEvents(workspaceId, {
@@ -326,11 +328,25 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (isLoading || !blueprint) {
+  if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-zinc-400 text-sm py-8">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading blueprint...
+      </div>
+    );
+  }
+
+  if (isError || !blueprint) {
+    return (
+      <div className="space-y-3 py-8">
+        <p className="text-sm text-zinc-400">Blueprint not found or failed to load.</p>
+        <button
+          onClick={onBack}
+          className="text-sm text-teal-400 hover:text-teal-300 transition-colors"
+        >
+          &larr; Back to blueprints
+        </button>
       </div>
     );
   }

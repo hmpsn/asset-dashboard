@@ -312,8 +312,6 @@ export function updateBlueprint(
 export function deleteBlueprint(workspaceId: string, id: string): boolean {
   const row = stmts().getBlueprint.get(id, workspaceId) as BlueprintRow | undefined;
   if (!row) return false;
-  // Delete entries first (FK cascade may handle this, but be explicit)
-  stmts().deleteEntriesByBlueprint.run(id);
   const result = stmts().deleteBlueprint.run(id, workspaceId);
   log.info({ id, workspaceId }, 'Blueprint deleted');
   return result.changes > 0;
@@ -465,6 +463,12 @@ export function reorderEntries(
   const blueprintRow = stmts().getBlueprint.get(blueprintId, workspaceId) as BlueprintRow | undefined;
   if (!blueprintRow) return false;
 
+  // Validate that orderedIds is complete and all entries belong to this blueprint
+  const existingEntries = stmts().listEntries.all(blueprintId) as EntryRow[];
+  const existingIdSet = new Set(existingEntries.map(e => e.id));
+  if (orderedIds.length !== existingEntries.length) return false;
+  if (!orderedIds.every(id => existingIdSet.has(id))) return false;
+
   const reorderTx = db.transaction((ids: string[]) => {
     ids.forEach((id, index) => {
       stmts().updateEntryOrder.run({ id, blueprint_id: blueprintId, sort_order: index + 1 });
@@ -521,9 +525,9 @@ export function createVersion(
   };
 }
 
-export function listVersions(workspaceId: string, blueprintId: string): BlueprintVersion[] {
+export function listVersions(workspaceId: string, blueprintId: string): BlueprintVersion[] | null {
   const blueprintRow = stmts().getBlueprint.get(blueprintId, workspaceId) as BlueprintRow | undefined;
-  if (!blueprintRow) return [];
+  if (!blueprintRow) return null;
 
   const rows = stmts().listVersions.all(blueprintId) as VersionRow[];
   return rows.map(rowToVersion);
