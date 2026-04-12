@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
 import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check, Upload, Mic, Award,
+  Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
 import { PageHeader, SectionCard, TabBar } from './ui';
 import { themeColor } from './ui/constants';
@@ -13,6 +13,9 @@ import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
 import { VoiceTab } from './brand/VoiceTab';
 import { IdentityTab } from './brand/IdentityTab';
+import { PageStrategyTab } from './brand/PageStrategyTab';
+import { BlueprintDetail } from './brand/BlueprintDetail';
+import { BlueprintVersionHistory } from './brand/BlueprintVersionHistory';
 
 interface AudiencePersona {
   id: string;
@@ -84,6 +87,9 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
   const [generatingPersonas, setGeneratingPersonas] = useState(false);
+
+  // Page Strategy state
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(null);
 
   const saveBrandVoiceHandler = async () => {
     setSavingBrandVoice(true);
@@ -471,6 +477,39 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           </div>
         )}
       </SectionCard>
+
+      {/* ═══ PAGE STRATEGY ═══ */}
+      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
+        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+            <Map className="w-4 h-4 text-teal-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-zinc-200">Page Strategy</h3>
+            <p className="text-xs text-zinc-500">Plan your site's pages, sections, and keyword strategy</p>
+          </div>
+        </div>
+        <div className="p-5">
+          {selectedBlueprintId ? (
+            <div className="space-y-6">
+              <BlueprintDetail
+                workspaceId={workspaceId}
+                blueprintId={selectedBlueprintId}
+                onBack={() => setSelectedBlueprintId(null)}
+              />
+              <BlueprintVersionHistory
+                workspaceId={workspaceId}
+                blueprintId={selectedBlueprintId}
+              />
+            </div>
+          ) : (
+            <PageStrategyTab
+              workspaceId={workspaceId}
+              onSelectBlueprint={setSelectedBlueprintId}
+            />
+          )}
+        </div>
+      </section>
 
       {/* Info footer */}
       <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
