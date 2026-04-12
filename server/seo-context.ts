@@ -11,6 +11,9 @@ import { getVoiceProfile } from './voice-calibration.js';
 import { renderVoiceDNAForPrompt, renderVoiceDNASummary } from './voice-dna-render.js';
 import { listDeliverables } from './brand-identity.js';
 import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../shared/types/brand-engine.js';
+import { getActivePatterns } from './copy-intelligence.js';
+import { listBlueprints } from './page-strategy.js';
+import { getSectionsForEntry } from './copy-review.js';
 
 const log = createLogger('seo-context');
 
@@ -143,6 +146,10 @@ export interface SeoContext {
   fullContext: string;
   /** Full strategy object (for direct access if needed) */
   strategy: KeywordStrategy | undefined;
+  /** Active copy intelligence patterns formatted for prompt injection */
+  copyIntelligenceBlock?: string;
+  /** Site blueprint and matched entry context formatted for prompt injection */
+  blueprintBlock?: string;
 }
 
 // ── TTL cache for buildSeoContext (5-minute expiry) ──
@@ -180,7 +187,7 @@ export function buildSeoContext(
     const cached = seoContextCache.get(cacheKey);
     if (cached && Date.now() < cached.expiry) return cached.value;
   }
-  const empty: SeoContext = { keywordBlock: '', brandVoiceBlock: '', businessContext: '', personasBlock: '', knowledgeBlock: '', fullContext: '', strategy: undefined };
+  const empty: SeoContext = { keywordBlock: '', brandVoiceBlock: '', businessContext: '', personasBlock: '', knowledgeBlock: '', fullContext: '', strategy: undefined, copyIntelligenceBlock: undefined, blueprintBlock: undefined };
   if (!workspaceId) return empty;
 
   const ws = getWorkspace(workspaceId);
@@ -229,8 +236,12 @@ export function buildSeoContext(
         if (learningsBlock) baseParts.push(learningsBlock);
       }
     }
+    const copyIntelligenceBlock = buildCopyIntelligenceContext(workspaceId);
+    const blueprintBlock = buildBlueprintContext(workspaceId, pagePath);
+    if (copyIntelligenceBlock) baseParts.push(copyIntelligenceBlock);
+    if (blueprintBlock) baseParts.push(blueprintBlock);
     const fullContext = baseParts.join('');
-    const result: SeoContext = { keywordBlock: '', brandVoiceBlock: effectiveBrandVoice, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    const result: SeoContext = { keywordBlock: '', brandVoiceBlock: effectiveBrandVoice, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined, copyIntelligenceBlock: copyIntelligenceBlock || undefined, blueprintBlock: blueprintBlock || undefined };
     seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
     return result;
   }
@@ -284,8 +295,12 @@ export function buildSeoContext(
       if (learningsBlock) contextParts.push(learningsBlock);
     }
   }
+  const copyIntelligenceBlock = buildCopyIntelligenceContext(workspaceId);
+  const blueprintBlock = buildBlueprintContext(workspaceId, pagePath);
+  if (copyIntelligenceBlock) contextParts.push(copyIntelligenceBlock);
+  if (blueprintBlock) contextParts.push(blueprintBlock);
   const fullContext = contextParts.join('');
-  const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
+  const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy, copyIntelligenceBlock: copyIntelligenceBlock || undefined, blueprintBlock: blueprintBlock || undefined };
 
   // Cache result
   if (workspaceId) {
@@ -690,6 +705,68 @@ export function buildVoiceProfileContext(
 
   if (parts.length === 0) return '';
   return `\n\nBRAND VOICE PROFILE (you MUST match this voice — do not deviate):\n${parts.join('\n')}`;
+}
+
+/**
+ * Build a copy intelligence context block from the workspace's active learned patterns.
+ * Groups patterns by type and formats them for prompt injection.
+ * Returns '' if no active patterns exist.
+ */
+export function buildCopyIntelligenceContext(workspaceId: string): string {
+  const patterns = getActivePatterns(workspaceId);
+  if (patterns.length === 0) return '';
+  const grouped: Record<string, string[]> = {};
+  for (const p of patterns) {
+    (grouped[p.patternType] ??= []).push(p.pattern);
+  }
+  return `LEARNED COPY PATTERNS (apply to all content):\n${
+    Object.entries(grouped).map(([type, rules]) => `  ${type}: ${rules.join('; ')}`).join('\n')
+  }`;
+}
+
+/**
+ * Build a blueprint context block from the workspace's most recently updated blueprint.
+ * If a pageKeyword is provided, finds the matching entry and includes approved copy samples.
+ * Returns '' if no blueprints exist.
+ */
+export function buildBlueprintContext(workspaceId: string, _pagePath?: string, pageKeyword?: string): string {
+  const blueprints = listBlueprints(workspaceId);
+  if (blueprints.length === 0) return '';
+
+  // Use the most recently updated blueprint
+  const blueprint = blueprints[0];
+
+  // Find matching entry by keyword if provided
+  let matchedEntry = null;
+  if (pageKeyword && blueprint.entries) {
+    matchedEntry = blueprint.entries.find(e =>
+      e.primaryKeyword?.toLowerCase() === pageKeyword.toLowerCase()
+    ) ?? null;
+  }
+
+  // Build context: blueprint overview + matched entry + approved copy samples
+  const lines: string[] = [];
+  lines.push(`SITE BLUEPRINT: ${blueprint.name}`);
+
+  if (matchedEntry) {
+    lines.push(`TARGET PAGE: ${matchedEntry.name} (${matchedEntry.pageType})`);
+    lines.push(`PRIMARY KEYWORD: ${matchedEntry.primaryKeyword}`);
+    if (matchedEntry.secondaryKeywords?.length) {
+      lines.push(`SECONDARY KEYWORDS: ${matchedEntry.secondaryKeywords.join(', ')}`);
+    }
+
+    // Include approved copy from this entry for consistency
+    const sections = getSectionsForEntry(matchedEntry.id);
+    const approvedSections = sections.filter(s => s.status === 'approved');
+    if (approvedSections.length > 0) {
+      lines.push('APPROVED COPY SAMPLES (maintain consistency):');
+      for (const s of approvedSections.slice(0, 3)) {
+        lines.push(`  [${s.sectionPlanItemId}]: ${s.generatedCopy?.slice(0, 200) ?? ''}`);
+      }
+    }
+  }
+
+  return lines.join('\n');
 }
 
 /**
