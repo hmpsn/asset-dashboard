@@ -187,7 +187,8 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
   }
 
   // ── 5. Create the blueprint record ────────────────────────────────────────
-  const blueprint = createBlueprint(workspaceId, {
+  const blueprint = createBlueprint({
+    workspaceId,
     name: `${input.industryType} Site Blueprint`,
     brandscriptId: input.brandscriptId,
     industryType: input.industryType,
@@ -197,19 +198,19 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
   updateBlueprint(workspaceId, blueprint.id, {});
 
   // ── 6. Map entries with section plans and bulk-insert ─────────────────────
-  const entriesToInsert = generatedEntries.map((entry) => ({
+  const entriesToInsert: GeneratedBlueprintEntry[] = generatedEntries.map((entry) => ({
     name: entry.name,
     pageType: entry.pageType as BlueprintPageType,
     scope: (entry.scope === 'included' || entry.scope === 'recommended' ? entry.scope : 'included') as 'included' | 'recommended',
     isCollection: Boolean(entry.isCollection),
     primaryKeyword: entry.primaryKeyword,
     secondaryKeywords: entry.secondaryKeywords,
-    keywordSource: 'ai_suggested' as const,
     sectionPlan: getDefaultSectionPlan(entry.pageType),
+    rationale: entry.rationale ?? '',
   }));
 
   // bulkAddEntries(blueprintId, entries) — first param is blueprintId, NOT workspaceId
-  const insertedEntries = bulkAddEntries(blueprint.id, entriesToInsert);
+  const insertedEntries = bulkAddEntries(workspaceId, blueprint.id, entriesToInsert);
 
   // Mark blueprint as active now that entries are inserted
   updateBlueprint(workspaceId, blueprint.id, { status: 'active' });
@@ -226,7 +227,7 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
         keywordLocked: false,
       });
       // Update the entry's briefId FK (links blueprint entry ↔ content brief)
-      updateEntry(blueprint.id, entry.id, { briefId: brief.id });
+      updateEntry(workspaceId, blueprint.id, entry.id, { briefId: brief.id });
     } catch (err) {
       log.warn({ err, entryId: entry.id }, 'Auto-brief creation failed — entry usable without brief');
     }
