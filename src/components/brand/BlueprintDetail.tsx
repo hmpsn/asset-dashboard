@@ -9,6 +9,12 @@ import {
   Trash2,
   Layout,
   Loader2,
+  FileText,
+  Sparkles,
+  PenLine,
+  CheckCircle2,
+  Clock,
+  X,
 } from 'lucide-react';
 import {
   blueprintEntries as blueprintEntriesApi,
@@ -19,6 +25,13 @@ import { useToast } from '../Toast';
 import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { FeatureFlag } from '../ui/FeatureFlag';
+import { useCopyStatus, useCopyPipelineEvents, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
+import { CopyReviewPanel } from './CopyReviewPanel';
+import { BatchGenerationPanel } from './BatchGenerationPanel';
+import { CopyExportPanel } from './CopyExportPanel';
+import { CopyIntelligenceManager } from './CopyIntelligenceManager';
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   homepage: 'Homepage',
@@ -55,6 +68,54 @@ interface EntryCardProps {
   onRemove: () => void;
   isScopeToggling: boolean;
   isRemoving: boolean;
+  /** Copy pipeline integration (only rendered when feature flag is on) */
+  copyEnabled?: boolean;
+  workspaceId?: string;
+  blueprintId?: string;
+  isReviewing?: boolean;
+  onReviewCopy?: () => void;
+  onCloseReview?: () => void;
+  onGenerateCopy?: () => void;
+  isGenerating?: boolean;
+}
+
+// ─── EntryCard Copy Status Badge ─────────────────────────────────────────────
+
+function EntryCardCopyBadge({ workspaceId, entryId }: { workspaceId: string; entryId: string }) {
+  const { data: status } = useCopyStatus(workspaceId, entryId);
+
+  if (!status || status.totalSections === 0) return null;
+
+  const label =
+    status.overallStatus === 'approved' ? 'Approved' :
+    status.overallStatus === 'client_review' ? 'In Review' :
+    status.overallStatus === 'draft' ? 'Draft' :
+    status.overallStatus === 'revision_requested' ? 'Revision' :
+    'Pending';
+
+  const colorClass =
+    status.overallStatus === 'approved' ? 'bg-emerald-900/40 text-emerald-400' :
+    status.overallStatus === 'client_review' ? 'bg-blue-900/40 text-blue-400' :
+    status.overallStatus === 'draft' ? 'bg-zinc-700 text-zinc-300' :
+    status.overallStatus === 'revision_requested' ? 'bg-amber-900/40 text-amber-400' :
+    'bg-zinc-700 text-zinc-400';
+
+  const Icon =
+    status.overallStatus === 'approved' ? CheckCircle2 :
+    status.overallStatus === 'client_review' ? FileText :
+    Clock;
+
+  return (
+    <span className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs rounded font-medium ${colorClass}`}>
+      <Icon className="w-3 h-3" />
+      {label}
+      {status.totalSections > 0 && (
+        <span className="text-[10px] opacity-70">
+          ({status.approvedSections}/{status.totalSections})
+        </span>
+      )}
+    </span>
+  );
 }
 
 function EntryCard({
@@ -65,6 +126,14 @@ function EntryCard({
   onRemove,
   isScopeToggling,
   isRemoving,
+  copyEnabled,
+  workspaceId,
+  blueprintId,
+  isReviewing,
+  onReviewCopy,
+  onCloseReview,
+  onGenerateCopy,
+  isGenerating,
 }: EntryCardProps) {
   const Chevron = expanded ? ChevronDown : ChevronRight;
   const isIncluded = entry.scope === 'included';
@@ -105,6 +174,11 @@ function EntryCard({
             <Tag className="w-3 h-3" />
             {entry.primaryKeyword}
           </span>
+        )}
+
+        {/* Copy status badge (feature-gated) */}
+        {copyEnabled && workspaceId && (
+          <EntryCardCopyBadge workspaceId={workspaceId} entryId={entry.id} />
         )}
 
         {/* Scope toggle */}
@@ -194,11 +268,107 @@ function EntryCard({
           <p className="text-xs text-zinc-500 italic">No section plan defined.</p>
         </div>
       )}
+
+      {/* Copy action buttons (feature-gated) */}
+      {copyEnabled && expanded && (
+        <div className="border-t border-zinc-800 px-4 py-2.5 flex items-center gap-2">
+          <CopyActionButtons
+            workspaceId={workspaceId!}
+            entryId={entry.id}
+            isReviewing={isReviewing}
+            onReviewCopy={onReviewCopy}
+            onCloseReview={onCloseReview}
+            onGenerateCopy={onGenerateCopy}
+            isGenerating={isGenerating}
+          />
+        </div>
+      )}
+
+      {/* Inline copy review panel */}
+      {copyEnabled && isReviewing && workspaceId && blueprintId && (
+        <div className="border-t border-zinc-800">
+          <CopyReviewPanel
+            workspaceId={workspaceId}
+            blueprintId={blueprintId}
+            entryId={entry.id}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
+// ─── Copy Action Buttons ─────────────────────────────────────────────────────
+
+function CopyActionButtons({
+  workspaceId,
+  entryId,
+  isReviewing,
+  onReviewCopy,
+  onCloseReview,
+  onGenerateCopy,
+  isGenerating,
+}: {
+  workspaceId: string;
+  entryId: string;
+  isReviewing?: boolean;
+  onReviewCopy?: () => void;
+  onCloseReview?: () => void;
+  onGenerateCopy?: () => void;
+  isGenerating?: boolean;
+}) {
+  const { data: status } = useCopyStatus(workspaceId, entryId);
+  const hasCopy = status && status.totalSections > 0;
+
+  return (
+    <>
+      {hasCopy ? (
+        <button
+          onClick={isReviewing ? onCloseReview : onReviewCopy}
+          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+            isReviewing
+              ? 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+              : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90'
+          }`}
+        >
+          {isReviewing ? (
+            <>
+              <X className="w-3 h-3" />
+              Close Review
+            </>
+          ) : (
+            <>
+              <PenLine className="w-3 h-3" />
+              Review Copy
+            </>
+          )}
+        </button>
+      ) : (
+        <button
+          onClick={onGenerateCopy}
+          disabled={isGenerating}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-medium bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3 h-3" />
+              Generate Copy
+            </>
+          )}
+        </button>
+      )}
+    </>
+  );
+}
+
 // ─── BlueprintDetail ──────────────────────────────────────────────────────────
+
+type BlueprintTab = 'pages' | 'copy';
 
 export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const queryClient = useQueryClient();
@@ -213,6 +383,11 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  // ── Copy Pipeline state ──────────────────────────────────────────────────
+  const copyEnabled = useFeatureFlag('copy-engine-pipeline');
+  const [activeTab, setActiveTab] = useState<BlueprintTab>('pages');
+  const [reviewingEntryId, setReviewingEntryId] = useState<string | null>(null);
+
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: blueprint, isLoading, isError } = useBlueprint(workspaceId, blueprintId);
 
@@ -224,6 +399,12 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
       });
     },
   });
+
+  // Copy pipeline WS events (no-op when flag is off — hook only subscribes)
+  useCopyPipelineEvents(workspaceId);
+
+  // Copy generation mutation (safe to call unconditionally — only mutates on user click)
+  const generateCopyMutation = useGenerateCopy(workspaceId, blueprintId);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -387,129 +568,204 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
         </button>
       </div>
 
-      {/* In Scope section */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-300">
-            In Scope ({inScope.length})
-          </h3>
-          {!showAddForm && (
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add page
-            </button>
-          )}
-        </div>
+      {/* ── Tab bar ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 border-b border-zinc-800">
+        <button
+          onClick={() => setActiveTab('pages')}
+          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'pages'
+              ? 'border-teal-500 text-teal-400'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <Layout className="w-3.5 h-3.5" />
+          Pages
+        </button>
 
-        {/* Add page form */}
-        {showAddForm && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-            <div className="flex gap-3">
-              <div className="flex-1 space-y-1">
-                <label htmlFor="new-entry-name" className="text-xs text-zinc-400">
-                  Page name
-                </label>
-                <input
-                  id="new-entry-name"
-                  value={newEntryName}
-                  onChange={e => setNewEntryName(e.target.value)}
-                  placeholder="e.g. Home, Services, About Us"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
-                  disabled={addEntryMutation.isPending}
-                  onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="new-entry-type" className="text-xs text-zinc-400">
-                  Page type
-                </label>
-                <select
-                  id="new-entry-type"
-                  value={newEntryType}
-                  onChange={e => setNewEntryType(e.target.value as BlueprintPageType)}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-teal-500"
-                  disabled={addEntryMutation.isPending}
+        <FeatureFlag flag="copy-engine-pipeline">
+          <button
+            onClick={() => setActiveTab('copy')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'copy'
+                ? 'border-teal-500 text-teal-400'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Copy Pipeline
+          </button>
+        </FeatureFlag>
+      </div>
+
+      {/* ── Pages tab (existing content) ─────────────────────────────────── */}
+      {activeTab === 'pages' && (
+        <>
+          {/* In Scope section */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-300">
+                In Scope ({inScope.length})
+              </h3>
+              {!showAddForm && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
                 >
-                  {Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="w-3.5 h-3.5" />
+                  Add page
+                </button>
+              )}
+            </div>
+
+            {/* Add page form */}
+            {showAddForm && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-1">
+                    <label htmlFor="new-entry-name" className="text-xs text-zinc-400">
+                      Page name
+                    </label>
+                    <input
+                      id="new-entry-name"
+                      value={newEntryName}
+                      onChange={e => setNewEntryName(e.target.value)}
+                      placeholder="e.g. Home, Services, About Us"
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+                      disabled={addEntryMutation.isPending}
+                      onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="new-entry-type" className="text-xs text-zinc-400">
+                      Page type
+                    </label>
+                    <select
+                      id="new-entry-type"
+                      value={newEntryType}
+                      onChange={e => setNewEntryType(e.target.value as BlueprintPageType)}
+                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-teal-500"
+                      disabled={addEntryMutation.isPending}
+                    >
+                      {Object.entries(PAGE_TYPE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddEntry}
+                    disabled={!newEntryName.trim() || addEntryMutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {addEntryMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      'Add Page'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewEntryName('');
+                      setNewEntryType('service');
+                    }}
+                    disabled={addEntryMutation.isPending}
+                    className="px-3 py-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddEntry}
-                disabled={!newEntryName.trim() || addEntryMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {addEntryMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  'Add Page'
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setShowAddForm(false);
-                  setNewEntryName('');
-                  setNewEntryType('service');
+            {inScope.length === 0 && !showAddForm && (
+              <p className="text-sm text-zinc-500 italic">No pages in scope yet. Add one above.</p>
+            )}
+
+            {inScope.map(entry => (
+              <EntryCard
+                key={entry.id}
+                entry={entry}
+                expanded={expandedIds.has(entry.id)}
+                onToggle={() => toggleExpanded(entry.id)}
+                onScopeToggle={() => handleScopeToggle(entry)}
+                onRemove={() => handleRemove(entry)}
+                isScopeToggling={togglingId === entry.id}
+                isRemoving={removingId === entry.id}
+                copyEnabled={copyEnabled}
+                workspaceId={workspaceId}
+                blueprintId={blueprintId}
+                isReviewing={reviewingEntryId === entry.id}
+                onReviewCopy={() => setReviewingEntryId(entry.id)}
+                onCloseReview={() => setReviewingEntryId(null)}
+                onGenerateCopy={() => {
+                  generateCopyMutation.mutate(entry.id);
+                  toast('Generating copy...');
                 }}
-                disabled={addEntryMutation.isPending}
-                className="px-3 py-1.5 text-zinc-500 text-sm hover:text-zinc-300 transition-colors disabled:opacity-40"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+                isGenerating={generateCopyMutation.isPending && generateCopyMutation.variables === entry.id}
+              />
+            ))}
+          </section>
 
-        {inScope.length === 0 && !showAddForm && (
-          <p className="text-sm text-zinc-500 italic">No pages in scope yet. Add one above.</p>
-        )}
+          {/* Recommended — Upsell Opportunities */}
+          {recommended.length > 0 && (
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold text-zinc-300">
+                Recommended — Upsell Opportunities ({recommended.length})
+              </h3>
 
-        {inScope.map(entry => (
-          <EntryCard
-            key={entry.id}
-            entry={entry}
-            expanded={expandedIds.has(entry.id)}
-            onToggle={() => toggleExpanded(entry.id)}
-            onScopeToggle={() => handleScopeToggle(entry)}
-            onRemove={() => handleRemove(entry)}
-            isScopeToggling={togglingId === entry.id}
-            isRemoving={removingId === entry.id}
+              {recommended.map(entry => (
+                <EntryCard
+                  key={entry.id}
+                  entry={entry}
+                  expanded={expandedIds.has(entry.id)}
+                  onToggle={() => toggleExpanded(entry.id)}
+                  onScopeToggle={() => handleScopeToggle(entry)}
+                  onRemove={() => handleRemove(entry)}
+                  isScopeToggling={togglingId === entry.id}
+                  isRemoving={removingId === entry.id}
+                  copyEnabled={copyEnabled}
+                  workspaceId={workspaceId}
+                  blueprintId={blueprintId}
+                  isReviewing={reviewingEntryId === entry.id}
+                  onReviewCopy={() => setReviewingEntryId(entry.id)}
+                  onCloseReview={() => setReviewingEntryId(null)}
+                  onGenerateCopy={() => {
+                    generateCopyMutation.mutate(entry.id);
+                    toast('Generating copy...');
+                  }}
+                  isGenerating={generateCopyMutation.isPending && generateCopyMutation.variables === entry.id}
+                />
+              ))}
+            </section>
+          )}
+        </>
+      )}
+
+      {/* ── Copy Pipeline tab ────────────────────────────────────────────── */}
+      {activeTab === 'copy' && (
+        <div className="space-y-6">
+          <BatchGenerationPanel
+            workspaceId={workspaceId}
+            blueprintId={blueprintId}
+            entries={entries}
           />
-        ))}
-      </section>
-
-      {/* Recommended — Upsell Opportunities */}
-      {recommended.length > 0 && (
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-zinc-300">
-            Recommended — Upsell Opportunities ({recommended.length})
-          </h3>
-
-          {recommended.map(entry => (
-            <EntryCard
-              key={entry.id}
-              entry={entry}
-              expanded={expandedIds.has(entry.id)}
-              onToggle={() => toggleExpanded(entry.id)}
-              onScopeToggle={() => handleScopeToggle(entry)}
-              onRemove={() => handleRemove(entry)}
-              isScopeToggling={togglingId === entry.id}
-              isRemoving={removingId === entry.id}
-            />
-          ))}
-        </section>
+          <CopyExportPanel
+            workspaceId={workspaceId}
+            blueprintId={blueprintId}
+            entries={entries}
+          />
+          <CopyIntelligenceManager
+            workspaceId={workspaceId}
+          />
+        </div>
       )}
     </div>
   );
