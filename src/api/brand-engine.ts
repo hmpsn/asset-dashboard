@@ -110,11 +110,31 @@ export const blueprints = {
     post<SiteBlueprint>(`/api/page-strategy/${wsId}/generate`, body),
 };
 
+type BlueprintEntryCreateBody = {
+  name: string;
+  pageType: string;
+  scope?: BlueprintEntry['scope'];
+  isCollection?: boolean;
+  primaryKeyword?: string;
+  secondaryKeywords?: string[];
+  keywordSource?: BlueprintEntry['keywordSource'];
+  sectionPlan?: BlueprintEntry['sectionPlan'];
+  templateId?: string;
+  matrixId?: string;
+  notes?: string;
+};
+
+type BlueprintEntryUpdateBody = Partial<Pick<BlueprintEntry,
+  'name' | 'pageType' | 'scope' | 'isCollection' | 'primaryKeyword' |
+  'secondaryKeywords' | 'keywordSource' | 'sectionPlan' | 'templateId' |
+  'matrixId' | 'briefId' | 'notes'
+>>;
+
 export const blueprintEntries = {
-  add: (wsId: string, blueprintId: string, body: Partial<BlueprintEntry>) =>
+  add: (wsId: string, blueprintId: string, body: BlueprintEntryCreateBody) =>
     post<BlueprintEntry>(`/api/page-strategy/${wsId}/${blueprintId}/entries`, body),
 
-  update: (wsId: string, blueprintId: string, entryId: string, body: Partial<BlueprintEntry>) =>
+  update: (wsId: string, blueprintId: string, entryId: string, body: BlueprintEntryUpdateBody) =>
     put<BlueprintEntry>(`/api/page-strategy/${wsId}/${blueprintId}/entries/${entryId}`, body),
 
   remove: (wsId: string, blueprintId: string, entryId: string) =>
