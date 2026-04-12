@@ -479,37 +479,29 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       </SectionCard>
 
       {/* ═══ PAGE STRATEGY ═══ */}
-      <section className="rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
-        <div className="px-5 py-4 flex items-center gap-3 border-b border-zinc-800">
-          <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-            <Map className="w-4 h-4 text-teal-400" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-zinc-200">Page Strategy</h3>
-            <p className="text-xs text-zinc-500">Plan your site's pages, sections, and keyword strategy</p>
-          </div>
-        </div>
-        <div className="p-5">
-          {selectedBlueprintId ? (
-            <div className="space-y-6">
-              <BlueprintDetail
-                workspaceId={workspaceId}
-                blueprintId={selectedBlueprintId}
-                onBack={() => setSelectedBlueprintId(null)}
-              />
-              <BlueprintVersionHistory
-                workspaceId={workspaceId}
-                blueprintId={selectedBlueprintId}
-              />
-            </div>
-          ) : (
-            <PageStrategyTab
+      <SectionCard
+        title="Page Strategy"
+        titleIcon={<Map className="w-4 h-4 text-teal-400" />}
+      >
+        {selectedBlueprintId ? (
+          <div className="space-y-6">
+            <BlueprintDetail
               workspaceId={workspaceId}
-              onSelectBlueprint={setSelectedBlueprintId}
+              blueprintId={selectedBlueprintId}
+              onBack={() => setSelectedBlueprintId(null)}
             />
-          )}
-        </div>
-      </section>
+            <BlueprintVersionHistory
+              workspaceId={workspaceId}
+              blueprintId={selectedBlueprintId}
+            />
+          </div>
+        ) : (
+          <PageStrategyTab
+            workspaceId={workspaceId}
+            onSelectBlueprint={setSelectedBlueprintId}
+          />
+        )}
+      </SectionCard>
 
       {/* Info footer */}
       <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">

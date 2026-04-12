@@ -314,6 +314,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   }
 
   function handleRemove(entry: BlueprintEntry) {
+    if (!window.confirm(`Remove "${entry.name}" from this blueprint? This cannot be undone.`)) return;
     setRemovingId(entry.id);
     removeEntryMutation.mutate(entry.id);
   }

@@ -224,6 +224,7 @@ export function PageStrategyTab({ workspaceId, onSelectBlueprint }: Props) {
               <button
                 onClick={e => {
                   e.stopPropagation();
+                  if (!window.confirm(`Delete "${bp.name}"? This cannot be undone.`)) return;
                   setDeletingId(bp.id);
                   deleteMutation.mutate(bp.id);
                 }}
