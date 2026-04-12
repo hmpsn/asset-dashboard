@@ -32,12 +32,31 @@ const log = createLogger('seo-context');
  * which call site degraded on the dashboard. The fallback value is what the
  * caller would have received from an empty-state read (null / empty array /
  * empty string).
+ *
+ * **Narrow catch.** We only swallow errors that look like SQLite "no such
+ * table / no such column" schema-missing errors — that's the specific
+ * test-env scenario this wrapper exists for. Any other error (programming
+ * bug in `rowToProfile`, a renamed export, a TypeError from property access,
+ * a SyntaxError from JSON parsing that `parseJsonFallback` somehow missed)
+ * gets re-thrown so it surfaces loudly in CI and Sentry rather than
+ * silently falling through to the legacy brand-voice path. A programming
+ * error that only manifests as "brand engine features quietly stopped
+ * working in production" is the exact silent-failure class this codebase
+ * is trying to eliminate.
  */
+const MISSING_SCHEMA_ERROR_RE = /no such (table|column)/i;
+
 function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
   try {
     return fn();
   } catch (err) {
-    log.warn({ context, workspaceId, error: err instanceof Error ? err.message : String(err) }, 'brand-engine read failed — graceful degradation to legacy path');
+    const message = err instanceof Error ? err.message : String(err);
+    if (!MISSING_SCHEMA_ERROR_RE.test(message)) {
+      // Unexpected error — not a schema-missing test-env case. Re-throw so
+      // the programming bug surfaces instead of silently degrading.
+      throw err;
+    }
+    log.warn({ context, workspaceId, error: message }, 'brand-engine read failed — graceful degradation to legacy path');
     return fallback;
   }
 }
@@ -83,7 +102,16 @@ function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => 
 function isVoiceProfileAuthoritative(profile: VoiceProfile | null, voiceProfileBlock: string): boolean {
   if (profile === null) return false;
   if (profile.status === 'calibrated') return true;
-  const hasExplicitConfig = profile.voiceDNA !== undefined || profile.guardrails !== undefined;
+  // Use `!= null` (loose equality) rather than `!== undefined` — it's robust
+  // to both `null` and `undefined`. The `VoiceProfile` type currently declares
+  // `voiceDNA?: VoiceDNA` so only `undefined` is reachable today, but
+  // `rowToProfile` in voice-calibration.ts maps corrupted-JSON DB columns
+  // through `parseJsonFallback(...) ?? undefined`. If a future refactor widens
+  // the type to `VoiceDNA | null` or drops the `?? undefined` coercion, a
+  // `!== undefined` check would silently treat a corrupted profile as
+  // "configured" and activate the authority override — exactly the scenario
+  // the samples-only draft fix in 964b3ff was meant to prevent.
+  const hasExplicitConfig = profile.voiceDNA != null || profile.guardrails != null;
   return hasExplicitConfig && voiceProfileBlock.length > 0;
 }
 

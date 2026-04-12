@@ -28,6 +28,18 @@ router.get('/api/public/anomalies/:workspaceId', (req, res) => {
   res.json(listAnomalies(req.params.workspaceId));
 });
 
+// ADMIN-ONLY routes. These endpoints intentionally accept an unscoped
+// `:anomalyId` and resolve the workspace via a global lookup (no
+// `workspace_id` in WHERE) before calling the workspace-scoped mutation.
+// This is safe because:
+//   1. They are protected by the global HMAC `APP_PASSWORD` gate in
+//      `server/app.ts`, which is admin-only and spans all workspaces.
+//   2. Admins deliberately need cross-workspace visibility from the
+//      platform admin panel — mirroring the pattern used in
+//      `routes/churn-signals.ts` and `server/payments.ts::deletePayment`.
+// IMPORTANT: if these routes are ever moved behind `requireWorkspaceAccess`
+// or exposed to per-workspace client auth, the global lookup becomes an
+// enumeration oracle and MUST be replaced with a workspace-scoped one.
 router.post('/api/anomalies/:anomalyId/dismiss', (req, res) => {
   const anomaly = getAnomalyById(req.params.anomalyId);
   if (!anomaly) return res.status(404).json({ error: 'Anomaly not found' });
