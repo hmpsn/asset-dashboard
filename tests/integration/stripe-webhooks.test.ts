@@ -293,8 +293,14 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
       metadata: {},
     });
 
-    // Should not throw
     await handleWebhookEvent(event as never);
+
+    // Regression guard: the handler early-returns before addActivity() when
+    // metadata.workspaceId is missing. A regression that removed the guard
+    // would log a `payment_failed` activity with an undefined workspaceId.
+    // Assert no such activity was logged against the seeded workspace.
+    const activities = listActivity(ws.workspaceId);
+    expect(activities.some(a => a.type === 'payment_failed')).toBe(false);
   });
 
   // ── subscription events ──
@@ -338,7 +344,20 @@ describe('Stripe Webhooks — FM-2 & FM-5', () => {
       id: 'obj_unknown',
     });
 
-    // Should not throw
+    // Snapshot state before the call so the assertion is against a known
+    // baseline (seedWorkspace may have logged its own activities).
+    const paymentsBefore = listPayments(ws.workspaceId).length;
+    const activitiesBefore = listActivity(ws.workspaceId).length;
+    const wsBefore = getWorkspace(ws.workspaceId);
+
     await handleWebhookEvent(event as never);
+
+    // Unknown event types must be a no-op: no payment writes, no activity
+    // writes, no workspace mutation. A regression that added a default
+    // branch to the switch (e.g. logging an error as an activity) would
+    // trip one of these assertions.
+    expect(listPayments(ws.workspaceId).length).toBe(paymentsBefore);
+    expect(listActivity(ws.workspaceId).length).toBe(activitiesBefore);
+    expect(getWorkspace(ws.workspaceId)?.tier).toBe(wsBefore?.tier);
   });
 });

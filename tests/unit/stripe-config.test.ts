@@ -113,8 +113,14 @@ describe('clearStripeConfig', () => {
   });
 
   it('is idempotent (no error when config already cleared)', () => {
-    clearStripeConfig();
-    clearStripeConfig(); // should not throw
+    // Two back-to-back clears on an already-empty config must not throw
+    // AND must leave getStripeConfig() observably null both times. The
+    // .not.toThrow() wrapper gives us a real assertion rather than a
+    // body that only tests "doesn't throw" implicitly.
+    expect(() => clearStripeConfig()).not.toThrow();
+    expect(getStripeConfig()).toBeNull();
+    expect(() => clearStripeConfig()).not.toThrow();
+    expect(getStripeConfig()).toBeNull();
   });
 });
 
