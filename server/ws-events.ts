@@ -77,6 +77,10 @@ export const WS_EVENTS = {
   DISCOVERY_UPDATED: 'discovery:updated',
   VOICE_PROFILE_UPDATED: 'voice:updated',
   BRAND_IDENTITY_UPDATED: 'brand-identity:updated',
+
+  // Page Strategy (Phase 2 — blueprints)
+  BLUEPRINT_UPDATED: 'blueprint:updated',
+  BLUEPRINT_GENERATED: 'blueprint:generated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

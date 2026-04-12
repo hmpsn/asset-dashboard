@@ -82,7 +82,11 @@ export type ActivityType =
   | 'brand_deliverable_generated'
   | 'brand_deliverable_refined'
   | 'brand_deliverable_approved'
-  | 'brand_deliverable_reverted';
+  | 'brand_deliverable_reverted'
+  | 'blueprint_created'
+  | 'blueprint_updated'
+  | 'blueprint_deleted'
+  | 'blueprint_generated';
 
 export interface ActivityEntry {
   id: string;

@@ -308,7 +308,7 @@ export function deleteBrief(workspaceId: string, briefId: string): boolean {
 }
 
 // Page-type-specific configuration: word counts, section counts, content style, and prompt instructions
-interface PageTypeConfig {
+export interface PageTypeConfig {
   wordCountTarget: number;       // target word count for the JSON example
   wordCountRange: string;        // e.g. "800-1,200"
   sectionRange: string;          // e.g. "4-6 sections"
@@ -317,7 +317,7 @@ interface PageTypeConfig {
   prompt: string;                // page-type-specific instructions for the AI
 }
 
-const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
+export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
   blog: {
     wordCountTarget: 1800,
     wordCountRange: '1,500-2,500',
@@ -472,6 +472,79 @@ const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
 - CITATION DENSITY: Target 1 citation per ~300 words. Cite industry surveys, insurance databases, professional fee guides
 - Avoid vague adjectives — use measurable fields: "$2,500-$5,000" not "affordable", "3-6 months" not "quick recovery"
 - Schema: Article, Dataset, FAQPage`,
+  },
+
+  homepage: {
+    wordCountTarget: 1500,
+    wordCountRange: '1,200-2,000',
+    sectionRange: '5-7',
+    avgSectionWords: 225,
+    contentStyle: 'Brand-led, conversion-oriented, and approachable. Lead with the customer transformation. Use StoryBrand narrative arc. Every section earns its place.',
+    prompt: `PAGE TYPE: Homepage
+- Format as a brand-first homepage (1,200-2,000 words of copyable content)
+- Structure: Hero (transformation promise) → Problem → Solution/Guide → Simple Plan → Social Proof → CTA
+- H1 must communicate the customer transformation, not the product feature
+- Include trust signals and a primary + secondary CTA
+- Avoid generic filler — every sentence should address a customer pain or desire
+- Schema: WebPage, Organization`,
+  },
+
+  about: {
+    wordCountTarget: 1200,
+    wordCountRange: '900-1,600',
+    sectionRange: '4-6',
+    avgSectionWords: 220,
+    contentStyle: 'Authentic, human, and trust-building. Tell the origin story. Focus on why the business exists, not just what it does. Introduce real people.',
+    prompt: `PAGE TYPE: About Page
+- Format as an authentic brand story page (900-1,600 words)
+- Structure: Origin Story → Mission/Values → Team → Why Us → CTA
+- Focus on "why we exist" not just "what we do" — the customer is not the hero, the business is the guide
+- Include real team member names and credentials for E-E-A-T
+- End with a soft CTA that invites further engagement
+- Schema: AboutPage, Person, Organization`,
+  },
+
+  contact: {
+    wordCountTarget: 400,
+    wordCountRange: '300-600',
+    sectionRange: '2-4',
+    avgSectionWords: 120,
+    contentStyle: 'Welcoming and low-friction. Make reaching out feel easy. Brief copy, clear contact methods.',
+    prompt: `PAGE TYPE: Contact Page
+- Format as a low-friction contact page (300-600 words)
+- Structure: Welcome/invitation → Contact form → Address/hours/phone → FAQ (optional)
+- Minimize friction — do not gatekeep contact with excessive fields
+- Include NAP (Name, Address, Phone) for local SEO consistency
+- Schema: ContactPage, LocalBusiness`,
+  },
+
+  faq: {
+    wordCountTarget: 1200,
+    wordCountRange: '800-1,800',
+    sectionRange: '3-5',
+    avgSectionWords: 280,
+    contentStyle: 'Helpful and direct. Answer real questions, not softballs. Group by topic. Anticipate objections. Conversational but authoritative.',
+    prompt: `PAGE TYPE: FAQ Page
+- Format as a comprehensive FAQ page (800-1,800 words)
+- Structure: Introduction → Grouped Q&A sections → CTA
+- Group questions by topic/theme (e.g., "About the Service", "Pricing", "Process")
+- Answer questions directly and completely — no vague non-answers
+- Include People Also Ask keyword variants where relevant
+- Schema: FAQPage`,
+  },
+
+  testimonials: {
+    wordCountTarget: 800,
+    wordCountRange: '600-1,200',
+    sectionRange: '3-5',
+    avgSectionWords: 180,
+    contentStyle: 'Social-proof focused. Let customer outcomes speak. Organize by transformation type or service. Add context around each testimonial.',
+    prompt: `PAGE TYPE: Testimonials / Reviews Page
+- Format as a social proof showcase page (600-1,200 words)
+- Structure: Social proof headline → Curated testimonials (grouped by outcome or service) → Stats/awards → CTA
+- Each testimonial should describe a specific transformation or result, not generic praise
+- Include customer names and context (service received, location if relevant) for credibility
+- Schema: Review, AggregateRating`,
   },
 };
 
@@ -781,6 +854,8 @@ export async function generateBrief(
       contentGaps?: string[];
       searchIntent?: string;
     };
+    /** Blueprint entry ID that triggered this brief (used to backlink the brief to its entry). */
+    blueprintEntryId?: string;
     /** Strategy card context threaded from the content request. */
     strategyCardContext?: StrategyCardContext;
   }
