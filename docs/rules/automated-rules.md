@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **49** — 26 error, 23 warn.
+Total rules: **50** — 26 error, 24 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -72,6 +72,7 @@ advisory but tracked.
 | 21 | Admin mutation on client_users missing expectedWorkspaceId param | warn | custom | `server/client-users.ts` | `// ws-authz-ok` | Without an in-function cross-workspace guard on admin mutations, an admin auth'd for workspace A can mutate a user in workspace B by passing the foreign UUID through a workspace-A URL. |
 | 22 | Inline voice-profile authority check (use isVoiceProfileAuthoritative helper) | warn | pattern | `server/seo-context.ts` | `// voice-authority-ok` | Inline authority checks drift: the shadow-mode copy missed the `hasExplicitConfig` gate, silently dropping the legacy brand voice for samples-only draft profiles (PR #168 bug). |
 | 23 | Bare brand-engine read in seo-context.ts (use safeBrandEngineRead) | warn | custom | `server/seo-context.ts` | `// safe-read-ok` | A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation. |
+| 24 | Test body has no assertion or explicit failure throw | warn | custom | `*.test.ts, *.test.tsx` | `// no-assertion-ok` | A vitest/jest test body with no assertion passes unconditionally — a broken implementation will not trip the suite. 2026-04-11 audit found 3 such silent-pass bodies in the stripe webhook suite claiming regression coverage they never had. |
 
 ---
 

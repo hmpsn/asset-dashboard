@@ -2256,6 +2256,237 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // Added post-PR #168 scaled-review cleanup (2026-04-11).
+    //
+    // Silent-failure stop-gap for test bodies. A vitest `it()` / `test()`
+    // block with no assertion and no `throw new Error` PASSES unconditionally,
+    // which defeats the purpose of having a test at all. The 2026-04-11
+    // test audit surfaced three such silent-pass bodies in the stripe
+    // webhook + config suites — the test names claimed regression coverage
+    // ("missing workspaceId silently returns", "is idempotent", "no crash")
+    // but the bodies only called the function under test without asserting
+    // anything about the observable side effects, so a regression that
+    // broke the handler's early-return (or the idempotency guard, etc.)
+    // would not have tripped the suite.
+    //
+    // Scope: vitest + jest test files (`*.test.ts`, `*.test.tsx`). Playwright
+    // e2e tests under `tests/e2e/` are intentionally excluded — their
+    // "assertions" are implicit Playwright actions (`page.click`, `page.goto`)
+    // whose failures throw directly and don't need an `expect(...)` wrapper.
+    //
+    // Algorithm:
+    //   1. For each `it(...)` or `test(...)` call at file scope (not
+    //      `.todo`, `.skip`, `.only`, or `.each`), walk forward to find the
+    //      arrow function body (`=>` followed by `{`).
+    //   2. Brace-walk the body to the matching `}` (same technique as the
+    //      bridge-broadcast rule — tracks string literals to avoid false
+    //      closes inside template literals).
+    //   3. Scan the body text for ANY of the assertion tokens below. The
+    //      token set is deliberately broad: `expect(`, `assert(`,
+    //      `.toBe`/`.toEqual`/`.toMatch`/`.toThrow`/`.toHaveLength`/
+    //      `.toContain`/`.toHaveBeenCalled`/`.rejects`/`.resolves`, and
+    //      `throw new Error` (explicit failure throw is a legitimate
+    //      pattern for "this branch should be unreachable" tests).
+    //   4. If none match and the `it(` line has no `// no-assertion-ok`
+    //      hatch (inline or on the preceding line), report it.
+    //
+    // The hatch is for the ~13 helper-delegation cases where the assertion
+    // lives inside a helper (`walkStatuses`, `noGarbage`, …) the `it` body
+    // calls. Those helpers contain real `expect(` calls but the rule can't
+    // see through the function boundary. Each hatch must carry a one-line
+    // rationale naming the helper.
+    name: 'Test body has no assertion or explicit failure throw',
+    fileGlobs: ['*.test.ts', '*.test.tsx'],
+    excludeLines: ['// no-assertion-ok'],
+    message: 'Test body has no assertion (no expect(...), assert(...), .rejects, .resolves, or `throw new Error`). A test with no assertion passes unconditionally and provides zero regression coverage. Either add an assertion or delegate to a helper that asserts (and add `// no-assertion-ok` with a comment naming the helper).',
+    severity: 'warn',
+    rationale: 'A vitest/jest test body with no assertion passes unconditionally — a broken implementation will not trip the suite. 2026-04-11 audit found 3 such silent-pass bodies in the stripe webhook suite claiming regression coverage they never had.',
+    claudeMdRef: '#test-conventions-mandatory-for-feature-work',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Mask out string literals, template literal contents (except
+      // ${...} interpolations, which ARE code), and line/block comments
+      // so the main `it(` regex cannot match inside them. Preserves
+      // newlines so line numbers stay 1:1 with the original file. Without
+      // this pass, the rule finds `it(` inside its own test harness's
+      // fixture strings AND inside JSDoc comments that reference `it()`
+      // for readability, producing a torrent of false positives.
+      const maskNonCode = (src: string): string => {
+        const out: string[] = [];
+        let i = 0;
+        while (i < src.length) {
+          const ch = src[i];
+          // Line comment — preserve `//`, replace the rest with spaces.
+          // The `src[i - 1] !== '\\'` guard prevents `//` at the end of
+          // a regex literal like `/\/assets\//` from being mis-parsed as
+          // a comment. Without it, the masker erases the rest of the line
+          // and the brace walker terminates early at the regex's closing
+          // context, producing a false positive on any test body whose
+          // setup uses `mockWebflowSuccess(/regex/, { ... })`.
+          if (ch === '/' && src[i + 1] === '/' && (i === 0 || src[i - 1] !== '\\')) {
+            out.push('  ');
+            i += 2;
+            while (i < src.length && src[i] !== '\n') {
+              out.push(' ');
+              i++;
+            }
+            continue;
+          }
+          // Block comment — preserve `/*` and `*/`, replace the middle
+          // with spaces; newlines stay so line numbers align. Same `\\`
+          // guard as `//` above for `/\/*/`-style regex literals.
+          if (ch === '/' && src[i + 1] === '*' && (i === 0 || src[i - 1] !== '\\')) {
+            out.push('  ');
+            i += 2;
+            while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) {
+              out.push(src[i] === '\n' ? '\n' : ' ');
+              i++;
+            }
+            if (i < src.length) {
+              out.push('  ');
+              i += 2;
+            }
+            continue;
+          }
+          // String literal — ', ", `. Template literal contents are
+          // masked EXCEPT for ${...} interpolations, which contain real
+          // code the scanner may care about.
+          if (ch === "'" || ch === '"' || ch === '`') {
+            const quote = ch;
+            out.push(quote);
+            i++;
+            while (i < src.length && src[i] !== quote) {
+              if (src[i] === '\\' && i + 1 < src.length) {
+                out.push('  ');
+                i += 2;
+                continue;
+              }
+              if (quote === '`' && src[i] === '$' && src[i + 1] === '{') {
+                out.push('${');
+                i += 2;
+                let depth = 1;
+                while (i < src.length && depth > 0) {
+                  if (src[i] === '{') depth++;
+                  else if (src[i] === '}') depth--;
+                  if (depth > 0) {
+                    out.push(src[i]);
+                    i++;
+                  }
+                }
+                if (i < src.length) {
+                  out.push('}');
+                  i++;
+                }
+                continue;
+              }
+              out.push(src[i] === '\n' ? '\n' : ' ');
+              i++;
+            }
+            if (i < src.length) {
+              out.push(quote);
+              i++;
+            }
+            continue;
+          }
+          out.push(ch);
+          i++;
+        }
+        return out.join('');
+      };
+      // Match `it(`, `test(`, `it.skip.todo` DOES NOT match (period before
+      // paren blocks it). We deliberately allow `it(` and `test(` to be
+      // preceded by any non-identifier character so `fit(`/`xit(` still
+      // match — jest-compatible globals. `.each`, `.todo`, `.skip`, `.only`
+      // are filtered explicitly below.
+      const itRe = /(^|[^\w.$])(it|test)\s*\(/g;
+      const assertionTokens = [
+        'expect(',
+        'assert(',
+        '.toBe',
+        '.toEqual',
+        '.toMatch',
+        '.toThrow',
+        '.toHaveLength',
+        '.toContain',
+        '.toHaveBeenCalled',
+        '.toHaveProperty',
+        '.toBeDefined',
+        '.toBeUndefined',
+        '.toBeNull',
+        '.toBeTruthy',
+        '.toBeFalsy',
+        '.toBeGreaterThan',
+        '.toBeLessThan',
+        '.toBeInstanceOf',
+        '.rejects',
+        '.resolves',
+        'throw new Error',
+        'throw new TypeError',
+        'throw new RangeError',
+      ];
+      for (const file of files) {
+        if (!file.endsWith('.test.ts') && !file.endsWith('.test.tsx')) continue;
+        // Playwright e2e tests live under tests/e2e — their action calls
+        // throw on failure, so `expect(...)` is often absent by design.
+        if (file.includes(`${path.sep}e2e${path.sep}`) || file.includes('/e2e/')) continue;
+        const rawContent = readFileOrEmpty(file);
+        if (!rawContent || (!rawContent.includes('it(') && !rawContent.includes('test('))) continue;
+        const content = maskNonCode(rawContent);
+        const lines = rawContent.split('\n');
+        itRe.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = itRe.exec(content)) !== null) {
+          // Leading char of the match is either '' or a non-identifier
+          // separator — index of the `it`/`test` keyword is match.index + len(leading).
+          const leading = match[1];
+          const kwStart = match.index + leading.length;
+          const kwEnd = kwStart + match[2].length; // end of `it` / `test`
+          // Reject `.each`, `.todo`, `.skip`, `.only` by peeking BEFORE the
+          // keyword for a `.` — e.g. `it.each(` appears as `it` preceded by
+          // `.`, which is an identifier char so our regex wouldn't match.
+          // We still check defensively to stay robust to regex evolution.
+          if (content[kwStart - 1] === '.') continue;
+          // Walk from the first `(` after the keyword, find the description
+          // string, then skip commas until we land on the arrow function.
+          // Rather than fully parse JS, we look for `=> {` within the next
+          // 800 chars — far enough to cover long describe-style titles, but
+          // bounded so a pathological file can't blow the scan open.
+          const paramOpen = content.indexOf('(', kwEnd);
+          if (paramOpen === -1) continue;
+          const searchWindow = content.slice(paramOpen, paramOpen + 800);
+          const arrowMatch = /=>\s*\{/.exec(searchWindow);
+          if (!arrowMatch) continue;
+          const bodyOpen = paramOpen + arrowMatch.index + arrowMatch[0].length - 1;
+          // Brace-walk the body on the MASKED content. String literals and
+          // comments are already replaced with spaces, so brace counting is
+          // now a simple scan with no quote tracking needed.
+          let depth = 0;
+          let i = bodyOpen;
+          while (i < content.length) {
+            const ch = content[i];
+            if (ch === '{') {
+              depth++;
+            } else if (ch === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            i++;
+          }
+          if (i >= content.length) continue;
+          const body = content.slice(bodyOpen, i + 1);
+          const hasAssertion = assertionTokens.some(tok => body.includes(tok));
+          if (hasAssertion) continue;
+          // Compute the 1-indexed line number of the `it(` / `test(` opener
+          // for the hit + hatch lookup.
+          const lineNum = content.slice(0, kwStart).split('\n').length;
+          if (hasHatch(lines, lineNum - 1, '// no-assertion-ok')) continue;
+          hits.push({ file, line: lineNum, text: lines[lineNum - 1]?.trim() ?? '' });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

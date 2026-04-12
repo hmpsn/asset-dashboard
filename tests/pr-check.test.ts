@@ -2030,6 +2030,209 @@ describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRea
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Test body has no assertion or explicit failure throw
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Test body has no assertion or explicit failure throw', () => {
+  const RULE = 'Test body has no assertion or explicit failure throw';
+
+  it('flags an `it(...)` body with no assertion', () => {
+    // The canonical failure mode this rule prevents: a test that calls the
+    // function under test, expecting nothing, and passes silently even if
+    // the function throws… wait, it wouldn't pass if the function throws.
+    // The real failure mode is: the test name CLAIMS regression coverage
+    // ("missing workspaceId silently returns") but the body does nothing
+    // observable — a regression that removes the early-return won't throw,
+    // so the test passes on a broken implementation.
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it } from 'vitest';",                                     // 1
+        "it('silently passes', () => {",                                    // 2
+        "  doSomething();",                                                 // 3
+        "});",                                                              // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('flags a `test(...)` body with no assertion', () => {
+    // `test` is jest-compatible alias. Rule must match both.
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { test } from 'vitest';",
+        "test('alias works', () => {",
+        "  doSomething();",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag a body with an expect() call', () => {
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it, expect } from 'vitest';",
+        "it('asserts properly', () => {",
+        "  const x = compute();",
+        "  expect(x).toBe(42);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a body that uses .toEqual', () => {
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it, expect } from 'vitest';",
+        "it('asserts properly', () => {",
+        "  const x = compute();",
+        "  expect(x).toEqual({ a: 1 });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a body that uses .rejects', () => {
+    // `.rejects` / `.resolves` are assertion-continuation chains. They
+    // satisfy the rule even though `expect(` may also be present — we check
+    // either separately.
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it, expect } from 'vitest';",
+        "it('asserts async error', async () => {",
+        "  await expect(compute()).rejects.toThrow('bad');",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a body that uses `throw new Error` as explicit failure', () => {
+    // "this branch should be unreachable" is a legitimate pattern. A test
+    // that bakes in an unreachable throw is asserting via control flow.
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it } from 'vitest';",
+        "it('unreachable branch', () => {",
+        "  try { doSomething(); } catch { return; }",
+        "  throw new Error('expected doSomething to throw');",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline `// no-assertion-ok` hatch on the `it(` line', () => {
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it } from 'vitest';",
+        "it('delegates to helper', () => { // no-assertion-ok — walkStatuses asserts internally",
+        "  walkStatuses(['a', 'b']);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects `// no-assertion-ok` hatch on the line above the `it(` opener', () => {
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it } from 'vitest';",
+        "// no-assertion-ok — noGarbage() asserts via expect() inside",
+        "it('delegates to helper', () => {",
+        "  noGarbage('foo');",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside *.test.ts / *.test.tsx', () => {
+    // A vitest-style `it()` in a fixture file (non-test) must not trip.
+    const file = write(
+      uniqPath('rule-no-assertion', 'fixtures/sample.ts'),
+      lines(
+        "// A non-test file that mentions `it(` in a string or comment",
+        "const doc = 'use it() and test() in your suites';",
+        "it('fake', () => { doSomething(); });", // still exercises the helper, but file is filtered
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag e2e tests (Playwright actions throw on failure)', () => {
+    // Playwright's `expect(page).toHaveURL(...)` is still an assertion, but
+    // many e2e tests rely on action throws (`page.click('[data-missing]')`)
+    // and have no `expect(` in the body. The rule skips `tests/e2e/`
+    // entirely to match that convention.
+    const file = write(
+      uniqPath('rule-no-assertion', 'tests/e2e/flow.test.ts'),
+      lines(
+        "import { test } from '@playwright/test';",
+        "test('navigates', async ({ page }) => {",
+        "  await page.goto('/');",
+        "  await page.click('button');",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('handles multiple its in the same file, flagging only the offenders', () => {
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it, expect } from 'vitest';",
+        "it('asserts', () => {",
+        "  expect(1 + 1).toBe(2);",
+        "});",
+        "it('does not assert', () => {",
+        "  doSomething();",
+        "});",
+        "it('asserts again', () => {",
+        "  expect(2 + 2).toBe(4);",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('does not get tripped up by `it(` appearing inside a string literal', () => {
+    // Brace-walker tracks quotes so a `{` inside a template literal does
+    // not skew depth and the `it(` inside a description string does not
+    // get matched as a call.
+    const file = write(
+      uniqPath('rule-no-assertion', 'fake.test.ts'),
+      lines(
+        "import { it, expect } from 'vitest';",
+        "it('handles `{ foo: bar }` in description', () => {",
+        "  const s = `template with {braces}`;",
+        "  expect(s).toContain('braces');",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Meta-test: pinned customCheck rule names
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -2221,6 +2424,8 @@ describe('Meta: customCheck rule name registry', () => {
     // PR #168 scaled-review follow-ups
     'Admin mutation on client_users missing expectedWorkspaceId param',
     'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
+    // 2026-04-11 test audit follow-up
+    'Test body has no assertion or explicit failure throw',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
