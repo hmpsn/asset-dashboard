@@ -159,8 +159,8 @@ function EntryCard({
                   <span className="text-sm font-medium text-zinc-200 capitalize">
                     {section.sectionType.replace(/-/g, ' ')}
                   </span>
-                  {/* narrative role — violet is acceptable here (admin-only component) */}
-                  <span className="px-1.5 py-0.5 text-xs bg-violet-900/30 text-violet-400 rounded font-medium capitalize">
+                  {/* narrative role — purple (admin-only) */}
+                  <span className="px-1.5 py-0.5 text-xs bg-purple-900/30 text-purple-400 rounded font-medium capitalize">
                     {section.narrativeRole.replace(/-/g, ' ')}
                   </span>
                   {section.wordCountTarget > 0 && (
