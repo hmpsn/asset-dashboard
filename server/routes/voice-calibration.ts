@@ -79,7 +79,17 @@ const refineSchema = z.object({
 
 // Get or create voice profile (includes samples)
 router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  res.json(getOrCreateVoiceProfile(req.params.workspaceId));
+  try {
+    res.json(getOrCreateVoiceProfile(req.params.workspaceId));
+  } catch (err) {
+    // `getOrCreateVoiceProfile` throws when the INSERT-IGNORE lost a race AND
+    // the subsequent re-read also failed — meaning the row we expected to
+    // exist is gone (manual delete, FK cascade, test teardown). Rare in
+    // production but we map it to a descriptive 500 rather than letting
+    // Express's default handler emit a generic stack trace.
+    const message = err instanceof Error ? err.message : 'Failed to load voice profile';
+    return res.status(500).json({ error: message });
+  }
 });
 
 // Update voice profile (DNA, guardrails, modifiers, status)

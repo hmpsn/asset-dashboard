@@ -489,10 +489,19 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     );
 
     for (const r of activeRequests.slice(0, 30)) {
+      // Skip requests without a targetPageSlug — the llms.txt index is a
+      // crawlable link map, and `|| '#'` would emit a markdown entry pointing
+      // at the site root with an empty anchor (e.g. `[Title](https://site.com/#)`).
+      // That's a broken link from the crawler's perspective and pollutes the
+      // index with entries that no LLM can actually fetch. A content request
+      // that hasn't been assigned a URL yet isn't ready to be advertised.
+      // (The matrix branch above already filters by `c.plannedUrl` truthiness
+      // for the same reason.)
+      if (!r.targetPageSlug) continue;
       const brief = r.briefId ? briefMap.get(r.briefId) : undefined;
       const title = brief?.suggestedTitle || r.topic || r.targetKeyword || 'Untitled';
       plannedPages.push({
-        url: r.targetPageSlug || '#',
+        url: r.targetPageSlug,
         keyword: title,
         status: r.status,
       });

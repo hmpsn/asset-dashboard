@@ -42,6 +42,51 @@ function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => 
   }
 }
 
+/**
+ * Resolve the effective brand voice block — the single authority decision
+ * for which voice source wins: the modern voice profile, or the legacy
+ * `workspace.brandVoice` + brand-docs block.
+ *
+ * A voice profile is "authoritative" (replaces the legacy brandVoiceBlock)
+ * only when either:
+ *   (a) `status === 'calibrated'` — `buildSystemPrompt` Layer 2 injects voice
+ *       DNA + guardrails into the SYSTEM prompt, and we must not also emit
+ *       the legacy block in the USER prompt (two contradictory voice sources
+ *       in front of the model), OR
+ *   (b) the profile has explicit DNA or guardrails saved AND the rendered
+ *       `voiceProfileBlock` is non-empty — the admin has made a deliberate
+ *       configuration commitment while still in draft.
+ *
+ * Samples ALONE do NOT trigger the override. A draft profile with only voice
+ * samples is a "preparing to calibrate" state (the admin uploaded source
+ * material but hasn't saved any DNA or guardrails yet) — we must NOT silently
+ * drop the legacy brandVoice + brand-docs they previously configured. The
+ * legacy block stays in place until the admin explicitly commits to the new
+ * profile by saving DNA, saving guardrails, or running calibration through
+ * to `calibrated`.
+ *
+ * A fresh draft profile auto-created on `GET /api/voice/:id` has neither DNA
+ * nor guardrails nor samples, so it correctly falls through to the legacy
+ * block as before.
+ *
+ * Factored out so the two branches of `buildSeoContext` (strategy / no
+ * strategy) and the shadow-mode parity check can never drift. Previously
+ * each site hand-rolled the `hasExplicitConfig` + `voiceProfileActive`
+ * check, and shadow-mode's copy fell out of sync — missing the
+ * `hasExplicitConfig` gate — which caused the parity check to incorrectly
+ * skip the raw brand voice comparison for draft profiles with samples but
+ * no explicit config.
+ *
+ * Returns `true` when the voice profile is the authoritative source.
+ * (PR #168 scaled-review finding, DRY refactor.)
+ */
+function isVoiceProfileAuthoritative(profile: VoiceProfile | null, voiceProfileBlock: string): boolean {
+  if (profile === null) return false;
+  if (profile.status === 'calibrated') return true;
+  const hasExplicitConfig = profile.voiceDNA !== undefined || profile.guardrails !== undefined;
+  return hasExplicitConfig && voiceProfileBlock.length > 0;
+}
+
 export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
@@ -142,34 +187,11 @@ export function buildSeoContext(
     const profile = safeBrandEngineRead('buildSeoContext.noStrategy.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
     const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
     const identityBlock = buildIdentityContext(workspaceId);
-    // A voice profile is "authoritative" (replaces the legacy brandVoiceBlock)
-    // only when either:
-    //   (a) status === 'calibrated' — buildSystemPrompt Layer 2 injects voice
-    //       DNA + guardrails into the SYSTEM prompt, and we must not also
-    //       emit the legacy block in the USER prompt (two contradictory
-    //       voice sources in front of the model), OR
-    //   (b) the profile has explicit DNA or guardrails saved AND the rendered
-    //       voiceProfileBlock is non-empty — the admin has made a deliberate
-    //       configuration commitment while still in draft.
-    //
-    // Samples ALONE no longer trigger the override. A draft profile with
-    // only voice samples is a "preparing to calibrate" state (the admin
-    // uploaded source material but hasn't saved any DNA or guardrails yet) —
-    // we must NOT silently drop the legacy brandVoice + brand-docs they
-    // previously configured. The legacy block stays in place until the
-    // admin explicitly commits to the new profile by saving DNA, saving
-    // guardrails, or running calibration through to `calibrated`.
-    // (PR #168 scaled-review finding flagged during staging hardening.)
-    //
-    // A fresh draft profile auto-created on GET /api/voice/:id has neither
-    // DNA nor guardrails nor samples, so it correctly falls through to the
-    // legacy block as before.
-    const hasExplicitConfig = profile !== null && (profile.voiceDNA !== undefined || profile.guardrails !== undefined);
-    const voiceProfileActive = profile !== null && (
-      profile.status === 'calibrated' ||
-      (hasExplicitConfig && voiceProfileBlock.length > 0)
-    );
-    const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
+    // Authority decision: see `isVoiceProfileAuthoritative` for the full rules.
+    // Samples alone do NOT trigger the override — a draft profile with just
+    // uploaded samples is "preparing to calibrate", not a configuration
+    // commitment.
+    const effectiveBrandVoice = isVoiceProfileAuthoritative(profile, voiceProfileBlock) ? voiceProfileBlock : brandVoiceBlock;
     const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
     // Inject workspace learnings if feature is enabled
     if (isFeatureEnabled('outcome-ai-injection')) {
@@ -222,18 +244,9 @@ export function buildSeoContext(
   const profile = safeBrandEngineRead('buildSeoContext.withStrategy.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
   const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
   const identityBlock = buildIdentityContext(workspaceId);
-  // See authority rules on the `!strategy` branch above — same logic applies
-  // here: calibrated OR (explicit DNA/guardrails + non-empty voiceProfileBlock)
-  // replaces legacy. Samples alone do NOT trigger the override — a draft
-  // profile with just uploaded samples is "preparing to calibrate", not a
-  // configuration commitment. Admins with existing brand voice content keep
-  // seeing it until they save DNA, save guardrails, or finish calibration.
-  const hasExplicitConfig = profile !== null && (profile.voiceDNA !== undefined || profile.guardrails !== undefined);
-  const voiceProfileActive = profile !== null && (
-    profile.status === 'calibrated' ||
-    (hasExplicitConfig && voiceProfileBlock.length > 0)
-  );
-  const effectiveBrandVoice = voiceProfileActive ? voiceProfileBlock : brandVoiceBlock;
+  // Authority decision: see `isVoiceProfileAuthoritative` helper above for
+  // the full rules. Shared with the no-strategy branch to prevent drift.
+  const effectiveBrandVoice = isVoiceProfileAuthoritative(profile, voiceProfileBlock) ? voiceProfileBlock : brandVoiceBlock;
   const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
   // Inject workspace learnings if feature is enabled
   if (isFeatureEnabled('outcome-ai-injection')) {
@@ -288,9 +301,15 @@ export function buildSeoContext(
           // still passed into buildVoiceProfileContext below to avoid a fourth read
           // inside that helper.
           const shadowProfile = getVoiceProfile(workspaceId);
-          const voiceProfileActive =
-            shadowProfile !== null &&
-            (shadowProfile.status === 'calibrated' || buildVoiceProfileContext(workspaceId, 'full', shadowProfile).length > 0);
+          const shadowVoiceBlock = buildVoiceProfileContext(workspaceId, 'full', shadowProfile);
+          // Use the same authority helper as the main path so shadow-mode's
+          // decision to skip the raw brand voice parity check mirrors what
+          // the main path actually did. Previously this site hand-rolled a
+          // weaker version of the check (missing the `hasExplicitConfig`
+          // gate added in the main path fix), causing parity checks to skip
+          // the legacy brand-voice comparison on draft profiles that still
+          // saw the legacy voice in production.
+          const voiceProfileActive = isVoiceProfileAuthoritative(shadowProfile, shadowVoiceBlock);
           const comparisonFields: { name: string; match: boolean }[] = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
             { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
