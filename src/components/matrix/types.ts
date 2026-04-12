@@ -1,4 +1,6 @@
-import type { ContentPageType } from '../../../shared/types/content';
+import type { ContentPageType, TemplateSection } from '../../../shared/types/content';
+
+export type { TemplateSection };
 
 export interface ContentTemplate {
   id: string;
@@ -23,19 +25,6 @@ export interface TemplateVariable {
   name: string;
   label: string;
   description?: string;
-}
-
-export interface TemplateSection {
-  id: string;
-  name: string;
-  headingTemplate: string;
-  guidance: string;
-  wordCountTarget: number;
-  order: number;
-  cmsFieldSlug?: string;
-  narrativeRole?: string;   // StoryBrand or custom narrative role
-  brandNote?: string;        // one-line brand purpose
-  seoNote?: string;          // one-line SEO purpose
 }
 
 export interface ContentMatrix {

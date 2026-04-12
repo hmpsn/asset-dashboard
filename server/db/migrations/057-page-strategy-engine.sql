@@ -4,17 +4,17 @@
 -- ═══ SITE BLUEPRINTS ═══
 
 CREATE TABLE IF NOT EXISTS site_blueprints (
-  id                    TEXT PRIMARY KEY,
-  workspace_id          TEXT NOT NULL,
-  name                  TEXT NOT NULL,
-  version               INTEGER NOT NULL DEFAULT 1,
-  status                TEXT NOT NULL DEFAULT 'draft',
-  brandscript_id        TEXT,
-  industry_type         TEXT,
+  id                     TEXT PRIMARY KEY,
+  workspace_id           TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name                   TEXT NOT NULL,
+  version                INTEGER NOT NULL DEFAULT 1,
+  status                 TEXT NOT NULL DEFAULT 'draft',
+  brandscript_id         TEXT,
+  industry_type          TEXT,
   generation_inputs_json TEXT,
-  notes                 TEXT,
-  created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL
+  notes                  TEXT,
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_site_blueprints_workspace ON site_blueprints(workspace_id);

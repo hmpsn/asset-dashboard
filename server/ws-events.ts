@@ -79,6 +79,8 @@ export const WS_EVENTS = {
   BRAND_IDENTITY_UPDATED: 'brand-identity:updated',
 
   // Page Strategy (Phase 2 — blueprints)
+  // BLUEPRINT_UPDATED covers create, update, and delete (same consolidation pattern as BRANDSCRIPT_UPDATED).
+  // Use a { deleted: true } payload flag to distinguish deletion broadcasts.
   BLUEPRINT_UPDATED: 'blueprint:updated',
   BLUEPRINT_GENERATED: 'blueprint:generated',
 } as const;

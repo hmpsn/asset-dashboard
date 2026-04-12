@@ -567,6 +567,8 @@ export function buildStrategyCardBlock(ctx: StrategyCardContext | undefined): st
 // Helper to get config for a page type, with blog as default
 export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   if (pageType && PAGE_TYPE_CONFIGS[pageType]) return PAGE_TYPE_CONFIGS[pageType];
+  // 'custom' and unrecognized page types intentionally fall back to blog config.
+  // All external access to PAGE_TYPE_CONFIGS should go through this function.
   return PAGE_TYPE_CONFIGS.blog;
 }
 
@@ -854,7 +856,7 @@ export async function generateBrief(
       contentGaps?: string[];
       searchIntent?: string;
     };
-    /** Blueprint entry ID that triggered this brief (used to backlink the brief to its entry). */
+    /** Blueprint entry ID that triggered this brief (Phase 3 — used to backlink the brief to its entry via updateEntry(blueprintId, entryId, { briefId })). Not read in this function. */
     blueprintEntryId?: string;
     /** Strategy card context threaded from the content request. */
     strategyCardContext?: StrategyCardContext;
