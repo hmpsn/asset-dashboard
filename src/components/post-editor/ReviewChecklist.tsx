@@ -102,7 +102,7 @@ export function ReviewChecklist({
                 <button
                   onClick={handleAIReview}
                   disabled={aiRunning}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 mb-2 rounded-lg text-[11px] font-medium bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:bg-violet-600/30 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 mb-2 rounded-lg text-[11px] font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
                 >
                   {aiRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                   {aiRunning ? 'Running AI Review...' : 'AI Pre-Check'}

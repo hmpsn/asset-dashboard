@@ -77,6 +77,7 @@ const minOperational: OperationalSlice = {
 const minSeoContext = {
   strategy: undefined,
   brandVoice: '',
+  effectiveBrandVoiceBlock: '',
   businessContext: '',
   personas: [],
   knowledgeBase: '',

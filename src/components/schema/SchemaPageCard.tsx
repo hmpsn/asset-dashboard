@@ -10,7 +10,7 @@ import {
   Loader2, Save, Trash2, Star, History, Clock, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
-import { statusBorderClass } from '../ui/statusConfig';
+import { statusBorderClass, type PageEditStatus } from '../ui/statusConfig';
 import { SchemaEditor } from './SchemaEditor';
 import { SchemaVersionHistory } from './SchemaVersionHistory';
 
@@ -55,7 +55,7 @@ export interface SchemaPageCardProps {
   page: SchemaPageSuggestion;
   isOpen: boolean;
   isRegenLoading: boolean;
-  editState: { status: string } | undefined;
+  editState: { status: PageEditStatus | null | undefined } | undefined;
   copiedId: string | null;
   published: boolean;
   publishing: boolean;

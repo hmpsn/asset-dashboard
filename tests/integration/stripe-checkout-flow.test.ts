@@ -239,9 +239,9 @@ describe('Stripe Checkout Flow — FM-2 Phantom Success', () => {
 
     // All records should share the same session ID
     expect(payments.length).toBeGreaterThan(0);
-    expect(payments.every(p => p.stripeSessionId === 'cs_test_cart_001')).toBe(true);
-    expect(payments.every(p => p.status === 'pending')).toBe(true);
-    expect(payments.every(p => p.workspaceId === ws.workspaceId)).toBe(true);
+    expect(payments.length > 0 && payments.every(p => p.stripeSessionId === 'cs_test_cart_001')).toBe(true);
+    expect(payments.length > 0 && payments.every(p => p.status === 'pending')).toBe(true);
+    expect(payments.length > 0 && payments.every(p => p.workspaceId === ws.workspaceId)).toBe(true);
 
     // Product types
     const productTypes = payments.map(p => p.productType).sort();

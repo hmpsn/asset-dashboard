@@ -66,7 +66,7 @@ describe('GET /api/public/insights/:workspaceId', () => {
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
     expect(body.length).toBeGreaterThan(0);
-    expect(body.every((i: { insightType: string }) => i.insightType === 'ranking_opportunity')).toBe(true);
+    expect(body.length > 0 && body.every((i: { insightType: string }) => i.insightType === 'ranking_opportunity')).toBe(true);
   });
 
   it('returns 404 for unknown workspace', async () => {

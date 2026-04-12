@@ -3,13 +3,13 @@
 // and automatic Content-Type headers.
 
 export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly body?: unknown,
-  ) {
+  readonly status: number;
+  readonly body?: unknown;
+  constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
   }
 }
 
@@ -33,6 +33,21 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
 export async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, { signal });
   return handleResponse<T>(res);
+}
+
+/** GET that returns the raw response body as text (for markdown/csv/plaintext endpoints) */
+export async function getText(url: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) {
+    // Error responses are still JSON `{ error }` per the API error shape.
+    let body: unknown;
+    try { body = await res.json(); } catch { /* non-JSON error body — fall through */ }
+    const msg = (body && typeof body === 'object' && 'error' in body)
+      ? String((body as { error: unknown }).error)
+      : res.statusText || `HTTP ${res.status}`;
+    throw new ApiError(res.status, msg, body);
+  }
+  return res.text();
 }
 
 /** POST with JSON body */

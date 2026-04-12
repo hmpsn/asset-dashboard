@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { get } from '../../api/client';
 import { keywords } from '../../api/seo';
 import { workspaces } from '../../api/workspaces';
-import type { KeywordStrategy } from '../../shared/types/workspace';
+import type { KeywordStrategy } from '../../../shared/types/workspace';
 import { queryKeys } from '../../lib/queryKeys';
 
 interface WorkspaceData {

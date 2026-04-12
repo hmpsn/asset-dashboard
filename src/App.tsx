@@ -7,7 +7,7 @@ import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
 import { useAuth } from './hooks/useAuth';
-import { useWebSocket } from './hooks/useWebSocket';
+import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';
 import { useWsInvalidation } from './hooks/useWsInvalidation';
 import { ADMIN_EVENTS } from './lib/wsEvents';
 import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY, useHealthCheck, useQueue, QUEUE_KEY } from './hooks/admin';
@@ -21,7 +21,9 @@ import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
-import { Clipboard, Globe } from 'lucide-react';
+import { FeatureFlag } from './components/ui/FeatureFlag';
+import { EmptyState } from './components/ui/EmptyState';
+import { Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -301,7 +303,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (urlWorkspaceId === id) navigate('/');
   }, [queryClient, urlWorkspaceId, navigate]);
 
-  useWebSocket({
+  useGlobalAdminEvents({
     [ADMIN_EVENTS.QUEUE_UPDATE]: handleQueueUpdate,
     [ADMIN_EVENTS.WORKSPACE_CREATED]: handleWorkspaceCreated,
     [ADMIN_EVENTS.WORKSPACE_DELETED]: handleWorkspaceDeleted,
@@ -385,7 +387,26 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
+    if (tab === 'brand') return (
+      // Double-gated: Sidebar already hides the nav entry when the flag is
+      // off, but a user who deep-links to /ws/:id/brand directly would hit
+      // this route. Without a fallback, `<FeatureFlag>` renders null and the
+      // content pane goes blank with no explanation. Ship an EmptyState so
+      // the deep-link path degrades gracefully instead of looking broken.
+      // (PR #168 scaled-review UX polish.)
+      <FeatureFlag
+        flag="copy-engine"
+        fallback={
+          <EmptyState
+            icon={Sparkles}
+            title="Brand Hub is rolling out"
+            description="The Copy & Brand Engine is still rolling out to workspaces. Check back soon, or reach out if you'd like early access."
+          />
+        }
+      >
+        <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />
+      </FeatureFlag>
+    );
         if (tab === 'seo-ranks') return <RankTracker key={`ranks-${selected.id}`} workspaceId={selected.id} hasGsc={!!selected.gscPropertyUrl} />;
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;

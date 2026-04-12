@@ -2251,16 +2251,96 @@ When brandscript is approved:
 
 ---
 
+## Integration Tests
+
+**File:** `tests/integration/copy-pipeline-routes.test.ts` (new, port 13319)
+
+Phase 1 integration tests caught a critical production bug (routes never registered in `app.ts`). Phase 3 must have the same coverage. The copy pipeline has AI-generating endpoints with TOCTOU risk — `assertConcurrentGenerateSafe` and `assertIdempotentGenerate` are mandatory.
+
+**Import the shared factories:**
+```typescript
+import { createTestContext, assertWorkspaceIsolation, assertConcurrentGenerateSafe, assertIdempotentGenerate } from './helpers.js';
+```
+
+**Required test cases:**
+
+- [ ] **Smoke test — App registration guard**
+  - GET any endpoint for fresh workspace → must return 200 or 404 (never a 404 "Cannot GET" which means route not registered)
+  - Add comment: `// 404 "Cannot GET" = route not registered in app.ts`
+
+- [ ] **Copy section CRUD**
+  - `GET /api/copy/:wsId/entry/:entryId/sections` for fresh entry → returns empty array
+  - `GET /api/copy/:wsId/entry/:entryId/status` → returns `{ generated: false }` or equivalent
+  - `PATCH /api/copy/:wsId/section/:sectionId/status` — updates status, returns 200 with new status
+  - `PATCH /api/copy/:wsId/section/:sectionId/text` — updates copy text
+
+- [ ] **Generate endpoint idempotency** — use `assertIdempotentGenerate`:
+  ```typescript
+  // Seed a blueprint + entry first, then:
+  await assertIdempotentGenerate({
+    ctx,
+    endpoint: `/api/copy/${wsId}/${blueprintId}/${entryId}/generate`,
+    body: {},
+    expectedStatus: 409,   // second generate without force must 409, not silently duplicate
+  });
+  ```
+
+- [ ] **Concurrent generate safety** — use `assertConcurrentGenerateSafe`:
+  ```typescript
+  await assertConcurrentGenerateSafe({
+    ctx,
+    endpoint: `/api/copy/${wsId}/${blueprintId}/${entryId}/generate`,
+    body: { force: true },
+    countRows: () => db.prepare(
+      'SELECT COUNT(*) as n FROM copy_sections WHERE entry_id = ?'
+    ).get(entryId).n,
+  });
+  ```
+
+- [ ] **Workspace isolation on sections** — use `assertWorkspaceIsolation`:
+  - Seed entry in wsA, verify sections are not visible from wsB
+  - Verify `PATCH .../section/:sectionId/status` with wsB token on wsA section → 403 or 404
+
+- [ ] **Copy intelligence CRUD**
+  - `GET /api/copy/:wsId/intelligence` → returns array (empty for fresh workspace)
+  - `GET /api/copy/:wsId/intelligence/promotable` → returns array
+  - `PATCH /api/copy/:wsId/intelligence/:patternId` — updates pattern
+  - `DELETE /api/copy/:wsId/intelligence/:patternId` — removes pattern
+
+- [ ] **Zod validation** — bad payloads return 400:
+  - `PATCH .../section/:sectionId/status` with invalid status value → 400
+  - `POST .../suggest` missing `originalText` → 400
+
+- [ ] **Commit:**
+  ```bash
+  git add tests/integration/copy-pipeline-routes.test.ts
+  git commit -m "test: add copy-pipeline route integration tests"
+  ```
+
+---
+
 ## Final Verification
 
-- [ ] **Step 1: Start dev server and verify migration 028 runs**
-- [ ] **Step 2: Test copy generation for a single blueprint entry via API**
-- [ ] **Step 3: Test section status updates and steering history**
-- [ ] **Step 4: Test copy intelligence pattern extraction**
-- [ ] **Step 5: Verify seo-context.ts includes copy intelligence in fullContext**
-- [ ] **Step 6: Verify UI renders — copy review panel, batch controls, export panel**
-- [ ] **Step 7: End-to-end test: generate → review → approve → export CSV**
-- [ ] **Step 8 (intelligence loop): Approve a copy section → confirm voice sample was added → generate new copy for a different entry → confirm AI prompt includes learned patterns**
+- [ ] **Step 1: Run integration tests**
+
+```bash
+npx vitest run tests/integration/copy-pipeline-routes.test.ts
+```
+
+Expected: all tests pass.
+
+- [ ] **Step 2: Run full suite**
+
+```bash
+npx vitest run
+```
+
+Expected: all tests pass (no regressions).
+
+- [ ] **Step 3: Start dev server and verify migration 028 runs**
+- [ ] **Step 4: Verify UI renders — copy review panel, batch controls, export panel**
+- [ ] **Step 5: End-to-end test: generate → review → approve → export CSV**
+- [ ] **Step 6 (intelligence loop): Approve a copy section → confirm voice sample was added → generate new copy for a different entry → confirm AI prompt includes learned patterns**
 
 ---
 

@@ -5,6 +5,11 @@
 import { createLogger } from './logger.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import type * as OutcomeMeasurement from './outcome-measurement.js';
+import type * as WorkspaceLearnings from './workspace-learnings.js';
+import type * as ExternalDetection from './external-detection.js';
+import type * as OutcomePlaybooks from './outcome-playbooks.js';
+import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('outcome-crons');
 
@@ -30,7 +35,7 @@ export function startOutcomeCrons() {
 
   const runMeasure = async () => {
     try {
-      const { measurePendingOutcomes } = await import('./outcome-measurement.js');
+      const { measurePendingOutcomes }: typeof OutcomeMeasurement = await import('./outcome-measurement.js'); // dynamic-import-ok
       const { workspaceIds } = await measurePendingOutcomes();
 
       // Invalidate cache for every workspace that had pending measurements.
@@ -49,7 +54,7 @@ export function startOutcomeCrons() {
 
   const runLearnings = async () => {
     try {
-      const { recomputeAllWorkspaceLearnings, getWorkspaceIdsWithOutcomes } = await import('./workspace-learnings.js');
+      const { recomputeAllWorkspaceLearnings, getWorkspaceIdsWithOutcomes }: typeof WorkspaceLearnings = await import('./workspace-learnings.js'); // dynamic-import-ok
       await recomputeAllWorkspaceLearnings();
 
       // Only invalidate workspaces that have outcome data (same set learnings processes)
@@ -68,7 +73,7 @@ export function startOutcomeCrons() {
   const runDetection = async () => {
     if (!isFeatureEnabled('outcome-external-detection')) return;
     try {
-      const { detectExternalExecutions } = await import('./external-detection.js');
+      const { detectExternalExecutions }: typeof ExternalDetection = await import('./external-detection.js'); // dynamic-import-ok
       await detectExternalExecutions();
     } catch (err) {
       log.error({ err }, 'Failed to detect external executions');
@@ -78,7 +83,7 @@ export function startOutcomeCrons() {
   const runPlaybooks = async () => {
     if (!isFeatureEnabled('outcome-playbooks')) return;
     try {
-      const { detectAllWorkspacePlaybooks } = await import('./outcome-playbooks.js');
+      const { detectAllWorkspacePlaybooks }: typeof OutcomePlaybooks = await import('./outcome-playbooks.js'); // dynamic-import-ok
       await detectAllWorkspacePlaybooks();
     } catch (err) {
       log.error({ err }, 'Failed to detect playbook patterns');
@@ -86,7 +91,7 @@ export function startOutcomeCrons() {
   };
 
   const runArchive = () => {
-    import('./outcome-tracking.js').then(m => m.archiveOldActions()).catch(err => {
+    (import('./outcome-tracking.js') as Promise<typeof OutcomeTracking>).then(m => m.archiveOldActions()).catch(err => {
       log.error({ err }, 'Failed to archive old actions');
     });
   };

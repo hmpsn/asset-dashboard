@@ -101,6 +101,10 @@ import debugRouter from './routes/debug.js';
 import suggestedBriefsRouter from './routes/suggested-briefs.js';
 import clientSignalsRouter from './routes/client-signals.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
+import brandscriptRoutes from './routes/brandscript.js';
+import voiceCalibrationRoutes from './routes/voice-calibration.js';
+import discoveryIngestionRoutes from './routes/discovery-ingestion.js';
+import brandIdentityRoutes from './routes/brand-identity.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -351,6 +355,10 @@ export function createApp(): express.Express {
   app.use(suggestedBriefsRouter);
   app.use(clientSignalsRouter);
   app.use(meetingBriefRouter);
+  app.use(brandscriptRoutes);
+  app.use(voiceCalibrationRoutes);
+  app.use(discoveryIngestionRoutes);
+  app.use(brandIdentityRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);

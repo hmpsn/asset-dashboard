@@ -48,20 +48,18 @@ import type { ContentSubscription, ContentMatrix, GeneratedPost } from '../share
 import type { SchemaSitePlan } from '../shared/types/schema-plan.js';
 import type { RecommendationSet } from '../shared/types/recommendations.js';
 import type { ApprovalBatch } from '../shared/types/approvals.js';
-import type { ChurnSignal, listChurnSignals } from './churn-signals.js';
+import type { ChurnSignal } from './churn-signals.js';
 // Compile-time contracts for HIGH-risk dynamic-import modules — erased at runtime; tsc fails if these exports are renamed
-import type { Anomaly, listAnomalies } from './anomaly-detection.js';
+import type { Anomaly } from './anomaly-detection.js';
 // client-signals-store uses dynamic import inside try-catch (like other subsystems)
 // to degrade gracefully if the module or table is unavailable on older DBs.
 import type { DecayAnalysis } from './content-decay.js';
-import type { AuditSnapshot } from './reports.js';
 import type { ROIData } from './roi.js';
 import type { SeoChangeEvent } from './seo-change-tracker.js';
 import type { CannibalizationReport } from './cannibalization-detection.js';
 import type { Annotation as AnalyticsAnnotation } from './analytics-annotations.js';
 import type { Annotation as TimelineAnnotation } from './annotations.js';
 import type { ActionOutcome, ActionPlaybook, TopWin } from '../shared/types/outcome-tracking.js';
-import type { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions, getPendingActions, getActionsByPage } from './outcome-tracking.js';
 import type { SafeClientUser } from '../shared/types/users.js';
 import type { ClientRequest } from '../shared/types/requests.js';
 import type { ContentBrief } from '../shared/types/content.js';
@@ -74,7 +72,6 @@ import type { Job } from './jobs.js';
 import type { SchemaValidation } from './schema-validator.js';
 import type { SiteNode } from './site-architecture.js';
 import type { PageSeoResult, SeoIssue } from './audit-page.js';
-import type { Snapshot } from './performance-store.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -235,10 +232,22 @@ async function assembleSeoContext(
     strategy: ctx.strategy
       ? { ...ctx.strategy, pageMap: livePageMap.length > 0 ? livePageMap : ctx.strategy.pageMap }
       : ctx.strategy,
-    // Store RAW values (no headers). Callers that need formatted blocks use
-    // formatBrandVoiceForPrompt() / formatKnowledgeBaseForPrompt() from this module.
-    // This prevents double-formatting when formatSeoContextSection adds its own prefixes.
+    // Store RAW brand voice value (no headers) for legacy read-only consumers that need
+    // the raw workspace.brandVoice text — NOT for prompt injection. Prompt callers MUST
+    // use `effectiveBrandVoiceBlock` below (which already applies voice-profile authority).
+    // There is intentionally no helper that adds the "BRAND VOICE & STYLE" header to this
+    // raw field: any such helper would bypass voice-profile authority and silently drop
+    // the entire voice profile feature on calibrated workspaces. For knowledge base,
+    // callers still use `formatKnowledgeBaseForPrompt()` because knowledge has no
+    // authority-layered variant (it's the same raw text everywhere).
     brandVoice: getRawBrandVoice(workspaceId),
+    // Pre-formatted block with voice-profile authority applied. Source of truth:
+    // buildSeoContext().brandVoiceBlock, which honors the rule that voice profile
+    // replaces legacy brandVoice only when (a) status === 'calibrated' (Layer 2 system
+    // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is non-empty.
+    // Intelligence-path callers inject this DIRECTLY — it already carries the emphatic
+    // BRAND VOICE header when non-empty.
+    effectiveBrandVoiceBlock: ctx.brandVoiceBlock,
     businessContext: ctx.businessContext,
     personas: workspace?.personas ?? [],
     knowledgeBase: getRawKnowledge(workspaceId),
@@ -473,7 +482,7 @@ async function assembleLearnings(
   }
 
   return {
-    summary,
+    summary: summary ?? null,
     confidence: summary?.confidence ?? null,
     topActionTypes: summary?.overall.topActionTypes.slice(0, 5) ?? [],
     overallWinRate: summary?.overall.totalWinRate ?? 0,
@@ -562,7 +571,7 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
         for (const conflict of report.conflicts.slice(0, 10)) {
           cannibalizationWarnings.push({
             keyword: conflict.keyword ?? '',
-            pages: conflict.pages ?? [],
+            pages: [conflict.sourceId, conflict.conflictsWith?.identifier].filter((p): p is string => Boolean(p)),
             severity: conflict.severity ?? 'low',
           });
         }
@@ -850,7 +859,7 @@ async function assembleClientSignals(
   try {
     const row = stmts().clientBusinessPriorities.get(workspaceId) as { priorities: string } | undefined;
     if (row) {
-      businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), 'client_business_priorities') ?? [];
+      businessPriorities = parseJsonSafe(row.priorities, z.array(z.string()), [] as string[], { workspaceId, field: 'priorities', table: 'client_business_priorities' });
     }
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: business priorities table optional, degrading gracefully');
@@ -1229,7 +1238,9 @@ async function assembleOperational(
     const insights = getInsights(workspaceId);
     const totalShown = insights.length;
     const confirmed = insights.filter(i => i.resolutionStatus === 'resolved' || i.resolutionStatus === 'in_progress').length;
-    const dismissed = insights.filter(i => i.resolutionStatus === 'dismissed').length;
+    // `dismissed` is a runtime-only value written by legacy code paths; the strict
+    // `AnalyticsInsight['resolutionStatus']` union omits it, hence the string cast.
+    const dismissed = insights.filter(i => (i.resolutionStatus as string) === 'dismissed').length;
     if (totalShown > 0) {
       insightAcceptanceRate = {
         totalShown,
@@ -1307,8 +1318,11 @@ export function formatForPrompt(
     // not a misleading "newly onboarded" message about the workspace.
     if (include !== null && !include.has('seoContext')) return '';
     sections.push('This workspace is newly onboarded. Limited data available.');
-    if (intelligence.seoContext?.brandVoice) {
-      sections.push(`Brand voice: ${intelligence.seoContext.brandVoice}`);
+    // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback.
+    // Pre-formatted with its own header; inject directly rather than wrapping the raw field.
+    const bvBlock = intelligence.seoContext?.effectiveBrandVoiceBlock ?? '';
+    if (bvBlock) {
+      sections.push(bvBlock);
     }
     sections.push('Recommendation: Focus on establishing baseline data before making optimization decisions.');
     return sections.join('\n');
@@ -1374,7 +1388,7 @@ export function formatForPrompt(
  */
 export async function buildIntelPrompt(
   workspaceId: string,
-  slices: IntelligenceSlice[],
+  slices: readonly IntelligenceSlice[],
   opts?: Omit<IntelligenceOptions, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget' | 'learningsDomain'>,
 ): Promise<string> {
   const intel = await buildWorkspaceIntelligence(workspaceId, { ...opts, slices });
@@ -1469,17 +1483,36 @@ function pct(rate: number | null | undefined): string {
  * Renders SeoContextSlice as a `## SEO Context` summary block for formatForPrompt().
  *
  * TWO-PATH FORMAT SPLIT: Callers using formatForPrompt() get this combined block.
- * Callers that need individual fields at different prompt positions use the standalone
- * helpers instead: formatBrandVoiceForPrompt(), formatKeywordsForPrompt(), etc.
- * These intentionally produce DIFFERENT output (standalone helpers add emphatic standalone
- * headers; this function renders compact inline labels within the ## SEO Context block).
+ * Callers that need individual fields at different prompt positions use standalone
+ * helpers instead: formatKeywordsForPrompt(), formatPersonasForPrompt(),
+ * formatKnowledgeBaseForPrompt(). For BRAND VOICE specifically, standalone callers
+ * must read `seo?.effectiveBrandVoiceBlock` directly — it is already pre-formatted
+ * by `buildSeoContext` with full voice-profile authority applied. There is
+ * intentionally no equivalent standalone helper for raw `seo?.brandVoice`: any such
+ * helper would bypass voice-profile authority and create silent-drop bugs on
+ * calibrated workspaces.
+ *
+ * These standalone helpers intentionally produce DIFFERENT output (emphatic standalone
+ * headers) compared to this function's compact inline labels within the ## SEO Context
+ * block.
  */
 function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
   const lines: string[] = ['## SEO Context'];
 
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
-  // Emphatic brand voice directive — AI models respond to capitalized instructional headers
-  if (ctx.brandVoice) lines.push(`BRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${ctx.brandVoice}`);
+  // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it was
+  // already computed by `buildSeoContext` with full voice authority (calibrated profile
+  // → voice samples block; else legacy brandVoice + brand-docs block; else empty). An
+  // empty string means "render nothing here" and is INTENTIONAL when the workspace is
+  // calibrated with no samples — `buildSystemPrompt` Layer 2 handles DNA + guardrails
+  // via the system message. Injecting raw `ctx.brandVoice` as a fallback would bypass
+  // the authority rule and produce two contradictory voice sources (see the bug from
+  // PR #167 where the `else if` fallback re-injected legacy voice on calibrated empty
+  // profiles). `.trim()` strips the leading `\n\n` from buildSeoContext's output.
+  const voiceBlock = (ctx.effectiveBrandVoiceBlock ?? '').trim();
+  if (voiceBlock) {
+    lines.push(voiceBlock);
+  }
 
   // Personas — always include when present
   // Must match formatPersonasForPrompt (standalone helper) for content parity
@@ -2263,15 +2296,6 @@ export function getIntelligenceCacheStats() {
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
 // These produce prompt-ready text from intelligence slice data, matching the
 // output format of the legacy mini-builders in seo-context.ts.
-
-/**
- * Format raw brand voice text into a prompt block matching buildSeoContext().brandVoiceBlock format.
- * Required because seoContext.brandVoice stores the RAW voice text (no header).
- */
-export function formatBrandVoiceForPrompt(brandVoice: string | null | undefined): string {
-  if (!brandVoice?.trim()) return '';
-  return `\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\n${brandVoice}`;
-}
 
 /**
  * Format raw knowledge base text into a prompt block matching buildSeoContext().knowledgeBlock format.

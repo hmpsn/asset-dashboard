@@ -339,8 +339,7 @@ describe('SEMRush module — keyword overview', () => {
     ]);
 
     const results = await getKeywordOverview(['seo tools'], ws.workspaceId);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.keyword && typeof r.volume === 'number')).toBe(true);
+    expect(results.length > 0 && results.every(r => r.keyword && typeof r.volume === 'number')).toBe(true);
 
     const hit = results.find(r => r.keyword === 'seo tools');
     expect(hit).toBeDefined();
@@ -357,8 +356,7 @@ describe('SEMRush module — keyword overview', () => {
     ]);
 
     const results = await getKeywordOverview(['seo tools', 'analytics platform'], ws.workspaceId);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => typeof r.volume === 'number')).toBe(true);
+    expect(results.length > 0 && results.every(r => typeof r.volume === 'number')).toBe(true);
   });
 
   it('handles NOTHING FOUND gracefully — returns empty results for that keyword', async () => {
@@ -417,8 +415,7 @@ describe('SEMRush module — domain organic keywords', () => {
     ]);
 
     const results = await getDomainOrganicKeywords('example.com', ws.workspaceId);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.keyword && typeof r.position === 'number')).toBe(true);
+    expect(results.length > 0 && results.every(r => r.keyword && typeof r.position === 'number')).toBe(true);
 
     const kw = results[0];
     expect(kw.keyword).toBe('seo audit tool');

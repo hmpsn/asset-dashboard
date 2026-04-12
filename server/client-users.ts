@@ -74,16 +74,21 @@ const stmts = createStmtCache(() => ({
         UPDATE client_users SET email = @email, name = @name, password_hash = @password_hash,
           role = @role, avatar_url = @avatar_url, last_login_at = @last_login_at,
           updated_at = @updated_at
-        WHERE id = @id
+        WHERE id = @id AND workspace_id = @workspace_id
       `),
-  deleteById: db.prepare('DELETE FROM client_users WHERE id = ?'),
+  deleteById: db.prepare('DELETE FROM client_users WHERE id = ? AND workspace_id = ?'),
   selectToken: db.prepare('SELECT * FROM reset_tokens WHERE token = ?'),
   insertToken: db.prepare(`
         INSERT INTO reset_tokens (token, user_id, workspace_id, email, expires_at)
         VALUES (@token, @user_id, @workspace_id, @email, @expires_at)
       `),
+  // reset_tokens.token is crypto.randomBytes(32).toString('hex') (256-bit entropy);
+  // globally unique by construction, so single-row delete by token cannot collide.
+  // ws-scope-ok
   deleteToken: db.prepare('DELETE FROM reset_tokens WHERE token = ?'),
   deleteTokensByUserWs: db.prepare('DELETE FROM reset_tokens WHERE user_id = ? AND workspace_id = ?'),
+  // Global retention sweep: prune expired reset_tokens across all workspaces.
+  // ws-scope-ok
   deleteExpiredTokens: db.prepare('DELETE FROM reset_tokens WHERE expires_at <= ?'),
 }));
 
@@ -152,11 +157,30 @@ export async function createClientUser(
   return stripPassword(user);
 }
 
+/**
+ * Cross-workspace authorization guard. Every admin-mutating function below
+ * takes an `expectedWorkspaceId` and enforces that the target user actually
+ * belongs to that workspace. Without this guard, an admin authenticated for
+ * workspace A could call `PATCH/DELETE/password-change` on a user from
+ * workspace B simply by knowing the UUID (the route handler only verifies
+ * the caller's access to the `:id` workspace, not that `:userId` belongs
+ * to it). Returns `null` (not `false`) so callers can't distinguish
+ * "doesn't exist" from "belongs to another workspace" — avoiding a
+ * workspace-enumeration oracle.
+ */
+function assertUserInWorkspace(id: string, expectedWorkspaceId: string): ClientUser | null {
+  const existing = getClientUserById(id);
+  if (!existing) return null;
+  if (existing.workspaceId !== expectedWorkspaceId) return null;
+  return existing;
+}
+
 export async function updateClientUser(
   id: string,
+  expectedWorkspaceId: string,
   updates: Partial<Pick<ClientUser, 'name' | 'email' | 'role' | 'avatarUrl'>>,
 ): Promise<SafeClientUser | null> {
-  const existing = getClientUserById(id);
+  const existing = assertUserInWorkspace(id, expectedWorkspaceId);
   if (!existing) return null;
 
   if (updates.email && updates.email.toLowerCase() !== existing.email) {
@@ -171,6 +195,7 @@ export async function updateClientUser(
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: merged.workspaceId,
     email: merged.email,
     name: merged.name,
     password_hash: merged.passwordHash,
@@ -183,8 +208,8 @@ export async function updateClientUser(
   return stripPassword(merged);
 }
 
-export async function changeClientPassword(id: string, newPassword: string): Promise<boolean> {
-  const existing = getClientUserById(id);
+export async function changeClientPassword(id: string, expectedWorkspaceId: string, newPassword: string): Promise<boolean> {
+  const existing = assertUserInWorkspace(id, expectedWorkspaceId);
   if (!existing) return false;
 
   const merged = {
@@ -195,6 +220,7 @@ export async function changeClientPassword(id: string, newPassword: string): Pro
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: merged.workspaceId,
     email: merged.email,
     name: merged.name,
     password_hash: merged.passwordHash,
@@ -207,8 +233,10 @@ export async function changeClientPassword(id: string, newPassword: string): Pro
   return true;
 }
 
-export function deleteClientUser(id: string): boolean {
-  const info = stmts().deleteById.run(id);
+export function deleteClientUser(id: string, expectedWorkspaceId: string): boolean {
+  const existing = assertUserInWorkspace(id, expectedWorkspaceId);
+  if (!existing) return false;
+  const info = stmts().deleteById.run(id, existing.workspaceId);
   return info.changes > 0;
 }
 
@@ -220,6 +248,7 @@ export function recordClientLogin(id: string): void {
 
   stmts().update.run({
     id: merged.id,
+    workspace_id: merged.workspaceId,
     email: merged.email,
     name: merged.name,
     password_hash: merged.passwordHash,
@@ -276,14 +305,6 @@ export function hasClientUsers(workspaceId: string): boolean {
 
 // ── Password Reset ──
 
-interface ResetToken {
-  token: string;
-  userId: string;
-  workspaceId: string;
-  email: string;
-  expiresAt: number;
-}
-
 export function createResetToken(email: string, workspaceId: string): { token: string; user: SafeClientUser } | null {
   const user = getClientUserByEmail(email, workspaceId);
   if (!user) return null;
@@ -317,7 +338,11 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 
   if (newPassword.length < 8) return { success: false, error: 'Password must be at least 8 characters' };
 
-  const changed = await changeClientPassword(row.user_id, newPassword);
+  // The reset token row carries the workspace_id it was created against
+  // (see `createResetToken` — that's `getClientUserByEmail(email, workspaceId)`
+  // scoped), so `row.workspace_id` IS the authoritative expected workspace
+  // for `row.user_id`. No separate lookup needed.
+  const changed = await changeClientPassword(row.user_id, row.workspace_id, newPassword);
   if (!changed) return { success: false, error: 'User not found' };
 
   // Remove used token

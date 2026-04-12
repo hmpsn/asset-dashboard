@@ -212,3 +212,130 @@ export function createTestContext(port: number): TestContext {
     authDel,
   };
 }
+
+// ─── Test assertion factories ─────────────────────────────────────────────────
+//
+// Reusable helpers for asserting correctness properties that cut across many
+// integration tests. Import these alongside createTestContext:
+//   import { createTestContext, assertWorkspaceIsolation } from './helpers.js';
+
+/**
+ * Assert that a GET endpoint only returns data belonging to the requesting workspace.
+ *
+ * Calls the endpoint with both workspaceIds and verifies:
+ * - wsA's response doesn't contain any wsB data (checked via the `extractId` fn)
+ * - wsB's response doesn't contain any wsA data
+ *
+ * Usage:
+ *   await assertWorkspaceIsolation({
+ *     ctx,
+ *     wsA: 'ws_aaaaaaaa',
+ *     wsB: 'ws_bbbbbbbb',
+ *     endpoint: (wsId) => `/api/voice/${wsId}`,
+ *     extractIds: (body) => body.samples.map((s: any) => s.id),
+ *     seedAIds: ['vs_sample1'],  // IDs belonging to wsA that must not appear in wsB's response
+ *     seedBIds: ['vs_sample2'],  // IDs belonging to wsB
+ *   });
+ */
+export async function assertWorkspaceIsolation(opts: {
+  ctx: TestContext;
+  wsA: string;
+  wsB: string;
+  endpoint: (workspaceId: string) => string;
+  extractIds: (body: unknown) => string[];
+  seedAIds: string[];
+  seedBIds: string[];
+}): Promise<void> {
+  const { ctx, wsA, wsB, endpoint, extractIds, seedAIds, seedBIds } = opts;
+  const { expect } = await import('vitest');
+
+  const [resA, resB] = await Promise.all([
+    ctx.api(endpoint(wsA)),
+    ctx.api(endpoint(wsB)),
+  ]);
+
+  expect(resA.status, `${endpoint(wsA)} should return 200`).toBe(200);
+  expect(resB.status, `${endpoint(wsB)} should return 200`).toBe(200);
+
+  const bodyA = await resA.json();
+  const bodyB = await resB.json();
+  const idsFromA = new Set(extractIds(bodyA));
+  const idsFromB = new Set(extractIds(bodyB));
+
+  for (const id of seedBIds) {
+    expect(idsFromA.has(id), `wsA response must not contain wsB row ${id}`).toBe(false);
+  }
+  for (const id of seedAIds) {
+    expect(idsFromB.has(id), `wsB response must not contain wsA row ${id}`).toBe(false);
+  }
+}
+
+/**
+ * Assert that two concurrent POST requests to a generator endpoint produce
+ * exactly one stored row (not duplicates).
+ *
+ * Fires both requests simultaneously and checks the count function returns 1.
+ *
+ * Usage:
+ *   await assertConcurrentGenerateSafe({
+ *     ctx,
+ *     endpoint: `/api/voice/${wsId}/calibrate`,
+ *     body: { promptType: 'headline' },
+ *     countRows: () => db.prepare('SELECT COUNT(*) as n FROM voice_calibration_sessions WHERE voice_profile_id = ?').get(profileId).n,
+ *   });
+ */
+export async function assertConcurrentGenerateSafe(opts: {
+  ctx: TestContext;
+  endpoint: string;
+  body: unknown;
+  countRows: () => number;
+}): Promise<void> {
+  const { ctx, endpoint, body, countRows } = opts;
+  const { expect } = await import('vitest');
+
+  const beforeCount = countRows();
+
+  // Fire both requests simultaneously — they race through the AI call window
+  const [res1, res2] = await Promise.all([
+    ctx.postJson(endpoint, body),
+    ctx.postJson(endpoint, body),
+  ]);
+
+  // Both should succeed (200 or 201) — the loser should not 500
+  expect([200, 201]).toContain(res1.status);
+  expect([200, 201]).toContain(res2.status);
+
+  // Exactly one new row should have been written
+  const afterCount = countRows();
+  expect(afterCount - beforeCount).toBe(1);
+}
+
+/**
+ * Assert that a second call to an AI-generating endpoint returns 409
+ * (already-processed guard) rather than silently duplicating rows.
+ *
+ * Usage:
+ *   await assertIdempotentGenerate({
+ *     ctx,
+ *     endpoint: `/api/discovery/${wsId}/sources/${srcId}/process`,
+ *     body: {},
+ *     expectedStatus: 409,
+ *   });
+ */
+export async function assertIdempotentGenerate(opts: {
+  ctx: TestContext;
+  endpoint: string;
+  body?: unknown;
+  expectedStatus?: number;
+}): Promise<void> {
+  const { ctx, endpoint, body = {}, expectedStatus = 409 } = opts;
+  const { expect } = await import('vitest');
+
+  // First call should succeed
+  const first = await ctx.postJson(endpoint, body);
+  expect([200, 201]).toContain(first.status);
+
+  // Second call without force should return expectedStatus (409 by convention)
+  const second = await ctx.postJson(endpoint, body);
+  expect(second.status, `second call to ${endpoint} should be ${expectedStatus} (not a silent duplicate)`).toBe(expectedStatus);
+}

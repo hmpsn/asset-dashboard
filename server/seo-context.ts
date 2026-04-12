@@ -6,6 +6,11 @@ import { getUploadRoot } from './data-dir.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { createLogger } from './logger.js';
+import { listBrandscripts } from './brandscript.js';
+import { getVoiceProfile } from './voice-calibration.js';
+import { renderVoiceDNAForPrompt, renderVoiceDNASummary } from './voice-dna-render.js';
+import { listDeliverables } from './brand-identity.js';
+import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../shared/types/brand-engine.js';
 
 const log = createLogger('seo-context');
 
@@ -14,10 +19,119 @@ const log = createLogger('seo-context');
  * Ensures every AI prompt gets consistent strategy + business context.
  */
 
+/**
+ * Graceful wrapper around brand-engine table reads (voice_profiles,
+ * brandscripts, brand_identity_deliverables). In production these tables
+ * always exist because migrations run at startup, but test environments may
+ * skip migrations entirely and a missing table throws from `db.prepare()`
+ * inside the stmt-cache initializer — crashing the entire `buildSeoContext`
+ * call tree. Mirrors the pattern used in `server/prompt-assembly.ts` where
+ * the same concern led to an explicit try/catch around `getVoiceProfile`.
+ *
+ * The `context` argument is only used for the warn-log so we can distinguish
+ * which call site degraded on the dashboard. The fallback value is what the
+ * caller would have received from an empty-state read (null / empty array /
+ * empty string).
+ *
+ * **Narrow catch.** We only swallow errors that look like SQLite "no such
+ * table / no such column" schema-missing errors — that's the specific
+ * test-env scenario this wrapper exists for. Any other error (programming
+ * bug in `rowToProfile`, a renamed export, a TypeError from property access,
+ * a SyntaxError from JSON parsing that `parseJsonFallback` somehow missed)
+ * gets re-thrown so it surfaces loudly in CI and Sentry rather than
+ * silently falling through to the legacy brand-voice path. A programming
+ * error that only manifests as "brand engine features quietly stopped
+ * working in production" is the exact silent-failure class this codebase
+ * is trying to eliminate.
+ */
+const MISSING_SCHEMA_ERROR_RE = /no such (table|column)/i;
+
+function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!MISSING_SCHEMA_ERROR_RE.test(message)) {
+      // Unexpected error — not a schema-missing test-env case. Re-throw so
+      // the programming bug surfaces instead of silently degrading.
+      throw err;
+    }
+    log.warn({ context, workspaceId, error: message }, 'brand-engine read failed — graceful degradation to legacy path');
+    return fallback;
+  }
+}
+
+/**
+ * Resolve the effective brand voice block — the single authority decision
+ * for which voice source wins: the modern voice profile, or the legacy
+ * `workspace.brandVoice` + brand-docs block.
+ *
+ * A voice profile is "authoritative" (replaces the legacy brandVoiceBlock)
+ * only when either:
+ *   (a) `status === 'calibrated'` — `buildSystemPrompt` Layer 2 injects voice
+ *       DNA + guardrails into the SYSTEM prompt, and we must not also emit
+ *       the legacy block in the USER prompt (two contradictory voice sources
+ *       in front of the model), OR
+ *   (b) the profile has explicit DNA or guardrails saved AND the rendered
+ *       `voiceProfileBlock` is non-empty — the admin has made a deliberate
+ *       configuration commitment while still in draft.
+ *
+ * Samples ALONE do NOT trigger the override. A draft profile with only voice
+ * samples is a "preparing to calibrate" state (the admin uploaded source
+ * material but hasn't saved any DNA or guardrails yet) — we must NOT silently
+ * drop the legacy brandVoice + brand-docs they previously configured. The
+ * legacy block stays in place until the admin explicitly commits to the new
+ * profile by saving DNA, saving guardrails, or running calibration through
+ * to `calibrated`.
+ *
+ * A fresh draft profile auto-created on `GET /api/voice/:id` has neither DNA
+ * nor guardrails nor samples, so it correctly falls through to the legacy
+ * block as before.
+ *
+ * Factored out so the two branches of `buildSeoContext` (strategy / no
+ * strategy) and the shadow-mode parity check can never drift. Previously
+ * each site hand-rolled the `hasExplicitConfig` + `voiceProfileActive`
+ * check, and shadow-mode's copy fell out of sync — missing the
+ * `hasExplicitConfig` gate — which caused the parity check to incorrectly
+ * skip the raw brand voice comparison for draft profiles with samples but
+ * no explicit config.
+ *
+ * Returns `true` when the voice profile is the authoritative source.
+ * (PR #168 scaled-review finding, DRY refactor.)
+ */
+function isVoiceProfileAuthoritative(profile: VoiceProfile | null, voiceProfileBlock: string): boolean {
+  if (profile === null) return false;
+  if (profile.status === 'calibrated') return true;
+  // Use `!= null` (loose equality) rather than `!== undefined` — it's robust
+  // to both `null` and `undefined`. The `VoiceProfile` type currently declares
+  // `voiceDNA?: VoiceDNA` so only `undefined` is reachable today, but
+  // `rowToProfile` in voice-calibration.ts maps corrupted-JSON DB columns
+  // through `parseJsonFallback(...) ?? undefined`. If a future refactor widens
+  // the type to `VoiceDNA | null` or drops the `?? undefined` coercion, a
+  // `!== undefined` check would silently treat a corrupted profile as
+  // "configured" and activate the authority override — exactly the scenario
+  // the samples-only draft fix in 964b3ff was meant to prevent.
+  const hasExplicitConfig = profile.voiceDNA != null || profile.guardrails != null;
+  return hasExplicitConfig && voiceProfileBlock.length > 0;
+}
+
 export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
-  /** Brand voice block for AI prompts */
+  /**
+   * Effective brand voice block. Always reflects the same source `fullContext`
+   * uses — i.e. when a calibrated voice profile exists, this is the voice
+   * profile block (formatted for AI prompt injection); otherwise it falls back
+   * to the legacy `workspace.brandVoice` + brand-docs concatenation.
+   *
+   * This field used to lag behind `fullContext` (it always returned the legacy
+   * source even when the voice profile took over). It is now kept consistent
+   * so that direct readers of `brandVoiceBlock` can never see a different brand
+   * voice than the one that was actually injected into the prompt.
+   *
+   * New callers should still prefer `fullContext`, which is the canonical
+   * combined block.
+   */
   brandVoiceBlock: string;
   /** Business context string (industry, location, services) */
   businessContext: string;
@@ -90,7 +204,23 @@ export function buildSeoContext(
   const knowledgeBlock = buildKnowledgeBase(workspaceId);
 
   if (!strategy) {
-    const baseParts = [brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
+    const brandscriptBlock = buildBrandscriptContext(workspaceId);
+    // Read the voice profile ONCE and reuse for both the authority check below
+    // and the voice-profile block rendering. Passing it into
+    // buildVoiceProfileContext avoids a second DB read on the hot prompt-assembly
+    // path. Before this optimization, each buildSeoContext invocation read the
+    // voice_profiles table twice (once here, once inside buildVoiceProfileContext)
+    // — that's also a TOCTOU risk: a calibration transition landing between the
+    // two reads could produce a mixed snapshot. One read = one snapshot.
+    const profile = safeBrandEngineRead('buildSeoContext.noStrategy.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
+    const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
+    const identityBlock = buildIdentityContext(workspaceId);
+    // Authority decision: see `isVoiceProfileAuthoritative` for the full rules.
+    // Samples alone do NOT trigger the override — a draft profile with just
+    // uploaded samples is "preparing to calibrate", not a configuration
+    // commitment.
+    const effectiveBrandVoice = isVoiceProfileAuthoritative(profile, voiceProfileBlock) ? voiceProfileBlock : brandVoiceBlock;
+    const baseParts = [effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
     // Inject workspace learnings if feature is enabled
     if (isFeatureEnabled('outcome-ai-injection')) {
       const learnings = getWorkspaceLearnings(workspaceId);
@@ -100,7 +230,7 @@ export function buildSeoContext(
       }
     }
     const fullContext = baseParts.join('');
-    const result: SeoContext = { keywordBlock: '', brandVoiceBlock, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
+    const result: SeoContext = { keywordBlock: '', brandVoiceBlock: effectiveBrandVoice, businessContext: '', personasBlock, knowledgeBlock, fullContext, strategy: undefined };
     seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
     return result;
   }
@@ -137,7 +267,15 @@ export function buildSeoContext(
     keywordBlock = `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
   }
 
-  const contextParts = [keywordBlock, brandVoiceBlock, personasBlock, knowledgeBlock].filter(Boolean);
+  const brandscriptBlock = buildBrandscriptContext(workspaceId);
+  // Read the voice profile ONCE — see the `!strategy` branch above for rationale.
+  const profile = safeBrandEngineRead('buildSeoContext.withStrategy.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
+  const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
+  const identityBlock = buildIdentityContext(workspaceId);
+  // Authority decision: see `isVoiceProfileAuthoritative` helper above for
+  // the full rules. Shared with the no-strategy branch to prevent drift.
+  const effectiveBrandVoice = isVoiceProfileAuthoritative(profile, voiceProfileBlock) ? voiceProfileBlock : brandVoiceBlock;
+  const contextParts = [keywordBlock, effectiveBrandVoice, brandscriptBlock, identityBlock, personasBlock, knowledgeBlock].filter(Boolean);
   // Inject workspace learnings if feature is enabled
   if (isFeatureEnabled('outcome-ai-injection')) {
     const learnings = getWorkspaceLearnings(workspaceId);
@@ -147,7 +285,7 @@ export function buildSeoContext(
     }
   }
   const fullContext = contextParts.join('');
-  const result: SeoContext = { keywordBlock, brandVoiceBlock, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
+  const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy };
 
   // Cache result
   if (workspaceId) {
@@ -160,31 +298,66 @@ export function buildSeoContext(
   if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId && !internalOpts?._skipShadow) {
     void (async () => {
       try {
-        const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js');
+        const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js'); // dynamic-import-ok — circular dep prevention in shadow-mode fire-and-forget
         const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'], pagePath, learningsDomain });
 
         if (intel.seoContext) {
           // Shadow-mode comparison: compare buildSeoContext() output against the
-          // intelligence assembler's seoContext slice. Both sides originate from the
-          // same source data. The assembler maps:
-          //   brandVoice  = getRawBrandVoice() (raw, no header)
+          // intelligence assembler's seoContext slice. Both sides originate from
+          // the same source data. The assembler maps:
+          //   brandVoice    = getRawBrandVoice() (raw, no header)
           //   knowledgeBase = getRawKnowledge() (raw, no header)
-          // So compare raw-to-raw (voiceParts.join vs intel.seoContext.brandVoice).
-          const comparisonFields = [
+          // So we compare raw-to-raw (getRawBrandVoice vs intel.seoContext.brandVoice)
+          // — this validates that the assembler reads from the same source data,
+          // NOT that it produces the effective brand voice that ultimately ends
+          // up in `result.brandVoiceBlock` / `fullContext`. When the voice
+          // profile is authoritative (calibrated, OR non-empty block), the
+          // effective voice is sourced from `buildVoiceProfileContext()` instead
+          // of the raw legacy block, and the intelligence assembler does not yet
+          // expose an equivalent field — so the raw-source check is skipped on
+          // those workspaces to avoid logging an unrelated parity issue as a
+          // real mismatch. The derivation matches the prompt-path check above
+          // so shadow-mode and prompt-assembly stay in sync on what "voice
+          // profile active" means.
+          //
+          // NOTE: shadow mode reads the profile FRESH here rather than reusing the
+          // profile read on the main path above. This is intentional — shadow mode
+          // runs asynchronously after the main result is already returned and
+          // cached, so the main-path snapshot may be stale by the time this block
+          // runs (e.g. a calibration transition landed in the meantime). Using the
+          // current DB state is the whole point of a parity check. The profile IS
+          // still passed into buildVoiceProfileContext below to avoid a fourth read
+          // inside that helper.
+          const shadowProfile = getVoiceProfile(workspaceId);
+          const shadowVoiceBlock = buildVoiceProfileContext(workspaceId, 'full', shadowProfile);
+          // Use the same authority helper as the main path so shadow-mode's
+          // decision to skip the raw brand voice parity check mirrors what
+          // the main path actually did. Previously this site hand-rolled a
+          // weaker version of the check (missing the `hasExplicitConfig`
+          // gate added in the main path fix), causing parity checks to skip
+          // the legacy brand-voice comparison on draft profiles that still
+          // saw the legacy voice in production.
+          const voiceProfileActive = isVoiceProfileAuthoritative(shadowProfile, shadowVoiceBlock);
+          const comparisonFields: { name: string; match: boolean }[] = [
             { name: 'strategy', match: JSON.stringify(result.strategy) === JSON.stringify(intel.seoContext.strategy) },
-            // Both are raw brand voice (no "BRAND VOICE & STYLE" header)
-            { name: 'brandVoice', match: getRawBrandVoice(workspaceId) === (intel.seoContext.brandVoice ?? '') },
             { name: 'businessContext', match: (result.businessContext ?? '') === (intel.seoContext.businessContext ?? '') },
             // Both are raw knowledge (no "BUSINESS KNOWLEDGE BASE" header)
             { name: 'knowledgeBase', match: getRawKnowledge(workspaceId) === (intel.seoContext.knowledgeBase ?? '') },
             // Personas: old path is prose string, new is structured array — compare presence as proxy
             { name: 'personas', match: (result.personasBlock ? 'present' : 'empty') === ((intel.seoContext.personas?.length ?? 0) > 0 ? 'present' : 'empty') },
           ];
+          if (!voiceProfileActive) {
+            // Both sides are raw legacy brand voice (no "BRAND VOICE & STYLE" header)
+            comparisonFields.push({
+              name: 'rawBrandVoice',
+              match: getRawBrandVoice(workspaceId) === (intel.seoContext.brandVoice ?? ''),
+            });
+          }
           const mismatches = comparisonFields.filter(f => !f.match).map(f => f.name);
           if (mismatches.length > 0) {
-            log.warn({ workspaceId, mismatches, totalFields: comparisonFields.length }, 'Intelligence shadow-mode mismatch detected');
+            log.warn({ workspaceId, mismatches, totalFields: comparisonFields.length, voiceProfileActive }, 'Intelligence shadow-mode mismatch detected');
           } else {
-            log.debug({ workspaceId, totalFields: comparisonFields.length }, 'Intelligence shadow-mode: all 5 fields match');
+            log.debug({ workspaceId, totalFields: comparisonFields.length, voiceProfileActive }, 'Intelligence shadow-mode: all fields match');
           }
         }
       } catch (err) {
@@ -406,4 +579,130 @@ export function buildKeywordMapContext(workspaceId?: string): string {
   ).join('\n');
 
   return `\n\nEXISTING KEYWORD MAP (avoid cannibalization, suggest internal links where relevant):\n${mapStr}`;
+}
+
+/**
+ * Build a brand narrative block from the workspace's active brandscript.
+ * Uses the most recently created brandscript. Returns '' if none exists or no sections have content.
+ */
+export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
+  // Graceful degradation if brandscripts table doesn't exist (test envs).
+  const scripts = safeBrandEngineRead('buildBrandscriptContext.listBrandscripts', workspaceId, () => listBrandscripts(workspaceId), []);
+  if (scripts.length === 0) return '';
+
+  const bs = scripts[0]; // Use most recent
+  const filledSections = bs.sections.filter(sec => sec.content?.trim());
+
+  if (filledSections.length === 0) return '';
+
+  if (emphasis === 'minimal') {
+    const first = filledSections[0];
+    return `\n\nBRAND NARRATIVE (${bs.frameworkType}): ${first.title} — ${first.content?.slice(0, 200)}...`;
+  }
+
+  const sections = (emphasis === 'summary' ? filledSections.slice(0, 3) : filledSections)
+    .map(sec => `  ${sec.title}: ${sec.content}`)
+    .join('\n');
+
+  return `\n\nBRAND NARRATIVE (${bs.frameworkType} framework):\n${sections}`;
+}
+
+/**
+ * Build a voice profile block for AI prompts from the workspace's calibrated voice profile.
+ * Includes voice DNA, sample writing, and guardrails. Returns '' if no profile exists.
+ *
+ * Guards on `profile.status === 'calibrated'`: when calibrated, buildSystemPrompt's
+ * Layer 2 already injects DNA + guardrails into the system message. Re-injecting them
+ * here would duplicate instructions and waste tokens.
+ * When calibrated: returns only voice samples (safe at any status).
+ * When not calibrated: returns the full DNA + samples + guardrails block.
+ *
+ * Hot-path optimization: callers that have already read the profile (e.g. `buildSeoContext`
+ * which needs the profile independently for the authority rule) can pass it as `profileArg`
+ * to avoid a second DB read. If omitted, the profile is fetched internally. Both paths
+ * produce identical output — the parameter is a pure optimization, never a semantic change.
+ *
+ * Sentinel semantics: `profileArg === undefined` means "caller did not supply — fetch it";
+ * `profileArg === null` means "caller already checked, no profile exists — skip the fetch
+ * and return empty." We use `!== undefined` (strict) rather than a truthiness check because
+ * `getVoiceProfile()` returns `VoiceProfile | null`, so `null` is a legitimate caller-supplied
+ * value that must NOT trigger a re-read. A truthy check would re-read the DB for every caller
+ * that correctly passed `null`, defeating the optimization.
+ */
+export function buildVoiceProfileContext(
+  workspaceId: string,
+  emphasis: ContextEmphasis = 'full',
+  profileArg?: (VoiceProfile & { samples: VoiceSample[] }) | null,
+): string {
+  const profile = profileArg !== undefined ? profileArg : getVoiceProfile(workspaceId);
+  if (!profile) return '';
+
+  const isCalibrated = profile.status === 'calibrated';
+  const parts: string[] = [];
+
+  // `minimal` returns only a one-line voice summary (used by lightweight prompts).
+  if (emphasis === 'minimal') {
+    if (!profile.voiceDNA) return '';
+    return `\n\nBRAND VOICE: ${renderVoiceDNASummary(profile.voiceDNA)}`;
+  }
+
+  const sampleLimit = emphasis === 'summary' ? 3 : 5;
+
+  // Only inject DNA when not calibrated — Layer 2 handles it when calibrated.
+  // Uses the shared `renderVoiceDNAForPrompt` helper so this path cannot drift
+  // from voice-calibration.ts or prompt-assembly.ts. Adding a field to VoiceDNA
+  // is a single-file change in voice-dna-render.ts; the compile fails here if
+  // someone forgets.
+  if (!isCalibrated && profile.voiceDNA) {
+    parts.push(`VOICE DNA:`);
+    parts.push(renderVoiceDNAForPrompt(profile.voiceDNA));
+  }
+
+  // Voice samples are safe to include at any status
+  if (profile.samples.length > 0) {
+    parts.push(`\nVOICE SAMPLES (write like these):`);
+    for (const sample of profile.samples.slice(0, sampleLimit)) {
+      parts.push(`  [${sample.contextTag || 'general'}] "${sample.content}"`);
+    }
+  }
+
+  // Only inject guardrails when not calibrated — Layer 2 handles it when calibrated.
+  // `summary` emphasis drops guardrails to keep the block compact.
+  if (emphasis === 'full' && !isCalibrated && profile.guardrails) {
+    parts.push(`\nGUARDRAILS:`);
+    if (profile.guardrails.forbiddenWords.length) parts.push(`  Never use: ${profile.guardrails.forbiddenWords.join(', ')}`);
+    if (profile.guardrails.requiredTerminology.length) parts.push(`  Required: ${profile.guardrails.requiredTerminology.map(t => `"${t.use}" not "${t.insteadOf}"`).join(', ')}`);
+    if (profile.guardrails.toneBoundaries.length) parts.push(`  Boundaries: ${profile.guardrails.toneBoundaries.join('. ')}`);
+  }
+
+  if (parts.length === 0) return '';
+  return `\n\nBRAND VOICE PROFILE (you MUST match this voice — do not deviate):\n${parts.join('\n')}`;
+}
+
+/**
+ * Build a brand identity block for AI prompts from approved brand identity deliverables.
+ * Only includes deliverables with status 'approved'. Returns '' if none exist.
+ */
+export function buildIdentityContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
+  // Graceful degradation if brand_identity_deliverables table doesn't exist (test envs).
+  const deliverables = safeBrandEngineRead('buildIdentityContext.listDeliverables', workspaceId, () => listDeliverables(workspaceId), [])
+    .filter(d => d.status === 'approved');
+  if (deliverables.length === 0) return '';
+
+  if (emphasis === 'minimal') {
+    const mission = deliverables.find(d => d.deliverableType === 'mission');
+    return mission ? `\n\nBRAND MISSION: ${mission.content.slice(0, 200)}` : '';
+  }
+
+  const selected = emphasis === 'summary'
+    ? deliverables.filter(d => ['mission', 'messaging_pillars', 'tagline'].includes(d.deliverableType))
+    : deliverables;
+
+  const parts: string[] = [];
+  for (const d of selected) {
+    parts.push(`  ${d.deliverableType.replace(/_/g, ' ').toUpperCase()}: ${d.content.slice(0, 500)}`);
+  }
+
+  if (parts.length === 0) return '';
+  return `\n\nBRAND IDENTITY (approved deliverables):\n${parts.join('\n')}`;
 }

@@ -8,7 +8,7 @@ type TrafficMap = Record<string, { clicks: number; impressions: number; sessions
 
 export function useAuditTrafficMap(siteId: string | undefined) {
   return useQuery<TrafficMap>({
-    queryKey: queryKeys.admin.auditTraffic(siteId),
+    queryKey: queryKeys.admin.auditTraffic(siteId ?? ''),
     queryFn: async () => {
       const m = await getOptional<TrafficMap>(`/api/audit-traffic/${siteId}`);
       return (m && typeof m === 'object') ? m : {};
@@ -23,7 +23,7 @@ type Suppression = { check: string; pageSlug: string; pagePattern?: string };
 
 export function useAuditSuppressions(workspaceId: string | undefined) {
   return useQuery<Suppression[]>({
-    queryKey: queryKeys.admin.auditSuppressions(workspaceId),
+    queryKey: queryKeys.admin.auditSuppressions(workspaceId ?? ''),
     queryFn: async () => {
       const s = await getSafe<Suppression[]>(`/api/workspaces/${workspaceId}/audit-suppressions`, []);
       return Array.isArray(s) ? s : [];
@@ -44,7 +44,7 @@ export interface AuditSchedule {
 
 export function useAuditSchedule(workspaceId: string | undefined) {
   return useQuery<AuditSchedule | null>({
-    queryKey: queryKeys.admin.auditSchedule(workspaceId),
+    queryKey: queryKeys.admin.auditSchedule(workspaceId ?? ''),
     queryFn: async () => {
       const s = await getOptional<AuditSchedule>(`/api/audit-schedules/${workspaceId}`);
       return s ?? null;

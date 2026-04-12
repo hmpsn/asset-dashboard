@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { Globe, Search, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, Info, Zap, FileText } from 'lucide-react';
-import { scoreColorClass, MetricRing, MetricRingSvg } from './ui';
+import { MetricRing, MetricRingSvg } from './ui';
 import { salesReport as salesReportApi } from '../api/misc';
 
 interface SalesIssue {

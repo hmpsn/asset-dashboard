@@ -76,7 +76,7 @@ router.post('/api/public/requests/:workspaceId/:requestId/notes', (req, res) => 
   if (!content) return res.status(400).json({ error: 'content required' });
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
-  const updated = addNote(req.params.requestId, 'client', content);
+  const updated = addNote(req.params.workspaceId, req.params.requestId, 'client', content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   broadcast('request:updated', updated);
   broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
@@ -90,7 +90,7 @@ router.post('/api/public/requests/:workspaceId/:requestId/attachments', upload.a
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const atts = processUploadedAttachments(files);
-  const updated = addAttachmentsToRequest(req.params.requestId, atts);
+  const updated = addAttachmentsToRequest(req.params.workspaceId, req.params.requestId, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
   broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });
@@ -105,7 +105,7 @@ router.post('/api/public/requests/:workspaceId/:requestId/notes-with-files', upl
   const r = getRequest(req.params.requestId);
   if (!r || r.workspaceId !== req.params.workspaceId) return res.status(404).json({ error: 'Not found' });
   const atts = files?.length ? processUploadedAttachments(files) : undefined;
-  const updated = addNote(req.params.requestId, 'client', content, atts);
+  const updated = addNote(req.params.workspaceId, req.params.requestId, 'client', content, atts);
   if (!updated) return res.status(404).json({ error: 'Not found' });
   broadcast('request:updated', updated);
   broadcastToWorkspace(req.params.workspaceId, 'request:update', { id: updated.id });

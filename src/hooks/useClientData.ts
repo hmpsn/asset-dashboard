@@ -130,10 +130,8 @@ export function useClientData(workspaceId: string) {
 
   // ── Compatibility: section error setters (mostly no-ops now) ────
   const setSectionErrors = useState<Record<string, string>>({})[1]; // placeholder for backward compat
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const setSectionError = useCallback((key: string, msg: string) => { /* errors now derived from React Query */ }, []);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const clearSectionError = useCallback((key: string) => { /* errors now derived from React Query */ }, []);
+  const setSectionError = useCallback((_key: string, _msg: string) => { /* errors now derived from React Query */ }, []);
+  const clearSectionError = useCallback((_key: string) => { /* errors now derived from React Query */ }, []);
 
   // ── loadDashboardData: enables React Query hooks + sets pricing ─
   const loadDashboardData = useCallback((data: WorkspaceInfo, setPricingData?: (p: PricingData | null) => void) => {
@@ -159,41 +157,35 @@ export function useClientData(workspaceId: string) {
   }, [queryClient]);
 
   // ── loadSearchData / loadGA4Data: now just change date params ───
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const loadSearchData = useCallback((wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
+  const loadSearchData = useCallback((_wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
     setDays(numDays);
     if (dateRange) setCustomDateRange(dateRange);
     // React Query auto-refetches when query key (days/dateRange) changes
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const loadGA4Data = useCallback((wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
+  const loadGA4Data = useCallback((_wsId: string, numDays: number, dateRange?: { startDate: string; endDate: string }) => {
     setDays(numDays);
     if (dateRange) setCustomDateRange(dateRange);
   }, []);
 
   // ── loadRequests / loadApprovals: invalidate queries ────────────
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const loadRequests = useCallback((wsId: string) => {
+  const loadRequests = useCallback((_wsId: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.client.requests(workspaceId) });
   }, [queryClient, workspaceId]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const loadApprovals = useCallback((wsId: string) => {
+  const loadApprovals = useCallback((_wsId: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
   }, [queryClient, workspaceId]);
 
   // ── changeDays / applyCustomRange ───────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const changeDays = useCallback((d: number, currentWs: WorkspaceInfo | null) => {
+  const changeDays = useCallback((d: number, _currentWs: WorkspaceInfo | null) => {
     setDays(d);
     setCustomDateRange(null);
     setShowDatePicker(false);
     // React Query auto-refetches — query keys include days + dateRange
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const applyCustomRange = useCallback((startDate: string, endDate: string, currentWs: WorkspaceInfo | null) => {
+  const applyCustomRange = useCallback((startDate: string, endDate: string, _currentWs: WorkspaceInfo | null) => {
     const dr = { startDate, endDate };
     const spanDays = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
     setCustomDateRange(dr);
@@ -202,9 +194,8 @@ export function useClientData(workspaceId: string) {
   }, []);
 
   // ── refetchClient: invalidate the appropriate query ─────────────
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const refetchClient = useCallback((key: string, url: string) => {
-    const keyFns: Record<string, unknown[]> = {
+  const refetchClient = useCallback((key: string, _url: string) => {
+    const keyFns: Record<string, readonly unknown[]> = {
       activity: queryKeys.client.activity(workspaceId),
       approvals: queryKeys.client.approvals(workspaceId),
       requests: queryKeys.client.requests(workspaceId),

@@ -9,11 +9,15 @@
     "dev:all": "concurrently -n server,ui -c blue,green \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "db:migrate": "tsx server/db/migrate-json.ts",
     "db:sync-staging": "tsx scripts/sync-staging-db.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "pr-check": "tsx scripts/pr-check.ts",
+    "pr-check:all": "tsx scripts/pr-check.ts --all",
+    "rules:generate": "tsx scripts/generate-rules-doc.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

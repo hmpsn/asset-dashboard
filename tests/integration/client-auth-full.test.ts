@@ -74,7 +74,7 @@ describe('createClientUser', () => {
     expect((user as Record<string, unknown>).passwordHash).toBeUndefined();
 
     // Cleanup
-    deleteClientUser(user.id);
+    deleteClientUser(user.id, seeded.workspaceId);
   });
 
   it('creates a client_owner role user', async () => {
@@ -88,7 +88,7 @@ describe('createClientUser', () => {
     );
 
     expect(user.role).toBe('client_owner');
-    deleteClientUser(user.id);
+    deleteClientUser(user.id, seeded.workspaceId);
   });
 
   it('rejects duplicate email within the same workspace', async () => {
@@ -101,7 +101,7 @@ describe('createClientUser', () => {
       createClientUser(email, 'Pass5678!', 'Second', seeded.workspaceId),
     ).rejects.toThrow('already exists');
 
-    deleteClientUser(first.id);
+    deleteClientUser(first.id, seeded.workspaceId);
   });
 
   it('allows the same email in a different workspace', async () => {
@@ -120,8 +120,8 @@ describe('createClientUser', () => {
 
     expect(userA.id).not.toBe(userB.id);
 
-    deleteClientUser(userA.id);
-    deleteClientUser(userB.id);
+    deleteClientUser(userA.id, seeded.workspaceId);
+    deleteClientUser(userB.id, wsB);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(wsB);
   });
 
@@ -135,7 +135,7 @@ describe('createClientUser', () => {
     );
 
     expect(user.email).toBe(`upper-${suffix}@test.local`);
-    deleteClientUser(user.id);
+    deleteClientUser(user.id, seeded.workspaceId);
   });
 });
 
@@ -156,7 +156,7 @@ describe('verifyClientPassword', () => {
     // verifyClientPassword returns a ClientUser (with passwordHash), not SafeClientUser
     expect(result!.passwordHash).toBeDefined();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('returns null on wrong password', async () => {
@@ -168,7 +168,7 @@ describe('verifyClientPassword', () => {
     const result = await verifyClientPassword(email, seeded.workspaceId, 'WrongPassword1!');
     expect(result).toBeNull();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('returns null for a non-existent email', async () => {
@@ -196,7 +196,7 @@ describe('verifyClientPassword', () => {
     const result = await verifyClientPassword(email, seeded.workspaceId, 'IsoPass1!');
     expect(result).toBeNull();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, wsB);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(wsB);
   });
 });
@@ -287,7 +287,7 @@ describe('signClientToken / verifyClientToken', () => {
     expect(payload).not.toBeNull();
     expect(payload.role).toBe('client_owner');
 
-    deleteClientUser(ownerUser.id);
+    deleteClientUser(ownerUser.id, seeded.workspaceId);
   });
 
   it('signClientToken encodes role correctly for client_member', async () => {
@@ -306,7 +306,7 @@ describe('signClientToken / verifyClientToken', () => {
     expect(payload).not.toBeNull();
     expect(payload.role).toBe('client_member');
 
-    deleteClientUser(memberUser.id);
+    deleteClientUser(memberUser.id, seeded.workspaceId);
   });
 });
 
@@ -321,7 +321,7 @@ describe('changeClientPassword', () => {
 
     const created = await createClientUser(email, oldPassword, 'Change PW', seeded.workspaceId);
 
-    const changed = await changeClientPassword(created.id, newPassword);
+    const changed = await changeClientPassword(created.id, seeded.workspaceId, newPassword);
     expect(changed).toBe(true);
 
     // Old password must now be rejected
@@ -332,11 +332,11 @@ describe('changeClientPassword', () => {
     const withNew = await verifyClientPassword(email, seeded.workspaceId, newPassword);
     expect(withNew).not.toBeNull();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('returns false for a non-existent user id', async () => {
-    const result = await changeClientPassword('cu_nonexistent_999', 'NewPassword1!');
+    const result = await changeClientPassword('cu_nonexistent_999', seeded.workspaceId, 'NewPassword1!');
     expect(result).toBe(false);
   });
 });
@@ -367,7 +367,7 @@ describe('recordClientLogin', () => {
     expect(stampMs).toBeGreaterThanOrEqual(beforeTime - 1000); // 1s tolerance
     expect(stampMs).toBeLessThanOrEqual(afterTime + 1000);
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('is a no-op for a non-existent user id (does not throw)', () => {
@@ -394,7 +394,7 @@ describe('getClientUserById / getClientUserByEmail', () => {
     expect(found!.passwordHash).toBeDefined();
     expect(found!.passwordHash.length).toBeGreaterThan(0);
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('getClientUserById returns null for a non-existent id', () => {
@@ -415,7 +415,7 @@ describe('getClientUserById / getClientUserByEmail', () => {
     expect(foundLower!.id).toBe(created.id);
     expect(foundUpper!.id).toBe(created.id);
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('getClientUserByEmail returns null for a different workspace', async () => {
@@ -427,7 +427,7 @@ describe('getClientUserById / getClientUserByEmail', () => {
     const result = getClientUserByEmail(email, 'completely-different-workspace-id');
     expect(result).toBeNull();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 });
 
@@ -456,11 +456,11 @@ describe('listClientUsers', () => {
     expect(ids).toContain(b.id);
 
     // SafeClientUser — no passwordHash
-    expect(users.every(u => (u as Record<string, unknown>).passwordHash === undefined)).toBe(true);
+    expect(users.length > 0 && users.every(u => (u as Record<string, unknown>).passwordHash === undefined)).toBe(true);
 
     // Cleanup
-    deleteClientUser(a.id);
-    deleteClientUser(b.id);
+    deleteClientUser(a.id, wsId);
+    deleteClientUser(b.id, wsId);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(wsId);
   });
 
@@ -483,17 +483,14 @@ describe('listClientUsers', () => {
     const usersA = listClientUsers(wsA);
     const usersB = listClientUsers(wsB);
 
-    expect(usersA.length).toBeGreaterThan(0);
-    expect(usersB.length).toBeGreaterThan(0);
-
-    expect(usersA.every(u => u.workspaceId === wsA)).toBe(true);
-    expect(usersB.every(u => u.workspaceId === wsB)).toBe(true);
+    expect(usersA.length > 0 && usersA.every(u => u.workspaceId === wsA)).toBe(true);
+    expect(usersB.length > 0 && usersB.every(u => u.workspaceId === wsB)).toBe(true);
 
     expect(usersA.find(u => u.id === userB.id)).toBeUndefined();
     expect(usersB.find(u => u.id === userA.id)).toBeUndefined();
 
-    deleteClientUser(userA.id);
-    deleteClientUser(userB.id);
+    deleteClientUser(userA.id, wsA);
+    deleteClientUser(userB.id, wsB);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(wsA);
     db.prepare('DELETE FROM workspaces WHERE id = ?').run(wsB);
   });
@@ -517,7 +514,7 @@ describe('deleteClientUser', () => {
       seeded.workspaceId,
     );
 
-    const result = deleteClientUser(created.id);
+    const result = deleteClientUser(created.id, seeded.workspaceId);
     expect(result).toBe(true);
 
     const lookup = getClientUserById(created.id);
@@ -525,7 +522,39 @@ describe('deleteClientUser', () => {
   });
 
   it('returns false for a non-existent user id', () => {
-    expect(deleteClientUser('cu_already_gone_999')).toBe(false);
+    expect(deleteClientUser('cu_already_gone_999', seeded.workspaceId)).toBe(false);
+  });
+
+  it('returns false when caller specifies a different workspace (cross-workspace authz)', async () => {
+    // Regression test for PR #168 staging-hardening flag. An admin
+    // authenticated for workspace B must not be able to delete a user
+    // belonging to workspace A by knowing the user id.
+    const suffix = randomUUID().slice(0, 6);
+    const wsB = `test-ws-cross-${suffix}`;
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO workspaces (id, name, folder, tier, created_at) VALUES (?, ?, ?, 'free', ?)`,
+    ).run(wsB, `Cross-WS ${suffix}`, `cross-${suffix}`, now);
+
+    const created = await createClientUser(
+      `cross-del-${suffix}@test.local`,
+      'CrossDel1!',
+      'Cross Del',
+      seeded.workspaceId,
+    );
+
+    // Attempt to delete as if we were authenticated for wsB — must fail
+    const result = deleteClientUser(created.id, wsB);
+    expect(result).toBe(false);
+
+    // User still exists in its real workspace
+    const stillThere = getClientUserById(created.id);
+    expect(stillThere).not.toBeNull();
+    expect(stillThere!.workspaceId).toBe(seeded.workspaceId);
+
+    // Cleanup
+    deleteClientUser(created.id, seeded.workspaceId);
+    db.prepare('DELETE FROM workspaces WHERE id = ?').run(wsB);
   });
 });
 
@@ -545,7 +574,7 @@ describe('createResetToken / resetPasswordWithToken', () => {
     expect(result!.user.id).toBe(created.id);
     expect((result!.user as Record<string, unknown>).passwordHash).toBeUndefined();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('createResetToken returns null for a non-existent email', () => {
@@ -576,7 +605,7 @@ describe('createResetToken / resetPasswordWithToken', () => {
     const withNew = await verifyClientPassword(email, seeded.workspaceId, newPassword);
     expect(withNew).not.toBeNull();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('resetPasswordWithToken fails for an invalid token', async () => {
@@ -598,7 +627,7 @@ describe('createResetToken / resetPasswordWithToken', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('8 characters');
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('resetPasswordWithToken rejects the token after a successful reset (single-use)', async () => {
@@ -617,7 +646,7 @@ describe('createResetToken / resetPasswordWithToken', () => {
     const second = await resetPasswordWithToken(tokenResult!.token, 'AnotherNew1!');
     expect(second.success).toBe(false);
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 
   it('resetPasswordWithToken rejects an expired token', async () => {
@@ -641,6 +670,6 @@ describe('createResetToken / resetPasswordWithToken', () => {
     const stillValid = await verifyClientPassword(email, seeded.workspaceId, 'ExpiredTok1!');
     expect(stillValid).not.toBeNull();
 
-    deleteClientUser(created.id);
+    deleteClientUser(created.id, seeded.workspaceId);
   });
 });

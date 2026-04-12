@@ -6,6 +6,7 @@ import { fireBridge, withWorkspaceLock } from './bridge-infrastructure.js';
 import { listWorkspaces } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { STUDIO_NAME, STUDIO_URL } from './constants.js';
+import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';
@@ -159,10 +160,14 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
     const ws = listWorkspaces().find(w => w.webflowSiteId === siteId);
     if (ws) {
       // Bridge #12 — per-page health insights
+      // Returns { modified } so executeBridge() auto-broadcasts
+      // INSIGHT_BRIDGE_UPDATED via the bridge-infrastructure auto-dispatch
+      // path. Inline broadcastToWorkspace() removed to prevent double-fire.
       if (isFeatureEnabled('bridge-audit-page-health')) {
         fireBridge('bridge-audit-page-health', ws.id, async () => {
+          let modified = 0;
           await withWorkspaceLock(ws.id, async () => {
-            const { upsertInsight } = await import('./analytics-insights-store.js');
+            const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             for (const page of audit.pages.slice(0, 50)) {
               const issues = page.issues ?? [];
               const errorCount = issues.filter(i => i.severity === 'error').length;
@@ -175,30 +180,43 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
                 pageId: page.url,
                 insightType: 'page_health',
                 data: {
+                  score,
+                  trend: 'stable',
+                  clicks: 0,
+                  impressions: 0,
+                  position: 0,
+                  ctr: 0,
+                  pageviews: 0,
+                  bounceRate: 0,
+                  avgEngagementTime: 0,
+                  // Audit-derived enrichment (not part of the canonical PageHealthData shape)
                   auditSnapshotId: id,
                   errorCount,
                   warningCount,
                   topIssues: issues.slice(0, 5).map(i => i.message),
-                },
+                } as never,
                 severity,
                 impactScore: 100 - score,
                 domain: 'cross',
                 pageTitle: page.page ?? undefined,
                 resolutionSource: 'bridge_12_audit_page_health',
+                bridgeSource: 'bridge-audit-page-health',
               });
+              modified++;
             }
           });
-          const { WS_EVENTS } = await import('./ws-events.js');
-          const { broadcastToWorkspace } = await import('./broadcast.js');
-          broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-page-health' });
+          return { modified };
         });
       }
 
       // Bridge #15 — site-level health insight
+      // Returns { modified: 1 } so executeBridge() auto-broadcasts
+      // INSIGHT_BRIDGE_UPDATED. Inline broadcastToWorkspace() removed to
+      // prevent double-fire (same pattern as Bridge #12 above).
       if (isFeatureEnabled('bridge-audit-site-health')) {
         fireBridge('bridge-audit-site-health', ws.id, async () => {
           await withWorkspaceLock(ws.id, async () => {
-            const { upsertInsight } = await import('./analytics-insights-store.js');
+            const { upsertInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             const delta = previousScore != null ? audit.siteScore - previousScore : null;
             const severity =
               audit.siteScore < 50 ? 'critical' :
@@ -223,11 +241,10 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
               impactScore: Math.max(0, 100 - audit.siteScore),
               domain: 'cross',
               resolutionSource: 'bridge_15_audit_site_health',
+              bridgeSource: 'bridge-audit-site-health',
             });
           });
-          const { WS_EVENTS } = await import('./ws-events.js');
-          const { broadcastToWorkspace } = await import('./broadcast.js');
-          broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'bridge-audit-site-health' });
+          return { modified: 1 };
         });
       }
     }

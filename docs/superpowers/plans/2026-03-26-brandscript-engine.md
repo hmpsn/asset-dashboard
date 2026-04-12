@@ -4,7 +4,7 @@
 
 **Goal:** Add a structured brandscript system, discovery ingestion from transcripts/docs/website crawl, voice calibration with conversational steering, and brand identity deliverable generation to the existing Brand Hub.
 
-**Architecture:** Four new server-side modules (`brandscript.ts`, `discovery-ingestion.ts`, `voice-calibration.ts`, `brand-identity.ts`) with corresponding route files, a single new migration (`049-brandscript-engine.sql`), frontend API layer (`src/api/brand-engine.ts`), and four new Brand Hub sub-tab components. The existing `seo-context.ts` gets extended with three new builder functions. All AI calls go through the existing `callAnthropic` / `callOpenAI` helpers.
+**Architecture:** Four new server-side modules (`brandscript.ts`, `discovery-ingestion.ts`, `voice-calibration.ts`, `brand-identity.ts`) with corresponding route files, a single new migration (`053-brandscript-engine.sql`), frontend API layer (`src/api/brand-engine.ts`), and four new Brand Hub sub-tab components. The existing `seo-context.ts` gets extended with three new builder functions. All AI calls go through the existing `callAnthropic` / `callOpenAI` helpers.
 
 > **⚠️ AMENDMENTS:** A pattern alignment audit (2026-03-28) identified 9 corrections to the inline code blocks below. See the **Amendments** section at the bottom of this file. Implementers MUST apply those corrections — the inline code is the original draft, amendments override it.
 
@@ -24,7 +24,7 @@
 
 ```
 Batch A — Foundation (sequential):
-  Task 1 (Migration 049)
+  Task 1 (Migration 053)
   Task 2 (Shared Types)
 
 Batch B — Server Services (parallel, after Batch A commits):
@@ -63,7 +63,7 @@ Batch F — Shared Frontend (sequential, after Batch E review):
 
 | File | Responsibility |
 |------|---------------|
-| `server/db/migrations/049-brandscript-engine.sql` | All new tables: brandscripts, brandscript_sections, brandscript_templates, discovery_sources, discovery_extractions, voice_profiles, voice_samples, voice_calibration_sessions, brand_identity_deliverables, brand_identity_versions |
+| `server/db/migrations/053-brandscript-engine.sql` | All new tables: brandscripts, brandscript_sections, brandscript_templates, discovery_sources, discovery_extractions, voice_profiles, voice_samples, voice_calibration_sessions, brand_identity_deliverables, brand_identity_versions |
 | `server/brandscript.ts` | Brandscript CRUD, import parsing, AI-assisted completion, template management |
 | `server/discovery-ingestion.ts` | Source upload processing, AI extraction, review workflow, confidence scoring |
 | `server/voice-calibration.ts` | Voice profile CRUD, calibration loop (generate/rate/steer), voice sample management |
@@ -115,12 +115,12 @@ Batch F — Shared Frontend (sequential, after Batch E review):
 ## Task 1: Database Migration
 
 **Files:**
-- Create: `server/db/migrations/049-brandscript-engine.sql`
+- Create: `server/db/migrations/053-brandscript-engine.sql`
 
 - [ ] **Step 1: Write the migration file**
 
 ```sql
--- 049-brandscript-engine.sql
+-- 053-brandscript-engine.sql
 -- Brandscript Engine + Voice Calibration tables
 
 -- ═══ BRANDSCRIPT BUILDER ═══
@@ -272,8 +272,8 @@ Expected: No errors, tables created. Check with: `sqlite3 data/app.db ".tables"`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add server/db/migrations/049-brandscript-engine.sql
-git commit -m "feat(db): add brandscript engine tables — migration 049"
+git add server/db/migrations/053-brandscript-engine.sql
+git commit -m "feat(db): add brandscript engine tables — migration 053"
 ```
 
 ---
@@ -625,10 +625,25 @@ describe('voice calibration store', () => {
   });
 
   it('adds a voice sample and retrieves with profile', () => {
-    const profile = getOrCreateVoiceProfile(wsId);
-    addVoiceSample(profile.id, 'This is our voice.', 'headline', 'manual');
+    getOrCreateVoiceProfile(wsId);
+    // addVoiceSample takes workspaceId (not profile.id) — the service resolves the profile internally
+    addVoiceSample(wsId, 'This is our voice.', 'headline', 'manual');
+    // VoiceProfile type does not include a `samples` field — samples live in a separate table.
+    // getVoiceProfile() must JOIN and include samples in its return, OR use a separate
+    // getVoiceSamples(wsId) function. The implementer of Task 5 (voice-calibration.ts)
+    // must choose one approach and align the type definition accordingly.
+    //
+    // Option A — getVoiceProfile includes samples (add `samples: VoiceSample[]` to VoiceProfile):
     const fetched = getVoiceProfile(wsId);
-    expect(fetched!.samples?.length).toBeGreaterThan(0);
+    expect(fetched!.samples).toBeDefined();
+    expect(fetched!.samples!.length).toBeGreaterThan(0);
+    //
+    // Option B — separate query (if getVoiceProfile does not join samples):
+    // import { getVoiceSamples } from '../voice-calibration.js';
+    // const samples = getVoiceSamples(wsId);
+    // expect(samples.length).toBeGreaterThan(0);
+    //
+    // Implementer must pick one approach and delete the other before committing.
   });
 });
 ```
@@ -897,15 +912,22 @@ ${emptySections.map(sec => `- "${sec.title}" (purpose: ${sec.purpose || 'not spe
 Return valid JSON: { "sections": [{ "title": "exact title from above", "content": "your draft content" }] }
 Write in a natural, compelling voice that matches the tone of the existing sections. Be specific to this business, not generic.`;
 
-  const aiCall = isAnthropicConfigured() ? callAnthropic : callOpenAI;
-  const result = await aiCall({
-    model: isAnthropicConfigured() ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+  // Amendment 12: temperature 0.6 for brandscript AI-assist (not 0.7)
+  // Amendment 13: use buildSystemPrompt() for Anthropic calls
+  // Amendment 10: callAnthropic takes a single options object
+  const useAnthropic = isAnthropicConfigured();
+  const system = useAnthropic
+    ? buildSystemPrompt(workspaceId, 'You are a brand strategist completing a brandscript. Write in a natural, compelling voice. Be specific to this business.')
+    : undefined;
+  const result = await (useAnthropic ? callAnthropic : callOpenAI)({
+    model: useAnthropic ? 'claude-sonnet-4-20250514' : 'gpt-4.1',
+    ...(system ? { system } : {}),
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
-    temperature: 0.7,
+    temperature: 0.6,   // Amendment 12: 0.6 for AI-assist (creative but controlled)
     feature: 'brandscript-complete',
     workspaceId,
-  });
+  } as Parameters<typeof callAnthropic>[0]);
 
   const cleaned = (result.text || '{}').replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
   const parsed = JSON.parse(cleaned) as { sections: { title: string; content: string }[] };
@@ -922,6 +944,8 @@ Write in a natural, compelling voice that matches the tone of the existing secti
 ```
 
 - [ ] **Step 2: Write the routes file**
+
+> **Amendment 5:** All route params below use `:wsId` — replace every `:wsId` with `:workspaceId` and every `requireWorkspaceAccess('wsId')` with `requireWorkspaceAccess('workspaceId')` per codebase convention. The inline code reflects the original draft; the amendment overrides it.
 
 ```typescript
 // server/routes/brandscript.ts
@@ -1004,9 +1028,11 @@ router.post('/api/brandscripts/:wsId/:id/complete', requireWorkspaceAccess('wsId
 export default router;
 ```
 
-- [ ] **Step 3: Register routes in app.ts**
+- [ ] **Step 3: SKIP — app.ts registration is handled by Task 8 (see Amendment 4)**
 
-Add to the imports section of `server/app.ts`:
+> **Amendment 4:** `server/app.ts` is exclusively owned by Task 8. Tasks 3–6 must NOT modify it. The code below is retained for reference only — Task 8 will add all four route registrations in one commit. Do not run these commands here.
+
+Add to the imports section of `server/app.ts` *(handled in Task 8)*:
 ```typescript
 import brandscriptRoutes from './routes/brandscript.js';
 ```
@@ -1667,6 +1693,8 @@ Return valid JSON: { "refined": "the refined text" }`;
 
 - [ ] **Step 2: Write the routes file**
 
+> **Amendment 5:** All route params below use `:wsId` — replace every `:wsId` with `:workspaceId` and every `requireWorkspaceAccess('wsId')` with `requireWorkspaceAccess('workspaceId')` per codebase convention.
+
 ```typescript
 // server/routes/voice-calibration.ts
 import { Router } from 'express';
@@ -1765,7 +1793,7 @@ git commit -m "feat: add voice calibration service — profile, samples, calibra
 Add these tests to `server/__tests__/prompt-assembly.test.ts`:
 
 ```typescript
-// Add after existing tests — requires voice_profiles table (migration 049)
+// Add after existing tests — requires voice_profiles table (migration 053)
 
 describe('buildSystemPrompt — Layer 2 (voice DNA)', () => {
   const wsId = `test-voice-prompt-${Date.now()}`;
@@ -2530,30 +2558,41 @@ All `callAnthropic()` and `callOpenAI()` calls in this feature must specify expl
 | Task 6 | Brand identity deliverables | Claude | 0.7 | Creative but structured |
 | Task 6 | Deliverable refinement | Claude | 0.6 | Smaller variance — steering adjustments only |
 
-Pattern for callAnthropic:
+Pattern for callAnthropic (single options object — see Amendment 10 for full signature note):
 ```typescript
-const result = await callAnthropic(messages, {
-  system: systemPrompt,
+const result = await callAnthropic({
+  messages: [{ role: 'user', content: userPrompt }],
+  system: systemPrompt,   // ← separate field, not concatenated into messages
   maxTokens: 1500,
-  temperature: 0.85,  // ← always explicit
+  temperature: 0.85,      // ← always explicit
+  feature: 'feature-name',
+  workspaceId,
 });
 ```
 
-Pattern for callOpenAI (structured extraction):
+Pattern for callOpenAI (structured extraction — note: no `system` field in `OpenAIChatOptions`):
 ```typescript
-const result = await callOpenAI(messages, {
-  system: systemPrompt,
+// callOpenAI does not support a system parameter.
+// For Task 4 (discovery extraction with GPT-4.1-mini), embed the extraction
+// instructions as the first user message. buildSystemPrompt() is NOT called
+// for callOpenAI — it applies only to callAnthropic calls in Tasks 3, 5, 6.
+const result = await callOpenAI({
+  messages: [{ role: 'user', content: `${extractionInstructions}\n\n${rawContent}` }],
   maxTokens: 1000,
-  temperature: 0.2,
-  response_format: { type: 'json_object' },
+  temperature: 0.2,       // ← always explicit
+  responseFormat: { type: 'json_object' },  // ← camelCase, not snake_case
+  feature: 'discovery-extraction',
+  workspaceId,
 });
 ```
 
-### Amendment 13: Use buildSystemPrompt() for all AI calls
+### Amendment 13: Use buildSystemPrompt() for Anthropic AI calls in Tasks 3, 5, 6
 
-Every AI call across Tasks 3, 5, and 6 must use `buildSystemPrompt(workspaceId, baseInstructions)` from `server/prompt-assembly.ts` instead of building system prompts inline.
+Every `callAnthropic()` call across Tasks 3, 5, and 6 must use `buildSystemPrompt(workspaceId, baseInstructions)` from `server/prompt-assembly.ts` instead of building system prompts inline.
 
-**Import to add** to each service file (`brandscript.ts`, `voice-calibration.ts`, `brand-identity.ts`):
+**Scope:** This applies to `callAnthropic` only. `callOpenAI` (used in Task 4 for discovery extraction) does NOT support a `system` parameter — `buildSystemPrompt()` is not applicable there. See Amendment 12 for the `callOpenAI` pattern.
+
+**Import to add** to each Anthropic-calling service file (`brandscript.ts`, `voice-calibration.ts`, `brand-identity.ts`):
 ```typescript
 import { buildSystemPrompt } from './prompt-assembly.js';
 ```
@@ -2564,7 +2603,8 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 const systemPrompt = `Write for a client audience. This brand is ${brandName}.`;
 
 // ✅ Correct — layered assembly
-const systemPrompt = buildSystemPrompt(workspaceId, `Write for a client audience. This brand is ${brandName}.`);
+const system = buildSystemPrompt(workspaceId, `Write for a client audience. This brand is ${brandName}.`);
+// Then pass `system` to callAnthropic({ system, messages, ... })
 ```
 
 This activates voice DNA framing (Layer 2) automatically once the voice profile is calibrated — zero code changes needed at that point.
@@ -2572,23 +2612,35 @@ This activates voice DNA framing (Layer 2) automatically once the voice profile 
 **Note:** `buildSystemPrompt()` is synchronous. If it needs to become async in the future (e.g., external voice model), that's a breaking change — keep it sync for Phase 1.
 
 ### Amendment 10: callAnthropic system parameter
-**All calls to `callAnthropic()` that pass a system prompt must use the separate `system` parameter in `AnthropicChatOptions`, not concatenate it into the first user message.**
+**All calls to `callAnthropic()` that pass a system prompt must use the separate `system` field inside the single `AnthropicChatOptions` object, not concatenate it into the first user message.**
 
-Pattern used throughout this plan that MUST be applied at implementation:
+`callAnthropic` takes a **single options object** — NOT `(messages, options)`. This is confirmed in `server/anthropic-helpers.ts`:
+
 ```typescript
-// ✅ CORRECT
+// ✅ CORRECT — single options object with system field
+const result = await callAnthropic({
+  messages: [{ role: 'user', content: userContent }],
+  system: systemPromptString,
+  maxTokens: 2000,
+  temperature: 0.7,
+  feature: 'feature-name',
+  workspaceId,
+});
+
+// ❌ WRONG — two arguments (does not match actual signature)
 const result = await callAnthropic(messages, {
   system: systemPromptString,
   maxTokens: 2000,
 });
 
 // ❌ WRONG — do not prefix system prompt into user messages array
-const result = await callAnthropic([
-  { role: 'user', content: `${systemPrompt}\n\n${userContent}` }
-]);
+const result = await callAnthropic({
+  messages: [{ role: 'user', content: `${systemPrompt}\n\n${userContent}` }],
+  feature: 'feature-name',
+});
 ```
 
-Check `server/anthropic-helpers.ts` to confirm the `AnthropicChatOptions` interface — look for `system?: string` field.
+The actual interface is `callAnthropic(opts: AnthropicChatOptions): Promise<AnthropicChatResult>`. The `system` field is optional on the options object.
 
 ### Amendment 11: multer upload import path
 Verify `import { upload } from '../middleware.js'` is correct before using. Check whether multer is exported from `server/middleware.ts` or a dedicated file. If it lives in `server/middleware/upload.ts`, the import must be `import { upload } from './middleware/upload.js'`.
@@ -2599,17 +2651,18 @@ grep -rn "multer\|upload" server/middleware* 2>/dev/null || grep -rn "multer" se
 ```
 Use the actual path found.
 
-### Amendment 1: Migration Number — 026 → 049
+### Amendment 1: Migration Number — 026 → 049 → 053
 
-Migration 026 already exists (`026-missing-indexes.sql`). The current highest migration is 047 (Meeting Brief will use 048).
+Migration 026 already exists (`026-missing-indexes.sql`). When first amended (2026-03-28), the target was 049 based on the highest-then being 047. As of 2026-04-09, migrations 041–052 have all shipped — the current highest is `052-workspace-competitor-fetch.sql`.
 
-**Change:** All references to `026-brandscript-engine.sql` become `049-brandscript-engine.sql`.
+**Change:** All references to `026-brandscript-engine.sql` or `049-brandscript-engine.sql` must use `053-brandscript-engine.sql`.
 
 Affected locations:
-- Task 1: filename, step descriptions, commit message
-- Guardrails doc: file ownership map, task dependency graph, model assignments
+- Task 1: filename, step descriptions, commit message (already updated in this document)
+- Guardrails doc: file ownership map, task dependency graph, model assignments (already updated)
+- `server/prompt-assembly.ts` line 52: comment references "migration 049" — implementer must update to "migration 053"
 
-Downstream impact: Phase 2 migration becomes **050**, Phase 3 becomes **051**.
+Downstream impact: Phase 2 migration becomes **054**, Phase 3 becomes **055**.
 
 ### Amendment 2: ID Generation — `genId()` → `randomUUID()` Convention
 
@@ -2750,7 +2803,7 @@ The plan's Task 9 (now Task 9/10 depending on renumbering) introduces sub-tab na
 
 | # | What | Where in plan | Impact |
 |---|------|--------------|--------|
-| 1 | Migration 026 → 049 | Task 1, guardrails | All references |
+| 1 | Migration 026 → 049 → 053 (phases: 054, 055) | Task 1, guardrails | All references updated |
 | 2 | `genId()` → `randomUUID()` | Tasks 3-6 | All ID generation |
 | 3 | Manual stmt cache → `createStmtCache()` | Tasks 3-6 | All DB access |
 | 4 | app.ts registration → Task 8 only | Tasks 3-6 steps removed, Task 8 expanded | File ownership |

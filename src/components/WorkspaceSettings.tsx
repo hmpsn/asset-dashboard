@@ -13,6 +13,7 @@ import { themeColor } from './ui/constants';
 interface GscSite { siteUrl: string; permissionLevel: string; }
 interface GA4Property { name: string; displayName: string; propertyId: string; }
 interface WorkspaceData {
+  [key: string]: unknown;
   id: string; name: string;
   webflowSiteId?: string; webflowSiteName?: string;
   gscPropertyUrl?: string; ga4PropertyId?: string;

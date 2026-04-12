@@ -10,7 +10,10 @@ interface PageMeta {
   id: string;
   title: string;
   slug: string;
-  seo?: { title?: string; description?: string };
+  publishedPath?: string | null;
+  seo?: { title?: string | null; description?: string | null };
+  source?: 'static' | 'cms';
+  collectionId?: string;
 }
 
 export interface BulkOperationsProps {

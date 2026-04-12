@@ -41,19 +41,19 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM pending_schemas WHERE workspace_id = ? ORDER BY created_at DESC`,
   ),
   selectByCellId: db.prepare(
-    `SELECT * FROM pending_schemas WHERE cell_id = ? AND status = 'pending' LIMIT 1`,
+    `SELECT * FROM pending_schemas WHERE cell_id = ? AND workspace_id = ? AND status = 'pending' LIMIT 1`,
   ),
   updateStatus: db.prepare(
-    `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id`, // status-ok: simple pending→applied/stale lifecycle, validateTransition planned in Batch 2
+    `UPDATE pending_schemas SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: simple pending→applied/stale lifecycle, validateTransition planned in Batch 2
   ),
   markStaleByCellId: db.prepare(
-    `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND status = 'pending'`,
+    `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND workspace_id = @workspace_id AND status = 'pending'`,
   ),
 }));
 
 // ── Template loader (lazy import to avoid circular deps) ──
 
-let _getTemplate: ((workspaceId: string, templateId: string) => ContentTemplate | undefined) | null = null;
+let _getTemplate: ((workspaceId: string, templateId: string) => ContentTemplate | null) | null = null;
 async function loadGetTemplate(): Promise<typeof _getTemplate> {
   if (!_getTemplate) {
     const mod = await import('./content-templates.js'); // dynamic-import-ok: breaks circular dep with content-matrices
@@ -208,6 +208,7 @@ export async function queueSchemaPreGeneration(
     // Mark any existing pending schemas for this cell as stale before inserting new one
     stmts().markStaleByCellId.run({
       cell_id: cellId,
+      workspace_id: workspaceId,
       updated_at: now,
     });
 
@@ -258,25 +259,27 @@ export function listPendingSchemas(workspaceId: string): {
 /**
  * Mark a pending schema as applied (called when schema is published to a page).
  */
-export function markSchemaApplied(cellId: string): void {
-  const row = stmts().selectByCellId.get(cellId) as PendingSchemaRow | undefined;
+export function markSchemaApplied(workspaceId: string, cellId: string): void {
+  const row = stmts().selectByCellId.get(cellId, workspaceId) as PendingSchemaRow | undefined;
   if (row) {
     stmts().updateStatus.run({
       id: row.id,
+      workspace_id: workspaceId,
       status: 'applied',
       updated_at: new Date().toISOString(),
     });
-    log.info({ id: row.id, cellId }, 'Marked pending schema as applied');
+    log.info({ id: row.id, cellId, workspaceId }, 'Marked pending schema as applied');
   }
 }
 
 /**
  * Mark pending schemas for a cell as stale (called when keyword/URL changes).
  */
-export function markSchemaStale(cellId: string): void {
+export function markSchemaStale(workspaceId: string, cellId: string): void {
   stmts().markStaleByCellId.run({
     cell_id: cellId,
+    workspace_id: workspaceId,
     updated_at: new Date().toISOString(),
   });
-  log.info({ cellId }, 'Marked pending schemas as stale for cell');
+  log.info({ cellId, workspaceId }, 'Marked pending schemas as stale for cell');
 }

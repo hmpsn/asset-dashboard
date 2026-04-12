@@ -66,7 +66,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM feedback WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id`, // status-ok: simple lifecycle, validateTransition planned in Batch 2
+    `UPDATE feedback SET status = @status, replies = @replies, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`, // status-ok: simple lifecycle, validateTransition planned in Batch 2
   ),
   deleteById: db.prepare(
     `DELETE FROM feedback WHERE id = ? AND workspace_id = ?`,
@@ -157,6 +157,7 @@ export function updateFeedbackStatus(workspaceId: string, id: string, status: Fe
   item.updatedAt = new Date().toISOString();
   stmts().update.run({
     id: item.id,
+    workspace_id: workspaceId,
     status: item.status,
     replies: JSON.stringify(item.replies),
     updated_at: item.updatedAt,
@@ -178,6 +179,7 @@ export function addFeedbackReply(workspaceId: string, id: string, author: 'team'
   item.updatedAt = new Date().toISOString();
   stmts().update.run({
     id: item.id,
+    workspace_id: workspaceId,
     status: item.status,
     replies: JSON.stringify(item.replies),
     updated_at: item.updatedAt,

@@ -46,7 +46,7 @@ interface Props {
   webflowSiteId?: string;
   publishTarget?: PublishTarget | null;
   onSave: (target: PublishTarget) => Promise<void>;
-  toast: (msg: string, type?: 'success' | 'error') => void;
+  toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const FIELD_MAP_KEYS: { key: keyof FieldMap; label: string; required: boolean; hint: string }[] = [
@@ -62,7 +62,7 @@ const FIELD_MAP_KEYS: { key: keyof FieldMap; label: string; required: boolean; h
   { key: 'category', label: 'Category', required: false, hint: 'Category or tag' },
 ];
 
-export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onSave, toast }: Props) {
+export function PublishSettings({ workspaceId: _workspaceId, webflowSiteId, publishTarget, onSave, toast }: Props) {
   const [collections, setCollections] = useState<CollectionInfo[]>([]);
   const [fields, setFields] = useState<CollectionField[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string>(publishTarget?.collectionId || '');
@@ -112,7 +112,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
         const suggested: FieldMap = { title: '', slug: '', body: '' };
         for (const [key, val] of Object.entries(result.mapping)) {
           if (val && (key in suggested || FIELD_MAP_KEYS.some(f => f.key === key))) {
-            (suggested as Record<string, string>)[key] = val;
+            (suggested as unknown as Record<string, string>)[key] = val;
           }
         }
         setFieldMap(suggested);
@@ -234,7 +234,7 @@ export function PublishSettings({ workspaceId, webflowSiteId, publishTarget, onS
                 </div>
                 <div className="relative flex-1">
                   <select
-                    value={(fieldMap as Record<string, string | undefined>)[key] || ''}
+                    value={(fieldMap as unknown as Record<string, string | undefined>)[key] || ''}
                     onChange={e => updateField(key, e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
                   >

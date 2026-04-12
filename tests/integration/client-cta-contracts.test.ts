@@ -173,7 +173,7 @@ describe('Rate limiting contract — CTA must handle 429 gracefully', () => {
     }
     expect(results.length).toBe(10);
     // Every one of the 10 must be 200 — a vacuous pass on empty array is ruled out by the length check
-    expect(results.every((s) => s === 200)).toBe(true);
+    expect(results.length > 0 && results.every((s) => s === 200)).toBe(true);
   });
 
   it('11th click returns 429 with Retry-After header', async () => {
@@ -370,7 +370,7 @@ describe('Admin list endpoint contract — signal shape for admin inbox', () => 
     const body = await res.json();
     expect(body.length).toBeGreaterThan(0);
     const validTypes = new Set(['service_interest', 'content_interest']);
-    expect(body.every((s: { type: string }) => validTypes.has(s.type))).toBe(true);
+    expect(body.length > 0 && body.every((s: { type: string }) => validTypes.has(s.type))).toBe(true);
   });
 
   it('signal status is one of the three valid enum values', async () => {
@@ -378,6 +378,6 @@ describe('Admin list endpoint contract — signal shape for admin inbox', () => 
     const body = await res.json();
     expect(body.length).toBeGreaterThan(0);
     const validStatuses = new Set(['new', 'reviewed', 'actioned']);
-    expect(body.every((s: { status: string }) => validStatuses.has(s.status))).toBe(true);
+    expect(body.length > 0 && body.every((s: { status: string }) => validStatuses.has(s.status))).toBe(true);
   });
 });

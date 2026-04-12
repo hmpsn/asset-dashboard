@@ -27,7 +27,7 @@ const TYPE_CONFIG: Record<ItemType, { icon: typeof FileText; color: string; bg: 
   brief:   { icon: Clipboard,      color: 'text-teal-400',  bg: 'bg-teal-500/10',  border: 'border-teal-500/20', label: 'Brief' },
   post:    { icon: FileText,       color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Post' },
   request: { icon: MessageSquare,  color: 'text-blue-400',  bg: 'bg-blue-500/10',  border: 'border-blue-500/20', label: 'Request' },
-  matrix:  { icon: Layers,         color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', label: 'Matrix Cell' },
+  matrix:  { icon: Layers,         color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20', label: 'Matrix Cell' },
 };
 
 const STATUS_ICONS: Record<string, { icon: typeof Clock; color: string }> = {
@@ -207,7 +207,7 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
           { label: 'Briefs', value: stats.briefs, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
           { label: 'Posts', value: stats.posts, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
           { label: 'Requests', value: stats.requests, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-          { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
+          { label: 'Matrix Cells', value: stats.matrixCells, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
           { label: 'Published', value: stats.published, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
         ].map(s => (
           <div key={s.label} className={`border ${s.border} ${s.bg} px-4 py-3`} style={{ borderRadius: '6px 12px 6px 12px' }}>

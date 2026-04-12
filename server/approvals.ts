@@ -36,7 +36,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
-    `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id`,
+    `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
     `DELETE FROM approval_batches WHERE id = ? AND workspace_id = ?`,
@@ -61,7 +61,7 @@ function rowToBatch(row: BatchRow): ApprovalBatch {
     log.warn({ batchId: row.id, workspaceId: row.workspace_id, dropped, total: rawItems.length }, 'approval_batches.items: dropped invalid items');
   }
   if (healed) {
-    stmts().update.run({ id: row.id, items: JSON.stringify(items), status: row.status, updated_at: new Date().toISOString() });
+    stmts().update.run({ id: row.id, workspace_id: row.workspace_id, items: JSON.stringify(items), status: row.status, updated_at: new Date().toISOString() });
   }
   return {
     id: row.id,
@@ -159,6 +159,7 @@ function recalcBatchStatus(batch: ApprovalBatch): void {
   batch.updatedAt = new Date().toISOString();
   stmts().update.run({
     id: batch.id,
+    workspace_id: batch.workspaceId,
     items: JSON.stringify(batch.items),
     status: batch.status,
     updated_at: batch.updatedAt,

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { patch, post, getOptional } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';
 import { useWorkspaceOverviewData } from '../hooks/admin';
 import type { FeedbackItem, PresenceMap, WorkspaceOverviewData } from '../hooks/admin/useWorkspaceOverview';
 import {
@@ -45,7 +45,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
   const handlePresenceUpdate = useCallback((d: unknown) => {
     if (d && typeof d === 'object') setWsPresence(d as PresenceMap);
   }, []);
-  useWebSocket({ 'presence:update': handlePresenceUpdate });
+  useGlobalAdminEvents({ 'presence:update': handlePresenceUpdate });
 
   // Derive data from query result
   const data = overviewData?.workspaces ?? [];

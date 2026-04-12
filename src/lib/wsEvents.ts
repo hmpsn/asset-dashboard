@@ -37,6 +37,12 @@ export const WS_EVENTS = {
   CLIENT_SIGNAL_CREATED: 'client-signal:created',
   CLIENT_SIGNAL_UPDATED: 'client-signal:updated',
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
+
+  // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
+  BRANDSCRIPT_UPDATED: 'brandscript:updated',
+  DISCOVERY_UPDATED: 'discovery:updated',
+  VOICE_PROFILE_UPDATED: 'voice:updated',
+  BRAND_IDENTITY_UPDATED: 'brand-identity:updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

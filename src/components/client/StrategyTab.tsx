@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Zap, FileText, Sparkles, Target, CheckCircle2,
-  TrendingUp, TrendingDown, Minus, ChevronDown, Shield, BookOpen, Layers,
+  TrendingUp, TrendingDown, Minus, ChevronDown, Layers,
   MessageCircle, BarChart3, Eye, AlertTriangle,
   ThumbsUp, ThumbsDown, Undo2, Ban, Plus, X, Briefcase,
 } from 'lucide-react';
@@ -717,11 +717,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                             if (s === 'brief_generated' || s === 'client_review') return (
                               <span className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 flex-shrink-0">
                                 <FileText className="w-3.5 h-3.5" /> Brief Requested
-                              </span>
-                            );
-                            if (s === 'tracking') return (
-                              <span className="flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 flex-shrink-0">
-                                <BarChart3 className="w-3.5 h-3.5" /> Tracking
                               </span>
                             );
                             return (

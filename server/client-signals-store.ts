@@ -6,11 +6,8 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
-import { createLogger } from './logger.js';
 import type { ClientSignal, ClientSignalType, ClientSignalStatus } from '../shared/types/client-signals.js';
 import { z } from './middleware/validate.js';
-
-const log = createLogger('client-signals-store');
 
 interface ClientSignalRow {
   id: string;
@@ -68,6 +65,9 @@ const stmts = createStmtCache(() => ({
   selectById: db.prepare(`
     SELECT * FROM client_signals WHERE id = ?
   `),
+  // client_signals.id is randomUUID() (122-bit entropy) — globally unique, no
+  // cross-workspace collision is possible.
+  // ws-scope-ok
   updateStatus: db.prepare(`
     UPDATE client_signals
     SET status = ?, updated_at = ? -- status-ok: simple new/acknowledged/resolved lifecycle

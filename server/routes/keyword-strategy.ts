@@ -821,6 +821,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let strategy: any;
+    // Hoisted out of the try-block so incremental-mode post-processing (below) can reference it.
+    let pagesToAnalyze: typeof pageInfo = [];
     try {
     // --- Incremental mode: split pages into fresh (preserve) vs stale (analyze) ---
     // Reuse the pre-loaded records from before content fetch (avoids a redundant DB read).
@@ -828,11 +830,12 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const existingByPath = new Map(
       existingPageKeywords.map(pk => [pk.pagePath, { analysisGeneratedAt: pk.analysisGeneratedAt ?? null }])
     );
-    const { toAnalyze: pagesToAnalyze, toPreserve: pagesToPreserve } = getPagesNeedingAnalysis(
+    const { toAnalyze, toPreserve: pagesToPreserve } = getPagesNeedingAnalysis(
       pageInfo,
       strategyMode,
       existingByPath,
     );
+    pagesToAnalyze = toAnalyze;
     if (strategyMode === 'incremental') {
       log.info(`Incremental mode: ${pagesToAnalyze.length} stale pages to analyze, ${pagesToPreserve.length} fresh pages to preserve`);
       sendProgress('ai', `Incremental mode: ${pagesToAnalyze.length} pages need fresh analysis, ${pagesToPreserve.length} already fresh`, 0.54);
@@ -1050,7 +1053,22 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
 
     // Run batches with limited concurrency (3 at a time)
     const CONCURRENCY = 3;
-    const allPageMappings: Array<{ pagePath: string; pageTitle: string; primaryKeyword: string; secondaryKeywords: string[]; searchIntent: string }> = [];
+    type PageMapping = {
+      pagePath: string;
+      pageTitle: string;
+      primaryKeyword: string;
+      secondaryKeywords: string[];
+      searchIntent: string;
+      volume?: number;
+      difficulty?: number;
+      cpc?: number;
+      metricsSource?: string;
+      serpFeatures?: string[];
+      secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
+      validated?: boolean;
+      _parseError?: boolean;
+    };
+    const allPageMappings: PageMapping[] = [];
     for (let i = 0; i < batches.length; i += CONCURRENCY) {
       const chunk = batches.slice(i, i + CONCURRENCY);
       const results = await Promise.all(chunk.map((batch, ci) => runBatch(batch, i + ci)));
@@ -1104,7 +1122,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         // Check domain organic data (already fetched this run)
         const domainHit = domainKwLookup.get(kwLower);
         if (domainHit && domainHit.volume > 0) {
-          (pm as Record<string, unknown>).validated = true;
+          pm.validated = true;
           pm.volume = domainHit.volume;
           pm.difficulty = domainHit.difficulty;
           preEnriched++;
@@ -1113,7 +1131,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         // Check existing page_keywords from previous strategy runs
         const pkHit = existingPkLookup.get(kwLower);
         if (pkHit && pkHit.volume && pkHit.volume > 0) {
-          (pm as Record<string, unknown>).validated = true;
+          pm.validated = true;
           pm.volume = pkHit.volume;
           pm.difficulty = pkHit.difficulty ?? 0;
           preEnriched++;
@@ -1132,14 +1150,14 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
 
           let unvalidated = 0;
           for (const pm of allPageMappings) {
-            if ((pm as Record<string, unknown>).validated != null) continue; // already handled
+            if (pm.validated != null) continue; // already handled
             const m = metricMap.get(pm.primaryKeyword.toLowerCase());
             if (m && m.volume > 0) {
-              (pm as Record<string, unknown>).validated = true;
+              pm.validated = true;
               pm.volume = m.volume;
               pm.difficulty = m.difficulty;
             } else {
-              (pm as Record<string, unknown>).validated = false;
+              pm.validated = false;
               unvalidated++;
             }
           }
@@ -1474,7 +1492,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           const partial = semrushDomainData.find(k => {
             const kwWords = new Set(k.keyword.toLowerCase().split(/\s+/));
             const pmWords = pm.primaryKeyword.toLowerCase().split(/\s+/);
-            const overlap = pmWords.filter(w => kwWords.has(w)).length;
+            const overlap = pmWords.filter((w: string) => kwWords.has(w)).length;
             return overlap / pmWords.length >= 0.8 && pmWords.length >= 2;
           });
           if (partial) {
@@ -1585,7 +1603,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
               let totalImpr = 0;
               for (const [q, data] of gscByQuery) {
                 const qWords = q.split(/\s+/);
-                const allMatch = targetWords.every(tw => qWords.includes(tw));
+                const allMatch = targetWords.every((tw: string) => qWords.includes(tw));
                 if (allMatch) totalImpr += data.impressions;
               }
               if (totalImpr > 0) cg.impressions = totalImpr;
@@ -1995,13 +2013,27 @@ Rules:
       },
       generatedAt: new Date().toISOString(),
     };
-    // Save previous strategy to history (keep last 5)
-    if (ws.keywordStrategy?.generatedAt) {
-      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
-        ws.id, JSON.stringify(ws.keywordStrategy), JSON.stringify(prevPageMapForHistory), ws.keywordStrategy.generatedAt
-      );
-      // Prune old entries, keep last 5
-      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+    // Save previous strategy to history (keep last 5).
+    // Wrapped in db.transaction() so that the INSERT and the prune-DELETE
+    // are atomic — without it, an INSERT that succeeds followed by a
+    // DELETE that fails would leave the table over-quota and the next
+    // generation would re-attempt the same prune on a stale snapshot,
+    // potentially corrupting history ordering for the workspace.
+    // Capture into a local so the closure inside db.transaction() preserves
+    // the narrowed type from the if-guard above (TS can't propagate the
+    // narrowing through the closure boundary on its own).
+    const previousStrategy = ws.keywordStrategy;
+    if (previousStrategy?.generatedAt) {
+      const previousStrategyJson = JSON.stringify(previousStrategy);
+      const previousGeneratedAt = previousStrategy.generatedAt;
+      const saveStrategyHistory = db.transaction(() => {
+        db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run(
+          ws.id, previousStrategyJson, JSON.stringify(prevPageMapForHistory), previousGeneratedAt
+        );
+        // Prune old entries, keep last 5
+        db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
+      });
+      saveStrategyHistory();
     }
 
     updateWorkspace(ws.id, { keywordStrategy });
@@ -2091,20 +2123,24 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/diff', (req, res) => {
   const prev = db.prepare('SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1').get(ws.id) as { strategy_json: string; page_map_json: string; generated_at: string } | undefined;
   if (!prev) return res.json(null);
 
-  const prevStrategy = parseJsonFallback(prev.strategy_json, {});
-  const prevPageMap = parseJsonFallback(prev.page_map_json, []);
+  type PrevStrategyShape = {
+    siteKeywords?: string[];
+    contentGaps?: { targetKeyword: string }[];
+  };
+  const prevStrategy = parseJsonFallback<PrevStrategyShape>(prev.strategy_json, {});
+  const prevPageMap = parseJsonFallback<Array<{ pagePath: string; primaryKeyword: string }>>(prev.page_map_json, []);
   const currentPageMap = listPageKeywords(ws.id);
 
   // Compute diffs
-  const prevSiteKws = new Set(prevStrategy.siteKeywords || []);
-  const currSiteKws = new Set(current.siteKeywords || []);
-  const newKeywords = [...currSiteKws].filter(k => !prevSiteKws.has(k));
-  const lostKeywords = [...prevSiteKws].filter(k => !currSiteKws.has(k));
+  const prevSiteKws = new Set<string>(prevStrategy.siteKeywords || []);
+  const currSiteKws = new Set<string>(current.siteKeywords || []);
+  const newKeywords = [...currSiteKws].filter((k: string) => !prevSiteKws.has(k));
+  const lostKeywords = [...prevSiteKws].filter((k: string) => !currSiteKws.has(k));
 
-  const prevGapKws = new Set((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
-  const currGapKws = new Set((current.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
-  const newGaps = [...currGapKws].filter(k => !prevGapKws.has(k));
-  const resolvedGaps = [...prevGapKws].filter(k => !currGapKws.has(k));
+  const prevGapKws = new Set<string>((prevStrategy.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const currGapKws = new Set<string>((current.contentGaps || []).map((g: { targetKeyword: string }) => g.targetKeyword));
+  const newGaps = [...currGapKws].filter((k: string) => !prevGapKws.has(k));
+  const resolvedGaps = [...prevGapKws].filter((k: string) => !currGapKws.has(k));
 
   // Page map changes
   const prevPageKws = new Map(prevPageMap.map((p: { pagePath: string; primaryKeyword: string }) => [p.pagePath, p.primaryKeyword]));

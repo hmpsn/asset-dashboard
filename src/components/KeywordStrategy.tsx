@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { MetricsSource } from '../shared/types/keywords.js';
+import type { MetricsSource } from '../../shared/types/keywords.js';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
   AlertCircle, Sparkles, Briefcase,
@@ -91,7 +91,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       .then(data => { if (data?.providers) setProviderList(data.providers); })
       .catch(() => {});
     workspaces.getById(workspaceId)
-      .then((ws: Record<string, unknown>) => { if (ws?.seoDataProvider) setActiveProvider(ws.seoDataProvider as string); })
+      .then((ws) => {
+        const wsObj = ws as Record<string, unknown> | null;
+        if (wsObj?.seoDataProvider) setActiveProvider(wsObj.seoDataProvider as string);
+      })
       .catch(() => {});
   }, [workspaceId]);
 

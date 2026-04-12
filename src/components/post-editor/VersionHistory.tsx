@@ -25,10 +25,10 @@ export function VersionHistory({
   versions, versionsLoading, reverting, onRevert, onClose,
 }: VersionHistoryProps) {
   return (
-    <div className="bg-zinc-900 rounded-xl border border-violet-500/20 overflow-hidden">
+    <div className="bg-zinc-900 rounded-xl border border-teal-500/20 overflow-hidden">
       <div className="px-4 py-3 border-b border-zinc-800/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <History className="w-3.5 h-3.5 text-violet-400" />
+          <History className="w-3.5 h-3.5 text-teal-400" />
           <span className="text-xs font-medium text-zinc-300">Version History</span>
           <span className="text-[11px] text-zinc-500">{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
         </div>
@@ -58,8 +58,8 @@ export function VersionHistory({
               return (
                 <div key={v.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors group">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                      <span className="text-[10px] font-semibold text-violet-400">v{v.versionNumber}</span>
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
+                      <span className="text-[10px] font-semibold text-teal-400">v{v.versionNumber}</span>
                     </div>
                     <div className="min-w-0">
                       <div className="text-[11px] text-zinc-300 truncate">{label}{detail}</div>
@@ -69,7 +69,7 @@ export function VersionHistory({
                   <button
                     onClick={() => onRevert(v.id)}
                     disabled={reverting === v.id}
-                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-zinc-500 hover:text-violet-300 hover:bg-violet-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-zinc-500 hover:text-teal-300 hover:bg-teal-500/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
                   >
                     {reverting === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
                     Revert

@@ -12,8 +12,9 @@ export type {
   ContentGap, QuickWin, KeywordStrategy, PageEditStatus, PageEditState,
   AudiencePersona, Workspace,
 } from '../shared/types/workspace.ts';
-import type { PageEditStatus, PageEditState, Workspace } from '../shared/types/workspace.ts';
-import { parseJsonSafe, parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
+import type { PageEditStatus, PageEditState, Workspace, KeywordStrategy } from '../shared/types/workspace.ts';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import { createStmtCache } from './db/stmt-cache.js';
 import {
   eventDisplayConfigSchema, eventGroupSchema,
   keywordStrategySchema,
@@ -123,7 +124,10 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   if (row.live_domain) ws.liveDomain = row.live_domain;
   if (row.event_config) ws.eventConfig = parseJsonSafeArray(row.event_config, eventDisplayConfigSchema, { workspaceId: row.id, field: 'event_config', table: 'workspaces' });
   if (row.event_groups) ws.eventGroups = parseJsonSafeArray(row.event_groups, eventGroupSchema, { workspaceId: row.id, field: 'event_groups', table: 'workspaces' });
-  if (row.keyword_strategy) ws.keywordStrategy = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, { siteKeywords: [], pageMap: [], opportunities: [] }, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
+  if (row.keyword_strategy) {
+    const ks = parseJsonSafe(row.keyword_strategy, keywordStrategySchema, null, { workspaceId: row.id, field: 'keyword_strategy', table: 'workspaces' });
+    ws.keywordStrategy = (ks ?? { siteKeywords: [], pageMap: [], opportunities: [], generatedAt: '' }) as unknown as KeywordStrategy;
+  }
   if (row.competitor_domains) ws.competitorDomains = parseJsonSafeArray(row.competitor_domains, z.string(), { workspaceId: row.id, field: 'competitor_domains', table: 'workspaces' });
   ws.competitorLastFetchedAt = row.competitor_last_fetched_at ?? null;
   if (row.personas) ws.personas = parseJsonSafeArray(row.personas, audiencePersonaSchema, { workspaceId: row.id, field: 'personas', table: 'workspaces' });
@@ -156,7 +160,9 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     const bp = parseJsonSafe(row.business_profile, businessProfileSchema, null, { workspaceId: row.id, field: 'business_profile', table: 'workspaces' });
     if (bp) ws.businessProfile = bp;
   }
-  if (row.scoring_config) ws.scoringConfig = parseJsonSafe(row.scoring_config, scoringConfigOverrideSchema, {}, { workspaceId: row.id, field: 'scoring_config', table: 'workspaces' });
+  if (row.scoring_config) {
+    ws.scoringConfig = parseJsonSafe(row.scoring_config, scoringConfigOverrideSchema, {}, { workspaceId: row.id, field: 'scoring_config', table: 'workspaces' }) as Workspace['scoringConfig'];
+  }
   if (row.intelligence_profile) {
     const ip = parseJsonSafe(row.intelligence_profile, intelligenceProfileSchema, null, { workspaceId: row.id, field: 'intelligence_profile', table: 'workspaces' });
     if (ip) ws.intelligenceProfile = ip;
@@ -171,7 +177,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
 
 /** Attach pageEditStates from the page_edit_states table. */
 function attachPageStates(ws: Workspace): Workspace {
-  const pageRows = listPageEditStatesStmt().all(ws.id) as PageEditRow[];
+  const pageRows = stmts().listPageEditStates.all(ws.id) as PageEditRow[];
   if (pageRows.length > 0) {
     const states: Record<string, PageEditState> = {};
     for (const r of pageRows) {
@@ -198,125 +204,62 @@ function attachPageStates(ws: Workspace): Workspace {
 
 // -- Lazy prepared statements --
 
-let _listAll: ReturnType<typeof db.prepare> | null = null;
-function listAllStmt() {
-  if (!_listAll) {
-    _listAll = db.prepare(`SELECT * FROM workspaces`);
-  }
-  return _listAll;
-}
-
-let _getById: ReturnType<typeof db.prepare> | null = null;
-function getByIdStmt() {
-  if (!_getById) {
-    _getById = db.prepare(`SELECT * FROM workspaces WHERE id = ?`);
-  }
-  return _getById;
-}
-
-let _getBySiteId: ReturnType<typeof db.prepare> | null = null;
-function getBySiteIdStmt() {
-  if (!_getBySiteId) {
-    _getBySiteId = db.prepare(`SELECT * FROM workspaces WHERE webflow_site_id = ?`);
-  }
-  return _getBySiteId;
-}
-
-let _insert: ReturnType<typeof db.prepare> | null = null;
-function insertStmt() {
-  if (!_insert) {
-    _insert = db.prepare(`
-      INSERT INTO workspaces
-        (id, name, folder, webflow_site_id, webflow_site_name, webflow_token,
-         gsc_property_url, ga4_property_id, client_password, client_email,
-         live_domain, event_config, event_groups, keyword_strategy,
-         competitor_domains, personas, client_portal_enabled, seo_client_view,
-         analytics_client_view, site_intelligence_client_view, auto_reports, auto_report_frequency,
-         brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
-         tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
-         onboarding_enabled, onboarding_completed, content_pricing,
-         portal_contacts, audit_suppressions, custom_prompt_notes, created_at)
-      VALUES
-        (@id, @name, @folder, @webflow_site_id, @webflow_site_name, @webflow_token,
-         @gsc_property_url, @ga4_property_id, @client_password, @client_email,
-         @live_domain, @event_config, @event_groups, @keyword_strategy,
-         @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
-         @analytics_client_view, @site_intelligence_client_view, @auto_reports, @auto_report_frequency,
-         @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
-         @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
-         @onboarding_enabled, @onboarding_completed, @content_pricing,
-         @portal_contacts, @audit_suppressions, @custom_prompt_notes, @created_at)
-    `);
-  }
-  return _insert;
-}
-
-let _deleteById: ReturnType<typeof db.prepare> | null = null;
-function deleteByIdStmt() {
-  if (!_deleteById) {
-    _deleteById = db.prepare(`DELETE FROM workspaces WHERE id = ?`);
-  }
-  return _deleteById;
-}
-
-let _listPageEditStates: ReturnType<typeof db.prepare> | null = null;
-function listPageEditStatesStmt() {
-  if (!_listPageEditStates) {
-    _listPageEditStates = db.prepare(`SELECT * FROM page_edit_states WHERE workspace_id = ?`);
-  }
-  return _listPageEditStates;
-}
-
-let _getPageEditState: ReturnType<typeof db.prepare> | null = null;
-function getPageEditStateStmt() {
-  if (!_getPageEditState) {
-    _getPageEditState = db.prepare(`SELECT * FROM page_edit_states WHERE workspace_id = ? AND page_id = ?`);
-  }
-  return _getPageEditState;
-}
-
-let _upsertPageEditState: ReturnType<typeof db.prepare> | null = null;
-function upsertPageEditStateStmt() {
-  if (!_upsertPageEditState) {
-    _upsertPageEditState = db.prepare(`
-      INSERT OR REPLACE INTO page_edit_states
-        (workspace_id, page_id, slug, status, audit_issues, fields, source,
-         approval_batch_id, content_request_id, work_order_id, recommendation_id,
-         rejection_note, updated_at, updated_by)
-      VALUES
-        (@workspace_id, @page_id, @slug, @status, @audit_issues, @fields, @source,
-         @approval_batch_id, @content_request_id, @work_order_id, @recommendation_id,
-         @rejection_note, @updated_at, @updated_by)
-    `);
-  }
-  return _upsertPageEditState;
-}
-
-let _deletePageEditState: ReturnType<typeof db.prepare> | null = null;
-function deletePageEditStateStmt() {
-  if (!_deletePageEditState) {
-    _deletePageEditState = db.prepare(`DELETE FROM page_edit_states WHERE workspace_id = ? AND page_id = ?`);
-  }
-  return _deletePageEditState;
-}
-
-
-let _clearAllPageEditStates: ReturnType<typeof db.prepare> | null = null;
-function clearAllPageEditStatesStmt() {
-  if (!_clearAllPageEditStates) {
-    _clearAllPageEditStates = db.prepare(`DELETE FROM page_edit_states WHERE workspace_id = ?`);
-  }
-  return _clearAllPageEditStates;
-}
-
-
-let _getPageIdBySlug: ReturnType<typeof db.prepare> | null = null;
-function getPageIdBySlugStmt() {
-  if (!_getPageIdBySlug) {
-    _getPageIdBySlug = db.prepare(`SELECT page_id FROM page_edit_states WHERE workspace_id = ? AND slug = ?`);
-  }
-  return _getPageIdBySlug;
-}
+const stmts = createStmtCache(() => ({
+  listAll: db.prepare(`SELECT * FROM workspaces`),
+  getById: db.prepare<[id: string]>(`SELECT * FROM workspaces WHERE id = ?`),
+  getBySiteId: db.prepare<[siteId: string]>(`SELECT * FROM workspaces WHERE webflow_site_id = ?`),
+  insert: db.prepare(`
+    INSERT INTO workspaces
+      (id, name, folder, webflow_site_id, webflow_site_name, webflow_token,
+       gsc_property_url, ga4_property_id, client_password, client_email,
+       live_domain, event_config, event_groups, keyword_strategy,
+       competitor_domains, personas, client_portal_enabled, seo_client_view,
+       analytics_client_view, site_intelligence_client_view, auto_reports, auto_report_frequency,
+       brand_voice, knowledge_base, brand_logo_url, brand_accent_color,
+       tier, trial_ends_at, stripe_customer_id, stripe_subscription_id,
+       onboarding_enabled, onboarding_completed, content_pricing,
+       portal_contacts, audit_suppressions, custom_prompt_notes, created_at)
+    VALUES
+      (@id, @name, @folder, @webflow_site_id, @webflow_site_name, @webflow_token,
+       @gsc_property_url, @ga4_property_id, @client_password, @client_email,
+       @live_domain, @event_config, @event_groups, @keyword_strategy,
+       @competitor_domains, @personas, @client_portal_enabled, @seo_client_view,
+       @analytics_client_view, @site_intelligence_client_view, @auto_reports, @auto_report_frequency,
+       @brand_voice, @knowledge_base, @brand_logo_url, @brand_accent_color,
+       @tier, @trial_ends_at, @stripe_customer_id, @stripe_subscription_id,
+       @onboarding_enabled, @onboarding_completed, @content_pricing,
+       @portal_contacts, @audit_suppressions, @custom_prompt_notes, @created_at)
+  `),
+  deleteById: db.prepare<[id: string]>(`DELETE FROM workspaces WHERE id = ?`),
+  listPageEditStates: db.prepare<[workspaceId: string]>(
+    `SELECT * FROM page_edit_states WHERE workspace_id = ?`,
+  ),
+  getPageEditState: db.prepare<[workspaceId: string, pageId: string]>(
+    `SELECT * FROM page_edit_states WHERE workspace_id = ? AND page_id = ?`,
+  ),
+  upsertPageEditState: db.prepare(`
+    INSERT OR REPLACE INTO page_edit_states
+      (workspace_id, page_id, slug, status, audit_issues, fields, source,
+       approval_batch_id, content_request_id, work_order_id, recommendation_id,
+       rejection_note, updated_at, updated_by)
+    VALUES
+      (@workspace_id, @page_id, @slug, @status, @audit_issues, @fields, @source,
+       @approval_batch_id, @content_request_id, @work_order_id, @recommendation_id,
+       @rejection_note, @updated_at, @updated_by)
+  `),
+  deletePageEditState: db.prepare<[workspaceId: string, pageId: string]>(
+    `DELETE FROM page_edit_states WHERE workspace_id = ? AND page_id = ?`,
+  ),
+  clearAllPageEditStates: db.prepare<[workspaceId: string]>(
+    `DELETE FROM page_edit_states WHERE workspace_id = ?`,
+  ),
+  getPageIdBySlug: db.prepare<[workspaceId: string, slug: string]>(
+    `SELECT page_id FROM page_edit_states WHERE workspace_id = ? AND slug = ?`,
+  ),
+  deletePageEditStatesByStatus: db.prepare<[workspaceId: string, status: string]>(
+    `DELETE FROM page_edit_states WHERE workspace_id = ? AND status = ?`,
+  ),
+}));
 
 // ── Helper: convert Workspace to DB params ──
 
@@ -384,12 +327,12 @@ export function getClientPortalUrl(ws: { id: string }): string | undefined {
 
 // Look up the token for a given siteId across all workspaces, fall back to env
 export function getTokenForSite(siteId: string): string | null {
-  const row = getBySiteIdStmt().get(siteId) as WorkspaceRow | undefined;
+  const row = stmts().getBySiteId.get(siteId) as WorkspaceRow | undefined;
   return row?.webflow_token || process.env.WEBFLOW_API_TOKEN || null;
 }
 
 export function listWorkspaces(): Workspace[] {
-  const rows = listAllStmt().all() as WorkspaceRow[];
+  const rows = stmts().listAll.all() as WorkspaceRow[];
   return rows.map(r => attachPageStates(rowToWorkspace(r)));
 }
 
@@ -422,12 +365,12 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  insertStmt().run(workspaceToParams(workspace));
+  stmts().insert.run(workspaceToParams(workspace));
   return workspace;
 }
 
 export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities' | 'customPromptNotes'>>): Workspace | null {
-  const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
+  const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
   const existing = rowToWorkspace(row);
@@ -478,18 +421,18 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
   if (updates.pageEditStates !== undefined) {
     const states = updates.pageEditStates || {};
     // Get existing page IDs so we can detect removals
-    const existingRows = listPageEditStatesStmt().all(id) as PageEditRow[];
+    const existingRows = stmts().listPageEditStates.all(id) as PageEditRow[];
     const existingIds = new Set(existingRows.map(r => r.page_id));
     const newIds = new Set(Object.keys(states));
     // Remove pages no longer present
     for (const pid of existingIds) {
       if (!newIds.has(pid)) {
-        deletePageEditStateStmt().run(id, pid);
+        stmts().deletePageEditState.run(id, pid);
       }
     }
     // Upsert all current states
     for (const [pid, state] of Object.entries(states)) {
-      upsertPageEditStateStmt().run({
+      stmts().upsertPageEditState.run({
         workspace_id: id,
         page_id: pid,
         slug: state.slug ?? null,
@@ -513,16 +456,16 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     db.prepare(sql).run(params);
   }
 
-  return attachPageStates(rowToWorkspace(getByIdStmt().get(id) as WorkspaceRow));
+  return attachPageStates(rowToWorkspace(stmts().getById.get(id) as WorkspaceRow));
 }
 
 export function deleteWorkspace(id: string): boolean {
-  const result = deleteByIdStmt().run(id);
+  const result = stmts().deleteById.run(id);
   return result.changes > 0;
 }
 
 export function getWorkspace(id: string): Workspace | undefined {
-  const row = getByIdStmt().get(id) as WorkspaceRow | undefined;
+  const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return undefined;
   return attachPageStates(rowToWorkspace(row));
 }
@@ -532,18 +475,18 @@ export function getOptRoot() { return OPT_ROOT; }
 
 /** Resolve a URL slug to a Webflow page ID via the page_edit_states table. */
 export function getPageIdBySlug(workspaceId: string, slug: string): string | undefined {
-  const row = getPageIdBySlugStmt().get(workspaceId, slug) as { page_id: string } | undefined;
+  const row = stmts().getPageIdBySlug.get(workspaceId, slug) as { page_id: string } | undefined;
   if (row) return row.page_id;
   // Try with leading slash stripped
   const stripped = slug.replace(/^\//, '');
   if (stripped !== slug) {
-    const row2 = getPageIdBySlugStmt().get(workspaceId, stripped) as { page_id: string } | undefined;
+    const row2 = stmts().getPageIdBySlug.get(workspaceId, stripped) as { page_id: string } | undefined;
     if (row2) return row2.page_id;
   }
   // Try with leading slash added
   if (!slug.startsWith('/')) {
     const withSlash = `/${slug}`;
-    const row3 = getPageIdBySlugStmt().get(workspaceId, withSlash) as { page_id: string } | undefined;
+    const row3 = stmts().getPageIdBySlug.get(workspaceId, withSlash) as { page_id: string } | undefined;
     if (row3) return row3.page_id;
   }
   return undefined;
@@ -560,10 +503,10 @@ export function updatePageState(
   pageId: string,
   updates: Partial<Omit<PageEditState, 'pageId' | 'updatedAt'>>,
 ): PageEditState | null {
-  const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
+  const row = stmts().getById.get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return null;
 
-  const existingRow = getPageEditStateStmt().get(workspaceId, pageId) as PageEditRow | undefined;
+  const existingRow = stmts().getPageEditState.get(workspaceId, pageId) as PageEditRow | undefined;
   let existing: PageEditState | undefined;
   if (existingRow) {
     existing = {
@@ -599,7 +542,7 @@ export function updatePageState(
     : { pageId, status: 'clean', updatedAt: now };
   const merged: PageEditState = Object.assign(base, updates, { pageId, updatedAt: now });
 
-  upsertPageEditStateStmt().run({
+  stmts().upsertPageEditState.run({
     workspace_id: workspaceId,
     page_id: pageId,
     slug: merged.slug ?? null,
@@ -620,7 +563,7 @@ export function updatePageState(
 }
 
 export function getPageState(workspaceId: string, pageId: string): PageEditState | undefined {
-  const row = getPageEditStateStmt().get(workspaceId, pageId) as PageEditRow | undefined;
+  const row = stmts().getPageEditState.get(workspaceId, pageId) as PageEditRow | undefined;
   if (!row) return undefined;
   return {
     pageId: row.page_id,
@@ -640,7 +583,7 @@ export function getPageState(workspaceId: string, pageId: string): PageEditState
 }
 
 export function getAllPageStates(workspaceId: string): Record<string, PageEditState> {
-  const rows = listPageEditStatesStmt().all(workspaceId) as PageEditRow[];
+  const rows = stmts().listPageEditStates.all(workspaceId) as PageEditRow[];
   const states: Record<string, PageEditState> = {};
   for (const row of rows) {
     states[row.page_id] = {
@@ -662,30 +605,21 @@ export function getAllPageStates(workspaceId: string): Record<string, PageEditSt
   return states;
 }
 
-let _deletePageEditStatesByStatus: ReturnType<typeof db.prepare> | null = null;
-function deletePageEditStatesByStatusStmt() {
-  if (!_deletePageEditStatesByStatus) {
-    _deletePageEditStatesByStatus = db.prepare(`DELETE FROM page_edit_states WHERE workspace_id = ? AND status = ?`);
-  }
-  return _deletePageEditStatesByStatus;
-}
-
-
 export function clearPageStatesByStatus(workspaceId: string, status: string): number {
-  const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
+  const row = stmts().getById.get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return 0;
   if (status === 'all') {
     // Clear ALL page states for this workspace
-    const info = clearAllPageEditStatesStmt().run(workspaceId);
+    const info = stmts().clearAllPageEditStates.run(workspaceId);
     return info.changes;
   }
-  const info = deletePageEditStatesByStatusStmt().run(workspaceId, status);
+  const info = stmts().deletePageEditStatesByStatus.run(workspaceId, status);
   return info.changes;
 }
 
 export function clearPageState(workspaceId: string, pageId: string): boolean {
-  const row = getByIdStmt().get(workspaceId) as WorkspaceRow | undefined;
+  const row = stmts().getById.get(workspaceId) as WorkspaceRow | undefined;
   if (!row) return false;
-  deletePageEditStateStmt().run(workspaceId, pageId);
+  stmts().deletePageEditState.run(workspaceId, pageId);
   return true;
 }

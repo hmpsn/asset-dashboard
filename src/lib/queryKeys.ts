@@ -67,6 +67,7 @@ export const queryKeys = {
 
     // Workspace / global
     workspaces: () => ['admin-workspaces'] as const,
+    workspaceDetail: (wsId: string) => ['admin-workspace-detail', wsId] as const,
     workspaceHome: (wsId: string) => ['admin-workspace-home', wsId] as const,
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     health: () => ['admin-health'] as const,
@@ -80,7 +81,7 @@ export const queryKeys = {
     outcomeOverview: () => ['admin-outcome-overview'] as const,
 
     // Intelligence
-    intelligence: (wsId: string, slices?: string[], pagePath?: string, learningsDomain?: string) =>
+    intelligence: (wsId: string, slices?: readonly string[], pagePath?: string, learningsDomain?: string) =>
       ['admin-intelligence', wsId, pagePath ?? '', learningsDomain ?? 'all', ...(slices ? [...slices].sort() : [])] as const,
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,

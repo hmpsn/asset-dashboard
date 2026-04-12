@@ -79,22 +79,23 @@ export function backfillPublishedContent(workspaceId: string): number {
       const existing = getActionBySource('post', post.id);
       if (existing) continue;
 
-      recordAction({
-        workspaceId: post.workspace_id,
-        actionType: 'content_published',
-        sourceType: 'post',
-        sourceId: post.id,
-        pageUrl: null,
-        targetKeyword: post.target_keyword ?? null,
-        baselineSnapshot: {
-          captured_at: post.published_at ?? new Date().toISOString(),
-        },
-        sourceFlag: 'backfill',
-        baselineConfidence: 'estimated',
-        attribution: 'platform_executed',
-      });
-
-      count++;
+      if (post.workspace_id) {
+        recordAction({ // recordAction-ok: workspaceId guarded by if (post.workspace_id)
+          workspaceId: post.workspace_id,
+          actionType: 'content_published',
+          sourceType: 'post',
+          sourceId: post.id,
+          pageUrl: null,
+          targetKeyword: post.target_keyword ?? null,
+          baselineSnapshot: {
+            captured_at: post.published_at ?? new Date().toISOString(),
+          },
+          sourceFlag: 'backfill',
+          baselineConfidence: 'estimated',
+          attribution: 'platform_executed',
+        });
+        count++;
+      }
     } catch (err) {
       log.warn(
         { err, workspaceId, postId: post.id },
@@ -120,22 +121,23 @@ export function backfillResolvedInsights(workspaceId: string): number {
       const existing = getActionBySource('insight', insight.id);
       if (existing) continue;
 
-      recordAction({
-        workspaceId: insight.workspace_id,
-        actionType: 'insight_acted_on',
-        sourceType: 'insight',
-        sourceId: insight.id,
-        pageUrl: insight.page_id ?? null,
-        targetKeyword: null,
-        baselineSnapshot: {
-          captured_at: insight.resolved_at ?? new Date().toISOString(),
-        },
-        sourceFlag: 'backfill',
-        baselineConfidence: 'estimated',
-        attribution: 'platform_executed',
-      });
-
-      count++;
+      if (insight.workspace_id) {
+        recordAction({ // recordAction-ok: workspaceId guarded by if (insight.workspace_id)
+          workspaceId: insight.workspace_id,
+          actionType: 'insight_acted_on',
+          sourceType: 'insight',
+          sourceId: insight.id,
+          pageUrl: insight.page_id ?? null,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: insight.resolved_at ?? new Date().toISOString(),
+          },
+          sourceFlag: 'backfill',
+          baselineConfidence: 'estimated',
+          attribution: 'platform_executed',
+        });
+        count++;
+      }
     } catch (err) {
       log.warn(
         { err, workspaceId, insightId: insight.id },
@@ -178,22 +180,23 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
 
       const firstAffectedPage = rec.affectedPages?.[0] ?? null;
 
-      recordAction({
-        workspaceId,
-        actionType: 'audit_fix_applied',
-        sourceType: 'recommendation',
-        sourceId: rec.id,
-        pageUrl: firstAffectedPage,
-        targetKeyword: null,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-        },
-        sourceFlag: 'backfill',
-        baselineConfidence: 'estimated',
-        attribution: 'platform_executed',
-      });
-
-      count++;
+      if (workspaceId) {
+        recordAction({ // recordAction-ok: workspaceId guarded by if (workspaceId)
+          workspaceId,
+          actionType: 'audit_fix_applied',
+          sourceType: 'recommendation',
+          sourceId: rec.id,
+          pageUrl: firstAffectedPage,
+          targetKeyword: null,
+          baselineSnapshot: {
+            captured_at: new Date().toISOString(),
+          },
+          sourceFlag: 'backfill',
+          baselineConfidence: 'estimated',
+          attribution: 'platform_executed',
+        });
+        count++;
+      }
     } catch (err) {
       log.warn(
         { err, workspaceId, recId: rec.id },

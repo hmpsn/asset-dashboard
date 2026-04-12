@@ -3,7 +3,7 @@
  * Extracted from SeoAudit.tsx.
  */
 import {
-  Search as SearchIcon, Share2, FileText, RefreshCw, CheckCircle, Loader2, XCircle,
+  Search as SearchIcon, Share2, FileText, RefreshCw, CheckCircle, XCircle,
 } from 'lucide-react';
 import type { SeoAuditResult, CheckCategory } from './types';
 import { CATEGORY_CONFIG } from './types';

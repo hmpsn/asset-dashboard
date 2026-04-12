@@ -29,6 +29,7 @@ import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-sto
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
+import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
 
@@ -151,8 +152,10 @@ const stmts = createStmtCache(() => ({
           @title, @description, @metric, @current_value, @previous_value, @change_pct,
           @ai_summary, @detected_at, @dismissed_at, @acknowledged_at, @source)
       `),
-  dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ?'),
-  acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ?'),
+  dismiss: db.prepare('UPDATE anomalies SET dismissed_at = ? WHERE id = ? AND workspace_id = ?'),
+  acknowledge: db.prepare('UPDATE anomalies SET acknowledged_at = ? WHERE id = ? AND workspace_id = ?'),
+  // Global retention sweep: prune anomalies older than N days across all workspaces.
+  // ws-scope-ok
   deleteOlderThan: db.prepare('DELETE FROM anomalies WHERE detected_at < ?'),
   recentUndismissed: db.prepare(`
         SELECT * FROM anomalies
@@ -190,13 +193,18 @@ export function listAnomalies(workspaceId?: string, includeDismissed = false): A
   return rows.filter(r => r.id !== '__last_scan__').map(rowToAnomaly);
 }
 
-export function dismissAnomaly(id: string): boolean {
-  const info = stmts().dismiss.run(new Date().toISOString(), id);
+export function getAnomalyById(id: string): Anomaly | null {
+  const row = stmts().selectById.get(id) as AnomalyRow | undefined;
+  return row ? rowToAnomaly(row) : null;
+}
+
+export function dismissAnomaly(workspaceId: string, id: string): boolean {
+  const info = stmts().dismiss.run(new Date().toISOString(), id, workspaceId);
   return info.changes > 0;
 }
 
-export function acknowledgeAnomaly(id: string): boolean {
-  const info = stmts().acknowledge.run(new Date().toISOString(), id);
+export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
+  const info = stmts().acknowledge.run(new Date().toISOString(), id, workspaceId);
   return info.changes > 0;
 }
 
@@ -601,7 +609,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // anomaly→InsightDomain logic at lines 555-561.
         debouncedAnomalyBoost(ws.id, async () => {
           const modifiedCount = await withWorkspaceLock(ws.id, async () => {
-            const { getInsights: fetchInsights, upsertInsight: updateInsight } = await import('./analytics-insights-store.js');
+            const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
@@ -636,7 +644,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
                   workspaceId: insight.workspaceId,
                   pageId: insight.pageId,
                   insightType: insight.insightType,
-                  data: newData,
+                  data: newData as never,
                   severity: insight.severity,
                   pageTitle: insight.pageTitle,
                   strategyKeyword: insight.strategyKeyword,

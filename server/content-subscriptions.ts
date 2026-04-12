@@ -63,7 +63,7 @@ const stmts = createStmtCache(() => ({
     "SELECT * FROM content_subscriptions WHERE status IN ('active', 'past_due') ORDER BY created_at DESC",
   ),
   deleteById: db.prepare(
-    'DELETE FROM content_subscriptions WHERE id = ?',
+    'DELETE FROM content_subscriptions WHERE id = ? AND workspace_id = ?',
   ),
 }));
 
@@ -153,6 +153,7 @@ export function listActiveContentSubscriptions(): ContentSubscription[] {
 }
 
 export function updateContentSubscription(
+  workspaceId: string,
   id: string,
   updates: Partial<Pick<ContentSubscription,
     'status' | 'stripeSubscriptionId' | 'stripePriceId' | 'plan' | 'postsPerMonth' |
@@ -176,7 +177,7 @@ export function updateContentSubscription(
   };
 
   const sets: string[] = [];
-  const values: Record<string, unknown> = { id };
+  const values: Record<string, unknown> = { id, workspace_id: workspaceId };
 
   for (const [key, val] of Object.entries(updates)) {
     const col = fieldMap[key];
@@ -194,35 +195,35 @@ export function updateContentSubscription(
   sets.push("updated_at = @now");
   values.now = new Date().toISOString();
 
-  const sql = `UPDATE content_subscriptions SET ${sets.join(', ')} WHERE id = @id`;
+  const sql = `UPDATE content_subscriptions SET ${sets.join(', ')} WHERE id = @id AND workspace_id = @workspace_id`;
   db.prepare(sql).run(values);
   return getContentSubscription(id);
 }
 
-export function deleteContentSubscription(id: string): boolean {
-  const result = stmts().deleteById.run(id);
+export function deleteContentSubscription(workspaceId: string, id: string): boolean {
+  const result = stmts().deleteById.run(id, workspaceId);
   return result.changes > 0;
 }
 
 // ── Period management ──
 
-export function incrementDeliveredPosts(id: string, count = 1): void {
+export function incrementDeliveredPosts(workspaceId: string, id: string, count = 1): void {
   db.prepare(
     `UPDATE content_subscriptions
      SET posts_delivered_this_period = posts_delivered_this_period + ?,
          updated_at = ?
-     WHERE id = ?`,
-  ).run(count, new Date().toISOString(), id);
+     WHERE id = ? AND workspace_id = ?`,
+  ).run(count, new Date().toISOString(), id, workspaceId);
 }
 
-export function resetPeriod(id: string, periodStart: string, periodEnd: string): void {
+export function resetPeriod(workspaceId: string, id: string, periodStart: string, periodEnd: string): void {
   db.prepare(
     `UPDATE content_subscriptions
      SET posts_delivered_this_period = 0,
          current_period_start = ?,
          current_period_end = ?,
          updated_at = ?
-     WHERE id = ?`,
-  ).run(periodStart, periodEnd, new Date().toISOString(), id);
+     WHERE id = ? AND workspace_id = ?`,
+  ).run(periodStart, periodEnd, new Date().toISOString(), id, workspaceId);
   log.info(`Reset period for subscription ${id}: ${periodStart} → ${periodEnd}`);
 }

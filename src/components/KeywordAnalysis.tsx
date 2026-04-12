@@ -208,7 +208,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
         <div className="text-sm text-zinc-400">
           <span className="font-medium text-zinc-200">{pages.length}</span> pages
           {pages.some(p => p.source === 'cms') && (
-            <span className="text-[11px] text-violet-400 ml-1">({pages.filter(p => p.source === 'cms').length} CMS)</span>
+            <span className="text-[11px] text-teal-400 ml-1">({pages.filter(p => p.source === 'cms').length} CMS)</span>
           )}
         </div>
         {analyzedCount > 0 && (
@@ -227,7 +227,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
           <button
             onClick={analyzeAllPages}
             disabled={analyzing.size > 0 || analyzedCount === pages.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600/80 hover:bg-violet-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
           >
             <Sparkles className="w-3.5 h-3.5" />
             {analyzedCount === pages.length ? 'All Analyzed' : analyzedCount > 0 ? `Analyze Remaining (${pages.length - analyzedCount})` : 'Analyze All Pages'}
@@ -272,7 +272,7 @@ export function KeywordAnalysis({ siteId, workspaceId }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-zinc-200 truncate">{page.title}</span>
                     {page.source === 'cms' && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/20 shrink-0">CMS</span>
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-teal-500/15 text-teal-400 border border-teal-500/20 shrink-0">CMS</span>
                     )}
                   </div>
                   <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>

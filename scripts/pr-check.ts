@@ -21,11 +21,36 @@
  */
 
 import { execSync, execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, realpathSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
+
+function getFiles(dir: string, pattern: string): string[] {
+  try {
+    // maxBuffer: 50MB. The default 1MB is not enough for `find <repo-root>
+    // -name '*.ts'` which on this codebase returns ~11k absolute paths
+    // totalling ~900KB+ — right at the boundary where ENOBUFS would silently
+    // throw and the catch would return []. That is itself a Category A
+    // silent-failure mode (rule reports ✓ because it received zero files).
+    // 50MB is comfortably above any plausible repo-walk output.
+    return execSync(`find "${dir}" -name "${pattern}" -type f 2>/dev/null`, {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      maxBuffer: 50 * 1024 * 1024,
+    }).trim().split('\n').filter(Boolean);
+  } catch (err) {
+    // Surface the error to stderr so silent file-list collapses are visible.
+    // The previous bare `return []` made every getFiles failure look identical
+    // to "directory exists but contains no matches" — the exact silent-failure
+    // class the 2026-04-10 audit was built to catch.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[pr-check] getFiles("${dir}", "${pattern}") failed: ${msg}`);
+    return [];
+  }
+}
 
 // ─── Determine changed files ──────────────────────────────────────────────────
 
@@ -75,25 +100,606 @@ function getChangedFiles(): string[] {
   }
 }
 
-const changedFiles = SCAN_ALL ? [] : getChangedFiles();
-const mode = SCAN_ALL ? 'full scan' : changedFiles.length > 0
-  ? `${changedFiles.length} changed file(s)`
-  : 'full scan (no diff detected)';
+// Lazy-memoised so that `import { CHECKS }` from the test harness does NOT
+// spawn a `git diff` subprocess at module-load time. Only `runCli()` (and any
+// future runner) reads `cachedChangedFiles()`; customCheck closures inside the
+// CHECKS array never reference changedFiles directly.
+let _changedFilesCache: string[] | null = null;
+function cachedChangedFiles(): string[] {
+  if (_changedFilesCache !== null) return _changedFilesCache;
+  _changedFilesCache = SCAN_ALL ? [] : getChangedFiles();
+  return _changedFilesCache;
+}
+
+// ─── Shared regexes ───────────────────────────────────────────────────────────
+
+/**
+ * Matches the *opener* of a function declaration or arrow function. Used by
+ * customCheck rules that need to determine whether two lines live inside the
+ * same function body. Must NOT be used for closing braces (`}`, `};`, `})`):
+ * those are ambiguous (they also close if/for/try/switch blocks) and produce
+ * false-negatives on legitimate violations. Any two statements separated by a
+ * real function boundary are also separated by the opener of the next
+ * function; the opener alone is always sufficient.
+ *
+ * The arrow-function alternative anchors `=>` at end-of-line (optionally
+ * followed by `{`) so we only match function *declarations* whose body starts
+ * on the same or the next line. Inline arrow *expressions* like
+ * `const ids = items.map(item => item.id)` are deliberately excluded — they
+ * are not function boundaries for multi-step write detection (Rule 3). A
+ * single-line arrow body (`const add = (a, b) => a + b;`) cannot contain
+ * multi-step writes, so ignoring it is safe.
+ */
+const FUNC_BOUNDARY_RE =
+  /^(\s*(export\s+)?(async\s+)?function\s+\w+|\s*(export\s+)?const\s+\w+\s*[:=].*=>\s*\{?\s*$)/;
+
+// ─── Rule window sizes ────────────────────────────────────────────────────────
+//
+// Every customCheck rule that scans a sliding window over file lines picks a
+// window size that balances false-negatives (too small, legitimate bugs
+// outside the window are missed) against false-positives + cost (too large,
+// unrelated code bleeds in and the scan gets slow). Collecting these as
+// named constants makes the tradeoffs reviewable in one place and lets the
+// rule bodies read as intent, not magic numbers. Changes to these values
+// directly affect rule sensitivity and MUST be re-tested via
+// `tests/pr-check.test.ts` before merging.
+
+/** Max lines to walk forward from a `window.addEventListener('keydown', ...)`
+ *  call looking for the end of the handler body. Enough for long inline
+ *  arrow bodies; small enough to stop at the next top-level declaration. */
+const KEYDOWN_BODY_LOOKAHEAD = 60;
+
+/** Max distance (in lines) between two `db.prepare().run()` calls for them
+ *  to be considered a *pair* in the multi-step txn rule. Function-opener
+ *  walkback already prevents cross-function pairing — this is a
+ *  belt-and-suspenders upper bound. */
+const TXN_PAIR_MAX_DISTANCE = 25;
+
+/** Max lines to scan on a single `db.prepare(` call line to accumulate its
+ *  full multi-line SQL body. Prepared statements rarely exceed 8 lines;
+ *  anything bigger is almost certainly a different construct. */
+const DB_PREPARE_MULTILINE_LOOKAHEAD = 8;
+
+/** How far *back* from a flagged write we search for an already-open
+ *  `db.transaction(` wrapper (multi-step txn rule). */
+const TXN_WRAPPER_LOOKBEHIND = 20;
+
+/** How far *forward* from a `callOpenAI`/`callClaude` call we scan for a
+ *  following `db.prepare()` write (AI-race rule). 30 lines covers the
+ *  typical "await AI → transform → write" pattern. */
+const AI_RACE_FORWARD_LOOKAHEAD = 30;
+
+/** How far *back* from an AI call we scan for a hoisted `db.transaction(`
+ *  declaration. The canonical correct pattern in
+ *  `docs/rules/ai-dispatch-patterns.md` hoists the txn above the await
+ *  because SQLite doesn't support async transactions. */
+const AI_RACE_BACKWARD_LOOKBEHIND = 20;
+
+/** Max lines to scan on a single `db.prepare(` call line to collect its
+ *  full SQL body for the ws-scope workspace_id check. Chosen higher than
+ *  `DB_PREPARE_MULTILINE_LOOKAHEAD` because some long UPDATEs span ~25
+ *  lines (multi-column updates with CASE expressions). */
+const WS_SCOPE_SQL_LOOKAHEAD = 25;
+
+/** Max lines to scan on a `function getOrCreate*` declaration to collect
+ *  its return-type annotation. Long generics + multi-line param lists
+ *  rarely push past 15. */
+const GETORCREATE_RETURN_TYPE_LOOKAHEAD = 15;
+
+/** Max lines to scan after a `router.post/put/patch/delete` call looking
+ *  for an `addActivity(` call before we flag the mutation as silent
+ *  (public-portal activity rule). Bounded to the next route declaration
+ *  so route bodies don't bleed into each other. The 250-line cap is a
+ *  defensive limit for unusually long handlers — public-portal route
+ *  bodies in the wild range from 5 to ~110 lines, with the onboarding
+ *  handler topping out at 101 lines from `router.post(...)` to its
+ *  `addActivity(...)`. The previous 60-line cap silently false-flagged
+ *  it (reported a "silent mutation" even though the call was right
+ *  there, just past the window). 250 leaves comfortable headroom for
+ *  any reasonable future handler. */
+const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 250;
+
+/** Max lines to scan after a `useEffect(` call to brace-balance its body
+ *  for the layout-driving-state rule. Acts as a safety net if the brace
+ *  balancer never reaches zero (e.g. malformed input). */
+const USE_EFFECT_BODY_LOOKAHEAD = 60;
 
 // ─── Check definitions ────────────────────────────────────────────────────────
 
-type Check = {
+export type CustomCheckMatch = { file: string; line: number; text: string };
+
+export type Check = {
   name: string;
-  pattern: string;
+  /**
+   * Ripgrep/grep pattern for the single-line scan path. Optional when
+   * `customCheck` is present — custom checks implement their own detection.
+   * A missing/empty pattern with no customCheck is a misconfiguration and
+   * the runner aborts to avoid `grep -E ""` matching every line.
+   */
+  pattern?: string;
   fileGlobs: string[];
   exclude?: string | string[];
   pathFilter?: string;  // only scan files under this path prefix
   excludeLines?: string[];  // grep -v patterns — lines matching any of these are filtered out
   message: string;
   severity: 'error' | 'warn';
+  // Metadata consumed by rule-metadata generator (PR C of the pr-check audit)
+  rationale?: string;     // 1-sentence explanation of the bug class this prevents
+  claudeMdRef?: string;   // anchor/heading in CLAUDE.md, e.g. '#code-conventions'
+  // Optional override for the scope column in docs/rules/automated-rules.md.
+  // Set this when a customCheck self-narrows to a more specific path than
+  // `pathFilter`/`fileGlobs` implies (e.g. public-portal.ts only), so the
+  // generated docs show the actual scan scope instead of the broader
+  // file-resolution scope. Does NOT affect runtime file resolution.
+  displayScope?: string;
+  // Optional custom detection function. When present, runCheck uses this
+  // instead of the ripgrep path. It receives the resolved file list (absolute
+  // or repo-relative paths — matching what the ripgrep path would scan) and
+  // returns an array of { file, line, text } matches. The runner formats
+  // these into the same `file:line:text` string shape the ripgrep path emits.
+  customCheck?: (files: string[]) => CustomCheckMatch[];
 };
 
-const CHECKS: Check[] = [
+// ─── Helpers used by customCheck rules ────────────────────────────────────────
+
+// Dynamically build the set of workspace-scoped tables by scanning migration
+// SQL files. A table is considered workspace-scoped if its CREATE TABLE block
+// contains a `workspace_id` column (i.e. the column appears inside the DDL
+// parentheses, not just in an index or a later DML statement) OR if a later
+// `ALTER TABLE <name> ADD COLUMN workspace_id ...` adds the column after the
+// fact. This is more accurate than a hard-coded list and auto-updates as new
+// tables are added via migrations.
+// Exported so tests can drive it against a fixture migrations dir without
+// polluting the real `server/db/migrations` tree. Production callers go
+// through the cached `workspaceScopedTables()` wrapper which always uses
+// the default `server/db/migrations` location.
+export function buildWorkspaceScopedTables(migrationsDirOverride?: string): Set<string> {
+  const migrationsDir = migrationsDirOverride ?? path.join(ROOT, 'server/db/migrations');
+  const files = getFiles(migrationsDir, '*.sql');
+  const tables = new Set<string>();
+  const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(/i;
+  // Detects `ALTER TABLE <name> ADD COLUMN ... workspace_id ...`. The
+  // `[^;]*` is bounded by the statement terminator so we don't bleed into
+  // a following statement on the same line. `\bworkspace_id\b` ensures
+  // `workspace_id_idx` and similar do not falsely match.
+  const alterRe = /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN[^;]*\bworkspace_id\b/i;
+
+  for (const file of files) {
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    let i = 0;
+    while (i < lines.length) {
+      const m = lines[i].match(tableRe);
+      if (!m) { i++; continue; }
+      const tableName = m[1];
+      // Walk the block using paren depth to find the closing );
+      let depth = 0;
+      let hasWorkspaceId = false;
+      let nextI = lines.length; // guarantee forward progress even if the block never closes
+      let sawOpen = false;
+      for (let j = i; j < lines.length; j++) {
+        const line = lines[j];
+        const opens = (line.match(/\(/g) ?? []).length;
+        const closes = (line.match(/\)/g) ?? []).length;
+        depth += opens - closes;
+        if (opens > 0) sawOpen = true;
+        if (/\bworkspace_id\b/i.test(line)) hasWorkspaceId = true;
+        if (sawOpen && depth <= 0) { nextI = j + 1; break; }
+      }
+      i = nextI;
+      if (hasWorkspaceId) tables.add(tableName);
+    }
+  }
+
+  // Second-pass: union tables that gain a workspace_id column via
+  // `ALTER TABLE ... ADD COLUMN workspace_id`. A table created without the
+  // column and altered later is otherwise invisible to the ws-scope rule.
+  // No existing migration uses this shape today (verified via prelude grep
+  // in 2026-04-10 audit B9), but the scan is defence-in-depth against
+  // future migrations.
+  for (const file of files) {
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    for (const line of content.split('\n')) {
+      const am = line.match(alterRe);
+      if (am) tables.add(am[1]);
+    }
+  }
+
+  return tables;
+}
+
+// Lazy-memoised so that `import { CHECKS }` from the test harness doesn't
+// read every migration SQL file at module-load time. Consumers (the ws-scope
+// customCheck, runCli's diagnostic print) call workspaceScopedTables() which
+// builds the set on first access and caches it for the process lifetime.
+let _workspaceScopedTablesCache: Set<string> | null = null;
+function workspaceScopedTables(): Set<string> {
+  if (_workspaceScopedTablesCache !== null) return _workspaceScopedTablesCache;
+  _workspaceScopedTablesCache = buildWorkspaceScopedTables();
+  return _workspaceScopedTablesCache;
+}
+
+function readFileOrEmpty(file: string): string {
+  try { return readFileSync(file, 'utf-8'); } catch { return ''; }
+}
+
+/**
+ * Check whether a `// <hatch>-ok` comment exists on `lines[i]` or on the
+ * immediately preceding line. Every customCheck rule that flags the opening
+ * line of a potentially multi-line statement (template-literal db.prepare
+ * calls, multi-line callOpenAI arguments, router.post callbacks, useEffect
+ * openers, etc.) MUST call this before pushing a hit.
+ *
+ * The global `excludeLines` post-filter in `formatCustomMatches` only matches
+ * the flagged line's text; for multi-line constructs the hatch can't be
+ * placed inline without breaking syntax, so developers place it on the line
+ * above. Without this lookbehind, those hatches are silently ignored.
+ *
+ * See docs/rules/pr-check-rule-authoring.md → "Common mistakes" for the
+ * explanation and the funcBoundaryRe / ws-scope-ok / ai-race-ok precedents.
+ */
+function hasHatch(lines: string[], i: number, hatch: string): boolean {
+  if (lines[i]?.includes(hatch)) return true;
+  if (i > 0 && lines[i - 1]?.includes(hatch)) return true;
+  return false;
+}
+
+/**
+ * Find the end of a function's return-type annotation region given `tail`
+ * — the substring starting immediately after the closing `)` of the
+ * parameter list. Returns the index of the function-body opener (a `{`
+ * followed only by whitespace to end-of-line) or the arrow marker (`=>`),
+ * whichever comes first at outer depth.
+ *
+ * Tracks brace, angle, paren, and bracket depth so structural characters
+ * that appear *inside* the return type itself — object-literal types like
+ * `{ id: string }`, generic arguments like `Promise<{ x } | null>`, tuple
+ * types like `[number, string]` — are not mistaken for body markers.
+ * Skips over string literals so string-literal unions (`'a' | 'b'`) and
+ * template literals cannot introduce stray structural characters.
+ *
+ * Replaces the original `tail.search(/[{=]/)` which truncated the return
+ * region at the first `{` or `=` it saw, silently bypassing the
+ * getOrCreate* nullable-return rule for every declaration whose return
+ * type contained an object-literal or generic argument — the exact
+ * silent-false-negative class documented as Category C in the 2026-04-10
+ * audit Round 2 plan.
+ */
+function findReturnRegionEnd(tail: string): number {
+  let angle = 0;
+  let brace = 0;
+  let paren = 0;
+  let bracket = 0;
+  let k = 0;
+  while (k < tail.length) {
+    const c = tail[k];
+    // Skip over string literals — return types can carry string-literal
+    // unions like `'a' | 'b'` whose contents must not be counted.
+    if (c === "'" || c === '"' || c === '`') {
+      const q = c;
+      k++;
+      while (k < tail.length && tail[k] !== q) {
+        if (tail[k] === '\\') k += 2;
+        else k++;
+      }
+      k++;
+      continue;
+    }
+    // Skip `// line comments` (rare in signatures but possible).
+    if (c === '/' && tail[k + 1] === '/') {
+      while (k < tail.length && tail[k] !== '\n') k++;
+      continue;
+    }
+
+    // Arrow body marker — the first `=>` at outer depth wins.
+    if (c === '=' && tail[k + 1] === '>' && angle === 0 && paren === 0 && brace === 0 && bracket === 0) {
+      return k;
+    }
+
+    if (c === '<') { angle++; k++; continue; }
+    if (c === '>') {
+      if (angle > 0) angle--;
+      k++;
+      continue;
+    }
+    if (c === '(') { paren++; k++; continue; }
+    if (c === ')') { if (paren > 0) paren--; k++; continue; }
+    if (c === '[') { bracket++; k++; continue; }
+    if (c === ']') { if (bracket > 0) bracket--; k++; continue; }
+    if (c === '{') {
+      if (angle === 0 && paren === 0 && brace === 0 && bracket === 0) {
+        // Body-opener heuristic: the signature's body `{` is followed by
+        // only whitespace until the next newline (or end-of-tail). An
+        // object-literal type `{` always carries members immediately
+        // after, so it fails this test and falls through to brace++.
+        let j = k + 1;
+        while (j < tail.length && (tail[j] === ' ' || tail[j] === '\t')) j++;
+        if (j >= tail.length || tail[j] === '\n') return k;
+      }
+      brace++;
+      k++;
+      continue;
+    }
+    if (c === '}') { if (brace > 0) brace--; k++; continue; }
+    k++;
+  }
+  return tail.length;
+}
+
+/**
+ * Extract the argument substring of the first `db.prepare(...)` call inside
+ * `chunk`. Walks character-by-character starting after the opening `(`,
+ * tracks paren depth, and respects string-literal delimiters (backtick,
+ * single quote, double quote) so a `)` appearing *inside* a SQL string
+ * literal does not prematurely close the call.
+ *
+ * Returns the substring between the opening `(` and the matching `)`. If
+ * no `db.prepare(` is found, returns the original chunk unchanged. If the
+ * call is never closed inside `chunk` (e.g. because the lookahead window
+ * was too short), returns from `(` to end-of-chunk so the downstream regex
+ * still has something to match.
+ *
+ * Replaces the prior `chunk.indexOf(');')` truncation, which silently
+ * dropped half of any SQL containing an inline `);` inside a string
+ * literal — a CHECK constraint, an inline SQL comment, or any string
+ * fragment with `');` would all skip the workspace_id scan and produce
+ * a silent false-negative. The exact failure class documented as
+ * Category C in the 2026-04-10 audit plan.
+ */
+export function extractDbPrepareArg(chunk: string): string {
+  const startIdx = chunk.search(/db\.prepare\s*\(/);
+  if (startIdx === -1) return chunk;
+  let i = chunk.indexOf('(', startIdx);
+  if (i === -1) return chunk;
+  i++; // step past the opening (
+  const argStart = i;
+  let depth = 1;
+  let quote: string | null = null;
+  while (i < chunk.length) {
+    const ch = chunk[i];
+    if (quote) {
+      // Inside a string literal: handle backslash-escapes (\' \" \\ etc.)
+      // and the closing delimiter. We don't parse template-literal
+      // ${...} interpolation — the SQL we care about is plain text and
+      // any embedded JS is irrelevant to paren depth.
+      if (ch === '\\' && i + 1 < chunk.length) { i += 2; continue; }
+      if (ch === quote) quote = null;
+    } else {
+      if (ch === '`' || ch === "'" || ch === '"') quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') {
+        depth--;
+        if (depth === 0) return chunk.slice(argStart, i);
+      }
+    }
+    i++;
+  }
+  return chunk.slice(argStart); // never closed within chunk — fall through
+}
+
+// ─── Slice field rendering helpers ────────────────────────────────────────────
+//
+// Used by the 'Assembled-but-never-rendered slice fields' rule to detect fields
+// declared in *Slice interfaces (shared/types/intelligence.ts) but never referenced
+// in their corresponding format*Section function (server/workspace-intelligence.ts).
+// Must live at module scope because the rule lives in the CHECKS array and its
+// customCheck closure looks these up by lexical binding at invocation time.
+
+/** Map of slice interface name → formatter function name. */
+const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> = [
+  { sliceName: 'SeoContextSlice', formatterName: 'formatSeoContextSection' },
+  { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
+  { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
+  { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
+  { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
+  { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
+  { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
+  { sliceName: 'OperationalSlice', formatterName: 'formatOperationalSection' },
+];
+
+/** Fields intentionally not rendered (complex nested types, metadata, or
+ *  rendering handled differently — e.g. destructured `const { bySeverity } = ...`
+ *  which the property-access regex can't catch). */
+const KNOWN_UNRENDERED_FIELDS = new Set([
+  // SeoContextSlice
+  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
+  // InsightsSlice
+  'byType', 'forPage',
+  // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
+  'bySeverity',
+  // LearningsSlice
+  'forPage', 'topWins', 'winRateByActionType',
+  // ContentPipelineSlice
+  'rewritePlaybook', 'suggestedBriefs',
+  // SiteHealthSlice
+  'aeoReadiness', 'redirectDetails',
+  // PageProfileSlice
+  // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
+  'searchIntent',
+  // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
+  'insights',
+  // ClientSignalsSlice — these are rendered but may not appear by field name
+  // OperationalSlice
+  // none
+]);
+
+function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
+  // Find the interface declaration — use brace-depth counting to handle nested object types
+  const declStart = typeFileContent.search(new RegExp(`interface ${interfaceName}\\s*\\{`));
+  if (declStart === -1) return [];
+
+  const braceStart = typeFileContent.indexOf('{', declStart);
+  if (braceStart === -1) return [];
+
+  // Walk forward counting braces to find the matching closing brace of the interface itself
+  let depth = 0;
+  let i = braceStart;
+  while (i < typeFileContent.length) {
+    if (typeFileContent[i] === '{') depth++;
+    else if (typeFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) break;
+    }
+    i++;
+  }
+  const body = typeFileContent.slice(braceStart + 1, i);
+
+  // Extract only top-level field names (depth=0 within the body, lines like `  fieldName:`)
+  // Walk the body tracking nested depth so we only extract interface-level keys
+  const fields: string[] = [];
+  let nestedDepth = 0;
+  for (const line of body.split('\n')) {
+    for (const ch of line) {
+      if (ch === '{') nestedDepth++;
+      else if (ch === '}') nestedDepth--;
+    }
+    if (nestedDepth === 0) {
+      const m = line.match(/^\s+(\w+)\??:/);
+      if (m) fields.push(m[1]);
+    }
+  }
+  return fields;
+}
+
+function extractFormatterBody(formatterFileContent: string, formatterName: string): string {
+  // Find the function body start
+  const fnStart = formatterFileContent.indexOf(`function ${formatterName}(`);
+  if (fnStart === -1) return '';
+
+  // Find the opening brace
+  const braceStart = formatterFileContent.indexOf('{', fnStart);
+  if (braceStart === -1) return '';
+
+  // Walk forward counting braces to find the closing brace
+  let depth = 0;
+  let i = braceStart;
+  while (i < formatterFileContent.length) {
+    if (formatterFileContent[i] === '{') depth++;
+    else if (formatterFileContent[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        return formatterFileContent.slice(braceStart, i + 1);
+      }
+    }
+    i++;
+  }
+  return '';
+}
+
+/**
+ * Pure helper for the 'Assembled-but-never-rendered slice fields' rule.
+ *
+ * Exported so the harness can exercise it directly without monkeypatching ROOT.
+ * Takes both file contents as strings plus the paths to cite in hits, so a
+ * test can pass synthetic fixtures while production uses the real repo files.
+ *
+ * Returns a list of matches for fields declared in any *Slice interface in
+ * `typesContent` but never referenced in the corresponding format*Section
+ * function in `serverContent`. Fields in KNOWN_UNRENDERED_FIELDS are skipped.
+ */
+export function findUnrenderedSliceFields(
+  typesContent: string,
+  serverContent: string,
+  typesPath: string,
+  serverPath: string,
+): CustomCheckMatch[] {
+  if (!typesContent || !serverContent) return [];
+  const hits: CustomCheckMatch[] = [];
+  for (const { sliceName, formatterName } of SLICE_FORMATTER_MAP) {
+    const fields = extractInterfaceFields(typesContent, sliceName);
+    const formatterBody = extractFormatterBody(serverContent, formatterName);
+    if (!formatterBody) {
+      hits.push({
+        file: serverPath,
+        line: 1,
+        text: `${sliceName}: formatter ${formatterName} not found`,
+      });
+      continue;
+    }
+    for (const field of fields) {
+      if (KNOWN_UNRENDERED_FIELDS.has(field)) continue;
+      if (
+        !formatterBody.includes(`.${field}`) &&
+        !formatterBody.includes(`['${field}']`) &&
+        !formatterBody.includes(`["${field}"]`)
+      ) {
+        // Locate the field's declaration line in the types file for
+        // actionable output. Falls back to line 1 if not found.
+        const typeLines = typesContent.split('\n');
+        const fieldLineIdx = typeLines.findIndex(l => new RegExp(`^\\s+${field}\\??:`).test(l));
+        hits.push({
+          file: typesPath,
+          line: fieldLineIdx >= 0 ? fieldLineIdx + 1 : 1,
+          text: `${sliceName}.${field} → not referenced in ${formatterName}`,
+        });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * Pure helper for the 'Constants in sync (STUDIO_NAME, STUDIO_URL)' rule.
+ *
+ * Exported so the harness can exercise it directly without monkeypatching ROOT.
+ * Takes both file contents as strings plus the server path to cite in hits.
+ *
+ * Returns a list of matches for each STUDIO_* constant whose value differs
+ * between `serverSrc` and `frontendSrc`. The `serverConstPath` is the jump
+ * target written into each hit so clicking takes you to the server file's
+ * declaration line.
+ */
+export function compareStudioConstants(
+  serverSrc: string,
+  frontendSrc: string,
+  serverConstPath: string,
+): CustomCheckMatch[] {
+  if (!serverSrc || !frontendSrc) return [];
+  const extract = (src: string, name: string): string | null => {
+    const m = src.match(new RegExp(`export const ${name}\\s*=\\s*['"]([^'"]+)['"]`));
+    return m?.[1] ?? null;
+  };
+  const hits: CustomCheckMatch[] = [];
+  for (const name of ['STUDIO_NAME', 'STUDIO_URL']) {
+    const sv = extract(serverSrc, name);
+    const fv = extract(frontendSrc, name);
+    if (sv !== fv) {
+      // Point at the server file's declaration line for a useful jump target.
+      const lines = serverSrc.split('\n');
+      const lineIdx = lines.findIndex(l => l.includes(`export const ${name}`));
+      hits.push({
+        file: serverConstPath,
+        line: lineIdx >= 0 ? lineIdx + 1 : 1,
+        text: `${name}: server='${sv}' vs frontend='${fv}'`,
+      });
+    }
+  }
+  return hits;
+}
+
+// ─── Brand-engine route list ──────────────────────────────────────────────────
+// Used by the 'requireAuth in brand-engine routes' rule. These routes must use
+// `requireWorkspaceAccess` — the admin panel authenticates via HMAC (global gate)
+// and `requireAuth` (JWT-only) would 401 every admin call. See Auth Conventions
+// in CLAUDE.md.
+//
+// Stored as a Set of *basenames* so the rule can be exercised against fixture
+// files under tmpdir (where the relative path is `rule-33/case-1/...`, not
+// `server/routes/...`). Basename matching is safe because Express mounts these
+// routes under specific, unambiguous filenames — there is no other
+// `voice-calibration.ts` in the repo that could shadow them.
+export const BRAND_ENGINE_ROUTE_BASENAMES: ReadonlySet<string> = new Set([
+  'voice-calibration.ts',
+  'discovery-ingestion.ts',
+  'brand-identity.ts',
+  'brandscript.ts',
+  'page-strategy.ts',
+  'copy-pipeline.ts',
+]);
+
+export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
     pattern: 'purple-',
@@ -113,7 +719,12 @@ const CHECKS: Check[] = [
     name: 'Bare JSON.parse on server',
     pattern: 'JSON\\.parse\\(',
     fileGlobs: ['*.ts'],
-    // json-validation.ts is the implementation; the rest parse AI API response strings (not DB columns)
+    // This rule's INTENT is "server-side DB column parses must use parseJsonSafe".
+    // Narrowed to `server/` so it can't accidentally fire on frontend code
+    // (sessionStorage reads, WebSocket message handlers, etc.) which is a
+    // different class of parse. Adding a new server/ exclusion means the file
+    // parses non-DB data (AI response strings, file contents, WS messages).
+    pathFilter: 'server/',
     exclude: [
       'server/db/json-validation.ts', 'server/content-posts-ai.ts', 'server/routes/keyword-strategy.ts',
       'server/content-brief.ts', 'server/routes/aeo-review.ts', 'server/routes/jobs.ts',
@@ -125,6 +736,19 @@ const CHECKS: Check[] = [
       'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
+      'server/semrush.ts', // disk files: SEMRush API usage log + credit log files (not DB columns)
+      'server/providers/dataforseo-provider.ts', // disk files: DataForSEO credit log files (not DB columns)
+      'server/monthly-report.ts', // disk files: sent-report tracking + report output files (not DB columns)
+      'server/competitor-schema.ts', // HTTP fetch response (JSON-LD from HTML) + disk cache file (not DB columns)
+      'server/storage-stats.ts', // disk files: workspace storage stat files (not DB columns)
+      'server/db/migrate-json.ts', // disk files: one-time migration tool reads legacy flat-file JSON stores (not DB columns)
+      'server/db/json-column.ts', // safe JSON column helper — implements the wrapper, not a raw DB read
+      'server/email-queue.ts', // disk file: email queue persistence file (not DB columns)
+      'server/routes/semrush.ts', // disk cache files: SEMRush response cache (not DB columns)
+      'server/routes/reports.ts', // disk files: report output files served via API (not DB columns)
+      'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
+      'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
+      'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -134,15 +758,80 @@ const CHECKS: Check[] = [
     pattern: 'hmpsn[ .]studio',
     fileGlobs: ['*.ts', '*.tsx'],
     exclude: ['server/constants.ts', 'src/constants.ts'],
+    excludeLines: [
+      'hmpsn-studio-logo-wordmark-white.svg',
+      'alt="hmpsn studio"',
+      'alt="hmpsn.studio"',
+    ],
     message: 'Use the STUDIO_NAME / STUDIO_URL constant from src/constants.ts (frontend) or server/constants.ts (backend).',
     severity: 'error',
   },
   {
-    name: 'Raw fetch() in components',
-    pattern: '(?<![a-zA-Z])fetch\\(',
+    // Do-not-reintroduce rule. `formatBrandVoiceForPrompt` was deleted in PR #168
+    // because it bypassed voice-profile authority: any caller that grabbed the
+    // helper and wrapped the raw `seo?.brandVoice` field silently dropped the
+    // calibrated DNA/samples/guardrails layers that `buildSeoContext` applies
+    // via `effectiveBrandVoiceBlock`. The TypeScript signature didn't change
+    // when voice profiles were added, so the compiler couldn't catch the bypass
+    // — that's why we mechanize the ban here. See CLAUDE.md
+    // "Authority-layered fields — expose one resolved representation, never raw
+    // + format helper" for the general principle.
+    //
+    // Tests and auto-generated codesight files are excluded because they
+    // legitimately reference the deleted name when explaining why it's gone.
+    name: 'formatBrandVoiceForPrompt reintroduction',
+    pattern: '\\bformatBrandVoiceForPrompt\\b',
     fileGlobs: ['*.ts', '*.tsx'],
-    message: 'Use typed API client modules from src/api/ — no raw fetch() in components.',
+    exclude: [
+      'tests/',
+      '.codesight/',
+      'scripts/pr-check.ts', // this rule itself references the name
+    ],
+    message: 'formatBrandVoiceForPrompt was deleted in PR #168 because it bypassed voice-profile authority. Use `seo?.effectiveBrandVoiceBlock ?? ""` — it is pre-formatted by buildSeoContext with full authority applied. See CLAUDE.md "Authority-layered fields — expose one resolved representation, never raw + format helper".',
+    severity: 'error',
+    rationale: 'A generic format helper that wraps a raw authority-layered field bypasses the authority chain silently — the compiler cannot catch it because the raw field type is still `string`.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    name: 'Raw fetch() in components',
+    // customCheck (was regex) — see Round 2 Task P1.5. The original pattern
+    // `(?<![a-zA-Z])fetch\\(` uses a lookbehind assertion. BSD `grep -E`
+    // does not support lookbehind; running it errored with
+    // `grep: repetition-operator operand invalid` and `|| true` in the
+    // shell invocation silently swallowed the failure. The runner then
+    // reported ✓ while 6 real violations existed in src/components.
+    // Silent-failure Category B/D hybrid (regex feature unsupported by the
+    // shell tool). Fix: run the regex in-process as a JS regex where
+    // lookbehind is supported natively.
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/components/',
+    excludeLines: ['// fetch-ok'],
+    message: 'Use typed API client modules from src/api/ — no raw fetch() in components. Add // fetch-ok on the fetch line or the line immediately above if intentional (e.g., uploading FormData where api/ has no helper).',
     severity: 'warn',
+    rationale: 'Raw fetch() bypasses typed API wrappers, error normalization, and auth headers — the #1 source of untyped response bugs in UI code.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // JS regex — lookbehind is supported here even though BSD grep -E
+      // chokes on it. Matches bare `fetch(` but not `.fetch(` (method calls
+      // like `client.fetch()` or `queryClient.fetchQuery()`) or `refetch(`
+      // (React Query). The char before `fetch` must not be a letter or `.`.
+      const fetchRe = /(?<![a-zA-Z.])fetch\s*\(/;
+      for (const file of files) {
+        if (!file.includes('/src/components/')) continue;
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('fetch(')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!fetchRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// fetch-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Local prepared statement caching',
@@ -238,7 +927,7 @@ const CHECKS: Check[] = [
     // Catches formatForPrompt( calls that pass a literal array for sections, e.g. sections: ['seoContext', 'learnings']
     // These are dangerous because the literal can diverge from the slices array.
     pattern: 'formatForPrompt\\(.*sections:\\s*\\[',
-    fileGlobs: ['**/*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/workspace-intelligence.ts', 'tests/'],
     excludeLines: ['// bip-ok'],
@@ -257,33 +946,94 @@ const CHECKS: Check[] = [
   },
   {
     name: 'Raw string literal in broadcastToWorkspace() event arg',
-    // Matches: broadcastToWorkspace(anything, 'some:event', ...) or broadcastToWorkspace(anything, "some:event", ...)
-    // Does NOT match: broadcastToWorkspace(wsId, WS_EVENTS.FOO, data) — no quote after the second comma
-    pattern: 'broadcastToWorkspace\\([^,]+,\\s*[\'"]',
+    // customCheck (was regex) — see Round 2 Task P1.3. The original pattern
+    // `broadcastToWorkspace\\([^,]+,\\s*[\'"]` embedded a literal `"`
+    // which, when interpolated into the outer `grep -E "${pattern}"`
+    // invocation in `checkDirectory`, closed the outer double-quote and
+    // mangled the shell command. `grep` errored; `|| true` swallowed the
+    // error; the runner reported ✓ while 36+ real violations existed
+    // (server/feedback.ts, server/routes/workspaces.ts, etc.).
+    // Silent-failure Category D (shell quoting). Fix: run the regex
+    // in-process as a JS regex — the shell never sees it.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/broadcast.ts'],
     excludeLines: ['// ws-event-ok'],
-    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
-    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
-    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    message: 'Use WS_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add // ws-event-ok on the broadcast line or the line immediately above if intentional.',
+    // warn not error: ~36 pre-existing violations in unchanged files;
+    // new code is blocked by the changed-files scan. Upgrade to error
+    // once the Task B12 backfill is done.
     severity: 'warn',
+    rationale: 'Silent drift between broadcast emitter and frontend handler when an event string is typo\u2019d or renamed on one side only.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches `broadcastToWorkspace(anything, 'event', ...)` or the
+      // double-quoted variant. Does NOT match
+      // `broadcastToWorkspace(wsId, WS_EVENTS.FOO, data)` because the
+      // second arg does not start with a quote.
+      const bcastRe = /broadcastToWorkspace\s*\([^,]+,\s*['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('broadcastToWorkspace')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!bcastRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ws-event-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     name: 'Raw string literal in broadcast() event arg',
-    // Matches standalone broadcast('event') but NOT _broadcast('event') or _broadcastToWorkspace('event').
-    // Uses (^|[^a-zA-Z_]) to require broadcast() is not preceded by a letter/underscore,
-    // excluding private wrappers like websocket.ts's _broadcast() which use string literals.
-    // Note: grep -E does not support lookbehind, so we use a character class exclusion instead.
-    pattern: '(^|[^a-zA-Z_])broadcast\\(\\s*[\'"]',
+    // customCheck (was regex) — same Category D shell-quoting bug as the
+    // broadcastToWorkspace rule above. Original pattern was
+    // `(^|[^a-zA-Z_])broadcast\\(\\s*[\'"]`. Preserves the original
+    // exclusion semantics: `broadcast(` is flagged only when not preceded
+    // by a letter or underscore, so private wrappers like
+    // `_broadcast()` and `websocket._broadcast()` do not trigger.
+    pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
     exclude: ['server/broadcast.ts'],
     excludeLines: ['// ws-event-ok'],
-    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add `// ws-event-ok` if intentional.',
-    // warn not error: ~50 pre-existing violations in unchanged files; new code is blocked
-    // by the changed-files scan. Upgrade to error once the codebase-wide cleanup is done.
+    message: 'Use ADMIN_EVENTS.* constants from server/ws-events.ts instead of string literals. Literals cause silent drift between broadcast and frontend handler. Add // ws-event-ok on the broadcast line or the line immediately above if intentional.',
     severity: 'warn',
+    rationale: 'Silent drift between broadcast emitter and frontend handler when an event string is typo\u2019d or renamed on one side only.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // The `(?:^|[^a-zA-Z_])` prefix preserves the original rule's
+      // exclusion of `_broadcast(` (private wrappers in websocket.ts).
+      // Note: `.` IS in `[^a-zA-Z_]`, so `foo.broadcast('literal')` WILL
+      // be flagged — this is intentional. There are currently no
+      // legitimate method-call `.broadcast('literal')` sites in server/
+      // (only the global helper and the `_broadcast` private wrappers),
+      // so no false-positive carve-out is needed. If one is ever added,
+      // extend the exclusion to `[^a-zA-Z_.]` and annotate the exception.
+      // JS regex doesn't need shell escaping so both quote styles work
+      // directly (the original regex-in-shell version couldn't use `['"]`
+      // without closing the outer shell quote — Category D).
+      const bcastRe = /(?:^|[^a-zA-Z_])broadcast\s*\(\s*['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('broadcast(')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!bcastRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ws-event-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     // Catches always-true placeholder test assertions committed as real tests.
@@ -342,8 +1092,13 @@ const CHECKS: Check[] = [
     pattern: "SET\\s+(status|batch_status)\\s*=\\s*[?@]",
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    excludeLines: ['status-ok', 'validateTransition'],
-    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok if this is a non-state-machine column.',
+    // Accept both JS comment (`// status-ok`) and SQL comment (`-- status-ok`)
+    // forms since this rule fires on lines that are often inside backtick-SQL
+    // template literals where `//` would break the SQL. The comment prefix
+    // (`//` or `--`) is required so the hatch can't false-suppress via a bare
+    // `status-ok` substring inside an identifier, enum value, or string literal.
+    excludeLines: ['// status-ok', '-- status-ok', 'validateTransition'],
+    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) if this is a non-state-machine column.',
     severity: 'warn',
   },
   {
@@ -419,6 +1174,877 @@ const CHECKS: Check[] = [
     message: 'Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum.',
     severity: 'error',
   },
+
+  // ─── New rules (2026-04-10 audit) ───
+  {
+    name: 'useGlobalAdminEvents import restriction',
+    // customCheck (was regex) — see Round 2 postmortem in
+    // docs/superpowers/plans/2026-04-10-pr-check-audit-and-backfill.md.
+    // The original `pattern: "from '[^']*useGlobalAdminEvents"` caught only
+    // single-quoted imports; a double-quoted importer silently bypassed an
+    // error-severity gate (silent-failure Category B). A regex with
+    // `['"]` can't be passed through `grep -E "..."` because the `"` closes
+    // the outer shell quote, so the only safe fix is a customCheck that
+    // runs the detection as a JS regex in-process.
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    // Allowlist of audited global-fanout sites. Any new importer must be
+    // reviewed and added here explicitly. Enforced by resolveCheckFileList.
+    exclude: [
+      'src/hooks/useGlobalAdminEvents.ts',
+      'src/components/WorkspaceOverview.tsx',
+      'src/App.tsx',
+    ],
+    excludeLines: ['// global-events-ok'],
+    message: 'useGlobalAdminEvents does not subscribe — workspace-scoped events will be silently filtered. Use useWorkspaceEvents(workspaceId, ...) instead. Only audited global-fanout sites may import it. Add // global-events-ok on the import line or the line immediately above if this file is a legitimate global-fanout site.',
+    severity: 'error',
+    rationale: 'Silent dead broadcast handlers: the frontend never receives the event and the UI appears stale until a manual refetch.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Match `from '...useGlobalAdminEvents...'` OR
+      //        `from "...useGlobalAdminEvents..."`
+      // Anchoring on `from ['"]` ensures we only flag actual import
+      // statements — bare identifier references, string-literal mentions,
+      // and comments do not trigger. The quote-style class is the whole
+      // point of this fix.
+      const importRe = /from\s+['"][^'"]*useGlobalAdminEvents/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!importRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// global-events-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Global keydown missing isContentEditable guard',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    exclude: ['src/App.tsx'],
+    excludeLines: ['// keydown-ok'],
+    message: 'Global keydown handlers must early-return if e.target is an input/textarea/contenteditable. Use the pattern from src/App.tsx (check HTMLInputElement/HTMLTextAreaElement/HTMLSelectElement and isContentEditable). Add // keydown-ok if intentional.',
+    severity: 'error',
+    rationale: 'Escape/Enter/arrow keys hijack text fields, destroying the user\u2019s typing or closing modals from the wrong event.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches both single- and double-quoted 'keydown'.
+      const listenerRe = /addEventListener\s*\(\s*['"]keydown['"]/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!listenerRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// keydown-ok')) continue;
+          // Locate the handler body and scan it for an isContentEditable guard.
+          // Common shapes:
+          //   addEventListener('keydown', (e) => { ... })       ← inline arrow
+          //   addEventListener('keydown', handleKey)            ← referenced
+          // For the referenced form we fall back to a whole-file scan for
+          // isContentEditable (low false-negative risk — the guard either
+          // exists in the file or it doesn't).
+          const lookahead = lines.slice(i, Math.min(lines.length, i + KEYDOWN_BODY_LOOKAHEAD)).join('\n');
+          const hasInlineBody = /=>\s*\{/.test(lookahead);
+          let body: string;
+          if (hasInlineBody) {
+            // Walk forward to the opening brace of the arrow body and
+            // brace-match to the close.
+            const joined = lines.slice(i).join('\n');
+            const arrowIdx = joined.search(/=>\s*\{/);
+            if (arrowIdx === -1) { body = lookahead; }
+            else {
+              const bodyOpen = joined.indexOf('{', arrowIdx);
+              let depth = 0;
+              let j = bodyOpen;
+              while (j < joined.length) {
+                if (joined[j] === '{') depth++;
+                else if (joined[j] === '}') { depth--; if (depth === 0) break; }
+                j++;
+              }
+              body = joined.slice(bodyOpen, Math.min(j + 1, joined.length));
+            }
+          } else {
+            // Referenced-handler form: scan the entire file for the guard.
+            body = content;
+          }
+          if (/\bisContentEditable\b/.test(body)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Multi-step DB writes outside db.transaction()',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    // Tests run single-writer by definition; multi-write setup in a test is
+    // never a concurrency concern. Migrations are their own txn model.
+    exclude: ['server/db/migrations', '__tests__'],
+    excludeLines: ['// txn-ok'],
+    message: 'Multiple sequential db.prepare().run() calls must be wrapped in db.transaction() to prevent partial-failure state corruption. Add // txn-ok on the first prepare line if the pair is intentionally non-atomic.',
+    severity: 'error',
+    rationale: 'Partial failure leaves the DB in an inconsistent state; retries then hit PRIMARY KEY violations and permanently block the operation.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // A "write" is a prepare immediately chained with .run(...) on the same
+      // or next few lines. Module-level `stmts = createStmtCache({ foo:
+      // db.prepare(...) })` blocks prepare statements as reusable handles, not
+      // as executed writes, and must not trigger this rule. We detect an
+      // executed write by looking for `.run(` within 8 lines after prepare(
+      // (handles SQL strings that span multiple lines) but not on a line that
+      // is clearly a cache definition (contains `: db.prepare`).
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (file.includes('/server/db/migrations/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const writeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
+          // Skip cache-style definitions: `  foo: db.prepare(...)` or
+          // `const foo = db.prepare(...)` without an executing `.run(`.
+          const lookahead = lines.slice(i, Math.min(lines.length, i + DB_PREPARE_MULTILINE_LOOKAHEAD)).join('\n');
+          if (!/\.run\s*\(/.test(lookahead)) continue;
+          // Skip stmts() cache definitions — these are always part of a
+          // createStmtCache object literal where every value is a prepare.
+          if (/:\s*db\.prepare/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// txn-ok')) continue;
+          writeIdx.push(i);
+        }
+        if (writeIdx.length < 2) continue;
+        // A function boundary between two writes means they are in separate
+        // functions and are NOT a multi-step mutation. See FUNC_BOUNDARY_RE
+        // (module scope) for the rationale behind matching only openers.
+        const reported = new Set<number>();
+        for (let k = 0; k < writeIdx.length - 1; k++) {
+          const a = writeIdx[k];
+          const b = writeIdx[k + 1];
+          // Belt-and-suspenders: the function-opener walkback below already
+          // prevents cross-function pairing, but a hard distance cap still
+          // bounds the worst-case window. See TXN_PAIR_MAX_DISTANCE.
+          if (b - a > TXN_PAIR_MAX_DISTANCE) continue;
+          // Skip if a function boundary sits between the two writes — they
+          // live in different scopes and a shared transaction is nonsensical.
+          let boundaryBetween = false;
+          for (let m = a + 1; m < b; m++) {
+            if (FUNC_BOUNDARY_RE.test(lines[m])) { boundaryBetween = true; break; }
+          }
+          if (boundaryBetween) continue;
+          const winStart = Math.max(0, a - TXN_WRAPPER_LOOKBEHIND);
+          const lookbehind = lines.slice(winStart, a + 1).join('\n');
+          if (/\bdb\.transaction\s*\(/.test(lookbehind)) continue;
+          if (reported.has(a)) continue;
+          reported.add(a);
+          hits.push({ file, line: a + 1, text: lines[a].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'AI call before db.prepare without transaction guard',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: [
+      'server/openai-helpers.ts',
+      'server/anthropic-helpers.ts',
+      'server/prompt-assembly.ts',
+    ],
+    excludeLines: ['// ai-race-ok'],
+    message: 'AI calls take ~5s; concurrent requests race existence checks before the write. Put the existence check + INSERT inside db.transaction() and catch SQLITE_CONSTRAINT_UNIQUE. Add // ai-race-ok if the handler is provably single-writer.',
+    severity: 'error',
+    rationale: 'Two concurrent handlers both observe \u201cno existing row\u201d during the AI call and both INSERT, creating permanent duplicate rows on a logical natural key.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (/\/(openai-helpers|anthropic-helpers|prompt-assembly)\.ts$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const aiRe = /\b(callOpenAI|callAnthropic|callCreativeAI)\s*\(/;
+        for (let i = 0; i < lines.length; i++) {
+          if (!aiRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ai-race-ok')) continue;
+          const lookahead = lines.slice(i + 1, i + 1 + AI_RACE_FORWARD_LOOKAHEAD);
+          const hasWrite = lookahead.some(l => /\bdb\.prepare\s*\(/.test(l) || /\bstmts\s*\(\s*\)\./.test(l));
+          if (!hasWrite) continue;
+          // Forward scan: txn declared AFTER the AI call (rare — requires an
+          // async txn, which SQLite doesn't support, so this is mostly a
+          // defensive check).
+          const hasTxnForward = lookahead.some(l => /\bdb\.transaction\s*\(/.test(l));
+          if (hasTxnForward) continue;
+          // Backward scan: the CANONICAL correct pattern hoists the txn above
+          // the AI call because you cannot `await` inside db.transaction():
+          //   const doWork = db.transaction(() => { existence-check + upsert });
+          //   const result = await callOpenAI(...);
+          //   doWork();
+          // Without this backward scan, the rule false-positives on every
+          // correct implementation of the ai-dispatch-patterns.md contract.
+          const before = lines.slice(Math.max(0, i - AI_RACE_BACKWARD_LOOKBEHIND), i);
+          const hasTxnBackward = before.some(l => /\bdb\.transaction\s*\(/.test(l));
+          if (hasTxnBackward) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'UPDATE/DELETE missing workspace_id scope',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/db/migrations'],
+    excludeLines: ['// ws-scope-ok'],
+    message: 'Workspace-scoped tables must include workspace_id in every UPDATE and DELETE. Defence-in-depth against compromised auth or mis-routed requests. Add // ws-scope-ok if the row key is already workspace-unique.',
+    severity: 'error',
+    rationale: 'Cross-tenant read or write exposure: a forged row id or misrouted request can touch another workspace\u2019s data if the auth layer is ever compromised.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (file.includes('/server/db/migrations/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\bdb\.prepare\s*\(/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// ws-scope-ok')) continue;
+          // Grab the next WS_SCOPE_SQL_LOOKAHEAD lines to reconstruct the SQL
+          // string; the paren-depth tokeniser walks the chunk and returns the
+          // substring inside `db.prepare(...)`, respecting string-literal
+          // delimiters so an inline `);` inside a SQL CHECK constraint or
+          // string fragment does not prematurely close the call. Replaces
+          // the prior `chunk.indexOf(');')` truncation — see
+          // `extractDbPrepareArg` doc comment for the failure class avoided.
+          const chunk = lines.slice(i, Math.min(lines.length, i + WS_SCOPE_SQL_LOOKAHEAD)).join('\n');
+          // The tokeniser returns the substring strictly inside the
+          // `db.prepare(` parens — i.e. it has already stripped `db.prepare(`
+          // and the matching `)`. The first non-whitespace character of the
+          // result should therefore be the opening string delimiter.
+          const sqlBlob = extractDbPrepareArg(chunk);
+          // Normalise whitespace so regex patterns can match across newlines
+          const sql = sqlBlob.replace(/\s+/g, ' ');
+          // Extract the SQL statement inside the template/quote — the arg
+          // begins with a backtick/quote, so anchor at the start of the
+          // (whitespace-stripped) blob. Capture the opening delimiter and use
+          // \1 so embedded different-quote characters don't truncate.
+          const m = sql.match(/^\s*([`'"])([\s\S]*?)\1/);
+          const stmt = (m?.[2] ?? '').trim();
+          if (!stmt) continue;
+          const upper = stmt.toUpperCase();
+          let tableName: string | null = null;
+          if (upper.startsWith('UPDATE')) {
+            const tm = stmt.match(/UPDATE\s+(\w+)/i);
+            tableName = tm?.[1] ?? null;
+          } else if (upper.startsWith('DELETE FROM')) {
+            const tm = stmt.match(/DELETE\s+FROM\s+(\w+)/i);
+            tableName = tm?.[1] ?? null;
+          }
+          if (!tableName) continue;
+          if (!workspaceScopedTables().has(tableName)) continue;
+          if (/workspace_id/i.test(stmt)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'getOrCreate* function returns nullable',
+    // Extended in 2026-04-10 review: also catch arrow-form exports and class
+    // methods, and tolerate object-type parameters that contain `{`. The
+    // customCheck walks from `getOrCreate…(` past the matching `)` and then
+    // checks the return-type annotation for `| null`.
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// getorcreate-nullable-ok'],
+    message: 'getOrCreate* always returns an entity (creates one if missing). Its TypeScript return type must not include | null — callers would write dead guard branches. If it can genuinely fail, throw instead. Add // getorcreate-nullable-ok only if you have renamed the function and the "getOrCreate" name is misleading.',
+    severity: 'error',
+    rationale: 'Dead `if (!result)` guard branches lie to reviewers about the function\u2019s real shape and hide downstream assumptions that would fail on a genuine null.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches two declaration shapes:
+      //   function getOrCreateFoo(             ← function declaration
+      //   const getOrCreateFoo = (): T         ← arrow / const export
+      // Class methods are excluded intentionally — no getOrCreate* methods
+      // exist in the codebase and a bare `getOrCreateFoo(` without modifier
+      // would also match call sites.
+      const declRe =
+        /^\s*(?:(?:export\s+)?(?:async\s+)?function\s+getOrCreate\w+\s*\(|(?:export\s+)?(?:const|let)\s+getOrCreate\w+\s*=\s*(?:async\s+)?\()/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('getOrCreate')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(declRe);
+          if (!m) continue;
+          if (hasHatch(lines, i, '// getorcreate-nullable-ok')) continue;
+          // Heuristic: skip lines that look like plain call sites (no `:` or
+          // `{` ahead). A declaration always has a return-type annotation or
+          // an opening brace within ~10 lines.
+          const joined = lines.slice(i, Math.min(lines.length, i + GETORCREATE_RETURN_TYPE_LOOKAHEAD)).join('\n');
+          // Walk forward past the matching `)` that closes the parameter list
+          // so object-typed params containing `{` don't fool us. Find the
+          // first `(` on the line, then brace-walk.
+          const openIdx = joined.indexOf('(');
+          if (openIdx === -1) continue;
+          let depth = 0;
+          let j = openIdx;
+          while (j < joined.length) {
+            if (joined[j] === '(') depth++;
+            else if (joined[j] === ')') { depth--; if (depth === 0) break; }
+            j++;
+          }
+          if (j >= joined.length) continue;
+          // After the closing `)`, read until the body opener — either the
+          // function-body `{` (followed only by whitespace to EOL) or the
+          // arrow `=>`. `findReturnRegionEnd` tracks brace/angle/paren/
+          // bracket depth so object-literal types, `Promise<...>` generics,
+          // and tuple types inside the return annotation are NOT mistaken
+          // for the body opener. Without depth tracking, `tail.search(/[{=]/)`
+          // truncated `returnRegion` at the first `{` it saw, silently
+          // bypassing every declaration whose return type contained `{`.
+          const tail = joined.slice(j + 1);
+          const bodyIdx = findReturnRegionEnd(tail);
+          const returnRegion = tail.slice(0, bodyIdx);
+          if (!/:\s*[^,;]*\|\s*null\b/.test(returnRegion) &&
+              !/:\s*Promise<[^>]*\|\s*null\s*>/.test(returnRegion)) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Record<string, unknown> in shared/types',
+    // Tolerate flexible spacing: `Record<string,unknown>`, `Record< string , unknown >`,
+    // and `Record<string,  unknown>` all match. A developer using extra
+    // whitespace (or none) must not bypass the rule.
+    pattern: 'Record<\\s*string\\s*,\\s*unknown\\s*>',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'shared/types/',
+    // Grandfather exception: AnalyticsInsight.data is the discriminated-union
+    // container (InsightDataMap narrows it at the read boundary). This is the
+    // one legitimate escape hatch and is documented in the insight rules.
+    exclude: ['shared/types/analytics.ts'],
+    excludeLines: ['// record-unknown-ok'],
+    message: 'Define typed interfaces at layer boundaries, not Record<string, unknown>. Untyped contracts are the #1 recurring bug pattern. See InsightDataMap for the discriminated-union pattern. Add // record-unknown-ok only for grandfathered escape-hatch fields (e.g. AnalyticsInsight.data).',
+    severity: 'error',
+    rationale: 'Producer/consumer drift: field renames and semantic changes compile silently until a runtime bug surfaces in production.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+  },
+  {
+    name: 'PATCH spread without nested merge',
+    // Require req.body to end at `}`, `)`, `,`, or EOL — NOT at `.field`.
+    // The documented deep-merge fix writes `...req.body.address` inside a
+    // nested spread, which must NOT trigger the rule against the enclosing
+    // `...existing, ...req.body.address` prefix. The `[^.\w]` end boundary
+    // ensures we only match a top-level `req.body` spread, not `req.body.X`.
+    pattern: '\\.\\.\\.(existing|current),\\s*\\.\\.\\.req\\.body([^.\\w]|$)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// patch-spread-ok'],
+    message: 'PATCH endpoints on JSON columns with nested sub-objects must deep-merge. Top-level spread silently replaces nested objects. Add // patch-spread-ok if no nested objects exist.',
+    severity: 'error',
+    rationale: 'Nested sub-objects (e.g. `address` inside a profile blob) are silently replaced instead of merged, clobbering fields the PATCH body didn\u2019t mention.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    name: 'Public-portal mutation without addActivity',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    // No `pathFilter` — the customCheck self-filters via an explicit
+    // `endsWith('public-portal.ts')` guard below. A `pathFilter` here would
+    // be a Category A failure waiting to happen: if the resolveCheckFileList
+    // logic ever drifts (e.g. matches by directory prefix instead of full
+    // suffix), the customCheck silently receives an empty array and reports
+    // ✓. Self-filtering keeps the rule independent of the file-list pipeline.
+    excludeLines: ['// activity-ok'],
+    message: 'Every public-portal POST/PUT/PATCH/DELETE must call addActivity() so admins have visibility into client portal engagement in the activity feed. Add // activity-ok on the router line if this endpoint is intentionally silent (e.g. read-only health probe).',
+    severity: 'error',
+    rationale: 'Admins lose visibility into client portal engagement \u2014 writes performed by clients leave no trace in the activity feed.',
+    claudeMdRef: '#code-conventions',
+    // Doc-only: the customCheck below self-filters to this one file via
+    // `endsWith('server/routes/public-portal.ts')`. Without `displayScope`
+    // the generated docs would show `*.ts` (the file-resolution glob),
+    // which is technically accurate but misleading to readers.
+    displayScope: 'server/routes/public-portal.ts',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Only scan the one target file (if present).
+      // In diff-only mode, files is scoped to changed files — if public-portal.ts
+      // wasn't changed, return early so we don't warn on every unrelated PR.
+      const target = files.find(f => f.endsWith('server/routes/public-portal.ts'));
+      if (!target) return hits;
+      const content = readFileOrEmpty(target);
+      if (!content) return hits;
+      const lines = content.split('\n');
+      // Find all router.<method>( lines.
+      const routeIdx: number[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      for (let i = 0; i < lines.length; i++) {
+        if (routeRe.test(lines[i])) routeIdx.push(i);
+      }
+      for (let k = 0; k < routeIdx.length; k++) {
+        const start = routeIdx[k];
+        if (hasHatch(lines, start, '// activity-ok')) continue;
+        const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+        const routeBodyEnd = Math.min(nextStart, start + PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD);
+        const routeBody = lines.slice(start, routeBodyEnd).join('\n');
+        if (/\baddActivity\s*\(/.test(routeBody)) continue;
+        hits.push({ file: target, line: start + 1, text: lines[start].trim() });
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'broadcastToWorkspace inside bridge callback',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    // Canonical broadcast site + the bridge infrastructure itself.
+    exclude: [
+      'server/broadcast.ts',
+      'server/websocket.ts',
+      'server/ws-events.ts',
+      'server/bridge-infrastructure.ts',
+    ],
+    excludeLines: ['// bridge-broadcast-ok'],
+    message: 'Bridge callbacks must return { modified: N } and let executeBridge dispatch the broadcast. Inline broadcastToWorkspace double-fires. Add // bridge-broadcast-ok if the broadcast is genuinely separate from the bridge result.',
+    severity: 'error',
+    rationale: 'Double-dispatched WS events: every subscriber receives the same update twice, producing UI flicker or masking genuine retries behind idempotency guards.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Also matches debounceBridge — wrapper functions that accept bridge
+      // callbacks and apply rate limiting. A broadcast inside the callback
+      // body still double-fires once the debounced bridge runs.
+      const bridgeRe = /\b(executeBridge|fireBridge|debounceBridge)\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (/\/(broadcast|websocket|ws-events|bridge-infrastructure)\.ts$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !bridgeRe.test(content) || !content.includes('broadcastToWorkspace')) continue;
+        // Walk every bridge call, locate the arrow function body, and scan the
+        // body for broadcastToWorkspace( calls. We find the `async () =>` or
+        // `() =>` opening brace by walking forward from the bridge call site,
+        // then brace-match to find the matching close brace.
+        let cursor = 0;
+        while (cursor < content.length) {
+          const match = bridgeRe.exec(content.slice(cursor));
+          if (!match) break;
+          const absStart = cursor + match.index;
+          cursor = absStart + match[0].length;
+          // Find the start of the callback body within the next ~300 chars.
+          // Pattern: ... , async () => { ... }  or  , () => { ... }
+          const lookAhead = content.slice(cursor, cursor + 400);
+          const arrowMatch = lookAhead.match(/=>\s*\{/);
+          if (!arrowMatch || arrowMatch.index === undefined) continue;
+          const bodyOpen = cursor + arrowMatch.index + arrowMatch[0].length - 1; // position of '{'
+          let depth = 0;
+          let i = bodyOpen;
+          while (i < content.length) {
+            const ch = content[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            i++;
+          }
+          if (i >= content.length) continue;
+          const body = content.slice(bodyOpen, i + 1);
+          if (!body.includes('broadcastToWorkspace(')) continue;
+          // Report each broadcastToWorkspace line inside this body.
+          const fileLines = content.split('\n');
+          const bodyStartLine = content.slice(0, bodyOpen).split('\n').length;
+          const bodyLines = body.split('\n');
+          // TODO: migrate to for...of when refactoring — uses early-exit
+          // returns (`return` inside forEach) which need translating to
+          // `continue`. Mechanically trivial but kept as-is per B9 Step 6's
+          // "skip if early-exit" guidance to minimise risk in this commit.
+          bodyLines.forEach((bl, idx) => {
+            if (!bl.includes('broadcastToWorkspace(')) return;
+            const absLine = bodyStartLine + idx; // 1-indexed file line number
+            // hasHatch takes 0-indexed; fileLines[absLine - 1] is the match line.
+            if (hasHatch(fileLines, absLine - 1, '// bridge-broadcast-ok')) return;
+            hits.push({
+              file,
+              line: absLine,
+              text: bl.trim(),
+            });
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'Layout-driving state set in useEffect',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// effect-layout-ok'],
+    message: 'Layout-driving state must be derived synchronously in the render body (const effective = state && syncCondition). useEffect runs after paint, causing a one-frame layout flash. Add // effect-layout-ok if the state is genuinely post-paint.',
+    severity: 'warn',
+    rationale: 'One-frame layout flash: the browser paints with stale layout state, then the effect runs and re-lays-out, producing visible jitter.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // CLAUDE.md rule: "if a boolean state variable drives layout (padding,
+      // width, sidebar visibility), derive it as `const effective = state &&
+      // syncCondition` and use `effective` in JSX. The effect CAN still run
+      // to clean up backing state, but JSX must read the derived value."
+      //
+      // Two-stage detection:
+      //   1. Layout-setter allowlist: only flag setters whose name implies
+      //      layout (not data, not URL sync, not fetch callbacks).
+      //   2. Derivation escape: if the same file declares a
+      //      `const effective<Name> = ...` that references the layout state,
+      //      the pattern is the DOCUMENTED correct one (effect is the
+      //      cleanup half). Skip it.
+      const layoutSetterRe =
+        /\bset(FocusMode|Collapsed|Expanded|SidebarOpen|SidebarCollapsed|Drawer|DrawerOpen|Modal|ModalOpen|Menu|MenuOpen|Panel|PanelOpen|Visible|Hidden|Show|Width|Height|Padding|Margin|Offset|Top|Left|Right|Bottom|Size)\w*\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('useEffect')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\buseEffect\s*\(/.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// effect-layout-ok')) continue;
+          // Brace-balance the callback body so we don't bleed into an
+          // adjacent useEffect (small components often stack multiple
+          // useEffects within a few lines of each other). We start
+          // counting from the first `{` on or after the useEffect line and
+          // stop when the balance returns to 0. This is not lexer-perfect
+          // (ignores strings/comments) but is good enough for the 99% case
+          // and is bounded by MAX_LOOKAHEAD as a safety net.
+          let bodyStart = -1;
+          let bodyEnd = -1;
+          let depth = 0;
+          let started = false;
+          for (let j = i; j < Math.min(lines.length, i + USE_EFFECT_BODY_LOOKAHEAD); j++) {
+            for (const ch of lines[j]) {
+              if (ch === '{') { depth++; started = true; if (bodyStart === -1) bodyStart = j; }
+              else if (ch === '}') { depth--; }
+            }
+            if (started && depth <= 0) { bodyEnd = j; break; }
+          }
+          if (bodyStart === -1 || bodyEnd === -1) continue;
+          const effectBody = lines.slice(bodyStart, bodyEnd + 1);
+          // Collect every layout-setter called inside this useEffect body
+          // (not just "any match" — we need to know *which* states are set
+          // so the per-state escape check works).
+          const setterNames: string[] = [];
+          for (const l of effectBody) {
+            const m = l.match(/\bset([A-Z]\w*)\s*\(/);
+            if (m && layoutSetterRe.test(l)) setterNames.push(m[1]);
+          }
+          if (setterNames.length === 0) continue;
+          // Per-state escape: the CLAUDE.md rule says "derive it as
+          //   const effective = state && syncCondition"
+          // and use `effective` in JSX. The effect may still run to clean up
+          // backing state. We escape ONLY if EVERY setter called in this
+          // useEffect body has a matching `const effective<X> = ... <state>`
+          // declaration somewhere in the file that references the state
+          // corresponding to that setter. A file-wide escape (one effective*
+          // suppressing every useEffect) was previously too permissive.
+          const allEscaped = setterNames.every((setterName) => {
+            const stateName = setterName[0].toLowerCase() + setterName.slice(1);
+            // `const effective<Anything> = <expression containing stateName>`
+            // Match up to the first `;` or newline so we don't accidentally
+            // span into an unrelated declaration.
+            const escapeRe = new RegExp(
+              `\\bconst\\s+effective\\w*\\s*=[^;\\n]*\\b${stateName}\\b`
+            );
+            return escapeRe.test(content);
+          });
+          if (allEscaped) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Detects fields declared in a *Slice interface whose corresponding
+    // format*Section function never references them. Those fields are
+    // assembled at query time and silently dropped at prompt time — they
+    // never reach the AI. Add to KNOWN_UNRENDERED_FIELDS if intentional.
+    //
+    // Scope: diff-mode fires when either `shared/types/intelligence.ts` or
+    // `server/workspace-intelligence.ts` changes; the customCheck always
+    // reads both from disk. The fileGlobs include both basenames so that
+    // the diff-mode filter matches whichever file triggered the run; the
+    // customCheck then operates on the fixed pair.
+    name: 'Assembled-but-never-rendered slice fields',
+    fileGlobs: ['intelligence.ts', 'workspace-intelligence.ts'],
+    exclude: ['.test.ts'],
+    displayScope: 'shared/types/intelligence.ts + server/workspace-intelligence.ts',
+    message: 'Fields declared in *Slice types but not referenced in their format*Section formatter are silently dropped at prompt time. Add to KNOWN_UNRENDERED_FIELDS in scripts/pr-check.ts if intentionally omitted.',
+    severity: 'warn',
+    rationale: 'A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      // Diff-mode: only run if one of the two source files is in the diff set.
+      // Full-scan mode: resolveCheckFileList returns the files + possible test
+      // variants — non-empty, so the check runs.
+      if (files.length === 0) return [];
+      const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
+      const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
+      return findUnrenderedSliceFields(
+        readFileOrEmpty(typesPath),
+        readFileOrEmpty(serverPath),
+        typesPath,
+        serverPath,
+      );
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Detects `callCreativeAI(...)` calls that lack the `json:` flag in
+    // files that also use `parseJsonFallback`. Mixing the two is a strong
+    // signal that the caller expects JSON back but forgot to opt into the
+    // model's json-mode response format — prompt may succeed on one model
+    // but drift on another.
+    name: 'callCreativeAI without json: flag in files that use parseJsonFallback',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    message: 'Add json: true when the result is parsed as JSON, json: false when prose. See docs/rules/ai-dispatch-patterns.md.',
+    severity: 'warn',
+    rationale: 'callCreativeAI without an explicit json: flag silently drifts between models that return valid JSON and ones that wrap it in prose.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Files excluded from this check and why:
+      //   content-posts-ai.ts — definition file; callCreativeAI lives here, not a consumer
+      //   brand-identity.ts   — uses parseJsonFallback for DB column parsing, not AI output;
+      //                         its callCreativeAI calls correctly return prose (no json: needed)
+      const JSON_MODE_EXCLUSIONS = new Set([
+        path.join(ROOT, 'server/content-posts-ai.ts'),
+        path.join(ROOT, 'server/brand-identity.ts'),
+      ]);
+      for (const file of files) {
+        if (JSON_MODE_EXCLUSIONS.has(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Only flag files that call both callCreativeAI AND parseJsonFallback.
+        if (!content.includes('callCreativeAI') || !content.includes('parseJsonFallback')) continue;
+        // Walk each callCreativeAI block. If ANY call lacks `json:`, flag the
+        // file at its first such call's line so the developer has a jump target.
+        const lines = content.split('\n');
+        let unsafeCount = 0;
+        let firstUnsafeLine = -1;
+        const calls = content.split('callCreativeAI(').slice(1); // one entry per call
+        let cursor = 0;
+        for (const block of calls) {
+          // Advance cursor past this call's opening paren to find its line
+          cursor = content.indexOf('callCreativeAI(', cursor);
+          if (cursor === -1) break;
+          const lineNum = content.slice(0, cursor).split('\n').length;
+          cursor += 'callCreativeAI('.length;
+          const closeParen = block.indexOf(')');
+          const callBlock = closeParen > 0 ? block.slice(0, closeParen) : block.slice(0, 300);
+          if (!callBlock.includes('json:')) {
+            unsafeCount++;
+            if (firstUnsafeLine === -1) firstUnsafeLine = lineNum;
+          }
+        }
+        if (unsafeCount > 0) {
+          hits.push({
+            file,
+            line: firstUnsafeLine > 0 ? firstUnsafeLine : 1,
+            text: `${unsafeCount} callCreativeAI block(s) missing json: flag — ${lines[firstUnsafeLine - 1]?.trim() ?? ''}`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Brand-engine routes must use `requireWorkspaceAccess`, not
+    // `requireAuth`. The admin panel authenticates via HMAC token (global
+    // gate); `requireAuth` only accepts JWTs and would 401 every admin
+    // call. See Auth Conventions in CLAUDE.md. Suppress with `// auth-ok`
+    // if you intentionally want JWT-only access on a specific handler.
+    name: 'requireAuth in brand-engine route files (should be requireWorkspaceAccess)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    // Doc-only: the customCheck below filters hatches via `hasHatch(lines, i,
+    // '// auth-ok')` — this `excludeLines` entry is a no-op at runtime but
+    // drives the `Escape hatch` column of docs/rules/automated-rules.md via
+    // `generate-rules-doc.ts::describeHatch`.
+    excludeLines: ['// auth-ok'],
+    message: 'Admin panel uses HMAC token; requireAuth only accepts JWTs. Use requireWorkspaceAccess. See Auth Conventions in CLAUDE.md. Suppress with // auth-ok if intentionally JWT-only.',
+    severity: 'error',
+    rationale: 'requireAuth on brand-engine routes 401s every admin call because the admin panel authenticates via HMAC, not JWT.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        // Match by basename so the harness can test this rule against fixture
+        // files under tmpdir. The six brand-engine routes have unique,
+        // unambiguous filenames — there is no other `voice-calibration.ts`
+        // (or siblings) anywhere in the repo that could shadow them.
+        if (!BRAND_ENGINE_ROUTE_BASENAMES.has(path.basename(file))) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Match `requireAuth` as an identifier reference (middleware chain),
+          // not just as a function call. Express middleware is passed by
+          // reference: `router.get(path, requireAuth, handler)`.
+          if (!/\brequireAuth\b/.test(line)) continue;
+          // Skip import statements and JSDoc comments — the rule only flags
+          // actual usage sites, not the import line itself.
+          if (/^\s*import\b/.test(line)) continue;
+          if (/^\s*\*/.test(line)) continue;
+          // Skip the function definition line (shouldn't exist in routes, but
+          // defensive — if auth.ts is ever misplaced, don't flag its declaration).
+          if (/\bfunction\s+requireAuth\b/.test(line)) continue;
+          if (hasHatch(lines, i, '// auth-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // Catches the BrandscriptTab SectionEditorCard pattern where a dirty
+    // check recomputed against the live prop prevents an external-sync
+    // useEffect from ever firing. Correct pattern uses a useRef to track
+    // the last-synced prop. Suppress with `// sync-ok` on the guard line.
+    name: 'useEffect external-sync dirty guard against the live prop',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/',
+    // Doc-only: the customCheck below filters hatches via `hasHatch(fileLines,
+    // lineIdx, '// sync-ok')` — this `excludeLines` entry is a no-op at
+    // runtime but drives the `Escape hatch` column of
+    // docs/rules/automated-rules.md via `generate-rules-doc.ts::describeHatch`.
+    excludeLines: ['// sync-ok'],
+    message: 'The dirty check is recomputed against the new prop on every render, so it always reads "dirty" the moment an external update arrives — the sync skips and the user sees stale content. Track the last-synced prop in a useRef. See src/components/brand/BrandscriptTab.tsx. Suppress with // sync-ok on the guard line.',
+    severity: 'error',
+    rationale: 'Comparing a dirty flag against the live prop (not a ref) prevents external-sync useEffects from ever firing after an update arrives — classic stale-state bug.',
+    claudeMdRef: '#ui-ux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('useEffect') || !content.includes('isDirty')) continue;
+
+        // Walk every useEffect block and check whether its body contains
+        // `if (!isDirty)` (or a near-synonym) followed by a setState call.
+        // If so, also confirm the file defines `isDirty` as a comparison
+        // against a prop/state field — i.e. a recomputed-each-render value,
+        // not a ref.
+        const fileLines = content.split('\n');
+        const effectRegex = /useEffect\s*\(\s*\(\s*\)\s*=>\s*\{/g;
+        let match: RegExpExecArray | null;
+        while ((match = effectRegex.exec(content)) !== null) {
+          const start = match.index + match[0].length - 1; // position of '{'
+          let depth = 0;
+          let i = start;
+          while (i < content.length) {
+            const ch = content[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            i++;
+          }
+          if (i >= content.length) break;
+          const body = content.slice(start, i + 1);
+          const guardRegex = /if\s*\(\s*!\s*(isDirty|isEdited|hasChanges|hasEdits|hasUnsavedChanges)\s*\)\s*\{?\s*set[A-Z]\w*\s*\(/;
+          const guardMatch = body.match(guardRegex);
+          if (!guardMatch) continue;
+
+          // Compute file-relative line index (0-based) for the guard line.
+          const lineStartInBody = body.lastIndexOf('\n', body.indexOf(guardMatch[0])) + 1;
+          const absoluteIndex = start + lineStartInBody;
+          const lineNumber = content.slice(0, absoluteIndex).split('\n').length;
+          const lineIdx = lineNumber - 1;
+
+          // Check the matched line AND the preceding line for the suppression
+          // marker. hasHatch gives inline + one-line-above semantics matching
+          // every other hatch-ok hatch in this file.
+          if (hasHatch(fileLines, lineIdx, '// sync-ok')) continue;
+
+          const flagName = guardMatch[1];
+          const dirtyDefRegex = new RegExp(`const\\s+${flagName}\\s*=\\s*([^;\\n]+)`);
+          const dirtyDef = content.match(dirtyDefRegex);
+          if (!dirtyDef) continue;
+          if (dirtyDef[1].includes('.current')) continue; // already ref-based
+
+          hits.push({ file, line: lineNumber, text: (fileLines[lineIdx] ?? '').trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Migrated from inline block (PR #168 scaled-review I17).
+    //
+    // STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and
+    // src/constants.ts. They can't share a runtime module (different
+    // module resolution), so this check verifies the two files declare
+    // identical values. A drift means the studio name/URL shown in the
+    // admin UI disagrees with the one the server uses in emails, AI
+    // prompts, etc.
+    name: 'Constants in sync (STUDIO_NAME, STUDIO_URL)',
+    fileGlobs: ['constants.ts'],
+    exclude: ['.test.ts'],
+    displayScope: 'server/constants.ts + src/constants.ts',
+    message: 'Keep STUDIO_NAME and STUDIO_URL identical in server/constants.ts and src/constants.ts. The two files cannot share a runtime module due to differing module resolution, so drift is the only failure mode.',
+    severity: 'error',
+    rationale: 'STUDIO_NAME/STUDIO_URL drift silently desynchronizes the studio branding between the admin UI (src/) and server-generated content like emails and AI prompts (server/).',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      // Diff-mode: only run if either constants.ts is in scope.
+      // Full-scan: resolveCheckFileList returns any `constants.ts` it finds.
+      if (files.length === 0) return [];
+      const serverConst = path.join(ROOT, 'server/constants.ts');
+      const frontendConst = path.join(ROOT, 'src/constants.ts');
+      return compareStudioConstants(
+        readFileOrEmpty(serverConst),
+        readFileOrEmpty(frontendConst),
+        serverConst,
+      );
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -453,9 +2079,19 @@ const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', 'scripts', 'te
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES = ['test-branding.ts'];
 
-function checkDirectory(dir: string, check: Check): string[] {
+// Exported for tests/pr-check.test.ts — see the 'pathFilter vs EXCLUDED_DIRS
+// collision' regression test. Not part of the public API; do not import from
+// anywhere except the test harness.
+export function checkDirectory(dir: string, check: Check): string[] {
   const globs = check.fileGlobs.map(g => `--include="${g}"`).join(' ');
-  const excludeDirs = EXCLUDED_DIRS.map(d => `--exclude-dir="${d}"`).join(' ');
+  // If the rule opts into a normally-excluded directory via pathFilter (e.g.
+  // 'tests/'), that directory must NOT be in the grep --exclude-dir list.
+  // grep applies --exclude-dir against the starting directory too, so
+  // `grep -r --exclude-dir="tests" tests/` returns zero matches — the exact
+  // silent-false-negative class this audit prevents.
+  const pathFilterDir = check.pathFilter?.replace(/\/$/, '').split('/').pop() ?? null;
+  const effectiveExcludeDirs = EXCLUDED_DIRS.filter(d => d !== pathFilterDir);
+  const excludeDirs = effectiveExcludeDirs.map(d => `--exclude-dir="${d}"`).join(' ');
   const excludeFiles = EXCLUDED_FILES.map(f => `--exclude="${f}"`).join(' ');
   try {
     const out = execSync(
@@ -473,15 +2109,103 @@ function checkDirectory(dir: string, check: Check): string[] {
   }
 }
 
+// ─── CLI runner (gated so `import { CHECKS }` from tests doesn't fire this) ──
+// Everything from here to EOF is wrapped in runCli() which is only invoked
+// when this file is executed directly (npx tsx scripts/pr-check.ts), not when
+// imported (e.g. from tests/pr-check.test.ts). The body is intentionally NOT
+// re-indented — keeps the diff minimal and the git history readable.
+function runCli() {
 let errors = 0;
 let warnings = 0;
 
+// Resolve changed files ONCE here so all consumers in runCli() share the same
+// snapshot. The lazy cache prevents the import in tests/pr-check.test.ts from
+// spawning git subprocesses at module-load time.
+const changedFiles = cachedChangedFiles();
+const mode = SCAN_ALL ? 'full scan' : changedFiles.length > 0
+  ? `${changedFiles.length} changed file(s)`
+  : 'full scan (no diff detected)';
+
 console.log(`\n🔍 Running PR checks (${mode})...\n`);
+
+// Resolve the file list a check would scan (either the diff slice or a full
+// directory walk). Used by customCheck-based rules so they can operate on the
+// same file set the ripgrep path would have scanned.
+function resolveCheckFileList(check: Check): string[] {
+  if (!SCAN_ALL && changedFiles.length > 0) {
+    const exts = check.fileGlobs.map(g => g.replace('*.', '.').replace('**/', ''));
+    return changedFiles.filter(f =>
+      exts.some(ext => f.endsWith(ext)) &&
+      !isExcluded(f, check.exclude) &&
+      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
+      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
+       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
+      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
+    ).map(f => path.join(ROOT, f));
+  }
+  // Full scan: walk the pathFilter dir (or project root) for each fileGlob.
+  // A rule that opts into a normally-excluded directory via pathFilter (e.g.
+  // `pathFilter: 'tests/'`) must still scan that directory on a full run. The
+  // diff-only branch above already has this carve-out; mirror it here so the
+  // `--all` path is a proper superset of the diff path.
+  const baseDir = path.join(ROOT, check.pathFilter ?? '.');
+  // Basename of the pathFilter leaf (e.g. 'tests/' → 'tests', 'server/routes/'
+  // → 'routes'). Compared against EXCLUDED_DIRS basenames so a rule that opts
+  // into an excluded dir via pathFilter is actually scanned.
+  const pathFilterDir = check.pathFilter?.replace(/\/$/, '').split('/').pop() ?? null;
+  const all = new Set<string>();
+  for (const glob of check.fileGlobs) {
+    const pattern = glob.replace('**/', '');
+    for (const f of getFiles(baseDir, pattern)) {
+      if (isExcluded(f, check.exclude)) continue;
+      if (EXCLUDED_DIRS.some(d => d !== pathFilterDir && f.includes(`/${d}/`))) continue;
+      if (EXCLUDED_FILES.some(ef => f.endsWith('/' + ef))) continue;
+      all.add(f);
+    }
+  }
+  return Array.from(all);
+}
+
+function formatCustomMatches(check: Check, matches: CustomCheckMatch[]): string[] {
+  const lines = matches.map(m => {
+    const rel = path.isAbsolute(m.file) ? path.relative(ROOT, m.file) : m.file;
+    return `${rel}:${m.line}:${m.text}`;
+  });
+  return applyExcludeLines(lines, check.excludeLines);
+}
 
 for (const check of CHECKS) {
   let matches: string[] = [];
 
-  if (!SCAN_ALL && changedFiles.length > 0) {
+  if (check.customCheck) {
+    // Guard against a rule whose customCheck throws at runtime (regex bug on
+    // weird input, unexpected file shape, OOM on a huge file). Without this,
+    // one bad rule kills the whole runner mid-loop and every subsequent rule
+    // is silently skipped — the exact silent-false-negative class this audit
+    // is trying to eliminate. On throw we log, count as an error, set
+    // exitCode, and continue so remaining rules still run.
+    try {
+      const files = resolveCheckFileList(check);
+      const raw = check.customCheck(files);
+      matches = formatCustomMatches(check, raw);
+    } catch (err) {
+      const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
+      console.error(`\n  ✗ ${check.name}`);
+      console.error(`    customCheck threw: ${msg}`);
+      errors++;
+      process.exitCode = 1;
+      continue;
+    }
+  } else if (!check.pattern) {
+    // Defensive: a check with neither a customCheck nor a pattern is
+    // misconfigured. Falling through to grep -E "" would match every line
+    // in every file and produce a catastrophic false-positive flood.
+    console.error(`\n  ✗ ${check.name}`);
+    console.error(`    MISCONFIGURED: rule has no customCheck and no pattern.`);
+    errors++;
+    process.exitCode = 1;
+    continue;
+  } else if (!SCAN_ALL && changedFiles.length > 0) {
     // Only check changed files that match the glob extensions
     const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
     const relevant = changedFiles.filter(f =>
@@ -522,205 +2246,6 @@ for (const check of CHECKS) {
   else warnings++;
 }
 
-// ─── Assembled-but-never-rendered slice field check ───────────────────────────
-//
-// Warns if a field is present in a *Slice interface in shared/types/intelligence.ts
-// but not referenced in the corresponding format*Section function in
-// server/workspace-intelligence.ts. These fields are assembled at query time but
-// silently dropped at format time — they never reach the AI prompt.
-//
-// Map of slice interface name → formatter function name
-const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> = [
-  { sliceName: 'SeoContextSlice', formatterName: 'formatSeoContextSection' },
-  { sliceName: 'InsightsSlice', formatterName: 'formatInsightsSection' },
-  { sliceName: 'LearningsSlice', formatterName: 'formatLearningsSection' },
-  { sliceName: 'PageProfileSlice', formatterName: 'formatPageProfileSection' },
-  { sliceName: 'ContentPipelineSlice', formatterName: 'formatContentPipelineSection' },
-  { sliceName: 'SiteHealthSlice', formatterName: 'formatSiteHealthSection' },
-  { sliceName: 'ClientSignalsSlice', formatterName: 'formatClientSignalsSection' },
-  { sliceName: 'OperationalSlice', formatterName: 'formatOperationalSection' },
-];
-
-// Fields intentionally not rendered (complex nested types, metadata, or rendering handled differently)
-// Also includes fields that ARE rendered but accessed via destructuring or local variable
-// (e.g. `const { bySeverity } = insights`) which the property-access regex won't catch.
-const KNOWN_UNRENDERED_FIELDS = new Set([
-  // SeoContextSlice
-  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
-  // InsightsSlice
-  'byType', 'forPage',
-  // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
-  'bySeverity',
-  // LearningsSlice
-  'forPage', 'topWins', 'winRateByActionType',
-  // ContentPipelineSlice
-  'rewritePlaybook', 'suggestedBriefs',
-  // SiteHealthSlice
-  'aeoReadiness', 'redirectDetails',
-  // PageProfileSlice
-  // searchIntent: accessed via local pageKw.searchIntent variable, not profile.searchIntent
-  'searchIntent',
-  // insights: page-level insights array; page-specific insights are shown via the top-level InsightsSlice
-  'insights',
-  // ClientSignalsSlice — these are rendered but may not appear by field name
-  // OperationalSlice
-  // none
-]);
-
-function extractInterfaceFields(typeFileContent: string, interfaceName: string): string[] {
-  // Find the interface declaration — use brace-depth counting to handle nested object types
-  const declStart = typeFileContent.search(new RegExp(`interface ${interfaceName}\\s*\\{`));
-  if (declStart === -1) return [];
-
-  const braceStart = typeFileContent.indexOf('{', declStart);
-  if (braceStart === -1) return [];
-
-  // Walk forward counting braces to find the matching closing brace of the interface itself
-  let depth = 0;
-  let i = braceStart;
-  while (i < typeFileContent.length) {
-    if (typeFileContent[i] === '{') depth++;
-    else if (typeFileContent[i] === '}') {
-      depth--;
-      if (depth === 0) break;
-    }
-    i++;
-  }
-  const body = typeFileContent.slice(braceStart + 1, i);
-
-  // Extract only top-level field names (depth=0 within the body, lines like `  fieldName:`)
-  // Walk the body tracking nested depth so we only extract interface-level keys
-  const fields: string[] = [];
-  let nestedDepth = 0;
-  for (const line of body.split('\n')) {
-    for (const ch of line) {
-      if (ch === '{') nestedDepth++;
-      else if (ch === '}') nestedDepth--;
-    }
-    if (nestedDepth === 0) {
-      const m = line.match(/^\s+(\w+)\??:/);
-      if (m) fields.push(m[1]);
-    }
-  }
-  return fields;
-}
-
-function extractFormatterBody(formatterFileContent: string, formatterName: string): string {
-  // Find the function body start
-  const fnStart = formatterFileContent.indexOf(`function ${formatterName}(`);
-  if (fnStart === -1) return '';
-
-  // Find the opening brace
-  const braceStart = formatterFileContent.indexOf('{', fnStart);
-  if (braceStart === -1) return '';
-
-  // Walk forward counting braces to find the closing brace
-  let depth = 0;
-  let i = braceStart;
-  while (i < formatterFileContent.length) {
-    if (formatterFileContent[i] === '{') depth++;
-    else if (formatterFileContent[i] === '}') {
-      depth--;
-      if (depth === 0) {
-        return formatterFileContent.slice(braceStart, i + 1);
-      }
-    }
-    i++;
-  }
-  return '';
-}
-
-// Only run this check when scanning the whole codebase (--all) or when workspace-intelligence.ts changed
-const shouldRunSliceCheck = SCAN_ALL || changedFiles.some(f =>
-  f.includes('workspace-intelligence.ts') || f.includes('intelligence.ts'),
-);
-
-if (shouldRunSliceCheck) {
-  const typesPath = path.join(ROOT, 'shared/types/intelligence.ts');
-  const serverPath = path.join(ROOT, 'server/workspace-intelligence.ts');
-  let typesContent = '';
-  let serverContent = '';
-  try {
-    typesContent = readFileSync(typesPath, 'utf-8');
-    serverContent = readFileSync(serverPath, 'utf-8');
-  } catch {
-    // Files not found — skip
-  }
-
-  if (typesContent && serverContent) {
-    const unrenderedFindings: string[] = [];
-
-    for (const { sliceName, formatterName } of SLICE_FORMATTER_MAP) {
-      const fields = extractInterfaceFields(typesContent, sliceName);
-      const formatterBody = extractFormatterBody(serverContent, formatterName);
-
-      if (!formatterBody) {
-        unrenderedFindings.push(`  ${sliceName}: formatter ${formatterName} not found`);
-        continue;
-      }
-
-      for (const field of fields) {
-        if (KNOWN_UNRENDERED_FIELDS.has(field)) continue;
-        // Check if the field name appears in the formatter body (as a property access)
-        if (!formatterBody.includes(`.${field}`) && !formatterBody.includes(`['${field}']`) && !formatterBody.includes(`["${field}"]`)) {
-          unrenderedFindings.push(`  ${sliceName}.${field} → not referenced in ${formatterName}`);
-        }
-      }
-    }
-
-    if (unrenderedFindings.length > 0) {
-      console.log(`\n  ⚠ Assembled-but-never-rendered slice fields`);
-      console.log(`    These fields are assembled in *Slice types but not referenced in their format*Section formatter.`);
-      console.log(`    The data is assembled at query time but never reaches the AI prompt.`);
-      console.log(`    Add to KNOWN_UNRENDERED_FIELDS if intentionally omitted.`);
-      console.log(`    Fields (${unrenderedFindings.length}):`);
-      for (const finding of unrenderedFindings.slice(0, 10)) {
-        console.log(`      ${finding}`);
-      }
-      if (unrenderedFindings.length > 10) {
-        console.log(`      ... and ${unrenderedFindings.length - 10} more`);
-      }
-      warnings++;
-    } else {
-      console.log(`  ✓ Assembled-but-never-rendered slice fields`);
-    }
-  }
-}
-
-// ─── Constants sync check ─────────────────────────────────────────────────────
-// STUDIO_NAME and STUDIO_URL exist in both server/constants.ts and src/constants.ts.
-// They can't share a runtime module (different module resolution), so this check
-// verifies they declare identical values.
-
-{
-  const serverConst = path.join(ROOT, 'server/constants.ts');
-  const frontendConst = path.join(ROOT, 'src/constants.ts');
-  try {
-    const serverSrc = readFileSync(serverConst, 'utf-8');
-    const frontendSrc = readFileSync(frontendConst, 'utf-8');
-    const extract = (src: string, name: string) => {
-      const m = src.match(new RegExp(`export const ${name}\\s*=\\s*['"]([^'"]+)['"]`));
-      return m?.[1] ?? null;
-    };
-    const mismatches: string[] = [];
-    for (const name of ['STUDIO_NAME', 'STUDIO_URL']) {
-      const sv = extract(serverSrc, name);
-      const fv = extract(frontendSrc, name);
-      if (sv !== fv) mismatches.push(`${name}: server='${sv}' vs frontend='${fv}'`);
-    }
-    if (mismatches.length > 0) {
-      console.log(`\n  ✗ Constants out of sync (server/constants.ts vs src/constants.ts)`);
-      console.log(`    Keep STUDIO_NAME and STUDIO_URL identical in both files.`);
-      for (const m of mismatches) console.log(`      ${m}`);
-      errors++;
-    } else {
-      console.log(`  ✓ Constants in sync (STUDIO_NAME, STUDIO_URL)`);
-    }
-  } catch {
-    // If either file is missing, the import checks will catch the real problem
-  }
-}
-
 // ─── Manual checklist ─────────────────────────────────────────────────────────
 
 console.log('\n  📋 Manual checklist (verify before merging):');
@@ -733,6 +2258,11 @@ const manualChecks = [
   'clearSeoContextCache paired with invalidateIntelligenceCache (grep both, compare call sites)',
   'Any new optional field on a shared type (PageMeta, *Slice, etc.) — verify the server endpoint actually sets it, or add JSDoc: "Always undefined until [endpoint] populates it"',
   'Cross-cutting constraint (e.g. "never send X to API Y") — grep for ALL call sites before writing fix #1, guard them all in one commit. Never patch one site at a time as they are discovered.',
+  'AI-generating endpoints (callCreativeAI/callOpenAI → db write): existence check + INSERT/UPDATE inside db.transaction() — not just the write, the check too',
+  'New 1:1-per-workspace tables (e.g. one row per workspace+type): UNIQUE index on (workspace_id, natural_key) in migration; app code catches SQLITE_CONSTRAINT_UNIQUE and retries as update',
+  'Batch save endpoints (delete-all + reinsert): Map<id, preserved> built before delete to restore created_at, sort_order, and approval state',
+  'Field semantics changed (not just renamed): grep every reader of `result.X` / `slice.X` / `intel.X`, every Zod schema, every test, and every JSDoc comment for the field. Update them in the same commit. The compiler will not catch a meaning change when the type stays `string` (see seo-context.brandVoiceBlock as the canonical example).',
+  'useEffect external-sync: when copying a prop into local state on update, the dirty check must compare local state to a `useRef` of the last-synced prop, never to the live prop. Comparing against the live prop guarantees the sync never fires after an external update (see BrandscriptTab.SectionEditorCard).',
 ];
 for (const item of manualChecks) {
   console.log(`    [ ] ${item}`);
@@ -748,4 +2278,34 @@ if (errors > 0) {
   console.log(`\n  ⚠ 0 errors, ${warnings} warning(s). Review warnings before merging.\n`);
 } else {
   console.log(`\n  ✓ All automated checks passed.\n`);
+}
+} // end runCli()
+
+// Run the CLI only when this file is executed directly. When imported from
+// tests (vitest), import.meta.url is the module URL and process.argv[1] is
+// the vitest entry — the comparison below is false and this is a no-op.
+//
+// We use the ESM main-module idiom (resolve both sides to the same shape via
+// fileURLToPath + realpathSync) rather than a basename string match, because
+// a string match on 'pr-check.ts' breaks silently under symlinks, compiled
+// .js output, npm-run wrappers, and any other script in the project that
+// happens to share the basename. A mismatch here silently no-ops the whole
+// runner and exits 0, which is the worst possible failure mode for CI.
+function isMainModule(): boolean {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    const modulePath = realpathSync(fileURLToPath(import.meta.url));
+    const entryPath = realpathSync(argv1);
+    return modulePath === entryPath;
+  } catch {
+    // realpathSync throws on missing files — fall back to the looser
+    // basename check rather than silently no-op, so a developer running
+    // `tsx scripts/pr-check.ts` from an unusual CWD still gets a run.
+    return path.basename(argv1) === 'pr-check.ts';
+  }
+}
+
+if (isMainModule()) {
+  runCli();
 }

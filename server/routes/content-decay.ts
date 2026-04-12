@@ -38,6 +38,13 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
         });
       }
       if (topDecaying.length > 0) {
+        // This bridge dispatches a domain-specific SUGGESTED_BRIEF_UPDATED
+        // event, not the generic INSIGHT_BRIDGE_UPDATED that
+        // executeBridge() auto-broadcasts when a BridgeResult is returned.
+        // The event payload carries `count` so the suggested-briefs panel
+        // can refresh its specific list without invalidating every
+        // insight cache. Keeping the inline broadcast is intentional.
+        // bridge-broadcast-ok
         broadcastToWorkspace(ws.id, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, {
           bridge: 'bridge_2_decay_suggested_brief',
           count: topDecaying.length,
@@ -74,16 +81,18 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
         const sourceId = rec.page ?? null;
         if (!sourceId) continue;
         if (getActionByWorkspaceAndSource(req.params.workspaceId, 'content_decay', sourceId)) continue;
-        recordAction({
-          workspaceId: req.params.workspaceId,
-          actionType: 'content_refreshed',
-          sourceType: 'content_decay',
-          sourceId,
-          pageUrl: sourceId,
-          targetKeyword: null,
-          baselineSnapshot: { captured_at: new Date().toISOString() },
-          attribution: 'not_acted_on',
-        });
+        if (req.params.workspaceId) {
+          recordAction({ // recordAction-ok: workspaceId guarded by if (req.params.workspaceId)
+            workspaceId: req.params.workspaceId,
+            actionType: 'content_refreshed',
+            sourceType: 'content_decay',
+            sourceId,
+            pageUrl: sourceId,
+            targetKeyword: null,
+            baselineSnapshot: { captured_at: new Date().toISOString() },
+            attribution: 'not_acted_on',
+          });
+        }
       }
     } catch (err) {
       log.warn({ err }, 'Failed to record outcome actions for decay recommendations');

@@ -192,7 +192,12 @@ export function requireClientPortalAuth(wsIdParam = 'workspaceId') {
 
 const tmpDir = path.join(getUploadRoot(), '.tmp');
 fs.mkdirSync(tmpDir, { recursive: true });
-export const upload = multer({ dest: tmpDir });
+// 25MB per-file cap — covers all current upload call sites (brand docs,
+// request attachments, discovery text/md, clipboard images). Without a limit,
+// multer accepts arbitrarily large uploads and streams them to disk, opening an
+// OOM/DoS vector.
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const upload = multer({ dest: tmpDir, limits: { fileSize: MAX_UPLOAD_BYTES } });
 
 export function moveUploadedFiles(
   files: Express.Multer.File[],

@@ -18,6 +18,7 @@ function makeSeoContext(): SeoContextSlice {
   return {
     strategy: undefined,
     brandVoice: 'Professional and authoritative',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nProfessional and authoritative',
     businessContext: 'Enterprise SaaS analytics platform',
     personas: [
       { name: 'Marketing Maya', description: 'Experienced marketer focused on growth', id: 'p1', painPoints: [], goals: [], objections: [] },
@@ -316,6 +317,7 @@ describe('formatForPrompt', () => {
         seoContext: {
           strategy: undefined,
           brandVoice: '',
+          effectiveBrandVoiceBlock: '',
           businessContext: '',
           personas: [],
           knowledgeBase: '',
@@ -551,7 +553,7 @@ describe('buildIntelPrompt', () => {
     // a mismatch. Verify by inspecting the source.
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const src = readFileSync(resolve(import.meta.dirname, '../server/workspace-intelligence.ts'), 'utf-8');
+    const src = readFileSync(resolve(import.meta.dirname, '../server/workspace-intelligence.ts'), 'utf-8'); // readFile-ok — contract guard: asserts buildIntelPrompt uses slices as both assembly slices AND format sections so callers cannot create a slice/section mismatch.
     const fnStart = src.indexOf('export async function buildIntelPrompt(');
     const fnEnd = src.indexOf('\n}', fnStart) + 2;
     const fnBody = src.slice(fnStart, fnEnd);

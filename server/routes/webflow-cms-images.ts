@@ -7,6 +7,7 @@ import { listCollections, getCollectionSchema, listCollectionItems } from '../we
 import { getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '../../shared/types/cms-images.ts';
+import type * as WebflowClient from '../webflow-client.js';
 
 const router = Router();
 const log = createLogger('webflow-cms-images');
@@ -31,7 +32,7 @@ async function fetchAssetMap(
   byUrl: Map<string, string>; // hostedUrl → assetId
 }> {
   try {
-    const { webflowFetch } = await import('../webflow-client.js');
+    const { webflowFetch }: typeof WebflowClient = await import('../webflow-client.js'); // dynamic-import-ok
     const byId = new Map<string, { altText?: string; size?: number; contentType?: string; hostedUrl?: string }>();
     const byUrl = new Map<string, string>();
     let offset = 0;

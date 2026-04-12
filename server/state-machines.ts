@@ -70,13 +70,15 @@ export type ContentSubStatus = 'active' | 'paused' | 'cancelled' | 'past_due' | 
 // ── Generic validator ──
 
 export class InvalidTransitionError extends Error {
-  constructor(
-    public readonly entity: string,
-    public readonly from: string,
-    public readonly to: string,
-  ) {
+  readonly entity: string;
+  readonly from: string;
+  readonly to: string;
+  constructor(entity: string, from: string, to: string) {
     super(`Invalid ${entity} transition: '${from}' → '${to}'`);
     this.name = 'InvalidTransitionError';
+    this.entity = entity;
+    this.from = from;
+    this.to = to;
   }
 }
 

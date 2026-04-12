@@ -369,8 +369,7 @@ describe('Webflow CMS Writes — FM-2 Phantom Success', () => {
 
     const result = await listCollections(siteId, 'test-token');
 
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.every(c => c.id && c.displayName && c.slug)).toBe(true);
+    expect(result.length > 0 && result.every(c => c.id && c.displayName && c.slug)).toBe(true);
     expect(result).toHaveLength(2);
   });
 });

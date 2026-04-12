@@ -305,6 +305,10 @@ describe('contract: SeoContextSlice field population', () => {
     // Required fields (always present, non-optional in interface)
     expect(result).toHaveProperty('strategy');
     expect(result).toHaveProperty('brandVoice');
+    // Pre-formatted block with voice-authority applied — intelligence-path callers
+    // inject this directly. Contract regression guard: the assembler MUST populate
+    // this field or every downstream AI prompt loses brand voice entirely.
+    expect(result).toHaveProperty('effectiveBrandVoiceBlock');
     expect(result).toHaveProperty('businessContext');
     expect(result).toHaveProperty('personas');
     expect(result).toHaveProperty('knowledgeBase');
@@ -316,6 +320,7 @@ describe('contract: SeoContextSlice field population', () => {
     // strategy is undefined when workspace has no keyword strategy
     expect(result.strategy === undefined || typeof result.strategy === 'object').toBe(true);
     expect(typeof result.brandVoice).toBe('string');
+    expect(typeof result.effectiveBrandVoiceBlock).toBe('string');
     expect(typeof result.businessContext).toBe('string');
     expect(Array.isArray(result.personas)).toBe(true);
     expect(typeof result.knowledgeBase).toBe('string');
@@ -355,6 +360,27 @@ describe('contract: SeoContextSlice field population', () => {
     if (result.keywordRecommendations !== undefined) {
       expect(Array.isArray(result.keywordRecommendations)).toBe(true);
     }
+  });
+
+  it('effectiveBrandVoiceBlock passthrough: non-empty brandVoiceBlock reaches slice', async () => {
+    // Regression guard: the empty-path test above only verifies the contract when
+    // buildSeoContext returns an empty block. This test verifies the non-empty
+    // passthrough — if `assembleSeoContext` ever silently stripped, transformed, or
+    // mis-wired the field, this would catch it. The default mock at line 62 returns
+    // empty, so we re-mock for this test only.
+    const SENTINEL_BLOCK = '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nSentinel contract voice';
+    const seoContextMock = await import('../../server/seo-context.js');
+    const originalBuildSeoContext = vi.mocked(seoContextMock.buildSeoContext);
+    originalBuildSeoContext.mockReturnValueOnce({
+      strategy: null,
+      brandVoiceBlock: SENTINEL_BLOCK,
+      businessContext: '',
+      knowledgeBlock: '',
+    } as any);
+
+    const result = await getSlice<SeoContextSlice>('seoContext');
+
+    expect(result.effectiveBrandVoiceBlock).toBe(SENTINEL_BLOCK);
   });
 });
 

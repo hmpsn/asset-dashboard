@@ -114,7 +114,7 @@ Phase 3: Full Copy Pipeline
 
 ```
 Sequential foundation:
-  Task 1 (Migration 041) → Task 2 (Shared Types)
+  Task 1 (Migration 053) → Task 2 (Shared Types)
 
 Parallel services (after Task 2):
   Task 3 (Brandscript Service) ∥ Task 4 (Discovery Ingestion) ∥ Task 5 (Voice Calibration) ∥ Task 6 (Brand Identity)
@@ -136,7 +136,7 @@ Sequential shared frontend (after parallel batch):
 
 | Task | Model | Reason |
 |------|-------|--------|
-| Task 1 (Migration 041) | `haiku` | Mechanical SQL from plan |
+| Task 1 (Migration 053) | `haiku` | Mechanical SQL from plan |
 | Task 2 (Shared Types) | `haiku` | Transcribing types + constants from spec |
 | Task 3 (Brandscript Service) | `sonnet` | CRUD patterns with edge-case judgment |
 | Task 4 (Discovery Ingestion) | `sonnet` | CRUD patterns with edge-case judgment |
@@ -156,7 +156,7 @@ Sequential shared frontend (after parallel batch):
 
 | File | Owner | Phase |
 |------|-------|-------|
-| `server/db/migrations/041-brandscript-engine.sql` | Task 1 | Sequential |
+| `server/db/migrations/053-brandscript-engine.sql` | Task 1 | Sequential |
 | `shared/types/brand-engine.ts` | Task 2 | Sequential |
 | `server/brandscript.ts` | Task 3 | Parallel batch 1 |
 | `server/routes/brandscript.ts` | Task 3 | Parallel batch 1 |
@@ -184,7 +184,7 @@ Sequential shared frontend (after parallel batch):
 
 ```
 Sequential foundation:
-  Task 1 (Migration 042) → Task 2 (Shared Types + content.ts extension)
+  Task 1 (Migration 054) → Task 2 (Shared Types + content.ts extension)
 
 Parallel services (after Task 2):
   Task 3 (Blueprint CRUD) ∥ Task 4 (Blueprint Generator)
@@ -205,7 +205,7 @@ Sequential shared frontend (after parallel batch):
 
 | Task | Model | Reason |
 |------|-------|--------|
-| Task 1 (Migration 042) | `haiku` | Mechanical SQL from plan |
+| Task 1 (Migration 054) | `haiku` | Mechanical SQL from plan |
 | Task 2 (Shared Types + content.ts) | `haiku` | Transcribing types from spec; re-export pattern is trivial |
 | Task 3 (Blueprint CRUD) | `sonnet` | CRUD with ID-stability logic requires judgment |
 | Task 4 (Blueprint Generator) | `opus` | AI prompt design, brand context integration |
@@ -221,7 +221,7 @@ Sequential shared frontend (after parallel batch):
 
 | File | Owner | Phase |
 |------|-------|-------|
-| `server/db/migrations/042-page-strategy-engine.sql` | Task 1 | Sequential |
+| `server/db/migrations/054-page-strategy-engine.sql` | Task 1 | Sequential |
 | `shared/types/page-strategy.ts` | Task 2 | Sequential |
 | `shared/types/content.ts` | Task 2 | Sequential (extend ContentPageType + TemplateSection) |
 | `server/page-strategy.ts` | Task 3 | Parallel batch 1 |
@@ -242,7 +242,7 @@ Sequential shared frontend (after parallel batch):
 
 ```
 Sequential foundation:
-  Task 1 (Migration 043) → Task 2 (Shared Types) → Task 3 (Export existing constants)
+  Task 1 (Migration 055) → Task 2 (Shared Types) → Task 3 (Export existing constants)
 
 Parallel services (after Task 3):
   Task 4 (Copy Review Service) ∥ Task 5 (Copy Generation Engine) ∥ Task 6 (Copy Intelligence Service) ∥ Task 7 (Copy Export Service)
@@ -264,7 +264,7 @@ Sequential integration:
 
 | Task | Model | Reason |
 |------|-------|--------|
-| Task 1 (Migration 043) | `haiku` | Mechanical SQL from plan |
+| Task 1 (Migration 055) | `haiku` | Mechanical SQL from plan |
 | Task 2 (Shared Types) | `haiku` | Transcribing types from spec |
 | Task 3 (Export constants) | `haiku` | Re-exporting existing symbols only |
 | Task 4 (Copy Review Service) | `sonnet` | Review logic with quality-flag patterns |
@@ -285,7 +285,7 @@ Sequential integration:
 
 | File | Owner | Phase |
 |------|-------|-------|
-| `server/db/migrations/043-copy-pipeline.sql` | Task 1 | Sequential |
+| `server/db/migrations/055-copy-pipeline.sql` | Task 1 | Sequential |
 | `shared/types/copy-pipeline.ts` | Task 2 | Sequential |
 | `server/content-posts-ai.ts` | Task 3 | Sequential (export only) |
 | `server/content-brief.ts` | Task 3 | Sequential (export only) |
@@ -437,3 +437,76 @@ When dispatching subagents for any phase, include these codebase-specific warnin
 | 2026-03-28 | Initial creation — audit of 3 specs + 3 plans |
 | 2026-03-28 | Added model assignments per task (all 3 phases), pre-dispatch checklist, BLOCKED recovery guide |
 | 2026-03-28 | Migration numbers updated: 026→041, 027→042, 028→043. ID generation updated to `randomUUID()` convention. See plan Amendments section for full list of 9 pattern alignment corrections. |
+| 2026-04-09 | Migration numbers updated again: 041→053, 042→054, 043→055. Migrations 041–052 have since shipped. Current highest: 052-workspace-competitor-fetch.sql. |
+| 2026-04-09 | Added Phase 1 Review — Recurring Patterns section (6 bug patterns from 7 rounds of PR #161 review). |
+
+---
+
+## Phase 1 Review — Recurring Patterns
+
+> These patterns were caught during 7 rounds of code review on Phase 1 (PR #161). Phase 2 and Phase 3 agents must read this section before writing any server-side code.
+
+### 1. Workspace scoping in every WHERE clause
+
+Every `UPDATE`, `DELETE`, and non-PK `SELECT` on a brand-engine table must include `AND workspace_id = ?` even when the row is also keyed by `id`. Defence-in-depth: a mis-routed request must not leak another workspace's rows.
+
+**Brand-engine tables:** `brandscripts`, `brandscript_sections`, `discovery_sources`, `discovery_extractions`, `voice_profiles`, `voice_samples`, `voice_calibration_sessions`, `brand_identity_deliverables`, `brand_identity_versions`, `site_blueprints` (Phase 2), `blueprint_entries` (Phase 2), `copy_sections` (Phase 3).
+
+For tables with FK-only workspace scoping (e.g. `voice_samples` → `voice_profile_id` → `voice_profiles.workspace_id`), queries must JOIN through to the workspace or use the profile id obtained from a workspace-scoped read.
+
+### 2. AI-call-before-DB-write race
+
+When a handler `await`s an AI call (~5s) and then writes to the DB, two concurrent requests can both observe "no existing row" and both INSERT duplicates. This will happen in every blueprint generator, copy generator, and calibration endpoint in Phase 2 and Phase 3.
+
+**Required pattern for 1:1-per-workspace tables (one row per workspace+type):**
+- UNIQUE index on `(workspace_id, natural_key)` in the migration
+- Existence check + INSERT/UPDATE inside `db.transaction()`
+- Catch `SQLITE_CONSTRAINT_UNIQUE` and retry as UPDATE
+
+**Required pattern for 1:N tables (many rows per source):**
+- `force` flag + guard against re-processing (return 409 via a custom error class)
+- On `force`, delete existing child rows INSIDE the transaction before inserting new ones
+
+Full patterns with code examples: `docs/rules/ai-dispatch-patterns.md`
+
+### 3. Prompt Layer 2 contract — do not duplicate voice DNA
+
+`buildSystemPrompt` in `server/prompt-assembly.ts` injects voice DNA + guardrails into the system message when `profile.status === 'calibrated'` (Layer 2). Any user-prompt code that also inlines voice DNA must guard on `profile.status !== 'calibrated'`.
+
+**Use the helper:** import `buildVoiceCalibrationContext(profile)` from `server/voice-calibration.ts`. Returns `{ samplesText, dnaText, guardrailsText }` where `dnaText` and `guardrailsText` are empty strings when calibrated.
+
+Do not build your own inline voice context injection — it will duplicate Layer 2 once the profile is calibrated.
+
+### 4. Delete-then-reinsert batch updates must preserve metadata
+
+The batch-save pattern (delete-all + reinsert) is used for brandscript sections, voice samples ordering, and any future collection edit UI. This clobbers `created_at` and `sort_order`.
+
+Before the delete, build `Map<id, { createdAt, sortOrder }>` and re-apply on insert:
+```typescript
+const existingMeta = new Map(existing.items.map(i => [i.id, { createdAt: i.createdAt, sortOrder: i.sortOrder }]));
+// ... delete ...
+const meta = (item.id && existingMeta.get(item.id)) || { createdAt: now, sortOrder: i };
+```
+
+### 5. PATCH undefined vs null on multi-column UPDATEs
+
+When a PATCH endpoint updates 2+ columns and one is optional (e.g. a routing destination), use separate prepared statements: one that updates all columns (when the optional field is explicitly provided) and one that updates only the non-optional columns (when the optional field is absent). A single statement that always writes all columns silently clears the optional field when the caller omits it.
+
+See `updateExtractionStatus` in `server/discovery-ingestion.ts` for the two-statement pattern.
+
+### 6. getOrCreate* functions must return non-nullable types
+
+Functions named `getOrCreate*` always return a valid entity. Their return type must not include `| null`. Callers must not have a dead `if (!result)` guard.
+
+---
+
+### Pre-flight checklist for Phase 2 and Phase 3 tasks
+
+Before marking any Phase 2 or Phase 3 implementation task as done, verify:
+- [ ] Every new `db.prepare()` SELECT/UPDATE/DELETE on a workspace-scoped table includes `AND workspace_id = ?`
+- [ ] Every AI-generating endpoint that writes a 1:1-per-workspace row has a UNIQUE index + `db.transaction()` + SQLITE_CONSTRAINT_UNIQUE retry
+- [ ] Every AI-generating endpoint that writes 1:N rows has a `force` flag + 409 guard + transactional delete-before-reinsert on force
+- [ ] `json: true` passed to every `callCreativeAI` call whose result goes to `parseJsonFallback`
+- [ ] Voice context in user prompts built via `buildVoiceCalibrationContext(profile)`, not inline
+- [ ] Batch-save UX preserves `created_at` and `sort_order` via pre-delete `Map`
+- [ ] PATCH endpoints with optional fields use separate statements per field set

@@ -12,7 +12,7 @@ import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelli
 import { createLogger } from './logger.js';
 import type { KeywordCandidate } from '../shared/types/content.ts';
 import { isProgrammingError } from './errors.js';
-import type { getWorkspaceLearnings } from './workspace-learnings.js';
+import type * as WorkspaceLearnings from './workspace-learnings.js';
 
 const log = createLogger('keyword-recommendations');
 
@@ -135,7 +135,7 @@ export async function getKeywordRecommendations(
 
   // ── Bridge #9: Weight by empirical win rate per KD range ──────────
   try {
-    const { getWorkspaceLearnings } = await import('./workspace-learnings.js');
+    const { getWorkspaceLearnings }: typeof WorkspaceLearnings = await import('./workspace-learnings.js'); // dynamic-import-ok
     const learnings = getWorkspaceLearnings(workspaceId, 'strategy');
     const kdRangeWinRates = learnings?.strategy?.winRateByDifficultyRange;
     if (kdRangeWinRates && Object.keys(kdRangeWinRates).length > 0) {

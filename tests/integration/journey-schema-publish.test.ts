@@ -485,14 +485,12 @@ describe('Journey: Schema Approval → Publish → Webflow Custom Code', () => {
 
     expect(appliedIds).toHaveLength(2);
     expect(results).toHaveLength(2);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(r => r.success)).toBe(true);
+    expect(results.length > 0 && results.every(r => r.success)).toBe(true);
 
     // DB: both items applied, batch status is 'applied'
     const persisted = getBatch(ws.workspaceId, batch.id);
     expect(persisted).toBeDefined();
-    expect(persisted!.items.length).toBe(2);
-    expect(persisted!.items.every(i => i.status === 'applied')).toBe(true);
+    expect(persisted!.items.length > 0 && persisted!.items.every(i => i.status === 'applied')).toBe(true);
     expect(persisted!.status).toBe('applied');
 
     // Verify both Webflow call chains happened

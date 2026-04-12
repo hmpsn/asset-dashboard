@@ -71,7 +71,7 @@ router.get('/api/webflow/schema-snapshot/:siteId', requireWorkspaceAccessFromQue
   // Annotate each page result with its last publish date (for stale schema detection)
   const publishDates = getPublishDatesForSite(req.params.siteId);
   for (const result of snapshot.results) {
-    (result as Record<string, unknown>).lastPublishedAt = publishDates[result.pageId] || null;
+    (result as unknown as Record<string, unknown>).lastPublishedAt = publishDates[result.pageId] || null;
   }
   res.json(snapshot);
 });
@@ -205,7 +205,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     try {
       if (!pubWs) throw new Error('no workspace');
       if (getActionByWorkspaceAndSource(pubWs.id, 'schema', pageId)) throw new Error('already tracked');
-      const schemaAction = recordAction({
+      const schemaAction = recordAction({ // recordAction-ok: pubWs guaranteed non-null by throw guard at line 206
         workspaceId: pubWs.id,
         actionType: 'schema_deployed',
         sourceType: 'schema',

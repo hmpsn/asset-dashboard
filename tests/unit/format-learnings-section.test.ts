@@ -12,6 +12,7 @@ const intel: WorkspaceIntelligence = {
   seoContext: {
     strategy: undefined,
     brandVoice: 'Test voice',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nTest voice',
     businessContext: 'Test context',
     personas: [],
     knowledgeBase: '',

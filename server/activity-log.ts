@@ -66,7 +66,23 @@ export type ActivityType =
   | 'client_keyword_feedback'
   | 'client_priorities_updated'
   | 'client_content_gap_vote'
-  | 'meeting_brief_generated';
+  | 'meeting_brief_generated'
+  | 'brandscript_created'
+  | 'brandscript_deleted'
+  | 'brandscript_imported'
+  | 'brandscript_completed'
+  | 'discovery_source_added'
+  | 'discovery_source_deleted'
+  | 'discovery_processed'
+  | 'voice_sample_added'
+  | 'voice_sample_deleted'
+  | 'voice_calibrated'
+  | 'voice_refined'
+  | 'voice_profile_updated'
+  | 'brand_deliverable_generated'
+  | 'brand_deliverable_refined'
+  | 'brand_deliverable_approved'
+  | 'brand_deliverable_reverted';
 
 export interface ActivityEntry {
   id: string;
@@ -140,6 +156,10 @@ const stmts = createStmtCache(() => ({
     `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
   ),
   countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
+  // Global retention policy: prune the N oldest rows across all workspaces
+  // to enforce the global activity-log size cap. Scoping to a single workspace
+  // here would defeat the purpose of the global cap.
+  // ws-scope-ok
   pruneOldest: db.prepare(`
         DELETE FROM activity_log WHERE id IN (
           SELECT id FROM activity_log ORDER BY created_at ASC LIMIT ?

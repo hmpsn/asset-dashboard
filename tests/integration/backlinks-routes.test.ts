@@ -219,11 +219,10 @@ describe('GET /api/backlinks/:workspaceId — happy path', () => {
     expect(status).toBe(200);
     const domains = (body as Record<string, unknown>).referringDomains as ReferringDomain[];
     expect(Array.isArray(domains)).toBe(true);
-    expect(domains.length).toBeGreaterThan(0);
-    expect(domains.every((d) => typeof d.domain === 'string')).toBe(true);
-    expect(domains.every((d) => typeof d.backlinksCount === 'number')).toBe(true);
-    expect(domains.every((d) => typeof d.firstSeen === 'string')).toBe(true);
-    expect(domains.every((d) => typeof d.lastSeen === 'string')).toBe(true);
+    expect(domains.length > 0 && domains.every((d) => typeof d.domain === 'string')).toBe(true);
+    expect(domains.length > 0 && domains.every((d) => typeof d.backlinksCount === 'number')).toBe(true);
+    expect(domains.length > 0 && domains.every((d) => typeof d.firstSeen === 'string')).toBe(true);
+    expect(domains.length > 0 && domains.every((d) => typeof d.lastSeen === 'string')).toBe(true);
   });
 
   it('referringDomains values match mock provider data', async () => {
@@ -352,9 +351,8 @@ describe('GET /api/backlinks/:workspaceId — workspace scoping', () => {
     const { status } = await getJson(baseUrl, `/api/backlinks/${ws.workspaceId}`);
 
     expect(status).toBe(200);
-    expect(capturedWorkspaceIds.length).toBeGreaterThan(0);
     // Every call to the provider should use this workspace's id
-    expect(capturedWorkspaceIds.every((id) => id === ws.workspaceId)).toBe(true);
+    expect(capturedWorkspaceIds.length > 0 && capturedWorkspaceIds.every((id) => id === ws.workspaceId)).toBe(true);
   });
 });
 

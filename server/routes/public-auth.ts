@@ -6,6 +6,7 @@ import { Router } from 'express';
 const router = Router();
 
 import bcrypt from 'bcryptjs';
+import type * as EmailTemplates from '../email-templates.js';
 import {
   verifyClientPassword as verifyClientUserPassword,
   signClientToken,
@@ -151,7 +152,7 @@ router.post('/api/public/forgot-password/:id', clientLoginLimiter, verifyTurnsti
   if (result) {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const resetUrl = `${baseUrl}/client/${req.params.id}?reset_token=${result.token}`;
-    const { renderDigest } = await import('../email-templates.js');
+    const { renderDigest }: typeof EmailTemplates = await import('../email-templates.js'); // dynamic-import-ok
     const event = {
       type: 'password_reset' as const,
       recipient: email,

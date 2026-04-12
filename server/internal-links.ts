@@ -11,7 +11,7 @@ import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callOpenAI } from './openai-helpers.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
@@ -271,13 +271,22 @@ export async function analyzeInternalLinks(
   }
 
   // Enrich with brand voice for better anchor text quality
-  const wsObj = workspaceId ? getWorkspace(workspaceId) : null;
   const intel = workspaceId
     ? await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] })
     : null;
   const seo = intel?.seoContext;
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
-  const brandCtx = brandVoiceBlock || (wsObj?.brandVoice ? `\nBrand voice: ${wsObj.brandVoice}` : '');
+  // Voice authority: `effectiveBrandVoiceBlock` is the single source of truth — it was
+  // already computed by `buildSeoContext` with full voice authority applied. When a
+  // workspace has a calibrated voice profile with zero samples, this is INTENTIONALLY
+  // empty: the rule in CLAUDE.md ("Prompt assembly layers must not duplicate content")
+  // says Layer 2 `buildSystemPrompt` injects DNA+guardrails into the system message for
+  // calibrated profiles — but this orphan flow calls `callOpenAI` directly with its own
+  // system message, so Layer 2 never fires. Falling back to raw `wsObj.brandVoice` here
+  // would still violate the voice authority rule: once a user calibrates a profile, the
+  // legacy `workspace.brandVoice` column is no longer authoritative. Accept the tradeoff
+  // (calibrated-empty workspaces get no voice hint in this specific flow) until this
+  // flow is migrated onto `buildSystemPrompt`. See PR #167 review for context.
+  const brandCtx = seo?.effectiveBrandVoiceBlock ?? '';
 
   // Build the page summary for AI analysis
   const pageSummaries = pages.map(p => {

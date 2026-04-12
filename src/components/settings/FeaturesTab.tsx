@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  BarChart3, Loader2, Mail, Image as ImageIcon, DollarSign, Sparkles,
+  BarChart3, Mail, Image as ImageIcon, Sparkles,
   Users, Shield, SlidersHorizontal, Brain,
 } from 'lucide-react';
 import { post } from '../../api/client';
@@ -26,7 +26,7 @@ interface FeaturesTabProps {
   workspaceId: string;
   ws: WorkspaceData | null;
   patchWorkspace: (patch: Record<string, unknown>) => Promise<unknown>;
-  toast: (msg: string, type?: string) => void;
+  toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export function FeaturesTab({ workspaceId, ws, patchWorkspace, toast }: FeaturesTabProps) {

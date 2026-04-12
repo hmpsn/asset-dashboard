@@ -3,7 +3,6 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
@@ -97,7 +96,7 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireClientPor
     }
     // Record for outcome tracking — idempotent
     try {
-      if (!getActionBySource('recommendation', req.params.recId)) recordAction({
+      if (req.params.workspaceId && !getActionBySource('recommendation', req.params.recId)) recordAction({ // recordAction-ok: workspaceId guarded by if condition
         workspaceId: req.params.workspaceId,
         actionType: 'audit_fix_applied',
         sourceType: 'recommendation',

@@ -74,6 +74,7 @@ function makeSeoSlice(overrides?: Partial<SeoContextSlice>): SeoContextSlice {
   return {
     strategy: STRATEGY,
     brandVoice: 'Warm and professional',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nWarm and professional',
     businessContext: 'Premier dental clinic serving Chicago area patients',
     personas: PERSONAS,
     knowledgeBase: 'We offer implants, veneers, and whitening services',

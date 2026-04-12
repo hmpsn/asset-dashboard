@@ -9,6 +9,7 @@
  */
 
 import db from './db/index.js';
+import { createStmtCache } from './db/stmt-cache.js';
 
 // ── Feature keys ──
 export type UsageFeature = 'ai_chats' | 'strategy_generations';
@@ -26,28 +27,17 @@ export function getLimit(tier: string, feature: UsageFeature): number {
 
 // ── Prepared statements (lazy) ──
 
-let _getCount: ReturnType<typeof db.prepare> | null = null;
-function getCountStmt() {
-  if (!_getCount) {
-    _getCount = db.prepare(`
-      SELECT count FROM usage_tracking
-      WHERE workspace_id = ? AND month = ? AND feature = ?
-    `);
-  }
-  return _getCount;
-}
-
-let _upsert: ReturnType<typeof db.prepare> | null = null;
-function upsertStmt() {
-  if (!_upsert) {
-    _upsert = db.prepare(`
-      INSERT INTO usage_tracking (workspace_id, month, feature, count)
-      VALUES (@workspace_id, @month, @feature, @count)
-      ON CONFLICT(workspace_id, month, feature) DO UPDATE SET count = @count
-    `);
-  }
-  return _upsert;
-}
+const stmts = createStmtCache(() => ({
+  getCount: db.prepare<[workspaceId: string, month: string, feature: string]>(`
+    SELECT count FROM usage_tracking
+    WHERE workspace_id = ? AND month = ? AND feature = ?
+  `),
+  upsert: db.prepare(`
+    INSERT INTO usage_tracking (workspace_id, month, feature, count)
+    VALUES (@workspace_id, @month, @feature, @count)
+    ON CONFLICT(workspace_id, month, feature) DO UPDATE SET count = @count
+  `),
+}));
 
 function currentMonth(): string {
   const now = new Date();
@@ -59,7 +49,7 @@ function currentMonth(): string {
 /** Get current month's count for a feature. */
 export function getUsageCount(workspaceId: string, feature: UsageFeature): number {
   const month = currentMonth();
-  const row = getCountStmt().get(workspaceId, month, feature) as { count: number } | undefined;
+  const row = stmts().getCount.get(workspaceId, month, feature) as { count: number } | undefined;
   return row?.count || 0;
 }
 
@@ -68,7 +58,7 @@ export function incrementUsage(workspaceId: string, feature: UsageFeature): numb
   const month = currentMonth();
   const current = getUsageCount(workspaceId, feature);
   const newCount = current + 1;
-  upsertStmt().run({
+  stmts().upsert.run({
     workspace_id: workspaceId,
     month,
     feature,

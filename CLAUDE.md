@@ -25,6 +25,18 @@ Integrations: Webflow, Google Search Console, GA4, SEMRush, Stripe, OpenAI (GPT-
 
 ---
 
+## Enforcement Layers
+
+Claude Code project rules live in three places. Know which layer you're reading before copy-pasting:
+
+1. **CLAUDE.md** (this file) — session protocol, decision framework, design laws, and philosophical guardrails that can't be grepped.
+2. **[docs/rules/automated-rules.md](./docs/rules/automated-rules.md)** — every rule enforced by `scripts/pr-check.ts`. Auto-generated from the `CHECKS` array; do not hand-edit. CI fails if the committed file drifts from `npm run rules:generate`.
+3. **[docs/rules/*.md](./docs/rules/)** — deep-dive references for specific subsystems (data-flow, UI/UX, multi-agent coordination, analytics insights, AI dispatch patterns, etc.).
+
+When a CLAUDE.md rule becomes mechanizable, it moves to layer 2. The authoring guide for new pr-check rules is [docs/rules/pr-check-rule-authoring.md](./docs/rules/pr-check-rule-authoring.md).
+
+---
+
 ## Session Protocol
 
 ### Before writing code
@@ -43,7 +55,7 @@ Every completed task must include:
 1. **`FEATURE_AUDIT.md`** — add new entries or update existing ones for any feature work.
 2. **`data/roadmap.json`** — mark completed items `"pending"` → `"done"`, add `"notes"`. Run `npx tsx scripts/sort-roadmap.ts`.
 3. **`BRAND_DESIGN_LANGUAGE.md`** — update if any UI colors/components/patterns changed.
-4. **Build verify** — `npx tsc --noEmit --skipLibCheck && npx vite build`
+4. **Build verify** — `npm run typecheck && npx vite build`
 5. **Summarize** — what was done, what docs updated, what's next.
 6. **`data/features.json`** — if the completed feature is client-impactful or sales-relevant, add/update its entry. Not every feature belongs here — only ones you'd mention on a sales call.
 
@@ -68,14 +80,14 @@ Every completed task must include:
 | `npm run dev` | Vite dev server (frontend) |
 | `npm run dev:server` | Express server (backend) |
 | `npm run dev:all` | Both concurrently |
-| `npx tsc --noEmit --skipLibCheck` | Type-check |
+| `npm run typecheck` | Type-check (project-aware: `tsc -b --noEmit`, traverses both `tsconfig.app.json` and `tsconfig.node.json`). Plain `npx tsc --noEmit` against the root `tsconfig.json` checks **zero files** because the root config uses project references with `files: []` — always use the script. |
 | `npx vite build` | Production build |
 | `npx vitest run` | Unit + integration + component tests |
 | `npx playwright test` | E2E tests (requires server running) |
 | `npx tsx scripts/sort-roadmap.ts` | Auto-archive completed sprints |
 | `npx tsx scripts/pr-check.ts` | Automated pre-PR checklist (color violations, JSON.parse, hard-coded names) |
 
-**Always verify after changes:** `npx tsc --noEmit --skipLibCheck && npx vite build`
+**Always verify after changes:** `npm run typecheck && npx vite build`
 
 ---
 
@@ -113,17 +125,16 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 ## Data Flow Rules (mandatory)
 
 1. **Broadcast after mutation** — every POST/PUT/PATCH/DELETE that changes workspace data must call `broadcastToWorkspace()` with an appropriate event.
-2. **Frontend must handle broadcasts** — every `useWebSocket` handler must invalidate relevant React Query caches.
+2. **Frontend must handle broadcasts** — every workspace-scoped broadcast needs a `useWorkspaceEvents(workspaceId, ...)` handler that invalidates the relevant React Query caches. For workspace-scoped events (anything broadcast via `broadcastToWorkspace()`) ALWAYS use `useWorkspaceEvents`, never `useGlobalAdminEvents`. The latter does NOT send a `subscribe` action, so the server's workspace filter excludes the connection and your handler is dead code. `useGlobalAdminEvents` is reserved for the ~2 legitimate global-fanout events (`ADMIN_EVENTS.*`, `presence:update`) and is forbidden elsewhere.
 3. **Delete operations** — always read data before delete (for activity log context).
-4. **Activity logging** — all significant operations must call `addActivity()`.
-5. **STUDIO_NAME constant** — use the constant from `server/constants.ts`, never hard-code "hmpsn.studio".
-6. **Typed data contracts at boundaries** — when data flows between layers (backend → API → frontend, or between modules via JSON columns), define typed interfaces in `shared/types/` BEFORE implementing. Never use `Record<string, unknown>` for new data shapes. Specifically:
+4. **Activity logging** — all significant operations must call `addActivity()`. Public-portal mutations are enforced by pr-check (see [automated-rules.md](./docs/rules/automated-rules.md)).
+5. **Typed data contracts at boundaries** — when data flows between layers (backend → API → frontend, or between modules via JSON columns), define typed interfaces in `shared/types/` BEFORE implementing. Never use `Record<string, unknown>` for new data shapes. Specifically:
    - New DB JSON columns → define a typed interface, not `Record<string, unknown>`
    - New insight types → add to `InsightDataMap` in `shared/types/analytics.ts`
    - New filter/category values → use shared const objects (like `INSIGHT_FILTER_KEYS`), not string literals
    - Percentage vs decimal fields → add JSDoc: `/** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */`
    - Shared string enums between producer/consumer → single const object imported by both sides
-7. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/workspace-intelligence.ts`. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND read from the new store inside the corresponding `assemble*` function. The AI context and AdminChat are blind to data that isn't wired into a slice. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`.
+6. **Wire new data sources into the intelligence engine** — any new table or store that captures workspace activity must be surfaced in `server/workspace-intelligence.ts`. Add a field to the appropriate slice interface in `shared/types/intelligence.ts` AND read from the new store inside the corresponding `assemble*` function. The AI context and AdminChat are blind to data that isn't wired into a slice. The relevant slice for client-facing signals and engagement data is `ClientSignalsSlice`.
 
 ## UI/UX Rules (mandatory)
 
@@ -136,9 +147,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 7. **Accessibility** — proper ARIA labels, keyboard navigation, focus management.
 8. **Progressive disclosure** — show summary first, details on demand.
 9. **Extract shared interaction patterns** — when 2+ components implement the same user interaction (toggle logic, filter state, sort behavior), extract to a shared hook or utility. Don't let subagents independently re-implement the same logic — it drifts. Example: `useToggleSet(defaults, { min, max })` instead of 3 inline `useState<Set>` + toggle handlers.
-10. **Global keydown handlers must guard editable targets** — every `window.addEventListener('keydown', ...)` that fires on a special key (Escape, Enter, arrows) must check `e.target` before acting. Use this pattern (copy from `App.tsx` keyboard shortcuts handler and extend it): `if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable) return;`. `isContentEditable` is required — the `HTMLInputElement`/`HTMLTextAreaElement` check alone misses contenteditable divs.
-11. **Layout-driving state must be derived synchronously, not via `useEffect`** — if a boolean state variable drives layout (padding, width, sidebar visibility), derive it as `const effective = state && syncCondition` and use `effective` in JSX. A `useEffect` that resets state runs *after* the browser paints, causing a one-frame layout flash. The effect can still run to clean up backing state, but JSX must not read raw state when a synchronous guard is available (e.g. `effectiveFocusMode = focusMode && tab === 'rewrite'`).
-12. **AI prompt ↔ frontend rendering must be co-designed** — when a system prompt instructs the AI to format output a certain way (Markdown, JSON, prefixed labels), verify the frontend rendering matches. If a rewrite/insertion path uses `textContent` or `innerText`, the AI must be told to return plain prose, not Markdown. If a parsing path uses `match(/regex/)`, the AI's output format must be stable enough for the regex. Document the contract in the system prompt itself (e.g., "content is inserted into a live editor — no Markdown syntax").
+10. **AI prompt ↔ frontend rendering must be co-designed** — when a system prompt instructs the AI to format output a certain way (Markdown, JSON, prefixed labels), verify the frontend rendering matches. If a rewrite/insertion path uses `textContent` or `innerText`, the AI must be told to return plain prose, not Markdown. If a parsing path uses `match(/regex/)`, the AI's output format must be stable enough for the regex. Document the contract in the system prompt itself (e.g., "content is inserted into a live editor — no Markdown syntax").
 
 ---
 
@@ -175,47 +184,35 @@ This project uses **two separate auth systems** that must never be mixed up:
 - **TypeScript strict** — no `any` unless unavoidable
 - **API error shape**: `{ error: string }` consistently
 - **User-facing strings**: follow `docs/workflows/ui-vocabulary.md` canonical labels
+- **Studio name**: use the `STUDIO_NAME` / `STUDIO_URL` constants from `src/constants.ts` (frontend) or `server/constants.ts` (backend). Never hard-code `"hmpsn.studio"` — enforced by pr-check.
 - **Route validation**: Zod schemas via `validate()` middleware, not hand-written checks
 - **Frontend data**: all hooks use `useQuery`/`useMutation`. No hand-rolled `useState`+`useEffect`+fetch patterns. Query keys: `admin-*` / `client-*` prefixes.
 - **Imports**: always at top of file, grouped with existing imports. Never add imports mid-file next to the code that uses them — this breaks the oxc parser used by vitest/vite and violates code conventions. When adding code to an existing file, check existing imports first (`grep -n '^import' <file>`).
-- **DB patterns**: lazy prepared statements via `createStmtCache()`/`stmts()`, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Use `parseJsonSafe`/`parseJsonFallback` from `server/db/json-validation.ts` — never bare `JSON.parse` on DB columns. Never use local `let` variables inside functions for prepared statement caching — the `if (!stmt)` guard is useless on a local variable that's re-initialized every call.
-- **Multi-step DB mutations must use `db.transaction()`** — any function that runs 2+ sequential `db.prepare().run()` calls where a partial failure would leave inconsistent state (e.g. INSERT into table A succeeded but DELETE from table B failed). Without a transaction, the next run can hit PRIMARY KEY violations on the already-inserted rows, permanently blocking the operation. Use `const doWork = db.transaction(() => { ... }); doWork();`. See `server/outcome-tracking.ts` `archiveOldActions` as the canonical example.
-- **`SUM()` columns must use `COALESCE`** — SQLite `SUM()` returns `NULL` (not `0`) when no rows match. Always wrap: `COALESCE(SUM(col), 0)` in any query whose result flows to the frontend or is used in arithmetic. A `NULL` total silently breaks counters displayed to users.
+- **DB patterns**: lazy prepared statements via `createStmtCache()`/`stmts()`, JSON columns as TEXT parsed at read boundary, `rowToX()` mappers, three-state booleans (0/1/NULL). Bare `JSON.parse` on DB columns, local `let stmt` caching, multi-step DB writes outside `db.transaction()`, AI-call-before-DB-writes without a transaction guard, `SUM()` without `COALESCE`, UPDATE/DELETE without `workspace_id` scoping, and `getOrCreate*` functions with nullable return types are **all enforced by pr-check**. See [automated-rules.md](./docs/rules/automated-rules.md). For detailed rationales see [docs/rules/ai-dispatch-patterns.md](./docs/rules/ai-dispatch-patterns.md).
 - **Array validation from DB** — when Zod-validating a JSON array column, validate items individually (filter out bad items) rather than validating the whole array (which drops ALL items if any one fails). Use `parseJsonSafeArray(raw, itemSchema, context)` from `server/db/json-validation.ts`. See `server/approvals.ts` `rowToBatch` for the pattern.
 - **Zod schema field names** — when writing Zod schemas for existing TypeScript interfaces, always cross-reference field names against the source interface in `shared/types/`. Zod won't flag name mismatches at compile time — a required field with a wrong name silently fails `safeParse` at runtime, returning the fallback instead of real data.
 - **Schema vs stored shape** — DB column schemas must reflect what is actually stored, not the in-memory assembled object. If a write path deliberately omits a field (e.g. storing it in a separate table), that field must be `.optional()` in the Zod schema. A required field absent from the stored blob causes every `parseJsonSafe` call to silently return the empty fallback, destroying all real data. See `keywordStrategySchema.pageMap` as the canonical example.
 - **Large edits**: break into multiple smaller edits if > 300 lines
-- **Route removal checklist** — when removing or renaming a `Page` type value, update ALL of these in the same commit:
-  1. `src/routes.ts` — remove from `Page` union type
-  2. `src/App.tsx` — remove `renderContent()` case
-  3. `src/components/layout/Sidebar.tsx` — remove sidebar entry
-  4. `src/components/layout/Breadcrumbs.tsx` — remove from `TAB_LABELS`
-  5. `src/components/CommandPalette.tsx` — remove from `NAV_ITEMS`
-  6. Grep for `adminPath(*, 'old-route')` — update any navigation targets
-  7. Tests referencing the old route value
+- **Delete-then-reinsert batch updates must preserve metadata** — batch-save UX is often implemented as delete-all + reinsert (simpler than per-row upserts). This permanently clobbers `created_at`, user-defined `sort_order`, and any approval/status column not present in the new payload. Always build a `Map<id, { createdAt, sortOrder, ... }>` from the pre-delete read and re-apply those fields on insert. See `updateBrandscriptSections` in `server/brandscript.ts` for the pattern.
+- **Prompt assembly layers must not duplicate content** — `buildSystemPrompt` in `server/prompt-assembly.ts` injects voice DNA + guardrails into the system message when `profile.status === 'calibrated'` (Layer 2). Any user-prompt code that manually inlines the same DNA must guard on `profile.status !== 'calibrated'` to avoid redundant injection that wastes tokens and confuses the model. Use `buildVoiceCalibrationContext(profile)` from `server/voice-calibration.ts` rather than hand-rolling the guard inline.
+- **Authority-layered fields — expose one resolved representation, never raw + format helper** — when a shared-type field has multiple authority sources (legacy column + override, global + workspace-specific, raw + computed), the single blessed representation is the pre-resolved form (e.g. `SeoContextSlice.effectiveBrandVoiceBlock`, which is pre-formatted by `buildSeoContext` with voice-profile authority applied). Callers inject that form DIRECTLY. Never ship a generic `format<Field>ForPrompt(raw)` helper alongside it — any caller who grabs the helper bypasses the authority chain, and the compiler cannot see the mistake because the raw field's type is still `string`. **Corollary (the PR #167/#168 lesson):** when *adding* a new authority layer to an existing field, grep the repo for every format helper touching that field and delete them in the same commit. A helper that predates an authority layer cannot know about it. See `formatBrandVoiceForPrompt` (deleted in PR #168) as the canonical cautionary tale; the reintroduction hazard is mechanized by the pr-check rule of the same name.
+- **Route removal checklist** — removing or renaming a `Page` union value touches seven files. The full list lives in [docs/rules/route-removal-checklist.md](./docs/rules/route-removal-checklist.md). Every entry must be updated in the same commit.
 - **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature.
 - **Staging before main** — all PRs merge into `staging` first. After verifying on the staging deploy, merge `staging` → `main` to release to production. Never merge an unverified PR directly to `main`.
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
-- **Test assertions on collections** — never assert `.every()` or `.some()` on a potentially empty array without first asserting `length > 0`. `[].every(fn)` returns `true` vacuously, hiding real failures. Pattern: `expect(arr.length).toBeGreaterThan(0); expect(arr.every(fn)).toBe(true);`
 - **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `docs/rules/analytics-insights.md`.
 - **DB column + mapper lockstep** — adding columns to any table requires migration SQL, row interface, `rowToX()` mapper, write path (`upsertX()`), AND the public endpoint serialization list in `public-portal.ts` if the field is client-facing, all in the same commit. TypeScript will not catch a mapper that silently ignores a new column, and the public endpoint's explicit field list will silently omit it.
 - **Integration tests must cover the actual read path** — when a feature gates client-facing behavior on a field from `GET /api/public/workspace/:id`, the integration test must exercise that endpoint, not the admin GET. A test that only verifies the admin route gives false confidence; a regression in the public serialization goes undetected.
 - **Enrichment field fallbacks** — optional fields computed at insight-store time must have explicit fallbacks. `pageTitle` must always resolve to something (cleaned slug if all else fails) — never render a raw URL. Enrichment failure must degrade gracefully, not block insight storage.
-- **Feedback loop completeness** — every cross-system write (e.g. insights → strategy, insights → pipeline) requires both halves: server `broadcastToWorkspace()` AND frontend `useWebSocket` handler that invalidates the correct React Query key. Neither half alone is sufficient.
-- **Bridge authoring rules** — all bridges must follow these patterns. Violations produce recurring bugs:
-  1. **Stale-cleanup immunity**: pass `bridgeSource: '<bridge_flag>'` to `upsertInsight()` when creating bridge insights. When re-upserting an existing insight (e.g., score adjustments), pass `bridgeSource: insight.bridgeSource` to preserve the original value — omitting it defaults to `null` and strips protection. Never call `resolveInsight('in_progress')` as a cleanup-protection hack — it overwrites admin resolutions.
-  2. **Score adjustments**: use `applyScoreAdjustment()` from `server/insight-score-adjustments.ts`. Never store independent `_*BaseScore` fields — they don't compose across bridges.
-  3. **Broadcast**: return `{ modified: N }` from bridge callbacks. Never manually import/call `broadcastToWorkspace` inside a bridge — `executeBridge` handles it automatically when `modified > 0`.
-  4. **Resolution respect**: never call `resolveInsight()` inside a bridge callback unless the bridge's explicit purpose is resolution management.
+- **Feedback loop completeness** — every cross-system write (e.g. insights → strategy, insights → pipeline) requires both halves: server `broadcastToWorkspace()` AND frontend `useWorkspaceEvents` handler that invalidates the correct React Query key. Neither half alone is sufficient.
+- **Bridge authoring rules** — every bridge callback must follow four rules: pass `bridgeSource` for stale-cleanup immunity, use `applyScoreAdjustment()` for score changes, return `{ modified: N }` and never manually broadcast, and never call `resolveInsight()` unless the bridge's purpose is resolution management. Full rationale: [docs/rules/bridge-authoring.md](./docs/rules/bridge-authoring.md). Rule #3 is enforced by pr-check.
 - **Client vs admin insight framing** — client-facing insight components must use narrative, outcome-oriented language. No purple. No admin jargon. Premium features wrapped in `<TierGate>`. Verify with `grep -r "purple-" src/components/client/` before marking Phase 3 done.
 - **Rate display: numerator and denominator must share a source** — if a component shows both a computed rate (win rate, conversion rate, etc.) and a "total" count, the displayed count must be the exact denominator used to compute the rate. Never mix a DB-aggregated count with a locally-filtered count. A mismatch causes users to infer the wrong raw counts from the displayed percentage.
-- **Guard `recordAction()` with a valid `workspaceId`** — never fall back to a non-workspace ID (Webflow siteId, sourceId, etc.) as the FK value. Always gate: `if (workspaceId) { recordAction({ workspaceId, ... }) }`. A Webflow siteId passed as `workspaceId` fails the FK constraint and silently kills outcome tracking for that call.
-- **Never use `as any` on dynamic import results** — the `(x: any)` or `as any` cast on a dynamically imported module's return value suppresses TypeScript and lets wrong property/function names compile silently. Every field resolves to `undefined` and falls through to `?? ''` / `?? 0` defaults, producing all-zero/empty data. Instead: (1) add `import type { T } from './module.js'` at the top of the file, (2) type the variable from the dynamic import, (3) let TypeScript verify every field access. If the type isn't exported, export it. If a circular dependency prevents a value import, `import type` is always safe (erased at compile time). The `// as-any-ok` escape hatch is for genuinely untyped third-party code only.
 - **Read-before-write for cross-module consumption** — before writing code that consumes another module's exports (assemblers, bridges, mappers), read the source module's actual interface/type definitions and exported function signatures. Never guess property names, function names, or return shapes from memory. The #1 bug pattern in this codebase is guessed field names (`pages` vs `decayingPages`, `createdAt` vs `changedAt`, `organicValue` vs `organicTrafficValue`) that compile because of `as any` casts but produce silent data loss at runtime.
 - **Zod clearable-field pattern** — optional validated fields that back user-editable inputs (email, URL, phone with pattern) must use `.or(z.literal(''))` so clearing the field doesn't return a 400. `.optional()` only handles the key being absent, not an empty string from a cleared input.
-- **PATCH depth-aware merge on nested JSON** — PATCH endpoints on JSON columns with nested sub-objects (e.g. `address` inside `businessProfile`) must deep-merge known nested keys, not just top-level spread. `{ ...existing, ...req.body }` silently replaces nested objects. Pattern: `...(req.body.address !== undefined ? { address: { ...(existing.address ?? {}), ...req.body.address } } : {})`.
 - **Feature toggle scope minimality** — feature toggles must gate the specific sub-feature, never a composite parent component. Pass the flag as a prop and gate inside the component at the narrowest point. Wrapping a composite component (e.g. `InsightsDigest` with 12+ card types) hides far more than the toggle intends.
-- **Public-portal mutations must call `addActivity()`** — every POST/PUT/PATCH/DELETE in `public-portal.ts` that changes workspace data must call `addActivity()` with an appropriate type. Without it, admins have zero visibility into client portal engagement in the activity feed.
+
+> **Mechanized enforcement.** Many rules above (and every silent-failure rule removed from this section during the pr-check audit) are now enforced by `scripts/pr-check.ts`. The canonical list with escape hatches lives in [docs/rules/automated-rules.md](./docs/rules/automated-rules.md) — do not duplicate them here.
 
 ---
 
@@ -250,10 +247,15 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/workflows/new-feature-checklist.md` | Before/during/after feature implementation |
 | `docs/workflows/deploy.md` | Commit, push, verify deploy (staging → main flow) |
 | `docs/workflows/staging-environment.md` | Staging URLs, DB sync, feature flags, env vars |
+| `docs/rules/automated-rules.md` | **Generated** table of every rule enforced by `scripts/pr-check.ts` |
+| `docs/rules/pr-check-rule-authoring.md` | How to add a new mechanized rule (when to do it, how to write the regex/customCheck, how to test it) |
 | `docs/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `docs/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
 | `docs/rules/analytics-insights.md` | Insight type registration, enrichment contracts, anomaly dedup, phase gates |
+| `docs/rules/bridge-authoring.md` | Insight bridge rules (stale-cleanup immunity, score adjustments, broadcast, resolution respect) |
+| `docs/rules/route-removal-checklist.md` | Seven update sites when removing or renaming a `Page` value |
 | `docs/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
+| `docs/rules/ai-dispatch-patterns.md` | AI-call-before-DB-write race, transaction guards, retry-on-unique patterns |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 
 ---
@@ -295,7 +297,7 @@ Every plan must include: task dependency graph, model assignments (Haiku/Sonnet/
 
 Work is not done until ALL pass:
 
-- [ ] `npx tsc --noEmit --skipLibCheck` — zero errors
+- [ ] `npm run typecheck` — zero errors (uses `tsc -b` for project-aware checking)
 - [ ] `npx vite build` — builds successfully
 - [ ] `npx vitest run` — full test suite passes (not just new tests)
 - [ ] `FEATURE_AUDIT.md` updated (if feature work)
@@ -303,6 +305,6 @@ Work is not done until ALL pass:
 - [ ] `BRAND_DESIGN_LANGUAGE.md` updated (if UI changed)
 - [ ] No `violet` or `indigo` in `src/components/`
 - [ ] `npx tsx scripts/pr-check.ts` — zero errors
-- [ ] If subagents were used: invoke `scaled-code-review` skill for parallel batch output (10+ files), or `superpowers:requesting-code-review` for single-task output. Fix Critical/Important issues before proceeding.
+- [ ] If multiple/parallel agents were used for any part of this work: invoke `scaled-code-review` skill before merging. Fix Critical/Important issues before proceeding. (Single-agent work on a single domain: `superpowers:requesting-code-review` is sufficient.)
 - [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.

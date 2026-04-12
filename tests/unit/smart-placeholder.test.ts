@@ -38,6 +38,7 @@ const richIntel = {
   seoContext: {
     strategy: undefined,
     brandVoice: 'Clear, professional, and approachable tone for SMB owners.',
+    effectiveBrandVoiceBlock: '\n\nBRAND VOICE & STYLE (you MUST match this voice — do not deviate):\nClear, professional, and approachable tone for SMB owners.',
     businessContext: 'Digital marketing agency serving Austin TX businesses',
     personas: [{ name: 'SMB Owner', description: 'Small business owner 35-55' }],
     knowledgeBase: '',

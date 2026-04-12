@@ -13,7 +13,7 @@ import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
 import { useClientSignals, useUpdateSignalStatus } from '../../hooks/admin/useClientSignals';
-import type { ClientSignal, ClientSignalStatus } from '../../../../shared/types/client-signals';
+import type { ClientSignal, ClientSignalStatus } from '../../../shared/types/client-signals';
 
 interface AdminInboxProps {
   workspaceId: string;

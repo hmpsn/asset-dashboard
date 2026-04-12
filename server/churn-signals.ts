@@ -99,8 +99,12 @@ const stmts = createStmtCache(() => ({
         VALUES (@id, @workspace_id, @workspace_name, @type, @severity,
           @title, @description, @detected_at, @dismissed_at)
       `),
-  dismiss: db.prepare('UPDATE churn_signals SET dismissed_at = ? WHERE id = ?'),
+  dismiss: db.prepare('UPDATE churn_signals SET dismissed_at = ? WHERE id = ? AND workspace_id = ?'),
   countAll: db.prepare('SELECT COUNT(*) as count FROM churn_signals'),
+  // Global retention policy: prune the N oldest rows across all workspaces
+  // to enforce MAX_SIGNALS=200 cap. Scoping to a single workspace here would defeat
+  // the purpose of the global cap.
+  // ws-scope-ok
   pruneOldest: db.prepare(`
         DELETE FROM churn_signals WHERE id IN (
           SELECT id FROM churn_signals ORDER BY detected_at ASC LIMIT ?
@@ -117,9 +121,18 @@ export function listChurnSignals(workspaceId?: string): ChurnSignal[] {
   return rows.map(rowToSignal);
 }
 
-export function dismissSignal(signalId: string): boolean {
-  const info = stmts().dismiss.run(new Date().toISOString(), signalId);
+export function dismissSignal(workspaceId: string, signalId: string): boolean {
+  const info = stmts().dismiss.run(new Date().toISOString(), signalId, workspaceId);
   return info.changes > 0;
+}
+
+/**
+ * Look up a churn signal by id (used by routes that only know the signal id —
+ * the caller must then pass the resolved workspaceId into dismissSignal()).
+ */
+export function getSignal(signalId: string): ChurnSignal | undefined {
+  const row = stmts().selectById.get(signalId) as ChurnSignalRow | undefined;
+  return row ? rowToSignal(row) : undefined;
 }
 
 function addSignal(signal: Omit<ChurnSignal, 'id' | 'detectedAt'>): ChurnSignal {
@@ -223,8 +236,9 @@ async function runChurnCheck() {
       const auditDir = path.join(UPLOAD_ROOT, ws.folder);
       const auditFiles = fs.readdirSync(auditDir).filter(f => f.startsWith('audit-') && f.endsWith('.json')).sort().reverse();
       if (auditFiles.length >= 2) {
-        const latest = parseJsonFallback(fs.readFileSync(path.join(auditDir, auditFiles[0]), 'utf-8'), null);
-        const previous = parseJsonFallback(fs.readFileSync(path.join(auditDir, auditFiles[1]), 'utf-8'), null);
+        type AuditFile = { audit?: { siteScore?: number }; siteScore?: number };
+        const latest = parseJsonFallback<AuditFile | null>(fs.readFileSync(path.join(auditDir, auditFiles[0]), 'utf-8'), null);
+        const previous = parseJsonFallback<AuditFile | null>(fs.readFileSync(path.join(auditDir, auditFiles[1]), 'utf-8'), null);
         if (!latest || !previous) throw new Error('Audit file parse failed');
         const latestScore = latest.audit?.siteScore ?? latest.siteScore;
         const prevScore = previous.audit?.siteScore ?? previous.siteScore;

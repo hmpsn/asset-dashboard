@@ -18,13 +18,29 @@ const log = createLogger('content-posts-ai');
 // Claude produces more natural, less formulaic writing. GPT excels at
 // JSON output, unification editing, and SEO meta generation.
 const CONTENT_MODEL = 'gpt-4.1';         // fallback + structured tasks
-const CONTENT_TEMP = 0.7;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514' as const;
 const CLAUDE_TEMP = 0.7;
 
 /**
+ * Strip a single wrapping ```json ... ``` (or ``` ... ```) fence from a string.
+ * Both Claude and GPT occasionally wrap JSON output in markdown fences even when
+ * instructed to return raw JSON; strip them at the boundary so downstream
+ * `JSON.parse` / `parseJsonFallback` callers see clean payloads.
+ */
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  return fenceMatch ? fenceMatch[1].trim() : trimmed;
+}
+
+/**
  * Route creative writing to Claude when available, fall back to GPT.
  * Claude's system prompt is separate from messages (not a role).
+ *
+ * When `json: true` is set, the OpenAI fallback path uses native
+ * `response_format: { type: 'json_object' }`; the Claude path relies on a
+ * prompt-level instruction; both paths run the result through `stripCodeFence`
+ * so callers can use `parseJsonFallback` / `JSON.parse` directly.
  */
 export async function callCreativeAI(opts: {
   systemPrompt: string;
@@ -32,24 +48,40 @@ export async function callCreativeAI(opts: {
   maxTokens: number;
   feature: string;
   workspaceId: string;
+  /** Optional temperature override (default: 0.7 for both providers) */
+  temperature?: number;
+  /**
+   * When true: enforce JSON output on the GPT fallback via responseFormat,
+   * append a "return raw JSON only" reminder to the Claude system prompt, and
+   * strip markdown code fences from the returned text. Defaults to false.
+   */
+  json?: boolean;
 }): Promise<string> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
+  const temperature = opts.temperature ?? CLAUDE_TEMP;
+  const json = opts.json === true;
+
+  // Claude has no structured JSON mode — lean on the system prompt instead.
+  const effectiveSystem = json
+    ? `${systemPrompt}\n\nIMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.`
+    : systemPrompt;
 
   if (isAnthropicConfigured()) {
     try {
       const result = await callAnthropic({
         model: CLAUDE_MODEL,
-        system: systemPrompt,
+        system: effectiveSystem,
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens,
-        temperature: CLAUDE_TEMP,
+        temperature,
         feature,
         workspaceId,
         maxRetries: 3,      // patient retries — quality over speed
         timeoutMs: 90_000,
       });
       log.info(`[${feature}] Generated with Claude`);
-      return result.text.trim();
+      const text = result.text.trim();
+      return json ? stripCodeFence(text) : text;
     } catch (err) {
       log.info(`[${feature}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
@@ -58,14 +90,16 @@ export async function callCreativeAI(opts: {
   // Fallback to GPT (or primary if no Anthropic key)
   const result = await callOpenAI({
     model: CONTENT_MODEL,
-    messages: [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }],
+    messages: [{ role: 'user', content: `${effectiveSystem}\n\n${userPrompt}` }],
     maxTokens,
-    temperature: CONTENT_TEMP,
+    temperature,
     feature,
     workspaceId,
+    ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
   });
   log.info(`[${feature}] Generated with GPT`);
-  return result.text.trim();
+  const text = result.text.trim();
+  return json ? stripCodeFence(text) : text;
 }
 
 export async function buildVoiceContext(workspaceId: string): Promise<string> {

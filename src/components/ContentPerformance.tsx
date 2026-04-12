@@ -112,7 +112,7 @@ const PAGE_TYPE_COLORS: Record<string, string> = {
   service: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   location: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   product: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  pillar: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  pillar: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   resource: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
 };
 
@@ -272,7 +272,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                         )}
                         <Badge label={item.status} color={item.status === 'published' ? 'emerald' : 'blue'} />
                         {item.source === 'matrix' && (
-                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                          <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
                             <Layers className="w-2.5 h-2.5" /> Content Plan
                           </span>
                         )}

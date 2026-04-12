@@ -181,17 +181,15 @@ describe('Approval Execution — FM-2 & FM-5', () => {
 
       // No items should be applied
       expect(appliedIds).toHaveLength(0);
-      expect(results).toHaveLength(3);
 
       // All results report failure
-      expect(results.length).toBeGreaterThan(0);
-      expect(results.every(r => r.success === false)).toBe(true);
+      expect(results.length > 0 && results.every(r => r.success === false)).toBe(true);
+      expect(results).toHaveLength(3);
 
       // DB: read back the batch and verify NO item has status 'applied'
       const persisted = getBatch(ws.workspaceId, batch.id);
       expect(persisted).toBeDefined();
-      expect(persisted!.items.length).toBeGreaterThan(0);
-      expect(persisted!.items.every(i => i.status !== 'applied')).toBe(true);
+      expect(persisted!.items.length > 0 && persisted!.items.every(i => i.status !== 'applied')).toBe(true);
 
       // Batch-level status must NOT be 'applied'
       expect(persisted!.status).not.toBe('applied');
@@ -255,8 +253,7 @@ describe('Approval Execution — FM-2 & FM-5', () => {
       const successResults = results.filter(r => r.success);
       const failResults = results.filter(r => !r.success);
 
-      expect(successResults.length).toBeGreaterThan(0);
-      expect(successResults.every(r => r.pageId !== 'page-fail-1')).toBe(true);
+      expect(successResults.length > 0 && successResults.every(r => r.pageId !== 'page-fail-1')).toBe(true);
 
       expect(failResults).toHaveLength(1);
       expect(failResults[0].pageId).toBe('page-fail-1');

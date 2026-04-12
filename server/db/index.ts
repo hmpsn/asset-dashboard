@@ -28,6 +28,26 @@ db.pragma('busy_timeout = 5000');
 db.pragma('foreign_keys = ON');
 
 /**
+ * Migration filename aliases — idempotent rename bridge.
+ *
+ * When a migration file is renamed, the `_migrations` tracker (keyed by filename)
+ * must be taught about the new name or the runner will try to re-apply the SQL on
+ * existing databases. This map runs BEFORE the applied set is loaded, so the new
+ * filename is seen as already-applied by the main loop.
+ *
+ * Pattern: append entries here as `[oldName, newName]`. Never remove old entries.
+ *
+ * History:
+ *   2026-04 — 048 triple-prefix cleanup
+ *     048-meeting-briefs.sql                → 054-meeting-briefs.sql
+ *     048-site-intelligence-client-view.sql → 055-site-intelligence-client-view.sql
+ */
+const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
+  ['048-meeting-briefs.sql', '054-meeting-briefs.sql'],
+  ['048-site-intelligence-client-view.sql', '055-site-intelligence-client-view.sql'],
+];
+
+/**
  * Run all pending SQL migrations from server/db/migrations/.
  * Tracks applied migrations in a `_migrations` table.
  */
@@ -48,6 +68,17 @@ export function runMigrations(): void {
   if (!fs.existsSync(migrationsDir)) {
     log.info('No migrations directory found — skipping.');
     return;
+  }
+
+  // Apply filename aliases BEFORE loading the applied set — this is the ONLY
+  // place the rename bridge can run, because the main loop compares candidate
+  // filenames against a snapshot of the applied set taken on the next line.
+  const aliasInsert = db.prepare(
+    `INSERT OR IGNORE INTO _migrations (name, applied_at)
+     SELECT ?, applied_at FROM _migrations WHERE name = ?`,
+  );
+  for (const [oldName, newName] of MIGRATION_RENAMES) {
+    aliasInsert.run(newName, oldName);
   }
 
   const applied = new Set(

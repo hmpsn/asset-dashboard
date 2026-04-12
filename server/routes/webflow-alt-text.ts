@@ -5,6 +5,8 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { generateAltText } from '../alttext.js';
+import type { default as SharpConstructor } from 'sharp';
+import type * as SvgoMod from 'svgo';
 import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
 import {
   listSites,
@@ -25,7 +27,6 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('webflow-alt-text');
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 // --- AI Alt Text Generation for existing assets ---
@@ -79,16 +80,19 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
     if (resolvedWsId) {
       const altIntel = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
       const altBizCtx = altIntel.seoContext?.businessContext ?? '';
+      // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+      const bvBlock = altIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
       const ws = getWorkspace(resolvedWsId);
-      const brandVoice = ws?.brandVoice;
       const kwParts: string[] = [];
       if (altBizCtx) kwParts.push(`Business: ${altBizCtx}`);
-      if (brandVoice) kwParts.push(`Brand voice: ${brandVoice}`);
       if (ws?.keywordStrategy?.siteKeywords?.length) {
         kwParts.push(`Site keywords: ${ws.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
       }
       if (kwParts.length > 0) {
         context = context ? `${context}\n${kwParts.join('. ')}` : kwParts.join('. ');
+      }
+      if (bvBlock) {
+        context = context ? `${context}${bvBlock}` : bvBlock;
       }
     }
 
@@ -139,15 +143,19 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
   if (bulkWsId) {
     const bulkIntel = await buildWorkspaceIntelligence(bulkWsId, { slices: ['seoContext'] });
     const bulkBizCtx = bulkIntel.seoContext?.businessContext ?? '';
+    // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+    const bvBlock = bulkIntel.seoContext?.effectiveBrandVoiceBlock ?? '';
     const bulkWs = getWorkspace(bulkWsId);
     const kwParts: string[] = [];
     if (bulkBizCtx) kwParts.push(`Business: ${bulkBizCtx}`);
-    if (bulkWs?.brandVoice) kwParts.push(`Brand voice: ${bulkWs.brandVoice}`);
     if (bulkWs?.keywordStrategy?.siteKeywords?.length) {
       kwParts.push(`Site keywords: ${bulkWs.keywordStrategy.siteKeywords.slice(0, 5).join(', ')}`);
     }
     if (kwParts.length > 0) {
       siteContext = siteContext ? `${siteContext}. ${kwParts.join('. ')}` : kwParts.join('. ');
+    }
+    if (bvBlock) {
+      siteContext = siteContext ? `${siteContext}${bvBlock}` : bvBlock;
     }
   }
 
@@ -334,7 +342,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
   const compressToken = getTokenForSite(siteId) || undefined;
 
   try {
-    const sharp = (await import('sharp')).default;
+    const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
 
     const response = await fetch(imageUrl);
     const originalBuffer = Buffer.from(await response.arrayBuffer());
@@ -346,7 +354,7 @@ router.post('/api/webflow/compress/:assetId', async (req, res) => {
     const baseName = (fileName || 'image').replace(/\.[^.]+$/, '');
 
     if (ext === 'svg') {
-      const svgo = await import('svgo');
+      const svgo: typeof SvgoMod = await import('svgo'); // dynamic-import-ok
       let compressedSvg: Buffer;
       try {
         const svgString = originalBuffer.toString('utf-8');

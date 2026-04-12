@@ -7,6 +7,7 @@ import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
+import type * as AiDeduplication from './ai-deduplication.js';
 
 const log = createLogger('openai');
 
@@ -254,7 +255,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   } = opts;
 
   // Create deduplication key from request parameters
-  const { AIRequestDeduplicator } = await import('./ai-deduplication.js');
+  const { AIRequestDeduplicator }: typeof AiDeduplication = await import('./ai-deduplication.js'); // dynamic-import-ok
   const dedupeKey = AIRequestDeduplicator.createKey({
     model,
     messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),

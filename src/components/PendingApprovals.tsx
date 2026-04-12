@@ -47,7 +47,9 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
     : rawBatches;
 
   const retractMutation = useMutation({
-    mutationFn: (batchId: string) => approvals.remove(workspaceId, batchId) as Promise<void>,
+    mutationFn: async (batchId: string) => {
+      await approvals.remove(workspaceId, batchId);
+    },
     onSuccess: (_data, batchId) => {
       queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] });
       setConfirmId(null);

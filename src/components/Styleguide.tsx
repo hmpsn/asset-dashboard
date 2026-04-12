@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { STUDIO_NAME } from '../constants';
 import {
   BarChart3, Globe, MousePointer, TrendingUp, Target, Zap,
   Shield, AlertTriangle, Info, Search, FileText,
@@ -332,7 +333,7 @@ export function Styleguide() {
               <EmptyState
                 icon={Lock}
                 title="Feature not configured"
-                description="This module needs to be enabled by hmpsn studio."
+                description={`This module needs to be enabled by ${STUDIO_NAME}.`}
                 action={<button className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs font-medium hover:from-teal-500 hover:to-emerald-500 transition-all">Request Access</button>}
               />
             </div>
@@ -650,7 +651,7 @@ export function Styleguide() {
               <div className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Inline Toast (Client Dashboard)</div>
               <div className="px-5 py-3 rounded-xl border shadow-lg bg-emerald-500/15 border-emerald-500/30 text-emerald-300 flex items-center gap-2.5">
                 <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs font-medium">Brief approved! hmpsn studio will begin content production.</span>
+                <span className="text-xs font-medium">Brief approved! {STUDIO_NAME} will begin content production.</span>
                 <button className="ml-auto text-zinc-400 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
               </div>
             </div>
@@ -849,7 +850,7 @@ export function Styleguide() {
 
         {/* Footer */}
         <div className="text-center py-8 border-t border-zinc-800">
-          <p className="text-xs text-zinc-500">hmpsn.studio Design System · {new Date().getFullYear()}</p>
+          <p className="text-xs text-zinc-500">{STUDIO_NAME} Design System · {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>

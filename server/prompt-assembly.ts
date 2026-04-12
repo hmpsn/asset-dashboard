@@ -11,11 +11,19 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { parseJsonFallback } from './db/json-validation.js';
+import type { VoiceDNA, VoiceGuardrails } from '../shared/types/brand-engine.js';
 
 // Statement cache (module-level lazy init via createStmtCache — never inside a function)
 const stmts = createStmtCache(() => ({
   getCustomNotes: db.prepare(
     `SELECT custom_prompt_notes FROM workspaces WHERE id = ? LIMIT 1`
+  ),
+}));
+
+const voiceStmts = createStmtCache(() => ({
+  getVoiceProfile: db.prepare(
+    `SELECT status, voice_dna_json, guardrails_json FROM voice_profiles WHERE workspace_id = ? LIMIT 1`
   ),
 }));
 
@@ -35,6 +43,80 @@ export function getCustomPromptNotes(workspaceId: string): string | null {
 }
 
 /**
+ * Layer 2 renderer: converts a VoiceDNA into a semantic-translation block that
+ * goes into the calibrated system prompt. This is a *different* format from
+ * the raw renderer in server/voice-dna-render.ts — this one translates the
+ * numeric tone spectrum into natural-language directives ("playful — humor
+ * welcome"), whereas the raw renderer shows the numbers directly.
+ *
+ * Both renderers MUST cover every field in VoiceDNA. See the `_coverage`
+ * exhaustive-field guard below and in voice-dna-render.ts.
+ */
+export function voiceDNAToPromptInstructions(dna: VoiceDNA): string {
+  // ── Exhaustive field coverage ────────────────────────────────────────────
+  // Typechecked against `Record<keyof VoiceDNA, true>`. Adding a field to
+  // VoiceDNA without handling it below breaks the build here.
+  const _coverage: Record<keyof VoiceDNA, true> = {
+    personalityTraits: true,
+    toneSpectrum: true,
+    sentenceStyle: true,
+    vocabularyLevel: true,
+    humorStyle: true,
+  };
+  void _coverage;
+
+  const formalCasual = dna.toneSpectrum.formal_casual >= 7
+    ? 'conversational and casual'
+    : dna.toneSpectrum.formal_casual <= 3
+      ? 'formal and professional'
+      : 'professional but approachable';
+
+  const playfulness = dna.toneSpectrum.serious_playful >= 7
+    ? 'playful — humor welcome'
+    : dna.toneSpectrum.serious_playful <= 3
+      ? 'serious — no jokes'
+      : 'measured — light warmth only';
+
+  const accessibility = dna.toneSpectrum.technical_accessible >= 7
+    ? 'plain language — avoid jargon'
+    : dna.toneSpectrum.technical_accessible <= 3
+      ? 'technical — assume domain expertise'
+      : 'balanced — define terms where helpful';
+
+  return [
+    `Voice profile for this client:`,
+    `- Tone: ${formalCasual}`,
+    `- Playfulness: ${playfulness}`,
+    `- Complexity: ${accessibility}`,
+    `- Sentence style: ${dna.sentenceStyle}`,
+    `- Vocabulary: ${dna.vocabularyLevel}`,
+    dna.humorStyle ? `- Humor: ${dna.humorStyle}` : null,
+    dna.personalityTraits.length > 0
+      ? `- Personality: ${dna.personalityTraits.join(', ')}`
+      : null,
+  ].filter(Boolean).join('\n');
+}
+
+export function guardrailsToPromptInstructions(guardrails: VoiceGuardrails): string {
+  const parts: string[] = ['Voice guardrails:'];
+  if (guardrails.forbiddenWords.length > 0) {
+    parts.push(`- Never use: ${guardrails.forbiddenWords.join(', ')}`);
+  }
+  if (guardrails.requiredTerminology.length > 0) {
+    const terms = guardrails.requiredTerminology
+      .map(t => `"${t.use}" (not "${t.insteadOf}")`).join(', ');
+    parts.push(`- Preferred terms: ${terms}`);
+  }
+  if (guardrails.toneBoundaries.length > 0) {
+    parts.push(`- Tone boundaries: ${guardrails.toneBoundaries.join('; ')}`);
+  }
+  if (guardrails.antiPatterns.length > 0) {
+    parts.push(`- Avoid: ${guardrails.antiPatterns.join('; ')}`);
+  }
+  return parts.join('\n');
+}
+
+/**
  * Assembles a system prompt by layering workspace-specific context onto base instructions.
  * Safe to call before Brandscript ships — Layer 2 is a no-op until extended in Task 5b.
  *
@@ -48,9 +130,23 @@ export function buildSystemPrompt(
 ): string {
   const parts: string[] = [baseInstructions];
 
-  // Layer 2: voice DNA (extended in Brandscript Phase 1 — Task 5b)
-  // No-op here. voiceDNAToPromptInstructions() and the voice_profiles lookup
-  // are added to this file when the voice_profiles table exists (migration 049).
+  // ── Layer 2: voice DNA
+  try {
+    const profileRow = voiceStmts().getVoiceProfile.get(workspaceId) as {
+      status: string;
+      voice_dna_json: string | null;
+      guardrails_json: string | null;
+    } | undefined;
+
+    if (profileRow?.status === 'calibrated') {
+      const dna = parseJsonFallback<VoiceDNA | null>(profileRow.voice_dna_json, null);
+      const guardrails = parseJsonFallback<VoiceGuardrails | null>(profileRow.guardrails_json, null);
+      if (dna) parts.push(voiceDNAToPromptInstructions(dna));
+      if (guardrails) parts.push(guardrailsToPromptInstructions(guardrails));
+    }
+  } catch {
+    // voice_profiles table may not exist in test or legacy DBs — graceful degradation
+  }
 
   // Layer 3: per-workspace custom notes
   // Use the pre-fetched value if provided; otherwise query the DB.

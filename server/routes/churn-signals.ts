@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
-import { listChurnSignals, dismissSignal } from '../churn-signals.js';
+import { listChurnSignals, dismissSignal, getSignal } from '../churn-signals.js';
 
 // --- Churn Prevention Signals (admin) ---
 router.get('/api/churn-signals', (_req, res) => {
@@ -18,7 +18,9 @@ router.get('/api/churn-signals/:workspaceId', requireWorkspaceAccess('workspaceI
 });
 
 router.post('/api/churn-signals/:signalId/dismiss', (req, res) => {
-  const ok = dismissSignal(req.params.signalId);
+  const signal = getSignal(req.params.signalId);
+  if (!signal) return res.status(404).json({ error: 'Signal not found' });
+  const ok = dismissSignal(signal.workspaceId, req.params.signalId);
   if (!ok) return res.status(404).json({ error: 'Signal not found' });
   res.json({ dismissed: true });
 });

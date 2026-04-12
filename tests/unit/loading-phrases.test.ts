@@ -7,8 +7,7 @@ describe('loadingPhrases', () => {
   });
 
   it('every phrase ends with the ellipsis character …', () => {
-    expect(LOADING_PHRASES.length).toBeGreaterThan(0);
-    expect(LOADING_PHRASES.every(p => p.endsWith('…'))).toBe(true);
+    expect(LOADING_PHRASES.length > 0 && LOADING_PHRASES.every(p => p.endsWith('…'))).toBe(true);
   });
 
   it('all 9 phrases are reachable over 500 random picks', () => {

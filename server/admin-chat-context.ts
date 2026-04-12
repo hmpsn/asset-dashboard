@@ -30,7 +30,7 @@ import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview
 import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit, getAuditTrafficForWorkspace } from './helpers.js';
 import { RICH_BLOCKS_PROMPT } from './seo-context.js';
-import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatBrandVoiceForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPrompt, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
@@ -329,7 +329,8 @@ export async function assembleAdminContext(
 
   const keywordBlock = formatKeywordsForPrompt(seoCtx);
   const strategy = seoCtx?.strategy;
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seoCtx?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seoCtx?.effectiveBrandVoiceBlock ?? '';
   const bizCtx = seoCtx?.businessContext ?? '';
   const kwMapContext = seoCtx ? formatPageMapForPrompt(seoCtx) : '';
   const personasContext = formatPersonasForPrompt(seoCtx?.personas);
@@ -530,7 +531,10 @@ export async function assembleAdminContext(
               .slice(0, 8)
               .map(p => ({
                 page: p.page, slug: p.slug, score: p.score,
-                topIssues: p.issues?.slice(0, 3).map(i => `[${i.severity}] ${i.check || i.type}: ${i.message}`) || [],
+                // `i.check` is typed as required string, but stored audit
+                // snapshots can predate that contract — fall back defensively
+                // so we never render "[error] undefined: <msg>" to the model.
+                topIssues: p.issues?.slice(0, 3).map(i => `[${i.severity}] ${i.check || 'unknown'}: ${i.message}`) || [],
               })),
           };
           sections.push(`SITE HEALTH AUDIT:\n${JSON.stringify(auditSummary, null, 1)}`);

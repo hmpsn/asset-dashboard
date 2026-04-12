@@ -1,4 +1,4 @@
-import { FEATURE_FLAGS, FeatureFlagKey } from '../shared/types/feature-flags.js';
+import { FEATURE_FLAGS, type FeatureFlagKey } from '../shared/types/feature-flags.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';

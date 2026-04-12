@@ -784,13 +784,11 @@ describe('auditPage() — empty/baseline results', () => {
 
     // Issues is a non-empty array — a page with no meta or HTML should have issues flagged
     expect(Array.isArray(result.issues)).toBe(true);
-    expect(result.issues.length).toBeGreaterThan(0);
-
-    // Every issue has the required shape fields — assert length first to avoid vacuous .every()
-    expect(result.issues.every(i => typeof i.check === 'string')).toBe(true);
-    expect(result.issues.every(i => typeof i.severity === 'string')).toBe(true);
-    expect(result.issues.every(i => typeof i.message === 'string')).toBe(true);
-    expect(result.issues.every(i => typeof i.recommendation === 'string')).toBe(true);
+    // Every issue has the required shape fields — assert length first to avoid vacuous-truthy on empty array
+    expect(result.issues.length > 0 && result.issues.every(i => typeof i.check === 'string')).toBe(true);
+    expect(result.issues.length > 0 && result.issues.every(i => typeof i.severity === 'string')).toBe(true);
+    expect(result.issues.length > 0 && result.issues.every(i => typeof i.message === 'string')).toBe(true);
+    expect(result.issues.length > 0 && result.issues.every(i => typeof i.recommendation === 'string')).toBe(true);
   });
 
   it('does not throw for any combination of null inputs', () => {

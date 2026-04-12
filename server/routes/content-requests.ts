@@ -16,7 +16,7 @@ import {
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
-import { notifyClientBriefReady, notifyClientContentPublished, notifyTeamContentRequest } from '../email.js';
+import { notifyClientBriefReady, notifyClientContentPublished } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';

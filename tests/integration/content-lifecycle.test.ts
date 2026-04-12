@@ -733,8 +733,7 @@ describe('Generated Post — invalid transitions blocked', () => {
 
   it('listable posts in workspace all have valid statuses', () => {
     const posts = listPosts(workspaceId);
-    expect(posts.length).toBeGreaterThan(0);
     const validStatuses = new Set(['generating', 'draft', 'review', 'approved']);
-    expect(posts.every(p => validStatuses.has(p.status))).toBe(true);
+    expect(posts.length > 0 && posts.every(p => validStatuses.has(p.status))).toBe(true);
   });
 });

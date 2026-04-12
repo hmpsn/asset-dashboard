@@ -122,8 +122,7 @@ describe('GET /api/public/insights/:workspaceId — workspace scoping', () => {
     const res = await api(`/api/public/insights/${wsAId}`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ workspaceId: string }>;
-    expect(body.length).toBeGreaterThan(0);
-    expect(body.every(i => i.workspaceId === wsAId)).toBe(true);
+    expect(body.length > 0 && body.every(i => i.workspaceId === wsAId)).toBe(true);
   });
 
   it('workspace B returns 200 and empty array when no insights seeded', async () => {
@@ -196,12 +195,10 @@ describe('GET /api/public/insights — cross-workspace isolation', () => {
     const bodyB = await resB.json() as Array<{ id: string; workspaceId: string }>;
 
     // Workspace A still has its original insights
-    expect(bodyA.length).toBeGreaterThan(0);
-    expect(bodyA.every(i => i.workspaceId === wsAId)).toBe(true);
+    expect(bodyA.length > 0 && bodyA.every(i => i.workspaceId === wsAId)).toBe(true);
 
     // Workspace B now has exactly one insight — the one we just seeded
-    expect(bodyB.length).toBeGreaterThan(0);
-    expect(bodyB.every(i => i.workspaceId === wsBId)).toBe(true);
+    expect(bodyB.length > 0 && bodyB.every(i => i.workspaceId === wsBId)).toBe(true);
 
     // Cross-contamination check: neither workspace sees the other's IDs
     const idsA = new Set(bodyA.map(i => i.id));
@@ -289,16 +286,14 @@ describe('GET /api/public/insights/:workspaceId?type= — type filter scoping', 
     const res = await api(`/api/public/insights/${wsAId}?type=ranking_opportunity`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ insightType: string }>;
-    expect(body.length).toBeGreaterThan(0);
-    expect(body.every(i => i.insightType === 'ranking_opportunity')).toBe(true);
+    expect(body.length > 0 && body.every(i => i.insightType === 'ranking_opportunity')).toBe(true);
   });
 
   it('?type=content_decay returns only content_decay insights for wsA', async () => {
     const res = await api(`/api/public/insights/${wsAId}?type=content_decay`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<{ insightType: string }>;
-    expect(body.length).toBeGreaterThan(0);
-    expect(body.every(i => i.insightType === 'content_decay')).toBe(true);
+    expect(body.length > 0 && body.every(i => i.insightType === 'content_decay')).toBe(true);
   });
 
   it('?type=ranking_opportunity returns empty array for workspace B (no insights of that type)', async () => {

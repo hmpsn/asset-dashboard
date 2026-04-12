@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 
 describe('ApprovalsTab keyword chips', () => {
-  const src = readFileSync('src/components/client/ApprovalsTab.tsx', 'utf-8');
+  const src = readFileSync('src/components/client/ApprovalsTab.tsx', 'utf-8'); // readFile-ok — UI contract guard: asserts keyword chip feature props (pageMap, findPageKeywords, field gating, chip rendering) are wired correctly in ApprovalsTab after the chip feature was added.
 
   it('ApprovalsTabProps has pageMap optional prop', () => {
     expect(src).toMatch(/pageMap\??\s*:/);

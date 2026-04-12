@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
 import { type Page, adminPath } from '../../routes';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
 import {
@@ -54,7 +55,7 @@ interface SidebarProps {
 
 const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
 
-function buildNavGroups(hasContentItems: boolean): NavGroup[] {
+function buildNavGroups(hasContentItems: boolean, copyEngineEnabled: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
@@ -82,7 +83,8 @@ function buildNavGroups(hasContentItems: boolean): NavGroup[] {
       { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, needsSite: true, desc: 'Per-page keyword analysis, metrics, and optimization' },
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
-      { id: 'brand', label: 'Brand & AI', icon: Zap, needsSite: true, desc: 'Brand voice, knowledge base, and audience personas' },
+      // Copy Engine (Brand Hub) is phase-per-PR dark-launched; hide from nav until `copy-engine` flag is enabled.
+      { id: 'brand', label: 'Brand & AI', icon: Zap, needsSite: true, hidden: !copyEngineEnabled, desc: 'Brand voice, knowledge base, and audience personas' },
       { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
@@ -121,7 +123,8 @@ export function Sidebar({
     });
   }, []);
 
-  const navGroups = buildNavGroups(hasContentItems);
+  const copyEngineEnabled = useFeatureFlag('copy-engine');
+  const navGroups = buildNavGroups(hasContentItems, copyEngineEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => {

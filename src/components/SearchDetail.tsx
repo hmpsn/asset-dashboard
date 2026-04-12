@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Search, ExternalLink, ArrowUpDown, Loader2 } from 'lucide-react';
 import { SectionCard, DateRangeSelector, EmptyState, MetricToggleCard } from './ui';
 import { DATE_PRESETS_SEARCH } from './ui/constants';
-import type { SearchQuery, SearchPage } from '../../shared/types/analytics';
 import type { FeedInsight } from '../../shared/types/insights';
 import { useAdminSearch } from '../hooks/admin';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';

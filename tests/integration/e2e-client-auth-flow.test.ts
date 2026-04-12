@@ -57,7 +57,7 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(() => {
-  deleteClientUser(clientUserId);
+  deleteClientUser(clientUserId, testWsId);
   deleteWorkspace(testWsId);
   ctx.stopServer();
 });

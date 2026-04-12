@@ -5,7 +5,6 @@ import {
   formatKeywordsForPrompt,
   formatPersonasForPrompt,
   formatPageMapForPrompt,
-  formatBrandVoiceForPrompt,
   formatKnowledgeBaseForPrompt,
 } from './workspace-intelligence.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
@@ -189,7 +188,7 @@ const stmts = createStmtCache(() => ({
            keyword_locked = @keyword_locked, keyword_source = @keyword_source,
            keyword_validation = @keyword_validation, template_id = @template_id,
            title_variants = @title_variants, meta_desc_variants = @meta_desc_variants
-         WHERE id = @id`,
+         WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
     `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
@@ -513,7 +512,8 @@ export async function regenerateBrief(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
@@ -687,7 +687,8 @@ export async function regenerateOutline(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const ptConfig = getPageTypeConfig(existingBrief.pageType);
 
   const currentOutline = JSON.stringify(existingBrief.outline, null, 2);
@@ -797,7 +798,8 @@ export async function generateBrief(
   const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
   const seo = intel.seoContext;
   const keywordBlock = formatKeywordsForPrompt(seo);
-  const brandVoiceBlock = formatBrandVoiceForPrompt(seo?.brandVoice);
+  // Voice authority: effectiveBrandVoiceBlock already honors voice profile → legacy fallback
+  const brandVoiceBlock = seo?.effectiveBrandVoiceBlock ?? '';
   const stratBizCtx = seo?.businessContext ?? '';
   const knowledgeBlock = formatKnowledgeBaseForPrompt(seo?.knowledgeBase);
   const personasBlock = formatPersonasForPrompt(seo?.personas);

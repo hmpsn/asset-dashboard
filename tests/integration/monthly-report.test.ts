@@ -480,7 +480,7 @@ describe('Monthly report persistence', () => {
   it('listMonthlyReports entries have required fields', () => {
     const reports = listMonthlyReports(richWsId);
     expect(reports.length).toBeGreaterThan(0);
-    expect(reports.every(r =>
+    expect(reports.length > 0 && reports.every(r =>
       typeof r.id === 'string' &&
       r.id.startsWith('mr_') &&
       typeof r.workspaceId === 'string' &&
@@ -493,7 +493,7 @@ describe('Monthly report persistence', () => {
   it('listMonthlyReports entries all belong to the correct workspace', () => {
     const reports = listMonthlyReports(richWsId);
     expect(reports.length).toBeGreaterThan(0);
-    expect(reports.every(r => r.workspaceId === richWsId)).toBe(true);
+    expect(reports.length > 0 && reports.every(r => r.workspaceId === richWsId)).toBe(true);
   });
 
   it('GET /report/monthly/:id returns the persisted HTML', async () => {
@@ -522,11 +522,11 @@ describe('Monthly report workspace isolation', () => {
 
     // All rich reports are scoped to richWsId
     expect(richReports.length).toBeGreaterThan(0);
-    expect(richReports.every(r => r.workspaceId === richWsId)).toBe(true);
+    expect(richReports.length > 0 && richReports.every(r => r.workspaceId === richWsId)).toBe(true);
 
     // Empty workspace reports (if any) must not reference richWsId
     if (emptyReports.length > 0) {
-      expect(emptyReports.every(r => r.workspaceId !== richWsId)).toBe(true);
+      expect(emptyReports.length > 0 && emptyReports.every(r => r.workspaceId !== richWsId)).toBe(true);
     }
   });
 
@@ -538,7 +538,7 @@ describe('Monthly report workspace isolation', () => {
 
     const monthlyReports = body.filter(r => r.type === 'monthly');
     expect(monthlyReports.length).toBeGreaterThan(0);
-    expect(monthlyReports.every(r => typeof r.id === 'string')).toBe(true);
+    expect(monthlyReports.length > 0 && monthlyReports.every(r => typeof r.id === 'string')).toBe(true);
   });
 
   it('GET /api/public/reports/:workspaceId for empty workspace contains no richWsId reports', async () => {

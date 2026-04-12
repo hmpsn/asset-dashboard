@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { auditSchedules, anomalies } from '../api';
 import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
-  Target, Code2, Clipboard, Image, Flag, TrendingUp, Sparkles, FileText,
+  Target, Code2, Clipboard, Image, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
   Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy, BookOpen,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath } from '../routes';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 
 interface PaletteItem {
   id: string;
@@ -87,8 +88,22 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Copy Engine (Brand Hub) is dark-launched; filter the 'brand' nav item out until the flag flips on.
+  const copyEngineEnabled = useFeatureFlag('copy-engine');
 
   // ⌘K / Ctrl+K to toggle
+  // keydown-ok: this handler intentionally fires from input fields. The
+  // standard isContentEditable guard would break two desired behaviours:
+  //   1. Cmd/Ctrl+K is a global "open command palette" combo and must
+  //      fire from any focused field (Slack/Linear/Notion convention).
+  //   2. Escape closes the palette from within its own input — the
+  //      palette IS an editable target by design, and gating on
+  //      isContentEditable would prevent the dismiss interaction.
+  // The Escape branch self-gates on `open === true`, so it never fires
+  // when the palette is closed; the only stray-input scenario it could
+  // hit is "user has focus in some other input *while* the modal is
+  // also open", which is impossible because the palette modal grabs
+  // focus on open.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -103,7 +118,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         setOpen(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown); // keydown-ok
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open]);
 
@@ -118,6 +133,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
 
     // Navigation items
     for (const nav of NAV_ITEMS) {
+      if (nav.id === 'brand' && !copyEngineEnabled) continue;
       result.push({
         id: `nav:${nav.id}`,
         label: nav.label,
@@ -193,7 +209,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, copyEngineEnabled]);
 
   // Filter items by query
   const filtered = useMemo(() => {

@@ -15,8 +15,8 @@ describe('SeoEditor — unified pages integration contracts', () => {
     ];
     const showCmsOnly = true;
     const filtered = pages.filter(p => !(showCmsOnly && p.source !== 'cms'));
+    expect(filtered.length > 0 && filtered.every(p => p.source === 'cms')).toBe(true);
     expect(filtered).toHaveLength(2);
-    expect(filtered.every(p => p.source === 'cms')).toBe(true);
   });
 
   it('showCmsOnly filter excludes static pages', () => {

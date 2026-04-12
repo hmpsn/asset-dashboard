@@ -4,7 +4,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machines.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
-import type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
+import type { ContentTopicRequest } from '../shared/types/content.ts';
 
 // ── SQLite row shape ──
 
@@ -64,7 +64,7 @@ const stmts = createStmtCache(() => ({
            client_feedback = @client_feedback, service_type = @service_type,
            upgraded_at = @upgraded_at, delivery_url = @delivery_url,
            delivery_notes = @delivery_notes, comments = @comments, updated_at = @updated_at
-         WHERE id = @id`,
+         WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
     `DELETE FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
@@ -190,6 +190,7 @@ export function updateContentRequest(
 
   stmts().update.run({
     id: existing.id,
+    workspace_id: workspaceId,
     status: existing.status,
     brief_id: existing.briefId ?? null,
     client_note: existing.clientNote ?? null,
@@ -230,6 +231,7 @@ export function addComment(
 
   stmts().update.run({
     id: existing.id,
+    workspace_id: workspaceId,
     status: existing.status,
     brief_id: existing.briefId ?? null,
     client_note: existing.clientNote ?? null,

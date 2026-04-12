@@ -1,5 +1,5 @@
 import {
-  Loader2, Copy, CheckCircle, Upload, Database,
+  Loader2, Copy, CheckCircle, Upload,
 } from 'lucide-react';
 
 interface CmsTemplatePage {

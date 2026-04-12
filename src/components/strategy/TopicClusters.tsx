@@ -28,8 +28,8 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
   if (clusters.length === 0) return null;
 
   return (
-    <div className="bg-zinc-900 border border-violet-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
-      <h4 className="text-xs font-semibold text-violet-300 mb-1 flex items-center gap-1.5">
+    <div className="bg-zinc-900 border border-teal-500/20 p-5" style={{ borderRadius: '6px 12px 6px 12px' }}>
+      <h4 className="text-xs font-semibold text-teal-300 mb-1 flex items-center gap-1.5">
         <Layers className="w-3.5 h-3.5" /> Topical Authority
       </h4>
       <p className="text-[11px] text-zinc-500 mb-3">Topic clusters ranked by coverage gap — lowest coverage = biggest opportunity.</p>
@@ -66,7 +66,7 @@ export function TopicClusters({ clusters }: TopicClustersProps) {
             {cluster.gap.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {cluster.gap.slice(0, 5).map((kw, ki) => (
-                  <span key={ki} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                  <span key={ki} className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     {kw}
                   </span>
                 ))}
