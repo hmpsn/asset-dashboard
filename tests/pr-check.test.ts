@@ -1752,6 +1752,284 @@ describe('Rule: Constants in sync (STUDIO_NAME, STUDIO_URL)', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: Admin mutation on client_users missing expectedWorkspaceId param
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Admin mutation on client_users missing expectedWorkspaceId param', () => {
+  const RULE = 'Admin mutation on client_users missing expectedWorkspaceId param';
+
+  it('flags an exported `update*` function whose param list omits expectedWorkspaceId', () => {
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "import db from './db.js';",                                         // 1
+        "export async function updateClientPreferences(id: string, prefs: {}) {", // 2
+        "  db.prepare('UPDATE client_users SET prefs = ? WHERE id = ?').run(prefs, id);", // 3
+        "}",                                                                 // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('flags a `delete*` function whose multi-line param list omits expectedWorkspaceId', () => {
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "import db from './db.js';",                                         // 1
+        "export function deleteClientPreference(",                           // 2
+        "  id: string,",                                                     // 3
+        "  key: string,",                                                    // 4
+        ") {",                                                               // 5
+        "  db.prepare('DELETE FROM client_user_prefs WHERE id = ?').run(id);", // 6
+        "}",                                                                 // 7
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a `change*` function missing the param', () => {
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "export async function changeClientRole(id: string, role: string) {", // 1
+        "  void id; void role;",                                               // 2
+        "}",                                                                   // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects inline // ws-authz-ok hatch on the declaration line', () => {
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "export async function updateClientPreferences(id: string, prefs: {}) { // ws-authz-ok",
+        "  void id; void prefs;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // ws-authz-ok hatch on the line immediately above the declaration', () => {
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "// ws-authz-ok — this mutation is global retention, not workspace-scoped",
+        "export function deleteExpiredClientSessions(cutoffMs: number) {",
+        "  void cutoffMs;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a function whose param list includes expectedWorkspaceId', () => {
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "export async function updateClientUser(",
+        "  id: string,",
+        "  expectedWorkspaceId: string,",
+        "  updates: Partial<{ name: string }>,",
+        ") {",
+        "  void id; void expectedWorkspaceId; void updates;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-mutation functions (no update|delete|change verb prefix)', () => {
+    // `recordClientLogin` is a mutation at the DB level but falls outside
+    // the verb-prefix set. The rule intentionally whitelists it by
+    // convention — login bookkeeping is already workspace-agnostic (the
+    // caller has already authenticated the user and only passes the id).
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/client-users.ts'),
+      lines(
+        "export function recordClientLogin(id: string) {",
+        "  void id;",
+        "}",
+        "export function listClientUsers(workspaceId: string) {",
+        "  void workspaceId;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag functions in files other than server/client-users.ts', () => {
+    // Same declaration in a different file must not trip the rule —
+    // scope is limited to server/client-users.ts because assertUserInWorkspace
+    // lives there and the cross-workspace guard contract is file-local.
+    const file = write(
+      uniqPath('rule-ws-authz', 'server/unrelated.ts'),
+      lines(
+        "export async function updateUnrelated(id: string, data: string) {",
+        "  void id; void data;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)', () => {
+  const RULE = 'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)';
+
+  it('flags a bare getVoiceProfile() call', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "import { getVoiceProfile } from './brand-engine.js';",              // 1
+        "export function build(ws: string) {",                               // 2
+        "  const profile = getVoiceProfile(ws);",                            // 3
+        "  return profile;",                                                 // 4
+        "}",                                                                 // 5
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('flags a bare listBrandscripts() call', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "import { listBrandscripts } from './brandscript.js';",
+        "export function build(ws: string) {",
+        "  const scripts = listBrandscripts(ws);",
+        "  return scripts;",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('flags a bare listDeliverables() call', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "import { listDeliverables } from './brand-identity.js';",
+        "export function build(ws: string) {",
+        "  const d = listDeliverables(ws);",
+        "  return d;",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('respects inline // safe-read-ok hatch on the call line', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "import { getVoiceProfile } from './brand-engine.js';",
+        "export function build(ws: string) {",
+        "  const profile = getVoiceProfile(ws); // safe-read-ok",
+        "  return profile;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // safe-read-ok hatch on the line immediately above the call', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "import { getVoiceProfile } from './brand-engine.js';",
+        "export function build(ws: string) {",
+        "  // safe-read-ok — handled by outer try/catch",
+        "  const profile = getVoiceProfile(ws);",
+        "  return profile;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a call wrapped in safeBrandEngineRead on the same line', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "import { getVoiceProfile } from './brand-engine.js';",
+        "export function build(ws: string) {",
+        "  const profile = safeBrandEngineRead('build.getVoiceProfile', ws, () => getVoiceProfile(ws), null);",
+        "  return profile;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag JSDoc references to the bare function name', () => {
+    // A JSDoc continuation line like ` * getVoiceProfile(ws) is called via ...`
+    // mentions the function with parens for readability; the rule's JSDoc
+    // skip (`^\s*\*`) ensures this is not a false positive.
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "/**",
+        " * Build the SEO context.",
+        " * Internally calls getVoiceProfile(workspaceId) through safeBrandEngineRead.",
+        " */",
+        "export function build(ws: string) {",
+        "  void ws;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag line comments that reference the function name with parens', () => {
+    const file = write(
+      uniqPath('rule-safe-read', 'server/seo-context.ts'),
+      lines(
+        "export function build(ws: string) {",
+        "  // NOTE: listDeliverables(ws) wrapped below for test-env schema guard",
+        "  void ws;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag functions in files other than server/seo-context.ts', () => {
+    // Route handlers that call these directly are fine — errors at the
+    // request boundary become 500s and surface loudly.
+    const file = write(
+      uniqPath('rule-safe-read', 'server/routes/brand-voice.ts'),
+      lines(
+        "import { getVoiceProfile } from '../brand-engine.js';",
+        "export default function handler(ws: string) {",
+        "  return getVoiceProfile(ws);",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Meta-test: pinned customCheck rule names
 // ════════════════════════════════════════════════════════════════════════════
 //
@@ -1940,6 +2218,9 @@ describe('Meta: customCheck rule name registry', () => {
     'requireAuth in brand-engine route files (should be requireWorkspaceAccess)',
     'useEffect external-sync dirty guard against the live prop',
     'Constants in sync (STUDIO_NAME, STUDIO_URL)',
+    // PR #168 scaled-review follow-ups
+    'Admin mutation on client_users missing expectedWorkspaceId param',
+    'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

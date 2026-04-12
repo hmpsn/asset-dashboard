@@ -177,6 +177,8 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 **`requireWorkspaceAccess` is safe for all routes** — it explicitly passes through when no JWT user is present (HMAC auth users are covered by the global gate).
 
+**Rule: Admin mutations on workspace-scoped tables must take explicit `expectedWorkspaceId`.** `requireWorkspaceAccess(:id)` only verifies the caller has access to the `:id` workspace in the URL — it does NOT verify that nested `:userId` (or similar) path parameters actually belong to that workspace. Any exported mutation function in `server/client-users.ts` (`updateClientUser`, `changeClientPassword`, `deleteClientUser`, and any future `update*|delete*|change*`) must therefore accept `expectedWorkspaceId: string` as a required parameter and route the target `id` through the `assertUserInWorkspace(id, expectedWorkspaceId)` guard. The guard MUST return `null` uniformly for both "row not found" and "row belongs to a different workspace" so the endpoint cannot be used as a workspace-enumeration oracle. Without this, an admin authenticated for workspace A could call `PATCH|DELETE|password-change` against a user from workspace B by knowing only the UUID. Enforced by pr-check.
+
 ---
 
 ## Code Conventions

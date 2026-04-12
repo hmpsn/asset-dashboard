@@ -2045,6 +2045,217 @@ export const CHECKS: Check[] = [
       );
     },
   },
+  {
+    // Added post-PR #168 scaled-review cleanup (2026-04-11).
+    //
+    // Admin-mutating functions on workspace-scoped tables must take an
+    // explicit `expectedWorkspaceId` parameter AND route the target id
+    // through a guard (`assertUserInWorkspace` or equivalent) that returns
+    // null for both "not found" and "belongs to a different workspace".
+    //
+    // The route-level `requireWorkspaceAccess(:id)` middleware only verifies
+    // the caller has access to the `:id` workspace — it does NOT verify that
+    // a nested `:userId` path parameter actually belongs to that workspace.
+    // Without the in-function guard, an admin authenticated for workspace A
+    // could call `DELETE /api/workspaces/A/client-users/<userInB>` and knock
+    // out a user from workspace B by guessing the UUID. PR #168 commit
+    // 293485d addressed the existing three functions (`updateClientUser`,
+    // `changeClientPassword`, `deleteClientUser`); TypeScript catches
+    // callers that forget to pass the argument NOW, but cannot catch a
+    // NEW mutation function added without the parameter at all.
+    //
+    // Scope: server/client-users.ts ONLY. The verb prefix `update|delete|
+    // change` captures the current three plus any future variants that
+    // preserve the naming convention. Add new verbs here when introducing
+    // new mutation classes (e.g. `archive*`) in the same commit.
+    name: 'Admin mutation on client_users missing expectedWorkspaceId param',
+    fileGlobs: ['client-users.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/client-users.ts',
+    // Doc-only: the customCheck below filters hatches via `hasHatch(lines, i,
+    // '// ws-authz-ok')` — this `excludeLines` entry is a no-op at runtime
+    // but drives the `Escape hatch` column of docs/rules/automated-rules.md
+    // via `generate-rules-doc.ts::describeHatch`.
+    excludeLines: ['// ws-authz-ok'],
+    message: 'Admin mutation functions in server/client-users.ts must take `expectedWorkspaceId: string` and pass `(id, expectedWorkspaceId)` to `assertUserInWorkspace` — `requireWorkspaceAccess(:id)` only verifies the URL workspace, not that `:userId` belongs to it. Suppress with // ws-authz-ok only if the function is not workspace-scoped (rare — justify in a comment). See CLAUDE.md Auth Conventions.',
+    severity: 'warn',
+    rationale: 'Without an in-function cross-workspace guard on admin mutations, an admin auth\'d for workspace A can mutate a user in workspace B by passing the foreign UUID through a workspace-A URL.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Match `export function update*(` or `export async function delete*(` etc.
+      const declRe = /^\s*export\s+(?:async\s+)?function\s+(update|delete|change)\w*\s*\(/;
+      // Max lines a param list may span — 20 is generous; longest current
+      // declaration (updateClientUser) spans 5 lines. Acts as a safety bound
+      // against an unterminated signature eating the rest of the file.
+      const PARAM_LIST_MAX_SPAN = 20;
+      for (const file of files) {
+        if (path.basename(file) !== 'client-users.ts') continue;
+        // Defensive — there is only one client-users.ts in the repo, but
+        // anchor to server/ so an accidentally-created frontend copy can't
+        // shadow it silently.
+        if (!file.includes(`server${path.sep}client-users.ts`) && !file.includes('server/client-users.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!declRe.test(lines[i])) continue;
+          // Extract the full parameter list. It may span multiple lines; walk
+          // forward tracking paren depth until the declaration's opening `(`
+          // matches its closing `)`. Skip string literals so `)` inside a
+          // default-value literal or a string doesn't prematurely close the
+          // param list.
+          const openParen = lines[i].indexOf('(');
+          if (openParen === -1) continue;
+          let depth = 1;
+          let quote: string | null = null;
+          let params = '';
+          let closed = false;
+          const maxLine = Math.min(lines.length, i + PARAM_LIST_MAX_SPAN);
+          outer: for (let j = i; j < maxLine; j++) {
+            const seg = lines[j];
+            const startChar = j === i ? openParen + 1 : 0;
+            let k = startChar;
+            while (k < seg.length) {
+              const ch = seg[k];
+              if (quote) {
+                if (ch === '\\' && k + 1 < seg.length) { k += 2; continue; }
+                if (ch === quote) quote = null;
+              } else if (ch === '`' || ch === "'" || ch === '"') {
+                quote = ch;
+              } else if (ch === '(') {
+                depth++;
+              } else if (ch === ')') {
+                depth--;
+                if (depth === 0) {
+                  params += seg.slice(startChar, k);
+                  closed = true;
+                  break outer;
+                }
+              }
+              k++;
+            }
+            params += seg.slice(startChar) + '\n';
+          }
+          if (!closed) continue; // malformed — skip rather than false-flag
+          if (/\bexpectedWorkspaceId\b/.test(params)) continue;
+          if (hasHatch(lines, i, '// ws-authz-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Added post-PR #168 scaled-review cleanup (2026-04-11).
+    //
+    // Voice profile authority — the decision to let a voice profile OVERRIDE
+    // the legacy `workspace.brandVoice` + brand-docs block — must go through
+    // the `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` helper.
+    // PR #168 commit 3c8a6cd factored the helper out of three inline call
+    // sites (`buildSeoContext` no-strategy branch, with-strategy branch, and
+    // the shadow-mode parity check). The shadow-mode copy had drifted,
+    // missing the `hasExplicitConfig` gate, so draft profiles with voice
+    // samples but no saved DNA/guardrails were incorrectly treated as
+    // authoritative — silently hiding the legacy brand voice from the
+    // prompt. A samples-only draft is "preparing to calibrate", not a
+    // configuration commitment.
+    //
+    // The inline pattern is `voiceProfileBlock.length` — any `> 0`, `=== 0`,
+    // or `.length` comparison on the rendered voice profile block outside
+    // the helper itself is a re-invention of the authority decision and MUST
+    // go through the helper instead. The only legitimate site is the helper
+    // body itself (line 115), which is hatched inline with `// voice-authority-ok`.
+    //
+    // Scope: server/seo-context.ts ONLY. Other files don't render a
+    // `voiceProfileBlock` — if this name appears elsewhere in the future it
+    // should also route through the helper.
+    name: 'Inline voice-profile authority check (use isVoiceProfileAuthoritative helper)',
+    pattern: 'voiceProfileBlock\\.length',
+    fileGlobs: ['seo-context.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/seo-context.ts',
+    excludeLines: ['// voice-authority-ok'],
+    message: 'Do not inline `voiceProfileBlock.length > 0` authority checks. Call `isVoiceProfileAuthoritative(profile, voiceProfileBlock)` — the helper encodes the full calibration + hasExplicitConfig decision so every call site stays in sync. Suppress with // voice-authority-ok only inside the helper definition itself.',
+    severity: 'warn',
+    rationale: 'Inline authority checks drift: the shadow-mode copy missed the `hasExplicitConfig` gate, silently dropping the legacy brand voice for samples-only draft profiles (PR #168 bug).',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    // Added post-PR #168 scaled-review cleanup (2026-04-11).
+    //
+    // Brand-engine reader calls from inside `server/seo-context.ts` must be
+    // wrapped in `safeBrandEngineRead<T>(context, workspaceId, fn, fallback)`.
+    // In production the `voice_profiles`, `brandscripts`, and
+    // `brand_identity_deliverables` tables always exist because migrations
+    // run at startup, but test environments may skip migrations entirely
+    // and a missing table throws from `db.prepare()` inside the stmt-cache
+    // initializer — crashing the entire `buildSeoContext` call tree.
+    //
+    // The wrapper narrowly swallows `no such table|column` errors (the
+    // specific test-env scenario) and re-throws everything else so
+    // programming bugs (renamed exports, typeerrors, json parse failures)
+    // still surface loudly in CI and Sentry. An unnarrowed try/catch at
+    // each call site would hide real bugs as "brand engine quietly stopped
+    // working in production" — the exact silent-failure class this
+    // codebase is trying to eliminate.
+    //
+    // Scope: server/seo-context.ts ONLY. Route handlers that call these
+    // functions directly are fine — errors at the request boundary become
+    // 500s, which are loud and visible.
+    //
+    // Functions enforced: `getVoiceProfile`, `listBrandscripts`,
+    // `listDeliverables`. Add to the customCheck's `targetFns` set if a new
+    // brand-engine reader is introduced with the same schema-missing risk.
+    name: 'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
+    fileGlobs: ['seo-context.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/seo-context.ts',
+    // Doc-only: the customCheck below filters hatches via `hasHatch(lines, i,
+    // '// safe-read-ok')` — this `excludeLines` entry is a no-op at runtime
+    // but drives the `Escape hatch` column of docs/rules/automated-rules.md
+    // via `generate-rules-doc.ts::describeHatch`.
+    excludeLines: ['// safe-read-ok'],
+    message: 'Wrap `getVoiceProfile`, `listBrandscripts`, and `listDeliverables` calls in `safeBrandEngineRead("<context>", workspaceId, () => fn(workspaceId), fallback)` so a missing-table error in test envs degrades gracefully instead of crashing buildSeoContext. Suppress with // safe-read-ok on the call line (or the line immediately above for multi-line wrapper layouts). See CLAUDE.md Code Conventions.',
+    severity: 'warn',
+    rationale: 'A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const targetFns = /\b(getVoiceProfile|listBrandscripts|listDeliverables)\s*\(/;
+      for (const file of files) {
+        if (path.basename(file) !== 'seo-context.ts') continue;
+        if (!file.includes(`server${path.sep}seo-context.ts`) && !file.includes('server/seo-context.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const m = targetFns.exec(line);
+          if (!m) continue;
+          // Skip import lines (the bare function name here is a symbol
+          // reference, not a call — it's followed by `}` or `,`, not `(`,
+          // so the regex wouldn't match anyway, but anchor defensively).
+          if (/^\s*import\b/.test(line)) continue;
+          // Skip JSDoc continuation lines (` * ...`) and single-line
+          // comments — both occasionally reference the helpers by name
+          // with inline `()` for readability (e.g. ``getVoiceProfile()``).
+          if (/^\s*\*/.test(line)) continue;
+          if (/^\s*\/\//.test(line)) continue;
+          // Wrapped when `safeBrandEngineRead(` appears EARLIER on the SAME
+          // line as the bare call. Same-line-only is deliberate — a cross-
+          // line wrapper layout is a stylistic deviation the rule flags so
+          // callers either inline the wrapper or add a hatch.
+          const callIdx = m.index;
+          const wrapperIdx = line.indexOf('safeBrandEngineRead(');
+          if (wrapperIdx !== -1 && wrapperIdx < callIdx) continue;
+          if (hasHatch(lines, i, '// safe-read-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
