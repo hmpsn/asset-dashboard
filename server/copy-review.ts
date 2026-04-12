@@ -77,7 +77,7 @@ const stmts = createStmtCache(() => ({
   ),
   updateSectionStatus: db.prepare(
     `UPDATE copy_sections
-     SET status = @status, updated_at = @updated_at
+     SET status = @status, updated_at = @updated_at -- status-ok: validated by isValidTransition() before run()
      WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   updateSectionSteering: db.prepare(
