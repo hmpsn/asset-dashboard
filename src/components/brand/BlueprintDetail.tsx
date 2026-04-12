@@ -349,7 +349,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
           <div>
             <h2 className="text-lg font-semibold text-zinc-100">{blueprint.name}</h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              v{blueprint.version} · {entries.length} page{entries.length !== 1 ? 's' : ''} in scope
+              v{blueprint.version} · {inScope.length} page{inScope.length !== 1 ? 's' : ''} in scope{recommended.length > 0 ? ` · ${recommended.length} recommended` : ''}
             </p>
           </div>
         </div>
