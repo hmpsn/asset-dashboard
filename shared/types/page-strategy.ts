@@ -16,9 +16,9 @@ export type NarrativeRole =
 export interface SectionPlanItem {
   id: string;
   sectionType: SectionType;
-  narrativeRole: NarrativeRole;
-  brandNote: string;
-  seoNote: string;
+  narrativeRole?: NarrativeRole;
+  brandNote?: string;
+  seoNote?: string;
   wordCountTarget: number;
   order: number;
 }

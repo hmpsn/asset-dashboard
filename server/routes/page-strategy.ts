@@ -354,6 +354,7 @@ router.get(
   (req, res) => {
     const { workspaceId, blueprintId } = req.params;
     const versions = listVersions(workspaceId, blueprintId);
+    if (versions === null) return res.status(404).json({ error: 'Blueprint not found' });
     res.json(versions);
   },
 );
