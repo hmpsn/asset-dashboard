@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Layers,
   Loader2,
@@ -11,7 +11,6 @@ import {
   useStartBatch,
   useBatchJob,
   useCopyStatus,
-  useCopyPipelineEvents,
 } from '../../hooks/admin/useCopyPipeline';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
@@ -21,6 +20,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
 import type { BatchMode, BatchJob } from '../../../shared/types/copy-pipeline';
 import type { BlueprintEntry } from '../../../shared/types/page-strategy';
+import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,16 +29,6 @@ interface Props {
   blueprintId: string;
   entries: BlueprintEntry[];
 }
-
-// ─── Copy Status Badge Config ─────────────────────────────────────────────────
-
-const COPY_STATUS_BADGE: Record<string, { label: string; color: 'zinc' | 'blue' | 'amber' | 'green' | 'orange' }> = {
-  pending:            { label: 'No Copy',        color: 'zinc'   },
-  draft:              { label: 'Draft',           color: 'blue'   },
-  client_review:      { label: 'Client Review',  color: 'amber'  },
-  approved:           { label: 'Approved',        color: 'green'  },
-  revision_requested: { label: 'Needs Revision', color: 'orange' },
-};
 
 // ─── Entry Row with copy status ───────────────────────────────────────────────
 
@@ -53,8 +43,8 @@ function EntryRow({ entry, workspaceId, selected, onToggle }: EntryRowProps) {
   const { data: copyStatus } = useCopyStatus(workspaceId, entry.id);
 
   const pageTypeLabel = PAGE_TYPE_LABELS[entry.pageType] ?? entry.pageType;
-  const statusKey = copyStatus?.overallStatus ?? 'pending';
-  const statusConfig = COPY_STATUS_BADGE[statusKey] ?? COPY_STATUS_BADGE['pending'];
+  const statusKey = copyStatus?.overallStatus ?? 'none';
+  const statusConfig = COPY_STATUS_BADGE[statusKey] ?? COPY_STATUS_BADGE.none;
 
   const CheckIcon = selected ? CheckSquare : Square;
 
@@ -148,18 +138,34 @@ function BatchProgressBar({ job }: BatchProgressProps) {
 // ─── Inner Panel ──────────────────────────────────────────────────────────────
 
 function BatchGenerationPanelInner({ workspaceId, blueprintId, entries }: Props) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(entries.filter(e => e.scope === 'included').map(e => e.id))
+  const includedIds = useMemo(
+    () => new Set(entries.filter(e => e.scope === 'included').map(e => e.id)),
+    [entries]
   );
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(includedIds);
+
+  // Sync when entries change: add new included entries, remove deleted entries
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      // Add new included entries
+      for (const id of includedIds) {
+        if (!prev.has(id)) next.add(id);
+      }
+      // Remove entries that no longer exist
+      for (const id of prev) {
+        if (!entries.some(e => e.id === id)) next.delete(id);
+      }
+      return next.size === prev.size && [...next].every(id => prev.has(id)) ? prev : next;
+    });
+  }, [includedIds, entries]);
   const [mode, setMode]           = useState<BatchMode>('review_inbox');
   const [batchSize, setBatchSize] = useState(5);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
 
   const startBatch = useStartBatch(workspaceId, blueprintId);
   const { data: batchJob, isLoading: isBatchLoading } = useBatchJob(workspaceId, activeBatchId);
-
-  // Subscribe to live WS events
-  useCopyPipelineEvents(workspaceId);
 
   // ── Empty state ────────────────────────────────────────────────────────────
 

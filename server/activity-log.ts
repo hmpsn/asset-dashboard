@@ -95,7 +95,9 @@ export type ActivityType =
   | 'copy_batch_started'
   | 'copy_batch_complete'
   | 'copy_exported'
-  | 'copy_suggestion_added';
+  | 'copy_suggestion_added'
+  | 'copy_section_edited'
+  | 'copy_pattern_removed';
 
 export interface ActivityEntry {
   id: string;

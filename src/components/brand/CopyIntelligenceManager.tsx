@@ -17,7 +17,6 @@ import {
   usePromotablePatterns,
   useTogglePattern,
   useDeletePattern,
-  useCopyPipelineEvents,
 } from '../../hooks/admin/useCopyPipeline';
 import { copyIntelligence } from '../../api/brand-engine';
 import { SectionCard } from '../ui/SectionCard';
@@ -334,9 +333,6 @@ function PromotableSection({ workspaceId }: PromotableSectionProps) {
 
 function CopyIntelligenceManagerInner({ workspaceId }: Props) {
   const { data: patterns = [], isLoading, isError } = useCopyIntelligence(workspaceId);
-
-  // Subscribe to WS events
-  useCopyPipelineEvents(workspaceId);
 
   // Loading state
   if (isLoading) {

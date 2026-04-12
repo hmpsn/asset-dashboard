@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS copy_sections (
 CREATE INDEX IF NOT EXISTS idx_copy_sections_entry ON copy_sections(entry_id);
 CREATE INDEX IF NOT EXISTS idx_copy_sections_status ON copy_sections(status);
 CREATE INDEX IF NOT EXISTS idx_copy_sections_workspace ON copy_sections(workspace_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_copy_sections_unique ON copy_sections(entry_id, section_plan_item_id);
 
 -- ═══ COPY METADATA ═══
 -- SEO title, meta desc, OG tags per blueprint entry
@@ -50,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_copy_metadata_workspace ON copy_metadata(workspac
 
 CREATE TABLE IF NOT EXISTS copy_intelligence (
   id              TEXT PRIMARY KEY,
-  workspace_id    TEXT NOT NULL,
+  workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   pattern_type    TEXT NOT NULL,
   pattern         TEXT NOT NULL,
   source          TEXT,

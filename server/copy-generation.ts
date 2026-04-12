@@ -18,6 +18,7 @@ import {
 import { getActivePatterns } from './copy-intelligence.js';
 import { WRITING_QUALITY_RULES } from './content-posts-ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import db from './db/index.js';
 import {
   initializeSections,
   saveGeneratedCopy,
@@ -50,11 +51,20 @@ export async function generateCopyForEntry(
   const entry = getEntry(wsId, blueprintId, entryId);
   if (!entry) throw new Error(`Entry not found: ${entryId}`);
 
-  // Initialize sections from section plan (idempotent — delete-then-insert)
-  const initialSections = initializeSections(wsId, entryId, entry.sectionPlan);
-
-  // Build context
+  // Build context (uses getSectionsForEntry internally for cross-page awareness)
   const context = await buildCopyGenerationContext(wsId, blueprint, entry, accumulatedSteering);
+
+  // Extract guardrailsText from voice profile for quality checks
+  let guardrailsText: string | undefined;
+  try {
+    const profile = getVoiceProfile(wsId);
+    if (profile) {
+      const voiceCtx = buildVoiceCalibrationContext(profile);
+      if (voiceCtx.guardrailsText) guardrailsText = voiceCtx.guardrailsText;
+    }
+  } catch {
+    // voice_profiles table may not exist in all environments — graceful degradation
+  }
 
   // Build system prompt (includes voice DNA via buildSystemPrompt)
   const sectionDescriptions = entry.sectionPlan
@@ -106,29 +116,34 @@ ${context}`;
     throw new Error('Copy generation failed: invalid AI response format');
   }
 
-  // Save sections
-  const savedSections = await Promise.all(
-    generated.sections.map(async (s) => {
+  // AI call succeeded — now initialize sections and save in a single transaction.
+  // Deferred initialization prevents data loss: if the AI call above fails,
+  // previously approved copy is preserved.
+  const { sections: savedSections, metadata } = db.transaction(() => {
+    const initialSections = initializeSections(wsId, entryId, entry.sectionPlan);
+
+    const sections: (CopySection | null)[] = generated.sections.map((s) => {
       const section = initialSections.find(sec => sec.sectionPlanItemId === s.sectionPlanItemId);
       if (!section) return null;
       const sectionPlan = entry.sectionPlan.find(p => p.id === s.sectionPlanItemId);
-      const qualityFlags = sectionPlan ? runQualityCheck(s.copy, sectionPlan) : [];
+      const qualityFlags = sectionPlan ? runQualityCheck(s.copy, sectionPlan, guardrailsText) : [];
       return saveGeneratedCopy(section.id, wsId, {
         generatedCopy: s.copy,
         aiAnnotation: s.annotation,
         aiReasoning: s.reasoning,
         qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
       });
-    }),
-  );
+    });
 
-  // Save metadata
-  const metadata = saveMetadata(entryId, wsId, {
-    seoTitle: generated.seoTitle,
-    metaDescription: generated.metaDescription,
-    ogTitle: generated.ogTitle,
-    ogDescription: generated.ogDescription,
-  });
+    const meta = saveMetadata(entryId, wsId, {
+      seoTitle: generated.seoTitle,
+      metaDescription: generated.metaDescription,
+      ogTitle: generated.ogTitle,
+      ogDescription: generated.ogDescription,
+    });
+
+    return { sections, metadata: meta };
+  })();
 
   return {
     sections: savedSections.filter((s): s is CopySection => s !== null),
@@ -203,13 +218,28 @@ ${context}`;
     return null;
   }
 
-  const qualityFlags = runQualityCheck(result.copy, sectionPlanItem);
-  return saveGeneratedCopy(sectionId, wsId, {
-    generatedCopy: result.copy,
-    aiAnnotation: result.annotation,
-    aiReasoning: result.reasoning,
-    qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
-  });
+  // Extract guardrailsText from voice profile for quality checks
+  let guardrailsText: string | undefined;
+  try {
+    const profile = getVoiceProfile(wsId);
+    if (profile) {
+      const voiceCtx = buildVoiceCalibrationContext(profile);
+      if (voiceCtx.guardrailsText) guardrailsText = voiceCtx.guardrailsText;
+    }
+  } catch {
+    // voice_profiles table may not exist in all environments — graceful degradation
+  }
+
+  // Save in a transaction so copy + metadata are atomic
+  return db.transaction(() => {
+    const qualityFlags = runQualityCheck(result.copy, sectionPlanItem, guardrailsText);
+    return saveGeneratedCopy(sectionId, wsId, {
+      generatedCopy: result.copy,
+      aiAnnotation: result.annotation,
+      aiReasoning: result.reasoning,
+      qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
+    });
+  })();
 }
 
 /**

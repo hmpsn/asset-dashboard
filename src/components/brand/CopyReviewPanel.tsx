@@ -22,14 +22,14 @@ import {
   useUpdateSectionText,
   useRegenerateCopySection,
   useGenerateCopy,
-  useCopyPipelineEvents,
 } from '../../hooks/admin/useCopyPipeline';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
 import { SectionCardSkeleton } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorBoundary } from '../ErrorBoundary';
-import type { CopySection, CopySectionStatus, QualityFlag } from '../../../shared/types/copy-pipeline';
+import type { CopySection, QualityFlag } from '../../../shared/types/copy-pipeline';
+import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,15 +39,7 @@ interface Props {
   entryId: string;
 }
 
-// ─── Status Badge Config ──────────────────────────────────────────────────────
-
-const STATUS_BADGE: Record<CopySectionStatus, { label: string; color: 'zinc' | 'blue' | 'amber' | 'green' | 'orange' }> = {
-  pending:           { label: 'Pending',         color: 'zinc'   },
-  draft:             { label: 'Draft',            color: 'blue'   },
-  client_review:     { label: 'Client Review',   color: 'amber'  },
-  approved:          { label: 'Approved',         color: 'green'  },
-  revision_requested:{ label: 'Needs Revision',  color: 'orange' },
-};
+// Status badge config — uses shared COPY_STATUS_BADGE from lib/copyStatusConfig
 
 // ─── Quality Flag Row ─────────────────────────────────────────────────────────
 
@@ -92,7 +84,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
   const updateText     = useUpdateSectionText(workspaceId);
   const regenerate     = useRegenerateCopySection(workspaceId, blueprintId);
 
-  const statusConfig = STATUS_BADGE[section.status];
+  const statusConfig = COPY_STATUS_BADGE[section.status];
   const hasFlags = section.qualityFlags && section.qualityFlags.length > 0;
   const hasErrors = section.qualityFlags?.some(f => f.severity === 'error');
 
@@ -360,7 +352,7 @@ function ProgressBar({ approved, total, percentage }: ProgressBarProps) {
         aria-label="Approval progress"
       >
         <div
-          className="h-full bg-gradient-to-r from-teal-600 to-emerald-600 transition-all duration-500"
+          className="h-full bg-blue-500 transition-all duration-500"
           style={{ width: `${Math.min(100, percentage)}%` }}
         />
       </div>
@@ -375,9 +367,6 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
   const { data: copyStatus } = useCopyStatus(workspaceId, entryId);
   const { data: metadata } = useCopyMetadata(workspaceId, entryId);
   const generateCopy = useGenerateCopy(workspaceId, blueprintId);
-
-  // Subscribe to live WS events
-  useCopyPipelineEvents(workspaceId);
 
   // ── Loading ────────────────────────────────────────────────────────────────
 

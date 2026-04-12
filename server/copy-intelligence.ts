@@ -76,16 +76,19 @@ export function addPattern(
   wsId: string,
   data: { patternType: IntelligencePatternType; pattern: string; source?: string },
 ): CopyIntelligencePattern {
-  const existing = stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown> | undefined;
-  if (existing) {
-    stmts().incrementFrequency.run(existing.id, wsId);
-    return rowToPattern({ ...existing, frequency: (existing.frequency as number) + 1 });
-  }
+  // Wrap in transaction to eliminate TOCTOU race between SELECT and INSERT
+  return db.transaction(() => {
+    const existing = stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown> | undefined;
+    if (existing) {
+      stmts().incrementFrequency.run(existing.id, wsId);
+      return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown>);
+    }
 
-  const id = `ip_${randomUUID().slice(0, 8)}`;
-  const now = new Date().toISOString();
-  stmts().insertPattern.run(id, wsId, data.patternType, data.pattern, data.source ?? null, 1, 1, now);
-  return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown>);
+    const id = `ip_${randomUUID().slice(0, 8)}`;
+    const now = new Date().toISOString();
+    stmts().insertPattern.run(id, wsId, data.patternType, data.pattern, data.source ?? null, 1, 1, now);
+    return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown>);
+  })();
 }
 
 export function togglePattern(patternId: string, wsId: string, active: boolean): void {

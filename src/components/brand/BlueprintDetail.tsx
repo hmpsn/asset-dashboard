@@ -26,13 +26,14 @@ import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { FeatureFlag } from '../ui/FeatureFlag';
+import { TabBar } from '../ui/TabBar';
 import { useCopyStatus, useCopyPipelineEvents, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
 import { CopyExportPanel } from './CopyExportPanel';
 import { CopyIntelligenceManager } from './CopyIntelligenceManager';
 import { PAGE_TYPE_LABELS } from '../../lib/pageTypeLabels';
+import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
 
 interface Props {
   workspaceId: string;
@@ -68,29 +69,26 @@ function EntryCardCopyBadge({ workspaceId, entryId }: { workspaceId: string; ent
 
   if (!status || status.totalSections === 0) return null;
 
-  const label =
-    status.overallStatus === 'approved' ? 'Approved' :
-    status.overallStatus === 'client_review' ? 'In Review' :
-    status.overallStatus === 'draft' ? 'Draft' :
-    status.overallStatus === 'revision_requested' ? 'Revision' :
-    'Pending';
-
-  const colorClass =
-    status.overallStatus === 'approved' ? 'bg-emerald-900/40 text-emerald-400' :
-    status.overallStatus === 'client_review' ? 'bg-blue-900/40 text-blue-400' :
-    status.overallStatus === 'draft' ? 'bg-zinc-700 text-zinc-300' :
-    status.overallStatus === 'revision_requested' ? 'bg-amber-900/40 text-amber-400' :
-    'bg-zinc-700 text-zinc-400';
+  const config = COPY_STATUS_BADGE[status.overallStatus] ?? COPY_STATUS_BADGE.pending;
 
   const Icon =
     status.overallStatus === 'approved' ? CheckCircle2 :
     status.overallStatus === 'client_review' ? FileText :
     Clock;
 
+  // Map shared color names to inline badge classes
+  const colorClass: Record<string, string> = {
+    green: 'bg-emerald-900/40 text-emerald-400',
+    teal: 'bg-teal-900/40 text-teal-400',
+    blue: 'bg-blue-900/40 text-blue-400',
+    orange: 'bg-amber-900/40 text-amber-400',
+    zinc: 'bg-zinc-700 text-zinc-400',
+  };
+
   return (
-    <span className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs rounded font-medium ${colorClass}`}>
+    <span className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs rounded font-medium ${colorClass[config.color] ?? colorClass.zinc}`}>
       <Icon className="w-3 h-3" />
-      {label}
+      {config.label}
       {status.totalSections > 0 && (
         <span className="text-[10px] opacity-70">
           ({status.approvedSections}/{status.totalSections})
@@ -267,7 +265,7 @@ function EntryCard({
       )}
 
       {/* Inline copy review panel */}
-      {copyEnabled && isReviewing && workspaceId && blueprintId && (
+      {copyEnabled && expanded && isReviewing && workspaceId && blueprintId && (
         <div className="border-t border-zinc-800">
           <CopyReviewPanel
             workspaceId={workspaceId}
@@ -551,33 +549,14 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
       </div>
 
       {/* ── Tab bar ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 border-b border-zinc-800">
-        <button
-          onClick={() => setActiveTab('pages')}
-          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'pages'
-              ? 'border-teal-500 text-teal-400'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <Layout className="w-3.5 h-3.5" />
-          Pages
-        </button>
-
-        <FeatureFlag flag="copy-engine-pipeline">
-          <button
-            onClick={() => setActiveTab('copy')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'copy'
-                ? 'border-teal-500 text-teal-400'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Copy Pipeline
-          </button>
-        </FeatureFlag>
-      </div>
+      <TabBar
+        tabs={[
+          { id: 'pages', label: 'Pages', icon: Layout },
+          ...(copyEnabled ? [{ id: 'copy', label: 'Copy Pipeline', icon: FileText }] : []),
+        ]}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as BlueprintTab)}
+      />
 
       {/* ── Pages tab (existing content) ─────────────────────────────────── */}
       {activeTab === 'pages' && (

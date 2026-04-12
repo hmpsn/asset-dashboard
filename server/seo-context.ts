@@ -726,22 +726,34 @@ export function buildCopyIntelligenceContext(workspaceId: string): string {
 
 /**
  * Build a blueprint context block from the workspace's most recently updated blueprint.
- * If a pageKeyword is provided, finds the matching entry and includes approved copy samples.
+ * If a pagePath is provided, finds the matching entry by name (normalized) or primary keyword
+ * and includes approved copy samples.
  * Returns '' if no blueprints exist.
  */
-export function buildBlueprintContext(workspaceId: string, _pagePath?: string, pageKeyword?: string): string {
+export function buildBlueprintContext(workspaceId: string, pagePath?: string): string {
   const blueprints = listBlueprints(workspaceId);
   if (blueprints.length === 0) return '';
 
   // Use the most recently updated blueprint
   const blueprint = blueprints[0];
 
-  // Find matching entry by keyword if provided
+  // Find matching entry by path if provided.
+  // BlueprintEntry has `name` (e.g. "About Us", "/about") — normalize both
+  // sides for slash-insensitive comparison.
   let matchedEntry = null;
-  if (pageKeyword && blueprint.entries) {
-    matchedEntry = blueprint.entries.find(e =>
-      e.primaryKeyword?.toLowerCase() === pageKeyword.toLowerCase()
-    ) ?? null;
+  if (pagePath && blueprint.entries) {
+    const normalizePath = (p: string) => p.replace(/^\/+|\/+$/g, '').toLowerCase();
+    const normalizedPath = normalizePath(pagePath);
+    matchedEntry = blueprint.entries.find(e => {
+      const normalizedName = normalizePath(e.name);
+      return normalizedName === normalizedPath;
+    }) ?? null;
+    // Fallback: match by primary keyword if path-based match fails
+    if (!matchedEntry) {
+      matchedEntry = blueprint.entries.find(e =>
+        e.primaryKeyword?.toLowerCase() === pagePath.toLowerCase()
+      ) ?? null;
+    }
   }
 
   // Build context: blueprint overview + matched entry + approved copy samples

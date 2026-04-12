@@ -7,6 +7,7 @@ import {
   copyIntelligence,
 } from '../../api/brand-engine';
 import { useWorkspaceEvents } from '../useWorkspaceEvents';
+import { useToast } from '../../components/Toast';
 import type {
   CopySectionStatus,
   ExportRequest,
@@ -66,6 +67,7 @@ export function useBatchJob(wsId: string, batchId: string | null) {
 
 export function useGenerateCopy(wsId: string, blueprintId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: (entryId: string) =>
       copyGeneration.generate(wsId, blueprintId, entryId),
@@ -74,11 +76,13 @@ export function useGenerateCopy(wsId: string, blueprintId: string) {
       queryClient.invalidateQueries({ queryKey: ['admin-copy-status', wsId, entryId] });
       queryClient.invalidateQueries({ queryKey: ['admin-copy-metadata', wsId, entryId] });
     },
+    onError: () => { toast('Copy generation failed', 'error'); },
   });
 }
 
 export function useRegenerateCopySection(wsId: string, blueprintId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: ({ entryId, sectionId, note, highlight }: { entryId: string; sectionId: string; note: string; highlight?: string }) =>
       copyGeneration.regenerateSection(wsId, blueprintId, entryId, sectionId, { note, highlight }),
@@ -86,67 +90,75 @@ export function useRegenerateCopySection(wsId: string, blueprintId: string) {
       queryClient.invalidateQueries({ queryKey: ['admin-copy-sections', wsId, entryId] });
       queryClient.invalidateQueries({ queryKey: ['admin-copy-status', wsId, entryId] });
     },
+    onError: () => { toast('Regeneration failed', 'error'); },
   });
 }
 
 export function useUpdateSectionStatus(wsId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: ({ sectionId, status }: { sectionId: string; status: CopySectionStatus }) =>
       copyReview.updateSectionStatus(wsId, sectionId, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-status'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections', wsId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-status', wsId] });
     },
+    onError: () => { toast('Failed to update status', 'error'); },
   });
 }
 
 export function useUpdateSectionText(wsId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: ({ sectionId, copy }: { sectionId: string; copy: string }) =>
       copyReview.updateSectionText(wsId, sectionId, copy),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections', wsId] });
     },
+    onError: () => { toast('Failed to update copy', 'error'); },
   });
 }
 
 export function useAddSuggestion(wsId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: ({ sectionId, originalText, suggestedText }: { sectionId: string; originalText: string; suggestedText: string }) =>
       copyReview.addSuggestion(wsId, sectionId, { originalText, suggestedText }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections', wsId] });
     },
+    onError: () => { toast('Failed to add suggestion', 'error'); },
   });
 }
 
 export function useStartBatch(wsId: string, blueprintId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: ({ entryIds, mode, batchSize }: { entryIds: string[]; mode?: string; batchSize?: number }) =>
       copyBatch.start(wsId, blueprintId, { entryIds, mode, batchSize }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-copy-batch', wsId] });
     },
+    onError: () => { toast('Batch generation failed', 'error'); },
   });
 }
 
 export function useExportCopy(wsId: string, blueprintId: string) {
-  const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: (request: ExportRequest) =>
       copyExport.export(wsId, blueprintId, request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections'] });
-    },
+    onError: () => { toast('Export failed', 'error'); },
   });
 }
 
 export function useTogglePattern(wsId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: ({ patternId, active }: { patternId: string; active: boolean }) =>
       copyIntelligence.update(wsId, patternId, { active }),
@@ -154,11 +166,13 @@ export function useTogglePattern(wsId: string) {
       queryClient.invalidateQueries({ queryKey: ['admin-copy-intelligence', wsId] });
       queryClient.invalidateQueries({ queryKey: ['admin-copy-promotable', wsId] });
     },
+    onError: () => { toast('Failed to update pattern', 'error'); },
   });
 }
 
 export function useDeletePattern(wsId: string) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   return useMutation({
     mutationFn: (patternId: string) =>
       copyIntelligence.remove(wsId, patternId),
@@ -166,6 +180,7 @@ export function useDeletePattern(wsId: string) {
       queryClient.invalidateQueries({ queryKey: ['admin-copy-intelligence', wsId] });
       queryClient.invalidateQueries({ queryKey: ['admin-copy-promotable', wsId] });
     },
+    onError: () => { toast('Failed to delete pattern', 'error'); },
   });
 }
 
@@ -187,23 +202,23 @@ export function useCopyPipelineEvents(wsId: string) {
   const queryClient = useQueryClient();
   useWorkspaceEvents(wsId, {
     'copy:section_updated': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-status'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections', wsId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-status', wsId] });
     },
     'copy:metadata_updated': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-metadata'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-metadata', wsId] });
     },
     'copy:batch_progress': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-batch'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-batch', wsId] });
     },
     'copy:batch_complete': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-batch'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-status'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-batch', wsId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-sections', wsId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-status', wsId] });
     },
     'copy:intelligence_updated': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-intelligence'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-promotable'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-intelligence', wsId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-copy-promotable', wsId] });
     },
   });
 }

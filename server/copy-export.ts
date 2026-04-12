@@ -124,8 +124,13 @@ const SECTION_TYPE_TO_CSV_COL: Partial<Record<SectionType, string>> = {
 
 function escapeCSV(val: string | null | undefined): string {
   if (val == null) return '';
+  let str = String(val);
+  // Sanitize potential formula injection — prefix with single quote to prevent
+  // spreadsheet applications from interpreting the value as a formula
+  if (/^[=+\-@\t]/.test(str)) {
+    str = "'" + str;
+  }
   // Quote fields that contain comma, double-quote, or newline
-  const str = String(val);
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
   }

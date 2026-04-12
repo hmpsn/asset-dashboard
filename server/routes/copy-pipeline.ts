@@ -5,12 +5,14 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
+import { aiLimiter } from '../middleware.js';
 import { validate } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
+import { createStmtCache } from '../db/stmt-cache.js';
 import { parseJsonFallback } from '../db/json-validation.js';
 import {
   generateCopySchema,
@@ -48,6 +50,27 @@ import type { BatchJob } from '../../shared/types/copy-pipeline.js';
 
 const router = Router();
 const log = createLogger('copy-pipeline-routes');
+
+// ── Prepared statement cache for batch operations ───────────────────────────
+
+const batchStmts = createStmtCache(() => ({
+  insertJob: db.prepare(
+    `INSERT INTO copy_batch_jobs (id, workspace_id, blueprint_id, mode, entry_ids_json, batch_size, status, progress_json, accumulated_steering, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'running', ?, '[]', ?, ?)`,
+  ),
+  getSteering: db.prepare(
+    `SELECT accumulated_steering FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
+  ),
+  updateProgress: db.prepare(
+    `UPDATE copy_batch_jobs SET progress_json = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`,
+  ),
+  updateStatus: db.prepare(
+    `UPDATE copy_batch_jobs SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`, // status-ok: batch job lifecycle, not a state-machine column
+  ),
+  getById: db.prepare(
+    `SELECT * FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
+  ),
+}));
 
 // ── Batch job row mapper ─────────────────────────────────────────────────────
 
@@ -98,10 +121,11 @@ function rowToBatchJob(row: BatchJobRow): BatchJob {
 router.post(
   '/api/copy/:workspaceId/:blueprintId/:entryId/generate',
   requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
   validate(generateCopySchema),
   async (req, res) => {
     const { workspaceId, blueprintId, entryId } = req.params;
-    const { accumulatedSteering } = req.body as { accumulatedSteering?: string[]; force?: boolean };
+    const { accumulatedSteering } = req.body as { accumulatedSteering?: string[] };
     try {
       const { sections, metadata } = await generateCopyForEntry(
         workspaceId,
@@ -123,8 +147,7 @@ router.post(
       return res.json({ sections, metadata });
     } catch (err) {
       log.error({ err, workspaceId, blueprintId, entryId }, 'Copy generation failed');
-      const msg = err instanceof Error ? err.message : 'Copy generation failed';
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: 'Copy generation failed' });
     }
   },
 );
@@ -134,6 +157,7 @@ router.post(
 router.post(
   '/api/copy/:workspaceId/:blueprintId/:entryId/regenerate/:sectionId',
   requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
   validate(regenerateSectionSchema),
   async (req, res) => {
     const { workspaceId, blueprintId, entryId, sectionId } = req.params;
@@ -149,11 +173,11 @@ router.post(
       );
       if (!section) return res.status(404).json({ error: 'Section not found or regeneration failed' });
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+      addActivity(workspaceId, 'copy_generated', `Regenerated copy section`);
       return res.json(section);
     } catch (err) {
       log.error({ err, workspaceId, sectionId }, 'Section regeneration failed');
-      const msg = err instanceof Error ? err.message : 'Section regeneration failed';
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: 'Section regeneration failed' });
     }
   },
 );
@@ -227,6 +251,7 @@ router.patch(
     const section = updateCopyText(sectionId, workspaceId, copy);
     if (!section) return res.status(404).json({ error: 'Section not found' });
     broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+    addActivity(workspaceId, 'copy_section_edited', `Edited copy section text`);
     return res.json(section);
   },
 );
@@ -259,7 +284,7 @@ router.post(
     const { workspaceId, blueprintId } = req.params;
     const { entryIds, mode, batchSize } = req.body as { entryIds: string[]; mode?: string; batchSize?: number };
 
-    const batchId = `bj_${randomUUID().slice(0, 8)}`;
+    const batchId = `bj_${randomUUID()}`;
     const now = new Date().toISOString();
     const resolvedMode = mode ?? 'review_inbox';
     const total = entryIds.length;
@@ -267,10 +292,7 @@ router.post(
     const initialProgress = JSON.stringify({ total, generated: 0, reviewed: 0, approved: 0 });
 
     try {
-      db.prepare(
-        `INSERT INTO copy_batch_jobs (id, workspace_id, blueprint_id, mode, entry_ids_json, batch_size, status, progress_json, accumulated_steering, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'running', ?, '[]', ?, ?)`,
-      ).run(batchId, workspaceId, blueprintId, resolvedMode, JSON.stringify(entryIds), resolvedBatchSize, initialProgress, now, now);
+      batchStmts().insertJob.run(batchId, workspaceId, blueprintId, resolvedMode, JSON.stringify(entryIds), resolvedBatchSize, initialProgress, now, now);
     } catch (err) {
       log.error({ err, workspaceId, blueprintId }, 'Failed to create batch job record');
       return res.status(500).json({ error: 'Failed to start batch job' });
@@ -296,9 +318,7 @@ router.post(
 
       // Read accumulated_steering from the job record so it's passed to every
       // generation call (allows pre-seeded steering to influence all entries).
-      const jobRow = db.prepare(
-        `SELECT accumulated_steering FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
-      ).get(batchId, workspaceId) as { accumulated_steering: string } | undefined;
+      const jobRow = batchStmts().getSteering.get(batchId, workspaceId) as { accumulated_steering: string } | undefined;
       const accumulatedSteering = parseJsonFallback<string[]>(
         jobRow?.accumulated_steering ?? '[]',
         [],
@@ -315,9 +335,8 @@ router.post(
 
         const batchNow = new Date().toISOString();
         const progressJson = JSON.stringify({ total, generated, reviewed: 0, approved: 0 });
-        db.prepare( // txn-ok: intentionally non-atomic — per-entry progress update is independent of final status update
-          `UPDATE copy_batch_jobs SET progress_json = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`,
-        ).run(progressJson, batchNow, batchId, workspaceId);
+        // txn-ok: intentionally non-atomic — per-entry progress update is independent of final status update
+        batchStmts().updateProgress.run(progressJson, batchNow, batchId, workspaceId);
 
         broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_BATCH_PROGRESS, {
           batchId,
@@ -330,9 +349,8 @@ router.post(
       const completedAt = new Date().toISOString();
       const finalStatus = failed === total ? 'failed' : 'complete';
 
-      db.prepare(
-        `UPDATE copy_batch_jobs SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`, // status-ok: terminal state written after loop completion; no state-machine guard needed
-      ).run(finalStatus, completedAt, batchId, workspaceId);
+      // status-ok: terminal state written after loop completion; no state-machine guard needed
+      batchStmts().updateStatus.run(finalStatus, completedAt, batchId, workspaceId);
 
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_BATCH_COMPLETE, {
         batchId,
@@ -359,9 +377,7 @@ router.get(
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
     const { workspaceId, batchId } = req.params;
-    const job = db.prepare(
-      `SELECT * FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,
-    ).get(batchId, workspaceId) as BatchJobRow | undefined;
+    const job = batchStmts().getById.get(batchId, workspaceId) as BatchJobRow | undefined;
     if (!job) return res.status(404).json({ error: 'Batch job not found' });
     return res.json(rowToBatchJob(job));
   },
@@ -376,7 +392,7 @@ router.post(
   validate(exportCopySchema),
   async (req, res) => {
     const { workspaceId, blueprintId } = req.params;
-    const { format, scope, entryIds, entryId } = req.body as {
+    const { format, scope, entryIds, entryId, webflowSiteId } = req.body as {
       format: 'webflow_cms' | 'csv' | 'copy_deck';
       scope: 'all' | 'selected' | 'single';
       entryIds?: string[];
@@ -387,7 +403,7 @@ router.post(
     try {
       if (format === 'webflow_cms') {
         const ids = scope === 'selected' ? entryIds : scope === 'single' && entryId ? [entryId] : undefined;
-        const result = await exportToWebflow(workspaceId, blueprintId, ids);
+        const result = await exportToWebflow(workspaceId, blueprintId, ids, webflowSiteId);
         broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_EXPORT_COMPLETE, { format, success: result.success });
         addActivity(workspaceId, 'copy_exported', `Exported copy as Webflow CMS`);
         return res.json(result);
@@ -396,18 +412,17 @@ router.post(
         const { csv, filename } = exportCsv(workspaceId, blueprintId, ids);
         broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_EXPORT_COMPLETE, { format, filename });
         addActivity(workspaceId, 'copy_exported', `Exported copy as CSV: ${filename}`);
-        return res.json({ format, filename, content: csv });
+        return res.json({ success: true, format: 'csv', filename, content: csv });
       } else {
         const ids = scope === 'single' ? (entryId ? [entryId] : undefined) : scope === 'selected' ? entryIds : undefined;
         const { markdown, filename } = exportCopyDeck(workspaceId, blueprintId, ids);
         broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_EXPORT_COMPLETE, { format, filename });
         addActivity(workspaceId, 'copy_exported', `Exported copy deck: ${filename}`);
-        return res.json({ format, filename, content: markdown });
+        return res.json({ success: true, format: 'copy_deck', filename, content: markdown });
       }
     } catch (err) {
       log.error({ err, workspaceId, blueprintId, format }, 'Export failed');
-      const msg = err instanceof Error ? err.message : 'Export failed';
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: 'Export failed' });
     }
   },
 );
@@ -444,6 +459,7 @@ router.get(
 router.post(
   '/api/copy/:workspaceId/intelligence/extract',
   requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
   validate(extractPatternsSchema),
   async (req, res) => {
     const { workspaceId } = req.params;
@@ -458,8 +474,7 @@ router.post(
       return res.json(patterns);
     } catch (err) {
       log.error({ err, workspaceId }, 'Pattern extraction failed');
-      const msg = err instanceof Error ? err.message : 'Pattern extraction failed';
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: 'Pattern extraction failed' });
     }
   },
 );
@@ -496,8 +511,7 @@ router.patch(
       return res.json({ updated: true });
     } catch (err) {
       log.error({ err, workspaceId, patternId }, 'Pattern update failed');
-      const msg = err instanceof Error ? err.message : 'Pattern update failed';
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: 'Pattern update failed' });
     }
   },
 );
@@ -513,11 +527,11 @@ router.delete(
       clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId, deleted: true });
+      addActivity(workspaceId, 'copy_pattern_removed', `Removed copy intelligence pattern`);
       return res.status(204).send();
     } catch (err) {
       log.error({ err, workspaceId, patternId }, 'Pattern delete failed');
-      const msg = err instanceof Error ? err.message : 'Pattern delete failed';
-      return res.status(500).json({ error: msg });
+      return res.status(500).json({ error: 'Pattern delete failed' });
     }
   },
 );

@@ -8,7 +8,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
-import { useExportCopy, useCopyPipelineEvents } from '../../hooks/admin/useCopyPipeline';
+import { useExportCopy } from '../../hooks/admin/useCopyPipeline';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
@@ -109,9 +109,6 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
 
   const exportMutation = useExportCopy(workspaceId, blueprintId);
 
-  // Subscribe to WS events (export may trigger section invalidations)
-  useCopyPipelineEvents(workspaceId);
-
   // Only entries that have been approved are exportable
   // NOTE: BlueprintEntry doesn't carry copy status; the server filters for
   // approved sections. We still filter to the full entries list for scope
@@ -152,18 +149,22 @@ function CopyExportPanelInner({ workspaceId, blueprintId, entries }: Props) {
         ? { format: selectedFormat, scope: 'selected' as const, entryIds: Array.from(selectedEntryIds) }
         : { format: selectedFormat, scope: 'single' as const, entryId: singleEntryId };
 
-    const result = await exportMutation.mutateAsync(request);
+    try {
+      const result = await exportMutation.mutateAsync(request);
 
-    if (result.success) {
-      if (result.content && result.filename) {
-        triggerDownload(result.content, result.filename);
-        setSuccessMessage(`Downloaded "${result.filename}"`);
-      } else if (result.url) {
-        window.open(result.url, '_blank', 'noopener,noreferrer');
-        setSuccessMessage('Export opened in a new tab.');
-      } else {
-        setSuccessMessage('Export completed successfully.');
+      if (result.success) {
+        if (result.content && result.filename) {
+          triggerDownload(result.content, result.filename);
+          setSuccessMessage(`Downloaded "${result.filename}"`);
+        } else if (result.url) {
+          window.open(result.url, '_blank', 'noopener,noreferrer');
+          setSuccessMessage('Export opened in a new tab.');
+        } else {
+          setSuccessMessage('Export completed successfully.');
+        }
       }
+    } catch {
+      // Error is surfaced via exportMutation.isError — no action needed
     }
   }
 

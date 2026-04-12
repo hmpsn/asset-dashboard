@@ -45,8 +45,7 @@ export const intelligencePatternTypeSchema = z.enum([
 // ── Route body validation schemas ──
 
 export const generateCopySchema = z.object({
-  accumulatedSteering: z.array(z.string()).optional(),
-  force: z.boolean().optional(),
+  accumulatedSteering: z.array(z.string().max(2000)).max(50).optional(),
 });
 
 export const regenerateSectionSchema = z.object({
@@ -74,11 +73,11 @@ export const updatePatternSchema = z.object({
 });
 
 export const extractPatternsSchema = z.object({
-  steeringNotes: z.array(z.string()).min(1),
+  steeringNotes: z.array(z.string().max(2000)).min(1).max(50),
 });
 
 export const startBatchSchema = z.object({
-  entryIds: z.array(z.string()).min(1),
+  entryIds: z.array(z.string()).min(1).max(100),
   mode: z.enum(['review_inbox', 'iterative']).optional(),
   batchSize: z.number().int().positive().optional(),
 });
@@ -90,4 +89,10 @@ export const exportCopySchema = z.object({
   entryId: z.string().optional(),
   webflowSiteId: z.string().optional(),
   docFormat: z.enum(['google', 'word']).optional(),
-});
+}).refine(
+  (data) => data.scope !== 'selected' || (data.entryIds && data.entryIds.length > 0),
+  { message: 'entryIds required when scope is selected', path: ['entryIds'] },
+).refine(
+  (data) => data.scope !== 'single' || !!data.entryId,
+  { message: 'entryId required when scope is single', path: ['entryId'] },
+);
