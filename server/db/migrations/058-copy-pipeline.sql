@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS copy_metadata (
   updated_at        TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_copy_metadata_entry ON copy_metadata(entry_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_copy_metadata_entry ON copy_metadata(workspace_id, entry_id);
 CREATE INDEX IF NOT EXISTS idx_copy_metadata_workspace ON copy_metadata(workspace_id);
 
 -- ═══ COPY INTELLIGENCE ═══

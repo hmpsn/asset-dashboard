@@ -151,6 +151,7 @@ export interface EntryCopyStatus {
   totalSections: number;
   pendingSections: number;
   draftSections: number;
+  clientReviewSections: number;
   approvedSections: number;
   revisionSections: number;
   overallStatus: CopySectionStatus;

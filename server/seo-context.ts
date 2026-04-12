@@ -236,8 +236,8 @@ export function buildSeoContext(
         if (learningsBlock) baseParts.push(learningsBlock);
       }
     }
-    const copyIntelligenceBlock = buildCopyIntelligenceContext(workspaceId);
-    const blueprintBlock = buildBlueprintContext(workspaceId, pagePath);
+    const copyIntelligenceBlock = safeBrandEngineRead('buildSeoContext.noStrategy.buildCopyIntelligenceContext', workspaceId, () => buildCopyIntelligenceContext(workspaceId), '');
+    const blueprintBlock = safeBrandEngineRead('buildSeoContext.noStrategy.buildBlueprintContext', workspaceId, () => buildBlueprintContext(workspaceId, pagePath), '');
     if (copyIntelligenceBlock) baseParts.push(copyIntelligenceBlock);
     if (blueprintBlock) baseParts.push(blueprintBlock);
     const fullContext = baseParts.join('');
@@ -295,8 +295,8 @@ export function buildSeoContext(
       if (learningsBlock) contextParts.push(learningsBlock);
     }
   }
-  const copyIntelligenceBlock = buildCopyIntelligenceContext(workspaceId);
-  const blueprintBlock = buildBlueprintContext(workspaceId, pagePath);
+  const copyIntelligenceBlock = safeBrandEngineRead('buildSeoContext.withStrategy.buildCopyIntelligenceContext', workspaceId, () => buildCopyIntelligenceContext(workspaceId), '');
+  const blueprintBlock = safeBrandEngineRead('buildSeoContext.withStrategy.buildBlueprintContext', workspaceId, () => buildBlueprintContext(workspaceId, pagePath), '');
   if (copyIntelligenceBlock) contextParts.push(copyIntelligenceBlock);
   if (blueprintBlock) contextParts.push(blueprintBlock);
   const fullContext = contextParts.join('');

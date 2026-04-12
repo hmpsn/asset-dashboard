@@ -100,7 +100,7 @@ const stmts = createStmtCache(() => ({
   upsertMetadata: db.prepare(
     `INSERT INTO copy_metadata (id, workspace_id, entry_id, seo_title, meta_description, og_title, og_description, status, steering_history, created_at, updated_at)
      VALUES (@id, @workspace_id, @entry_id, @seo_title, @meta_description, @og_title, @og_description, 'pending', '[]', @created_at, @updated_at)
-     ON CONFLICT(entry_id) DO UPDATE SET
+     ON CONFLICT(workspace_id, entry_id) DO UPDATE SET
        seo_title = excluded.seo_title,
        meta_description = excluded.meta_description,
        og_title = excluded.og_title,
@@ -182,7 +182,9 @@ export function getSection(sectionId: string, workspaceId: string): CopySection 
   return rowToSection(row);
 }
 
-// Initialize sections from section plan (delete-then-insert in transaction)
+// Initialize sections from section plan (delete-then-insert in transaction).
+// Preserves steering_history, client_suggestions, and created_at from any
+// existing sections so that re-generation doesn't wipe accumulated review data.
 export function initializeSections(
   workspaceId: string,
   entryId: string,
@@ -191,11 +193,22 @@ export function initializeSections(
   const now = new Date().toISOString();
 
   const run = db.transaction(() => {
+    // Read before delete so steering history / client feedback survive re-generation
+    const existing = getSectionsForEntry(entryId, workspaceId);
+    const prevByPlanItem = new Map(
+      existing.map(s => [s.sectionPlanItemId, {
+        steeringHistory: s.steeringHistory,
+        clientSuggestions: s.clientSuggestions,
+        createdAt: s.createdAt,
+      }]),
+    );
+
     stmts().deleteSectionsByEntry.run(entryId, workspaceId);
 
     const sections: CopySection[] = [];
     for (const item of sectionPlan) {
       const id = `cs_${randomUUID().slice(0, 8)}`;
+      const prev = prevByPlanItem.get(item.id);
       stmts().insertSection.run({
         id,
         workspace_id: workspaceId,
@@ -205,11 +218,11 @@ export function initializeSections(
         status: 'pending',
         ai_annotation: null,
         ai_reasoning: null,
-        steering_history: '[]',
-        client_suggestions: null,
-        quality_flags: null,
+        steering_history: prev ? JSON.stringify(prev.steeringHistory) : '[]',
+        client_suggestions: prev?.clientSuggestions ? JSON.stringify(prev.clientSuggestions) : null,
+        quality_flags: null,  // reset — AI re-scores on generation
         version: 0,
-        created_at: now,
+        created_at: prev?.createdAt ?? now,
         updated_at: now,
       });
       sections.push({
@@ -221,11 +234,11 @@ export function initializeSections(
         status: 'pending',
         aiAnnotation: null,
         aiReasoning: null,
-        steeringHistory: [],
-        clientSuggestions: null,
+        steeringHistory: prev?.steeringHistory ?? [],
+        clientSuggestions: prev?.clientSuggestions ?? null,
         qualityFlags: null,
         version: 0,
-        createdAt: now,
+        createdAt: prev?.createdAt ?? now,
         updatedAt: now,
       });
     }
@@ -350,9 +363,10 @@ export function addClientSuggestion(
   const currentSuggestions = existing.clientSuggestions ?? [];
   const updatedSuggestions = [...currentSuggestions, newSuggestion];
 
-  // Determine new status: client_review → revision_requested is valid
+  // Determine new status: only client_review → revision_requested is a valid transition.
+  // draft sections receive a suggestion but stay in draft until sent for client review.
   let newStatus = existing.status;
-  if (existing.status === 'client_review' || existing.status === 'draft') {
+  if (existing.status === 'client_review') {
     newStatus = 'revision_requested';
   }
 
@@ -378,6 +392,10 @@ export function updateCopyText(
   const existing = getSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'updateCopyText: section not found');
+    return null;
+  }
+  if (existing.status === 'approved') {
+    log.warn({ sectionId, workspaceId }, 'updateCopyText: cannot edit approved section');
     return null;
   }
 
@@ -435,6 +453,7 @@ export function getEntryCopyStatus(entryId: string, workspaceId: string): EntryC
   const total = sections.length;
   const pending = sections.filter(s => s.status === 'pending').length;
   const draft = sections.filter(s => s.status === 'draft').length;
+  const clientReview = sections.filter(s => s.status === 'client_review').length;
   const approved = sections.filter(s => s.status === 'approved').length;
   const revision = sections.filter(s => s.status === 'revision_requested').length;
 
@@ -442,13 +461,15 @@ export function getEntryCopyStatus(entryId: string, workspaceId: string): EntryC
   if (total === 0) overallStatus = 'pending';
   else if (approved === total) overallStatus = 'approved';
   else if (revision > 0) overallStatus = 'revision_requested';
-  else if (draft > 0 || approved > 0) overallStatus = 'draft';
+  else if (clientReview > 0 && pending === 0 && draft === 0) overallStatus = 'client_review';
+  else if (draft > 0 || approved > 0 || clientReview > 0) overallStatus = 'draft';
 
   return {
     entryId,
     totalSections: total,
     pendingSections: pending,
     draftSections: draft,
+    clientReviewSections: clientReview,
     approvedSections: approved,
     revisionSections: revision,
     overallStatus,

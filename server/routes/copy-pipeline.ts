@@ -257,19 +257,20 @@ router.post(
   validate(startBatchSchema),
   (req, res) => {
     const { workspaceId, blueprintId } = req.params;
-    const { entryIds, mode } = req.body as { entryIds: string[]; mode?: string; batchSize?: number };
+    const { entryIds, mode, batchSize } = req.body as { entryIds: string[]; mode?: string; batchSize?: number };
 
     const batchId = `bj_${randomUUID().slice(0, 8)}`;
     const now = new Date().toISOString();
     const resolvedMode = mode ?? 'review_inbox';
     const total = entryIds.length;
+    const resolvedBatchSize = batchSize ?? total;
     const initialProgress = JSON.stringify({ total, generated: 0, reviewed: 0, approved: 0 });
 
     try {
       db.prepare(
         `INSERT INTO copy_batch_jobs (id, workspace_id, blueprint_id, mode, entry_ids_json, batch_size, status, progress_json, accumulated_steering, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, 'running', ?, '[]', ?, ?)`,
-      ).run(batchId, workspaceId, blueprintId, resolvedMode, JSON.stringify(entryIds), total, initialProgress, now, now);
+      ).run(batchId, workspaceId, blueprintId, resolvedMode, JSON.stringify(entryIds), resolvedBatchSize, initialProgress, now, now);
     } catch (err) {
       log.error({ err, workspaceId, blueprintId }, 'Failed to create batch job record');
       return res.status(500).json({ error: 'Failed to start batch job' });
