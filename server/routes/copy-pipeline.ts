@@ -498,12 +498,7 @@ router.patch(
       if (pattern !== undefined && patternType !== undefined) {
         updatePatternText(patternId, workspaceId, pattern, patternType);
       } else if (pattern !== undefined || patternType !== undefined) {
-        // Partial update: need both fields together to call updatePatternText
-        // (the service requires both). If only one is provided, skip the text update.
-        log.warn(
-          { workspaceId, patternId },
-          'updatePatternText requires both pattern and patternType — skipping text update',
-        );
+        return res.status(400).json({ error: 'Both pattern and patternType are required to update pattern text' });
       }
       clearSeoContextCache(workspaceId);
       invalidateIntelligenceCache(workspaceId);

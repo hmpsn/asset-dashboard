@@ -122,8 +122,8 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
   const deleteMutation = useDeletePattern(workspaceId);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, text }: { id: string; text: string }) =>
-      copyIntelligence.update(workspaceId, id, { pattern: text }),
+    mutationFn: ({ id, text, patternType }: { id: string; text: string; patternType: string }) =>
+      copyIntelligence.update(workspaceId, id, { pattern: text, patternType }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-copy-intelligence', workspaceId] });
       queryClient.invalidateQueries({ queryKey: ['admin-copy-promotable', workspaceId] });
@@ -145,7 +145,7 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
       return;
     }
     updateMutation.mutate(
-      { id: pattern.id, text: trimmed },
+      { id: pattern.id, text: trimmed, patternType: pattern.patternType },
       {
         onSettled: () => {
           setIsEditing(false);
