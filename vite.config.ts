@@ -58,5 +58,27 @@ export default defineConfig(async () => ({
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/db-setup.ts', 'tests/component/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}', 'server/__tests__/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['server/**/*.ts', 'src/**/*.{ts,tsx}', 'shared/**/*.ts'],
+      exclude: [
+        'server/index.ts',
+        'server/db/migrations/**',
+        'src/main.tsx',
+        '**/*.d.ts',
+        'scripts/**',
+        '**/*.test.{ts,tsx}',
+      ],
+      // Baseline 2026-04-11: lines 17.3%, branches 12.1%, functions 10.8%, stmts 16.2%
+      // Thresholds = baseline - 5pts. Ratchet up as coverage improves.
+      thresholds: {
+        lines: 12,
+        branches: 7,
+        functions: 6,
+        statements: 11,
+      },
+    },
   },
 }))
