@@ -6,6 +6,13 @@ import type {
   VoiceProfile, VoiceSample, CalibrationSession,
   BrandDeliverable,
 } from '../../shared/types/brand-engine';
+import type {
+  SiteBlueprint,
+  BlueprintEntry,
+  BlueprintVersion,
+  BlueprintGenerationInput,
+  SectionPlanItem,
+} from '../../shared/types/page-strategy';
 
 // ═══ BRANDSCRIPT ═══
 
@@ -79,4 +86,54 @@ export const identity = {
     const markdown = await getText(`/api/brand-identity/${wsId}/export${tier ? `?tier=${tier}` : ''}`);
     return { markdown };
   },
+};
+
+// ═══ PAGE STRATEGY ═══
+
+export const blueprints = {
+  list: (wsId: string) =>
+    get<SiteBlueprint[]>(`/api/page-strategy/${wsId}`),
+
+  getById: (wsId: string, blueprintId: string) =>
+    get<SiteBlueprint>(`/api/page-strategy/${wsId}/${blueprintId}`),
+
+  create: (wsId: string, body: { name: string; brandscriptId?: string; industryType?: string; notes?: string }) =>
+    post<SiteBlueprint>(`/api/page-strategy/${wsId}`, body),
+
+  update: (wsId: string, blueprintId: string, body: Partial<SiteBlueprint>) =>
+    put<SiteBlueprint>(`/api/page-strategy/${wsId}/${blueprintId}`, body),
+
+  remove: (wsId: string, blueprintId: string) =>
+    del(`/api/page-strategy/${wsId}/${blueprintId}`),
+
+  generate: (wsId: string, body: BlueprintGenerationInput) =>
+    post<SiteBlueprint>(`/api/page-strategy/${wsId}/generate`, body),
+};
+
+export const blueprintEntries = {
+  add: (wsId: string, blueprintId: string, body: Partial<BlueprintEntry>) =>
+    post<BlueprintEntry>(`/api/page-strategy/${wsId}/${blueprintId}/entries`, body),
+
+  update: (wsId: string, blueprintId: string, entryId: string, body: Partial<BlueprintEntry>) =>
+    put<BlueprintEntry>(`/api/page-strategy/${wsId}/${blueprintId}/entries/${entryId}`, body),
+
+  remove: (wsId: string, blueprintId: string, entryId: string) =>
+    del(`/api/page-strategy/${wsId}/${blueprintId}/entries/${entryId}`),
+
+  reorder: (wsId: string, blueprintId: string, orderedIds: string[]) =>
+    put<{ reordered: boolean }>(`/api/page-strategy/${wsId}/${blueprintId}/entries/reorder`, { orderedIds }),
+
+  getDefaultSectionPlan: (pageType: string) =>
+    get<SectionPlanItem[]>(`/api/page-strategy/section-plan-defaults/${pageType}`),
+};
+
+export const blueprintVersions = {
+  list: (wsId: string, blueprintId: string) =>
+    get<BlueprintVersion[]>(`/api/page-strategy/${wsId}/${blueprintId}/versions`),
+
+  create: (wsId: string, blueprintId: string, changeNotes?: string) =>
+    post<BlueprintVersion>(`/api/page-strategy/${wsId}/${blueprintId}/versions`, { changeNotes }),
+
+  getById: (wsId: string, blueprintId: string, versionId: string) =>
+    get<BlueprintVersion>(`/api/page-strategy/${wsId}/${blueprintId}/versions/${versionId}`),
 };
