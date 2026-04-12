@@ -28,7 +28,7 @@ export interface SectionPlanItem {
 // SPEC ADDENDUM §2: Do NOT create a separate BlueprintPageType.
 // Import ContentPageType from content.ts and use it everywhere.
 // Task 2 Step 2 extends ContentPageType with the new values.
-import type { ContentPageType } from './content';
+import type { ContentPageType } from './content.js';
 
 // Re-export for convenience — all blueprint code uses ContentPageType
 export type { ContentPageType as BlueprintPageType };
