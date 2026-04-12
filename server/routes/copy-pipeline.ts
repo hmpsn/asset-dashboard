@@ -42,6 +42,7 @@ import {
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
 import { clearSeoContextCache } from '../seo-context.js';
+import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getEntry } from '../page-strategy.js';
 import type { BatchJob } from '../../shared/types/copy-pipeline.js';
 
@@ -439,6 +440,7 @@ router.post(
     try {
       const patterns = await extractPatterns(workspaceId, steeringNotes);
       clearSeoContextCache(workspaceId);
+      invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, {
         extracted: patterns.length,
       });
@@ -478,6 +480,7 @@ router.patch(
         );
       }
       clearSeoContextCache(workspaceId);
+      invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId });
       return res.json({ updated: true });
     } catch (err) {
@@ -497,6 +500,7 @@ router.delete(
     try {
       removePattern(patternId, workspaceId);
       clearSeoContextCache(workspaceId);
+      invalidateIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_INTELLIGENCE_UPDATED, { patternId, deleted: true });
       return res.status(204).send();
     } catch (err) {

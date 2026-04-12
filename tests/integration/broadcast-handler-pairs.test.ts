@@ -335,14 +335,9 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:updated',
   'content-subscription:renewed',
 
-  // copy:* — Copy Pipeline (Phase 3) events. Routes (Task 10) that emit these
-  // and React Query hooks (Task 13) that handle them are implemented later in
-  // this same PR. Task 19 removes these entries once the handlers exist.
-  'copy:section_updated',
-  'copy:metadata_updated',
-  'copy:batch_progress',
-  'copy:batch_complete',
-  'copy:intelligence_updated',
+  // copy:export_complete — the server emits this after export, but there is
+  // no real-time UI reaction needed (the response body contains the result).
+  // A future enhancement could show a toast notification.
   'copy:export_complete',
 
 ]);
@@ -370,14 +365,6 @@ const KNOWN_UNHANDLED_HANDLERS = new Set<string>([
   //   `... ? 'sm:grid-cols-5' : 'sm:grid-cols-4' ...`
   'sm:grid-cols-5',
 
-  // copy:* — Copy Pipeline (Phase 3). Frontend handlers in useCopyPipeline.ts
-  // (Task 13) are not yet implemented. Task 19 removes these entries.
-  'copy:section_updated',
-  'copy:metadata_updated',
-  'copy:batch_progress',
-  'copy:batch_complete',
-  'copy:intelligence_updated',
-  'copy:export_complete',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -492,17 +479,7 @@ describe('broadcast ↔ handler pairing audit', () => {
 
   // ── WS_EVENTS definition coverage ─────────────────────────────────────────
 
-  // Constants that are defined but whose broadcastToWorkspace() calls are in
-  // routes not yet implemented in this PR phase.  Task 19 removes these entries
-  // once server/routes/copy-pipeline.ts is wired.
-  const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([
-    'copy:section_updated',
-    'copy:metadata_updated',
-    'copy:batch_progress',
-    'copy:batch_complete',
-    'copy:intelligence_updated',
-    'copy:export_complete',
-  ]);
+  const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([]);
 
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
     const definedValues = [...serverWsEventsMap.values()];
