@@ -94,6 +94,7 @@ const stmts = createStmtCache(() => ({
         notes = @notes, updated_at = @updated_at
     WHERE id = @id AND workspace_id = @workspace_id
   `),
+  // ws-scope-ok: caller (createVersion) verifies workspace ownership via getBlueprint(workspaceId, blueprintId) before this runs
   bumpBlueprintVersion: db.prepare(`
     UPDATE site_blueprints SET version = version + 1, updated_at = ? WHERE id = ?
   `),
