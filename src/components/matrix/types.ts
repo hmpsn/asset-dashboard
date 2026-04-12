@@ -1,9 +1,11 @@
+import type { ContentPageType } from '../../../shared/types/content';
+
 export interface ContentTemplate {
   id: string;
   workspaceId: string;
   name: string;
   description?: string;
-  pageType: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide' | 'pricing-page';
+  pageType: ContentPageType;
   variables: TemplateVariable[];
   sections: TemplateSection[];
   urlPattern: string;
@@ -31,6 +33,9 @@ export interface TemplateSection {
   wordCountTarget: number;
   order: number;
   cmsFieldSlug?: string;
+  narrativeRole?: string;   // StoryBrand or custom narrative role
+  brandNote?: string;        // one-line brand purpose
+  seoNote?: string;          // one-line SEO purpose
 }
 
 export interface ContentMatrix {

@@ -187,11 +187,15 @@ export interface TemplateSection {
   wordCountTarget: number;
   order: number;
   cmsFieldSlug?: string;
+  narrativeRole?: string;   // StoryBrand or custom narrative role
+  brandNote?: string;        // one-line brand purpose
+  seoNote?: string;          // one-line SEO purpose
 }
 
 export type ContentPageType =
   | 'blog' | 'landing' | 'service' | 'location' | 'product'
-  | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide' | 'pricing-page';
+  | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide' | 'pricing-page'
+  | 'homepage' | 'about' | 'contact' | 'faq' | 'testimonials' | 'custom';
 
 export interface ContentTemplate {
   id: string;

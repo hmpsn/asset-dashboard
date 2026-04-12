@@ -338,7 +338,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
               className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:border-teal-500/40 focus:outline-none transition-colors"
             >
               {PAGE_TYPES.map(pt => (
-                <option key={pt} value={pt}>{pt.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                <option key={pt} value={pt}>{pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</option>
               ))}
             </select>
           </div>
