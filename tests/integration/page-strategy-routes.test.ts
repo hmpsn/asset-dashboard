@@ -146,6 +146,56 @@ describe('Workspace isolation', () => {
   });
 });
 
+// ── Entry cross-workspace isolation ──────────────────────────────────────────
+
+describe('Entry workspace isolation', () => {
+  let bpA = '';
+  let bpB = '';
+  let entryA = '';
+
+  beforeAll(async () => {
+    // Blueprint in wsId
+    const resA = await postJson(`/api/page-strategy/${wsId}`, { name: 'Entry Isolation Blueprint A' });
+    bpA = ((await resA.json()) as SiteBlueprint).id;
+
+    // Entry in wsId blueprint
+    const resEntry = await postJson(`/api/page-strategy/${wsId}/${bpA}/entries`, {
+      name: 'Isolation Page',
+      pageType: 'service',
+    });
+    entryA = ((await resEntry.json()) as BlueprintEntry).id;
+
+    // Blueprint in wsOtherId
+    const resB = await postJson(`/api/page-strategy/${wsOtherId}`, { name: 'Entry Isolation Blueprint B' });
+    bpB = ((await resB.json()) as SiteBlueprint).id;
+  });
+
+  afterAll(async () => {
+    await del(`/api/page-strategy/${wsId}/${bpA}`).catch(() => undefined);
+    await del(`/api/page-strategy/${wsOtherId}/${bpB}`).catch(() => undefined);
+  });
+
+  it('PUT entry via wrong workspace returns 404', async () => {
+    // Attempt to update wsId entry via wsOtherId workspace param
+    const res = await api(`/api/page-strategy/${wsOtherId}/${bpA}/entries/${entryA}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Should Not Update' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('DELETE entry via wrong workspace returns 404', async () => {
+    // Attempt to delete wsId entry via wsOtherId workspace param
+    const res = await del(`/api/page-strategy/${wsOtherId}/${bpA}/entries/${entryA}`);
+    expect(res.status).toBe(404);
+    // Confirm entry still exists in correct workspace
+    const check = await api(`/api/page-strategy/${wsId}/${bpA}`);
+    const bp = (await check.json()) as SiteBlueprint;
+    expect(bp.entries?.find(e => e.id === entryA)).toBeDefined();
+  });
+});
+
 // ── Entry CRUD ────────────────────────────────────────────────────────────────
 
 describe('Entry CRUD', () => {

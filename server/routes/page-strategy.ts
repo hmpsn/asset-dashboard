@@ -11,6 +11,7 @@ import {
   createBlueprint,
   updateBlueprint,
   deleteBlueprint,
+  getEntry,
   addEntry,
   updateEntry,
   removeEntry,
@@ -148,7 +149,7 @@ router.post(
       res.json(blueprint);
     } catch (err) {
       log.error({ err, workspaceId }, 'Blueprint generation failed');
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Blueprint generation failed' });
+      res.status(500).json({ error: 'Blueprint generation failed' });
     }
   },
 );
@@ -249,6 +250,7 @@ router.post(
       const entry = addEntry(workspaceId, blueprintId, req.body);
       if (!entry) return res.status(404).json({ error: 'Blueprint not found' });
       broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, action: 'entries_updated' });
+      addActivity(workspaceId, 'blueprint_entry_added', `Added page "${entry.name}" to blueprint`);
       res.json(entry);
     } catch (err) {
       log.error({ err, workspaceId, blueprintId }, 'Add entry failed');
@@ -269,6 +271,7 @@ router.put(
       const ok = reorderEntries(workspaceId, blueprintId, req.body.orderedIds);
       if (!ok) return res.status(404).json({ error: 'Blueprint not found' });
       broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, action: 'entries_updated' });
+      // no addActivity — sort-only operation, no content change
       res.json({ reordered: true });
     } catch (err) {
       log.error({ err, workspaceId, blueprintId }, 'Reorder entries failed');
@@ -288,6 +291,7 @@ router.put(
       const entry = updateEntry(workspaceId, blueprintId, entryId, req.body);
       if (!entry) return res.status(404).json({ error: 'Entry not found' });
       broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, action: 'entries_updated' });
+      addActivity(workspaceId, 'blueprint_entry_updated', `Updated page "${entry.name}" in blueprint`);
       res.json(entry);
     } catch (err) {
       log.error({ err, workspaceId, blueprintId, entryId }, 'Update entry failed');
@@ -303,9 +307,16 @@ router.delete(
   (req, res) => {
     const { workspaceId, blueprintId, entryId } = req.params;
     try {
+      // Read before delete for activity log context
+      const existing = getEntry(workspaceId, blueprintId, entryId);
       const ok = removeEntry(workspaceId, blueprintId, entryId);
       if (!ok) return res.status(404).json({ error: 'Entry not found' });
       broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, action: 'entries_updated' });
+      addActivity(
+        workspaceId,
+        'blueprint_entry_deleted',
+        existing ? `Removed page "${existing.name}" from blueprint` : 'Removed page from blueprint',
+      );
       res.status(204).send();
     } catch (err) {
       log.error({ err, workspaceId, blueprintId, entryId }, 'Delete entry failed');
@@ -326,6 +337,8 @@ router.post(
     try {
       const version = createVersion(workspaceId, blueprintId, req.body.changeNotes);
       if (!version) return res.status(404).json({ error: 'Blueprint not found' });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, { blueprintId, action: 'version_created', version: version.version });
+      addActivity(workspaceId, 'blueprint_updated', `Saved blueprint version ${version.version}`);
       res.json(version);
     } catch (err) {
       log.error({ err, workspaceId, blueprintId }, 'Create version failed');

@@ -12,6 +12,7 @@ import { getKeywordOverview, getDomainOrganicKeywords } from './semrush.js';
 import { getBrandscript } from './brandscript.js';
 import {
   createBlueprint,
+  deleteBlueprint,
   bulkAddEntries,
   updateBlueprint,
   updateEntry,
@@ -192,28 +193,37 @@ Return ONLY a JSON array of objects with these fields. No markdown, no explanati
     name: `${input.industryType} Site Blueprint`,
     brandscriptId: input.brandscriptId,
     industryType: input.industryType,
+    generationInputs: input,
   });
 
-  // Store generation inputs reference (updateBlueprint currently stores name/status/brandscriptId/industryType/notes)
-  updateBlueprint(workspaceId, blueprint.id, {});
-
   // ── 6. Map entries with section plans and bulk-insert ─────────────────────
-  const entriesToInsert: GeneratedBlueprintEntry[] = generatedEntries.map((entry) => ({
-    name: entry.name,
-    pageType: entry.pageType as BlueprintPageType,
-    scope: (entry.scope === 'included' || entry.scope === 'recommended' ? entry.scope : 'included') as 'included' | 'recommended',
-    isCollection: Boolean(entry.isCollection),
-    primaryKeyword: entry.primaryKeyword,
-    secondaryKeywords: entry.secondaryKeywords,
-    sectionPlan: getDefaultSectionPlan(entry.pageType),
-    rationale: entry.rationale ?? '',
-  }));
+  // Wrap in try/catch so a bulk-insert failure deletes the already-created
+  // blueprint rather than leaving an orphaned draft with zero entries.
+  let insertedEntries: ReturnType<typeof bulkAddEntries>;
+  try {
+    const entriesToInsert: GeneratedBlueprintEntry[] = generatedEntries.map((entry) => ({
+      name: entry.name,
+      pageType: entry.pageType as BlueprintPageType,
+      scope: (entry.scope === 'included' || entry.scope === 'recommended' ? entry.scope : 'included') as 'included' | 'recommended',
+      isCollection: Boolean(entry.isCollection),
+      primaryKeyword: entry.primaryKeyword,
+      secondaryKeywords: entry.secondaryKeywords,
+      sectionPlan: getDefaultSectionPlan(entry.pageType),
+      rationale: entry.rationale ?? '',
+    }));
 
-  // bulkAddEntries(blueprintId, entries) — first param is blueprintId, NOT workspaceId
-  const insertedEntries = bulkAddEntries(workspaceId, blueprint.id, entriesToInsert);
-
-  // Mark blueprint as active now that entries are inserted
-  updateBlueprint(workspaceId, blueprint.id, { status: 'active' });
+    insertedEntries = bulkAddEntries(workspaceId, blueprint.id, entriesToInsert);
+    // Mark blueprint as active now that entries are inserted
+    updateBlueprint(workspaceId, blueprint.id, { status: 'active' });
+  } catch (err) {
+    // Clean up the orphaned draft blueprint before re-throwing
+    try {
+      deleteBlueprint(workspaceId, blueprint.id);
+    } catch (cleanupErr) {
+      log.warn({ cleanupErr, blueprintId: blueprint.id }, 'Failed to clean up orphaned blueprint after generation error');
+    }
+    throw err;
+  }
 
   // ── 7. AUTO-BRIEF CREATION (Phase 3 dependency) ───────────────────────────
   // NOTE: Each iteration calls generateBrief(), which makes an OpenAI call.

@@ -321,6 +321,14 @@ export function deleteBlueprint(workspaceId: string, id: string): boolean {
 
 // ── Entry CRUD ──
 
+export function getEntry(workspaceId: string, blueprintId: string, entryId: string): BlueprintEntry | null {
+  const blueprintRow = stmts().getBlueprint.get(blueprintId, workspaceId) as BlueprintRow | undefined;
+  if (!blueprintRow) return null;
+  const row = stmts().getEntry.get(entryId, blueprintId) as EntryRow | undefined;
+  if (!row) return null;
+  return rowToEntry(row);
+}
+
 export interface AddEntryInput {
   name: string;
   pageType: ContentPageType;
@@ -487,17 +495,20 @@ export function createVersion(
     entries: entries ?? [],
   };
 
-  stmts().insertVersion.run({
-    id,
-    blueprint_id: blueprintId,
-    version: blueprint.version,
-    snapshot_json: JSON.stringify(snapshot),
-    change_notes: changeNotes ?? null,
-    created_at: now,
+  const versionTx = db.transaction(() => {
+    stmts().insertVersion.run({
+      id,
+      blueprint_id: blueprintId,
+      version: blueprint.version,
+      snapshot_json: JSON.stringify(snapshot),
+      change_notes: changeNotes ?? null,
+      created_at: now,
+    });
+    // Bump the blueprint version number inside the same transaction so snapshot
+    // and version counter are always consistent.
+    stmts().bumpBlueprintVersion.run(now, blueprintId);
   });
-
-  // Bump the blueprint version number
-  stmts().bumpBlueprintVersion.run(now, blueprintId);
+  versionTx();
 
   log.info({ id, blueprintId, version: blueprint.version }, 'Blueprint version created');
   return {
