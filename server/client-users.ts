@@ -157,11 +157,30 @@ export async function createClientUser(
   return stripPassword(user);
 }
 
+/**
+ * Cross-workspace authorization guard. Every admin-mutating function below
+ * takes an `expectedWorkspaceId` and enforces that the target user actually
+ * belongs to that workspace. Without this guard, an admin authenticated for
+ * workspace A could call `PATCH/DELETE/password-change` on a user from
+ * workspace B simply by knowing the UUID (the route handler only verifies
+ * the caller's access to the `:id` workspace, not that `:userId` belongs
+ * to it). Returns `null` (not `false`) so callers can't distinguish
+ * "doesn't exist" from "belongs to another workspace" — avoiding a
+ * workspace-enumeration oracle.
+ */
+function assertUserInWorkspace(id: string, expectedWorkspaceId: string): ClientUser | null {
+  const existing = getClientUserById(id);
+  if (!existing) return null;
+  if (existing.workspaceId !== expectedWorkspaceId) return null;
+  return existing;
+}
+
 export async function updateClientUser(
   id: string,
+  expectedWorkspaceId: string,
   updates: Partial<Pick<ClientUser, 'name' | 'email' | 'role' | 'avatarUrl'>>,
 ): Promise<SafeClientUser | null> {
-  const existing = getClientUserById(id);
+  const existing = assertUserInWorkspace(id, expectedWorkspaceId);
   if (!existing) return null;
 
   if (updates.email && updates.email.toLowerCase() !== existing.email) {
@@ -189,8 +208,8 @@ export async function updateClientUser(
   return stripPassword(merged);
 }
 
-export async function changeClientPassword(id: string, newPassword: string): Promise<boolean> {
-  const existing = getClientUserById(id);
+export async function changeClientPassword(id: string, expectedWorkspaceId: string, newPassword: string): Promise<boolean> {
+  const existing = assertUserInWorkspace(id, expectedWorkspaceId);
   if (!existing) return false;
 
   const merged = {
@@ -214,8 +233,8 @@ export async function changeClientPassword(id: string, newPassword: string): Pro
   return true;
 }
 
-export function deleteClientUser(id: string): boolean {
-  const existing = getClientUserById(id);
+export function deleteClientUser(id: string, expectedWorkspaceId: string): boolean {
+  const existing = assertUserInWorkspace(id, expectedWorkspaceId);
   if (!existing) return false;
   const info = stmts().deleteById.run(id, existing.workspaceId);
   return info.changes > 0;
@@ -319,7 +338,11 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 
   if (newPassword.length < 8) return { success: false, error: 'Password must be at least 8 characters' };
 
-  const changed = await changeClientPassword(row.user_id, newPassword);
+  // The reset token row carries the workspace_id it was created against
+  // (see `createResetToken` — that's `getClientUserByEmail(email, workspaceId)`
+  // scoped), so `row.workspace_id` IS the authoritative expected workspace
+  // for `row.user_id`. No separate lookup needed.
+  const changed = await changeClientPassword(row.user_id, row.workspace_id, newPassword);
   if (!changed) return { success: false, error: 'User not found' };
 
   // Remove used token

@@ -768,9 +768,14 @@ router.post('/api/workspaces/:id/client-users', requireWorkspaceAccess(), expres
 
 // Update a client user
 router.patch('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), express.json(), validate(updateClientUserSchema), async (req, res) => {
+  // NOTE: `requireWorkspaceAccess()` only verifies the caller can access the
+  // workspace in `:id`. It does NOT verify that `:userId` belongs to `:id` —
+  // that's enforced inside `updateClientUser` by passing `req.params.id` as
+  // the expected workspace. Same pattern for the password change + DELETE
+  // handlers below. See PR #168 staging-hardening flag (cross-workspace authz).
   try {
     const { name, email, role, avatarUrl } = req.body;
-    const user = await updateClientUser(req.params.userId, { name, email, role, avatarUrl });
+    const user = await updateClientUser(req.params.userId, req.params.id, { name, email, role, avatarUrl });
     if (!user) return res.status(404).json({ error: 'Client user not found' });
     res.json(user);
   } catch (err) {
@@ -783,7 +788,7 @@ router.post('/api/workspaces/:id/client-users/:userId/password', requireWorkspac
   try {
     const { password } = req.body;
     if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    const ok = await changeClientPassword(req.params.userId, password);
+    const ok = await changeClientPassword(req.params.userId, req.params.id, password);
     if (!ok) return res.status(404).json({ error: 'Client user not found' });
     res.json({ ok: true });
   } catch (err) {
@@ -793,7 +798,7 @@ router.post('/api/workspaces/:id/client-users/:userId/password', requireWorkspac
 
 // Delete a client user
 router.delete('/api/workspaces/:id/client-users/:userId', requireWorkspaceAccess(), (req, res) => {
-  const ok = deleteClientUser(req.params.userId);
+  const ok = deleteClientUser(req.params.userId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Client user not found' });
   res.json({ ok: true });
 });

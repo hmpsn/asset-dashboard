@@ -118,8 +118,8 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(() => {
-  deleteClientUser(clientUserId);
-  deleteClientUser(otherClientUserId);
+  deleteClientUser(clientUserId, protectedWsId);
+  deleteClientUser(otherClientUserId, otherWsId);
   deleteWorkspace(protectedWsId);
   deleteWorkspace(otherWsId);
   deleteWorkspace(openWsId);

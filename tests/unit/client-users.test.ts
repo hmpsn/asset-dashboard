@@ -41,18 +41,33 @@ const FIXED_TEST_WORKSPACES = [
   WS_ID + '_login',
 ];
 
+/**
+ * Test-only cleanup helper: deletes a client user by id, looking up the
+ * workspace from the user row itself. Required because `deleteClientUser`
+ * now enforces cross-workspace authorization (PR #168 staging-hardening
+ * flag) by requiring the caller to pass the expected workspace id.
+ * Sweep paths like `afterAll` only have the id in hand, so we fetch the
+ * user first and pass its own workspace id. Returns silently on missing
+ * user (already cleaned up).
+ */
+function cleanupUser(id: string): void {
+  const user = getClientUserById(id);
+  if (!user) return;
+  try { deleteClientUser(id, user.workspaceId); } catch { /* skip */ }
+}
+
 beforeAll(() => {
   for (const ws of FIXED_TEST_WORKSPACES) {
     const users = listClientUsers(ws);
     for (const u of users) {
-      try { deleteClientUser(u.id); } catch { /* skip */ }
+      try { deleteClientUser(u.id, ws); } catch { /* skip */ }
     }
   }
 });
 
 afterAll(() => {
   for (const id of createdIds) {
-    try { deleteClientUser(id); } catch { /* skip */ }
+    cleanupUser(id);
   }
 });
 
@@ -156,14 +171,31 @@ describe('updateClientUser', () => {
     const user = await createClientUser('update-client@example.com', 'pass123', 'Original', WS_ID + '_upd');
     createdIds.push(user.id);
 
-    const updated = await updateClientUser(user.id, { name: 'Updated', role: 'client_owner' });
+    const updated = await updateClientUser(user.id, WS_ID + '_upd', { name: 'Updated', role: 'client_owner' });
     expect(updated).not.toBeNull();
     expect(updated!.name).toBe('Updated');
     expect(updated!.role).toBe('client_owner');
   });
 
   it('returns null for non-existent id', async () => {
-    expect(await updateClientUser('cu_nonexistent', { name: 'X' })).toBeNull();
+    expect(await updateClientUser('cu_nonexistent', WS_ID, { name: 'X' })).toBeNull();
+  });
+
+  it('returns null when the user belongs to a different workspace', async () => {
+    // Cross-workspace authz regression test: PR #168 staging-hardening flag.
+    // A caller authenticated for workspace A must not be able to mutate a user
+    // in workspace B even if they know the user id. Returns null (not false)
+    // so callers can't distinguish "doesn't exist" from "belongs to another
+    // workspace" — avoids a workspace-enumeration oracle.
+    const user = await createClientUser('cross-ws-authz@example.com', 'pass123', 'CrossWs', WS_ID + '_a');
+    createdIds.push(user.id);
+
+    const result = await updateClientUser(user.id, WS_ID + '_b', { name: 'Hacked' });
+    expect(result).toBeNull();
+
+    // Confirm the name did NOT change
+    const unchanged = getClientUserById(user.id);
+    expect(unchanged!.name).toBe('CrossWs');
   });
 });
 
@@ -190,9 +222,21 @@ describe('client password operations', () => {
     const created = await createClientUser('changepw-client@example.com', 'oldpass', 'Change', wsId);
     createdIds.push(created.id);
 
-    expect(await changeClientPassword(created.id, 'newpass')).toBe(true);
+    expect(await changeClientPassword(created.id, wsId, 'newpass')).toBe(true);
     expect(await verifyClientPassword('changepw-client@example.com', wsId, 'newpass')).not.toBeNull();
     expect(await verifyClientPassword('changepw-client@example.com', wsId, 'oldpass')).toBeNull();
+  });
+
+  it('changeClientPassword returns false when user belongs to a different workspace', async () => {
+    // Cross-workspace authz regression test: PR #168 staging-hardening flag.
+    const created = await createClientUser('cross-ws-pw@example.com', 'oldpass', 'CrossWsPw', WS_ID + '_a');
+    createdIds.push(created.id);
+
+    const result = await changeClientPassword(created.id, WS_ID + '_b', 'newpass');
+    expect(result).toBe(false);
+
+    // Confirm the original password still works
+    expect(await verifyClientPassword('cross-ws-pw@example.com', WS_ID + '_a', 'oldpass')).not.toBeNull();
   });
 });
 
@@ -298,12 +342,26 @@ describe('createResetToken / resetPasswordWithToken', () => {
 describe('deleteClientUser', () => {
   it('removes the user', async () => {
     const user = await createClientUser('delete-client@example.com', 'pass', 'Del', WS_ID + '_del');
-    expect(deleteClientUser(user.id)).toBe(true);
+    expect(deleteClientUser(user.id, WS_ID + '_del')).toBe(true);
     expect(getClientUserById(user.id)).toBeNull();
   });
 
   it('returns false for non-existent id', () => {
-    expect(deleteClientUser('cu_nonexistent')).toBe(false);
+    expect(deleteClientUser('cu_nonexistent', WS_ID)).toBe(false);
+  });
+
+  it('returns false when the user belongs to a different workspace', async () => {
+    // Cross-workspace authz regression test: PR #168 staging-hardening flag.
+    // An admin authenticated for workspace B who knows a user id from
+    // workspace A must NOT be able to delete it.
+    const user = await createClientUser('cross-ws-del@example.com', 'pass', 'CrossWsDel', WS_ID + '_a');
+    createdIds.push(user.id);
+
+    const result = deleteClientUser(user.id, WS_ID + '_b');
+    expect(result).toBe(false);
+
+    // Confirm the user still exists
+    expect(getClientUserById(user.id)).not.toBeNull();
   });
 });
 
