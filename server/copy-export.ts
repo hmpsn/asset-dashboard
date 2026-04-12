@@ -60,10 +60,11 @@ const stmts = createStmtCache(() => ({
     SELECT * FROM site_blueprints WHERE id = ? AND workspace_id = ?
   `),
   getBlueprintEntries: db.prepare(`
-    SELECT id, blueprint_id, name, page_type, primary_keyword, section_plan_json
-    FROM blueprint_entries
-    WHERE blueprint_id = ? AND workspace_id = ?
-    ORDER BY sort_order ASC
+    SELECT be.id, be.blueprint_id, be.name, be.page_type, be.primary_keyword, be.section_plan_json
+    FROM blueprint_entries be
+    JOIN site_blueprints sb ON sb.id = be.blueprint_id
+    WHERE be.blueprint_id = ? AND sb.workspace_id = ?
+    ORDER BY be.sort_order ASC
   `),
   getSectionsForEntry: db.prepare(`
     SELECT * FROM copy_sections WHERE entry_id = ? AND workspace_id = ? ORDER BY rowid ASC
