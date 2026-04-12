@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
 import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
-  Plus, Pencil, Trash2, Check, Upload, Mic, Award,
+  Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
 import { PageHeader, SectionCard, TabBar } from './ui';
 import { themeColor } from './ui/constants';
@@ -13,6 +13,9 @@ import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
 import { VoiceTab } from './brand/VoiceTab';
 import { IdentityTab } from './brand/IdentityTab';
+import { PageStrategyTab } from './brand/PageStrategyTab';
+import { BlueprintDetail } from './brand/BlueprintDetail';
+import { BlueprintVersionHistory } from './brand/BlueprintVersionHistory';
 
 interface AudiencePersona {
   id: string;
@@ -84,6 +87,9 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
   const [generatingPersonas, setGeneratingPersonas] = useState(false);
+
+  // Page Strategy state
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(null);
 
   const saveBrandVoiceHandler = async () => {
     setSavingBrandVoice(true);
@@ -469,6 +475,31 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               <span className="text-[11px] text-zinc-500">{localPersonas.length} persona{localPersonas.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
+        )}
+      </SectionCard>
+
+      {/* ═══ PAGE STRATEGY ═══ */}
+      <SectionCard
+        title="Page Strategy"
+        titleIcon={<Map className="w-4 h-4 text-teal-400" />}
+      >
+        {selectedBlueprintId ? (
+          <div className="space-y-6">
+            <BlueprintDetail
+              workspaceId={workspaceId}
+              blueprintId={selectedBlueprintId}
+              onBack={() => setSelectedBlueprintId(null)}
+            />
+            <BlueprintVersionHistory
+              workspaceId={workspaceId}
+              blueprintId={selectedBlueprintId}
+            />
+          </div>
+        ) : (
+          <PageStrategyTab
+            workspaceId={workspaceId}
+            onSelectBlueprint={setSelectedBlueprintId}
+          />
         )}
       </SectionCard>
 

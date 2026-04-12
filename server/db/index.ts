@@ -94,10 +94,15 @@ export function runMigrations(): void {
   const applyMigration = db.transaction((file: string) => {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
     log.info(`Applying migration: ${file}`);
-    // For migrations containing ALTER TABLE ADD COLUMN, execute each
-    // statement individually so "duplicate column" errors (from concurrent
-    // test workers) don't abort the entire migration.
-    if (/ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN/i.test(sql)) {
+    // For migrations containing ALTER TABLE ADD COLUMN or RENAME COLUMN,
+    // execute each statement individually so idempotency errors don't abort
+    // the entire migration:
+    //   ADD COLUMN  → "duplicate column name" if column already exists
+    //   RENAME COLUMN → "no such column" if column was already renamed
+    const needsPerStatement =
+      /ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN/i.test(sql) ||
+      /ALTER\s+TABLE\s+\S+\s+RENAME\s+COLUMN/i.test(sql);
+    if (needsPerStatement) {
       // Strip comment lines, then split on semicolons
       const stripped = sql.replace(/^--.*$/gm, '');
       const statements = stripped
@@ -111,6 +116,9 @@ export function runMigrations(): void {
           const msg = err instanceof Error ? err.message : '';
           if (msg.includes('duplicate column name')) {
             log.info(`Skipping (column already exists): ${stmt.slice(0, 60)}…`);
+          } else if (msg.includes('no such column')) {
+            // RENAME COLUMN: target column doesn't exist — already renamed on this DB
+            log.info(`Skipping (column already renamed or absent): ${stmt.slice(0, 60)}…`);
           } else {
             throw err;
           }
