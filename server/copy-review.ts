@@ -253,35 +253,32 @@ function handleApprovedVoiceSample(section: CopySection, workspaceId: string): v
       ? (SECTION_TYPE_TO_CONTEXT_TAG[planItem.sectionType] ?? 'body')
       : 'body';
 
-    // FIFO cap: delete oldest copy_approved samples for this context_tag if at limit
+    // FIFO cap: delete oldest copy_approved samples for this context_tag if at limit.
+    // Wrapped in db.transaction() so delete+add are atomic — a crash between them
+    // cannot lose samples without adding the replacement.
     const profile = safeBrandEngineRead(
       'handleApprovedVoiceSample.getVoiceProfile', workspaceId,
       () => getVoiceProfile(workspaceId),
       null,
     );
-    if (profile) {
-      const existingForTag = profile.samples
-        .filter(s => s.source === 'copy_approved' && s.contextTag === contextTag)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)); // oldest first
 
-      if (existingForTag.length >= MAX_COPY_APPROVED_SAMPLES_PER_TAG) {
-        // Delete oldest to make room (FIFO)
-        const toDelete = existingForTag.slice(0, existingForTag.length - MAX_COPY_APPROVED_SAMPLES_PER_TAG + 1);
-        for (const old of toDelete) {
-          safeBrandEngineRead(
-            'handleApprovedVoiceSample.deleteVoiceSample', workspaceId,
-            () => deleteVoiceSample(workspaceId, old.id),
-            false,
-          );
+    db.transaction(() => {
+      if (profile) {
+        const existingForTag = profile.samples
+          .filter(s => s.source === 'copy_approved' && s.contextTag === contextTag)
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt)); // oldest first
+
+        if (existingForTag.length >= MAX_COPY_APPROVED_SAMPLES_PER_TAG) {
+          // Delete oldest to make room (FIFO)
+          const toDelete = existingForTag.slice(0, existingForTag.length - MAX_COPY_APPROVED_SAMPLES_PER_TAG + 1);
+          for (const old of toDelete) {
+            deleteVoiceSample(workspaceId, old.id);
+          }
         }
       }
-    }
 
-    safeBrandEngineRead(
-      'handleApprovedVoiceSample.addVoiceSample', workspaceId,
-      () => addVoiceSample(workspaceId, section.generatedCopy!, contextTag, 'copy_approved'),
-      undefined as unknown as ReturnType<typeof addVoiceSample>,
-    );
+      addVoiceSample(workspaceId, section.generatedCopy!, contextTag, 'copy_approved');
+    })();
 
     log.info({ sectionId: section.id, workspaceId, contextTag }, 'auto-added approved copy as voice sample');
   } catch (err) {

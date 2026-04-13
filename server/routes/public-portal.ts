@@ -652,6 +652,7 @@ router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const blueprints = listBlueprints(wsId);
   const entries: { id: string; name: string; pageType: string; blueprintId: string; blueprintName: string; copyStatus: ReturnType<typeof getEntryCopyStatus> }[] = [];
@@ -681,6 +682,7 @@ router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', (req, res) =
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const sections = getSectionsForEntry(req.params.entryId, wsId);
   // Only return sections visible to clients (in review or approved)
