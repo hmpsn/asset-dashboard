@@ -20,8 +20,8 @@ export function ProgressIndicator({
 }: ProgressIndicatorProps) {
   const [visible, setVisible] = useState(true);
 
-  // Fade out after 3s when complete
-  useEffect(() => {
+  // Fade out after 3s when complete — opacity transition only, not layout
+  useEffect(() => { // effect-layout-ok
     if (status === 'complete') {
       const timer = setTimeout(() => setVisible(false), 3000);
       return () => clearTimeout(timer);
