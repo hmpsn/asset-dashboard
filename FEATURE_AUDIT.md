@@ -3426,3 +3426,13 @@ Current feature count: **296**. Last updated: April 2026.
 **Files:** `src/components/PageIntelligenceGuide.tsx`, integrated in `src/components/PageIntelligence.tsx`
 
 **Agency value:** PageIntelligence surfaces complex architecture and link health signals. The guide translates those signals into plain-language explanations and recommended actions, reducing the learning curve for the tool.
+
+
+---
+
+### 297. Deep Diagnostics
+**What it does:** Admin-triggered deep investigation from anomaly insights. Orchestrator gathers data from GSC, GA4, SEMRush, redirect scanner, site architecture, canonical/link probe, and workspace intelligence (including backlinks). GPT-4.1 synthesizes root causes with confidence levels, ranked remediation actions (P0-P3, effort/impact/owner), and client-facing narrative. Results stored in `diagnostic_reports` table.
+
+**Files:** `server/diagnostic-orchestrator.ts`, `server/diagnostic-store.ts`, `server/diagnostic-probe.ts`, `server/routes/diagnostics.ts`, `server/routes/jobs.ts` (deep-diagnostic case), `src/api/diagnostics.ts`, `src/hooks/admin/useDiagnostics.ts`, `src/components/admin/DiagnosticReport/` (4 components), `shared/types/diagnostics.ts`, `server/db/migrations/059-diagnostic-reports.sql`
+
+**Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. Dark-launched behind `deep-diagnostics` feature flag.

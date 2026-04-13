@@ -2,6 +2,8 @@
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { getReportForInsight } from './diagnostic-store.js';
+import { getWorkspace } from './workspaces.js';
 import type { AnalyticsInsight, InsightType } from '../shared/types/analytics.js';
 import type { ClientInsight } from '../shared/types/narrative.js';
 
@@ -113,11 +115,26 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
       impact: undefined,
     }),
 
-    anomaly_digest: () => ({
-      headline: `Traffic pattern change detected`,
-      narrative: `We noticed an unusual change in your site metrics and are monitoring the situation.`,
-      impact: data.durationDays ? `Ongoing for ${data.durationDays} days` : undefined,
-    }),
+    anomaly_digest: () => {
+      // For Growth+ workspaces: enrich with diagnostic client summary if a completed report exists
+      const workspace = getWorkspace(insight.workspaceId);
+      const isGrowthPlus = workspace?.tier !== 'free';
+      if (isGrowthPlus) {
+        const report = getReportForInsight(insight.workspaceId, insight.id);
+        if (report?.status === 'completed' && report.clientSummary) {
+          return {
+            headline: `Traffic pattern change analyzed`,
+            narrative: report.clientSummary,
+            impact: data.durationDays ? `Ongoing for ${data.durationDays} days` : undefined,
+          };
+        }
+      }
+      return {
+        headline: `Traffic pattern change detected`,
+        narrative: `We noticed an unusual change in your site metrics and are monitoring the situation.`,
+        impact: data.durationDays ? `Ongoing for ${data.durationDays} days` : undefined,
+      };
+    },
   };
 
   const generator = narrativeMap[insight.insightType];
