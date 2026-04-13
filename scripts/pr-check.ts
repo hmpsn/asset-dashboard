@@ -2487,6 +2487,51 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    name: 'TabBar component without ?tab= deep-link support',
+    // customCheck because we need to verify two conditions in the same file:
+    // presence of <TabBar AND absence of searchParams.get('tab').
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    excludeLines: ['tab-deeplink-ok'],
+    message:
+      'This component uses <TabBar> but does not read searchParams.get(\'tab\') for deep-link support. ' +
+      'If another component navigates here with ?tab=X, the param will be silently ignored. ' +
+      'Either add useSearchParams() and read the \'tab\' param in your useState initializer, ' +
+      'or add a tab-deeplink-ok comment (// or {/* */}) on or above the <TabBar line if deep-linking is intentionally unsupported.',
+    severity: 'warn',
+    rationale:
+      'A ?tab= URL that the target component ignores is a silent navigation bug — ' +
+      'the user sees the default tab instead of the requested one.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!/\.tsx$/.test(file)) continue;
+        if (!file.includes('/src/components/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        if (!content.includes('<TabBar')) continue;
+        // Already wired — skip
+        if (
+          content.includes("searchParams.get('tab')") ||
+          content.includes('searchParams.get("tab")')
+        ) continue;
+        // File-level escape hatch (matches both // and {/* */} comment styles)
+        if (content.includes('tab-deeplink-ok')) continue;
+        // Report the first <TabBar line
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i].includes('<TabBar')) continue;
+          if (hasHatch(lines, i, 'tab-deeplink-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+          break; // one hit per file
+        }
+      }
+      return hits;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

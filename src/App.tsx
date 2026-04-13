@@ -23,6 +23,7 @@ import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { FeatureFlag } from './components/ui/FeatureFlag';
 import { EmptyState } from './components/ui/EmptyState';
+import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
@@ -55,7 +56,6 @@ const ContentPerformance = lazyWithRetry(() => import('./components/ContentPerfo
 const LinksPanel = lazyWithRetry(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
 const RankTracker = lazyWithRetry(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazyWithRetry(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
-const ContentCalendar = lazyWithRetry(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const ContentSubscriptions = lazyWithRetry(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const BrandHub = lazyWithRetry(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
@@ -208,6 +208,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
+  const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests'>('signals');
+
+  // Reset requests sub-tab when workspace changes so stale state doesn't persist
+  useEffect(() => { setRequestsSubTab('signals'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
 
   // Derive selected workspace from URL + React Query data
   const selected = useMemo(() => {
@@ -338,7 +342,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -371,6 +375,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     }
 
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
+    // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
     if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
@@ -382,7 +387,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'calendar') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=calendar'} replace />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return (
       // Double-gated: Sidebar already hides the nav entry when the flag is
@@ -409,9 +414,18 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return (
-      <div className="space-y-6 p-6 overflow-y-auto">
-        <AdminInbox workspaceId={selected.id} />
-        <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />
+      <div className="flex flex-col">
+        <TabBar
+          tabs={[
+            { id: 'signals', label: 'Signals' },
+            { id: 'requests', label: 'Requests' },
+          ]}
+          active={requestsSubTab}
+          onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests')}
+          className="mb-6"
+        />
+        {requestsSubTab === 'signals' && <AdminInbox key={`inbox-${selected.id}`} workspaceId={selected.id} />}
+        {requestsSubTab === 'requests' && <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />}
       </div>
     );
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} focusMode={effectiveFocusMode} onFocusModeToggle={() => setFocusMode(f => !f)} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
