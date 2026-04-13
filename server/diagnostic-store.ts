@@ -41,7 +41,7 @@ const stmts = createStmtCache(() => ({
   `),
   // ws-scope-ok: id is a UUID primary key (workspace-unique); status-ok: internal store transitions only
   updateStatus: db.prepare(`
-    UPDATE diagnostic_reports SET status = @status, error_message = @error_message WHERE id = @id
+    UPDATE diagnostic_reports SET status = @status, error_message = @error_message WHERE id = @id -- status-ok: internal orchestrator transitions only (running→completed/failed)
   `),
   // ws-scope-ok: id is a UUID primary key (workspace-unique)
   updateCompleted: db.prepare(`
