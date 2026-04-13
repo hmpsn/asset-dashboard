@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist } from './ui';
 import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -69,6 +69,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     const param = searchParams.get('tab');
     return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
   });
+
+  const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
+  const [checklistDismissed, setChecklistDismissed] = useState(
+    () => !!localStorage.getItem(storageKey)
+  );
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: string) => {
@@ -186,8 +191,58 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
 
+  const onboardingSteps = [
+    {
+      id: 'webflow',
+      label: 'Link Webflow site',
+      description: 'Connect your Webflow site to enable SEO tools and page analysis.',
+      completed: !!webflowSiteId,
+      estimatedTime: '2 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'gsc',
+      label: 'Connect Google Search Console',
+      description: 'Get search performance data — clicks, impressions, and rankings.',
+      completed: !!gscPropertyUrl,
+      estimatedTime: '3 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'ga4',
+      label: 'Connect Google Analytics',
+      description: 'Track users, sessions, and conversions from organic traffic.',
+      completed: !!ga4PropertyId,
+      estimatedTime: '3 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'audit',
+      label: 'Run your first SEO audit',
+      description: 'Get a full health score for your site — issues, warnings, and fixes.',
+      completed: !!(audit && audit.siteScore > 0),
+      estimatedTime: '1 min',
+      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
+    },
+  ];
+
+  const showOnboardingChecklist = !checklistDismissed && onboardingSteps.some(s => !s.completed);
+
   return (
     <div className="space-y-8">
+      {showOnboardingChecklist && (
+        <OnboardingChecklist
+          steps={onboardingSteps}
+          onDismiss={() => {
+            localStorage.setItem(storageKey, '1');
+            setChecklistDismissed(true);
+          }}
+          onComplete={() => {
+            localStorage.setItem(storageKey, '1');
+            setChecklistDismissed(true);
+          }}
+        />
+      )}
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}

@@ -36,3 +36,9 @@ export {
   chartTooltipStyle,
   chartTooltipLabelStyle,
 } from './constants';
+export { OnboardingChecklist } from './OnboardingChecklist';
+export type { OnboardingStep, OnboardingChecklistProps } from './OnboardingChecklist';
+export { WorkflowStepper } from './WorkflowStepper';
+export type { WorkflowStep, WorkflowStepperProps } from './WorkflowStepper';
+export { WorkspaceHealthBar } from './WorkspaceHealthBar';
+export type { HealthMetric, WorkspaceHealthBarProps } from './WorkspaceHealthBar';
