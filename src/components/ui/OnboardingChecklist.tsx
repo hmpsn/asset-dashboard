@@ -115,7 +115,7 @@ export function OnboardingChecklist({
             <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-teal-400" />
             </div>
-            <h2 className="text-lg font-semibold text-zinc-200">You're all set!</h2>
+            <h2 id="onboarding-checklist-title" className="text-lg font-semibold text-zinc-200">You're all set!</h2>
             <p className="text-sm text-zinc-400 text-center">
               All setup steps are complete. Your workspace is ready to go.
             </p>
