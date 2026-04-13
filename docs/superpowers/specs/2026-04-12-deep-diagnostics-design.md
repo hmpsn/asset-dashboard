@@ -64,9 +64,9 @@ No new data collectors. The orchestrator pulls from existing sources:
 | Data Need | Existing Source | Function/Module |
 |---|---|---|
 | Position history (90 days daily) | GSC integration | `getPageTrend()` |
-| Query-level breakdown | GSC integration | `getQueryPageData()` |
+| Query-level breakdown | GSC integration | `getQueryPageData()` — returns site-wide; orchestrator filters for affected page(s) |
 | Period comparison | GSC integration | `getSearchPeriodComparison()` |
-| Internal link structure | Site architecture | `getCachedArchitecture()` |
+| Internal link structure (hierarchy) | Site architecture | `getCachedArchitecture()` — returns parent-child tree, NOT `<a>` link counts |
 | Backlink profile | SEMRush integration | `getBacklinksOverview()` + `getTopReferringDomains()` |
 | Redirect chains | Redirect scanner | `scanRedirects()` |
 | Page audit issues, schema status | Intelligence assembler | `PageProfileSlice` |
@@ -74,13 +74,24 @@ No new data collectors. The orchestrator pulls from existing sources:
 | Content decay status | Content decay engine | Decay analysis data |
 | GA4 engagement data | GA4 integration | `getGA4LandingPages()`, `getGA4TopPages()` |
 
-### New: HTTP Probe
+### New: Canonical Probe + Internal Link Counter
 
-Lightweight HTTP HEAD request chain for each affected URL:
-- Follow redirects, recording each hop (status code, location header)
-- At final destination: GET request, parse `<link rel="canonical">` from HTML head
-- Detect: soft-404s (homepage redirect), 302s that should be 301s, redirect loops, canonical mismatches
-- Returns: `{ chain: RedirectHop[], finalStatus: number, canonical: string | null, isSoftFourOhFour: boolean }`
+`scanRedirects()` already does live HTTP probing for redirect chains (with `redirect: 'manual'`). The new probe module handles two things `scanRedirects()` doesn't:
+
+1. **Canonical tag extraction** — GET request to affected URL, parse `<link rel="canonical">` from HTML head. Detect: canonical mismatches, self-referencing correctness, parameter pollution.
+
+2. **Internal link counting** — `getCachedArchitecture()` returns a parent-child tree (site hierarchy), NOT actual `<a>` link references to a page. The probe fetches the top 20 pages by traffic and counts `<a href>` elements pointing to each affected URL. This gives the actual internal link count that made the copilot article diagnosis possible (<4 links vs site median of 10-21).
+
+Returns: `{ canonical: string | null, selfReferencing: boolean, internalLinkCount: number, topLinkingPages: string[], siteMedianLinks: number }`
+
+### Credential Resolution
+
+The orchestrator must resolve workspace integration credentials before calling data sources:
+- **GSC:** `siteId` + `gscSiteUrl` from workspace Google integration config
+- **GA4:** `propertyId` from workspace GA4 config
+- **SEMRush:** `domain` from workspace settings (cleaned via `cleanDomainForSemrush()`)
+
+If a data source is not configured for the workspace, that module is skipped gracefully and noted in the diagnostic context as `{ available: false, reason: 'not_configured' }`.
 
 ### Module Router
 
@@ -254,7 +265,7 @@ export interface DiagnosticContext {
   backlinks: {
     totalBacklinks: number;
     referringDomains: number;
-    topDomains: { domain: string; backlinks: number }[];
+    topDomains: { domain: string; backlinksCount: number }[];
     recentlyLost: number;  // best-effort — SEMRush domain-level API may not expose per-URL lost links
   };
   siteBaselines: {
@@ -408,10 +419,10 @@ When a diagnostic completes, the client's corresponding anomaly insight gets upg
 | File | Purpose |
 |---|---|
 | `shared/types/diagnostics.ts` | `DiagnosticReport`, `RootCause`, `RemediationAction`, `DiagnosticContext`, `DiagnosticStatus` |
-| `server/db/migrations/0XX-diagnostic-reports.sql` | Table creation |
+| `server/db/migrations/057-diagnostic-reports.sql` | Table creation |
 | `server/diagnostic-store.ts` | Row interface, stmt cache, CRUD, row mapper |
 | `server/diagnostic-orchestrator.ts` | Module router, parallel data gathering, context assembly, AI synthesis dispatch |
-| `server/diagnostic-probe.ts` | HTTP HEAD redirect chain + canonical extraction |
+| `server/diagnostic-probe.ts` | Canonical tag extraction + internal link counting (redirect chains handled by existing `scanRedirects()`) |
 | `src/components/admin/DiagnosticReport/DiagnosticReportPage.tsx` | Full report detail view |
 | `src/components/admin/DiagnosticReport/RootCauseCard.tsx` | Individual root cause display |
 | `src/components/admin/DiagnosticReport/RemediationPlan.tsx` | Prioritized action list |
