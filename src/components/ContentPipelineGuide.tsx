@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Layers, FileText, Grid3X3, Map, Bot, Download,
+  Layers, FileText, Grid3X3, Download,
   Clipboard, RefreshCw, ChevronDown, ChevronRight,
   Sparkles, Flag, Eye, Send, ArrowRight,
 } from 'lucide-react';
@@ -94,47 +94,6 @@ const SECTIONS: GuideSection[] = [
       {
         label: 'Track Delivery',
         detail: 'Monitor which clients have active subscriptions, how many posts have been delivered this period, and upcoming renewals.',
-      },
-    ],
-  },
-  {
-    id: 'architecture',
-    icon: Map,
-    title: 'Site Architecture',
-    subtitle: 'Visualize your site\'s URL structure and find gaps',
-    steps: [
-      {
-        label: 'View the URL Tree',
-        detail: 'See every page on the site in a collapsible hierarchy. Each URL shows its source: Webflow page, CMS sitemap entry, keyword strategy target, or planned content.',
-      },
-      {
-        label: 'Find Gaps',
-        detail: 'The gap analysis highlights orphan pages (no internal links), pages missing from strategy, and depth distribution issues.',
-      },
-      {
-        label: 'Search & Filter',
-        detail: 'Type to filter the tree instantly. Use source badges to focus on specific page types.',
-      },
-    ],
-    tip: 'Run this after updating your keyword strategy to spot new content opportunities in the URL structure.',
-  },
-  {
-    id: 'llms-txt',
-    icon: Bot,
-    title: 'LLMs.txt Generator',
-    subtitle: 'Help AI systems understand your site for AEO',
-    steps: [
-      {
-        label: 'Generate',
-        detail: 'One click builds an LLMs.txt file from your published pages, keyword strategy, and planned content. This structured file helps AI search engines understand your site.',
-      },
-      {
-        label: 'Preview & Copy',
-        detail: 'Review the generated content in a scrollable preview. Copy to clipboard or download as a .txt file.',
-      },
-      {
-        label: 'Deploy',
-        detail: 'Add the file to your site\'s root (e.g. yoursite.com/llms.txt) so AI crawlers can find it. Similar to robots.txt but for AI comprehension.',
       },
     ],
   },

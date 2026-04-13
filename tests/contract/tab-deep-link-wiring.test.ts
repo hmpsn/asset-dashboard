@@ -48,8 +48,7 @@ function collectTsxFiles(dir: string): string[] {
  * Combined: page slug → absolute file path.
  */
 function buildRouteMap(): Map<string, string> {
-  // readFile-ok — intentional static analysis of route table
-  const appTsx = readFileSync(join(SRC_DIR, 'App.tsx'), 'utf8');
+  const appTsx = readFileSync(join(SRC_DIR, 'App.tsx'), 'utf8'); // readFile-ok — intentional static analysis of route table
 
   // Step 1: component name → import path
   const componentPaths = new Map<string, string>();
@@ -122,7 +121,7 @@ function findTabSenders(): TabSender[] {
   const senderRe = /adminPath\([^,]+,\s*'([^']+)'\)\s*\+\s*['"`]\?tab=([^'"`\s]+)['"`]/g;
 
   for (const file of allFiles) {
-    const content = readFileSync(file, 'utf8');
+    const content = readFileSync(file, 'utf8'); // readFile-ok — intentional static analysis of sender URLs
     const lines = content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
@@ -149,7 +148,7 @@ function findTabSenders(): TabSender[] {
 /** Check if a component file reads the 'tab' query param via useSearchParams. */
 function readsTabParam(filePath: string): boolean {
   try {
-    const content = readFileSync(filePath, 'utf8');
+    const content = readFileSync(filePath, 'utf8'); // readFile-ok — intentional static analysis of receiver
     return (
       content.includes("searchParams.get('tab')") ||
       content.includes('searchParams.get("tab")')
@@ -233,7 +232,7 @@ describe('?tab= deep-link wiring contract', () => {
       if (!componentFile) continue;
 
       try {
-        const content = readFileSync(componentFile, 'utf8');
+        const content = readFileSync(componentFile, 'utf8'); // readFile-ok — intentional static analysis of tab IDs
         // Check if the tab value appears as a string literal in the file
         // (in a type union like 'calendar' | 'briefs' or a TABS array)
         if (
