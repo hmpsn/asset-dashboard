@@ -26,7 +26,6 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
-import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('public-portal');
 
