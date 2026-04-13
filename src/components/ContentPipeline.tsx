@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown } from 'lucide-react';
+import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
 import { useContentPipeline } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
@@ -15,6 +15,7 @@ import type { FixContext } from '../App';
 const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 const LlmsTxtGenerator = lazyWithRetry(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
+const ContentCalendar = lazyWithRetry(() => import('./ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
 
 interface Props {
@@ -26,6 +27,7 @@ interface Props {
 
 const TABS = [
   { id: 'planner' as const, label: 'Planner', icon: Layers },
+  { id: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { id: 'briefs' as const, label: 'Briefs', icon: Clipboard },
   { id: 'posts' as const, label: 'Posts', icon: FileText },
   { id: 'subscriptions' as const, label: 'Subscriptions', icon: RefreshCw },
@@ -190,6 +192,11 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {activeTab === 'planner' && (
         <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
           <ContentPlanner key={`planner-${workspaceId}`} workspaceId={workspaceId} />
+        </Suspense>
+      )}
+      {activeTab === 'calendar' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <ContentCalendar key={`calendar-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
       {activeTab === 'briefs' && (
