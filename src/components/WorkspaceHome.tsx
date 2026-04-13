@@ -77,6 +77,12 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [checklistVisible, setChecklistVisible] = useState(
     () => !localStorage.getItem(storageKey)
   );
+  // Sync visibility when workspaceId changes without remount (React Router reuses
+  // the same component instance across workspace switches). The !loading render
+  // guard prevents any flash — the component is in a loading state at switch time.
+  useEffect(() => {
+    setChecklistVisible(!localStorage.getItem(storageKey));
+  }, [storageKey]);
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: string) => {
