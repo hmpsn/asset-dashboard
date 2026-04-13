@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **277 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **290 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3255,3 +3255,112 @@ Current feature count: **278**. Last updated: April 2026.
 **Agency value:** Programming errors in assembler catch blocks previously silenced TypeErrors and ReferenceErrors as empty-fallback degradation. After hardening, any renamed export or null-dereference in a slice assembler fires a Sentry alert immediately instead of silently returning stale/empty data to the AI prompt. Eliminates the silent data-loss class of bugs in the intelligence engine.
 
 **Mutual:** CI enforcement — the new `pr-check` rule prevents future bare catches from being introduced in workspace-intelligence.ts. Any contributor who writes `} catch {` in that file will see an error before the PR merges.
+
+---
+
+## Copy & Brand Engine — Phase 3: Full Copy Pipeline
+
+### 280. Copy Generation Pipeline
+**What it does:** AI-powered copy generation for every page in a client's site blueprint. Uses Claude Sonnet 4 (via `callAnthropic`) with an 8-layer context assembly: voice DNA, brand identity deliverables, brandscript, SEO context, content brief, page-type config, quality rules, and cross-page awareness. Generates section-by-section copy matching the blueprint's section plan (hero, problem, solution, features, CTA, FAQ, etc.). Each section gets AI annotations explaining creative decisions and quality flags (word count, readability, guardrail violations). SEO metadata (title, meta description, OG tags) generated alongside copy. Deferred initialization pattern prevents data loss on AI failure — existing approved copy is preserved until new generation succeeds, then written atomically in a `db.transaction()`.
+
+**Files:** `server/copy-generation.ts`, `server/copy-review.ts`, `server/db/migrations/058-copy-pipeline.sql`, `shared/types/copy-pipeline.ts`, `server/schemas/copy-pipeline.ts`
+
+**Agency value:** Transforms site blueprints from planning documents into live copy — every page gets AI-generated content matched to brand voice, SEO targets, and page-type best practices. Eliminates the blank-page problem for copywriters.
+
+**Client value:** Faster time-to-copy. Every page in their site strategy gets professionally written content informed by their brand voice, competitive landscape, and keyword targets.
+
+**Mutual:** Bridges the gap between strategy (blueprints) and execution (live copy), making the agency's deliverable pipeline end-to-end.
+
+---
+
+### 281. Copy Review & Steering
+**What it does:** Section-by-section copy review with inline editing, status management, and AI-powered regeneration with steering. Status machine: `pending → draft → client_review/approved`, `client_review → approved/revision_requested`, `revision_requested → draft`. Inline text editing auto-resets status to draft. Regenerate with steering notes — accumulated steering persists across regeneration cycles. Quality flags surface readability issues, word count violations, and guardrail breaches. Client suggestion system stores original + suggested text side-by-side.
+
+**Files:** `server/copy-review.ts`, `server/routes/copy-pipeline.ts`, `src/components/brand/CopyReviewPanel.tsx`, `src/hooks/admin/useCopyPipeline.ts`
+
+**Agency value:** Systematic review workflow replaces ad-hoc copy feedback. Steering notes guide AI regeneration instead of manual rewrites. Version tracking preserves history.
+
+**Client value:** Clear status visibility (draft/in-review/approved). Structured feedback mechanism via suggestions.
+
+---
+
+### 282. Batch Copy Generation
+**What it does:** Generate copy for multiple blueprint entries in a single operation. Entry selection with page-type labels, mode picker (all/selected), configurable batch size. Real-time progress tracking via WebSocket broadcasts. Rate-limited AI endpoints (3 req/min/IP). Background processing with job status tracking (`copy_batch_jobs` table).
+
+**Files:** `src/components/brand/BatchGenerationPanel.tsx`, `server/routes/copy-pipeline.ts`
+
+**Agency value:** Generate copy for an entire site blueprint in one click instead of page-by-page. Progress visibility prevents duplicate work.
+
+---
+
+### 283. Copy Export
+**What it does:** Export approved copy in multiple formats: CSV (with formula injection mitigation), Copy Deck (structured Markdown), and Webflow push. Scope selector: export all entries, selected entries, or single entry. CSV escapes values starting with `=`, `+`, `-`, `@` to prevent spreadsheet formula injection. Copy deck format organizes by page with section headings, SEO metadata, and AI annotations.
+
+**Files:** `server/copy-export.ts`, `src/components/brand/CopyExportPanel.tsx`
+
+**Agency value:** Client-ready deliverables in the format they need. Copy deck for review meetings, CSV for CMS import, Webflow push for direct publishing.
+
+---
+
+### 284. Copy Intelligence (Pattern Learning)
+**What it does:** Extracts recurring patterns from generated copy — terminology choices, tone markers, structural patterns, keyword usage. Patterns track frequency and can be toggled active/inactive. When frequency reaches >= 3, patterns surface as "Promote to Voice Guardrail" candidates. Promotion appends the pattern to the workspace's voice profile guardrails (tone boundaries or anti-patterns) in a single atomic transaction. Promotable patterns UI with one-click promotion button.
+
+**Files:** `server/copy-intelligence.ts`, `src/components/brand/CopyIntelligenceManager.tsx`
+
+**Agency value:** The system learns from each generation cycle. Recurring patterns get codified into voice guardrails automatically, improving future generations without manual voice profile maintenance.
+
+---
+
+### 285. Client Copy Review Portal
+**What it does:** Client-facing copy review interface extending the existing client portal. 4 public API routes: list entries with copy status, get sections filtered to client-visible statuses (client_review/approved only, internal reasoning omitted), approve sections, and suggest edits. React component with entry list, status badges, expand-to-review, approve button (teal), and inline suggest-changes form. Real-time updates via WebSocket. Client-friendly language throughout.
+
+**Files:** `src/components/client/ClientCopyReview.tsx`, `server/routes/public-portal.ts`
+
+**Agency value:** Clients can review and approve copy without back-and-forth emails. Suggestions are structured and trackable.
+
+**Client value:** Self-service review at their own pace. Clear approve/suggest workflow with real-time status updates.
+
+---
+
+### 286. Approved Copy → Voice Samples
+**What it does:** When a copy section is approved, automatically adds the copy text as a voice sample in the workspace's voice profile. Maps section types to voice context tags (hero→headline, CTA→cta, FAQ/body sections→body, about→about). FIFO cap of 3 `copy_approved` samples per context tag per workspace — oldest deleted before inserting new. Voice calibration improves over time as more copy is approved.
+
+**Files:** `server/copy-review.ts`
+
+**Agency value:** Voice profiles self-improve through the normal copy approval workflow. No manual sample curation needed.
+
+---
+
+### 287. Voice Feedback Loop
+**What it does:** Classifies steering notes as content feedback (structure/information changes) vs voice feedback (tone/style/personality) using GPT-4.1-mini. When voice feedback is detected, generates voice profile update suggestions (new guardrails or modifier adjustments) using the current voice DNA as context. Suggestions are flagged for review — never auto-applied.
+
+**Files:** `server/copy-voice-feedback.ts`
+
+**Agency value:** Steering feedback naturally informs voice profile evolution. Voice-related feedback is surfaced as actionable profile updates instead of being lost in steering history.
+
+---
+
+### 288. Questionnaire → Brandscript Auto-Population
+**What it does:** Maps onboarding questionnaire data to StoryBrand framework brandscript sections. Extracts from workspace knowledge base (about, services, differentiators, competitors), intelligence profile (industry, target audience), and persona definitions (pain points, goals, objections). Maps to 8 StoryBrand sections: Character, Problem, Guide, Plan, CTA, Failure, Success, Unique Value Proposition. Idempotent — returns existing brandscript if one already exists.
+
+**Files:** `server/brandscript.ts`
+
+**Agency value:** Brandscripts start pre-populated from onboarding data instead of blank. Reduces brand strategy workshop time.
+
+---
+
+### 289. Admin Chat Copy/Blueprint Awareness
+**What it does:** Adds `'copy'` context category to the admin chat AI advisor. When questions relate to copy, copywriting, blueprints, or section status, the chat assembles copy pipeline context: blueprint overview, per-entry copy status with approval percentages, active intelligence patterns. Wired into the `contentPipeline` intelligence slice for broader queries.
+
+**Files:** `server/admin-chat-context.ts`
+
+**Agency value:** Admin chat can answer "what's the copy status for [client]?" or "which pages still need copy?" using real pipeline data.
+
+---
+
+### 290. Content Decay → Copy Refresh
+**What it does:** Matches decaying pages (from content decay analysis) to blueprint entries via URL/slug normalization. For matched entries, AI (GPT-4.1-mini) analyzes current copy sections against decay signals and recommends per-section actions: rewrite, update, or keep. Prioritized by severity (high/medium/low) and action type. Batch analysis processes all decaying pages for a workspace.
+
+**Files:** `server/copy-refresh.ts`
+
+**Agency value:** Decay signals automatically surface which specific copy sections need refreshing, not just which pages. Targeted refresh instead of full rewrites.

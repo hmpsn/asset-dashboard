@@ -1141,8 +1141,8 @@
           "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
           "est": "16-22h",
           "priority": "P1",
-          "notes": "Site Blueprint deliverable: page-by-page content plan tied to brandscript + keyword strategy. Intelligence-informed generation: cannibalization insights → consolidation, competitor gaps → prioritization, learnings → proven patterns. Auto-brief creation after blueprint generation. Prerequisite for Copy Pipeline Phase 3. Plan audit deferred until after Brandscript ships to staging.",
-          "status": "pending"
+          "notes": "Shipped — Site Blueprint deliverable with page-by-page content plan. Intelligence-informed generation. Auto-brief creation. Prerequisite for Copy Pipeline Phase 3.",
+          "status": "done"
         },
         {
           "id": "copy-pipeline-phase3",
@@ -1150,8 +1150,8 @@
           "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
           "est": "24-32h",
           "priority": "P1",
-          "notes": "Full page-level AI copy generation: per-page intelligence injection (content decay + CTR + SERP opportunity → copy structure), copy intelligence feedback loop (patterns back into prompts via buildCopyIntelligenceContext()), approved copy → voice sample loop. Uses buildSystemPrompt() for voice-calibrated output. Prerequisite: Page Strategy Engine shipped to staging. Plan audit deferred until after Page Strategy ships.",
-          "status": "pending"
+          "notes": "Shipped — Tier 1 (Tasks 1-19): 4 server modules (copy-generation, copy-review, copy-intelligence, copy-export), migration 058, Zod schemas, frontend API + hooks, 5 UI components (CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager, BlueprintDetail Copy tab). 21 integration tests. Tier 2 (Tasks 20-28): voice sample feedback loop, steering classification, pattern promotion, client copy review portal, questionnaire→brandscript, admin chat awareness, content decay→copy refresh, workspace intelligence wiring. Feature-flagged via copy-engine-pipeline. PR #173 (Tier 1) + PR for Tier 2.",
+          "status": "done"
         }
       ]
     },
