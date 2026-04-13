@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
-import { type Page, adminPath } from '../../routes';
+import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
@@ -40,7 +40,6 @@ interface SidebarProps {
   tab: Page;
   theme: 'dark' | 'light';
   pendingContentRequests: number;
-  hasContentItems: boolean;
   onCreate: (name: string, siteId?: string, siteName?: string) => void;
   onDelete: (id: string) => void;
   onLinkSite: (workspaceId: string, siteId: string, siteName: string, token?: string) => void;
@@ -55,7 +54,7 @@ interface SidebarProps {
 
 const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
-function buildNavGroups(_hasContentItems: boolean, copyEngineEnabled: boolean): NavGroup[] {
+function buildNavGroups(copyEngineEnabled: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
@@ -109,10 +108,8 @@ function buildNavGroups(_hasContentItems: boolean, copyEngineEnabled: boolean): 
   ];
 }
 
-const GLOBAL_TABS = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']);
-
 export function Sidebar({
-  workspaces, selected, tab, theme, pendingContentRequests, hasContentItems,
+  workspaces, selected, tab, theme, pendingContentRequests,
   onCreate, onDelete, onLinkSite, onUnlinkSite,
   toggleTheme, onLogout, hidden, onExitHidden,
 }: SidebarProps) {
@@ -135,7 +132,7 @@ export function Sidebar({
   }, []);
 
   const copyEngineEnabled = useFeatureFlag('copy-engine');
-  const navGroups = buildNavGroups(hasContentItems, copyEngineEnabled);
+  const navGroups = buildNavGroups(copyEngineEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => {
@@ -290,5 +287,5 @@ export function Sidebar({
   );
 }
 
-export { ALL_GROUP_LABELS, GLOBAL_TABS };
+export { ALL_GROUP_LABELS };
 export type { NavGroup, NavItem };

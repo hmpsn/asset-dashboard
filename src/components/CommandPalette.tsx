@@ -8,7 +8,7 @@ import {
   Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
-import { type Page, adminPath } from '../routes';
+import { type Page, adminPath, GLOBAL_TABS } from '../routes';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 
 interface PaletteItem {
@@ -147,7 +147,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: nav.group || undefined,
         icon: nav.icon,
         type: 'nav',
-        action: () => { const GLOBAL = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'features', 'outcomes-overview']); if (GLOBAL.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
+        action: () => { if (GLOBAL_TABS.has(nav.id) || selectedWorkspace) { navigate(adminPath(selectedWorkspace?.id || '', nav.id)); } addRecent(`nav:${nav.id}`); },
       });
     }
 

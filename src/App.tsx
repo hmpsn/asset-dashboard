@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { get, postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
-import { type Page, adminPath, clientPath } from './routes';
+import { type Page, adminPath, clientPath, GLOBAL_TABS } from './routes';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
@@ -156,7 +156,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const { data: queue = [] } = useQueue();
 
   // Derive tab and workspace ID from URL path
-  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']), []);
   const { tab, urlWorkspaceId } = useMemo(() => {
     const p = location.pathname;
     const wsTabMatch = p.match(/^\/ws\/([^/]+)\/(.+)$/);
@@ -166,7 +165,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     const globalMatch = p.match(/^\/([^/]+)\/?$/);
     if (globalMatch && GLOBAL_TABS.has(globalMatch[1])) return { tab: globalMatch[1] as Page, urlWorkspaceId: undefined as string | undefined };
     return { tab: 'home' as Page, urlWorkspaceId: undefined as string | undefined };
-  }, [location.pathname, GLOBAL_TABS]);
+  }, [location.pathname]);
 
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
   const clearFixContext = useCallback(() => setFixContext(null), []);
@@ -209,7 +208,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
-  const [hasContentItems, setHasContentItems] = useState(false);
 
   // Derive selected workspace from URL + React Query data
   const selected = useMemo(() => {
@@ -229,7 +227,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       .then(badges => {
         if (cancelled) return;
         setPendingContentRequests(badges.pendingRequests);
-        setHasContentItems(badges.hasContent);
       })
       .catch((err) => { console.error('App operation failed:', err); });
     return () => { cancelled = true; };
@@ -431,7 +428,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         tab={tab}
         theme={theme}
         pendingContentRequests={pendingContentRequests}
-        hasContentItems={hasContentItems}
         onCreate={handleCreate}
         onDelete={handleDelete}
         onLinkSite={handleLinkSite}
