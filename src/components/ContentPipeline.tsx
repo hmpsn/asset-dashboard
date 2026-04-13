@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
@@ -11,6 +11,8 @@ import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
+import { WorkflowStepper } from './ui';
+import { adminPath } from '../routes';
 import type { FixContext } from '../App';
 
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
@@ -43,6 +45,7 @@ const EXPORTS = [
 ] as const;
 
 export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
     const param = searchParams.get('tab');
@@ -109,8 +112,17 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
     setActiveTab('briefs');
   };
 
+  const contentWorkflowSteps = [
+    { number: 1, label: 'Strategy', completed: false, current: activeTab === 'planner', onClick: () => navigate(adminPath(workspaceId, 'seo-strategy')) },
+    { number: 2, label: 'Briefs', completed: activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'briefs', onClick: () => handleTabChange('briefs') },
+    { number: 3, label: 'Posts', completed: activeTab === 'subscriptions', current: activeTab === 'posts', onClick: () => handleTabChange('posts') },
+    { number: 4, label: 'Publish', completed: false, current: activeTab === 'subscriptions', onClick: () => handleTabChange('subscriptions') },
+  ];
+
   return (
     <div className="space-y-8">
+      <WorkflowStepper steps={contentWorkflowSteps} compact />
+
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
         <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400" style={{ borderRadius: '10px 24px 10px 24px' }}>
