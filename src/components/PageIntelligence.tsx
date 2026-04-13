@@ -18,6 +18,7 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
 import type { MetricsSource } from '../../shared/types/keywords.js';
+import { PageIntelligenceGuide } from './PageIntelligenceGuide';
 
 const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 
@@ -200,7 +201,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const strategy = keywordData?.strategy || null;
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'pages' | 'architecture'>('pages');
+  const [activeTab, setActiveTab] = useState<'pages' | 'architecture' | 'guide'>('pages');
 
   // All pages from webflow (static + CMS)
   const [allPages, setAllPages] = useState<PageMeta[]>([]);
@@ -598,9 +599,10 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
         tabs={[
           { id: 'pages', label: 'Pages' },
           { id: 'architecture', label: 'Architecture' },
+          { id: 'guide', label: 'Guide' },
         ]}
         active={activeTab}
-        onChange={(id) => setActiveTab(id as 'pages' | 'architecture')}
+        onChange={(id) => setActiveTab(id as 'pages' | 'architecture' | 'guide')}
       />
 
       {activeTab === 'architecture' && (
@@ -608,6 +610,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <SiteArchitecture key={`arch-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
+
+      {activeTab === 'guide' && <PageIntelligenceGuide />}
 
       {activeTab === 'pages' && (
       <div className="space-y-8">
