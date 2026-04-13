@@ -79,7 +79,7 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   page_analysis: [/https?:\/\//i, /analyze.*page/i, /review.*page/i, /look at.*\//i, /check.*\//i, /what.*wrong.*\//i, /www[.]/i],
   content_review: [], // detected by content length, not patterns
   insights: [/what.*should.*work/i, /priorit/i, /quick.*win/i, /opportunit/i, /declin/i, /cannibali/i, /page.*health/i, /health.*score/i, /what.*focus/i, /biggest.*impact/i],
-  copy: [/copywriting/i, /blueprint/i, /copy\s+(status|pipeline|section|review|generation|approved)/i, /approved\s+copy/i, /section\s+status/i, /generated?\s+copy/i, /copy\s+deck/i],
+  copy: [/copywriting/i, /copy\s+(blueprint|status|pipeline|section|review|generation|approved)/i, /blueprint\s+(status|section|deck|copy|entry|entries)/i, /approved\s+copy/i, /section\s+status/i, /generated?\s+copy/i, /copy\s+deck/i],
 };
 
 /** Context size for general queries is managed through selective slice inclusion, not

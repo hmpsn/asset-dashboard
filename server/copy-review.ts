@@ -140,7 +140,7 @@ const stmts = createStmtCache(() => ({
 
   // blueprint entry lookup (for voice sample context tag resolution)
   selectEntryBlueprintId: db.prepare(
-    `SELECT blueprint_id FROM blueprint_entries WHERE id = ?`,
+    `SELECT blueprint_id FROM blueprint_entries WHERE id = ? AND workspace_id = ?`,
   ),
 
   // copy_metadata
@@ -227,21 +227,16 @@ function handleApprovedVoiceSample(section: CopySection, workspaceId: string): v
     if (!section.generatedCopy) return;
 
     // Look up the entry to get the section plan and resolve the section type.
-    const entryRow = safeBrandEngineRead(
-      'handleApprovedVoiceSample.selectEntryBlueprintId', workspaceId,
-      () => stmts().selectEntryBlueprintId.get(section.entryId) as { blueprint_id: string } | undefined,
-      undefined,
-    );
+    // Note: blueprint_entries is a page-strategy table (migration 057), not a brand-engine
+    // table — we use a direct call here and rely on the outer try-catch for error handling,
+    // consistent with handleAllSectionsApproved.
+    const entryRow = stmts().selectEntryBlueprintId.get(section.entryId, workspaceId) as { blueprint_id: string } | undefined;
     if (!entryRow) {
       log.warn({ sectionId: section.id, entryId: section.entryId }, 'voice sample: could not resolve blueprint_id for entry');
       return;
     }
 
-    const entry = safeBrandEngineRead(
-      'handleApprovedVoiceSample.getEntry', workspaceId,
-      () => getEntry(workspaceId, entryRow.blueprint_id, section.entryId),
-      null,
-    );
+    const entry = getEntry(workspaceId, entryRow.blueprint_id, section.entryId);
     if (!entry) {
       log.warn({ sectionId: section.id, entryId: section.entryId }, 'voice sample: entry not found');
       return;
@@ -310,7 +305,7 @@ function handleAllSectionsApproved(entryId: string, workspaceId: string): void {
     const approvalRate = Math.round((firstTryCount / sections.length) * 100);
 
     // Look up entry name for a meaningful activity title
-    const entryRow = stmts().selectEntryBlueprintId.get(entryId) as { blueprint_id: string } | undefined;
+    const entryRow = stmts().selectEntryBlueprintId.get(entryId, workspaceId) as { blueprint_id: string } | undefined;
     let entryName = entryId;
     if (entryRow) {
       const entry = getEntry(workspaceId, entryRow.blueprint_id, entryId);

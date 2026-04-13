@@ -127,14 +127,15 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
 
   // ── Real-time updates ──
+  // Invalidate all section queries for the workspace (not just the currently expanded
+  // entry) so that when the user later expands a different entry, React Query doesn't
+  // serve stale section data from before the WS event arrived.
   const wsHandlers = useMemo(() => ({
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
       queryClient.invalidateQueries({ queryKey: ['client-copy-entries', workspaceId] });
-      if (expandedEntryId) {
-        queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId, expandedEntryId] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId] });
     },
-  }), [queryClient, workspaceId, expandedEntryId]);
+  }), [queryClient, workspaceId]);
 
   useWorkspaceEvents(workspaceId, wsHandlers);
 
@@ -282,10 +283,10 @@ function EntryCard({ entry, workspaceId, isExpanded, onToggle, staggerIndex }: E
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Badge label={badgeConfig.label} color={badgeConfig.color} />
-          {/* Progress indicator */}
+          {/* Progress indicator — both fraction and bar use totalSections as denominator */}
           {copyStatus.totalSections > 0 && (
             <span className="text-xs text-zinc-500">
-              {copyStatus.approvedSections}/{copyStatus.clientReviewSections + copyStatus.approvedSections}
+              {copyStatus.approvedSections}/{copyStatus.totalSections}
             </span>
           )}
           {isExpanded ? (
