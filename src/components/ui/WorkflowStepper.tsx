@@ -22,7 +22,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
 
   return (
     <nav aria-label="Workflow steps" className="w-full">
-      <ol className="flex items-start w-full">
+      <ol role="list" className="flex items-start w-full">
         {steps.map((step, index) => {
           const isLast = index === steps.length - 1;
           const isClickable = !!step.onClick;
@@ -63,7 +63,6 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
               </div>
               <span
                 className={`${labelSize} ${labelClasses} text-center leading-tight max-w-[4rem] whitespace-nowrap`}
-                aria-current={step.current ? 'step' : undefined}
               >
                 {step.label}
               </span>
@@ -71,35 +70,24 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
           );
 
           return (
-            <li key={step.number} className="flex flex-1 items-start min-w-0">
+            <li
+              key={step.number}
+              className="flex flex-1 items-start min-w-0"
+              aria-current={step.current ? 'step' : undefined}
+            >
               {isClickable ? (
                 <button
                   type="button"
                   onClick={step.onClick}
-                  className={`group flex flex-col items-center ${gap} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-md`}
+                  className={`group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 rounded-md`}
                   aria-label={`Step ${step.number}: ${step.label}${step.completed ? ' (completed)' : step.current ? ' (current)' : ''}`}
+                  aria-current={step.current ? 'step' : undefined}
                 >
-                  <div className="relative">
-                    <div
-                      className={`${circleSize} rounded-full flex items-center justify-center flex-shrink-0 ${circleClasses} ${ringClasses}`}
-                    >
-                      {step.completed ? (
-                        <CheckCircle className={iconSize} />
-                      ) : (
-                        <span className={`font-bold leading-none ${numberSize}`}>{step.number}</span>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={`${labelSize} ${labelClasses} text-center leading-tight max-w-[4rem] whitespace-nowrap`}
-                    aria-current={step.current ? 'step' : undefined}
-                  >
-                    {step.label}
-                  </span>
+                  {stepContent}
                 </button>
               ) : (
                 <div
-                  className="flex flex-col items-center gap-1"
+                  role="presentation"
                   aria-label={`Step ${step.number}: ${step.label}${step.completed ? ' (completed)' : step.current ? ' (current)' : ''}`}
                 >
                   {stepContent}
@@ -107,7 +95,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
               )}
 
               {!isLast && (
-                <div className="flex-1 flex items-start pt-3 mx-1 min-w-[8px]">
+                <div className={`flex-1 flex items-start ${compact ? 'pt-2' : 'pt-3'} mx-1 min-w-[8px]`}>
                   <div className={`w-full h-px ${compact ? 'mt-0' : 'mt-1'} bg-zinc-700`} aria-hidden="true" />
                 </div>
               )}
