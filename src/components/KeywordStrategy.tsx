@@ -6,7 +6,8 @@ import {
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, AIContextIndicator } from './ui';
+import { StatCard, AIContextIndicator, TabBar } from './ui';
+import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
 import { BacklinkProfile } from './strategy/BacklinkProfile';
@@ -70,6 +71,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
+  const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
 
   // Invalidate intelligence signals cache on WebSocket event
   useWorkspaceEvents(workspaceId, {
@@ -271,6 +273,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   return (
     <div className="space-y-8">
+      {/* tab-deeplink-ok: KeywordStrategy is not a direct navigation target for ?tab= */}
+      <TabBar
+        tabs={[{ id: 'analysis', label: 'Analysis' }, { id: 'guide', label: 'Guide' }]}
+        active={strategyTab}
+        onChange={(id) => setStrategyTab(id as 'analysis' | 'guide')}
+      />
+      {strategyTab === 'guide' && <KeywordStrategyGuide />}
+      {strategyTab === 'analysis' && <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-zinc-200">Keyword Strategy</h3>
@@ -715,6 +725,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           </div>
         </>
       )}
+      </div>}
     </div>
   );
 }
