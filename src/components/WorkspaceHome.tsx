@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, Suspense } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar } from './ui';
 import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -18,6 +18,9 @@ import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotation
 import { type Page, adminPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { WS_EVENTS } from '../lib/wsEvents';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+
+const MeetingBriefPage = lazyWithRetry(() => import('./admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -42,8 +45,16 @@ function fmt(n: number): string {
   return String(n);
 }
 
+const HOME_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'meeting-brief', label: 'Meeting Brief' },
+];
+
+type HomeTab = 'overview' | 'meeting-brief';
+
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
@@ -53,6 +64,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [now, setNow] = useState(() => new Date());
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [showSetupSuggestions, setShowSetupSuggestions] = useState(false);
+  const [activeTab, setActiveTab] = useState<HomeTab>(() => {
+    const param = searchParams.get('tab');
+    return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
+  });
 
   // Tick every 30s so relative timestamps stay fresh
   useEffect(() => {
@@ -193,6 +208,21 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         }
       />
 
+      <TabBar
+        tabs={HOME_TABS}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as HomeTab)}
+        className="mb-2"
+      />
+
+      {activeTab === 'meeting-brief' ? (
+        <ErrorBoundary label="Meeting Brief">
+          <Suspense fallback={<div className="flex items-center justify-center py-24"><Loader2 className="w-5 h-5 animate-spin text-teal-400" /></div>}>
+            <MeetingBriefPage workspaceId={workspaceId} />
+          </Suspense>
+        </ErrorBoundary>
+      ) : (
+      <>
       {/* ── Weekly Accomplishments ── */}
       {weeklySummary && <WeeklyAccomplishments summary={weeklySummary} />}
 
@@ -436,6 +466,8 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Active Requests + Annotations ── */}
       <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} workspaceId={workspaceId} />
+      </>
+      )}
 
     </div>
   );
