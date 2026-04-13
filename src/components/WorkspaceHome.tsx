@@ -54,7 +54,7 @@ type HomeTab = 'overview' | 'meeting-brief';
 
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
@@ -68,6 +68,16 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     const param = searchParams.get('tab');
     return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
   });
+
+  // Clear ?tab= from URL on manual tab change so refresh shows last selection
+  const handleTabChange = (id: string) => {
+    setActiveTab(id as HomeTab);
+    if (searchParams.has('tab')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   // Tick every 30s so relative timestamps stay fresh
   useEffect(() => {
@@ -211,7 +221,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <TabBar
         tabs={HOME_TABS}
         active={activeTab}
-        onChange={(id) => setActiveTab(id as HomeTab)}
+        onChange={handleTabChange}
         className="mb-2"
       />
 
