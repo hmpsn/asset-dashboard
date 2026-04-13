@@ -53,8 +53,8 @@ const SECTIONS = [
   {
     title: 'AEO Review Tab',
     icon: Sparkles,
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10 border-purple-500/20',
+    color: 'text-sky-400',
+    bg: 'bg-sky-500/10 border-sky-500/20',
     description: 'AI Search Ready checks your site\'s readiness for AI-driven answer engines (Google AI Overviews, Perplexity, ChatGPT search). It\'s a different signal from traditional SEO.',
     actions: [
       'AEO score measures how well your content is structured for AI citation — entity clarity, question-answer density, structured data coverage',
