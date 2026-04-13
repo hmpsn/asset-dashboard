@@ -106,6 +106,7 @@ import voiceCalibrationRoutes from './routes/voice-calibration.js';
 import discoveryIngestionRoutes from './routes/discovery-ingestion.js';
 import brandIdentityRoutes from './routes/brand-identity.js';
 import pageStrategyRoutes from './routes/page-strategy.js';
+import copyPipelineRoutes from './routes/copy-pipeline.js';
 import { registerProvider } from './seo-data-provider.js';
 import { SemrushProvider } from './providers/semrush-provider.js';
 import { DataForSeoProvider } from './providers/dataforseo-provider.js';
@@ -361,6 +362,7 @@ export function createApp(): express.Express {
   app.use(discoveryIngestionRoutes);
   app.use(brandIdentityRoutes);
   app.use(pageStrategyRoutes);
+  app.use(copyPipelineRoutes);
 
   // --- Sentry error handler (must be after all route mounts, before frontend catch-all) ---
   setupSentryErrorHandler(app);
