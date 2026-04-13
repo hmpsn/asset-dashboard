@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
+import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
 import { useContentPipeline } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
@@ -12,8 +12,6 @@ import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
 import type { FixContext } from '../App';
 
-const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
-const LlmsTxtGenerator = lazyWithRetry(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
 const ContentCalendar = lazyWithRetry(() => import('./ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
@@ -31,8 +29,6 @@ const TABS = [
   { id: 'briefs' as const, label: 'Briefs', icon: Clipboard },
   { id: 'posts' as const, label: 'Posts', icon: FileText },
   { id: 'subscriptions' as const, label: 'Subscriptions', icon: RefreshCw },
-  { id: 'architecture' as const, label: 'Architecture', icon: Map },
-  { id: 'llms-txt' as const, label: 'LLMs.txt', icon: Bot },
 ];
 
 type PipelineTab = typeof TABS[number]['id'];
@@ -207,16 +203,6 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       )}
       {activeTab === 'subscriptions' && (
         <ContentSubscriptions key={`subs-${workspaceId}`} workspaceId={workspaceId} />
-      )}
-      {activeTab === 'architecture' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
-          <SiteArchitecture key={`arch-${workspaceId}`} workspaceId={workspaceId} />
-        </Suspense>
-      )}
-      {activeTab === 'llms-txt' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
-          <LlmsTxtGenerator key={`llms-${workspaceId}`} workspaceId={workspaceId} />
-        </Suspense>
       )}
       {/* Floating help button */}
       <button
