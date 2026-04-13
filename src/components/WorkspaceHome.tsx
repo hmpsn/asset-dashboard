@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar } from './ui';
 import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -228,6 +228,32 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
   const showOnboardingChecklist = !checklistDismissed && onboardingSteps.some(s => !s.completed);
 
+  // ── Workspace Health Bar ──
+  const healthMetrics = [
+    {
+      label: 'SEO Audit',
+      percent: audit?.siteScore ?? 0,
+      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
+    },
+    {
+      label: 'Setup',
+      percent: Math.round(([!!webflowSiteId, !!gscPropertyUrl, !!ga4PropertyId].filter(Boolean).length / 3) * 100),
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    ...(contentPipeline && contentPipeline.totalCells > 0 ? [{
+      label: 'Content',
+      percent: Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100),
+      onClick: () => navigate(adminPath(workspaceId, 'content')),
+    }] : []),
+  ];
+
+  const healthRecommendations = [
+    ...(!webflowSiteId ? [{ label: 'Link your Webflow site', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '2 min' }] : []),
+    ...(!gscPropertyUrl ? [{ label: 'Connect Google Search Console', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
+    ...(!ga4PropertyId ? [{ label: 'Connect Google Analytics', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
+    ...(audit && audit.siteScore < 60 ? [{ label: `Fix ${audit.errors} SEO errors`, onClick: () => navigate(adminPath(workspaceId, 'seo-audit')), estimatedTime: '30 min' }] : []),
+  ].slice(0, 3);
+
   return (
     <div className="space-y-8">
       {showOnboardingChecklist && (
@@ -436,6 +462,14 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           />
         )}
       </div>
+
+      {/* ── Workspace Health Bar ── */}
+      {activeTab === 'overview' && healthMetrics.length > 0 && (
+        <WorkspaceHealthBar
+          metrics={healthMetrics}
+          recommendations={healthRecommendations.length > 0 ? healthRecommendations : undefined}
+        />
+      )}
 
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
