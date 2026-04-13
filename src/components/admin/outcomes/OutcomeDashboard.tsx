@@ -34,6 +34,7 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
           title="Outcomes"
           subtitle="Track what's working across all your SEO actions"
         />
+        {/* tab-deeplink-ok — outcomes tabs are not navigated to via ?tab= from other components */}
         <TabBar tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as OutcomeTab)} />
         <ErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64" />}>

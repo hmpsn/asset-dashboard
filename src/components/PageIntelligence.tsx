@@ -593,6 +593,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* tab-deeplink-ok — page intel tabs are not navigated to via ?tab= from other components */}
       <TabBar
         tabs={[
           { id: 'pages', label: 'Pages' },

@@ -2401,6 +2401,87 @@ describe('buildWorkspaceScopedTables ALTER TABLE workspace_id detection', () => 
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: TabBar component without ?tab= deep-link support
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: TabBar component without ?tab= deep-link support', () => {
+  const RULE = 'TabBar component without ?tab= deep-link support';
+
+  it('flags a component with <TabBar> that does not read searchParams', () => {
+    const file = write(
+      uniqPath('rule-tabbar', 'src/components/TestTab.tsx'),
+      lines(
+        "import { TabBar } from './ui/TabBar';",                  // 1
+        "export function TestTab() {",                             // 2
+        "  const [tab, setTab] = useState('overview');",           // 3
+        "  return <TabBar tabs={[]} active={tab} onChange={setTab} />;", // 4
+        "}",                                                        // 5
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('does not flag a component that reads searchParams.get("tab")', () => {
+    const file = write(
+      uniqPath('rule-tabbar', 'src/components/WiredTab.tsx'),
+      lines(
+        "import { useSearchParams } from 'react-router-dom';",     // 1
+        "import { TabBar } from './ui/TabBar';",                    // 2
+        "const [searchParams] = useSearchParams();",                // 3
+        "const param = searchParams.get('tab');",                   // 4
+        "return <TabBar tabs={[]} active={tab} onChange={setTab} />;", // 5
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a file outside src/components/', () => {
+    const file = write(
+      uniqPath('rule-tabbar', 'src/pages/TestPage.tsx'),
+      lines(
+        "import { TabBar } from './ui/TabBar';",                    // 1
+        "return <TabBar tabs={[]} active={tab} onChange={setTab} />;", // 2
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects {/* tab-deeplink-ok */} JSX comment on preceding line', () => {
+    const file = write(
+      uniqPath('rule-tabbar', 'src/components/HatchAbove.tsx'),
+      lines(
+        "export function HatchTab() {",                              // 1
+        "  const [tab, setTab] = useState('overview');",             // 2
+        "  return (",                                                 // 3
+        "    <div>",                                                  // 4
+        "      {/* tab-deeplink-ok — not navigated to via ?tab= */}",// 5
+        "      <TabBar tabs={[]} active={tab} onChange={setTab} />", // 6
+        "    </div>",                                                 // 7
+        "  );",                                                       // 8
+        "}",                                                          // 9
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // tab-deeplink-ok JS comment on preceding line', () => {
+    const file = write(
+      uniqPath('rule-tabbar', 'src/components/HatchJS.tsx'),
+      lines(
+        "export function HatchTab() {",                              // 1
+        "  const [tab, setTab] = useState('overview');",             // 2
+        "  // tab-deeplink-ok — not navigated to via ?tab=",         // 3
+        "  return <TabBar tabs={[]} active={tab} onChange={setTab} />;", // 4
+        "}",                                                          // 5
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -2426,6 +2507,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Bare brand-engine read in seo-context.ts (use safeBrandEngineRead)',
     // 2026-04-11 test audit follow-up
     'Test body has no assertion or explicit failure throw',
+    // PR 2 deep-link guard
+    'TabBar component without ?tab= deep-link support',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

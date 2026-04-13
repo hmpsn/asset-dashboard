@@ -34,6 +34,7 @@ export function AnalyticsHub({ workspaceId, siteId, gscPropertyUrl, ga4PropertyI
         icon={<BarChart3 className="w-5 h-5 text-teal-400" />}
       />
 
+      {/* tab-deeplink-ok — analytics tabs are not navigated to via ?tab= from other components */}
       <TabBar
         tabs={[...HUB_TABS]}
         active={tab}
