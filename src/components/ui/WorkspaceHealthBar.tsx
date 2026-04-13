@@ -18,33 +18,32 @@ export function WorkspaceHealthBar({ metrics, recommendations }: WorkspaceHealth
     <SectionCard title="Workspace Health">
       <div className="space-y-3">
         {metrics.map((metric) => (
-          <div
+          <button
             key={metric.label}
-            className={`${metric.onClick ? 'cursor-pointer group' : ''}`}
+            type="button"
+            className={`w-full text-left ${metric.onClick ? 'cursor-pointer group' : 'cursor-default'}`}
             onClick={metric.onClick}
-            role={metric.onClick ? 'button' : undefined}
-            tabIndex={metric.onClick ? 0 : undefined}
-            onKeyDown={metric.onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); metric.onClick!(); } } : undefined}
-            aria-label={metric.onClick ? `${metric.label}: ${metric.percent}%` : undefined}
+            disabled={!metric.onClick}
+            aria-label={`${metric.label}: ${Math.min(100, Math.max(0, metric.percent))}%`}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-xs font-medium text-zinc-400 ${metric.onClick ? 'group-hover:text-zinc-200 transition-colors duration-150' : ''}`}>
                 {metric.label}
               </span>
-              <span className="text-xs text-zinc-500 tabular-nums">{metric.percent}%</span>
+              <span className="text-xs text-zinc-500 tabular-nums">{Math.min(100, Math.max(0, metric.percent))}%</span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
               <div
                 className="h-full rounded-full bg-blue-500 transition-[width] duration-500 ease-out"
                 style={{ width: `${Math.min(100, Math.max(0, metric.percent))}%` }}
-                aria-valuenow={metric.percent}
+                aria-valuenow={Math.min(100, Math.max(0, metric.percent))}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 role="progressbar"
                 aria-label={metric.label}
               />
             </div>
-          </div>
+          </button>
         ))}
       </div>
 

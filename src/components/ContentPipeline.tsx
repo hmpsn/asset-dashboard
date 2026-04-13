@@ -121,7 +121,8 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
   return (
     <div className="space-y-8">
-      <WorkflowStepper steps={contentWorkflowSteps} compact />
+      {/* Calendar tab has no workflow phase — stepper only shown for pipeline tabs */}
+      {activeTab !== 'calendar' && <WorkflowStepper steps={contentWorkflowSteps} compact />}
 
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (

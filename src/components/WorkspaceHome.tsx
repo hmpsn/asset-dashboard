@@ -257,7 +257,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
   return (
     <div className="space-y-8">
-      {checklistVisible && (
+      {checklistVisible && !loading && (
         <OnboardingChecklist
           steps={onboardingSteps}
           onDismiss={() => {

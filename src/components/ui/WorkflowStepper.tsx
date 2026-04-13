@@ -43,7 +43,7 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
             labelClasses = `text-zinc-500`;
           }
 
-          if (isClickable && step.completed) {
+          if (isClickable) {
             circleClasses += ' group-hover:border-teal-500 group-hover:text-teal-400 group-hover:bg-teal-500/10 transition-colors';
             labelClasses += ' group-hover:text-teal-400 transition-colors';
           }
