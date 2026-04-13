@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import type { MetricsSource } from '../../shared/types/keywords.js';
 import {
   Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
-  AlertCircle, Sparkles, Briefcase,
+  Sparkles, Briefcase,
   BarChart3, Users, Search, FileText,
   Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check,
 } from 'lucide-react';
-import { StatCard, AIContextIndicator, TabBar } from './ui';
+import { StatCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState } from './ui';
 import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
 import { useKeywordStrategy } from '../hooks/admin';
 import { useQueryClient } from '@tanstack/react-query';
@@ -68,6 +68,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
+  const [showNextSteps, setShowNextSteps] = useState(false);
   const [trackedKeywords, setTrackedKeywords] = useState<Set<string>>(new Set());
   const [providerList, setProviderList] = useState<{ name: string; configured: boolean }[]>([]);
   const [activeProvider, setActiveProvider] = useState<string | undefined>(undefined);
@@ -139,6 +140,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
     setGenerating(true);
+    setShowNextSteps(false);
     setError(null);
     setProgressStep('');
     setProgressDetail('');
@@ -181,7 +183,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           try {
             const evt = JSON.parse(line.slice(6));
             if (evt.error) { setError(evt.error); break; }
-            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); break; }
+            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); setShowNextSteps(true); break; }
             if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
           } catch (err) { console.error('KeywordStrategy operation failed:', err); }
         }
@@ -255,12 +257,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   }, {} as Record<string, number>);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-        <span className="ml-3 text-sm text-zinc-400">Loading keyword strategy...</span>
-      </div>
-    );
+    return <LoadingState message="Loading keyword strategy..." />;
   }
 
   if (!workspaceId) {
@@ -517,29 +514,36 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       <IntelligenceSignals workspaceId={workspaceId} />
 
       {/* Progress Indicator */}
-      {generating && progressStep && (
-        <div className="bg-zinc-900 border border-teal-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
-              <span className="text-xs font-medium text-zinc-200">{stepLabels[progressStep] || progressStep}</span>
-            </div>
-            <span className="text-[11px] text-zinc-500 font-mono">{Math.round(progressPct * 100)}%</span>
-          </div>
-          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${Math.round(progressPct * 100)}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-zinc-500">{progressDetail}</p>
-        </div>
-      )}
+      <ProgressIndicator
+        status={generating ? 'running' : 'idle'}
+        step={progressStep ? (stepLabels[progressStep] || progressStep) : undefined}
+        detail={progressDetail || undefined}
+        percent={generating && progressPct > 0 ? Math.round(progressPct * 100) : undefined}
+      />
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-xs text-red-400 flex items-center gap-2">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
-        </div>
+        <ErrorState
+          type="general"
+          title="Strategy Generation Failed"
+          message={error}
+          action={{ label: 'Try Again', onClick: () => generateStrategy('full') }}
+        />
+      )}
+
+      {showNextSteps && strategy && !generating && (
+        <NextStepsCard
+          title="Strategy ready"
+          variant="success"
+          onDismiss={() => setShowNextSteps(false)}
+          staggerIndex={0}
+          steps={[
+            {
+              label: 'Review Quick Wins',
+              onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('quick-wins-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
+              estimatedTime: '2 min',
+            },
+          ]}
+        />
       )}
 
       {!strategy && !generating && (
@@ -611,7 +615,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           )}
 
           {/* ── Quick Wins ── */}
-          <QuickWins quickWins={strategy.quickWins || []} />
+          <div id="quick-wins-section">
+            <QuickWins quickWins={strategy.quickWins || []} />
+          </div>
 
           {/* ── Low-Hanging Fruit ── */}
           <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />

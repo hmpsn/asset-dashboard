@@ -13,6 +13,8 @@ export { SocialPreview } from './SocialPreview';
 export { EmptyState } from './EmptyState';
 export { LoadingState, Skeleton as LoadingSkeleton, TableSkeleton } from './LoadingState';
 export { ErrorState, NetworkError, DataError, PermissionError } from './ErrorState';
+export { NextStepsCard } from './NextStepsCard';
+export { ProgressIndicator } from './ProgressIndicator';
 export { TabBar } from './TabBar';
 export { TierGate, TierBadge, type Tier } from './TierGate';
 export { AIContextIndicator } from './AIContextIndicator';

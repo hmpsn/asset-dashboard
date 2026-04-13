@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
+import { LoadingState } from './ui';
 import { useContentPipeline } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
@@ -214,12 +215,12 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Tab content */}
       {activeTab === 'planner' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+        <Suspense fallback={<LoadingState size="lg" message="Loading..." />}>
           <ContentPlanner key={`planner-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
       {activeTab === 'calendar' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+        <Suspense fallback={<LoadingState size="lg" message="Loading..." />}>
           <ContentCalendar key={`calendar-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
@@ -253,7 +254,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
               </button>
             </div>
             <div className="p-5">
-              <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+              <Suspense fallback={<LoadingState size="sm" message="Loading..." />}>
                 <ContentPipelineGuide />
               </Suspense>
             </div>
