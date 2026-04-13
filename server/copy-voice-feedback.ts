@@ -44,6 +44,7 @@ export interface SteeringFeedbackResult {
  */
 export async function classifySteeringFeedback(
   notes: string[],
+  workspaceId?: string,
 ): Promise<FeedbackClassification> {
   if (notes.length === 0) {
     return { content: [], voice: [] };
@@ -87,6 +88,7 @@ Every input note must appear in exactly one of the two arrays.`;
       temperature: 0.2,
       responseFormat: { type: 'json_object' },
       feature: 'voice-feedback-classify',
+      workspaceId,
     });
 
     const parsed = parseAIJson<{
@@ -267,7 +269,7 @@ export async function processSteeringFeedback(
   );
 
   // Step 1: Classify all notes
-  const classification = await classifySteeringFeedback(steeringNotes);
+  const classification = await classifySteeringFeedback(steeringNotes, workspaceId);
 
   // Step 2: If voice feedback detected, suggest profile update
   let voiceSuggestion: VoiceUpdateSuggestion | null = null;

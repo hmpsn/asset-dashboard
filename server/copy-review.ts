@@ -257,24 +257,30 @@ function handleApprovedVoiceSample(section: CopySection, workspaceId: string): v
     // 1. Crash between delete and add losing samples without replacement
     // 2. TOCTOU race where two concurrent approvals read the same stale count
     //    and both evict the same sample, overshooting the cap
+    // Check voice table availability before entering the transaction.
+    // If tables don't exist, skip entirely — no point wrapping a guaranteed failure.
+    const profile = safeBrandEngineRead(
+      'handleApprovedVoiceSample.getVoiceProfile', workspaceId,
+      () => getVoiceProfile(workspaceId),
+      null,
+    );
+    if (!profile) {
+      log.debug({ workspaceId }, 'voice tables unavailable or no profile — skipping voice sample creation');
+      return;
+    }
+
     db.transaction(() => {
-      const profile = safeBrandEngineRead(
-        'handleApprovedVoiceSample.getVoiceProfile', workspaceId,
-        () => getVoiceProfile(workspaceId),
-        null,
-      );
+      // Re-read inside transaction for TOCTOU safety on concurrent approvals
+      const freshProfile = getVoiceProfile(workspaceId);
+      const existingForTag = (freshProfile?.samples ?? [])
+        .filter(s => s.source === 'copy_approved' && s.contextTag === contextTag)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)); // oldest first
 
-      if (profile) {
-        const existingForTag = profile.samples
-          .filter(s => s.source === 'copy_approved' && s.contextTag === contextTag)
-          .sort((a, b) => a.createdAt.localeCompare(b.createdAt)); // oldest first
-
-        if (existingForTag.length >= MAX_COPY_APPROVED_SAMPLES_PER_TAG) {
-          // Delete oldest to make room (FIFO)
-          const toDelete = existingForTag.slice(0, existingForTag.length - MAX_COPY_APPROVED_SAMPLES_PER_TAG + 1);
-          for (const old of toDelete) {
-            deleteVoiceSample(workspaceId, old.id);
-          }
+      if (existingForTag.length >= MAX_COPY_APPROVED_SAMPLES_PER_TAG) {
+        // Delete oldest to make room (FIFO)
+        const toDelete = existingForTag.slice(0, existingForTag.length - MAX_COPY_APPROVED_SAMPLES_PER_TAG + 1);
+        for (const old of toDelete) {
+          deleteVoiceSample(workspaceId, old.id);
         }
       }
 
