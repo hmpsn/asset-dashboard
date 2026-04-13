@@ -113,7 +113,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
   };
 
   const contentWorkflowSteps = [
-    { number: 1, label: 'Strategy', completed: false, current: activeTab === 'planner', onClick: () => navigate(adminPath(workspaceId, 'seo-strategy')) },
+    { number: 1, label: 'Strategy', completed: activeTab === 'briefs' || activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'planner', onClick: () => navigate(adminPath(workspaceId, 'seo-strategy')) },
     { number: 2, label: 'Briefs', completed: activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'briefs', onClick: () => handleTabChange('briefs') },
     { number: 3, label: 'Posts', completed: activeTab === 'subscriptions', current: activeTab === 'posts', onClick: () => handleTabChange('posts') },
     { number: 4, label: 'Publish', completed: false, current: activeTab === 'subscriptions', onClick: () => handleTabChange('subscriptions') },
