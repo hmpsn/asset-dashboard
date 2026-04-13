@@ -2,7 +2,7 @@
  * OnboardingChecklist — Modal overlay guiding users through initial workspace setup.
  * Shown on first workspace visit. Pure UI component, no backend dependency.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { CheckCircle, Circle, Clock, X } from 'lucide-react';
 
 export interface OnboardingStep {
@@ -37,6 +37,50 @@ export function OnboardingChecklist({
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
 
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Move focus to panel on mount
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
+
+  // Escape key dismisses the modal
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const target = e.target as HTMLElement;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable) return;
+      onDismissRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown); // keydown-ok — isContentEditable guard on line above
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Tab key trap — keep focus within the panel
+  const handlePanelKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const focusable = panel.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const focusableArr = Array.from(focusable);
+    if (focusableArr.length === 0) return;
+    const first = focusableArr[0];
+    const last = focusableArr[focusableArr.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
   // Auto-dismiss after 2s when all steps are complete
   useEffect(() => {
     if (!allComplete) return;
@@ -52,14 +96,17 @@ export function OnboardingChecklist({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-labelledby="onboarding-checklist-title"
     >
       {/* Backdrop click dismisses */}
       <div className="absolute inset-0" onClick={onDismiss} aria-hidden="true" />
 
       {/* Panel */}
       <div
-        className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 shadow-2xl"
+        ref={panelRef}
+        tabIndex={-1}
+        onKeyDown={handlePanelKeyDown}
+        className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 shadow-2xl outline-none"
         style={{ borderRadius: '10px 24px 10px 24px' }}
       >
         {allComplete ? (
@@ -77,7 +124,7 @@ export function OnboardingChecklist({
           <>
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <h2 className="text-base font-semibold text-zinc-200">{title}</h2>
+              <h2 id="onboarding-checklist-title" className="text-base font-semibold text-zinc-200">{title}</h2>
               <button
                 onClick={onDismiss}
                 className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
