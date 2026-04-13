@@ -71,9 +71,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   });
 
   const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
-  const [checklistDismissed, setChecklistDismissed] = useState(
-    () => !!localStorage.getItem(storageKey)
-  );
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: string) => {
@@ -226,7 +223,11 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     },
   ];
 
-  const showOnboardingChecklist = !checklistDismissed && onboardingSteps.some(s => !s.completed);
+  // Initialized once on mount — stays visible until explicit dismiss, NOT until steps complete.
+  // This ensures the "You're all set!" celebration inside OnboardingChecklist is reachable.
+  const [checklistVisible, setChecklistVisible] = useState(
+    () => !localStorage.getItem(storageKey) && onboardingSteps.some(s => !s.completed)
+  );
 
   // ── Workspace Health Bar ──
   const healthMetrics = [
@@ -256,12 +257,12 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
   return (
     <div className="space-y-8">
-      {showOnboardingChecklist && (
+      {checklistVisible && (
         <OnboardingChecklist
           steps={onboardingSteps}
           onDismiss={() => {
             localStorage.setItem(storageKey, '1');
-            setChecklistDismissed(true);
+            setChecklistVisible(false);
           }}
           onComplete={() => {
             // Write localStorage now so checklist won't reappear after the
