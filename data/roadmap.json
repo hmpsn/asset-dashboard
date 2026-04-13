@@ -30,8 +30,9 @@
           "source": "ADMIN_UX_AUDIT P2-7",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "7-step checklist on empty command center: create workspace, link Webflow, connect GSC, connect GA4, run audit, set client password, configure email.",
-          "status": "pending"
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — OnboardingChecklist modal overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, localStorage dismissal per workspace, auto-celebrate on completion. Feature #291.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
         },
         {
           "id": 119,
@@ -1152,6 +1153,74 @@
           "priority": "P1",
           "notes": "Shipped — Tier 1 (Tasks 1-19): 4 server modules (copy-generation, copy-review, copy-intelligence, copy-export), migration 058, Zod schemas, frontend API + hooks, 5 UI components (CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager, BlueprintDetail Copy tab). 21 integration tests. Tier 2 (Tasks 20-28): voice sample feedback loop, steering classification, pattern promotion, client copy review portal, questionnaire→brandscript, admin chat awareness, content decay→copy refresh, workspace intelligence wiring. Feature-flagged via copy-engine-pipeline. PR #173 (Tier 1) + PR for Tier 2.",
           "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-ux-pr4",
+      "name": "✅ SHIPPED — Admin UX PR4: Onboarding & Guided Flows",
+      "shippedAt": "2026-04-13",
+      "rationale": "Reduce cold-start friction and learning curve for new workspaces. Add workflow orientation to complex multi-step tools. Surface in-app educational guides alongside analysis views.",
+      "items": [
+        {
+          "id": 291,
+          "title": "OnboardingChecklist — workspace first-visit setup overlay",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Modal-style overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, focus trap, Escape key close, localStorage dismissal per workspace, auto-celebrate on completion.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 292,
+          "title": "WorkflowStepper — horizontal numbered stepper primitive",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Shared UI primitive: horizontal stepper with green=completed/teal=current/zinc=future states, compact variant, clickable steps via onStepClick. Integrated in ContentPipeline (4 steps: Strategy→Briefs→Posts→Publish) and SchemaSuggester generator view (5 steps: Scan→Review→Edit→Publish→Validate).",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 293,
+          "title": "WorkspaceHealthBar — multi-metric health + recommended next action",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Progress bars for key workspace health metrics (blue fills per data-color law), Recommended Next section with teal CTA, SectionCard wrapper. Renders below stat cards on WorkspaceHome.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 294,
+          "title": "SeoAuditGuide — in-app guide tab for SeoAudit",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide sub-tab in SeoAudit analysis section (5 sections: issue severity, prioritization, fix options, AEO review, content decay). Uses existing custom tab bar pattern from SeoAudit.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 295,
+          "title": "KeywordStrategyGuide — in-app guide tab for KeywordStrategy",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide tab added to KeywordStrategy (TabBar added, analysis|guide). 6 sections: reading the strategy, intent badges, content gap prioritization, KD/volume interpretation, quick wins, implementation order.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 296,
+          "title": "PageIntelligenceGuide — in-app guide tab for PageIntelligence",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide tab added to PageIntelligence (pages|architecture|guide TabBar). 6 sections: page scores, architecture signals, link health, prioritization, action recommendations, tool integrations. Also fixed pre-existing purple color violations in PageIntelligence.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
         }
       ]
     },

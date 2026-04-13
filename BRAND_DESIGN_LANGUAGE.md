@@ -112,6 +112,9 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **MonthlyDigest** | `client/MonthlyDigest.tsx` | Emerald=wins, blue=ROI highlights, teal=pages optimized count | Growth-gated. No purple. |
 | **ActionQueue** | `admin/ActionQueue.tsx` | Blue=impact scores (data), teal=resolve CTA (action) | Admin-only. No purple. |
 | **DataList** | `DataList.tsx` | Rank: `text-zinc-500`, label: `text-zinc-300`, value: `text-zinc-400` | Optional ranking numbers |
+| **OnboardingChecklist** | `OnboardingChecklist.tsx` | Progress bar: `bg-blue-500` (data metric); checkmarks: `text-teal-400` (action state) | Modal overlay with focus trap, Escape-key close, localStorage dismissal per workspace |
+| **WorkflowStepper** | `WorkflowStepper.tsx` | Completed: `bg-emerald-500 text-white`; Current: `bg-teal-500 text-white`; Future: `bg-zinc-700 text-zinc-400` | Horizontal numbered stepper; `compact` prop for tight layouts; steps clickable via `onStepClick` |
+| **WorkspaceHealthBar** | `WorkspaceHealthBar.tsx` | Progress fills: `bg-blue-500` (data metric); Recommended Next CTA: `from-teal-600 to-emerald-600` (action) | Multi-metric health bars + recommended next action; `SectionCard` wrapper |
 
 ### Helper Functions (`constants.ts`)
 
@@ -178,6 +181,14 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | **KeywordStrategy.tsx** | Page type badge, content gap cards | `teal` | Matches design system |
 | **WorkspaceOverview.tsx** | Tier badges on workspace cards | `teal-500/15 text-teal-400` | Unified |
 | **WorkspaceSettings.tsx** | Knowledge base icon, client users icon, avatar gradient | `teal` | Unified |
+| **OnboardingChecklist.tsx** | Progress bar | `bg-blue-500` | Data metric — tracks setup completion |
+| **OnboardingChecklist.tsx** | Completed step checkmarks | `text-teal-400` | Teal = action accomplished |
+| **OnboardingChecklist.tsx** | Dismiss button | `text-zinc-400 hover:text-zinc-200` | Neutral close action |
+| **WorkflowStepper.tsx** | Completed step circle | `bg-emerald-500 text-white` | Green = done |
+| **WorkflowStepper.tsx** | Current step circle | `bg-teal-500 text-white` | Teal = active |
+| **WorkflowStepper.tsx** | Future step circle | `bg-zinc-700 text-zinc-400` | Zinc = inactive |
+| **WorkspaceHealthBar.tsx** | Metric progress bars | `bg-blue-500` | Blue = data metric (read-only) |
+| **WorkspaceHealthBar.tsx** | Recommended Next CTA | `from-teal-600 to-emerald-600` | Teal = action |
 | **AssetAudit.tsx** | Action buttons (Crawl, Export) | `bg-blue-700 hover:bg-blue-600` | Admin data-action context (acceptable) |
 | **SeoEditor.tsx** | "Unsaved" badge | `blue-500/10 text-blue-400` | State indicator |
 | **RequestManager.tsx** | "New" status | `blue-500/10 text-blue-400` | Info state |
@@ -321,6 +332,9 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/EmptyState.tsx` | Centered empty/placeholder |
 | `src/components/ui/TierGate.tsx` | Tier lock overlay + TierBadge |
 | `src/components/ui/DataList.tsx` | Ranked data list |
+| `src/components/ui/OnboardingChecklist.tsx` | First-visit workspace setup modal (blue progress, teal checkmarks, localStorage) |
+| `src/components/ui/WorkflowStepper.tsx` | Horizontal numbered stepper (green=done, teal=current, zinc=future) |
+| `src/components/ui/WorkspaceHealthBar.tsx` | Multi-metric health bars + recommended next action (blue fills, teal CTA) |
 | `src/components/ClientDashboard.tsx` | Client-facing dashboard (largest component) |
 | `src/components/AdminChat.tsx` | Admin AI chat (purple accent) |
 | `src/components/KeywordStrategy.tsx` | SEO strategy + content gaps |
@@ -415,6 +429,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-03-29 | **Outcome Intelligence Engine**: Added Outcome Tracking color map — win rate rings use `scoreColor()`, score badges (strong_win/win=green, neutral=amber, loss=red, insufficient_data/inconclusive=zinc), action type badges (blue), delta indicators (green/red/zinc), confidence badges (green/amber/red). Client "We Called It" uses soft teal. All outcome CTAs use standard teal gradient. |
 | 2026-03-30 | **Light Mode Audit + Visual Polish**: Fixed 148 dark-color instances across 42 files. Added 7 chart theme helpers to `constants.ts` (`themeColor`, `chartGridColor`, `chartAxisColor`, `chartDotStroke`, `chartDotFill`, `chartTooltipStyle`, `chartTooltipLabelStyle`). Fixed MetricRing glow to match score color (not always teal). Fixed ScannerReveal overlay, MetricRing track, Skeleton shimmer, Stripe Elements theming, all Recharts chart axes/grids/dots/tooltips. Added 17 missing `.dashboard-light` CSS overrides. Added 2 pr-check rules for dark hex enforcement. Standardized `space-y-8` on 10 page wrappers, asymmetric border radius on 11 cards. |
 | 2026-04-09 | **Page Rewriter UI** (Feature #138): Apply interaction uses teal highlight — `background-color: rgba(13,148,136,0.2)` + `border-left: 2px solid #0d9488` — fades over 2s via CSS transition (all three properties cleared). Floating formatting toolbar uses `bg-zinc-700 border-zinc-600` (no teal — it's a utility tool, not an action). Issue chips: `red-*` for errors, `amber-*` for warnings, `blue-*` for info — follows existing status color convention. Focus mode toggle: teal active state (`text-teal-400 bg-teal-500/10`) per Law 1 (toggle = action). **Integration note for Copy & Brand Engine:** `data-section` attribute on all document headings and `applyToSection()` in `PageRewriteChat.tsx` are the designated extension points for inline text-selection targeting. |
+| 2026-04-13 | **Admin UX PR4 — Onboarding & Guided Flows**: Added 3 new shared UI primitives. `OnboardingChecklist`: modal overlay with blue progress bar (data), teal checkmarks (action accomplished), focus trap, Escape-key dismiss, localStorage persistence per workspace. `WorkflowStepper`: horizontal numbered stepper — green=completed, teal=current, zinc=future; compact variant. `WorkspaceHealthBar`: blue progress fills (data metric law) + teal Recommended Next CTA (action law). Added per-component color map rows for all three. Also fixed purple violations in `PageIntelligence` (admin-only component with no client-facing exposure — purple removed per Three Laws). |
 
 ---
 

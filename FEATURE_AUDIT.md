@@ -3233,9 +3233,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**278 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**296 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **278**. Last updated: April 2026.
+Current feature count: **296**. Last updated: April 2026.
 
 ---
 
@@ -3364,3 +3364,65 @@ Current feature count: **278**. Last updated: April 2026.
 **Files:** `server/copy-refresh.ts`
 
 **Agency value:** Decay signals automatically surface which specific copy sections need refreshing, not just which pages. Targeted refresh instead of full rewrites.
+
+---
+
+## Admin UX — Onboarding & Guided Flows (PR4)
+
+### 291. OnboardingChecklist
+**What it does:** Modal-style overlay shown on first visit to a workspace (WorkspaceHome). 4-step setup checklist: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar tracks completion. Teal checkmarks for completed steps. Focus-trapped, closeable via Escape key or "Dismiss" button. Completion state and dismissal persisted to `localStorage` per workspace so the overlay never re-appears once dismissed. Auto-celebrates (confetti-style state) when all 4 steps are completed.
+
+**Files:** `src/components/ui/OnboardingChecklist.tsx`, integrated in `src/components/WorkspaceHome.tsx`
+
+**Agency value:** New workspace setup used to require knowing which tools to visit first. The checklist surfaces the four must-do setup steps in order, with direct navigation to each tool, reducing cold-start time and ensuring nothing is skipped when onboarding a new client.
+
+**Mutual:** Faster workspace activation = faster time-to-value for both agency and client.
+
+---
+
+### 292. WorkflowStepper
+**What it does:** Horizontal numbered stepper component showing progress through a multi-step workflow. Three visual states: green (completed), teal (current active step), zinc (future step). Compact variant (`compact` prop) for tighter layouts. Steps are clickable when `onStepClick` handler is provided. Used in ContentPipeline (4 steps: Strategy → Briefs → Posts → Publish) and SchemaSuggester generator view (5 steps: Scan → Review → Edit → Publish → Validate).
+
+**Files:** `src/components/ui/WorkflowStepper.tsx`, integrated in `src/components/ContentPipeline.tsx` and `src/components/SchemaSuggester.tsx`
+
+**Agency value:** Complex multi-step tools previously had no visual orientation. The stepper communicates where the user is in the workflow and what comes next, reducing confusion on first use of ContentPipeline and SchemaSuggester.
+
+**Mutual:** Shared primitive — any future multi-step tool can adopt WorkflowStepper instead of building custom progress UI.
+
+---
+
+### 293. WorkspaceHealthBar
+**What it does:** Multi-metric health progress bar section rendered below stat cards on WorkspaceHome. Shows per-metric progress bars for key workspace health signals (SEO health, content coverage, keyword coverage, etc.) with blue progress fills (data metric = blue per design system). Below the metrics, a "Recommended Next" section surfaces the single highest-priority action the admin should take, with a teal CTA button. Wrapped in `SectionCard`.
+
+**Files:** `src/components/ui/WorkspaceHealthBar.tsx`, integrated in `src/components/WorkspaceHome.tsx`
+
+**Agency value:** WorkspaceHome previously showed stat cards but no consolidated health summary or next-action prompt. WorkspaceHealthBar gives admins an at-a-glance health snapshot and a clear next step without navigating into individual tools.
+
+**Mutual:** Turns the workspace home into an actionable command surface rather than a passive data view.
+
+---
+
+### 294. SeoAuditGuide
+**What it does:** Guide sub-tab in SeoAudit's analysis section (alongside existing analysis tabs). 5 educational sections: issue severity levels, prioritization framework, fix options overview, AEO review guidance, and content decay explanation. Static reference content using the existing custom tab bar pattern from SeoAudit.
+
+**Files:** `src/components/audit/SeoAuditGuide.tsx`, integrated in `src/components/SeoAudit.tsx`
+
+**Agency value:** New team members or clients reviewing the audit can understand what each severity level means and how to prioritize fixes without leaving the tool.
+
+---
+
+### 295. KeywordStrategyGuide
+**What it does:** Guide tab in KeywordStrategy (TabBar added alongside existing analysis tab). 6 sections: reading the strategy, understanding intent badges, content gap prioritization, KD/volume interpretation, quick win identification, and implementation order.
+
+**Files:** `src/components/strategy/KeywordStrategyGuide.tsx`, integrated in `src/components/KeywordStrategy.tsx`
+
+**Agency value:** KeywordStrategy output is data-dense. The guide explains how to translate strategy data into action, making the tool useful even for team members unfamiliar with SEO keyword methodology.
+
+---
+
+### 296. PageIntelligenceGuide
+**What it does:** Guide tab in PageIntelligence (added to the existing pages|architecture tab set as a third tab). 6 sections: understanding page scores, reading architecture signals, interpreting link health, prioritization criteria, action recommendations, and integration with other tools.
+
+**Files:** `src/components/PageIntelligenceGuide.tsx`, integrated in `src/components/PageIntelligence.tsx`
+
+**Agency value:** PageIntelligence surfaces complex architecture and link health signals. The guide translates those signals into plain-language explanations and recommended actions, reducing the learning curve for the tool.
