@@ -216,13 +216,19 @@ export function promoteToGuardrail(
     [field]: [...existing[field], pattern.pattern],
   };
 
-  // 4. Persist: update guardrails + deactivate pattern in a transaction
-  db.transaction(() => {
-    safeVoiceRead('promoteToGuardrail.updateVoiceProfile', wsId, () => {
+  // 4. Persist: update guardrails + deactivate pattern in a transaction.
+  // Do NOT wrap updateVoiceProfile in safeVoiceRead — if the write fails,
+  // the transaction must roll back so the pattern is not deactivated without
+  // the guardrail being saved (silent data loss).
+  try {
+    db.transaction(() => {
       updateVoiceProfile(wsId, { guardrails: updatedGuardrails });
-    }, undefined);
-    stmts().togglePattern.run(0, patternId, wsId);
-  })();
+      stmts().togglePattern.run(0, patternId, wsId);
+    })();
+  } catch (err) {
+    log.error({ err, wsId, patternId }, 'Failed to promote pattern to guardrail');
+    return { success: false, error: 'Could not update voice profile guardrails' };
+  }
 
   log.info(
     { wsId, patternId, patternType: pattern.patternType, field, frequency: pattern.frequency },
