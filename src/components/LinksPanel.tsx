@@ -1,4 +1,5 @@
 import { useState, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CornerDownRight, Share2, AlertTriangle } from 'lucide-react';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -21,7 +22,11 @@ const TABS = [
 type LinksTab = typeof TABS[number]['id'];
 
 export function LinksPanel({ siteId, workspaceId }: Props) {
-  const [activeTab, setActiveTab] = useState<LinksTab>('redirects');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<LinksTab>(() => {
+    const param = searchParams.get('tab');
+    return TABS.some(t => t.id === param) ? (param as LinksTab) : 'redirects';
+  });
 
   return (
     <div className="space-y-8">
