@@ -34,6 +34,10 @@ export function setup() {
  * that use seed fixtures to prevent data leaking into other test files.
  */
 export function cleanSeedData(workspaceId?: string): void {
+  // Guard: empty string is a no-op. An unset variable passed as '' must never
+  // fall through to the full-cleanup branch and wipe other tests' workspaces.
+  if (workspaceId === '') return;
+
   if (workspaceId) {
     // Targeted cleanup — only delete rows for a specific workspace
     for (const table of SEED_TABLES) {

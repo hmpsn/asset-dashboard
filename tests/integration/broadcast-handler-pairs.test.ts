@@ -335,6 +335,11 @@ const KNOWN_UNHANDLED_BROADCASTS = new Set<string>([
   'content-subscription:updated',
   'content-subscription:renewed',
 
+  // copy:export_complete — the server emits this after export, but there is
+  // no real-time UI reaction needed (the response body contains the result).
+  // A future enhancement could show a toast notification.
+  'copy:export_complete',
+
 ]);
 
 /**
@@ -359,6 +364,7 @@ const KNOWN_UNHANDLED_HANDLERS = new Set<string>([
   // occurring in WorkspaceOverview.tsx:
   //   `... ? 'sm:grid-cols-5' : 'sm:grid-cols-4' ...`
   'sm:grid-cols-5',
+
 ]);
 
 // ---------------------------------------------------------------------------
@@ -473,13 +479,15 @@ describe('broadcast ↔ handler pairing audit', () => {
 
   // ── WS_EVENTS definition coverage ─────────────────────────────────────────
 
+  const KNOWN_CONSTANTS_PENDING_ROUTES = new Set<string>([]);
+
   it('every WS_EVENTS constant is actually used in a broadcastToWorkspace() call', () => {
     const definedValues = [...serverWsEventsMap.values()];
     expect(definedValues.length).toBeGreaterThan(0);
 
     const unusedConstants: string[] = [];
     for (const value of definedValues) {
-      if (!serverBroadcasts.has(value)) {
+      if (!serverBroadcasts.has(value) && !KNOWN_CONSTANTS_PENDING_ROUTES.has(value)) {
         unusedConstants.push(`  '${value}'`);
       }
     }

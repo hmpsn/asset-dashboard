@@ -197,12 +197,19 @@ beforeAll(async () => {
 }, 25_000);
 
 afterAll(() => {
-  // Clean page_keywords rows (not covered by cleanSeedData since FK enforcement is off in tests)
-  db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(wsAId);
-  db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(wsBId);
-  cleanSeedData(wsAId);
-  cleanSeedData(wsBId);
-  cleanupWorkspaces();
+  // Guard: only clean up rows for workspaces that were actually seeded.
+  // If beforeAll failed (e.g. EADDRINUSE), wsAId/wsBId remain '' and
+  // cleanSeedData('') would be a no-op — but cleanupWorkspaces would be
+  // undefined, so use optional-call syntax.
+  if (wsAId) {
+    db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(wsAId);
+    cleanSeedData(wsAId);
+  }
+  if (wsBId) {
+    db.prepare('DELETE FROM page_keywords WHERE workspace_id = ?').run(wsBId);
+    cleanSeedData(wsBId);
+  }
+  cleanupWorkspaces?.();
   ctx.stopServer();
 });
 

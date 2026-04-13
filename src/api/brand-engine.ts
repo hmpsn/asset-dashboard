@@ -12,6 +12,11 @@ import type {
   BlueprintVersion,
   BlueprintGenerationInput,
 } from '../../shared/types/page-strategy';
+import type {
+  CopySection, CopyMetadata, CopySectionStatus,
+  CopyIntelligencePattern, EntryCopyStatus, BatchJob,
+  ExportRequest, ExportResult,
+} from '../../shared/types/copy-pipeline';
 
 // ═══ BRANDSCRIPT ═══
 
@@ -152,4 +157,80 @@ export const blueprintVersions = {
 
   getById: (wsId: string, blueprintId: string, versionId: string) =>
     get<BlueprintVersion>(`/api/page-strategy/${wsId}/${blueprintId}/versions/${versionId}`),
+};
+
+// ═══ COPY PIPELINE ═══
+
+export const copyGeneration = {
+  generate: (wsId: string, blueprintId: string, entryId: string, body?: { accumulatedSteering?: string[]; force?: boolean }) =>
+    post<{ sections: CopySection[]; metadata: CopyMetadata }>(
+      `/api/copy/${wsId}/${blueprintId}/${entryId}/generate`,
+      body ?? {}
+    ),
+  regenerateSection: (wsId: string, blueprintId: string, entryId: string, sectionId: string, body: { note: string; highlight?: string }) =>
+    post<CopySection | null>(
+      `/api/copy/${wsId}/${blueprintId}/${entryId}/regenerate/${sectionId}`,
+      body
+    ),
+};
+
+export const copyReview = {
+  getSections: (wsId: string, entryId: string) =>
+    get<CopySection[]>(`/api/copy/${wsId}/entry/${entryId}/sections`),
+  getStatus: (wsId: string, entryId: string) =>
+    get<EntryCopyStatus>(`/api/copy/${wsId}/entry/${entryId}/status`),
+  getMetadata: (wsId: string, entryId: string) =>
+    get<CopyMetadata | null>(`/api/copy/${wsId}/entry/${entryId}/metadata`),
+  updateSectionStatus: (wsId: string, sectionId: string, status: CopySectionStatus) =>
+    patch<CopySection | null>(
+      `/api/copy/${wsId}/section/${sectionId}/status`,
+      { status }
+    ),
+  updateSectionText: (wsId: string, sectionId: string, copy: string) =>
+    patch<CopySection | null>(
+      `/api/copy/${wsId}/section/${sectionId}/text`,
+      { copy }
+    ),
+  addSuggestion: (wsId: string, sectionId: string, body: { originalText: string; suggestedText: string }) =>
+    post<CopySection | null>(
+      `/api/copy/${wsId}/section/${sectionId}/suggest`,
+      body
+    ),
+};
+
+export const copyBatch = {
+  start: (wsId: string, blueprintId: string, body: { entryIds: string[]; mode?: string; batchSize?: number }) =>
+    post<{ batchId: string }>(
+      `/api/copy/${wsId}/${blueprintId}/batch`,
+      body
+    ),
+  getJob: (wsId: string, batchId: string) =>
+    get<BatchJob | null>(`/api/copy/${wsId}/batch/${batchId}`),
+};
+
+export const copyExport = {
+  export: (wsId: string, blueprintId: string, request: ExportRequest) =>
+    post<ExportResult & { filename?: string; content?: string }>(
+      `/api/copy/${wsId}/${blueprintId}/export`,
+      request
+    ),
+};
+
+export const copyIntelligence = {
+  getAll: (wsId: string) =>
+    get<CopyIntelligencePattern[]>(`/api/copy/${wsId}/intelligence`),
+  getPromotable: (wsId: string) =>
+    get<CopyIntelligencePattern[]>(`/api/copy/${wsId}/intelligence/promotable`),
+  update: (wsId: string, patternId: string, body: { active?: boolean; pattern?: string; patternType?: string }) =>
+    patch<void>(
+      `/api/copy/${wsId}/intelligence/${patternId}`,
+      body
+    ),
+  remove: (wsId: string, patternId: string) =>
+    del(`/api/copy/${wsId}/intelligence/${patternId}`),
+  extract: (wsId: string, steeringNotes: string[]) =>
+    post<CopyIntelligencePattern[]>(
+      `/api/copy/${wsId}/intelligence/extract`,
+      { steeringNotes }
+    ),
 };
