@@ -18,9 +18,9 @@ type HubTab = 'overview' | 'search-performance' | 'site-traffic' | 'annotations'
 
 const HUB_TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'annotations', label: 'Annotations', icon: StickyNote },
   { id: 'search-performance', label: 'Search Performance', icon: Search },
   { id: 'site-traffic', label: 'Site Traffic', icon: Activity },
-  { id: 'annotations', label: 'Annotations', icon: StickyNote },
 ] as const;
 
 export function AnalyticsHub({ workspaceId, siteId, gscPropertyUrl, ga4PropertyId }: Props) {

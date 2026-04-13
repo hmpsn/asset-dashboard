@@ -14,13 +14,13 @@ interface Props {
 }
 
 const subTabs: { id: SubTab; label: string; icon: typeof Upload }[] = [
+  { id: 'audit', label: 'Audit', icon: ShieldCheck },
   { id: 'upload', label: 'Upload', icon: Upload },
   { id: 'browse', label: 'Browse', icon: FolderSearch },
-  { id: 'audit', label: 'Audit', icon: ShieldCheck },
 ];
 
 export function MediaTab({ siteId, workspaceFolder, queue }: Props) {
-  const [sub, setSub] = useState<SubTab>('upload');
+  const [sub, setSub] = useState<SubTab>('audit');
 
   return (
     <div>
