@@ -621,15 +621,15 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <h3 className="text-sm font-semibold text-zinc-200">Page Intelligence</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {unifiedPages.length} pages
-            {cmsCount > 0 && <span className="text-purple-400"> · {cmsCount} CMS</span>}
+            {cmsCount > 0 && <span className="text-sky-400"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
             {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
         {/* Analyze All */}
         {bulkProgress ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+          <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
             <span className="text-xs text-zinc-300">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
             <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
           </div>
