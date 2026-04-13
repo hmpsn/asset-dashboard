@@ -339,7 +339,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;

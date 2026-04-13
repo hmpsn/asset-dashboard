@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
@@ -42,7 +43,11 @@ const EXPORTS = [
 ] as const;
 
 export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
-  const [activeTab, setActiveTab] = useState<PipelineTab>('briefs');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
+    const param = searchParams.get('tab');
+    return TABS.some(t => t.id === param) ? (param as PipelineTab) : 'briefs';
+  });
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);

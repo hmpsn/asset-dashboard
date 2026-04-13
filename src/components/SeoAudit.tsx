@@ -727,6 +727,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             sub={effectiveData!.deadLinkSummary.total === 0 ? 'All links healthy' : `${effectiveData!.deadLinkSummary.internal} internal · ${effectiveData!.deadLinkSummary.external} external`}
             size="hero"
             staggerIndex={4}
+            onClick={workspaceId ? () => navigate(adminPath(workspaceId, 'links') + '?tab=dead-links') : undefined}
           />
         )}
       </div>
