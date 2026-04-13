@@ -73,7 +73,6 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
             <li
               key={step.number}
               className="flex flex-1 items-start min-w-0"
-              aria-current={step.current ? 'step' : undefined}
             >
               {isClickable ? (
                 <button
@@ -87,7 +86,6 @@ export function WorkflowStepper({ steps, compact = false }: WorkflowStepperProps
                 </button>
               ) : (
                 <div
-                  role="presentation"
                   aria-label={`Step ${step.number}: ${step.label}${step.completed ? ' (completed)' : step.current ? ' (current)' : ''}`}
                 >
                   {stepContent}

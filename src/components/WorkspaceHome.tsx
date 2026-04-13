@@ -264,8 +264,10 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             setChecklistDismissed(true);
           }}
           onComplete={() => {
+            // Write localStorage now so checklist won't reappear after the
+            // 2-second celebration — but don't set state here to keep the
+            // celebration visible until OnboardingChecklist auto-calls onDismiss.
             localStorage.setItem(storageKey, '1');
-            setChecklistDismissed(true);
           }}
         />
       )}
