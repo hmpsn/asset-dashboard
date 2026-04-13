@@ -1,7 +1,11 @@
-import { useState } from 'react';
-import { CornerDownRight, Share2 } from 'lucide-react';
+import { useState, Suspense } from 'react';
+import { CornerDownRight, Share2, AlertTriangle } from 'lucide-react';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+import { ErrorBoundary } from './ErrorBoundary';
 import { RedirectManager } from './RedirectManager';
 import { InternalLinks } from './InternalLinks';
+
+const LinkChecker = lazyWithRetry(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
 
 interface Props {
   siteId: string;
@@ -11,6 +15,7 @@ interface Props {
 const TABS = [
   { id: 'redirects' as const, label: 'Redirects', icon: CornerDownRight },
   { id: 'internal' as const, label: 'Internal Links', icon: Share2 },
+  { id: 'dead-links' as const, label: 'Dead Links', icon: AlertTriangle },
 ];
 
 type LinksTab = typeof TABS[number]['id'];
@@ -48,6 +53,13 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
       )}
       {activeTab === 'internal' && (
         <InternalLinks key={`internal-${siteId}`} siteId={siteId} workspaceId={workspaceId} />
+      )}
+      {activeTab === 'dead-links' && (
+        <ErrorBoundary>
+          <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+            <LinkChecker siteId={siteId} />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </div>
   );
