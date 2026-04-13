@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
-import { type Page, adminPath } from '../../routes';
+import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
@@ -9,7 +9,7 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, LogOut, TrendingUp, Link2, MessageSquare,
   Sun, Moon, LayoutDashboard, ChevronRight, Activity, Shield,
-  Zap, BookOpen, CalendarDays, DollarSign, Trophy,
+  BookOpen, DollarSign, Trophy, Sparkles, Layers, FileSearch, Map,
 } from 'lucide-react';
 
 interface NavItem {
@@ -40,7 +40,6 @@ interface SidebarProps {
   tab: Page;
   theme: 'dark' | 'light';
   pendingContentRequests: number;
-  hasContentItems: boolean;
   onCreate: (name: string, siteId?: string, siteName?: string) => void;
   onDelete: (id: string) => void;
   onLinkSite: (workspaceId: string, siteId: string, siteName: string, token?: string) => void;
@@ -53,20 +52,19 @@ interface SidebarProps {
   onExitHidden?: () => void;
 }
 
-const ALL_GROUP_LABELS = ['ANALYTICS', 'SITE HEALTH', 'SEO', 'CONTENT'];
+const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
-function buildNavGroups(hasContentItems: boolean, copyEngineEnabled: boolean): NavGroup[] {
+function buildNavGroups(copyEngineEnabled: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
-      { id: 'brief', label: 'Meeting Brief', icon: BookOpen, desc: 'AI-generated meeting prep for client calls' },
     ]},
-    { label: 'ANALYTICS', groupIcon: Activity, groupColor: 'text-blue-400',
+    { label: 'MONITORING', groupIcon: Activity, groupColor: 'text-blue-400',
       activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300',
       items: [
-      { id: 'analytics-hub', label: 'Analytics', icon: BarChart3, needsSite: true, desc: 'Unified analytics: search performance, traffic, insights, and annotations' },
+      { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, needsSite: true, desc: 'Unified analytics: search performance, traffic, insights, and annotations' },
       { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, needsSite: true, desc: 'Track keyword rankings over time' },
-      { id: 'outcomes', label: 'Outcomes', icon: Trophy, desc: 'Track what\'s working across all your SEO actions' },
+      { id: 'outcomes', label: 'Action Results', icon: Trophy, desc: 'Track what\'s working across all your SEO actions' },
     ]},
     { label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
       activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300',
@@ -76,32 +74,42 @@ function buildNavGroups(hasContentItems: boolean, copyEngineEnabled: boolean): N
       { id: 'links', label: 'Links', icon: Link2, needsSite: true, desc: 'Internal links, broken links, and redirect management' },
       { id: 'media', label: 'Assets', icon: Image, desc: 'Images, alt text, and media optimization' },
     ]},
-    { label: 'SEO', groupIcon: Zap, groupColor: 'text-teal-400',
+    { label: 'SEO STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
       activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
       items: [
-            { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
+      { id: 'seo-strategy', label: 'Strategy', icon: Target, needsSite: true, desc: 'Keyword strategy with page-keyword mapping' },
       { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, needsSite: true, desc: 'Per-page keyword analysis, metrics, and optimization' },
+    ]},
+    { label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
+      activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300',
+      items: [
       { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, needsSite: true, desc: 'Edit titles, descriptions, and meta tags' },
       { id: 'seo-schema', label: 'Schema', icon: Code2, needsSite: true, desc: 'Structured data and schema markup' },
       // Copy Engine (Brand Hub) is phase-per-PR dark-launched; hide from nav until `copy-engine` flag is enabled.
-      { id: 'brand', label: 'Brand & AI', icon: Zap, needsSite: true, hidden: !copyEngineEnabled, desc: 'Brand voice, knowledge base, and audience personas' },
+      { id: 'brand', label: 'Brand & AI', icon: Sparkles, needsSite: true, hidden: !copyEngineEnabled, desc: 'Brand voice, knowledge base, and audience personas' },
       { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, needsSite: true, desc: 'AI-assisted page rewriting with playbook instructions' },
     ]},
     { label: 'CONTENT', groupIcon: BookOpen, groupColor: 'text-amber-400',
       activeBg: 'bg-amber-500/10', activeText: 'text-amber-300', activeIcon: 'text-amber-400', inactiveIcon: 'text-zinc-500', hoverBg: 'hover:bg-amber-500/5', hoverText: 'hover:text-amber-300',
       items: [
-      { id: 'content-pipeline', label: 'Content Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
-      { id: 'calendar', label: 'Calendar', icon: CalendarDays, needsSite: true, hidden: !hasContentItems, desc: 'Content calendar with briefs, posts, and requests' },
+      { id: 'content-pipeline', label: 'Pipeline', icon: Clipboard, needsSite: true, desc: 'Briefs, posts, and subscriptions in one view' },
       { id: 'requests', label: 'Requests', icon: MessageSquare, needsSite: true, desc: 'Client content requests and feedback' },
       { id: 'content-perf', label: 'Content Perf', icon: BarChart3, needsSite: true, desc: 'Post-publish content performance metrics' },
+    ]},
+    { label: 'ADMIN', groupIcon: Settings, groupColor: 'text-zinc-400',
+      activeBg: 'bg-zinc-500/10', activeText: 'text-zinc-300', activeIcon: 'text-zinc-400', inactiveIcon: 'text-zinc-600', hoverBg: 'hover:bg-zinc-500/5', hoverText: 'hover:text-zinc-300',
+      items: [
+      { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, desc: 'Cross-workspace outcomes overview' },
+      { id: 'prospect', label: 'Prospect', icon: FileSearch, desc: 'Sales prospect research' },
+      { id: 'ai-usage', label: 'AI Usage', icon: Activity, desc: 'AI token usage and costs' },
+      { id: 'roadmap', label: 'Roadmap', icon: Map, desc: 'Product roadmap and sprint tracking' },
+      { id: 'features', label: 'Features', icon: Layers, desc: 'Feature library and changelog' },
     ]},
   ];
 }
 
-const GLOBAL_TABS = new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'outcomes-overview']);
-
 export function Sidebar({
-  workspaces, selected, tab, theme, pendingContentRequests, hasContentItems,
+  workspaces, selected, tab, theme, pendingContentRequests,
   onCreate, onDelete, onLinkSite, onUnlinkSite,
   toggleTheme, onLogout, hidden, onExitHidden,
 }: SidebarProps) {
@@ -124,7 +132,7 @@ export function Sidebar({
   }, []);
 
   const copyEngineEnabled = useFeatureFlag('copy-engine');
-  const navGroups = buildNavGroups(hasContentItems, copyEngineEnabled);
+  const navGroups = buildNavGroups(copyEngineEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => {
@@ -211,11 +219,12 @@ export function Sidebar({
               {!isCollapsed && group.items.filter(item => !item.hidden).map(item => {
                 const Icon = item.icon;
                 const active = tab === item.id;
-                const disabled = !selected || (item.needsSite && !selected.webflowSiteId);
+                const isGlobal = GLOBAL_TABS.has(item.id);
+                const disabled = isGlobal ? false : (!selected || (item.needsSite && !selected.webflowSiteId));
                 return (
                   <button
                     key={item.id}
-                    onClick={() => !disabled && selected && navigate(adminPath(selected.id, item.id))}
+                    onClick={() => !disabled && (isGlobal ? navigate('/' + item.id) : selected && navigate(adminPath(selected.id, item.id)))}
                     title={item.desc}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-[5px] rounded-lg text-[12px] font-medium transition-all ${
                       active
@@ -278,5 +287,5 @@ export function Sidebar({
   );
 }
 
-export { ALL_GROUP_LABELS, GLOBAL_TABS };
+export { ALL_GROUP_LABELS };
 export type { NavGroup, NavItem };

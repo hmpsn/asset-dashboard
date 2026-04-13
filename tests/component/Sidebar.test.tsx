@@ -35,7 +35,6 @@ const defaultProps = {
   tab: 'home' as const,
   theme: 'dark' as const,
   pendingContentRequests: 0,
-  hasContentItems: false,
   onCreate: vi.fn(),
   onDelete: vi.fn(),
   onLinkSite: vi.fn(),
@@ -62,29 +61,31 @@ describe('Sidebar', () => {
 
   it('renders nav group labels', () => {
     renderSidebar();
-    expect(screen.getByText('ANALYTICS')).toBeInTheDocument();
+    expect(screen.getByText('MONITORING')).toBeInTheDocument();
     expect(screen.getByText('SITE HEALTH')).toBeInTheDocument();
-    expect(screen.getByText('SEO')).toBeInTheDocument();
+    expect(screen.getByText('SEO STRATEGY')).toBeInTheDocument();
+    expect(screen.getByText('OPTIMIZATION')).toBeInTheDocument();
     expect(screen.getByText('CONTENT')).toBeInTheDocument();
+    expect(screen.getByText('ADMIN')).toBeInTheDocument();
   });
 
   it('renders navigation items within groups', () => {
     renderSidebar();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    expect(screen.getByText('Search & Traffic')).toBeInTheDocument();
     expect(screen.getByText('Site Audit')).toBeInTheDocument();
     expect(screen.getByText('SEO Editor')).toBeInTheDocument();
-    expect(screen.getByText('Content Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Pipeline')).toBeInTheDocument();
   });
 
   it('highlights the active tab', () => {
     renderSidebar({ tab: 'analytics-hub' });
-    const analyticsBtn = screen.getByText('Analytics').closest('button')!;
+    const analyticsBtn = screen.getByText('Search & Traffic').closest('button')!;
     expect(analyticsBtn.className).toContain('bg-blue-500/10');
   });
 
   it('disables items that need a site when no site linked', () => {
     renderSidebar({ selected: WORKSPACES[1] }); // Beta has no webflowSiteId
-    const analyticsBtn = screen.getByText('Analytics').closest('button')!;
+    const analyticsBtn = screen.getByText('Search & Traffic').closest('button')!;
     expect(analyticsBtn.className).toContain('cursor-not-allowed');
   });
 
@@ -126,11 +127,11 @@ describe('Sidebar', () => {
 
   it('collapses group on click and re-expands', () => {
     renderSidebar();
-    const analyticsHeader = screen.getByText('ANALYTICS');
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
-    fireEvent.click(analyticsHeader);
-    expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
-    fireEvent.click(analyticsHeader);
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    const monitoringHeader = screen.getByText('MONITORING');
+    expect(screen.getByText('Search & Traffic')).toBeInTheDocument();
+    fireEvent.click(monitoringHeader);
+    expect(screen.queryByText('Search & Traffic')).not.toBeInTheDocument();
+    fireEvent.click(monitoringHeader);
+    expect(screen.getByText('Search & Traffic')).toBeInTheDocument();
   });
 });
