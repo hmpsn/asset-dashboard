@@ -5,7 +5,7 @@ import {
   Loader2, Save, Sparkles, BookOpen, Users, MessageSquare,
   Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
-import { PageHeader, SectionCard, TabBar } from './ui';
+import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator } from './ui';
 import { themeColor } from './ui/constants';
 import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
@@ -88,6 +88,10 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   const [personaDraft, setPersonaDraft] = useState({ name: '', description: '', painPoints: '', goals: '', objections: '', preferredContentFormat: '', buyingStage: '' as string });
   const [generatingPersonas, setGeneratingPersonas] = useState(false);
 
+  // Brand voice error + completion state
+  const [showNextSteps, setShowNextSteps] = useState(false);
+  const [brandVoiceError, setBrandVoiceError] = useState<string | null>(null);
+
   // Page Strategy state
   const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(null);
 
@@ -100,6 +104,23 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     finally { setSavingBrandVoice(false); }
   };
 
+  const generateBrandVoiceHandler = async () => {
+    setGeneratingBrandVoice(true);
+    setBrandVoiceError(null);
+    setShowNextSteps(false);
+    try {
+      const data = await workspaces.generateBrandVoice(workspaceId) as { brandVoice: string; pagesScraped: number };
+      setBrandVoice(data.brandVoice);
+      toast(`Brand voice generated from ${data.pagesScraped} pages — review and save`);
+      setShowNextSteps(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
+      setBrandVoiceError(err instanceof Error ? err.message : 'Brand voice generation failed');
+    } finally {
+      setGeneratingBrandVoice(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -108,6 +129,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         icon={<Sparkles className="w-5 h-5 text-teal-400" />}
       />
 
+      {/* tab-deeplink-ok — nothing navigates to BrandHub with ?tab= */}
       <TabBar
         active={activeTab}
         onChange={(id) => setActiveTab(id as BrandHubTab)}
@@ -155,24 +177,39 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
             </button>
             <button
               type="button"
-              onClick={async () => {
-                setGeneratingBrandVoice(true);
-                try {
-                  const data = await workspaces.generateBrandVoice(workspaceId) as { brandVoice: string; pagesScraped: number };
-                  setBrandVoice(data.brandVoice);
-                  toast(`Brand voice generated from ${data.pagesScraped} pages — review and save`);
-                } catch (err) {
-                  toast(err instanceof Error ? err.message : 'Failed to generate', 'error');
-                } finally {
-                  setGeneratingBrandVoice(false);
-                }
-              }}
+              onClick={generateBrandVoiceHandler}
               disabled={generatingBrandVoice || !webflowSiteId}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generatingBrandVoice ? <><Loader2 className="w-3 h-3 animate-spin" /> Crawling site...</> : <><Sparkles className="w-3 h-3" /> Generate from Website</>}
             </button>
           </div>
+          <ProgressIndicator
+            status={generatingBrandVoice ? 'running' : 'idle'}
+            step="Analyzing brand voice..."
+          />
+          {brandVoiceError && (
+            <ErrorState
+              type="general"
+              title="Brand Voice Generation Failed"
+              message={brandVoiceError}
+              action={{ label: 'Try Again', onClick: generateBrandVoiceHandler }}
+            />
+          )}
+          {showNextSteps && brandVoice && !generatingBrandVoice && (
+            <NextStepsCard
+              title="Brand voice generated"
+              variant="success"
+              onDismiss={() => setShowNextSteps(false)}
+              staggerIndex={0}
+              steps={[
+                {
+                  label: 'Review knowledge base',
+                  onClick: () => setShowNextSteps(false),
+                },
+              ]}
+            />
+          )}
           <p className="text-[11px] text-zinc-500">
             You can also drop <code className="text-teal-400">.txt</code> or <code className="text-teal-400">.md</code> files into the <code className="text-teal-400">brand-docs/</code> folder in your workspace uploads.
           </p>

@@ -7,7 +7,7 @@ import {
   Shield, DollarSign, ArrowUp, ArrowDown, ArrowUpRight, Code2, Plus,
 } from 'lucide-react';
 import { adminPath } from '../routes';
-import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
@@ -214,6 +214,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const cancelBulkRef = useRef(false);
   const { jobs, startJob, cancelJob: cancelBgJob } = useBackgroundTasks();
   const bulkJobIdRef = useRef<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showNextSteps, setShowNextSteps] = useState(false);
 
   // Page list UI state
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -357,6 +359,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   // ── AI Analysis ──
   const analyzePage = async (page: UnifiedPage) => {
+    setAnalysisError(null);
+    setShowNextSteps(false);
     setAnalyzing(prev => new Set(prev).add(page.id));
     try {
       let pageContent = '';
@@ -426,6 +430,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       }
     } catch (err) {
       console.error('Analysis failed:', err);
+      setAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
       setAnalyzing(prev => { const n = new Set(prev); n.delete(page.id); return n; });
     }
@@ -434,6 +439,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   // ── Bulk Analysis via Background Job ──
   const analyzeAllPages = async (forceRefresh = false) => {
     cancelBulkRef.current = false;
+    setAnalysisError(null);
+    setShowNextSteps(false);
     setBulkProgress({ done: 0, total: unifiedPages.length });
     const jobId = await startJob('page-analysis', { siteId, workspaceId, forceRefresh });
     if (jobId) {
@@ -459,6 +466,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       }
     } else if (job.status === 'done') {
       setBulkProgress(null);
+      setShowNextSteps(true);
       bulkJobIdRef.current = null;
       lastRefreshedAt.current = 0;
       queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
@@ -617,18 +625,19 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           <h3 className="text-sm font-semibold text-zinc-200">Page Intelligence</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {unifiedPages.length} pages
-            {cmsCount > 0 && <span className="text-purple-400"> · {cmsCount} CMS</span>}
+            {cmsCount > 0 && <span className="text-blue-400"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
             {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
         {/* Analyze All */}
         {bulkProgress ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
-            <span className="text-xs text-zinc-300">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
-            <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
-          </div>
+          <ProgressIndicator
+            status="running"
+            detail={`Analyzing ${bulkProgress.done}/${bulkProgress.total}...`}
+            percent={bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}
+            onCancel={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}
+          />
         ) : (
           <div className="flex items-center gap-2">
             {analyzedCount > 0 && analyzedCount < unifiedPages.length && (
@@ -656,6 +665,30 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           </div>
         )}
       </div>
+
+      {analysisError && (
+        <ErrorState
+          type="general"
+          title="Page Analysis Failed"
+          message={analysisError}
+          action={{ label: 'Dismiss', onClick: () => { setAnalysisError(null); } }}
+        />
+      )}
+
+      {showNextSteps && !bulkProgress && (
+        <NextStepsCard
+          title="Analysis complete"
+          variant="success"
+          onDismiss={() => setShowNextSteps(false)}
+          staggerIndex={0}
+          steps={[
+            {
+              label: 'Go to SEO Editor',
+              onClick: () => navigate(adminPath(workspaceId, 'seo-editor')),
+            },
+          ]}
+        />
+      )}
 
       {/* Fix These First — impact-ranked priority queue */}
       {fixQueue.length > 0 && (
@@ -750,7 +783,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-zinc-300 truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20 shrink-0">CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">CMS</span>
                       )}
                     </div>
                     <span className="text-[11px] text-zinc-500 font-mono">{page.path}</span>

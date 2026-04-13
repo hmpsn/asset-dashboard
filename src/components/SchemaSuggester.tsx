@@ -5,13 +5,14 @@ import type { FixContext } from '../App';
 import { useSchemaSnapshot, useWebflowPages } from '../hooks/admin';
 import {
   Loader2, CheckCircle,
-  AlertCircle, Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
+  Info, Sparkles, RefreshCw, Plus, Database, HelpCircle,
   TrendingUp, TrendingDown, Clock, BarChart3, BookOpen,
 } from 'lucide-react';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
+import { ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -93,6 +94,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPages, setSentPages] = useState<Set<string>>(new Set());
   const [progressMsg, setProgressMsg] = useState<string | null>(null);
+  const [showNextSteps, setShowNextSteps] = useState(false);
   const [showPagePicker, setShowPagePicker] = useState(false);
   const [availablePages, setAvailablePages] = useState<Array<{ id: string; title: string; slug: string }>>([]);
   const [pageSearch, setPageSearch] = useState('');
@@ -198,6 +200,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       if (job.result && Array.isArray(job.result)) {
         setData(job.result as SchemaPageSuggestion[]);
       }
+      setShowNextSteps(true);
       setProgressMsg(null);
       jobIdRef.current = null;
     } else if (job.status === 'error') {
@@ -242,6 +245,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   const runScan = async () => {
     setStarted(true);
     setLoading(true);
+    setShowNextSteps(false);
     setData(null);
     setScanError(null);
     setProgressMsg('Starting schema generation...');
@@ -716,28 +720,28 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
 
   if (loading && (!data || data.length === 0)) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
+      <div>
         {schemaTabBar}
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-sm">{progressMsg || 'Scanning pages for schema opportunities...'}</p>
-        <p className="text-xs text-zinc-500">Results will appear as each batch completes</p>
-        <button onClick={stopScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-red-400 bg-zinc-800 hover:bg-zinc-800/80 transition-colors mt-2">
-          Stop
-        </button>
+        <ProgressIndicator
+          status="running"
+          step="Scanning schema opportunities..."
+          detail={progressMsg || undefined}
+          onCancel={stopScan}
+        />
       </div>
     );
   }
 
   if (scanError) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <div>
         {schemaTabBar}
-        <AlertCircle className="w-8 h-8 text-red-400/80" />
-        <p className="text-red-400/80 text-sm font-medium">Schema generation failed</p>
-        <p className="text-zinc-500 text-xs max-w-md text-center">{scanError}</p>
-        <button onClick={runScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors mt-2">
-          <RefreshCw className="w-3 h-3" /> Retry
-        </button>
+        <ErrorState
+          type="general"
+          title="Schema Scan Failed"
+          message={scanError}
+          action={{ label: 'Scan Again', onClick: runScan }}
+        />
       </div>
     );
   }
@@ -770,14 +774,30 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       <SchemaPlanPanel siteId={siteId} />
 
       {/* Progress banner while streaming */}
-      {loading && (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-teal-500/10 border border-teal-500/20 rounded-xl">
-          <Loader2 className="w-4 h-4 animate-spin text-teal-400 flex-shrink-0" />
-          <span className="text-xs text-teal-300 flex-1">{progressMsg || 'Generating schemas...'}</span>
-          <button onClick={stopScan} className="text-xs text-teal-400/60 hover:text-red-400 transition-colors">
-            Stop
-          </button>
-        </div>
+      {loading && data && data.length > 0 && (
+        <ProgressIndicator
+          status="running"
+          step="Generating schemas..."
+          detail={progressMsg || undefined}
+          onCancel={stopScan}
+        />
+      )}
+
+      {/* Completion next steps */}
+      {showNextSteps && data && data.length > 0 && !loading && (
+        <NextStepsCard
+          title={`Scan complete: ${data.length} pages with suggestions`}
+          variant="success"
+          onDismiss={() => setShowNextSteps(false)}
+          staggerIndex={0}
+          steps={[
+            {
+              label: 'Review suggestions',
+              onClick: () => setShowNextSteps(false),
+              estimatedTime: '3 min',
+            },
+          ]}
+        />
       )}
 
       {/* Header */}
