@@ -63,7 +63,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   const [maxPages, setMaxPages] = useState<number>(500);
   const [competitors, setCompetitors] = useState('');
   const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const [progressStep, setProgressStep] = useState('');
   const [progressDetail, setProgressDetail] = useState('');
   const [progressPct, setProgressPct] = useState(0);
@@ -311,28 +311,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
       )}
 
-      <IntelligenceSignals workspaceId={workspaceId} />
-
-      {/* Progress Indicator */}
-      {generating && progressStep && (
-        <div className="bg-zinc-900 border border-teal-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
-              <span className="text-xs font-medium text-zinc-200">{stepLabels[progressStep] || progressStep}</span>
-            </div>
-            <span className="text-[11px] text-zinc-500 font-mono">{Math.round(progressPct * 100)}%</span>
-          </div>
-          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${Math.round(progressPct * 100)}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-zinc-500">{progressDetail}</p>
-        </div>
-      )}
-
       {/* Settings Panel */}
       <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <button
@@ -526,6 +504,28 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         )}
       </div>
 
+      <IntelligenceSignals workspaceId={workspaceId} />
+
+      {/* Progress Indicator */}
+      {generating && progressStep && (
+        <div className="bg-zinc-900 border border-teal-500/20 p-4 space-y-3" style={{ borderRadius: '10px 24px 10px 24px' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+              <span className="text-xs font-medium text-zinc-200">{stepLabels[progressStep] || progressStep}</span>
+            </div>
+            <span className="text-[11px] text-zinc-500 font-mono">{Math.round(progressPct * 100)}%</span>
+          </div>
+          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.round(progressPct * 100)}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-zinc-500">{progressDetail}</p>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-xs text-red-400 flex items-center gap-2">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
@@ -600,17 +600,46 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             </div>
           )}
 
-          {/* ── What Changed (Strategy Diff) ── */}
-          <StrategyDiff workspaceId={workspaceId} />
+          {/* ── Quick Wins ── */}
+          <QuickWins quickWins={strategy.quickWins || []} />
 
           {/* ── Low-Hanging Fruit ── */}
           <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
 
-          {/* ── Quick Wins ── */}
-          <QuickWins quickWins={strategy.quickWins || []} />
-
           {/* ── Content Gaps ── */}
           <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
+
+          {/* Keyword Gaps */}
+          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
+
+          {/* ── Reference & Analysis ── */}
+          <div className="border-t border-zinc-800 my-6 flex items-center gap-3">
+            <span className="text-xs text-zinc-500 uppercase tracking-wide">Reference & Analysis</span>
+            <div className="flex-1 border-t border-zinc-800" />
+          </div>
+
+          {/* ── Topical Authority ── */}
+          {strategy.topicClusters && strategy.topicClusters.length > 0 && (
+            <TopicClusters clusters={strategy.topicClusters} />
+          )}
+
+          {/* ── Cannibalization Alert ── */}
+          {strategy.cannibalization && strategy.cannibalization.length > 0 && (
+            <CannibalizationAlert items={strategy.cannibalization} />
+          )}
+
+          {/* ── What Changed (Strategy Diff) ── */}
+          <StrategyDiff workspaceId={workspaceId} />
+
+          {/* Backlink Profile */}
+          <BacklinkProfile workspaceId={workspaceId} />
+
+          {/* Competitive Intelligence Hub */}
+          <CompetitiveIntel
+            workspaceId={workspaceId}
+            competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
+            semrushAvailable={semrushAvailable}
+          />
 
           {/* ── Site Keywords ── */}
           <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
@@ -662,29 +691,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
               </div>
             </div>
           )}
-
-          {/* ── Cannibalization Alert ── */}
-          {strategy.cannibalization && strategy.cannibalization.length > 0 && (
-            <CannibalizationAlert items={strategy.cannibalization} />
-          )}
-
-          {/* ── Topical Authority ── */}
-          {strategy.topicClusters && strategy.topicClusters.length > 0 && (
-            <TopicClusters clusters={strategy.topicClusters} />
-          )}
-
-          {/* Keyword Gaps */}
-          <KeywordGaps keywordGaps={strategy.keywordGaps || []} difficultyColor={difficultyColor} />
-
-          {/* Backlink Profile */}
-          <BacklinkProfile workspaceId={workspaceId} />
-
-          {/* Competitive Intelligence Hub */}
-          <CompetitiveIntel
-            workspaceId={workspaceId}
-            competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-            semrushAvailable={semrushAvailable}
-          />
 
           {/* How it works */}
           <div className="bg-zinc-800/30 rounded-lg border border-zinc-800 px-4 py-3">
