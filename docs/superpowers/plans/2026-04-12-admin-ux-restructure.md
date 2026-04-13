@@ -48,6 +48,44 @@ These issues were found by validating the plan against the actual codebase. Each
 
 ---
 
+## PR 2 Lessons Learned (Apply to All Remaining PRs)
+
+These patterns caused bugs in PR 2 and must be accounted for in PR 3–5.
+
+### 1. Feature moves require help/guide content audit
+
+Moving a tab or feature between components leaves stale references in guide components, tooltips, empty states, and onboarding flows. PR 2 moved Architecture and LLMs.txt out of ContentPipeline but left `ContentPipelineGuide` still documenting them — users clicking "?" saw instructions for features that no longer exist there.
+
+**Rule for PR 3–5:** Any task that moves, renames, or removes a feature must include a grep step: `grep -rn '<feature-name>\|<tab-id>' src/components/` to find help text, guide content, tooltips, and empty state references. This is especially relevant for PR 4 (guides reference specific tab locations from PR 2).
+
+### 2. `?tab=` deep-links are a two-halves contract
+
+When navigating to a component with `?tab=X`, the receiving component MUST read `useSearchParams` and initialize tab state from the param. PR 2 had three components that were deep-link targets but silently ignored the param. The pattern:
+
+```tsx
+const [searchParams, setSearchParams] = useSearchParams();
+const [tab, setTab] = useState(() => {
+  const param = searchParams.get('tab');
+  return TABS.some(t => t.id === param) ? param : defaultTab;
+});
+const handleTabChange = (id: TabType) => {
+  setTab(id);
+  if (searchParams.has('tab')) {
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    setSearchParams(next, { replace: true });
+  }
+};
+```
+
+**Rule for PR 3–5:** Any task that adds cross-tool navigation links (Task 5.6) or NextStepsCard onClick handlers (Tasks 3.5–3.10) that construct `?tab=X` URLs must verify the target component implements this pattern. The contract test at `tests/contract/tab-deep-link-wiring.test.ts` catches `adminPath(...)  + '?tab=...'` senders automatically.
+
+### 3. pr-check escape hatches must be inline for pattern-based rules
+
+Pattern-based rules (`excludeLines`) only check the matched line. Above-line comments are silently ignored. Only `customCheck` rules call `hasHatch()` which checks the preceding line. Always place hatches inline on the flagged line.
+
+---
+
 ## Task Dependencies (All 5 PR Gates)
 
 ```
@@ -575,6 +613,8 @@ PR 5: Client Handoff & Platform Cohesion
 
 Each task integrates NextStepsCard, ProgressIndicator, and/or ErrorRecoveryCard into one page.
 
+> **PR 2 lesson:** NextStepsCard `onClick` handlers that navigate to other pages with `?tab=X` (e.g., "Go to SEO Editor" → `adminPath(wsId, 'seo-editor') + '?tab=...'`) create deep-link senders. The target component MUST implement the `useSearchParams` receiver pattern (see "PR 2 Lessons Learned" above). The contract test will catch missing receivers for `adminPath(...)` senders automatically, but verify manually for any non-standard URL construction.
+
 **Task 3.5 — SeoAudit integration**
 **Owns:** `src/components/SeoAudit.tsx`
 - [ ] Add NextStepsCard after audit completes (fix critical errors → create tasks → share report)
@@ -738,6 +778,8 @@ Each task integrates NextStepsCard, ProgressIndicator, and/or ErrorRecoveryCard 
 ### Tasks 4.5–4.8 — Per-Tool Guides (Model: sonnet each, parallel)
 
 Follow the `ContentPipelineGuide.tsx` pattern exactly.
+
+> **PR 2 lesson:** ContentPipelineGuide described tabs that had been moved elsewhere. Each guide's SECTIONS array must reference only features that actually exist as tabs/panels in its host component. Before writing any guide, read the host component's TABS array or render cases to verify current tab IDs and labels. After writing the guide, grep `src/components/` for the guide component name to ensure nothing else references stale content.
 
 **Task 4.5 — SchemaWorkflowGuide**
 **Owns:** `src/components/schema/SchemaWorkflowGuide.tsx` (NEW — already referenced in SchemaSuggester)
@@ -911,6 +953,8 @@ Follow the `ContentPipelineGuide.tsx` pattern exactly.
 
 **Task 5.6 — Cross-tool navigation links**
 **Owns:** Multiple page components (add contextual cross-references)
+
+> **PR 2 lesson:** Every cross-tool link that includes `?tab=X` is a deep-link sender. Before adding a link, verify the target component reads `searchParams.get('tab')` in its `useState` initializer. Run `npx vitest run tests/contract/tab-deep-link-wiring.test.ts` after adding links to catch any broken wiring.
 - [ ] Add "Related in Links panel: X broken redirects" to SeoAudit issue rows
 - [ ] Add "Edit this post" button in ContentPerformance expanded rows
 - [ ] Add "Related SEO issues" link in LinksPanel redirect rows
