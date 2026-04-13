@@ -7,6 +7,7 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
+import { getWorkspace } from './workspaces.js';
 import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../shared/types/brand-engine.js';
 
 const log = createLogger('brandscript');
@@ -258,4 +259,158 @@ Return valid JSON: { "sections": [{ "title": "exact title from above", "content"
   });
 
   return updateBrandscriptSections(workspaceId, brandscriptId, updatedSections);
+}
+
+// ── Questionnaire → Brandscript auto-population ────────────────────────
+
+/**
+ * Extract a labelled block from the workspace knowledgeBase.
+ * The onboarding endpoint stores fields as "Label: value" lines.
+ */
+function extractKbField(kb: string, label: string): string | undefined {
+  // Match "Label: value" possibly spanning until the next label or double-newline
+  const pattern = new RegExp(`^${label}:\\s*(.+?)(?=\\n[A-Z][\\w\\s/]+:|\\n\\n|$)`, 'ms');
+  const m = kb.match(pattern);
+  return m?.[1]?.trim() || undefined;
+}
+
+/**
+ * Reads workspace onboarding/profile data and creates a pre-populated brandscript
+ * with sections seeded from questionnaire answers.
+ *
+ * Returns null if the workspace doesn't exist or has no usable onboarding data.
+ * If a brandscript already exists for the workspace, returns the first one
+ * (avoids creating duplicates on repeated calls).
+ */
+export function prefillFromQuestionnaire(workspaceId: string): Brandscript | null {
+  try {
+    const ws = getWorkspace(workspaceId);
+    if (!ws) {
+      log.warn({ workspaceId }, 'prefillFromQuestionnaire: workspace not found');
+      return null;
+    }
+
+    // If a brandscript already exists, return it — don't create duplicates
+    const existing = listBrandscripts(workspaceId);
+    if (existing.length > 0) {
+      log.info({ workspaceId, brandscriptId: existing[0].id }, 'prefillFromQuestionnaire: brandscript already exists');
+      return existing[0];
+    }
+
+    const kb = ws.knowledgeBase || '';
+    const profile = ws.intelligenceProfile;
+    const personas = ws.personas || [];
+
+    // Extract fields from the onboarding-populated knowledge base
+    const businessDescription = extractKbField(kb, 'About');
+    const services = extractKbField(kb, 'Key Services/Products');
+    const differentiators = extractKbField(kb, 'Differentiators');
+    const ourAdvantages = extractKbField(kb, 'Our Advantages');
+    const competitorStrengths = extractKbField(kb, 'Competitor Strengths');
+    const industry = profile?.industry || extractKbField(kb, 'Industry');
+    const targetAudience = profile?.targetAudience;
+
+    // Build audience content from personas + profile
+    const audienceParts: string[] = [];
+    if (targetAudience) audienceParts.push(targetAudience);
+    for (const p of personas) {
+      const parts: string[] = [];
+      if (p.description) parts.push(p.description);
+      if (p.painPoints.length) parts.push(`Pain points: ${p.painPoints.join('; ')}`);
+      if (p.goals.length) parts.push(`Goals: ${p.goals.join('; ')}`);
+      if (p.objections.length) parts.push(`Objections: ${p.objections.join('; ')}`);
+      if (parts.length) audienceParts.push(`${p.name}: ${parts.join('. ')}`);
+    }
+    const audienceContent = audienceParts.join('\n\n') || undefined;
+
+    // Build problem section from persona pain points
+    const painPoints = personas.flatMap(p => p.painPoints).filter(Boolean);
+    const problemContent = painPoints.length > 0
+      ? `Key challenges your audience faces:\n${painPoints.map(pp => `- ${pp}`).join('\n')}`
+      : undefined;
+
+    // Build differentiators content
+    const diffParts: string[] = [];
+    if (differentiators) diffParts.push(differentiators);
+    if (ourAdvantages) diffParts.push(ourAdvantages);
+    const diffContent = diffParts.join('\n\n') || undefined;
+
+    // Build value proposition from description + services
+    const valueParts: string[] = [];
+    if (businessDescription) valueParts.push(businessDescription);
+    if (services) valueParts.push(`Key offerings: ${services}`);
+    if (industry) valueParts.push(`Industry: ${industry}`);
+    const valueContent = valueParts.join('\n\n') || undefined;
+
+    // If there's nothing useful to prefill, bail out
+    if (!valueContent && !audienceContent && !problemContent && !diffContent) {
+      log.info({ workspaceId }, 'prefillFromQuestionnaire: no usable onboarding data');
+      return null;
+    }
+
+    // Build sections mapped to StoryBrand framework
+    const sections: { title: string; purpose: string; content?: string }[] = [
+      {
+        title: 'Character',
+        purpose: 'Who is the hero? Define your customer and what they want.',
+        content: audienceContent,
+      },
+      {
+        title: 'Problem',
+        purpose: 'What challenges does the hero face? External, internal, and philosophical problems.',
+        content: problemContent,
+      },
+      {
+        title: 'Guide',
+        purpose: 'Position your brand as the guide with empathy and authority.',
+        content: valueContent,
+      },
+      {
+        title: 'Plan',
+        purpose: 'Give the hero a clear plan to engage with you.',
+        content: undefined, // Not derivable from questionnaire — left for AI completion
+      },
+      {
+        title: 'Call to Action',
+        purpose: 'What direct and transitional actions should the hero take?',
+        content: undefined,
+      },
+      {
+        title: 'Failure',
+        purpose: 'What negative consequences does the hero avoid by working with you?',
+        content: competitorStrengths
+          ? `Without the right partner, your audience may settle for competitors who: ${competitorStrengths}`
+          : undefined,
+      },
+      {
+        title: 'Success',
+        purpose: 'What does transformation look like for the hero?',
+        content: personas.flatMap(p => p.goals).filter(Boolean).length > 0
+          ? `When your audience succeeds:\n${personas.flatMap(p => p.goals).filter(Boolean).map(g => `- ${g}`).join('\n')}`
+          : undefined,
+      },
+      {
+        title: 'Unique Value Proposition',
+        purpose: 'What makes your brand different from the competition?',
+        content: diffContent,
+      },
+    ];
+
+    const brandscript = createBrandscript(
+      workspaceId,
+      `${ws.name} Brand Story`,
+      'storybrand',
+      sections,
+    );
+
+    log.info(
+      { workspaceId, brandscriptId: brandscript.id, prefilled: sections.filter(s => s.content).length },
+      'prefillFromQuestionnaire: created brandscript from onboarding data',
+    );
+
+    return brandscript;
+  } catch (err) {
+    log.error({ workspaceId, err }, 'prefillFromQuestionnaire: failed');
+    return null;
+  }
 }

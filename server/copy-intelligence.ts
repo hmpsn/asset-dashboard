@@ -4,6 +4,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { callOpenAI } from './openai-helpers.js';
+import { getVoiceProfile, updateVoiceProfile } from './voice-calibration.js';
+import type { VoiceGuardrails } from '../shared/types/brand-engine.js';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 
 const log = createLogger('copy-intelligence');
@@ -37,7 +39,10 @@ const stmts = createStmtCache(() => ({
     `UPDATE copy_intelligence SET pattern = ?, pattern_type = ? WHERE id = ? AND workspace_id = ?`,
   ),
   getPromotable: db.prepare(
-    `SELECT * FROM copy_intelligence WHERE workspace_id = ? AND frequency >= 3 ORDER BY frequency DESC`,
+    `SELECT * FROM copy_intelligence WHERE workspace_id = ? AND active = 1 AND frequency >= 3 ORDER BY frequency DESC`,
+  ),
+  getPatternById: db.prepare(
+    `SELECT * FROM copy_intelligence WHERE id = ? AND workspace_id = ?`,
   ),
 }));
 
@@ -108,10 +113,112 @@ export function updatePatternText(
   stmts().updatePattern.run(pattern, patternType, patternId, wsId);
 }
 
-/** Returns patterns with frequency >= 3, candidates for promotion to persistent rules. */
+/** Returns active patterns with frequency >= 3, candidates for promotion to persistent rules. */
 export function getPatternsForPromotion(wsId: string): CopyIntelligencePattern[] {
   const rows = stmts().getPromotable.all(wsId) as Record<string, unknown>[];
   return rows.map(rowToPattern);
+}
+
+// ── Guardrail promotion ──
+
+const MISSING_SCHEMA_RE = /no such (table|column)/i;
+
+/**
+ * Safe wrapper for voice-calibration reads — tables may not exist in test envs
+ * or before brand-engine migrations have run. Mirrors the pattern in seo-context.ts.
+ */
+function safeVoiceRead<T>(context: string, wsId: string, fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!MISSING_SCHEMA_RE.test(message)) {
+      // Real error — re-throw so callers see it
+      throw err;
+    }
+    log.debug({ wsId, context, error: message }, 'voice table missing, returning fallback');
+    return fallback;
+  }
+}
+
+/**
+ * Map pattern type → guardrails field.
+ * - tone → toneBoundaries
+ * - terminology / structure / keyword_usage → antiPatterns (general rules)
+ */
+function guardrailFieldForType(type: IntelligencePatternType): keyof Pick<VoiceGuardrails, 'toneBoundaries' | 'antiPatterns'> {
+  return type === 'tone' ? 'toneBoundaries' : 'antiPatterns';
+}
+
+/**
+ * Promote a high-frequency intelligence pattern into the workspace's voice guardrails.
+ *
+ * Validates: pattern exists, belongs to workspace, is active, has frequency >= 3,
+ * and a calibrated voice profile exists. Appends the pattern text to the appropriate
+ * guardrails array, then deactivates the pattern so it no longer appears as promotable.
+ */
+export function promoteToGuardrail(
+  patternId: string,
+  wsId: string,
+): { success: boolean; guardrailText?: string; error?: string } {
+  // 1. Load and validate the pattern
+  const row = stmts().getPatternById.get(patternId, wsId) as Record<string, unknown> | undefined;
+  if (!row) {
+    return { success: false, error: 'Pattern not found' };
+  }
+  const pattern = rowToPattern(row);
+
+  if (!pattern.active) {
+    return { success: false, error: 'Pattern is already inactive (may have been promoted previously)' };
+  }
+  if (pattern.frequency < 3) {
+    return { success: false, error: `Pattern frequency (${pattern.frequency}) is below the promotion threshold of 3` };
+  }
+
+  // 2. Load voice profile — wrapped in safe read for missing-table resilience
+  const profile = safeVoiceRead('promoteToGuardrail.getVoiceProfile', wsId, () => getVoiceProfile(wsId), null);
+  if (!profile) {
+    return { success: false, error: 'No voice profile exists for this workspace' };
+  }
+  if (profile.status !== 'calibrated') {
+    return { success: false, error: `Voice profile must be calibrated to accept guardrails (current status: ${profile.status})` };
+  }
+
+  // 3. Build updated guardrails — append pattern text to the appropriate array
+  const field = guardrailFieldForType(pattern.patternType);
+  const existing: VoiceGuardrails = profile.guardrails ?? {
+    forbiddenWords: [],
+    requiredTerminology: [],
+    toneBoundaries: [],
+    antiPatterns: [],
+  };
+
+  // Avoid duplicates — check if this exact text is already present
+  if (existing[field].includes(pattern.pattern)) {
+    // Still deactivate the pattern (it's already in guardrails)
+    stmts().togglePattern.run(0, patternId, wsId);
+    return { success: true, guardrailText: pattern.pattern };
+  }
+
+  const updatedGuardrails: VoiceGuardrails = {
+    ...existing,
+    [field]: [...existing[field], pattern.pattern],
+  };
+
+  // 4. Persist: update guardrails + deactivate pattern in a transaction
+  db.transaction(() => {
+    safeVoiceRead('promoteToGuardrail.updateVoiceProfile', wsId, () => {
+      updateVoiceProfile(wsId, { guardrails: updatedGuardrails });
+    }, undefined);
+    stmts().togglePattern.run(0, patternId, wsId);
+  })();
+
+  log.info(
+    { wsId, patternId, patternType: pattern.patternType, field, frequency: pattern.frequency },
+    'promoted intelligence pattern to voice guardrail',
+  );
+
+  return { success: true, guardrailText: pattern.pattern };
 }
 
 /**

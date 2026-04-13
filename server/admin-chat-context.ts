@@ -34,6 +34,9 @@ import { buildWorkspaceIntelligence, formatPageMapForPrompt, formatKeywordsForPr
 import { scrapeUrl } from './web-scraper.js';
 import { createLogger } from './logger.js';
 import { getInsights } from './analytics-insights-store.js';
+import { listBlueprints } from './page-strategy.js';
+import { getEntryCopyStatus } from './copy-review.js';
+import { getAllPatterns } from './copy-intelligence.js';
 import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
 import type { IntelligenceSlice } from '../shared/types/intelligence.js';
 import { STUDIO_NAME } from './constants.js';
@@ -57,7 +60,8 @@ type ContextCategory =
   | 'client'         // client communication, churn, engagement
   | 'page_analysis'  // analyze a specific page URL
   | 'content_review' // review pasted content/document
-  | 'insights';      // analytics intelligence — quick wins, priorities, decay, cannibalization
+  | 'insights'       // analytics intelligence — quick wins, priorities, decay, cannibalization
+  | 'copy';          // copy pipeline — blueprints, copy status, section approvals, intelligence patterns
 
 const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   general: [/status report/i, /overview/i, /what.*happening/i, /what.*going on/i, /summary/i, /this week/i, /this month/i, /full.*report/i, /everything/i, /what.*next/i, /roi/i, /highest.*priority/i, /work.*on/i],
@@ -75,6 +79,7 @@ const CATEGORY_PATTERNS: Record<ContextCategory, RegExp[]> = {
   page_analysis: [/https?:\/\//i, /analyze.*page/i, /review.*page/i, /look at.*\//i, /check.*\//i, /what.*wrong.*\//i, /www[.]/i],
   content_review: [], // detected by content length, not patterns
   insights: [/what.*should.*work/i, /priorit/i, /quick.*win/i, /opportunit/i, /declin/i, /cannibali/i, /page.*health/i, /health.*score/i, /what.*focus/i, /biggest.*impact/i],
+  copy: [/copy/i, /copywriting/i, /blueprint/i, /copy.*status/i, /copy.*pipeline/i, /copy.*review/i, /approved.*copy/i, /copy.*approved/i, /section.*status/i],
 };
 
 /** Context size for general queries is managed through selective slice inclusion, not
@@ -319,6 +324,7 @@ export async function assembleAdminContext(
   if (categories.has('performance') || categories.has('general')) intelSlices.push('siteHealth');
   if (categories.has('client') || categories.has('general')) intelSlices.push('clientSignals');
   if (categories.has('approvals') && !intelSlices.includes('operational')) intelSlices.push('operational');
+  if (categories.has('copy') && !intelSlices.includes('contentPipeline')) intelSlices.push('contentPipeline');
 
   const intel = await buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok — slices built dynamically above; general queries union operational+siteHealth+clientSignals
     slices: intelSlices as IntelligenceSlice[],
@@ -754,6 +760,45 @@ export async function assembleAdminContext(
         dataSources.push(`Content Plan (${templates.length} templates, ${matrices.length} matrices)`);
       }
     } catch { /* non-critical */ }
+  }
+
+  // Copy Pipeline (blueprints, copy status, intelligence patterns)
+  if (categories.has('copy') || categories.has('general')) {
+    try {
+      const blueprints = listBlueprints(workspaceId);
+      if (blueprints.length > 0) {
+        const copyLines: string[] = [];
+        for (const bp of blueprints) {
+          const entries = bp.entries ?? [];
+          const entryLines: string[] = [];
+          for (const entry of entries.slice(0, 20)) {
+            try {
+              const copyStatus = getEntryCopyStatus(entry.id, workspaceId);
+              entryLines.push(`  - ${entry.name}: ${copyStatus.overallStatus} (${copyStatus.approvedSections}/${copyStatus.totalSections} sections approved, ${copyStatus.approvalPercentage}%)`);
+            } catch {
+              entryLines.push(`  - ${entry.name}: (copy status unavailable)`);
+            }
+          }
+          copyLines.push(`Blueprint: ${bp.name} (${bp.status}, ${entries.length} pages)\n${entryLines.join('\n')}`);
+        }
+
+        // Intelligence patterns
+        try {
+          const patterns = getAllPatterns(workspaceId);
+          const activePatterns = patterns.filter(p => p.active);
+          if (activePatterns.length > 0) {
+            copyLines.push(`Active Intelligence Patterns: ${activePatterns.length}`);
+            const patternSummary = activePatterns.slice(0, 8).map(p =>
+              `  - [${p.patternType}] ${p.pattern} (freq: ${p.frequency})`
+            );
+            copyLines.push(patternSummary.join('\n'));
+          }
+        } catch { /* copy_intelligence table may not exist yet */ }
+
+        sections.push(`COPY PIPELINE STATUS:\n${copyLines.join('\n')}`);
+        dataSources.push(`Copy Pipeline (${blueprints.length} blueprint(s), section copy status, intelligence patterns)`);
+      }
+    } catch { /* page_strategy / copy tables may not exist yet */ }
   }
 
   // SEO Change Tracker

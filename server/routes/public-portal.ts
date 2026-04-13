@@ -23,6 +23,9 @@ import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
+import { listBlueprints } from '../page-strategy.js';
+import { getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('public-portal');
 
@@ -623,6 +626,125 @@ router.get('/api/public/content-gap-votes/:workspaceId', (req, res) => {
   const votes: Record<string, string> = {};
   for (const r of rows) votes[r.keyword] = r.vote;
   res.json({ votes });
+});
+
+// ── Client Copy Review ──────────────────────────
+// Lets clients review, approve, and suggest edits on generated copy.
+
+// List blueprint entries with their copy status
+router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const blueprints = listBlueprints(wsId);
+  const entries: { id: string; name: string; pageType: string; blueprintId: string; blueprintName: string; copyStatus: ReturnType<typeof getEntryCopyStatus> }[] = [];
+  for (const bp of blueprints) {
+    if (!bp.entries) continue;
+    for (const entry of bp.entries) {
+      const copyStatus = getEntryCopyStatus(entry.id, wsId);
+      // Only include entries that have at least some sections beyond pending
+      if (copyStatus.totalSections > 0 && copyStatus.pendingSections < copyStatus.totalSections) {
+        entries.push({
+          id: entry.id,
+          name: entry.name,
+          pageType: entry.pageType,
+          blueprintId: bp.id,
+          blueprintName: bp.name,
+          copyStatus,
+        });
+      }
+    }
+  }
+
+  res.json({ entries });
+});
+
+// Get sections for an entry (only client_review or approved — no drafts)
+router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const sections = getSectionsForEntry(req.params.entryId, wsId);
+  // Only return sections visible to clients (in review or approved)
+  const clientVisible = sections
+    .filter(s => s.status === 'client_review' || s.status === 'approved')
+    .map(s => ({
+      id: s.id,
+      entryId: s.entryId,
+      sectionPlanItemId: s.sectionPlanItemId,
+      generatedCopy: s.generatedCopy,
+      status: s.status,
+      aiAnnotation: s.aiAnnotation,
+      // Omit aiReasoning — internal only
+      clientSuggestions: s.clientSuggestions,
+      version: s.version,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+    }));
+
+  res.json({ sections: clientVisible });
+});
+
+// Client approves a section
+router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { sectionId } = req.params;
+  const section = updateSectionStatus(sectionId, wsId, 'approved');
+  if (!section) {
+    return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
+  }
+
+  broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
+  log.info({ wsId, sectionId }, 'Client approved copy section');
+  res.json({ section });
+});
+
+// Client suggests an edit on a section
+router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, res) => {
+  const wsId = req.params.workspaceId;
+  const sessionToken = req.cookies?.[`client_session_${wsId}`];
+  const clientUserToken = req.cookies?.[`client_user_token_${wsId}`];
+  const hasSession = sessionToken && verifyClientSession(wsId, sessionToken);
+  const hasClientUserAuth = clientUserToken && verifyClientToken(clientUserToken)?.workspaceId === wsId;
+  if (!hasSession && !hasClientUserAuth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const ws = getWorkspace(wsId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const { sectionId } = req.params;
+  const { originalText, suggestedText } = req.body;
+  if (!originalText || !suggestedText) {
+    return res.status(400).json({ error: 'originalText and suggestedText are required' });
+  }
+
+  const section = addClientSuggestion(sectionId, wsId, {
+    originalText: String(originalText).slice(0, 5000),
+    suggestedText: String(suggestedText).slice(0, 5000),
+  });
+  if (!section) {
+    return res.status(400).json({ error: 'Could not add suggestion. Section not found.' });
+  }
+
+  broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
+  log.info({ wsId, sectionId }, 'Client suggested copy edit');
+  res.json({ section });
 });
 
 export default router;

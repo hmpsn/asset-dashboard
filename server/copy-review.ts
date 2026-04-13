@@ -7,6 +7,9 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { steeringEntrySchema, clientSuggestionSchema, qualityFlagSchema } from './schemas/copy-pipeline.js';
 import { createLogger } from './logger.js';
+import { addVoiceSample, getVoiceProfile, deleteVoiceSample } from './voice-calibration.js';
+import { getEntry } from './page-strategy.js';
+import { addActivity } from './activity-log.js';
 import type {
   CopySection,
   CopyMetadata,
@@ -17,8 +20,47 @@ import type {
   EntryCopyStatus,
 } from '../shared/types/copy-pipeline.js';
 import type { SectionPlanItem } from '../shared/types/page-strategy.js';
+import type { VoiceSampleContext } from '../shared/types/brand-engine.js';
 
 const log = createLogger('copy-review');
+
+// ── Voice sample auto-add on approve ──
+
+/** Max `copy_approved` voice samples per context_tag per workspace (FIFO). */
+const MAX_COPY_APPROVED_SAMPLES_PER_TAG = 3;
+
+const MISSING_SCHEMA_ERROR_RE = /no such (table|column)/i;
+
+/** Gracefully degrade when voice_profiles / voice_samples tables don't exist (test envs). */
+function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!MISSING_SCHEMA_ERROR_RE.test(message)) {
+      throw err;
+    }
+    log.warn({ context, workspaceId, error: message }, 'brand-engine read failed — graceful degradation');
+    return fallback;
+  }
+}
+
+/**
+ * Map section types to voice context tags.
+ * Only valid VoiceSampleContext values are used.
+ * 'faq' maps to 'body' since 'faq' is not a valid VoiceSampleContext.
+ */
+const SECTION_TYPE_TO_CONTEXT_TAG: Record<string, VoiceSampleContext> = {
+  'hero': 'headline',
+  'problem': 'body',
+  'solution': 'body',
+  'features-benefits': 'body',
+  'process': 'body',
+  'faq': 'body',
+  'cta': 'cta',
+  'about-team': 'about',
+  'content-body': 'body',
+};
 
 // ── SQLite row shapes ──
 
@@ -96,6 +138,11 @@ const stmts = createStmtCache(() => ({
      WHERE id = @id AND workspace_id = @workspace_id`,
   ),
 
+  // blueprint entry lookup (for voice sample context tag resolution)
+  selectEntryBlueprintId: db.prepare(
+    `SELECT blueprint_id FROM blueprint_entries WHERE id = ?`,
+  ),
+
   // copy_metadata
   upsertMetadata: db.prepare(
     `INSERT INTO copy_metadata (id, workspace_id, entry_id, seo_title, meta_description, og_title, og_description, status, steering_history, created_at, updated_at)
@@ -167,6 +214,124 @@ const VALID_TRANSITIONS: Record<CopySectionStatus, CopySectionStatus[]> = {
 
 function isValidTransition(from: CopySectionStatus, to: CopySectionStatus): boolean {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+// ── Approve side-effects ──
+
+/**
+ * Task 20: When a section is approved, auto-add its copy as a voice sample.
+ * Resolves section type → context tag, enforces FIFO cap of 3 per tag per workspace.
+ */
+function handleApprovedVoiceSample(section: CopySection, workspaceId: string): void {
+  try {
+    if (!section.generatedCopy) return;
+
+    // Look up the entry to get the section plan and resolve the section type.
+    const entryRow = safeBrandEngineRead(
+      'handleApprovedVoiceSample.selectEntryBlueprintId', workspaceId,
+      () => stmts().selectEntryBlueprintId.get(section.entryId) as { blueprint_id: string } | undefined,
+      undefined,
+    );
+    if (!entryRow) {
+      log.warn({ sectionId: section.id, entryId: section.entryId }, 'voice sample: could not resolve blueprint_id for entry');
+      return;
+    }
+
+    const entry = safeBrandEngineRead(
+      'handleApprovedVoiceSample.getEntry', workspaceId,
+      () => getEntry(workspaceId, entryRow.blueprint_id, section.entryId),
+      null,
+    );
+    if (!entry) {
+      log.warn({ sectionId: section.id, entryId: section.entryId }, 'voice sample: entry not found');
+      return;
+    }
+
+    // Find the matching section plan item to get the section type
+    const planItem = entry.sectionPlan.find(sp => sp.id === section.sectionPlanItemId);
+    const contextTag: VoiceSampleContext = planItem
+      ? (SECTION_TYPE_TO_CONTEXT_TAG[planItem.sectionType] ?? 'body')
+      : 'body';
+
+    // FIFO cap: delete oldest copy_approved samples for this context_tag if at limit
+    const profile = safeBrandEngineRead(
+      'handleApprovedVoiceSample.getVoiceProfile', workspaceId,
+      () => getVoiceProfile(workspaceId),
+      null,
+    );
+    if (profile) {
+      const existingForTag = profile.samples
+        .filter(s => s.source === 'copy_approved' && s.contextTag === contextTag)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)); // oldest first
+
+      if (existingForTag.length >= MAX_COPY_APPROVED_SAMPLES_PER_TAG) {
+        // Delete oldest to make room (FIFO)
+        const toDelete = existingForTag.slice(0, existingForTag.length - MAX_COPY_APPROVED_SAMPLES_PER_TAG + 1);
+        for (const old of toDelete) {
+          safeBrandEngineRead(
+            'handleApprovedVoiceSample.deleteVoiceSample', workspaceId,
+            () => deleteVoiceSample(workspaceId, old.id),
+            false,
+          );
+        }
+      }
+    }
+
+    safeBrandEngineRead(
+      'handleApprovedVoiceSample.addVoiceSample', workspaceId,
+      () => addVoiceSample(workspaceId, section.generatedCopy!, contextTag, 'copy_approved'),
+      undefined as unknown as ReturnType<typeof addVoiceSample>,
+    );
+
+    log.info({ sectionId: section.id, workspaceId, contextTag }, 'auto-added approved copy as voice sample');
+  } catch (err) {
+    log.error({ sectionId: section.id, workspaceId, error: err }, 'failed to add voice sample for approved section — non-critical');
+  }
+}
+
+/**
+ * Task 23: When ALL sections for an entry are approved, calculate copy_approval_rate
+ * (% approved on first try — version === 1) and log it via addActivity.
+ */
+function handleAllSectionsApproved(entryId: string, workspaceId: string): void {
+  try {
+    const sections = getSectionsForEntry(entryId, workspaceId);
+    if (sections.length === 0) return;
+
+    const allApproved = sections.every(s => s.status === 'approved');
+    if (!allApproved) return;
+
+    // Calculate first-try approval rate: sections where version === 1
+    const firstTryCount = sections.filter(s => s.version === 1).length;
+    const approvalRate = Math.round((firstTryCount / sections.length) * 100);
+
+    // Look up entry name for a meaningful activity title
+    const entryRow = stmts().selectEntryBlueprintId.get(entryId) as { blueprint_id: string } | undefined;
+    let entryName = entryId;
+    if (entryRow) {
+      const entry = getEntry(workspaceId, entryRow.blueprint_id, entryId);
+      if (entry) entryName = entry.name;
+    }
+
+    addActivity(
+      workspaceId,
+      'copy_approved',
+      `All copy approved: ${entryName}`,
+      `${sections.length} sections fully approved. First-try approval rate: ${approvalRate}% (${firstTryCount}/${sections.length} approved on first generation).`,
+      {
+        entryId,
+        entryName,
+        totalSections: sections.length,
+        firstTryCount,
+        approvalRate,
+        allSectionsApproved: true,
+      },
+    );
+
+    log.info({ entryId, workspaceId, approvalRate, firstTryCount, totalSections: sections.length }, 'all sections approved — logged approval rate');
+  } catch (err) {
+    log.error({ entryId, workspaceId, error: err }, 'failed to handle all-sections-approved feedback loop — non-critical');
+  }
 }
 
 // ── Section CRUD ──
@@ -309,7 +474,18 @@ export function updateSectionStatus(
     updated_at: now,
   });
 
-  return getSection(sectionId, workspaceId);
+  const updated = getSection(sectionId, workspaceId);
+
+  // ── Side effects on transition to 'approved' ──
+  if (status === 'approved' && updated) {
+    // Task 20: Auto-add approved copy as a voice sample
+    handleApprovedVoiceSample(updated, workspaceId);
+
+    // Task 23: Check if all sections for entry are now approved → log approval rate
+    handleAllSectionsApproved(updated.entryId, workspaceId);
+  }
+
+  return updated;
 }
 
 // Steering (appends to steering_history JSON array)
