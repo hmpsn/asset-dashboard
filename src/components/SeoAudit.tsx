@@ -30,8 +30,7 @@ import { AuditIssueRow } from './audit/AuditIssueRow';
 import { AuditBatchActions } from './audit/AuditBatchActions';
 import { AuditToolbar, AuditCategoryFilter } from './audit/AuditFilters';
 
-// ── Lazy-loaded sub-tool (only LinkChecker used internally for Dead Links sub-tab) ──
-const LinkChecker = lazyWithRetry(() => import('./LinkChecker').then(m => ({ default: m.LinkChecker })));
+// ── Lazy-loaded sub-tools ──
 const AeoReview = lazyWithRetry(() => import('./AeoReview'));
 const ContentDecay = lazyWithRetry(() => import('./ContentDecay'));
 
@@ -42,7 +41,7 @@ interface Props {
   siteName?: string;
 }
 
-type AuditSubTab = 'audit' | 'links' | 'history' | 'aeo-review' | 'content-decay';
+type AuditSubTab = 'audit' | 'history' | 'aeo-review' | 'content-decay';
 
 function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
@@ -55,7 +54,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [hasRun, setHasRun] = useState(false);
   const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>(() => {
     const sub = searchParams.get('sub');
-    const valid: AuditSubTab[] = ['audit', 'links', 'history', 'aeo-review', 'content-decay'];
+    const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay'];
     return valid.includes(sub as AuditSubTab) ? (sub as AuditSubTab) : 'audit';
   });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -554,7 +553,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mb-4">
       {([
         { id: 'audit' as const, label: 'Site Audit', icon: Globe },
-        { id: 'links' as const, label: 'Dead Links', icon: ExternalLink },
         { id: 'history' as const, label: 'History', icon: Clock },
       ] as const).map(t => (
         <button
@@ -596,9 +594,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   }
   if (auditSubTab === 'aeo-review' && workspaceId) {
     return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-purple-400" /></div>}><AeoReview workspaceId={workspaceId} /></Suspense></div>;
-  }
-  if (auditSubTab === 'links') {
-    return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}><LinkChecker siteId={siteId} /></Suspense></div>;
   }
   if (auditSubTab === 'history') {
     return <div>{auditTabBar}<AuditHistory siteId={siteId} history={history} onRefresh={loadHistory} /></div>;
@@ -730,7 +725,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             icon={Link2Off}
             valueColor={effectiveData!.deadLinkSummary.internal > 0 ? 'text-red-400' : effectiveData!.deadLinkSummary.total > 0 ? 'text-amber-400' : 'text-emerald-400'}
             sub={effectiveData!.deadLinkSummary.total === 0 ? 'All links healthy' : `${effectiveData!.deadLinkSummary.internal} internal · ${effectiveData!.deadLinkSummary.external} external`}
-            onClick={() => setAuditSubTab('links')}
             size="hero"
             staggerIndex={4}
           />
