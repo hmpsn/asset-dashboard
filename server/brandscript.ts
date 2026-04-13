@@ -268,8 +268,10 @@ Return valid JSON: { "sections": [{ "title": "exact title from above", "content"
  * The onboarding endpoint stores fields as "Label: value" lines.
  */
 function extractKbField(kb: string, label: string): string | undefined {
+  // Escape regex metacharacters in label to prevent injection
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Match "Label: value" possibly spanning until the next label or double-newline
-  const pattern = new RegExp(`^${label}:\\s*(.+?)(?=\\n[A-Z][\\w\\s/]+:|\\n\\n|$)`, 'ms');
+  const pattern = new RegExp(`^${escapedLabel}:\\s*(.+?)(?=\\n[A-Z][\\w\\s/]+:|\\n\\n|$)`, 'ms');
   const m = kb.match(pattern);
   return m?.[1]?.trim() || undefined;
 }

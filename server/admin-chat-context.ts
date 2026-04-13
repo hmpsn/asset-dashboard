@@ -768,7 +768,7 @@ export async function assembleAdminContext(
       const blueprints = listBlueprints(workspaceId);
       if (blueprints.length > 0) {
         const copyLines: string[] = [];
-        for (const bp of blueprints) {
+        for (const bp of blueprints.slice(0, 5)) {
           const entries = bp.entries ?? [];
           const entryLines: string[] = [];
           for (const entry of entries.slice(0, 20)) {
