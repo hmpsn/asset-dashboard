@@ -253,16 +253,17 @@ function handleApprovedVoiceSample(section: CopySection, workspaceId: string): v
       ? (SECTION_TYPE_TO_CONTEXT_TAG[planItem.sectionType] ?? 'body')
       : 'body';
 
-    // FIFO cap: delete oldest copy_approved samples for this context_tag if at limit.
-    // Wrapped in db.transaction() so delete+add are atomic — a crash between them
-    // cannot lose samples without adding the replacement.
-    const profile = safeBrandEngineRead(
-      'handleApprovedVoiceSample.getVoiceProfile', workspaceId,
-      () => getVoiceProfile(workspaceId),
-      null,
-    );
-
+    // FIFO cap: read + delete + add all inside one transaction to prevent:
+    // 1. Crash between delete and add losing samples without replacement
+    // 2. TOCTOU race where two concurrent approvals read the same stale count
+    //    and both evict the same sample, overshooting the cap
     db.transaction(() => {
+      const profile = safeBrandEngineRead(
+        'handleApprovedVoiceSample.getVoiceProfile', workspaceId,
+        () => getVoiceProfile(workspaceId),
+        null,
+      );
+
       if (profile) {
         const existingForTag = profile.samples
           .filter(s => s.source === 'copy_approved' && s.contextTag === contextTag)

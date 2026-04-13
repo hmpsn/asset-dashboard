@@ -24,7 +24,7 @@ import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
-import { getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
 import { WS_EVENTS } from '../ws-events.js';
 
 const log = createLogger('public-portal');
@@ -718,8 +718,18 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, re
 
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const { sectionId } = req.params;
+
+  // Pre-check: only client_review sections can be approved via the client portal.
+  // The general state machine allows draft→approved (for admin use), but the
+  // client portal must enforce the agency-sends-for-review workflow.
+  const existing = getSection(sectionId, wsId);
+  if (!existing || existing.status !== 'client_review') {
+    return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
+  }
+
   const section = updateSectionStatus(sectionId, wsId, 'approved');
   if (!section) {
     return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
@@ -745,11 +755,18 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, re
 
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const { sectionId } = req.params;
   const { originalText, suggestedText } = req.body;
   if (!originalText || !suggestedText) {
     return res.status(400).json({ error: 'originalText and suggestedText are required' });
+  }
+
+  // Only client_review sections accept suggestions via the client portal
+  const existing = getSection(sectionId, wsId);
+  if (!existing || existing.status !== 'client_review') {
+    return res.status(400).json({ error: 'Section is not in a reviewable state.' });
   }
 
   const section = addClientSuggestion(sectionId, wsId, {
