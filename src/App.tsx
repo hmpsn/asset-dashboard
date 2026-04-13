@@ -210,6 +210,9 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
   const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests'>('signals');
 
+  // Reset requests sub-tab when workspace changes so stale state doesn't persist
+  useEffect(() => { setRequestsSubTab('signals'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
+
   // Derive selected workspace from URL + React Query data
   const selected = useMemo(() => {
     if (!urlWorkspaceId) return null;
@@ -421,7 +424,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
           onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests')}
           className="mb-6"
         />
-        {requestsSubTab === 'signals' && <AdminInbox workspaceId={selected.id} />}
+        {requestsSubTab === 'signals' && <AdminInbox key={`inbox-${selected.id}`} workspaceId={selected.id} />}
         {requestsSubTab === 'requests' && <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />}
       </div>
     );

@@ -48,6 +48,7 @@ function collectTsxFiles(dir: string): string[] {
  * Combined: page slug → absolute file path.
  */
 function buildRouteMap(): Map<string, string> {
+  // readFile-ok — intentional static analysis of route table
   const appTsx = readFileSync(join(SRC_DIR, 'App.tsx'), 'utf8');
 
   // Step 1: component name → import path

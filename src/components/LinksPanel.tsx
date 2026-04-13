@@ -22,11 +22,21 @@ const TABS = [
 type LinksTab = typeof TABS[number]['id'];
 
 export function LinksPanel({ siteId, workspaceId }: Props) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<LinksTab>(() => {
     const param = searchParams.get('tab');
     return TABS.some(t => t.id === param) ? (param as LinksTab) : 'redirects';
   });
+
+  // Clear ?tab= from URL on manual tab change so refresh shows last selection
+  const handleTabChange = (id: LinksTab) => {
+    setActiveTab(id);
+    if (searchParams.has('tab')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -38,7 +48,7 @@ export function LinksPanel({ siteId, workspaceId }: Props) {
           return (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => handleTabChange(t.id)}
               className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
                 active
                   ? 'border-teal-400 text-teal-300'
