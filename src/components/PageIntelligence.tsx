@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
@@ -7,7 +7,7 @@ import {
   Shield, DollarSign, ArrowUp, ArrowDown, ArrowUpRight, Code2, Plus,
 } from 'lucide-react';
 import { adminPath } from '../routes';
-import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar } from './ui';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
@@ -15,8 +15,11 @@ import { useKeywordStrategy } from '../hooks/admin';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
 import type { MetricsSource } from '../../shared/types/keywords.js';
+
+const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 
 // ── Types ──
 
@@ -195,6 +198,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const queryClient = useQueryClient();
   const { data: keywordData, isLoading: strategyLoading } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'pages' | 'architecture'>('pages');
 
   // All pages from webflow (static + CMS)
   const [allPages, setAllPages] = useState<PageMeta[]>([]);
@@ -586,7 +592,24 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      <TabBar
+        tabs={[
+          { id: 'pages', label: 'Pages' },
+          { id: 'architecture', label: 'Architecture' },
+        ]}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as 'pages' | 'architecture')}
+      />
+
+      {activeTab === 'architecture' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <SiteArchitecture key={`arch-${workspaceId}`} workspaceId={workspaceId} />
+        </Suspense>
+      )}
+
+      {activeTab === 'pages' && (
+      <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1217,6 +1240,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           </div>
         )}
       </div>
+      </div>
+      )}
     </div>
   );
 }
