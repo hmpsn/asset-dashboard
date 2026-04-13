@@ -13,13 +13,14 @@ import {
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off, Download,
-  Wrench, ArrowRight, Plus,
+  Wrench, ArrowRight, Plus, BookOpen,
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { AuditHistory } from './audit/AuditHistory';
+import { SeoAuditGuide } from './audit/SeoAuditGuide';
 import {
   type Severity, type CheckCategory, type SeoIssue, type PageSeoResult,
   type SeoAuditResult, type SnapshotSummary, type CwvStrategyResult,
@@ -41,7 +42,7 @@ interface Props {
   siteName?: string;
 }
 
-type AuditSubTab = 'audit' | 'history' | 'aeo-review' | 'content-decay';
+type AuditSubTab = 'audit' | 'history' | 'aeo-review' | 'content-decay' | 'guide';
 
 function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
@@ -54,7 +55,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [hasRun, setHasRun] = useState(false);
   const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>(() => {
     const sub = searchParams.get('sub');
-    const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay'];
+    const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay', 'guide'];
     return valid.includes(sub as AuditSubTab) ? (sub as AuditSubTab) : 'audit';
   });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -589,8 +590,22 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           {t.label}
         </button>
       ))}
+      <div className="w-px h-4 bg-zinc-700 mx-1 self-center" />
+      <button
+        onClick={() => setAuditSubTab('guide')}
+        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+          auditSubTab === 'guide'
+            ? 'border-teal-500 text-teal-300'
+            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+        }`}
+      >
+        <BookOpen className="w-3.5 h-3.5" />
+        Guide
+      </button>
     </div>
   );
+
+  if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
     return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;

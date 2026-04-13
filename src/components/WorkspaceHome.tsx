@@ -6,7 +6,7 @@ import {
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar } from './ui';
 import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
@@ -69,6 +69,20 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     const param = searchParams.get('tab');
     return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
   });
+
+  const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
+  // Must be before any conditional early return (Rules of Hooks).
+  // Initialized from localStorage only — no async deps. OnboardingChecklist's
+  // own allComplete branch handles the "all steps done" celebration + auto-dismiss.
+  const [checklistVisible, setChecklistVisible] = useState(
+    () => !localStorage.getItem(storageKey)
+  );
+  // Sync visibility when workspaceId changes without remount (React Router reuses
+  // the same component instance across workspace switches). The !loading render
+  // guard prevents any flash — the component is in a loading state at switch time.
+  useEffect(() => {
+    setChecklistVisible(!localStorage.getItem(storageKey));
+  }, [storageKey]);
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: string) => {
@@ -186,8 +200,84 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
 
+  const onboardingSteps = [
+    {
+      id: 'webflow',
+      label: 'Link Webflow site',
+      description: 'Connect your Webflow site to enable SEO tools and page analysis.',
+      completed: !!webflowSiteId,
+      estimatedTime: '2 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'gsc',
+      label: 'Connect Google Search Console',
+      description: 'Get search performance data — clicks, impressions, and rankings.',
+      completed: !!gscPropertyUrl,
+      estimatedTime: '3 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'ga4',
+      label: 'Connect Google Analytics',
+      description: 'Track users, sessions, and conversions from organic traffic.',
+      completed: !!ga4PropertyId,
+      estimatedTime: '3 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'audit',
+      label: 'Run your first SEO audit',
+      description: 'Get a full health score for your site — issues, warnings, and fixes.',
+      completed: !!(audit && audit.siteScore > 0),
+      estimatedTime: '1 min',
+      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
+    },
+  ];
+
+  // ── Workspace Health Bar ──
+  const healthMetrics = [
+    {
+      label: 'SEO Audit',
+      percent: audit?.siteScore ?? 0,
+      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
+    },
+    {
+      label: 'Setup',
+      percent: Math.round(([!!webflowSiteId, !!gscPropertyUrl, !!ga4PropertyId].filter(Boolean).length / 3) * 100),
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    ...(contentPipeline && contentPipeline.totalCells > 0 ? [{
+      label: 'Content',
+      percent: Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100),
+      onClick: () => navigate(adminPath(workspaceId, 'content')),
+    }] : []),
+  ];
+
+  const healthRecommendations = [
+    ...(!webflowSiteId ? [{ label: 'Link your Webflow site', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '2 min' }] : []),
+    ...(!gscPropertyUrl ? [{ label: 'Connect Google Search Console', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
+    ...(!ga4PropertyId ? [{ label: 'Connect Google Analytics', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
+    ...(audit && audit.siteScore < 60 ? [{ label: `Fix ${audit.errors} SEO errors`, onClick: () => navigate(adminPath(workspaceId, 'seo-audit')), estimatedTime: '30 min' }] : []),
+  ].slice(0, 3);
+
   return (
     <div className="space-y-8">
+      {checklistVisible && !loading && (
+        <OnboardingChecklist
+          steps={onboardingSteps}
+          onDismiss={() => {
+            localStorage.setItem(storageKey, '1');
+            setChecklistVisible(false);
+          }}
+          onComplete={() => {
+            // Write localStorage now so checklist won't reappear after the
+            // 2-second celebration — but don't set state here to keep the
+            // celebration visible until OnboardingChecklist auto-calls onDismiss.
+            localStorage.setItem(storageKey, '1');
+          }}
+        />
+      )}
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
@@ -381,6 +471,14 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           />
         )}
       </div>
+
+      {/* ── Workspace Health Bar ── */}
+      {activeTab === 'overview' && healthMetrics.length > 0 && (
+        <WorkspaceHealthBar
+          metrics={healthMetrics}
+          recommendations={healthRecommendations.length > 0 ? healthRecommendations : undefined}
+        />
+      )}
 
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {

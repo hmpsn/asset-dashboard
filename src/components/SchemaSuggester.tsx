@@ -12,7 +12,7 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { StatusBadge } from './ui/StatusBadge';
-import { ErrorState, ProgressIndicator, NextStepsCard } from './ui';
+import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { CmsTemplatePanel } from './schema/CmsTemplatePanel';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -594,6 +594,18 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
     return (
       <div className="space-y-8">
         {schemaTabBar}
+        {schemaSubTab === 'generator' && (
+          <WorkflowStepper
+            steps={[
+              { number: 1, label: 'Scan', completed: false, current: true },
+              { number: 2, label: 'Review', completed: false, current: false },
+              { number: 3, label: 'Edit', completed: false, current: false },
+              { number: 4, label: 'Publish', completed: false, current: false },
+              { number: 5, label: 'Validate', completed: false, current: false },
+            ]}
+            compact
+          />
+        )}
         <div className="flex flex-col items-center justify-center py-8 gap-4">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
             <Sparkles className="w-7 h-7 text-teal-400" />
@@ -770,6 +782,18 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
   return (
     <div className="space-y-8">
       {schemaTabBar}
+      {schemaSubTab === 'generator' && (
+        <WorkflowStepper
+          steps={[
+            { number: 1, label: 'Scan', completed: !!data && data.length > 0, current: loading },
+            { number: 2, label: 'Review', completed: false, current: !loading && !!data && data.length > 0 },
+            { number: 3, label: 'Edit', completed: false, current: false },
+            { number: 4, label: 'Publish', completed: false, current: false },
+            { number: 5, label: 'Validate', completed: false, current: false },
+          ]}
+          compact
+        />
+      )}
       {/* Schema site plan */}
       <SchemaPlanPanel siteId={siteId} />
 
