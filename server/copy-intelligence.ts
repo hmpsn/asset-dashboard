@@ -48,28 +48,39 @@ const stmts = createStmtCache(() => ({
 
 // ── Row mapper ──
 
-function rowToPattern(row: Record<string, unknown>): CopyIntelligencePattern {
+interface CopyIntelligenceRow {
+  id: string;
+  workspace_id: string;
+  pattern_type: string;
+  pattern: string;
+  source: string | null;
+  frequency: number;
+  active: number;
+  created_at: string;
+}
+
+function rowToPattern(row: CopyIntelligenceRow): CopyIntelligencePattern {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
+    id: row.id,
+    workspaceId: row.workspace_id,
     patternType: row.pattern_type as IntelligencePatternType,
-    pattern: row.pattern as string,
-    source: row.source as string | null,
-    frequency: row.frequency as number,
+    pattern: row.pattern,
+    source: row.source,
+    frequency: row.frequency,
     active: Boolean(row.active),
-    createdAt: row.created_at as string,
+    createdAt: row.created_at,
   };
 }
 
 // ── Public API ──
 
 export function getAllPatterns(wsId: string): CopyIntelligencePattern[] {
-  const rows = stmts().getAllPatterns.all(wsId) as Record<string, unknown>[];
+  const rows = stmts().getAllPatterns.all(wsId) as CopyIntelligenceRow[];
   return rows.map(rowToPattern);
 }
 
 export function getActivePatterns(wsId: string): CopyIntelligencePattern[] {
-  const rows = stmts().getActivePatterns.all(wsId) as Record<string, unknown>[];
+  const rows = stmts().getActivePatterns.all(wsId) as CopyIntelligenceRow[];
   return rows.map(rowToPattern);
 }
 
@@ -83,16 +94,16 @@ export function addPattern(
 ): CopyIntelligencePattern {
   // Wrap in transaction to eliminate TOCTOU race between SELECT and INSERT
   return db.transaction(() => {
-    const existing = stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown> | undefined;
+    const existing = stmts().findByPattern.get(wsId, data.pattern) as CopyIntelligenceRow | undefined;
     if (existing) {
       stmts().incrementFrequency.run(existing.id, wsId);
-      return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown>);
+      return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as CopyIntelligenceRow);
     }
 
     const id = `ip_${randomUUID().slice(0, 8)}`;
     const now = new Date().toISOString();
     stmts().insertPattern.run(id, wsId, data.patternType, data.pattern, data.source ?? null, 1, 1, now);
-    return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as Record<string, unknown>);
+    return rowToPattern(stmts().findByPattern.get(wsId, data.pattern) as CopyIntelligenceRow);
   })();
 }
 
@@ -115,7 +126,7 @@ export function updatePatternText(
 
 /** Returns active patterns with frequency >= 3, candidates for promotion to persistent rules. */
 export function getPatternsForPromotion(wsId: string): CopyIntelligencePattern[] {
-  const rows = stmts().getPromotable.all(wsId) as Record<string, unknown>[];
+  const rows = stmts().getPromotable.all(wsId) as CopyIntelligenceRow[];
   return rows.map(rowToPattern);
 }
 
@@ -162,7 +173,7 @@ export function promoteToGuardrail(
   wsId: string,
 ): { success: boolean; guardrailText?: string; error?: string } {
   // 1. Load and validate the pattern
-  const row = stmts().getPatternById.get(patternId, wsId) as Record<string, unknown> | undefined;
+  const row = stmts().getPatternById.get(patternId, wsId) as CopyIntelligenceRow | undefined;
   if (!row) {
     return { success: false, error: 'Pattern not found' };
   }
@@ -245,14 +256,20 @@ Extract patterns into these categories:
 Return JSON array: [{"patternType": "terminology|tone|structure|keyword_usage", "pattern": "concise rule description"}]
 Return only valid JSON, no markdown.`;
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1-mini',
-    messages: [{ role: 'user', content: prompt }],
-    maxTokens: 1000,
-    feature: 'copy-intelligence',
-    workspaceId: wsId,
-    responseFormat: { type: 'json_object' },
-  });
+  let result;
+  try {
+    result = await callOpenAI({
+      model: 'gpt-4.1-mini',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 1000,
+      feature: 'copy-intelligence',
+      workspaceId: wsId,
+      responseFormat: { type: 'json_object' },
+    });
+  } catch (err) {
+    log.error({ err, wsId, noteCount: steeringNotes.length }, 'Pattern extraction AI call failed');
+    return [];
+  }
 
   let extracted: Array<{ patternType: IntelligencePatternType; pattern: string }> = [];
   // The model may return a bare array or wrap it in { patterns: [...] } / { items: [...] }

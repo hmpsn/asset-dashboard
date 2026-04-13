@@ -239,9 +239,11 @@ Prioritize sections that are most likely contributing to the decline (outdated i
       const priority = raw.priority;
       if (priority !== 'high' && priority !== 'medium' && priority !== 'low') continue;
 
+      // Extract readable type from plan item ID (format: "sp_xxx_hero" → "hero")
+      const extractedType = section.sectionPlanItemId.split('_').slice(2).join('_') || 'section';
       suggestions.push({
         sectionId: section.id,
-        sectionType: section.sectionPlanItemId,
+        sectionType: extractedType,
         currentCopy: section.generatedCopy,
         suggestedAction: action,
         reason: raw.reason ?? 'No reason provided',

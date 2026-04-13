@@ -336,12 +336,18 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 
   const sections = sectionsData?.sections ?? [];
 
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
   // ── Approve mutation ──
   const approveMutation = useMutation({
     mutationFn: (sectionId: string) => approveSection(workspaceId, sectionId),
     onSuccess: () => {
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId, entryId] });
       queryClient.invalidateQueries({ queryKey: ['client-copy-entries', workspaceId] });
+    },
+    onError: () => {
+      setMutationError('Could not approve this section. Please try again.');
     },
   });
 
@@ -353,8 +359,12 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
         suggestedText: args.suggestedText,
       }),
     onSuccess: () => {
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId, entryId] });
       queryClient.invalidateQueries({ queryKey: ['client-copy-entries', workspaceId] });
+    },
+    onError: () => {
+      setMutationError('Could not submit your suggestion. Please try again.');
     },
   });
 
@@ -396,6 +406,12 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 
   return (
     <div className="space-y-4">
+      {mutationError && (
+        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>{mutationError}</span>
+        </div>
+      )}
       {sections.map(section => (
         <SectionReviewCard
           key={section.id}
@@ -405,7 +421,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
             suggestMutation.mutate({ sectionId: section.id, originalText, suggestedText })
           }
           isApproving={approveMutation.isPending && approveMutation.variables === section.id}
-          isSuggesting={suggestMutation.isPending}
+          isSuggesting={suggestMutation.isPending && suggestMutation.variables?.sectionId === section.id}
         />
       ))}
     </div>
@@ -426,6 +442,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
   const [showSuggestForm, setShowSuggestForm] = useState(false);
   const [suggestedText, setSuggestedText] = useState('');
   const isApproved = section.status === 'approved';
+  const isReviewable = section.status === 'client_review';
 
   // Extract section type from the sectionPlanItemId (format: "sp_xxx_hero" etc.)
   const sectionTypeRaw = section.sectionPlanItemId.split('_').slice(2).join('_') || 'section';
@@ -491,7 +508,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
       )}
 
       {/* Action buttons (only for sections in client_review) */}
-      {!isApproved && (
+      {isReviewable && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button
             onClick={onApprove}
@@ -524,7 +541,7 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
       )}
 
       {/* Suggestion form */}
-      {showSuggestForm && !isApproved && (
+      {showSuggestForm && isReviewable && (
         <div className="border-t border-zinc-800 pt-3 space-y-2">
           <label className="text-xs text-zinc-400 block">
             How would you like this section to read?

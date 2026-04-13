@@ -631,6 +631,22 @@ router.get('/api/public/content-gap-votes/:workspaceId', (req, res) => {
 // ── Client Copy Review ──────────────────────────
 // Lets clients review, approve, and suggest edits on generated copy.
 
+/** Strip internal-only fields (aiReasoning, steeringHistory, qualityFlags, workspaceId) from a CopySection before returning to client. */
+function toClientSection(s: { id: string; entryId: string; sectionPlanItemId: string; generatedCopy: string | null; status: string; aiAnnotation: string | null; clientSuggestions: unknown; version: number; createdAt: string; updatedAt: string }) {
+  return {
+    id: s.id,
+    entryId: s.entryId,
+    sectionPlanItemId: s.sectionPlanItemId,
+    generatedCopy: s.generatedCopy,
+    status: s.status,
+    aiAnnotation: s.aiAnnotation,
+    clientSuggestions: s.clientSuggestions,
+    version: s.version,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
+
 // List blueprint entries with their copy status
 router.get('/api/public/copy/:workspaceId/entries', (req, res) => {
   const wsId = req.params.workspaceId;
@@ -710,7 +726,8 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', (req, re
   broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
   addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
   log.info({ wsId, sectionId }, 'Client approved copy section');
-  res.json({ section });
+  // Strip internal-only fields before returning to client
+  res.json({ section: toClientSection(section) });
 });
 
 // Client suggests an edit on a section
@@ -744,7 +761,8 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', (req, re
   broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
   addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
   log.info({ wsId, sectionId }, 'Client suggested copy edit');
-  res.json({ section });
+  // Strip internal-only fields before returning to client
+  res.json({ section: toClientSection(section) });
 });
 
 export default router;

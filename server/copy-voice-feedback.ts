@@ -134,7 +134,13 @@ export async function suggestVoiceProfileUpdate(
     return null;
   }
 
-  const profile = getVoiceProfile(workspaceId);
+  let profile;
+  try {
+    profile = getVoiceProfile(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'voice_profiles table unavailable — skipping voice update suggestion');
+    return null;
+  }
   if (!profile) {
     log.info({ workspaceId }, 'no voice profile found — skipping voice update suggestion');
     return null;
