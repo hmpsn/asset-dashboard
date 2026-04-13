@@ -71,6 +71,12 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   });
 
   const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
+  // Must be before any conditional early return (Rules of Hooks).
+  // Initialized from localStorage only — no async deps. OnboardingChecklist's
+  // own allComplete branch handles the "all steps done" celebration + auto-dismiss.
+  const [checklistVisible, setChecklistVisible] = useState(
+    () => !localStorage.getItem(storageKey)
+  );
 
   // Clear ?tab= from URL on manual tab change so refresh shows last selection
   const handleTabChange = (id: string) => {
@@ -222,12 +228,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
     },
   ];
-
-  // Initialized once on mount — stays visible until explicit dismiss, NOT until steps complete.
-  // This ensures the "You're all set!" celebration inside OnboardingChecklist is reachable.
-  const [checklistVisible, setChecklistVisible] = useState(
-    () => !localStorage.getItem(storageKey) && onboardingSteps.some(s => !s.completed)
-  );
 
   // ── Workspace Health Bar ──
   const healthMetrics = [
