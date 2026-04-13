@@ -107,6 +107,8 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2` |
 | **DateRangeSelector** | `DateRangeSelector.tsx` | Active: `bg-zinc-700 text-zinc-200` | Segmented control style |
 | **EmptyState** | `EmptyState.tsx` | Icon: `text-zinc-400` in `bg-zinc-800` container | Centered layout with optional CTA |
+| **NextStepsCard** | `NextStepsCard.tsx` | Title icon: `text-emerald-400` (success) / `text-blue-400` (info). Step rows: `hover:bg-teal-500/5 group-hover:text-teal-300`. Dismiss: zinc | Completion card after AI operations. Wraps `SectionCard` with `noPadding` + `staggerIndex` passthrough. `success` = green CheckCircle2, `info` = blue Info. Empty steps guard: returns null. |
+| **ProgressIndicator** | `ProgressIndicator.tsx` | Progress bar: `bg-blue-500` (data law). Container: `bg-zinc-900 border border-blue-500/20 rounded-xl`. Complete: `text-emerald-400`. Cancel: zinc → `hover:text-red-400` | Unified progress bar. Idle/error → null. Indeterminate: `animate-pulse w-2/3`. Deterministic: `transition-all duration-500`. Auto-fades 3s after complete. `role="progressbar"` with ARIA attrs. |
 | **TierGate** | `TierGate.tsx` | Growth: `teal`, Premium: `amber` | Blurred preview + overlay lock. Exports `TierBadge`. `onGateHit` callback (optional) fires when gate blocks access for upsell tracking. |
 | **InsightsDigest** | `client/InsightsDigest.tsx` | Green=win, amber=opportunity/warning, red=critical, teal=CTA links | Unified feed: local + server insights merged. Server insights mapped via `SEVERITY_TO_COLOR` + `INSIGHT_TYPE_ACTIONS`. |
 | **MonthlyDigest** | `client/MonthlyDigest.tsx` | Emerald=wins, blue=ROI highlights, teal=pages optimized count | Growth-gated. No purple. |
@@ -319,6 +321,8 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | `src/components/ui/TabBar.tsx` | Underline tab navigation |
 | `src/components/ui/DateRangeSelector.tsx` | Segmented date picker |
 | `src/components/ui/EmptyState.tsx` | Centered empty/placeholder |
+| `src/components/ui/NextStepsCard.tsx` | Post-completion next-step card |
+| `src/components/ui/ProgressIndicator.tsx` | Blue progress bar, idle/error = null |
 | `src/components/ui/TierGate.tsx` | Tier lock overlay + TierBadge |
 | `src/components/ui/DataList.tsx` | Ranked data list |
 | `src/components/ClientDashboard.tsx` | Client-facing dashboard (largest component) |
