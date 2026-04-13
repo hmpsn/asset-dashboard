@@ -202,12 +202,12 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Tab content */}
       {activeTab === 'planner' && (
-        <Suspense fallback={<LoadingState size="sm" message="Loading..." />}>
+        <Suspense fallback={<LoadingState size="lg" message="Loading..." />}>
           <ContentPlanner key={`planner-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
       {activeTab === 'calendar' && (
-        <Suspense fallback={<LoadingState size="sm" message="Loading..." />}>
+        <Suspense fallback={<LoadingState size="lg" message="Loading..." />}>
           <ContentCalendar key={`calendar-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}

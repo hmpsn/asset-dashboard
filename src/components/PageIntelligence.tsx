@@ -672,7 +672,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           type="general"
           title="Page Analysis Failed"
           message={analysisError}
-          action={{ label: 'Dismiss', onClick: () => { setAnalysisError(null); } }}
+          actions={[{ label: 'Dismiss', onClick: () => { setAnalysisError(null); }, variant: 'secondary' }]}
         />
       )}
 
