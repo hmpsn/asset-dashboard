@@ -248,10 +248,11 @@ describe('Client suggestion', () => {
   beforeAll(() => {
     sectionId = `test-suggest-section-${randomUUID().slice(0, 8)}`;
     // Start in client_review so the suggestion triggers revision_requested transition
+    // Uses 'sp-3' to avoid UNIQUE(entry_id, section_plan_item_id) conflict with 'sp-1'/'sp-2'
     db.prepare(`
       INSERT INTO copy_sections (id, workspace_id, entry_id, section_plan_item_id, generated_copy, status, steering_history, version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(sectionId, wsId, entryId, 'sp-1', 'Review copy text', 'client_review', '[]', 1, now, now);
+    `).run(sectionId, wsId, entryId, 'sp-3', 'Review copy text', 'client_review', '[]', 1, now, now);
   });
 
   it('POST /api/copy/:wsId/section/:sectionId/suggest adds suggestion', async () => {
@@ -275,10 +276,11 @@ describe('Workspace isolation', () => {
 
   beforeAll(() => {
     sectionId = `test-iso-section-${randomUUID().slice(0, 8)}`;
+    // Uses 'sp-4' to avoid UNIQUE(entry_id, section_plan_item_id) conflict
     db.prepare(`
       INSERT INTO copy_sections (id, workspace_id, entry_id, section_plan_item_id, generated_copy, status, steering_history, version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(sectionId, wsId, entryId, 'sp-1', 'Isolation test copy', 'draft', '[]', 1, now, now);
+    `).run(sectionId, wsId, entryId, 'sp-4', 'Isolation test copy', 'draft', '[]', 1, now, now);
   });
 
   it('GET sections for wsA entry via wsB returns empty array (not wsA data)', async () => {
@@ -329,10 +331,11 @@ describe('Zod validation', () => {
 
   beforeAll(() => {
     sectionId = `test-zod-section-${randomUUID().slice(0, 8)}`;
+    // Uses 'sp-5' to avoid UNIQUE(entry_id, section_plan_item_id) conflict
     db.prepare(`
       INSERT INTO copy_sections (id, workspace_id, entry_id, section_plan_item_id, generated_copy, status, steering_history, version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(sectionId, wsId, entryId, 'sp-1', 'Validation test copy', 'draft', '[]', 1, now, now);
+    `).run(sectionId, wsId, entryId, 'sp-5', 'Validation test copy', 'draft', '[]', 1, now, now);
   });
 
   it('PATCH status with missing body returns 400', async () => {

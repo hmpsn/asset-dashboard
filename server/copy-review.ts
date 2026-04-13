@@ -139,8 +139,11 @@ const stmts = createStmtCache(() => ({
   ),
 
   // blueprint entry lookup (for voice sample context tag resolution)
+  // blueprint_entries has no workspace_id column; workspace isolation is via site_blueprints JOIN
   selectEntryBlueprintId: db.prepare(
-    `SELECT blueprint_id FROM blueprint_entries WHERE id = ? AND workspace_id = ?`,
+    `SELECT be.blueprint_id FROM blueprint_entries be
+     JOIN site_blueprints sb ON sb.id = be.blueprint_id
+     WHERE be.id = ? AND sb.workspace_id = ?`,
   ),
 
   // copy_metadata
