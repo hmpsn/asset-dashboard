@@ -5,7 +5,7 @@ import {
   Search, Globe, BarChart3, Shield, Gauge, Pencil, Link2,
   Target, Code2, Clipboard, Image, TrendingUp, Sparkles, FileText,
   LayoutDashboard, Settings, Command, ArrowUp, ArrowDown, CornerDownLeft,
-  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy, BookOpen,
+  Zap, FileSearch, MessageSquare, LayoutTemplate, Grid3X3, ListChecks, Layers, Trophy,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
 import { type Page, adminPath } from '../routes';
@@ -28,29 +28,36 @@ interface CommandPaletteProps {
 
 const NAV_ITEMS: Array<{ id: Page; label: string; icon: typeof Search; group: string; needsSite?: boolean }> = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, group: '' },
-  { id: 'brief', label: 'Meeting Brief', icon: BookOpen, group: '' },
-  { id: 'analytics-hub', label: 'Analytics', icon: BarChart3, group: 'Analytics', needsSite: true },
-  { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Analytics', needsSite: true },
+  // Monitoring
+  { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, group: 'Monitoring', needsSite: true },
+  { id: 'seo-ranks', label: 'Rank Tracker', icon: TrendingUp, group: 'Monitoring', needsSite: true },
+  { id: 'outcomes', label: 'Action Results', icon: Trophy, group: 'Monitoring' },
+  // Site Health
   { id: 'seo-audit', label: 'Site Audit', icon: Globe, group: 'Site Health', needsSite: true },
   { id: 'performance', label: 'Performance', icon: Gauge, group: 'Site Health', needsSite: true },
   { id: 'links', label: 'Links', icon: Link2, group: 'Site Health', needsSite: true },
   { id: 'media', label: 'Assets', icon: Image, group: 'Site Health' },
-  { id: 'brand', label: 'Brand & AI', icon: Sparkles, group: 'SEO' },
-  { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'SEO', needsSite: true },
-  { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'SEO', needsSite: true },
-  { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'SEO', needsSite: true },
-  { id: 'seo-schema', label: 'Schema', icon: Code2, group: 'SEO', needsSite: true },
+  // SEO Strategy
+  { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'SEO Strategy', needsSite: true },
+  { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'SEO Strategy', needsSite: true },
+  // Optimization
+  { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'Optimization', needsSite: true },
+  { id: 'seo-schema', label: 'Schema', icon: Code2, group: 'Optimization', needsSite: true },
+  { id: 'brand', label: 'Brand & AI', icon: Sparkles, group: 'Optimization' },
+  { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, group: 'Optimization', needsSite: true },
+  // Content
+  { id: 'content-pipeline', label: 'Pipeline', icon: ListChecks, group: 'Content', needsSite: true },
   { id: 'seo-briefs', label: 'Content Briefs', icon: Clipboard, group: 'Content', needsSite: true },
   { id: 'content', label: 'Content', icon: FileText, group: 'Content', needsSite: true },
-  { id: 'content-pipeline', label: 'Content Pipeline', icon: ListChecks, group: 'Content', needsSite: true },
   { id: 'content-perf', label: 'Content Performance', icon: BarChart3, group: 'Content', needsSite: true },
-  { id: 'requests', label: 'Requests', icon: MessageSquare, group: '' },
+  { id: 'requests', label: 'Requests', icon: MessageSquare, group: 'Content' },
+  // Admin (global)
+  { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, group: 'Admin' },
+  { id: 'prospect', label: 'Prospect', icon: FileSearch, group: 'Admin' },
+  { id: 'ai-usage', label: 'AI Usage', icon: BarChart3, group: 'Admin' },
+  { id: 'roadmap', label: 'Roadmap', icon: Shield, group: 'Admin' },
+  { id: 'features', label: 'Feature Library', icon: Layers, group: 'Admin' },
   { id: 'settings', label: 'Settings', icon: Settings, group: '' },
-  { id: 'prospect', label: 'Prospect', icon: FileSearch, group: '' },
-  { id: 'roadmap', label: 'Roadmap', icon: Shield, group: '' },
-  { id: 'features', label: 'Feature Library', icon: Layers, group: '' },
-  { id: 'outcomes', label: 'Outcomes', icon: Trophy, group: 'Analytics' },
-  { id: 'outcomes-overview', label: 'Outcomes Overview', icon: BarChart3, group: 'Analytics' },
 ];
 
 const RECENT_KEY = 'admin-palette-recent';
