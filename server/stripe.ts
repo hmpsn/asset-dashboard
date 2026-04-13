@@ -14,6 +14,7 @@ import {
   updateContentSubscription, resetPeriod,
 } from './content-subscriptions.js';
 import { CONTENT_SUB_PLANS, type ContentSubscription } from '../shared/types/content.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('stripe');
 
@@ -392,7 +393,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (productType === 'plan_growth' || productType === 'plan_premium') {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
         updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier });
+        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier });
         log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
@@ -515,7 +516,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       if (productType === 'plan_growth' || productType === 'plan_premium') {
         const newTier = productType === 'plan_growth' ? 'growth' : 'premium';
         updateWorkspace(workspaceId, { tier: newTier, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier });
+        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier });
         log.info(`Tier upgraded: workspace=${workspaceId} → ${newTier}`);
       }
 
@@ -568,7 +569,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         const updates: Record<string, unknown> = { stripeSubscriptionId: subscription.id };
         if (newTier) { updates.tier = newTier; updates.trialEndsAt = undefined; }
         updateWorkspace(workspaceId, updates as Parameters<typeof updateWorkspace>[1]);
-        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: newTier, subscriptionStatus: subscription.status });
+        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: newTier, subscriptionStatus: subscription.status });
         log.info(`Subscription ${event.type}: workspace=${workspaceId} status=${subscription.status} tier=${newTier}`);
       } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
         log.warn(`Subscription ${subscription.status}: workspace=${workspaceId} sub=${subscription.id}`);
@@ -605,7 +606,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       } else {
         // Downgrade to free tier (platform plan)
         updateWorkspace(workspaceId, { tier: 'free', stripeSubscriptionId: undefined, trialEndsAt: undefined });
-        _broadcastFn?.(workspaceId, 'workspace:updated', { tier: 'free' });
+        _broadcastFn?.(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, { tier: 'free' });
         addActivity(workspaceId, 'subscription_cancelled', 'Subscription cancelled — downgraded to Free tier', '', { subscriptionId: subscription.id });
         log.info(`Subscription cancelled: workspace=${workspaceId} sub=${subscription.id} → free tier`);
       }

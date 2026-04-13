@@ -7,6 +7,7 @@ const router = Router();
 
 import { z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
 import { getGA4TopPages } from '../google-analytics.js';
 import { applySuppressionsToAudit } from '../helpers.js';
@@ -561,7 +562,7 @@ router.patch('/api/public/workspaces/:id/business-profile', (req, res) => {
   // Flush caches immediately so AI chat/strategy use the updated data.
   clearSeoContextCache(wsId);
   invalidateIntelligenceCache(wsId);
-  broadcastToWorkspace(wsId, 'workspace:updated', { businessProfile: ws.businessProfile });
+  broadcastToWorkspace(wsId, WS_EVENTS.WORKSPACE_UPDATED, { businessProfile: ws.businessProfile });
   addActivity(wsId, 'client_profile_updated', 'Client updated business profile', 'Via client portal');
   log.info(`Client updated business profile for workspace ${wsId}`);
   res.json({ businessProfile: ws.businessProfile });
