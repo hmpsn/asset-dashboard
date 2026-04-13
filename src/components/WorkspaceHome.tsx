@@ -9,6 +9,7 @@ import {
 import { StatCard, SectionCard, PageHeader, MetricRing } from './ui';
 import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
+import { CartProvider } from './client/useCart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
@@ -424,7 +425,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Action Plan (InsightsEngine) ── */}
       {workspaceId && (
         <ErrorBoundary label="Action Plan">
-          <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
+          <CartProvider>
+            <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
+          </CartProvider>
         </ErrorBoundary>
       )}
 
