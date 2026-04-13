@@ -340,6 +340,8 @@ export interface AnomalyDigestData {
   durationDays: number;
   firstDetected: string;
   severity: string;
+  /** Set when a deep diagnostic has been run for this anomaly */
+  diagnosticReportId?: string;
 }
 
 /** Data shape for audit_finding insights (bridge-generated from scheduled audits) */

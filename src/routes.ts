@@ -19,7 +19,8 @@ export type Page =
   | 'revenue'
   | 'features'
   | 'outcomes'
-  | 'outcomes-overview';
+  | 'outcomes-overview'
+  | 'diagnostics';
 
 export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
 
