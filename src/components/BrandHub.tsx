@@ -205,7 +205,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
               steps={[
                 {
                   label: 'Review knowledge base',
-                  onClick: () => setShowNextSteps(false),
+                  onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('knowledge-base-textarea')?.scrollIntoView({ behavior: 'smooth' }), 150); },
                 },
               ]}
             />

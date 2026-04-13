@@ -793,7 +793,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
           steps={[
             {
               label: 'Review suggestions',
-              onClick: () => setShowNextSteps(false),
+              onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('schema-suggestions-list')?.scrollIntoView({ behavior: 'smooth' }), 150); },
               estimatedTime: '3 min',
             },
           ]}
@@ -865,6 +865,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext }: Props) {
       )}
 
       {/* Summary cards */}
+      <div id="schema-suggestions-list" />
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-zinc-900 p-4 border border-zinc-800" style={{ borderRadius: '6px 12px 6px 12px' }}>
           <div className="text-xs text-zinc-500 mb-1">Pages</div>

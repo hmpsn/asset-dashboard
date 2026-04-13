@@ -696,15 +696,15 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       {auditTabBar}
       {showNextSteps && data && (
         <NextStepsCard
-          title={`Audit complete: ${(data.errors ?? 0) + (data.warnings ?? 0)} issues found`}
+          title={`Audit complete: ${(effectiveData?.errors ?? 0) + (effectiveData?.warnings ?? 0)} issues found`}
           variant="success"
           onDismiss={() => setShowNextSteps(false)}
           staggerIndex={0}
           steps={[
             {
               label: 'Review top issues',
-              description: `${data.errors ?? 0} errors to resolve`,
-              onClick: () => setShowNextSteps(false),
+              description: `${effectiveData?.errors ?? 0} errors to resolve`,
+              onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('audit-issues-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
               estimatedTime: '5 min',
             },
           ]}
@@ -1089,6 +1089,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       )}
 
       {/* Category filter pills */}
+      <div id="audit-issues-section" />
       <AuditCategoryFilter categoryFilter={categoryFilter} onSetCategoryFilter={setCategoryFilter} />
 
       {/* Showing count + batch actions */}

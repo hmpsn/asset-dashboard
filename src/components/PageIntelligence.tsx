@@ -630,15 +630,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
             {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
-        {/* Analyze All */}
-        {bulkProgress ? (
-          <ProgressIndicator
-            status="running"
-            detail={`Analyzing ${bulkProgress.done}/${bulkProgress.total}...`}
-            percent={bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}
-            onCancel={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}
-          />
-        ) : (
+        {/* Analyze All — hidden while bulk is running */}
+        {!bulkProgress && (
           <div className="flex items-center gap-2">
             {analyzedCount > 0 && analyzedCount < unifiedPages.length && (
               <button
@@ -665,6 +658,14 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           </div>
         )}
       </div>
+      {bulkProgress && (
+        <ProgressIndicator
+          status="running"
+          detail={`Analyzing ${bulkProgress.done}/${bulkProgress.total}...`}
+          percent={bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}
+          onCancel={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}
+        />
+      )}
 
       {analysisError && (
         <ErrorState

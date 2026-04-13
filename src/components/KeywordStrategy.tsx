@@ -529,7 +529,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           steps={[
             {
               label: 'Review Quick Wins',
-              onClick: () => setShowNextSteps(false),
+              onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('quick-wins-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
               estimatedTime: '2 min',
             },
           ]}
@@ -605,7 +605,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           )}
 
           {/* ── Quick Wins ── */}
-          <QuickWins quickWins={strategy.quickWins || []} />
+          <div id="quick-wins-section">
+            <QuickWins quickWins={strategy.quickWins || []} />
+          </div>
 
           {/* ── Low-Hanging Fruit ── */}
           <LowHangingFruit pages={lowHangingFruit} positionColor={positionColor} />
