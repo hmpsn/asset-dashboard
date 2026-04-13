@@ -66,7 +66,7 @@ interface NextStepsCardProps {
 - Title row: variant icon (green `CheckCircle2` for success, blue `Info` for info) + title text + dismiss X button (zinc, hover → zinc-300).
 - Step rows: optional icon + label + optional description + optional estimated time badge + `→` arrow. Each row is clickable.
 - Step hover: teal highlight (action color per Three Laws).
-- Mount animation: subtle slide-up via CSS (`translateY(8px) → 0`, `opacity: 0 → 1`, 200ms ease-out). No animation library.
+- Mount animation: inherits `SectionCard`'s stagger-fade via `staggerIndex` passthrough prop (0.4s fade + 60ms delay per sibling). No custom animation — use the platform pattern.
 
 ### Integration Points
 
