@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 import { SectionCard } from '../../ui/SectionCard.js';
@@ -108,7 +108,7 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-4">
       <PageHeader title="Diagnostic Reports" icon={<Activity className="w-5 h-5 text-teal-400" />} />
       {reports.map((r) => (
-        <a key={r.id} href={`?report=${r.id}`} className="block">
+        <Link key={r.id} to={`?report=${r.id}`} className="block">
           <SectionCard>
             <div className="flex items-center justify-between">
               <div>
@@ -120,7 +120,7 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
               </span>
             </div>
           </SectionCard>
-        </a>
+        </Link>
       ))}
     </div>
   );

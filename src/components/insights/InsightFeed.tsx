@@ -4,6 +4,7 @@ import { INSIGHT_FILTER_KEYS, type InsightDomain } from '../../../shared/types/a
 import { InsightFeedItem } from './InsightFeedItem.js';
 import { InsightSkeleton } from './InsightSkeleton.js';
 import { SummaryPills } from './SummaryPills.js';
+import { useDiagnosticEvents } from '../../hooks/admin/useDiagnostics.js';
 
 interface InsightFeedProps {
   feed: FeedInsight[];
@@ -27,6 +28,7 @@ const FILTER_CHIPS = [
 export function InsightFeed({ feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll, workspaceId }: InsightFeedProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  useDiagnosticEvents(workspaceId ?? '');
 
   let filtered = domain ? feed.filter(f => f.domain === domain || f.domain === 'cross') : feed;
 

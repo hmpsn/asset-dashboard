@@ -17,8 +17,7 @@ import { getPageTrend, getQueryPageData, getSearchPeriodComparison } from './sea
 import { getGA4LandingPages } from './google-analytics.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
-import { getInsights } from './analytics-insights-store.js';
-import db from './db/index.js';
+import { getInsights, stampDiagnosticReportId } from './analytics-insights-store.js';
 import { callOpenAI } from './openai-helpers.js';
 import { probeCanonical, countInternalLinks } from './diagnostic-probe.js';
 import {
@@ -58,11 +57,10 @@ type DataModule =
   | 'redirects'
   | 'canonical'
   | 'internalLinks'
-  | 'backlinks'
-  | 'ga4';
+  | 'backlinks';
 
 const MODULE_ROUTER: Record<string, DataModule[]> = {
-  traffic_drop: ['positionHistory', 'queryBreakdown', 'periodComparison', 'redirects', 'canonical', 'internalLinks', 'backlinks', 'ga4'],
+  traffic_drop: ['positionHistory', 'queryBreakdown', 'periodComparison', 'redirects', 'canonical', 'internalLinks', 'backlinks'],
   impressions_drop: ['positionHistory', 'periodComparison', 'redirects', 'canonical'],
   position_decline: ['positionHistory', 'internalLinks', 'backlinks'],
   ctr_drop: ['positionHistory', 'periodComparison'],
@@ -140,11 +138,7 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
 
     // 6. Stamp the anomaly insight with the reportId so client narrative enrichment picks it up
     try {
-      const insight = getInsights(workspaceId).find((i) => i.id === insightId);
-      if (insight) {
-        const updatedData = { ...(insight.data as unknown as AnomalyDigestData), diagnosticReportId: reportId };
-        db.prepare('UPDATE analytics_insights SET data = ? WHERE id = ?').run(JSON.stringify(updatedData), insightId); // ws-scope-ok: insight id is a UUID primary key
-      }
+      stampDiagnosticReportId(workspaceId, insightId, reportId);
     } catch (stampErr) {
       log.warn({ err: stampErr }, 'Failed to stamp diagnosticReportId on insight — non-fatal');
     }

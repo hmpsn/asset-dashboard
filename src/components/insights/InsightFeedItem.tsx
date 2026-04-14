@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown, Loader2, FileSearch } from 'lucide-react';
 import type { FeedInsight } from '../../../shared/types/insights.js';
 import { useDiagnosticForInsight, useRunDiagnostic } from '../../hooks/admin/useDiagnostics.js';
@@ -18,13 +19,13 @@ function DiagnosticCTA({ workspaceId, insightId }: { workspaceId: string; insigh
 
   if (report?.status === 'completed') {
     return (
-      <a
-        href={`/ws/${workspaceId}/diagnostics?report=${report.id}`}
+      <Link
+        to={`/ws/${workspaceId}/diagnostics?report=${report.id}`}
         className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300"
       >
         <FileSearch className="w-3.5 h-3.5" />
         View Diagnostic Report
-      </a>
+      </Link>
     );
   }
 

@@ -212,6 +212,28 @@ For inline styles and Recharts props that can't be overridden by CSS class rules
 | Outcome CTAs (admin) | `from-teal-600 to-emerald-600` | Standard CTA gradient |
 | Client "We Called It" highlight | `bg-teal-600/20 border-teal-500/30 text-teal-300` | Soft teal — client-facing positive signal |
 
+### Diagnostic Report (`DiagnosticReport/`)
+
+| Element | Color | Rationale |
+|---------|-------|-----------|
+| Confidence: high | `bg-emerald-500/10 text-emerald-400` | High confidence = green (consistent with Outcome Tracking) |
+| Confidence: medium | `bg-amber-500/10 text-amber-400` | Medium confidence = amber |
+| Confidence: low | `bg-zinc-500/10 text-zinc-400` | Low confidence = zinc (not red — avoids false alarm) |
+| Priority badge: P0 | `bg-red-500/10 text-red-400` | Urgent / ship this week |
+| Priority badge: P1 | `bg-amber-500/10 text-amber-400` | This sprint |
+| Priority badge: P2 | `bg-blue-500/10 text-blue-400` | Backlog — blue for low-urgency data |
+| Priority badge: P3 | `bg-zinc-500/10 text-zinc-400` | Nice to have = zinc |
+| Effort: low | `text-emerald-400` | Low effort = green (quick win) |
+| Effort: medium | `text-amber-400` | Medium effort = amber |
+| Effort: high | `text-red-400` | High effort = red |
+| Impact: high | `text-emerald-400` | High impact = green |
+| Impact: medium | `text-amber-400` | Medium impact = amber |
+| Impact: low | `text-zinc-400` | Low impact = zinc |
+| Owner badge | `bg-zinc-800 text-zinc-300` | Neutral metadata |
+| Status badge: completed | `bg-emerald-500/10 text-emerald-400` | Done = green |
+| Status badge: failed | `bg-red-500/10 text-red-400` | Error = red |
+| Status badge: running/pending | `bg-amber-500/10 text-amber-400` | In-progress = amber |
+
 ### Stripe Payment (`StripePaymentForm.tsx`)
 
 | Element | Color |

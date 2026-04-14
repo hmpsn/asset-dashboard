@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { diagnostics } from '../../api/index.js';
+import { useWorkspaceEvents } from '../useWorkspaceEvents.js';
+import { WS_EVENTS } from '../../lib/wsEvents.js';
 
 const DIAGNOSTICS_KEYS = {
   list: (workspaceId: string) => ['admin-diagnostics', workspaceId] as const,
@@ -40,6 +42,24 @@ export function useRunDiagnostic(workspaceId: string) {
     mutationFn: (insightId: string) => diagnostics.run(workspaceId, insightId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DIAGNOSTICS_KEYS.list(workspaceId) });
+      // Invalidate all forInsight queries for this workspace so the CTA shows "Analyzing..." immediately
+      qc.invalidateQueries({ queryKey: ['admin-diagnostic-for-insight', workspaceId] });
+    },
+  });
+}
+
+/**
+ * Registers the diagnostic:complete WS handler.
+ * Call this from any component that's mounted while the insight feed is visible
+ * so cache invalidation fires even when DiagnosticReportPage is not mounted.
+ */
+export function useDiagnosticEvents(workspaceId: string) {
+  const qc = useQueryClient();
+  useWorkspaceEvents(workspaceId, {
+    [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => {
+      qc.invalidateQueries({ queryKey: ['admin-diagnostic-for-insight', workspaceId] });
+      qc.invalidateQueries({ queryKey: ['admin-diagnostics', workspaceId] });
+      qc.invalidateQueries({ queryKey: ['admin-insights', workspaceId] });
     },
   });
 }
