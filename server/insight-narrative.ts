@@ -118,7 +118,8 @@ function toClientInsight(insight: AnalyticsInsight): ClientInsight {
     anomaly_digest: () => {
       // For Growth+ workspaces: enrich with diagnostic client summary if a completed report exists
       const workspace = getWorkspace(insight.workspaceId);
-      const isGrowthPlus = workspace?.tier !== 'free';
+      // Guard: missing workspace should not receive premium enrichment
+      const isGrowthPlus = workspace != null && workspace.tier !== 'free';
       if (isGrowthPlus) {
         const report = getReportForInsight(insight.workspaceId, insight.id);
         if (report?.status === 'completed' && report.clientSummary) {
