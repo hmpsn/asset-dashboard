@@ -503,16 +503,18 @@ const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> =
  *  rendering handled differently — e.g. destructured `const { bySeverity } = ...`
  *  which the property-access regex can't catch). */
 const KNOWN_UNRENDERED_FIELDS = new Set([
-  // SeoContextSlice
-  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
+  // SeoContextSlice — backlinkProfile and serpFeatures are now rendered by formatSeoContextSection()
+  'keywordRecommendations',
   // InsightsSlice
   'byType', 'forPage',
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice
-  'forPage', 'topWins', 'winRateByActionType',
+  'forPage', 'winRateByActionType',
   // ContentPipelineSlice
-  'rewritePlaybook', 'suggestedBriefs',
+  // rewritePlaybook: formatter exists in formatContentPipelineSection but assembler doesn't populate it yet
+  // (workspace.rewritePlaybook is a TEXT column, needs parsing into { patterns, lastUsedAt } shape)
+  'rewritePlaybook',
   // SiteHealthSlice
   'aeoReadiness', 'redirectDetails',
   // PageProfileSlice
@@ -750,6 +752,7 @@ export const CHECKS: Check[] = [
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
       'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
+      'server/workspace-intelligence.ts', // disk file: AEO review JSON from aeo-reviews/ directory (not DB columns)
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',

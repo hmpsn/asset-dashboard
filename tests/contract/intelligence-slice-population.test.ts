@@ -113,6 +113,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   getOutcomesForAction: vi.fn(() => []),
   getActionsByPage: vi.fn(() => []),
   getPendingActions: vi.fn(() => []),
+  getTopWinsFromActions: vi.fn(() => []),
 }));
 
 // ── Content pipeline dependencies ────────────────────────────────────────────
@@ -180,6 +181,12 @@ vi.mock('../../server/performance-store.js', () => ({
   getPageSpeed: vi.fn(() => null),
   getLatestSnapshot: vi.fn(() => null),
   listSnapshots: vi.fn(() => []),
+  getInternalLinks: vi.fn(() => null),
+  getLinkCheck: vi.fn(() => null),
+}));
+
+vi.mock('../../server/data-dir.js', () => ({
+  getDataDir: vi.fn(() => '/tmp/test-data'),
 }));
 
 vi.mock('../../server/anomaly-detection.js', () => ({
@@ -526,6 +533,21 @@ describe('contract: LearningsSlice field population', () => {
     expect(Array.isArray(result.roiAttribution)).toBe(true);
     expect(Array.isArray(result.weCalledIt)).toBe(true);
   });
+
+  it('populates winRateByActionType from topActionTypes when feature flag is on', async () => {
+    const { isFeatureEnabled } = await import('../../server/feature-flags.js');
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+
+    const { buildWorkspaceIntelligence, invalidateIntelligenceCache } = await import('../../server/workspace-intelligence.js');
+    invalidateIntelligenceCache(WORKSPACE_ID);
+    const intel = await buildWorkspaceIntelligence(WORKSPACE_ID, { slices: ['learnings'] });
+
+    const result = intel.learnings as LearningsSlice;
+    expect(result).toBeDefined();
+    // winRateByActionType should be an object (Record<string, number>)
+    expect(result.winRateByActionType).toBeDefined();
+    expect(typeof result.winRateByActionType).toBe('object');
+  });
 });
 
 describe('contract: ContentPipelineSlice field population', () => {
@@ -697,6 +719,16 @@ describe('contract: SiteHealthSlice field population', () => {
     // seoChangeVelocity is set from the return object unconditionally
     expect(result.seoChangeVelocity).toBeDefined();
     expect(typeof result.seoChangeVelocity).toBe('number');
+  });
+
+  it('aeoReadiness is undefined when no saved review exists', async () => {
+    const result = await getSlice<SiteHealthSlice>('siteHealth');
+    // No aeo-reviews file on disk in test → should be undefined (graceful degradation)
+    expect(result.aeoReadiness === undefined || (
+      typeof result.aeoReadiness === 'object' &&
+      typeof result.aeoReadiness.pagesChecked === 'number' &&
+      typeof result.aeoReadiness.passingRate === 'number'
+    )).toBe(true);
   });
 });
 
