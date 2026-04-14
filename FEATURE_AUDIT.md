@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **297 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **298 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3233,9 +3233,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**297 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**298 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **297**. Last updated: April 2026.
+Current feature count: **298**. Last updated: April 2026.
 
 ---
 
@@ -3367,9 +3367,18 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
+### 291. Admin Shared UX Components (NextStepsCard, ProgressIndicator, ErrorState multi-action)
+**What it does:** Two new shared UI primitives and one extension integrated across 6 admin pages. **NextStepsCard** (`src/components/ui/NextStepsCard.tsx`): post-completion card displayed after AI operations succeed — shows contextual next-step actions (e.g. "Apply top fixes", "Review Quick Wins") with estimated times and teal hover accents. Dismissible. Uses `SectionCard` as outer shell with stagger animation support. **ProgressIndicator** (`src/components/ui/ProgressIndicator.tsx`): unified progress display for running operations — blue data-color bar (Three Laws compliant), deterministic or indeterminate modes, cancel button, auto-fades on completion after 3s. Returns null for idle/error (error is `ErrorState`'s job). **ErrorState `actions[]` extension**: backward-compatible multi-action support — `actions?: { label, onClick, variant?: 'primary'|'secondary' }[]` prop takes precedence over the existing singular `action` prop. All 3 components have full WAI-ARIA attributes (`role="progressbar"`, `role="alert"`, `aria-label`). **Integration**: SeoAudit (LoadingState + ErrorState + NextStepsCard), KeywordStrategy (ProgressIndicator replacing hand-rolled teal bar + ErrorState + NextStepsCard), SchemaSuggester (ProgressIndicator ×2 with cancel + ErrorState + NextStepsCard), ContentPipeline (LoadingState in 3 Suspense fallbacks), BrandHub (ProgressIndicator + ErrorState + NextStepsCard), PageIntelligence (ProgressIndicator with bulk cancel + ErrorState + NextStepsCard). Component tests: 22 tests across 3 test files.
+
+**Files:** `src/components/ui/NextStepsCard.tsx`, `src/components/ui/ProgressIndicator.tsx`, `src/components/ui/ErrorState.tsx`, `src/components/ui/index.ts`, `src/components/SeoAudit.tsx`, `src/components/KeywordStrategy.tsx`, `src/components/SchemaSuggester.tsx`, `src/components/ContentPipeline.tsx`, `src/components/BrandHub.tsx`, `src/components/PageIntelligence.tsx`, `tests/component/NextStepsCard.test.tsx`, `tests/component/ProgressIndicator.test.tsx`, `tests/component/ErrorState.test.tsx`
+
+**Agency value:** All admin AI operations now surface a consistent completion card pointing to obvious next actions — reduces context-switching after long-running operations. Unified error/progress UX across all 6 major tools instead of ad-hoc inline patterns.
+
+---
+
 ## Admin UX — Onboarding & Guided Flows (PR4)
 
-### 291. OnboardingChecklist
+### 292. OnboardingChecklist
 **What it does:** Modal-style overlay shown on first visit to a workspace (WorkspaceHome). 4-step setup checklist: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar tracks completion. Teal checkmarks for completed steps. Focus-trapped, closeable via Escape key or "Dismiss" button. Completion state and dismissal persisted to `localStorage` per workspace so the overlay never re-appears once dismissed. Auto-celebrates (confetti-style state) when all 4 steps are completed.
 
 **Files:** `src/components/ui/OnboardingChecklist.tsx`, integrated in `src/components/WorkspaceHome.tsx`
@@ -3380,7 +3389,7 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
-### 292. WorkflowStepper
+### 293. WorkflowStepper
 **What it does:** Horizontal numbered stepper component showing progress through a multi-step workflow. Three visual states: green (completed), teal (current active step), zinc (future step). Compact variant (`compact` prop) for tighter layouts. Steps are clickable when `onStepClick` handler is provided. Used in ContentPipeline (4 steps: Strategy → Briefs → Posts → Publish) and SchemaSuggester generator view (5 steps: Scan → Review → Edit → Publish → Validate).
 
 **Files:** `src/components/ui/WorkflowStepper.tsx`, integrated in `src/components/ContentPipeline.tsx` and `src/components/SchemaSuggester.tsx`
@@ -3391,7 +3400,7 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
-### 293. WorkspaceHealthBar
+### 294. WorkspaceHealthBar
 **What it does:** Multi-metric health progress bar section rendered below stat cards on WorkspaceHome. Shows per-metric progress bars for key workspace health signals (SEO health, content coverage, keyword coverage, etc.) with blue progress fills (data metric = blue per design system). Below the metrics, a "Recommended Next" section surfaces the single highest-priority action the admin should take, with a teal CTA button. Wrapped in `SectionCard`.
 
 **Files:** `src/components/ui/WorkspaceHealthBar.tsx`, integrated in `src/components/WorkspaceHome.tsx`
@@ -3402,7 +3411,7 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
-### 294. SeoAuditGuide
+### 295. SeoAuditGuide
 **What it does:** Guide sub-tab in SeoAudit's analysis section (alongside existing analysis tabs). 5 educational sections: issue severity levels, prioritization framework, fix options overview, AEO review guidance, and content decay explanation. Static reference content using the existing custom tab bar pattern from SeoAudit.
 
 **Files:** `src/components/audit/SeoAuditGuide.tsx`, integrated in `src/components/SeoAudit.tsx`
@@ -3411,7 +3420,7 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
-### 295. KeywordStrategyGuide
+### 296. KeywordStrategyGuide
 **What it does:** Guide tab in KeywordStrategy (TabBar added alongside existing analysis tab). 6 sections: reading the strategy, understanding intent badges, content gap prioritization, KD/volume interpretation, quick win identification, and implementation order.
 
 **Files:** `src/components/strategy/KeywordStrategyGuide.tsx`, integrated in `src/components/KeywordStrategy.tsx`
@@ -3420,7 +3429,7 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
-### 296. PageIntelligenceGuide
+### 297. PageIntelligenceGuide
 **What it does:** Guide tab in PageIntelligence (added to the existing pages|architecture tab set as a third tab). 6 sections: understanding page scores, reading architecture signals, interpreting link health, prioritization criteria, action recommendations, and integration with other tools.
 
 **Files:** `src/components/PageIntelligenceGuide.tsx`, integrated in `src/components/PageIntelligence.tsx`
@@ -3430,7 +3439,7 @@ Current feature count: **297**. Last updated: April 2026.
 
 ---
 
-### 297. Deep Diagnostics
+### 298. Deep Diagnostics
 **What it does:** Admin-triggered deep investigation from anomaly insights. Orchestrator gathers data from GSC, GA4, SEMRush, redirect scanner, site architecture, canonical/link probe, and workspace intelligence (including backlinks). GPT-4.1 synthesizes root causes with confidence levels, ranked remediation actions (P0-P3, effort/impact/owner), and client-facing narrative. Results stored in `diagnostic_reports` table.
 
 **Files:** `server/diagnostic-orchestrator.ts`, `server/diagnostic-store.ts`, `server/diagnostic-probe.ts`, `server/routes/diagnostics.ts`, `server/routes/jobs.ts` (deep-diagnostic case), `src/api/diagnostics.ts`, `src/hooks/admin/useDiagnostics.ts`, `src/components/admin/DiagnosticReport/` (4 components), `shared/types/diagnostics.ts`, `server/db/migrations/059-diagnostic-reports.sql`

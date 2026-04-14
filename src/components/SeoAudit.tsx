@@ -9,17 +9,18 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../hooks/admin';
 import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
 import {
-  Loader2, ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
   X, Clock, Share2, Copy, ExternalLink,
   TrendingDown, Sparkles, EyeOff, AlertTriangle, Link2Off, Download,
-  Wrench, ArrowRight, Plus,
+  Wrench, ArrowRight, Plus, BookOpen,
 } from 'lucide-react';
-import { StatCard, scoreColorClass, scoreBgBarClass } from './ui';
+import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
 import { statusBorderClass } from './ui/statusConfig';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { AuditHistory } from './audit/AuditHistory';
+import { SeoAuditGuide } from './audit/SeoAuditGuide';
 import {
   type Severity, type CheckCategory, type SeoIssue, type PageSeoResult,
   type SeoAuditResult, type SnapshotSummary, type CwvStrategyResult,
@@ -41,7 +42,7 @@ interface Props {
   siteName?: string;
 }
 
-type AuditSubTab = 'audit' | 'history' | 'aeo-review' | 'content-decay';
+type AuditSubTab = 'audit' | 'history' | 'aeo-review' | 'content-decay' | 'guide';
 
 function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
@@ -54,7 +55,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [hasRun, setHasRun] = useState(false);
   const [auditSubTab, setAuditSubTab] = useState<AuditSubTab>(() => {
     const sub = searchParams.get('sub');
-    const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay'];
+    const valid: AuditSubTab[] = ['audit', 'history', 'aeo-review', 'content-decay', 'guide'];
     return valid.includes(sub as AuditSubTab) ? (sub as AuditSubTab) : 'audit';
   });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -70,6 +71,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   const [skipLinkCheck, setSkipLinkCheck] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [showNextSteps, setShowNextSteps] = useState(false);
 
   // Dead link details — inline redirect form
   const [redirectFormUrl, setRedirectFormUrl] = useState<string | null>(null);
@@ -346,6 +348,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setLoading(true);
     setHasRun(true);
     setAuditError(null);
+    setShowNextSteps(false);
     const jobId = await startJob('seo-audit', { siteId, workspaceId, skipLinkCheck });
     if (jobId) {
       auditJobId.current = jobId;
@@ -370,6 +373,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       const d = job.result as SeoAuditResult & { snapshotId?: string };
       if (d && Array.isArray(d.pages)) {
         setData(d);
+        setShowNextSteps(true);
         loadHistory(); // Refresh history — snapshot was auto-saved server-side
       } else {
         setAuditError('Invalid audit response');
@@ -586,8 +590,22 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
           {t.label}
         </button>
       ))}
+      <div className="w-px h-4 bg-zinc-700 mx-1 self-center" />
+      <button
+        onClick={() => setAuditSubTab('guide')}
+        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+          auditSubTab === 'guide'
+            ? 'border-teal-500 text-teal-300'
+            : 'border-transparent text-zinc-500 hover:text-zinc-300'
+        }`}
+      >
+        <BookOpen className="w-3.5 h-3.5" />
+        Guide
+      </button>
     </div>
   );
+
+  if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;
 
   if (auditSubTab === 'content-decay' && workspaceId) {
     return <div>{auditTabBar}<Suspense fallback={<div className="flex items-center justify-center py-16"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-amber-400" /></div>}><ContentDecay workspaceId={workspaceId} /></Suspense></div>;
@@ -635,11 +653,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     return (
       <div>
         {auditTabBar}
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-zinc-500">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <p className="text-sm">Scanning pages for SEO issues...</p>
-          <p className="text-xs text-zinc-500">Fetching metadata and published HTML for each page</p>
-        </div>
+        <LoadingState message="Analyzing site health..." />
       </div>
     );
   }
@@ -648,15 +662,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     <div>
       {auditTabBar}
       {auditError && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 max-w-md text-center">
-            <p className="text-red-400 text-sm font-medium mb-1">SEO Audit Failed</p>
-            <p className="text-xs text-red-400/70">{auditError}</p>
-          </div>
-          <button onClick={runAudit} className="px-4 py-2 rounded-lg text-sm font-medium bg-teal-400 text-[#0f1219]">
-            Try Again
-          </button>
-        </div>
+        <ErrorState
+          type="general"
+          title="SEO Audit Failed"
+          message={auditError}
+          action={{ label: 'Run Again', onClick: runAudit }}
+        />
       )}
     </div>
   );
@@ -698,6 +709,22 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   return (
     <div className="space-y-8">
       {auditTabBar}
+      {showNextSteps && data && (
+        <NextStepsCard
+          title={`Audit complete: ${(effectiveData?.errors ?? 0) + (effectiveData?.warnings ?? 0)} issues found`}
+          variant="success"
+          onDismiss={() => setShowNextSteps(false)}
+          staggerIndex={0}
+          steps={[
+            {
+              label: 'Review top issues',
+              description: `${effectiveData?.errors ?? 0} errors to resolve`,
+              onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('audit-issues-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
+              estimatedTime: '5 min',
+            },
+          ]}
+        />
+      )}
       {/* Summary cards */}
       <div className={`grid gap-3 ${effectiveData!.deadLinkSummary ? 'grid-cols-6' : 'grid-cols-5'}`}>
         <div className="col-span-1 flex flex-col gap-1.5">
@@ -1077,6 +1104,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       )}
 
       {/* Category filter pills */}
+      <div id="audit-issues-section" />
       <AuditCategoryFilter categoryFilter={categoryFilter} onSetCategoryFilter={setCategoryFilter} />
 
       {/* Showing count + batch actions */}
