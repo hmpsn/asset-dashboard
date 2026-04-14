@@ -308,14 +308,12 @@ export function buildSeoContext(
   const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy, copyIntelligenceBlock: copyIntelligenceBlock || undefined, blueprintBlock: blueprintBlock || undefined };
 
   // Cache result
-  if (workspaceId) {
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
-  }
+  seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
 
   // Shadow-mode intelligence delegation (§14, §16)
   // Fire-and-forget — don't await, don't block the return.
   // ALWAYS returns the original result — shadow mode is observation-only.
-  if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId && !internalOpts?._skipShadow) {
+  if (isFeatureEnabled('intelligence-shadow-mode') && !internalOpts?._skipShadow) {
     void (async () => {
       try {
         const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js'); // dynamic-import-ok — circular dep prevention in shadow-mode fire-and-forget

@@ -60,6 +60,10 @@ export const queryKeys = {
     actionQueue: (wsId: string) => ['admin-action-queue', wsId] as const,
     meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
 
+    // Brand Engine — Brandscripts
+    brandscripts: (wsId: string) => ['admin-brandscripts', wsId] as const,
+    brandscriptTemplates: () => ['admin-brandscript-templates'] as const,
+
     // Brand Engine — Page Strategy
     blueprints: (wsId: string) => ['admin-blueprints', wsId] as const,
     blueprint: (wsId: string, blueprintId: string) => ['admin-blueprint', wsId, blueprintId] as const,
