@@ -48,6 +48,10 @@ export const WS_EVENTS = {
   BLUEPRINT_UPDATED: 'blueprint:updated',
   BLUEPRINT_GENERATED: 'blueprint:generated',
 
+  // Deep Diagnostics
+  DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
+  DIAGNOSTIC_FAILED: 'diagnostic:failed',
+
   // Copy Pipeline (Phase 3 — copy generation, review, export, intelligence)
   COPY_SECTION_UPDATED: 'copy:section_updated',
   COPY_METADATA_UPDATED: 'copy:metadata_updated',

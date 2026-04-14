@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, TrendingUp, TrendingDown, Target, ChevronDown, Loader2, FileSearch } from 'lucide-react';
 import type { FeedInsight } from '../../../shared/types/insights.js';
+import { useDiagnosticForInsight, useRunDiagnostic } from '../../hooks/admin/useDiagnostics.js';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag.js';
 
 const SEVERITY_CONFIG = {
   critical: { icon: TrendingDown, bg: 'bg-red-500/8', text: 'text-red-400/80', badge: 'Critical' },
@@ -9,11 +12,62 @@ const SEVERITY_CONFIG = {
   positive: { icon: TrendingUp, bg: 'bg-emerald-500/10', text: 'text-emerald-400', badge: 'Win' },
 } as const;
 
-export function InsightFeedItem({ insight }: { insight: FeedInsight }) {
+function DiagnosticCTA({ workspaceId, insightId }: { workspaceId: string; insightId: string }) {
+  const { data } = useDiagnosticForInsight(workspaceId, insightId);
+  const { mutate: run, isPending } = useRunDiagnostic(workspaceId);
+  const report = data?.report;
+
+  if (report?.status === 'completed') {
+    return (
+      <Link
+        to={`/ws/${workspaceId}/diagnostics?report=${report.id}`}
+        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300"
+      >
+        <FileSearch className="w-3.5 h-3.5" />
+        View Diagnostic Report
+      </Link>
+    );
+  }
+
+  if (report?.status === 'running' || isPending) {
+    return (
+      <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-zinc-500">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        Analyzing...
+      </div>
+    );
+  }
+
+  if (report?.status === 'failed') {
+    return (
+      <button
+        onClick={() => run(insightId)}
+        className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300"
+      >
+        <FileSearch className="w-3.5 h-3.5" />
+        Retry Diagnostic
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => run(insightId)}
+      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300"
+    >
+      <FileSearch className="w-3.5 h-3.5" />
+      Run Deep Diagnostic
+    </button>
+  );
+}
+
+export function InsightFeedItem({ insight, workspaceId }: { insight: FeedInsight; workspaceId?: string }) {
   const config = SEVERITY_CONFIG[insight.severity];
   const Icon = config.icon;
   const hasDetails = insight.details && insight.details.length > 0;
   const [expanded, setExpanded] = useState(false);
+  const diagnosticsEnabled = useFeatureFlag('deep-diagnostics');
+  const showDiagnosticCTA = diagnosticsEnabled && workspaceId && insight.type === 'anomaly_digest';
 
   return (
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg overflow-hidden">
@@ -48,6 +102,11 @@ export function InsightFeedItem({ insight }: { insight: FeedInsight }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {showDiagnosticCTA && (
+        <div className="px-3 pb-2.5 ml-10">
+          <DiagnosticCTA workspaceId={workspaceId} insightId={insight.id} />
         </div>
       )}
     </div>

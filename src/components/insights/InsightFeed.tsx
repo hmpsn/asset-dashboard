@@ -4,6 +4,7 @@ import { INSIGHT_FILTER_KEYS, type InsightDomain } from '../../../shared/types/a
 import { InsightFeedItem } from './InsightFeedItem.js';
 import { InsightSkeleton } from './InsightSkeleton.js';
 import { SummaryPills } from './SummaryPills.js';
+import { useDiagnosticEvents } from '../../hooks/admin/useDiagnostics.js';
 
 interface InsightFeedProps {
   feed: FeedInsight[];
@@ -14,6 +15,7 @@ interface InsightFeedProps {
   showPills?: boolean;
   showFilterChips?: boolean;
   onViewAll?: () => void;
+  workspaceId?: string;
 }
 
 const FILTER_CHIPS = [
@@ -23,9 +25,10 @@ const FILTER_CHIPS = [
   { key: INSIGHT_FILTER_KEYS.WINS, label: 'Wins' },
 ] as const;
 
-export function InsightFeed({ feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll }: InsightFeedProps) {
+export function InsightFeed({ feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll, workspaceId }: InsightFeedProps) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  useDiagnosticEvents(workspaceId ?? '');
 
   let filtered = domain ? feed.filter(f => f.domain === domain || f.domain === 'cross') : feed;
 
@@ -70,7 +73,7 @@ export function InsightFeed({ feed, summary, loading, domain, limit, showPills, 
       ) : displayed.length > 0 ? (
         <div className="space-y-1.5">
           {displayed.map(item => (
-            <InsightFeedItem key={item.id} insight={item} />
+            <InsightFeedItem key={item.id} insight={item} workspaceId={workspaceId} />
           ))}
         </div>
       ) : (

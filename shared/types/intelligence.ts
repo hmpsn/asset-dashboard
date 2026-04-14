@@ -3,6 +3,7 @@
 // Spec: docs/superpowers/specs/unified-workspace-intelligence.md §3, §11
 
 import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics.js';
+import type { DiagnosticStatus } from './diagnostics.js';
 import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
 import type {
   TrackedAction,
@@ -193,6 +194,16 @@ export interface SiteHealthSlice {
   anomalyCount?: number;
   anomalyTypes?: string[];
   seoChangeVelocity?: number;
+  /** Recent diagnostic reports (last 5, most recent first). Populated by assembleSiteHealth. */
+  recentDiagnostics?: Array<{
+    insightId: string | null;
+    anomalyType: string;
+    status: DiagnosticStatus;
+    affectedPages: string[];
+    completedAt: string | null;
+    /** Root cause titles from completed reports — the AI-synthesized findings. */
+    rootCauseTitles?: string[];
+  }>;
 }
 
 export interface ClientSignalsSlice {

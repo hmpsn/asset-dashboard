@@ -54,7 +54,7 @@ interface SidebarProps {
 
 const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
-function buildNavGroups(copyEngineEnabled: boolean): NavGroup[] {
+function buildNavGroups(copyEngineEnabled: boolean, diagnosticsEnabled: boolean): NavGroup[] {
   return [
     { label: '', items: [
       { id: 'home', label: 'Home', icon: LayoutDashboard, desc: 'Workspace overview and quick actions' },
@@ -104,6 +104,7 @@ function buildNavGroups(copyEngineEnabled: boolean): NavGroup[] {
       { id: 'ai-usage', label: 'AI Usage', icon: Activity, desc: 'AI token usage and costs' },
       { id: 'roadmap', label: 'Roadmap', icon: Map, desc: 'Product roadmap and sprint tracking' },
       { id: 'features', label: 'Features', icon: Layers, desc: 'Feature library and changelog' },
+      { id: 'diagnostics', label: 'Diagnostics', icon: FileSearch, desc: 'Deep diagnostic investigation reports', hidden: !diagnosticsEnabled },
     ]},
   ];
 }
@@ -132,7 +133,8 @@ export function Sidebar({
   }, []);
 
   const copyEngineEnabled = useFeatureFlag('copy-engine');
-  const navGroups = buildNavGroups(copyEngineEnabled);
+  const diagnosticsEnabled = useFeatureFlag('deep-diagnostics');
+  const navGroups = buildNavGroups(copyEngineEnabled, diagnosticsEnabled);
 
   // Auto-expand sidebar group containing active tab (#160)
   useEffect(() => {

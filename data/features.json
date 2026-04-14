@@ -629,6 +629,16 @@
       "tier": "premium",
       "impact": "medium",
       "clientFacing": false
+    },
+    {
+      "id": 64,
+      "title": "Deep Diagnostics",
+      "oneLiner": "AI-powered root cause analysis for traffic anomalies — gathers GSC position history, redirect chains, internal links, backlinks, and recent activity, then synthesizes ranked root causes and a prioritized remediation plan",
+      "category": "seo",
+      "painPoints": ["traffic-drops", "technical-seo", "reporting"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": false
     }
   ]
 }

@@ -749,6 +749,7 @@ export const CHECKS: Check[] = [
       'server/routes/roadmap.ts', // disk files: roadmap.json + runtime status files (not DB columns)
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
+      'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
