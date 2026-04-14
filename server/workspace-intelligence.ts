@@ -514,6 +514,9 @@ async function assembleLearnings(
     roiAttribution,
     topWins,
     weCalledIt,
+    winRateByActionType: Object.fromEntries(
+      (summary?.overall.topActionTypes ?? []).map(t => [t.type, t.winRate]),
+    ),
   };
 }
 
@@ -963,6 +966,29 @@ async function assembleSiteHealth(
     log.debug({ workspaceId, err }, 'siteHealth: diagnostic reports optional, degrading gracefully');
   }
 
+  // ── AEO readiness (aeo-page-review saved reviews) ──────────────────────
+  let aeoReadiness: SiteHealthSlice['aeoReadiness'];
+  try {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    const { getDataDir } = await import('./data-dir.js');
+    const reviewDir = getDataDir('aeo-reviews');
+    const reviewFile = pathMod.default.join(reviewDir, `${workspaceId}.json`);
+    if (fs.default.existsSync(reviewFile)) {
+      const raw = JSON.parse(fs.default.readFileSync(reviewFile, 'utf-8'));
+      const pages: Array<{ overallScore?: number }> = raw?.pages ?? [];
+      if (pages.length > 0) {
+        const passing = pages.filter(p => (p.overallScore ?? 0) >= 70).length;
+        aeoReadiness = {
+          pagesChecked: pages.length,
+          passingRate: passing / pages.length,
+        };
+      }
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: AEO readiness optional, degrading gracefully');
+  }
+
   return {
     auditScore,
     auditScoreDelta,
@@ -972,6 +998,7 @@ async function assembleSiteHealth(
     orphanPages,
     cwvPassRate,
     redirectDetails,
+    aeoReadiness,
     schemaValidation,
     performanceSummary,
     anomalyCount,
@@ -1070,9 +1097,29 @@ async function assembleClientSignals(
         if (item.status === 'approved') approved++;
       }
     }
+
+    // Compute avgResponseTime from batch-level timestamps.
+    // Batch-level approximation: for batches where all items are approved/applied,
+    // use (updatedAt - createdAt) as response time. There is no per-item resolved_at column.
+    let responseTimeSum = 0;
+    let resolvedBatchCount = 0;
+    for (const batch of batches) {
+      const allResolved = batch.items.length > 0 && batch.items.every(
+        i => i.status === 'approved' || i.status === 'applied',
+      );
+      if (allResolved && batch.createdAt && batch.updatedAt) {
+        const created = new Date(batch.createdAt).getTime();
+        const updated = new Date(batch.updatedAt).getTime();
+        if (updated > created) {
+          responseTimeSum += updated - created;
+          resolvedBatchCount++;
+        }
+      }
+    }
+
     approvalPatterns = {
       approvalRate: total > 0 ? approved / total : 0,
-      avgResponseTime: null,
+      avgResponseTime: resolvedBatchCount > 0 ? Math.round(responseTimeSum / resolvedBatchCount) : null,
     };
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: approval patterns optional, degrading gracefully');
@@ -2292,27 +2339,57 @@ async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: schema status optional, degrading gracefully');
   }
 
-  // Link health — SiteNode doesn't carry link counts; use orphanPaths from architecture result
+  // Link health — prefer cached InternalLinkResult (from performance-store) which has real
+  // inbound/outbound counts per page. Fall back to site-architecture orphan check if no
+  // internal-links snapshot exists for this workspace's site.
   let linkHealth = { inbound: 0, outbound: 0, orphan: false };
   try {
-    const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
-    const arch = await Promise.race([
-      getCachedArchitecture(workspaceId),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
-    ]);
-    if (arch) {
-      const nodes: SiteNode[] = flattenTree(arch.tree);
-      const nodeExists = nodes.some(n => n.path === pagePath);
-      if (nodeExists) {
-        linkHealth = {
-          inbound: 0, // Not available from site architecture tree
-          outbound: 0,
-          orphan: arch.orphanPaths?.includes(pagePath) ?? false,
-        };
+    const { getWorkspace: getWsForLinks } = await import('./workspaces.js');
+    const wsForLinks = getWsForLinks(workspaceId);
+    let foundFromLinkData = false;
+    if (wsForLinks?.webflowSiteId) {
+      try {
+        const { getInternalLinks } = await import('./performance-store.js');
+        const linkData = getInternalLinks(wsForLinks.webflowSiteId) as import('./internal-links.js').InternalLinkResult | null;
+        if (linkData?.pageHealth) {
+          const normalizedPath = pagePath === '/' ? '/' : pagePath.replace(/\/$/, '');
+          const entry = linkData.pageHealth.find(
+            ph => (ph.path === '/' ? '/' : ph.path.replace(/\/$/, '')) === normalizedPath,
+          );
+          if (entry) {
+            linkHealth = {
+              inbound: entry.inboundLinks,
+              outbound: entry.outboundLinks,
+              orphan: entry.isOrphan,
+            };
+            foundFromLinkData = true;
+          }
+        }
+      } catch (err) {
+        log.debug({ err, workspaceId }, 'assemblePageProfile: internal-links snapshot optional, degrading gracefully');
+      }
+    }
+    // Fallback: site-architecture orphan check (no inbound/outbound counts available)
+    if (!foundFromLinkData) {
+      const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
+      const arch = await Promise.race([
+        getCachedArchitecture(workspaceId),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (arch) {
+        const nodes: SiteNode[] = flattenTree(arch.tree);
+        const nodeExists = nodes.some(n => n.path === pagePath);
+        if (nodeExists) {
+          linkHealth = {
+            inbound: 0,
+            outbound: 0,
+            orphan: arch.orphanPaths?.includes(pagePath) ?? false,
+          };
+        }
       }
     }
   } catch (err) {
-    log.debug({ err, workspaceId }, 'assemblePageProfile: site architecture optional, degrading gracefully');
+    log.debug({ err, workspaceId }, 'assemblePageProfile: link health optional, degrading gracefully');
   }
 
   // SEO edits
