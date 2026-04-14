@@ -201,6 +201,8 @@ export interface SiteHealthSlice {
     status: DiagnosticStatus;
     affectedPages: string[];
     completedAt: string | null;
+    /** Root cause titles from completed reports — the AI-synthesized findings. */
+    rootCauseTitles?: string[];
   }>;
 }
 

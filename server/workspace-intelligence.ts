@@ -955,6 +955,9 @@ async function assembleSiteHealth(
       status: r.status,
       affectedPages: r.affectedPages,
       completedAt: r.completedAt,
+      rootCauseTitles: r.status === 'completed' && r.rootCauses.length > 0
+        ? r.rootCauses.map(c => c.title)
+        : undefined,
     }));
   } catch (err) {
     log.debug({ workspaceId, err }, 'siteHealth: diagnostic reports optional, degrading gracefully');
@@ -1983,7 +1986,10 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
     if (health.recentDiagnostics && health.recentDiagnostics.length > 0) {
       const diagLines = health.recentDiagnostics.map(d => {
         const pages = d.affectedPages.length > 0 ? ` on ${d.affectedPages.join(', ')}` : '';
-        return `  ${d.anomalyType} [${d.status}]${pages}`;
+        const causes = d.rootCauseTitles && d.rootCauseTitles.length > 0
+          ? ` → ${d.rootCauseTitles.join('; ')}`
+          : '';
+        return `  ${d.anomalyType} [${d.status}]${pages}${causes}`;
       });
       lines.push(`Recent diagnostics:\n${diagLines.join('\n')}`);
     }
