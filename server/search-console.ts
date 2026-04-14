@@ -377,7 +377,6 @@ export async function getTopDroppedGscPage(
   try {
     return new URL(topPage).pathname;
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'search-console: programming error');
     return topPage.startsWith('/') ? topPage : null;
   }
 }
@@ -438,7 +437,6 @@ export async function getTopSpikedGscPage(
   try {
     return new URL(topPage).pathname;
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'search-console: programming error');
     return topPage.startsWith('/') ? topPage : null;
   }
 }

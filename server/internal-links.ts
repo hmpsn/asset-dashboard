@@ -142,7 +142,6 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
 
     return { content: content.slice(0, 1200), internalLinks: [...new Set(internalLinks)], pageTitle };
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'internal-links/fetchPageContent: programming error');
     return null;
   }
 }

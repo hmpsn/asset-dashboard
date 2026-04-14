@@ -229,8 +229,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
     parsed = JSON.parse(cleaned);
   } catch (err) {
-    log.debug({ err }, 'aeo-page-review: expected error — degrading gracefully');
-    log.error({ detail: raw.slice(0, 200) }, 'Failed to parse AI response');
+    log.error({ err, detail: raw.slice(0, 200) }, 'Failed to parse AI response');
     throw new Error('Failed to parse AEO review response');
   }
 

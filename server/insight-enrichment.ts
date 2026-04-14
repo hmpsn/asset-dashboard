@@ -23,8 +23,6 @@ import type * as Reports from './reports.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as ContentBriefMod from './content-brief.js';
 import type * as ContentPostsDb from './content-posts-db.js';
-import { isProgrammingError } from './errors.js';
-
 const log = createLogger('insight-enrichment');
 
 // ── Pure utility functions ────────────────────────────────────────────────────
@@ -59,7 +57,6 @@ export function cleanSlugToTitle(urlOrPath: string): string {
     try {
       pathname = new URL(urlOrPath).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/cleanSlugToTitle: programming error');
       // fall through with original value
     }
   }
@@ -198,7 +195,6 @@ export function resolvePageTitle(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment: programming error');
       // keep original
     }
   }
@@ -238,7 +234,6 @@ export function checkStrategyAlignment(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/checkStrategyAlignment: programming error');
       // keep original
     }
   }
@@ -296,7 +291,6 @@ export function checkPipelineStatus(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/checkPipelineStatus: programming error');
       // keep original
     }
   }
@@ -305,7 +299,6 @@ export function checkPipelineStatus(
     try {
       return new URL(s).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/normalise: programming error');
       return s;
     }
   };
@@ -355,7 +348,6 @@ export function getSchemaGapsForPage(workspaceId: string, pageUrl: string): stri
         const pathname = new URL(pageUrl).pathname;
         validation = getValidation(workspaceId, pathname);
       } catch (err) {
-        if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/getSchemaGapsForPage: programming error');
         // invalid URL, skip pathname fallback
       }
     }
@@ -474,7 +466,6 @@ export function getAuditIssuesForPage(
     try {
       pathname = new URL(pageId).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/getAuditIssuesForPage: programming error');
       // keep original
     }
   }

@@ -148,7 +148,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
     const lines = opts.keywordClusters.slice(0, 10).map(c => {
       let pillar = '';
       if (c.pillarPage) {
-        try { pillar = ` → pillar: ${new URL(c.pillarPage).pathname}`; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy/buildStrategyIntelligenceBlock: programming error'); pillar = ` → pillar: ${c.pillarPage}`; }
+        try { pillar = ` → pillar: ${new URL(c.pillarPage).pathname}`; } catch (err) { pillar = ` → pillar: ${c.pillarPage}`; }
       }
       return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
     });
@@ -177,7 +177,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
   if (opts.conversionPages && opts.conversionPages.length > 0) {
     const lines = opts.conversionPages.slice(0, 10).map(c => {
       let path: string;
-      try { path = new URL(c.pageUrl).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); path = c.pageUrl; }
+      try { path = new URL(c.pageUrl).pathname; } catch (err) { path = c.pageUrl; }
       return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR, ${c.conversions} conversions (${c.sessions} sessions)`;
     });
     sections.push(`CONVERSION DATA (pages driving business outcomes — protect and prioritize keywords for these "money pages"):\n${lines.join('\n')}`);
@@ -1450,7 +1450,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (gscData.length > 0) {
       for (const pm of strategy.pageMap) {
         const matchingRows = gscData.filter(r => {
-          try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); return false; }
+          try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { return false; }
         });
         if (matchingRows.length > 0) {
           const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));

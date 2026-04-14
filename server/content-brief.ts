@@ -66,7 +66,7 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
   if (matching?.length) {
     const lines = matching.map(c => {
       const pageList = c.pages.map((p, i) => {
-        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief/buildBriefIntelligenceBlock: programming error'); return p; }
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch (err) { return p; }
       }).join(', ');
       return `- "${c.query}": ${pageList}`;
     });
@@ -77,7 +77,7 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
   if (opts.decayInsights?.length) {
     const lines = opts.decayInsights.map(d => {
       let path: string;
-      try { path = new URL(d.pageId).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); path = d.pageId; }
+      try { path = new URL(d.pageId).pathname; } catch (err) { path = d.pageId; }
       return `- ${path}: ${d.deltaPercent}% change (${d.baselineClicks} → ${d.currentClicks} clicks)`;
     });
     sections.push(`CONTENT DECAY — Existing content on this topic is losing traffic; brief should address freshness:\n${lines.join('\n')}`);
@@ -95,7 +95,7 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
   if (opts.pageHealthScores?.length) {
     const lines = opts.pageHealthScores.map(p => {
       let path: string;
-      try { path = new URL(p.pageId).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); path = p.pageId; }
+      try { path = new URL(p.pageId).pathname; } catch (err) { path = p.pageId; }
       return `- ${path}: ${p.score}/100 (${p.trend})`;
     });
     sections.push(`PAGE HEALTH — Related pages' health scores:\n${lines.join('\n')}`);

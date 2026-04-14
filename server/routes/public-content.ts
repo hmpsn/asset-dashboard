@@ -312,7 +312,7 @@ router.post('/api/public/content-request/:workspaceId/from-audit', async (req, r
       const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
       topKeywords = qpData
         .filter(r => {
-          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-content: programming error'); return false; }
+          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch (err) { return false; }
         })
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 5)

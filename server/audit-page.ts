@@ -433,7 +433,7 @@ export function auditPage(
         } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'audit-page: programming error'); return false; }
       });
       const authorityCitations = externalCitations.filter(l => {
-        try { return authorityDomains.test(new URL(l.href).hostname); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'audit-page: programming error'); return false; }
+        try { return authorityDomains.test(new URL(l.href).hostname); } catch (err) { return false; }
       });
       const wordCount2 = countWords(html);
       if (wordCount2 > 500 && externalCitations.length === 0) {

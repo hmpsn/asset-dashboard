@@ -349,7 +349,7 @@ function auditPageFromHtml(url: string, html: string): SalesPageResult {
   const links = extractLinks(html);
   const baseOrigin = new URL(url).origin;
   const internalLinks = links.filter(l => {
-    try { return new URL(l.href, url).origin === baseOrigin; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit: programming error'); return l.href.startsWith('/'); }
+    try { return new URL(l.href, url).origin === baseOrigin; } catch (err) { return l.href.startsWith('/'); }
   });
   if (internalLinks.length === 0) {
     issues.push({ check: 'internal-links', severity: 'info', message: 'No internal links found', recommendation: 'Add internal links to distribute page authority.' });

@@ -62,7 +62,6 @@ function normalizePageUrl(url: string): string {
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     return `${u.origin}${path}`;
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence/normalizePageUrl: programming error');
     // Not a valid URL — strip trailing slash as best-effort
     return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
   }
@@ -180,7 +179,6 @@ export function computePageHealthScores(
     try {
       pagePath = new URL(page.page).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence: programming error');
       pagePath = page.page;
     }
 
@@ -755,7 +753,6 @@ export function computeSerpOpportunities(
     try {
       pathname = new URL(page.page).pathname;
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence/computeSerpOpportunities: programming error');
       pathname = page.page;
     }
 

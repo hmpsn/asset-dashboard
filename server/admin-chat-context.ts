@@ -162,7 +162,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     .sort((a, b) => a.score - b.score);
   if (healthInsights.length > 0) {
     const lines = healthInsights.slice(0, 10).map(h => {
-      const title = h.pageTitle || (() => { try { return new URL(h.pageId || '').pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context/buildInsightsContext: programming error'); return h.pageId || '(unknown)'; } })();
+      const title = h.pageTitle || (() => { try { return new URL(h.pageId || '').pathname; } catch (err) { return h.pageId || '(unknown)'; } })();
       let line = `  ${title}: ${h.score}/100 (${h.trend}) — ${h.clicks} clicks, pos ${h.position?.toFixed?.(1) ?? h.position}`;
       if (h.strategyAlignment && h.strategyAlignment !== 'untracked') line += ` — strategy: ${h.strategyAlignment}`;
       if (h.pipelineStatus) line += ` — pipeline: ${h.pipelineStatus}`;
@@ -199,7 +199,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (decayInsights.length > 0) {
     const lines = decayInsights.slice(0, 8).map(d => {
       let path: string;
-      try { path = new URL(d.pageId || '').pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); path = d.pageId || '(unknown)'; }
+      try { path = new URL(d.pageId || '').pathname; } catch (err) { path = d.pageId || '(unknown)'; }
       return `  ${path}: ${d.deltaPercent}% (${d.baselineClicks} → ${d.currentClicks} clicks)`;
     });
     sections.push(`CONTENT DECAY (pages losing traffic):\n${lines.join('\n')}`);
@@ -212,7 +212,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (cannibalization.length > 0) {
     const lines = cannibalization.slice(0, 8).map(c => {
       const pages = c.pages.map((p, i) => {
-        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); return p; }
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch (err) { return p; }
       }).join(', ');
       return `  "${c.query}": ${pages}`;
     });
@@ -226,7 +226,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     .sort((a, b) => b.totalImpressions - a.totalImpressions);
   if (clusters.length > 0) {
     const lines = clusters.slice(0, 8).map(c => {
-      const pillar = c.pillarPage ? ` → pillar: ${(() => { try { return new URL(c.pillarPage).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); return c.pillarPage; } })()}` : '';
+      const pillar = c.pillarPage ? ` → pillar: ${(() => { try { return new URL(c.pillarPage).pathname; } catch (err) { return c.pillarPage; } })()}` : '';
       return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
     });
     sections.push(`KEYWORD CLUSTERS (topic groups from GSC queries):\n${lines.join('\n')}`);
@@ -253,7 +253,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (conversions.length > 0) {
     const lines = conversions.slice(0, 8).map(c => {
       let path: string;
-      try { path = new URL(c.pageId || '').pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); path = c.pageId || '(unknown)'; }
+      try { path = new URL(c.pageId || '').pathname; } catch (err) { path = c.pageId || '(unknown)'; }
       return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR (${c.conversions} conversions, ${c.sessions} sessions)`;
     });
     sections.push(`CONVERSION ATTRIBUTION (pages driving conversions):\n${lines.join('\n')}`);

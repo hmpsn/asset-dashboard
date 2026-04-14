@@ -165,7 +165,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
   try {
     parsed = JSON.parse(result.text) as MeetingBriefAIOutput;
   } catch (err) {
-    log.debug({ err }, 'meeting-brief-generator: expected error — degrading gracefully');
+    log.debug({ err }, 'meeting-brief-generator: AI returned invalid JSON — retrying');
     // Retry once — ask the model to fix its own JSON
     const retryMessages: typeof messages = [
       ...messages,
@@ -183,8 +183,7 @@ Avoid: "Your site health score is 78. You have 12 open insights."
     try {
       parsed = JSON.parse(retryResult.text) as MeetingBriefAIOutput;
     } catch (err) {
-      log.debug({ err }, 'meeting-brief-generator: expected error — degrading gracefully');
-      log.error({ workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid JSON after retry');
+      log.error({ err, workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid JSON after retry');
       throw new Error('Meeting brief AI returned invalid JSON after retry');
     }
   }

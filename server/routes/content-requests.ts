@@ -293,7 +293,6 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
           const url = new URL(p.page);
           gscPages.set(url.pathname, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
         } catch (err) {
-          if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error');
           gscPages.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
         }
       }

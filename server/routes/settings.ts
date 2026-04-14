@@ -7,11 +7,7 @@ import { getBookingUrl, setBookingUrl, clearBookingUrl } from '../studio-config.
 const router = Router();
 
 import { readEnvFile, writeEnvFile } from '../helpers.js';
-import { isProgrammingError } from '../errors.js';
-import { createLogger } from '../logger.js';
 
-
-const log = createLogger('settings');
 router.get('/api/settings', (_req, res) => {
   const vars = readEnvFile();
   res.json({
@@ -48,7 +44,7 @@ router.patch('/api/studio-config', (req, res) => {
     clearBookingUrl();
   } else {
     // Basic URL validation — must be http(s)
-    try { new URL(bookingUrl); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'settings: PATCH /api/studio-config: programming error'); return res.status(400).json({ error: 'Invalid URL' }); }
+    try { new URL(bookingUrl); } catch (err) { return res.status(400).json({ error: 'Invalid URL' }); }
     setBookingUrl(bookingUrl);
   }
   res.json({ ok: true, bookingUrl: bookingUrl || null });

@@ -95,7 +95,7 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
           const sitemapUrls = await discoverSitemapUrls(base);
           if (sitemapUrls.length > 0) {
             sitemapPaths = new Set(sitemapUrls.map(u => {
-              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: programming error'); return ''; }
+              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch (err) { return ''; }
             }).filter(Boolean));
             break; // use first successful sitemap
           }

@@ -6,8 +6,6 @@
 
 import { getGlobalToken } from './google-auth.js';
 import { createLogger } from './logger.js';
-import { isProgrammingError } from './errors.js';
-
 const log = createLogger('ga4');
 
 const GA4_API = 'https://analyticsdata.googleapis.com/v1beta';
@@ -885,7 +883,6 @@ export async function getTopDroppedGA4Page(
     }
     return topPage.split('?')[0];
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'google-analytics: programming error');
     return topPage.startsWith('/') ? topPage.split('?')[0] : null;
   }
 }
@@ -961,7 +958,6 @@ export async function getTopSpikedGA4Page(
     }
     return topPage.split('?')[0];
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'google-analytics: programming error');
     return topPage.startsWith('/') ? topPage.split('?')[0] : null;
   }
 }

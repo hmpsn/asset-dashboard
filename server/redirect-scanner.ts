@@ -103,7 +103,6 @@ async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: Redire
         try {
           currentUrl = new URL(location, currentUrl).toString();
         } catch (err) {
-          if (isProgrammingError(err)) log.warn({ err }, 'redirect-scanner: programming error');
           break;
         }
       } else {
@@ -111,7 +110,6 @@ async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: Redire
         break;
       }
     } catch (err) {
-      if (isProgrammingError(err)) log.warn({ err }, 'redirect-scanner/traceRedirects: programming error');
       hops.push({ url: currentUrl, status: 0 });
       break;
     }
@@ -139,7 +137,7 @@ async function checkPageStatus(url: string): Promise<{ status: number | 'error';
       const location = res.headers.get('location');
       let resolvedLocation = location || undefined;
       if (location) {
-        try { resolvedLocation = new URL(location, url).toString(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'redirect-scanner/checkPageStatus: programming error'); /* keep as-is */ }
+        try { resolvedLocation = new URL(location, url).toString(); } catch (err) { /* keep as-is */ }
       }
       return { status: res.status, statusText: res.statusText, redirectsTo: resolvedLocation };
     }
@@ -374,7 +372,7 @@ export async function scanRedirects(siteId: string, workspaceId?: string, liveDo
     if (typeof ps.status !== 'number') continue;
     if (ps.status >= 300 && ps.status < 400 && ps.redirectsTo) {
       // Already redirecting — check if destination is healthy
-      const destPath = (() => { try { return new URL(ps.redirectsTo).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'redirect-scanner/destPath: programming error'); return null; } })();
+      const destPath = (() => { try { return new URL(ps.redirectsTo).pathname; } catch (err) { return null; } })();
       if (destPath) {
         const destPage = pageStatuses.find(p => p.path === destPath);
         if (destPage && (destPage.status === 'error' || (typeof destPage.status === 'number' && destPage.status >= 400))) {

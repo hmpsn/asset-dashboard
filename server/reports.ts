@@ -412,7 +412,6 @@ function resolveUrl(base: string, relative: string): string {
   try {
     return new URL(relative, base).toString();
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'reports/resolveUrl: programming error');
     return relative;
   }
 }

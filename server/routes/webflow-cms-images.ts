@@ -18,7 +18,6 @@ function displayNameFromUrl(url: string): string {
     const pathname = new URL(url).pathname;
     return pathname.split('/').pop()?.split('?')[0] || url;
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms-images/displayNameFromUrl: programming error');
     return url.split('/').pop()?.split('?')[0] || url;
   }
 }

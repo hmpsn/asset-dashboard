@@ -13,6 +13,11 @@
 // malformed input, which is expected degradation (not a code bug). Do NOT call
 // isProgrammingError() inside catch blocks that wrap JSON parsing — use the
 // parseJsonSafe helper from server/db/json-validation.ts instead.
+//
+// ⚠ TypeError caveat: `new URL(invalidInput)` throws TypeError for malformed
+// URLs. When the input comes from user data, scraped pages, or external APIs,
+// this is expected validation — not a code bug. Do NOT call isProgrammingError()
+// inside catch blocks that wrap `new URL()` on external/user-supplied strings.
 
 export function isProgrammingError(err: unknown): boolean {
   return (

@@ -596,7 +596,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           const pageContent = cachedHtml ? extractBodyText(cachedHtml) : '';
 
           // Build keyword strategy + brand voice + KB + personas context for this page
-          const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit: programming error'); return undefined; } })() : undefined;
+          const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch (err) { return undefined; } })() : undefined;
           // Derive per-page keywords from pre-built pageMap — no extra DB call for seoContext
           const seoCtx = wsIntel.seoContext ? { ...wsIntel.seoContext } : undefined;
           if (seoCtx && pagePath && seoCtx.strategy?.pageMap?.length) {
