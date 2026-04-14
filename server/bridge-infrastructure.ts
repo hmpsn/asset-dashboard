@@ -34,6 +34,7 @@ const BRIDGE_FLAGS: FeatureFlagKey[] = [
   'bridge-action-annotation',
   'bridge-annotation-to-insight',
   'bridge-audit-site-health',
+  'bridge-audit-auto-resolve',
   'bridge-client-signal',
 ];
 

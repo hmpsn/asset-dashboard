@@ -53,6 +53,7 @@ export const FEATURE_FLAGS = {
   'bridge-action-annotation': false,        // #13: recordAction → create annotation
   'bridge-annotation-to-insight': false,    // #14: annotation created → insight correlation (Phase 3)
   'bridge-audit-site-health': false,        // #15: audit → site_health insights
+  'bridge-audit-auto-resolve': false,       // IG-4: auto-resolve audit_finding insights on clean audit
   'bridge-client-signal': false,            // #16: client feedback → signal insights (Phase 3)
   // Platform Intelligence Enhancements
   'smart-placeholders': false,       // System-wide smart placeholder hook (admin chips + prefill, client ghost text)

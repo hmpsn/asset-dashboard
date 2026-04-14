@@ -27,6 +27,7 @@ import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
@@ -644,7 +645,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
-              .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+              .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
 
             if (recentAnomalies.length === 0) return 0;
 
@@ -704,6 +705,62 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
     log.info(`Detected ${allNew.length} new anomalies across ${workspaces.length} workspaces`);
   } else {
     log.info(`No new anomalies detected`);
+  }
+
+  // ── Bridge #10 reversal: remove anomaly boost when anomalies age out ──
+  // For every workspace, check if recent (<24h) anomalies still exist.
+  // If none remain AND insights have an 'anomaly' score adjustment, reverse it (delta=0).
+  // This prevents stale +10 boosts from lingering indefinitely after anomalies resolve.
+  // Gated behind same feature flag as the boost itself — no point reversing if boosts were never applied.
+  if (!isFeatureEnabled('bridge-anomaly-boost')) {
+    log.debug('Bridge #10 reversal skipped — bridge-anomaly-boost flag OFF');
+  } else
+  for (const ws of workspaces) {
+    try {
+      const recentForWs = listAnomalies(ws.id, false)
+        .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+      if (recentForWs.length > 0) continue; // Still has active recent anomalies — keep boost
+
+      const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const allInsights = fetchInsights(ws.id);
+      let reversed = 0;
+      for (const insight of allInsights) {
+        if (insight.resolutionStatus === 'resolved') continue;
+        const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+        const adj = dataObj._scoreAdjustments as Record<string, number> | undefined;
+        if (!adj || typeof adj !== 'object' || !('anomaly' in adj)) continue;
+
+        // Remove the anomaly boost (delta=0 deletes the key)
+        const { data: newData, adjustedScore } = applyScoreAdjustment(
+          dataObj, insight.impactScore ?? 50, 'anomaly', 0,
+        );
+        if (adjustedScore !== insight.impactScore) {
+          updateInsight({
+            workspaceId: insight.workspaceId,
+            pageId: insight.pageId,
+            insightType: insight.insightType,
+            data: newData as never,
+            severity: insight.severity,
+            pageTitle: insight.pageTitle,
+            strategyKeyword: insight.strategyKeyword,
+            strategyAlignment: insight.strategyAlignment,
+            auditIssues: insight.auditIssues,
+            pipelineStatus: insight.pipelineStatus,
+            anomalyLinked: false,
+            impactScore: adjustedScore,
+            domain: insight.domain,
+            bridgeSource: insight.bridgeSource,
+          });
+          reversed++;
+        }
+      }
+      if (reversed > 0) {
+        log.info({ workspaceId: ws.id, reversed }, 'Reversed stale anomaly boost on insights');
+        invalidateIntelligenceCache(ws.id);
+      }
+    } catch (reverseErr) {
+      log.debug({ err: reverseErr, workspaceId: ws.id }, 'Anomaly boost reversal failed — non-critical');
+    }
   }
 
   // Prune old anomalies (older than 60 days)

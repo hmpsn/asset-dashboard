@@ -2563,6 +2563,73 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    name: 'seo-context.ts import restriction (deprecated module)',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'server/',
+    // Existing callers that are already imported — these are grandfathered until migrated.
+    // seo-context.ts itself and workspace-intelligence.ts (shadow-mode comparison) are allowed.
+    exclude: [
+      'server/seo-context.ts',
+      'server/workspace-intelligence.ts',
+      'server/prompt-assembly.ts',
+      'server/admin-chat-context.ts',
+      'server/helpers.ts',
+      'server/copy-review.ts',
+      'server/internal-links.ts',
+      'server/aeo-page-review.ts',
+      'server/deep-diagnostic.ts',
+      'server/schema-generator.ts',
+      'server/content-brief.ts',
+      'server/routes/ai-chat.ts',
+      'server/routes/content-generation.ts',
+      'server/routes/seo-audit.ts',
+      'server/routes/schema-generator.ts',
+      'server/routes/content-matrix.ts',
+      'server/routes/aeo-review.ts',
+      'server/routes/copy-generation.ts',
+      'server/routes/page-strategy.ts',
+      'server/routes/content-brief.ts',
+      'server/routes/ai-rewrite.ts',
+      'server/routes/internal-links.ts',
+      'server/routes/diagnostics.ts',
+      'server/routes/public-analytics.ts',
+      'server/routes/workspaces.ts',
+      'server/routes/voice-calibration.ts',
+      'server/routes/webflow-seo.ts',
+      'server/routes/discovery-ingestion.ts',
+      'server/routes/google.ts',
+      'server/routes/webflow-keywords.ts',
+      'server/routes/copy-pipeline.ts',
+      'server/routes/brandscript.ts',
+      'server/routes/brand-identity.ts',
+      'server/routes/jobs.ts',
+      'server/routes/public-portal.ts',
+      'server/routes/keyword-strategy.ts',
+      'tests/',
+    ],
+    excludeLines: ['// seo-context-ok'],
+    message: 'seo-context.ts is deprecated — use buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts instead. Add // seo-context-ok on the import line if this is a grandfathered caller awaiting migration.',
+    severity: 'error',
+    rationale: 'seo-context.ts is being retired in favor of the unified workspace intelligence system. New callers must use the intelligence assembler.',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const importRe = /from\s+['"][^'"]*seo-context/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!importRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// seo-context-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // P0 expansion rule: requireAuth outside allowed files.
     //
     // `requireAuth` is JWT-only middleware. Most server routes are protected by

@@ -1160,11 +1160,13 @@ async function assembleClientSignals(
       const { countActivityByType } = await import('./activity-log.js');
       const sessionCount = countActivityByType(workspaceId, 'portal_session', 30);
       if (sessionCount > 0) {
-        // pageViews approximated from portal_session login events; featuresUsed derived from chat + feedback activity
+        // pageViews approximated from portal_session login events; featuresUsed derived from client-specific activity
         const featuresUsed: string[] = [];
         if (chatSessionCount > 0) featuresUsed.push('chat');
-        const { hasRecentActivity } = await import('./activity-log.js');
-        if (hasRecentActivity(workspaceId, 30)) featuresUsed.push('dashboard');
+        // Check for client-initiated feedback activity (not admin-only types) to detect dashboard usage
+        const feedbackCount = countActivityByType(workspaceId, 'client_keyword_feedback', 30)
+          + countActivityByType(workspaceId, 'client_content_gap_vote', 30);
+        if (feedbackCount > 0) featuresUsed.push('dashboard');
         portalUsage = { pageViews: sessionCount, featuresUsed };
       }
     } catch (err) {
@@ -2607,6 +2609,21 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
 /** Cache stats for health endpoint (§18) */
 export function getIntelligenceCacheStats() {
   return intelligenceCache.stats();
+}
+
+/**
+ * Read-only peek at cached compositeHealthScore for a workspace.
+ * Returns null if no cached intelligence exists — does NOT trigger assembly.
+ * Used by outcome crons to prioritize measurement by workspace health.
+ */
+export function getWorkspaceHealthScore(workspaceId: string): number | null {
+  // Try the default cache key (all slices, no page path, 'all' learning domain)
+  const cacheKey = `intelligence:${workspaceId}:${[...ALL_SLICES].sort().join(',')}::all`;
+  const cached = intelligenceCache.peek(cacheKey);
+  if (cached?.clientSignals?.compositeHealthScore != null) {
+    return cached.clientSignals.compositeHealthScore;
+  }
+  return null;
 }
 
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────
