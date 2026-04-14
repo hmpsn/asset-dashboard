@@ -5,6 +5,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { normalizePath } from './helpers.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('roi-attribution');
 
@@ -18,7 +19,8 @@ function normalizePageUrl(url: string): string {
     if (url.startsWith('http')) {
       return normalizePath(new URL(url).pathname);
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'roi-attribution/normalizePageUrl: programming error');
     // fall through to shared normalizePath on the raw string
   }
   return normalizePath(url);

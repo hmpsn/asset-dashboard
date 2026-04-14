@@ -23,6 +23,7 @@ import { getAllGscPages } from '../search-console.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
+import { isProgrammingError } from '../errors.js';
 
 const router = Router();
 const log = createLogger('webflow-analysis');
@@ -203,7 +204,7 @@ router.get('/api/webflow/redirect-scan/:siteId', requireWorkspaceAccessFromQuery
             try {
               const parsed = new URL(p.page);
               return { url: p.page, path: parsed.pathname, clicks: p.clicks, impressions: p.impressions };
-            } catch { return null; }
+            } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-analysis: GET /api/webflow/redirect-scan/:siteId: programming error'); return null; }
           }).filter(Boolean) as typeof gscGhostUrls;
           log.info(`Found ${gscPages.length} GSC pages to cross-check`);
         }

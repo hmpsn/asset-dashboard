@@ -25,6 +25,7 @@ import { verifyTurnstile } from '../middleware/turnstile.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-auth');
 
@@ -51,7 +52,7 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
   if (match) {
     // Migrate legacy plaintext password to bcrypt on successful login
     if (!isHash) {
-      try { updateWorkspace(ws.id, { clientPassword: await bcrypt.hash(password, 12) }); } catch { /* best-effort migration */ }
+      try { updateWorkspace(ws.id, { clientPassword: await bcrypt.hash(password, 12) }); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-auth: POST /api/public/auth/:id: programming error'); /* best-effort migration */ }
     }
     // Issue signed session cookie for server-side verification
     const sessionToken = signClientSession(ws.id);

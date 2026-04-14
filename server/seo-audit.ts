@@ -13,6 +13,7 @@ import { resolvePagePath } from './helpers.js';
 export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-page.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('seo-audit');
 
@@ -74,7 +75,7 @@ async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<Pa
     });
     if (!res.ok) return null;
     return await res.json() as PageMeta;
-  } catch { return null; }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit/fetchPageMeta: programming error'); return null; }
 }
 
 async function fetchPublishedHtml(url: string): Promise<string | null> {
@@ -82,7 +83,7 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
     const res = await fetch(url, { redirect: 'follow' });
     if (!res.ok) return null;
     return await res.text();
-  } catch { return null; }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit/fetchPublishedHtml: programming error'); return null; }
 }
 
 interface SiteInfo {
@@ -119,10 +120,10 @@ async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<Site
           customDomain = domains[0].url;
         }
       }
-    } catch { /* custom domains fetch is best-effort */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit: programming error'); /* custom domains fetch is best-effort */ }
 
     return { subdomain, customDomain };
-  } catch { return { subdomain: null, customDomain: null }; }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit/getSiteInfo: programming error'); return { subdomain: null, customDomain: null }; }
 }
 
 export async function runSeoAudit(siteId: string, tokenOverride?: string, workspaceId?: string, skipLinkCheck = false): Promise<SeoAuditResult> {
@@ -269,7 +270,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           }
         }
       }
-    } catch { /* skip if fetch fails */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit: programming error'); /* skip if fetch fails */ }
 
     // XML Sitemap
     try {
@@ -291,7 +292,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           }
         }
       }
-    } catch { /* skip if fetch fails */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit: programming error'); /* skip if fetch fails */ }
 
     // Page response time (sample the homepage)
     try {
@@ -303,7 +304,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
       } else if (responseTime > 1000) {
         siteWideIssues.push({ check: 'response-time', severity: 'warning', message: `Server response time ${(responseTime / 1000).toFixed(1)}s`, recommendation: 'Aim for server response under 600ms. Consider caching, CDN, or server optimization.', value: `${responseTime}ms` });
       }
-    } catch { /* skip */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit/sitemapUrls: programming error'); /* skip */ }
 
     // SSL / HTTPS check
     if (!checkUrl.startsWith('https://')) {
@@ -474,7 +475,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
         try {
           const p = new URL(link.href).pathname.replace(/\/$/, '').toLowerCase();
           if (!p.startsWith('/cdn-cgi/')) internalLinkTargets.add(p);
-        } catch { /* skip */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit: programming error'); /* skip */ }
       }
     }
   }
@@ -595,7 +596,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           const pageContent = cachedHtml ? extractBodyText(cachedHtml) : '';
 
           // Build keyword strategy + brand voice + KB + personas context for this page
-          const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch { return undefined; } })() : undefined;
+          const pagePath = pageResult.url ? (() => { try { return new URL(pageResult.url).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'seo-audit: programming error'); return undefined; } })() : undefined;
           // Derive per-page keywords from pre-built pageMap — no extra DB call for seoContext
           const seoCtx = wsIntel.seoContext ? { ...wsIntel.seoContext } : undefined;
           if (seoCtx && pagePath && seoCtx.strategy?.pageMap?.length) {

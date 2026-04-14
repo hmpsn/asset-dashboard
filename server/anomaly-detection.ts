@@ -33,6 +33,7 @@ import { computeImpactScore } from './insight-enrichment.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('anomaly');
 
@@ -384,7 +385,8 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'anomaly-detection: programming error');
       // Conversions not set up or API unavailable — skip
     }
   }
@@ -446,7 +448,8 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
       feature: 'anomaly-summary',
     });
     return result.text;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'anomaly-detection/generateAiSummary: programming error');
     return undefined;
   }
 }

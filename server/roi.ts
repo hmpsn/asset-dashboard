@@ -8,7 +8,11 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { getWorkspace } from './workspaces.js';
 import { listContentRequests } from './content-requests.js';
 import { listMatrices } from './content-matrices.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('roi');
 // ── SQLite row shape ──
 
 interface SnapshotRow {
@@ -251,7 +255,7 @@ export function computeROI(workspaceId: string): ROIData | null {
         });
       }
     }
-  } catch { /* matrices not available — skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'roi: programming error'); /* matrices not available — skip */ }
 
   // Sort by traffic value descending
   contentItems.sort((a, b) => b.trafficValue - a.trafficValue);

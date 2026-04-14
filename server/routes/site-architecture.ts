@@ -14,6 +14,7 @@ import { createLogger } from '../logger.js';
 
 const log = createLogger('routes:site-architecture');
 import { requireWorkspaceAccess } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 router.get('/api/site-architecture/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
@@ -49,7 +50,7 @@ router.get('/api/site-architecture/:workspaceId/schema-coverage', requireWorkspa
           schemaPathSet.add(p);
           const types = page.suggestedSchemas?.map(s => s.type) || [];
           schemaTypeMap.set(p, types);
-        } catch { /* skip malformed URLs */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'site-architecture: GET /api/site-architecture/:workspaceId/schema-coverage: programming error'); /* skip malformed URLs */ }
       }
     }
 

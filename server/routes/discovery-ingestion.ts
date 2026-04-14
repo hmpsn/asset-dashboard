@@ -14,7 +14,11 @@ import {
 } from '../discovery-ingestion.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { isProgrammingError } from '../errors.js';
+import { createLogger } from '../logger.js';
 
+
+const log = createLogger('discovery-ingestion');
 // Accept text and markdown MIME types. Browsers are inconsistent for .md files,
 // so we also accept application/octet-stream when the extension matches — the
 // extension + mimetype pair is validated together in the upload loop.
@@ -90,7 +94,7 @@ router.post('/api/discovery/:workspaceId/sources',
       const mimeOk = ACCEPTED_MIMETYPES.has(file.mimetype);
       if (!extOk || !mimeOk) {
         // Clean up disk temp file for rejected types — multer doesn't auto-delete
-        if (file.path) { try { fs.unlinkSync(file.path); } catch { /* ignore cleanup errors */ } }
+        if (file.path) { try { fs.unlinkSync(file.path); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'discovery-ingestion: programming error'); /* ignore cleanup errors */ } }
         rejected.push({ filename: file.originalname, reason: 'Unsupported file type (only .txt and .md are accepted)' });
         continue;
       }
@@ -104,7 +108,8 @@ router.post('/api/discovery/:workspaceId/sources',
       try {
         content = fs.readFileSync(file.path, 'utf-8');
         fs.unlinkSync(file.path);
-      } catch {
+      } catch (err) {
+        if (isProgrammingError(err)) log.warn({ err }, 'discovery-ingestion: programming error');
         rejected.push({ filename: file.originalname, reason: 'Could not read uploaded file' });
         continue;
       }

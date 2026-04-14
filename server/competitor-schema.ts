@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('competitor-schema');
 
@@ -59,7 +60,7 @@ function extractJsonLdFromHtml(html: string): { types: string[]; count: number }
           if (item['@type']) types.push(String(item['@type']));
         }
       }
-    } catch { /* malformed JSON-LD — skip */ }
+    } catch (err) { /* malformed JSON-LD — skip */ }
   }
   return { types, count };
 }
@@ -78,7 +79,7 @@ function extractUrlsFromSitemap(xml: string, domain: string, maxUrls: number): s
       if (parsed.hostname === domain || parsed.hostname === `www.${domain}` || `www.${parsed.hostname}` === domain) {
         urls.push(url);
       }
-    } catch { /* invalid URL — skip */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'competitor-schema/extractUrlsFromSitemap: programming error'); /* invalid URL — skip */ }
   }
   return urls;
 }
@@ -95,7 +96,8 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<string 
     });
     if (!res.ok) return null;
     return await res.text();
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'competitor-schema/fetchWithTimeout: programming error');
     return null;
   } finally {
     clearTimeout(timer);
@@ -157,7 +159,8 @@ function readCache(domain: string): CompetitorSchemaResult | null {
     const age = Date.now() - new Date(cached.crawledAt).getTime();
     if (age > CACHE_TTL_MS) return null;
     return cached;
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'competitor-schema/readCache: expected error — degrading gracefully');
     return null;
   }
 }

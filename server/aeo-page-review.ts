@@ -116,7 +116,7 @@ function extractPageStructure(html: string): string {
           if (node['@type']) schemaTypes.push(node['@type']);
         }
       }
-    } catch { /* skip */ }
+    } catch (err) { /* skip */ }
   }
   if (schemaTypes.length > 0) parts.push(`\nEXISTING SCHEMA TYPES: ${schemaTypes.join(', ')}`);
 
@@ -228,7 +228,8 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   try {
     const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
     parsed = JSON.parse(cleaned);
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'aeo-page-review: expected error — degrading gracefully');
     log.error({ detail: raw.slice(0, 200) }, 'Failed to parse AI response');
     throw new Error('Failed to parse AEO review response');
   }

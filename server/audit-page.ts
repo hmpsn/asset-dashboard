@@ -3,7 +3,11 @@ import {
   extractImgTags, extractStyleBlocks, extractInlineScripts, countExternalResources,
   stripHiddenElements,
 } from './seo-audit-html.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('audit-page');
 export type Severity = 'error' | 'warning' | 'info';
 
 export type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
@@ -273,7 +277,7 @@ export function auditPage(
           if (canonRoot !== pageRoot && !canonicalHost.includes('webflow.io') && !pageHost.includes('webflow.io')) {
             issues.push({ check: 'canonical', severity: 'warning', message: 'Canonical points to different domain', recommendation: `The canonical URL (${canonicalHost}) differs from the page domain (${pageHost}). Verify this is intentional.`, value: canonicalUrl });
           }
-        } catch { /* skip malformed URLs */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'audit-page: programming error'); /* skip malformed URLs */ }
       }
     }
 
@@ -426,10 +430,10 @@ export function auditPage(
           const host = new URL(l.href).hostname;
           if (host.includes('webflow.io') || host.includes('facebook.') || host.includes('twitter.') || host.includes('instagram.') || host.includes('linkedin.') || host.includes('youtube.')) return false;
           return true;
-        } catch { return false; }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'audit-page: programming error'); return false; }
       });
       const authorityCitations = externalCitations.filter(l => {
-        try { return authorityDomains.test(new URL(l.href).hostname); } catch { return false; }
+        try { return authorityDomains.test(new URL(l.href).hostname); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'audit-page: programming error'); return false; }
       });
       const wordCount2 = countWords(html);
       if (wordCount2 > 500 && externalCitations.length === 0) {

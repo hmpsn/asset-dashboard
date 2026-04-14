@@ -9,6 +9,7 @@
 
 import { createLogger } from './logger.js';
 import type { InternalLinksResult } from '../shared/types/diagnostics.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('diagnostic-probe');
 
@@ -71,7 +72,8 @@ function normalizeUrl(url: string): string {
   try {
     const u = new URL(url);
     return `${u.origin}${u.pathname}`.replace(/\/$/, '');
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'diagnostic-probe/normalizeUrl: programming error');
     return url.replace(/\/$/, '');
   }
 }

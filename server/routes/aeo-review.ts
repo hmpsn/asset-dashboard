@@ -19,6 +19,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('aeo-review');
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
 const router = Router();
 const REVIEW_DIR = getDataDir('aeo-reviews');
 
@@ -35,7 +36,7 @@ function saveReview(workspaceId: string, data: unknown): void {
 function loadReview(workspaceId: string): unknown | null {
   const file = reviewFile(workspaceId);
   if (!fs.existsSync(file)) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return null; }
+  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch (err) { return null; }
 }
 
 // ─── Single page review ──────────────────────────────────────────
@@ -175,7 +176,7 @@ router.post('/api/aeo-review/:workspaceId/site', requireWorkspaceAccess('workspa
           const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() || page.name;
           pagesToReview.push({ url: page.url, title, html, issues: issueMap.get(page.slug) || [] });
         }
-      } catch { /* skip unreachable / timed-out pages */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'aeo-review/aeoIssueCount: programming error'); /* skip unreachable / timed-out pages */ }
     }));
 
     log.info(`AEO review: fetched ${pagesToReview.length}/${selected.length} pages, sending to AI`);

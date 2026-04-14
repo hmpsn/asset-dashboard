@@ -12,7 +12,11 @@ import { isStripeConfigured } from '../stripe.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
 import db from '../db/index.js';
+import { isProgrammingError } from '../errors.js';
+import { createLogger } from '../logger.js';
 
+
+const log = createLogger('health');
 const router = Router();
 
 /** Set to true during graceful shutdown so /api/health returns 503. */
@@ -171,7 +175,8 @@ router.get('/api/admin/db-export', (_req, res) => {
   }
   try {
     db.pragma('wal_checkpoint(FULL)');
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'health: GET /api/admin/db-export: programming error');
     // Non-fatal — export proceeds with whatever is in the main file
   }
   const stat = fs.statSync(dbPath);
@@ -208,7 +213,7 @@ router.post('/api/admin/db-import', (req, res) => {
       // Give the response time to flush, then restart so the new DB is opened fresh
       setTimeout(() => process.exit(0), 500);
     } catch (err) {
-      try { fs.unlinkSync(incomingPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(incomingPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'health: programming error'); /* ignore */ }
       res.status(500).json({ error: err instanceof Error ? err.message : 'Import failed' });
     }
   });

@@ -25,6 +25,7 @@ import { STUDIO_BOT_UA } from './constants.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { randomUUID } from 'crypto';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('llms-txt');
 
@@ -208,7 +209,8 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
           });
           clearTimeout(timeout);
           return res.ok ? url : null;
-        } catch {
+        } catch (err) {
+          if (isProgrammingError(err)) log.warn({ err }, 'llms-txt-generator/validateUrls: programming error');
           return null;
         }
       })
@@ -506,7 +508,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
         status: r.status,
       });
     }
-  } catch { /* non-critical */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'llms-txt-generator: programming error'); /* non-critical */ }
 
   // 6. Build both tiers
   const businessContext = ws.keywordStrategy?.businessContext;
@@ -529,7 +531,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   const generatedAt = new Date().toISOString();
 
   // Persist freshness timestamp
-  try { setLastGenerated(workspaceId, 'manual'); } catch { /* non-critical */ }
+  try { setLastGenerated(workspaceId, 'manual'); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'llms-txt-generator: programming error'); /* non-critical */ }
 
   log.info({ workspaceId, pageCount: pages.length, plannedCount: plannedPages.length, summariesGenerated: needsSummary.length }, 'LLMs.txt generated (two-tier)');
 

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { createLogger } from './logger.js';
 import type { default as SharpConstructor } from 'sharp';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('alt-text');
 
@@ -136,6 +137,6 @@ export async function generateAltText(filePath: string, context?: string): Promi
 
     return response.choices[0]?.message?.content?.trim() || null;
   } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    try { fs.unlinkSync(tmpFile); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'alttext: programming error'); /* ignore */ }
   }
 }

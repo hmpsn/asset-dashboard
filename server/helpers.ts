@@ -13,7 +13,11 @@ import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { PageHealthData } from '../shared/types/analytics.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('helpers');
 // ── Page Path Utilities ──
 
 /** Normalize a page path: ensure leading slash, strip trailing slash (keep '/' as-is) */
@@ -243,7 +247,7 @@ export async function buildSchemaContext(
           try {
             const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
             gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
-          } catch { /* skip malformed URLs */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers: programming error'); /* skip malformed URLs */ }
         }
       }
 
@@ -280,7 +284,7 @@ export async function buildSchemaContext(
             });
           }
         }
-      } catch { /* intelligence layer not ready — skip */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/urlPath: programming error'); /* intelligence layer not ready — skip */ }
 
       // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
       analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };
@@ -309,9 +313,9 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
           if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
           trafficMap[urlPath].clicks += p.clicks;
           trafficMap[urlPath].impressions += p.impressions;
-        } catch { /* skip */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/getAuditTrafficForWorkspace: programming error'); /* skip */ }
       }
-    } catch { /* GSC unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/getAuditTrafficForWorkspace: programming error'); /* GSC unavailable */ }
   }
   if (ws.ga4PropertyId) {
     try {
@@ -322,7 +326,7 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
         trafficMap[urlPath].pageviews += p.pageviews;
         trafficMap[urlPath].sessions += p.users;
       }
-    } catch { /* GA4 unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers: programming error'); /* GA4 unavailable */ }
   }
   auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
   return trafficMap;

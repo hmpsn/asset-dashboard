@@ -131,7 +131,8 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
     try {
       const url = new URL(p.page);
       currentMap.set(url.pathname, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'content-decay/analyzeContentDecay: programming error');
       currentMap.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
     }
   }
@@ -147,7 +148,8 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
       if (!prevMap.has(path)) {
         prevMap.set(path, { clicks: p.clicks, impressions: p.impressions, position: p.position });
       }
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'content-decay: programming error');
       if (!prevMap.has(p.page)) {
         prevMap.set(p.page, { clicks: p.clicks, impressions: p.impressions, position: p.position });
       }

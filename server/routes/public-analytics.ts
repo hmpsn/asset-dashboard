@@ -62,6 +62,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 import { getBookingUrl } from '../studio-config.js';
 import { parseJsonSafe } from '../db/json-validation.js';
+import { isProgrammingError } from '../errors.js';
 
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.
@@ -310,7 +311,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
               pagesWithTraffic.map(p => `• ${p.slug} — ${p.issues} issues | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
           }
         }
-      } catch { /* non-critical */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical */ }
     }
 
     const teamName = STUDIO_NAME;
@@ -343,7 +344,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
         }
         contentPlanSection = '\n\nCONTENT PLAN:\n' + parts.join('\n');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical */ }
 
     // --- Data inventory (shared across modes) ---
     const dataInventory = `DATA YOU HAVE ACCESS TO:
@@ -520,7 +521,7 @@ ${JSON.stringify(context, null, 2)}`;
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         }
       }
-    } catch { /* non-critical — never block chat response */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical — never block chat response */ }
 
     res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   } catch (err) {

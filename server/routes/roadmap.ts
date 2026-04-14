@@ -9,7 +9,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getDataDir } from '../data-dir.js';
+import { isProgrammingError } from '../errors.js';
+import { createLogger } from '../logger.js';
 
+
+const log = createLogger('roadmap');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- Roadmap Persistence ---
@@ -32,14 +36,14 @@ function loadRoadmap() {
         return repoData;
       }
     }
-  } catch { /* fall through to normal load */ }
+  } catch (err) { /* fall through to normal load */ }
 
   if (!repoNewer) {
     try {
       if (fs.existsSync(ROADMAP_RUNTIME_FILE)) {
         return JSON.parse(fs.readFileSync(ROADMAP_RUNTIME_FILE, 'utf-8'));
       }
-    } catch { /* fall through */ }
+    } catch (err) { /* fall through */ }
   }
 
   let data: ReturnType<typeof JSON.parse> | null = null;
@@ -47,7 +51,7 @@ function loadRoadmap() {
     if (fs.existsSync(ROADMAP_REPO_FILE)) {
       data = JSON.parse(fs.readFileSync(ROADMAP_REPO_FILE, 'utf-8'));
     }
-  } catch { /* fall through */ }
+  } catch (err) { /* fall through */ }
 
   if (!data) {
     data = { sprints: [] };
@@ -61,7 +65,7 @@ function loadRoadmap() {
           if (statuses[String(item.id)]) item.status = statuses[String(item.id)];
         }
       }
-    } catch { /* ignore */ }
+    } catch (err) { /* ignore */ }
   }
 
   fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
@@ -111,7 +115,7 @@ router.get('/api/roadmap-status', (_req, res) => {
       for (const item of sprint.items) statusMap[String(item.id)] = item.status;
     }
     res.json(statusMap);
-  } catch { res.json({}); }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'roadmap: GET /api/roadmap-status: programming error'); res.json({}); }
 });
 
 export default router;

@@ -18,6 +18,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow-organize');
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // --- Organize Assets into Folders ---
@@ -70,11 +71,11 @@ router.get('/api/webflow/organize-preview/:siteId', requireWorkspaceAccessFromQu
                 if (!m) continue;
                 for (const id of allAssetIds) { if (m[1].includes(id)) ogAssetIds.add(id); }
               }
-            } catch { /* skip */ }
+            } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-organize: programming error'); /* skip */ }
           }));
         }
       }
-    } catch { /* proceed without OG detection */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-organize: programming error'); /* proceed without OG detection */ }
 
     // 3. Build the organization plan
     const existingFolderNames = new Set(existingFolders.map(f => f.displayName));

@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 const log = createLogger('sales-audit');
 
 /**
@@ -160,7 +161,7 @@ async function fetchHtml(url: string): Promise<string | null> {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('text/html') && !contentType.includes('text/xml') && !contentType.includes('application/xml')) return null;
     return await res.text();
-  } catch { return null; }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit/fetchHtml: programming error'); return null; }
 }
 
 export function normalizeUrl(base: string, href: string): string | null {
@@ -175,7 +176,7 @@ export function normalizeUrl(base: string, href: string): string | null {
     if (/\.(pdf|jpg|jpeg|png|gif|svg|webp|mp4|mp3|zip|css|js|ico|woff|woff2|ttf|eot)$/i.test(path)) return null;
     if (path.startsWith('/cdn-cgi/')) return null; // Cloudflare utility endpoints
     return u.toString();
-  } catch { return null; }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit/normalizeUrl: programming error'); return null; }
 }
 
 async function discoverPages(baseUrl: string, maxPages: number = 50): Promise<string[]> {
@@ -235,14 +236,14 @@ async function parseSitemap(baseUrl: string): Promise<string[]> {
             let sm;
             while ((sm = subLocRegex.exec(subText)) !== null) urls.push(sm[1]);
           }
-        } catch { /* skip */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit: programming error'); /* skip */ }
       }
     } else {
       const locRegex = /<loc>([^<]+)<\/loc>/gi;
       let m;
       while ((m = locRegex.exec(text)) !== null) urls.push(m[1]);
     }
-  } catch { /* skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit/parseSitemap: programming error'); /* skip */ }
   return urls;
 }
 
@@ -348,7 +349,7 @@ function auditPageFromHtml(url: string, html: string): SalesPageResult {
   const links = extractLinks(html);
   const baseOrigin = new URL(url).origin;
   const internalLinks = links.filter(l => {
-    try { return new URL(l.href, url).origin === baseOrigin; } catch { return l.href.startsWith('/'); }
+    try { return new URL(l.href, url).origin === baseOrigin; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit: programming error'); return l.href.startsWith('/'); }
   });
   if (internalLinks.length === 0) {
     issues.push({ check: 'internal-links', severity: 'info', message: 'No internal links found', recommendation: 'Add internal links to distribute page authority.' });
@@ -504,7 +505,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
         }
       }
     }
-  } catch { /* skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit/siteWideChecks: programming error'); /* skip */ }
 
   // Sitemap
   try {
@@ -523,7 +524,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
         }
       }
     }
-  } catch { /* skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit: programming error'); /* skip */ }
 
   // Response time
   try {
@@ -535,7 +536,7 @@ async function siteWideChecks(baseUrl: string): Promise<SalesIssue[]> {
     } else if (responseTime > 1000) {
       issues.push({ check: 'response-time', severity: 'warning', message: `Server response ${(responseTime / 1000).toFixed(1)}s`, recommendation: 'Aim for under 600ms response time.', value: `${responseTime}ms` });
     }
-  } catch { /* skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'sales-audit/sitemapUrls: programming error'); /* skip */ }
 
   // Assign categories
   for (const issue of issues) {

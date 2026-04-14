@@ -6,6 +6,7 @@
 
 import db from './db/index.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('google-auth');
 
@@ -198,7 +199,8 @@ export async function getValidToken(siteId: string): Promise<string | null> {
     });
 
     return data.access_token;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'google-auth/getValidToken: programming error');
     return null;
   }
 }

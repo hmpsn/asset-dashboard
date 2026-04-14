@@ -37,6 +37,7 @@ import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 // ── Shared types for computation results ─────────────────────────
 
@@ -60,7 +61,8 @@ function normalizePageUrl(url: string): string {
     // Strip trailing slash (keep root '/')
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     return `${u.origin}${path}`;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence/normalizePageUrl: programming error');
     // Not a valid URL — strip trailing slash as best-effort
     return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
   }
@@ -177,7 +179,8 @@ export function computePageHealthScores(
     let pagePath: string;
     try {
       pagePath = new URL(page.page).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence: programming error');
       pagePath = page.page;
     }
 
@@ -751,7 +754,8 @@ export function computeSerpOpportunities(
     let pathname: string;
     try {
       pathname = new URL(page.page).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence/computeSerpOpportunities: programming error');
       pathname = page.page;
     }
 
@@ -1279,7 +1283,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
       ).all(workspaceId) as Array<{ page_path: string }>;
       pagesWithSchema = new Set(rows.map(r => r.page_path));
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence: programming error');
       // schema_page_types table may not exist — proceed with empty set
     }
     const serpOpps = computeSerpOpportunities(normGscPages, pagesWithSchema);

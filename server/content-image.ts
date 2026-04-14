@@ -9,6 +9,7 @@ import os from 'os';
 import { uploadAsset } from './webflow.js';
 import { createLogger } from './logger.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('content-image');
 
@@ -79,7 +80,7 @@ export async function generateFeaturedImage(
       uploadResult = await uploadAsset(siteId, tmpFile, fileName, altText, tokenOverride);
     } finally {
       // Clean up temp file regardless of success/failure
-      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+      try { fs.unlinkSync(tmpFile); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-image: programming error'); /* ignore */ }
     }
 
     if (!uploadResult.success) {

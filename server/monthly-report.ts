@@ -15,6 +15,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('auto-report');
 
@@ -27,12 +28,12 @@ const SENT_FILE = path.join(getUploadRoot(), '.report-sent.json');
 function loadSentReports(): Record<string, string> {
   try {
     if (fs.existsSync(SENT_FILE)) return JSON.parse(fs.readFileSync(SENT_FILE, 'utf-8'));
-  } catch { /* fresh */ }
+  } catch (err) { /* fresh */ }
   return {};
 }
 
 function saveSentReports(data: Record<string, string>) {
-  try { fs.writeFileSync(SENT_FILE, JSON.stringify(data, null, 2)); } catch { /* ignore */ }
+  try { fs.writeFileSync(SENT_FILE, JSON.stringify(data, null, 2)); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-report/saveSentReports: programming error'); /* ignore */ }
 }
 
 function currentMonth(): string {
@@ -115,7 +116,7 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
       const cmp = await getSearchPeriodComparison(ws.id, ws.gscPropertyUrl, days);
       traffic.clicks = { current: cmp.current.clicks, previous: cmp.previous.clicks, changePct: cmp.changePercent.clicks };
       traffic.impressions = { current: cmp.current.impressions, previous: cmp.previous.impressions, changePct: cmp.changePercent.impressions };
-    } catch { /* GSC unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-report: programming error'); /* GSC unavailable */ }
   }
 
   if (ws.ga4PropertyId) {
@@ -124,7 +125,7 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
       traffic.users = { current: cmp.current.totalUsers, previous: cmp.previous.totalUsers, changePct: cmp.changePercent.users };
       traffic.sessions = { current: cmp.current.totalSessions, previous: cmp.previous.totalSessions, changePct: cmp.changePercent.sessions };
       traffic.pageviews = { current: cmp.current.totalPageviews, previous: cmp.previous.totalPageviews, changePct: cmp.changePercent.pageviews };
-    } catch { /* GA4 unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-report: programming error'); /* GA4 unavailable */ }
   }
 
   return {
@@ -150,7 +151,7 @@ async function gatherMonthlyData(ws: Workspace): Promise<MonthlyData> {
           .slice(0, 5)
           .map(s => ({ title: s.title, summary: s.summary! }));
         return recent.length > 0 ? recent : undefined;
-      } catch { return undefined; }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-report: programming error'); return undefined; }
     })(),
   };
 }
@@ -362,7 +363,7 @@ export function listMonthlyReports(workspaceId: string): SavedMonthlyReport[] {
   for (const file of files) {
     try {
       reports.push(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')));
-    } catch { /* skip corrupt */ }
+    } catch (err) { /* skip corrupt */ }
   }
   return reports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }

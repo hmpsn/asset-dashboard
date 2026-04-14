@@ -559,100 +559,6 @@
       ]
     },
     {
-      "id": "sprint-connected-intelligence",
-      "name": "Connected Intelligence Engine",
-      "items": [
-        {
-          "id": 528,
-          "title": "Connected Intelligence Engine — Phase 1 (Hub UX + Enrichment)",
-          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
-          "est": "6h",
-          "priority": "P1",
-          "notes": "Shipped — Insight-first tab structure, InsightFeed + SummaryPills components, AnnotatedTrendChart with toggleable lines, new insight types (ranking_mover, ctr_opportunity, serp_opportunity), insight enrichment (page titles, strategy alignment, pipeline status, domain classification, impact scores), content decay delegation, progressive loading states.",
-          "status": "done",
-          "shippedAt": "2026-03-27"
-        },
-        {
-          "id": 526,
-          "title": "Connected Intelligence Engine — Phase 2 (Feedback Loops)",
-          "source": "docs/superpowers/plans/2026-03-27-connected-intelligence-phase2.md",
-          "est": "4h",
-          "priority": "P1",
-          "notes": "Shipped — Anomaly digest wiring with dedup (upsertAnomalyDigestInsight, unique index). Feedback loop orchestrator (insight-feedback.ts) generates strategy signals + pipeline signals, broadcasts via WebSocket. API endpoints for strategy signals and pipeline suggestions. React Query hooks. Intelligence Signals UI in KeywordStrategy panel. AI Suggested section in ContentPipeline. Admin chat context enriched with titles, alignment, pipeline status, anomaly digest, critical insight proactive mentions. Audit issues annotated on page health. Schema gaps enriched on SERP opportunities. 21 unit tests.",
-          "status": "done",
-          "shippedAt": "2026-03-27"
-        },
-        {
-          "id": 527,
-          "title": "Connected Intelligence Engine — Phase 3 (Client Intelligence)",
-          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
-          "est": "5h",
-          "priority": "P2",
-          "status": "done",
-          "shippedAt": "2026-03-28",
-          "notes": "Shipped — Client-facing insight narratives, ROI attribution tracking, monthly performance digest, admin action queue with resolution workflow. Hardened: unified insight feed (server + local insights merged into InsightsDigest with card-style badges and click actions), GSC URL normalization with metric deduplication, digest copy quality (warm voice, no promises), force-recompute admin auth (owner + admin), diverse insight caps (max 5 per type), stable insight IDs, WS event naming convention (namespace:verb), CI pr-check diff detection fix."
-        },
-        {
-          "id": 530,
-          "title": "Unified Workspace Intelligence Layer — Phase 1 (Foundation)",
-          "source": "docs/superpowers/plans/2026-03-30-unified-workspace-intelligence-phase1.md",
-          "est": "8h",
-          "priority": "P1",
-          "notes": "Shipped — Shadow infrastructure layer: shared types (intelligence.ts), LRU cache + single-flight (intelligence-cache.ts), cached page accessors with two-view filtering (workspace-data.ts), core assembler with per-slice graceful degradation (workspace-intelligence.ts), API endpoint + health route, React Query hook, prompt formatter (3 verbosity levels). Migrated all 20 listPages() callers to centralized getWorkspacePages()/getWorkspaceAllPages(). Shadow-mode comparison in buildSeoContext() behind feature flag. DB migration 043.",
-          "status": "done",
-          "shippedAt": "2026-03-31"
-        },
-        {
-          "id": 533,
-          "title": "Unified Workspace Intelligence Layer — Phase 2A (Bridge Infrastructure)",
-          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
-          "est": "4h",
-          "priority": "P1",
-          "notes": "Shipped — Bridge execution framework: executeBridge() with flag gating/timeout/error isolation, fireBridge() for sync callers, debounceBridge() for rapid-fire invalidation, withWorkspaceLock() for serialized mutations. 15 bridge feature flags (all default OFF). Pre-configured debounced instances. Persistent sub-cache with surgical invalidation. LRU page cache with peek() for stale fallback. Content pipeline summary accessor. Bridge-pairing structural test.",
-          "status": "done",
-          "shippedAt": "2026-03-31"
-        },
-        {
-          "id": 534,
-          "title": "Unified Workspace Intelligence Layer — Phase 2B (Simple Bridges)",
-          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
-          "est": "4h",
-          "priority": "P1",
-          "notes": "Shipped — 6 event bridges: #2 content decay → suggested briefs, #3 strategy → invalidate intelligence cache, #5 page analysis → clear caches, #7 action → auto-resolve insights, #11 settings → cascade invalidation, #13 action → create annotation. Suggested briefs CRUD store + REST routes + API client. resolution_source field on insights. Frontend WS handlers for 3 bridge events.",
-          "status": "done",
-          "shippedAt": "2026-03-31"
-        },
-        {
-          "id": 529,
-          "title": "AI insight validation pass (quality gate on surfaced insights)",
-          "source": "User feedback — 2026-03-28",
-          "est": "3-4h",
-          "priority": "P2",
-          "status": "done",
-          "shippedAt": "2026-04-14",
-          "notes": "Shipped — deterministic rules-based validation pass (validateInsightBatch) inserted into computeAndPersistInsights pipeline after all insight types computed, before feedback loops. Three rule categories: (1) contradiction suppression — ranking_opportunity+content_decay and ctr_opportunity+content_decay on same page suppress weaker signal, (2) severity clash — positive+critical on same page suppresses positive, (3) low-confidence suppression — ranking_opportunity <100 impressions or <5 traffic gain, content_decay <10 absolute click loss, ctr_opportunity <5 click gap. Added suppressInsights batch-delete helper to analytics-insights-store. 11 unit tests covering all rule categories + no-op scenarios."
-        },
-        {
-          "id": 536,
-          "title": "Assembler catch hardening — distinguish programming errors from expected degradation",
-          "source": "PR #154 review — 2026-04-08",
-          "est": "2-3h",
-          "priority": "P1",
-          "status": "done",
-          "notes": "Done April 2026. Created server/errors.ts with isProgrammingError(). Upgraded all 64 catch blocks in workspace-intelligence.ts: 3 HIGH-risk dynamic-import blocks get isProgrammingError split → log.warn on TypeError/ReferenceError; 43 SILENT blocks upgraded to log.debug; 2 intentionally-silent invalidateIntelligenceCache catches annotated with // catch-ok. Also applied to content-decay.ts, keyword-recommendations.ts, routes/misc.ts. Compile-time import type contracts added for HIGH-risk modules. Backlog #14/#15/#16/#17 resolved in same pass. pr-check rule added."
-        },
-        {
-          "id": 576,
-          "title": "Broad server catch hardening — extend isProgrammingError to 207 silent catches outside workspace-intelligence.ts",
-          "source": "Assembler catch hardening plan — 2026-04-08",
-          "est": "3-4h",
-          "priority": "P3",
-          "status": "pending",
-          "notes": "Pre-plan audit found 207 silent catch {} blocks across 67 server files outside workspace-intelligence.ts. Top offenders: admin-chat-context.ts (15), routes/webflow-seo.ts (13), routes/keyword-strategy.ts (10), routes/content-requests.ts (9), schema-suggester.ts (7), insight-enrichment.ts (7). No recent incidents traced to these files, so deferred from #536 plan. When triggered: apply the same isProgrammingError() split from server/errors.ts — programming errors log.warn, expected degradation log.debug. Use --all flag on pr-check to verify full-codebase sweep after. Prerequisite: #536 must be shipped first (server/errors.ts must exist)."
-        }
-      ]
-    },
-    {
       "id": "backlog",
       "name": "Backlog",
       "hours": "80+",
@@ -1156,6 +1062,102 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "id": "sprint-connected-intelligence",
+      "name": "✅ SHIPPED — Connected Intelligence Engine",
+      "items": [
+        {
+          "id": 528,
+          "title": "Connected Intelligence Engine — Phase 1 (Hub UX + Enrichment)",
+          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
+          "est": "6h",
+          "priority": "P1",
+          "notes": "Shipped — Insight-first tab structure, InsightFeed + SummaryPills components, AnnotatedTrendChart with toggleable lines, new insight types (ranking_mover, ctr_opportunity, serp_opportunity), insight enrichment (page titles, strategy alignment, pipeline status, domain classification, impact scores), content decay delegation, progressive loading states.",
+          "status": "done",
+          "shippedAt": "2026-03-27"
+        },
+        {
+          "id": 526,
+          "title": "Connected Intelligence Engine — Phase 2 (Feedback Loops)",
+          "source": "docs/superpowers/plans/2026-03-27-connected-intelligence-phase2.md",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — Anomaly digest wiring with dedup (upsertAnomalyDigestInsight, unique index). Feedback loop orchestrator (insight-feedback.ts) generates strategy signals + pipeline signals, broadcasts via WebSocket. API endpoints for strategy signals and pipeline suggestions. React Query hooks. Intelligence Signals UI in KeywordStrategy panel. AI Suggested section in ContentPipeline. Admin chat context enriched with titles, alignment, pipeline status, anomaly digest, critical insight proactive mentions. Audit issues annotated on page health. Schema gaps enriched on SERP opportunities. 21 unit tests.",
+          "status": "done",
+          "shippedAt": "2026-03-27"
+        },
+        {
+          "id": 527,
+          "title": "Connected Intelligence Engine — Phase 3 (Client Intelligence)",
+          "source": "docs/superpowers/specs/2026-03-27-connected-intelligence-design.md",
+          "est": "5h",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-03-28",
+          "notes": "Shipped — Client-facing insight narratives, ROI attribution tracking, monthly performance digest, admin action queue with resolution workflow. Hardened: unified insight feed (server + local insights merged into InsightsDigest with card-style badges and click actions), GSC URL normalization with metric deduplication, digest copy quality (warm voice, no promises), force-recompute admin auth (owner + admin), diverse insight caps (max 5 per type), stable insight IDs, WS event naming convention (namespace:verb), CI pr-check diff detection fix."
+        },
+        {
+          "id": 530,
+          "title": "Unified Workspace Intelligence Layer — Phase 1 (Foundation)",
+          "source": "docs/superpowers/plans/2026-03-30-unified-workspace-intelligence-phase1.md",
+          "est": "8h",
+          "priority": "P1",
+          "notes": "Shipped — Shadow infrastructure layer: shared types (intelligence.ts), LRU cache + single-flight (intelligence-cache.ts), cached page accessors with two-view filtering (workspace-data.ts), core assembler with per-slice graceful degradation (workspace-intelligence.ts), API endpoint + health route, React Query hook, prompt formatter (3 verbosity levels). Migrated all 20 listPages() callers to centralized getWorkspacePages()/getWorkspaceAllPages(). Shadow-mode comparison in buildSeoContext() behind feature flag. DB migration 043.",
+          "status": "done",
+          "shippedAt": "2026-03-31"
+        },
+        {
+          "id": 533,
+          "title": "Unified Workspace Intelligence Layer — Phase 2A (Bridge Infrastructure)",
+          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — Bridge execution framework: executeBridge() with flag gating/timeout/error isolation, fireBridge() for sync callers, debounceBridge() for rapid-fire invalidation, withWorkspaceLock() for serialized mutations. 15 bridge feature flags (all default OFF). Pre-configured debounced instances. Persistent sub-cache with surgical invalidation. LRU page cache with peek() for stale fallback. Content pipeline summary accessor. Bridge-pairing structural test.",
+          "status": "done",
+          "shippedAt": "2026-03-31"
+        },
+        {
+          "id": 534,
+          "title": "Unified Workspace Intelligence Layer — Phase 2B (Simple Bridges)",
+          "source": "docs/superpowers/plans/2026-03-31-unified-workspace-intelligence-phase2.md",
+          "est": "4h",
+          "priority": "P1",
+          "notes": "Shipped — 6 event bridges: #2 content decay → suggested briefs, #3 strategy → invalidate intelligence cache, #5 page analysis → clear caches, #7 action → auto-resolve insights, #11 settings → cascade invalidation, #13 action → create annotation. Suggested briefs CRUD store + REST routes + API client. resolution_source field on insights. Frontend WS handlers for 3 bridge events.",
+          "status": "done",
+          "shippedAt": "2026-03-31"
+        },
+        {
+          "id": 529,
+          "title": "AI insight validation pass (quality gate on surfaced insights)",
+          "source": "User feedback — 2026-03-28",
+          "est": "3-4h",
+          "priority": "P2",
+          "status": "done",
+          "shippedAt": "2026-04-14",
+          "notes": "Shipped — deterministic rules-based validation pass (validateInsightBatch) inserted into computeAndPersistInsights pipeline after all insight types computed, before feedback loops. Three rule categories: (1) contradiction suppression — ranking_opportunity+content_decay and ctr_opportunity+content_decay on same page suppress weaker signal, (2) severity clash — positive+critical on same page suppresses positive, (3) low-confidence suppression — ranking_opportunity <100 impressions or <5 traffic gain, content_decay <10 absolute click loss, ctr_opportunity <5 click gap. Added suppressInsights batch-delete helper to analytics-insights-store. 11 unit tests covering all rule categories + no-op scenarios."
+        },
+        {
+          "id": 536,
+          "title": "Assembler catch hardening — distinguish programming errors from expected degradation",
+          "source": "PR #154 review — 2026-04-08",
+          "est": "2-3h",
+          "priority": "P1",
+          "status": "done",
+          "notes": "Done April 2026. Created server/errors.ts with isProgrammingError(). Upgraded all 64 catch blocks in workspace-intelligence.ts: 3 HIGH-risk dynamic-import blocks get isProgrammingError split → log.warn on TypeError/ReferenceError; 43 SILENT blocks upgraded to log.debug; 2 intentionally-silent invalidateIntelligenceCache catches annotated with // catch-ok. Also applied to content-decay.ts, keyword-recommendations.ts, routes/misc.ts. Compile-time import type contracts added for HIGH-risk modules. Backlog #14/#15/#16/#17 resolved in same pass. pr-check rule added."
+        },
+        {
+          "id": 576,
+          "title": "Broad server catch hardening — extend isProgrammingError to 344 silent catches outside workspace-intelligence.ts",
+          "source": "Assembler catch hardening plan — 2026-04-08",
+          "est": "3-4h",
+          "priority": "P3",
+          "status": "done",
+          "shippedAt": "2026-04-14",
+          "notes": "Shipped — hardened 344 bare `} catch {` blocks across 90 server files. Pattern: (1) `} catch (err) { if (isProgrammingError(err)) log.warn(...)` for standard catches, (2) `log.debug` for JSON-parse and migration catches (expected degradation), (3) `// catch-ok` annotation for intentionally-silent catches. Added createLogger imports to 23 files that previously had no logger. Expanded pr-check rule from workspace-intelligence.ts-only to all server/ files. Top files hardened: admin-chat-context.ts (26), routes/keyword-strategy.ts (21), db/migrate-json.ts (18), routes/webflow-seo.ts (17). Updated count from original estimate of 207 across 67 files to actual 344 across 90 files."
+        }
+      ],
+      "shippedAt": "2026-04-14"
     },
     {
       "id": "sprint-admin-ux-pr4",

@@ -4,6 +4,7 @@ import path from 'path';
 import { getUploadRoot, getDataDir } from './data-dir.js';
 import { getCachedMetricsBatch, cacheMetrics } from './keyword-metrics-cache.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('semrush');
 
@@ -33,7 +34,7 @@ export function flushCreditsToDisk(): void {
   const today = new Date().toISOString().slice(0, 10);
   const filePath = path.join(CREDIT_DIR, `${today}.json`);
   let existing: SemrushCreditEntry[] = [];
-  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file */ }
+  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch (err) { /* new file */ }
   existing.push(...pendingCreditWrites);
   fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
   pendingCreditWrites = [];
@@ -83,10 +84,10 @@ function loadCreditsFromDisk(since?: string, days?: number): SemrushCreditEntry[
       try {
         const data = JSON.parse(fs.readFileSync(path.join(CREDIT_DIR, f), 'utf-8'));
         if (Array.isArray(data)) entries.push(...data);
-      } catch { /* skip corrupt file */ }
+      } catch (err) { /* skip corrupt file */ }
     }
     return entries;
-  } catch { return []; }
+  } catch (err) { return []; }
 }
 
 /** Get SEMRush credit usage summary */
@@ -165,7 +166,7 @@ function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | 
     const age = (Date.now() - new Date(raw.cachedAt).getTime()) / (1000 * 60 * 60);
     if (age > maxAgeHours) return null;
     return raw.data as T;
-  } catch { return null; }
+  } catch (err) { return null; }
 }
 
 function writeCache(workspaceId: string, key: string, data: unknown) {
@@ -923,5 +924,5 @@ export function clearSemrushCache(workspaceId: string): void {
   try {
     const files = fs.readdirSync(dir);
     for (const f of files) fs.unlinkSync(path.join(dir, f));
-  } catch { /* ignore */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'semrush/clearSemrushCache: programming error'); /* ignore */ }
 }

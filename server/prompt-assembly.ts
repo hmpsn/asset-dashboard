@@ -13,7 +13,11 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import type { VoiceDNA, VoiceGuardrails } from '../shared/types/brand-engine.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('prompt-assembly');
 // Statement cache (module-level lazy init via createStmtCache — never inside a function)
 const stmts = createStmtCache(() => ({
   getCustomNotes: db.prepare(
@@ -36,7 +40,8 @@ export function getCustomPromptNotes(workspaceId: string): string | null {
     const row = stmts().getCustomNotes.get(workspaceId) as
       { custom_prompt_notes: string | null } | undefined;
     return row?.custom_prompt_notes?.trim() || null;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'prompt-assembly/getCustomPromptNotes: programming error');
     // Graceful degradation: column may not exist in test or legacy DBs
     return null;
   }
@@ -144,7 +149,8 @@ export function buildSystemPrompt(
       if (dna) parts.push(voiceDNAToPromptInstructions(dna));
       if (guardrails) parts.push(guardrailsToPromptInstructions(guardrails));
     }
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'prompt-assembly/buildSystemPrompt: expected error — degrading gracefully');
     // voice_profiles table may not exist in test or legacy DBs — graceful degradation
   }
 
@@ -157,7 +163,8 @@ export function buildSystemPrompt(
           const row = stmts().getCustomNotes.get(workspaceId) as
             { custom_prompt_notes: string | null } | undefined;
           return row?.custom_prompt_notes?.trim() || null;
-        } catch {
+        } catch (err) {
+          if (isProgrammingError(err)) log.warn({ err }, 'prompt-assembly: programming error');
           // Graceful degradation: column may not exist in test or legacy DBs
           return null;
         }

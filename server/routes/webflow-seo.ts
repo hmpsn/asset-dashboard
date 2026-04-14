@@ -32,6 +32,7 @@ import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('webflow-seo');
 
@@ -118,7 +119,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
           }
         }
       }
-    } catch { /* non-critical — continue without GSC data */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical — continue without GSC data */ }
   }
 
   // Build audit context for this page (if available)
@@ -143,7 +144,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
           }
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical */ }
   }
 
   // Fetch page content server-side if not provided — extract headings + body text
@@ -191,7 +192,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
             .slice(0, 1500);
         }
       }
-    } catch { /* best-effort — continue without content */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort — continue without content */ }
   }
 
   // Enforce character limits helper - STRICT enforcement
@@ -251,7 +252,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
         if (lines.length > 0) {
           intelligenceBlock = `\n\nPAGE INTELLIGENCE:\n${lines.join('\n')}`;
         }
-      } catch { /* intelligence not available — skip */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* intelligence not available — skip */ }
     }
 
     // Assemble all context blocks
@@ -314,7 +315,8 @@ Return ONLY a JSON array of 3 objects, each with "title" and "description" keys.
               description: enforceLimit(String(p.description || ''), 160),
             }))
           : [];
-      } catch {
+      } catch (err) {
+        log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
         pairs = [];
       }
       while (pairs.length < 3 && pairs.length > 0) pairs.push(pairs[0]);
@@ -404,7 +406,8 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
     try {
       const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
       variations = Array.isArray(parsed) ? parsed.map((v: string) => enforceLimit(String(v), maxLen)) : [enforceLimit(String(parsed), maxLen)];
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
       // Fallback: single variation from raw text
       variations = [enforceLimit(aiText, maxLen)];
     }
@@ -439,7 +442,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
     try {
       const sub = await getSiteSubdomain(siteId, token);
       if (sub) baseUrl = `https://${sub}.webflow.io`;
-    } catch { /* best-effort */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo/pages: programming error'); /* best-effort */ }
   }
 
   const inlineBrandName = getBrandName(ws);
@@ -486,7 +489,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
               .trim()
               .slice(0, 800);
           }
-        } catch { /* best-effort */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
       }
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
@@ -623,7 +626,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
     try {
       const sub = await getSiteSubdomain(siteId, token);
       if (sub) baseUrl = `https://${sub}.webflow.io`;
-    } catch { /* best-effort */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
   }
 
   const inlineBrandName = getBrandName(ws);
@@ -637,7 +640,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
   if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
     try {
       allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical */ }
   }
 
   // Enforce character limits helper
@@ -715,7 +718,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
               .trim()
               .slice(0, 800);
           }
-        } catch { /* best-effort */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
       }
 
       // Match GSC queries to this page by slug (top 15 by impressions)
@@ -785,7 +788,8 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
                 description: enforceLimit(String(p.description || ''), 160),
               }))
             : [];
-        } catch {
+        } catch (err) {
+          log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
           pairs = [];
         }
         if (!pairs.length) return { savedSuggestions: [] as SeoSuggestion[], pageId: page.pageId, error: 'Empty AI response' };
@@ -829,7 +833,8 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
         variations = Array.isArray(parsed)
           ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
           : [enforceLimit(String(parsed), maxLen)];
-      } catch {
+      } catch (err) {
+        log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
         const single = enforceLimit(aiText, maxLen);
         variations = single ? [single] : [];
       }
@@ -968,7 +973,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
       try {
         const htmlRes = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' } });
         if (htmlRes.ok) { html = await htmlRes.text(); break; }
-      } catch { /* try next URL */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* try next URL */ }
     }
     if (!html) return res.status(404).json({ error: 'Failed to fetch page from live domain or webflow.io' });
 
@@ -1026,7 +1031,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
       try {
         const sub = await getSiteSubdomain(ws.webflowSiteId, getTokenForSite(ws.webflowSiteId) || undefined);
         if (sub) baseUrl = `https://${sub}.webflow.io`;
-      } catch { /* best-effort */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
     }
     if (baseUrl) {
       try {
@@ -1047,7 +1052,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
             .trim()
             .slice(0, 4000);
         }
-      } catch { /* non-critical — proceed without content */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical — proceed without content */ }
     }
   }
 
@@ -1115,7 +1120,8 @@ Return ONLY valid JSON, no markdown fences.`;
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
       return res.status(500).json({ error: 'AI returned invalid JSON', raw: raw.slice(0, 500) });
     }
 

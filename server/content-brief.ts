@@ -25,13 +25,18 @@ import {
   schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
 } from './schemas/content-schemas.js';
 import { z } from 'zod';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('content-brief');
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
 function parseAiJson<T = Record<string, unknown>>(raw: string, context: string): T {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
   try {
     return JSON.parse(cleaned) as T;
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'content-brief/parseAiJson: expected error — degrading gracefully');
     throw new Error(`Failed to parse AI response as JSON (${context})`);
   }
 }
@@ -61,7 +66,7 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
   if (matching?.length) {
     const lines = matching.map(c => {
       const pageList = c.pages.map((p, i) => {
-        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch { return p; }
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief/buildBriefIntelligenceBlock: programming error'); return p; }
       }).join(', ');
       return `- "${c.query}": ${pageList}`;
     });
@@ -72,7 +77,7 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
   if (opts.decayInsights?.length) {
     const lines = opts.decayInsights.map(d => {
       let path: string;
-      try { path = new URL(d.pageId).pathname; } catch { path = d.pageId; }
+      try { path = new URL(d.pageId).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); path = d.pageId; }
       return `- ${path}: ${d.deltaPercent}% change (${d.baselineClicks} → ${d.currentClicks} clicks)`;
     });
     sections.push(`CONTENT DECAY — Existing content on this topic is losing traffic; brief should address freshness:\n${lines.join('\n')}`);
@@ -90,7 +95,7 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
   if (opts.pageHealthScores?.length) {
     const lines = opts.pageHealthScores.map(p => {
       let path: string;
-      try { path = new URL(p.pageId).pathname; } catch { path = p.pageId; }
+      try { path = new URL(p.pageId).pathname; } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); path = p.pageId; }
       return `- ${path}: ${p.score}/100 (${p.trend})`;
     });
     sections.push(`PAGE HEALTH — Related pages' health scores:\n${lines.join('\n')}`);
@@ -1073,7 +1078,7 @@ The outline sections MUST match the following template sections in order. You ma
           .map(i => ({ pageId: i.pageId!, ...(i.data as unknown as PageHealthData) })),
       });
     }
-  } catch { /* intelligence layer not ready — skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); /* intelligence layer not ready — skip */ }
 
   // Workspace learnings: what content types and strategies historically win
   let learningsBlock = '';
@@ -1086,7 +1091,7 @@ The outline sections MUST match the following template sections in order. You ma
           learningsBlock = `\n\n${block}`;
         }
       }
-    } catch { /* learnings not available — skip */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error'); /* learnings not available — skip */ }
   }
 
   // Strategy card context from content request

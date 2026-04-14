@@ -14,6 +14,7 @@ import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../shared/types
 import { getActivePatterns } from './copy-intelligence.js';
 import { listBlueprints } from './page-strategy.js';
 import { getSectionsForEntry } from './copy-review.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('seo-context');
 
@@ -415,7 +416,8 @@ function readBrandDocs(workspaceFolder: string): string {
       if (content.length > 4000) break;
     }
     return content.slice(0, 4000);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'seo-context/readBrandDocs: programming error');
     return '';
   }
 }
@@ -483,7 +485,8 @@ function readKnowledgeDocs(workspaceFolder: string): string {
       if (content.length > 6000) break;
     }
     return content.slice(0, 6000);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'seo-context/readKnowledgeDocs: programming error');
     return '';
   }
 }

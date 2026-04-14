@@ -5,7 +5,11 @@
  */
 
 import { STUDIO_NAME } from './constants.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('email-templates');
 // ── Shared helpers ──
 
 /** HTML-escape a string for safe interpolation into raw HTML template literals.
@@ -187,14 +191,14 @@ function deriveLogoUrl(dashUrl?: string): string | undefined {
     try {
       const u = new URL(appUrl);
       return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-    } catch { /* continue to fallback */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-templates/deriveLogoUrl: programming error'); /* continue to fallback */ }
   }
   // Fallback: derive from the dashboard URL passed by the caller
   if (dashUrl) {
     try {
       const u = new URL(dashUrl);
       return `${u.origin}/hmpsn-studio-logo-wordmark-navy.png`;
-    } catch { /* continue to fallback */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-templates/deriveLogoUrl: programming error'); /* continue to fallback */ }
   }
   // Final fallback: return undefined (text fallback will be used)
   return undefined;

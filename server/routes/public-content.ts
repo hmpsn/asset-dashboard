@@ -24,7 +24,11 @@ import { getPageTrend, getQueryPageData } from '../search-console.js';
 import { getWorkspace } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { handleContentPerformance } from './content-requests.js';
+import { isProgrammingError } from '../errors.js';
+import { createLogger } from '../logger.js';
 
+
+const log = createLogger('public-content');
 // --- Public SEO Strategy (client dashboard, gated behind seoClientView) ---
 router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -308,12 +312,12 @@ router.post('/api/public/content-request/:workspaceId/from-audit', async (req, r
       const slug = pageSlug.startsWith('/') ? pageSlug : `/${pageSlug}`;
       topKeywords = qpData
         .filter(r => {
-          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch { return false; }
+          try { return new URL(r.page).pathname.replace(/\/$/, '') === slug.replace(/\/$/, ''); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-content: programming error'); return false; }
         })
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 5)
         .map(r => ({ query: r.query, clicks: r.clicks, impressions: r.impressions, position: r.position }));
-    } catch { /* GSC unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-content: POST /api/public/content-request/:workspaceId/from-audit: programming error'); /* GSC unavailable */ }
   }
 
   // Also check keyword strategy for this page's target keyword

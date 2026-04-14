@@ -23,6 +23,7 @@ import type * as Reports from './reports.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as ContentBriefMod from './content-brief.js';
 import type * as ContentPostsDb from './content-posts-db.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('insight-enrichment');
 
@@ -57,7 +58,8 @@ export function cleanSlugToTitle(urlOrPath: string): string {
   if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
     try {
       pathname = new URL(urlOrPath).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/cleanSlugToTitle: programming error');
       // fall through with original value
     }
   }
@@ -195,7 +197,8 @@ export function resolvePageTitle(
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
     try {
       pathname = new URL(pageId).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment: programming error');
       // keep original
     }
   }
@@ -234,7 +237,8 @@ export function checkStrategyAlignment(
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
     try {
       pathname = new URL(pageId).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/checkStrategyAlignment: programming error');
       // keep original
     }
   }
@@ -291,7 +295,8 @@ export function checkPipelineStatus(
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
     try {
       pathname = new URL(pageId).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/checkPipelineStatus: programming error');
       // keep original
     }
   }
@@ -299,7 +304,8 @@ export function checkPipelineStatus(
   const normalise = (s: string): string => {
     try {
       return new URL(s).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/normalise: programming error');
       return s;
     }
   };
@@ -348,7 +354,8 @@ export function getSchemaGapsForPage(workspaceId: string, pageUrl: string): stri
       try {
         const pathname = new URL(pageUrl).pathname;
         validation = getValidation(workspaceId, pathname);
-      } catch {
+      } catch (err) {
+        if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/getSchemaGapsForPage: programming error');
         // invalid URL, skip pathname fallback
       }
     }
@@ -466,7 +473,8 @@ export function getAuditIssuesForPage(
   if (pageId.startsWith('http://') || pageId.startsWith('https://')) {
     try {
       pathname = new URL(pageId).pathname;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'insight-enrichment/getAuditIssuesForPage: programming error');
       // keep original
     }
   }

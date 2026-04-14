@@ -3,6 +3,7 @@ import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('link-checker');
 
@@ -61,7 +62,7 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
     const res = await fetch(url, { redirect: 'follow' });
     if (!res.ok) return null;
     return await res.text();
-  } catch { return null; }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'link-checker/fetchPublishedHtml: programming error'); return null; }
 }
 
 export function isCheckableUrl(href: string): boolean {

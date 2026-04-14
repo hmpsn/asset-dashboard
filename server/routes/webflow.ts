@@ -28,6 +28,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow');
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // Processing queue
@@ -41,7 +42,8 @@ router.get('/api/webflow/sites', async (req, res) => {
     const tokenParam = req.query.token as string | undefined;
     const sites = await listSites(tokenParam || undefined);
     res.json(sites);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow: GET /api/webflow/sites: programming error');
     res.json([]);
   }
 });
@@ -52,7 +54,8 @@ router.get('/api/webflow/assets/:siteId', requireWorkspaceAccessFromQuery(), asy
     const token = getTokenForSite(req.params.siteId);
     const assets = await listAssets(req.params.siteId, token || undefined);
     res.json(assets);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow: GET /api/webflow/assets/:siteId: programming error');
     res.status(500).json({ error: 'Failed to list assets' });
   }
 });
