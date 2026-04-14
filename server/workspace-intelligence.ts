@@ -2350,7 +2350,8 @@ async function assemblePageProfile(
     if (wsForLinks?.webflowSiteId) {
       try {
         const { getInternalLinks } = await import('./performance-store.js');
-        const linkData = getInternalLinks(wsForLinks.webflowSiteId) as import('./internal-links.js').InternalLinkResult | null;
+        const linkSnapshot = getInternalLinks(wsForLinks.webflowSiteId);
+        const linkData = linkSnapshot?.result as import('./internal-links.js').InternalLinkResult | null;
         if (linkData?.pageHealth) {
           const normalizedPath = pagePath === '/' ? '/' : pagePath.replace(/\/$/, '');
           const entry = linkData.pageHealth.find(
