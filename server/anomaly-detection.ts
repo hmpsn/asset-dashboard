@@ -706,6 +706,58 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
     log.info(`No new anomalies detected`);
   }
 
+  // ── Bridge #10 reversal: remove anomaly boost when anomalies age out ──
+  // For every workspace, check if recent (<24h) anomalies still exist.
+  // If none remain AND insights have an 'anomaly' score adjustment, reverse it (delta=0).
+  // This prevents stale +10 boosts from lingering indefinitely after anomalies resolve.
+  for (const ws of workspaces) {
+    try {
+      const recentForWs = listAnomalies(ws.id, false)
+        .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+      if (recentForWs.length > 0) continue; // Still has active recent anomalies — keep boost
+
+      const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const allInsights = fetchInsights(ws.id);
+      let reversed = 0;
+      for (const insight of allInsights) {
+        if (insight.resolutionStatus === 'resolved') continue;
+        const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+        const adj = dataObj._scoreAdjustments as Record<string, number> | undefined;
+        if (!adj || typeof adj !== 'object' || !('anomaly' in adj)) continue;
+
+        // Remove the anomaly boost (delta=0 deletes the key)
+        const { data: newData, adjustedScore } = applyScoreAdjustment(
+          dataObj, insight.impactScore ?? 50, 'anomaly', 0,
+        );
+        if (adjustedScore !== insight.impactScore) {
+          updateInsight({
+            workspaceId: insight.workspaceId,
+            pageId: insight.pageId,
+            insightType: insight.insightType,
+            data: newData as never,
+            severity: insight.severity,
+            pageTitle: insight.pageTitle,
+            strategyKeyword: insight.strategyKeyword,
+            strategyAlignment: insight.strategyAlignment,
+            auditIssues: insight.auditIssues,
+            pipelineStatus: insight.pipelineStatus,
+            anomalyLinked: false,
+            impactScore: adjustedScore,
+            domain: insight.domain,
+            bridgeSource: insight.bridgeSource,
+          });
+          reversed++;
+        }
+      }
+      if (reversed > 0) {
+        log.info({ workspaceId: ws.id, reversed }, 'Reversed stale anomaly boost on insights');
+        invalidateIntelligenceCache(ws.id);
+      }
+    } catch (reverseErr) {
+      log.debug({ err: reverseErr, workspaceId: ws.id }, 'Anomaly boost reversal failed — non-critical');
+    }
+  }
+
   // Prune old anomalies (older than 60 days)
   clearOldAnomalies(60);
 

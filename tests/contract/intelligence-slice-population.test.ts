@@ -238,6 +238,8 @@ vi.mock('../../server/chat-memory.js', () => ({
 
 vi.mock('../../server/activity-log.js', () => ({
   listActivity: vi.fn(() => []),
+  countActivityByType: vi.fn(() => 0),
+  hasRecentActivity: vi.fn(() => false),
 }));
 
 vi.mock('../../server/analytics-annotations.js', () => ({

@@ -406,6 +406,8 @@ async function scoreActionAtCheckpoint(
 
 export async function measurePendingOutcomes(
   scoringConfigOverride?: Partial<ScoringConfig>,
+  /** Optional workspace priority map: workspaceId → sort score (lower = higher priority). */
+  workspacePriority?: ReadonlyMap<string, number>,
 ): Promise<{ measured: number; errors: number; workspaceIds: string[] }> {
   const pendingActions = getPendingActions();
 
@@ -413,6 +415,17 @@ export async function measurePendingOutcomes(
   // intelligence caches for workspaces that were actually measured, regardless
   // of whether getPendingActions is called independently elsewhere.
   const workspaceIds = [...new Set(pendingActions.map(a => a.workspaceId))];
+
+  // Sort actions by workspace health priority (lowest compositeHealthScore first)
+  // so the sickest workspaces get measured before healthier ones.
+  if (workspacePriority && workspacePriority.size > 0) {
+    pendingActions.sort((a, b) => {
+      const pa = workspacePriority.get(a.workspaceId) ?? 100;
+      const pb = workspacePriority.get(b.workspaceId) ?? 100;
+      return pa - pb;
+    });
+    log.info({ prioritized: workspacePriority.size }, 'Sorted pending actions by compositeHealthScore');
+  }
 
   log.info({ count: pendingActions.length }, 'Starting outcome measurement run');
 

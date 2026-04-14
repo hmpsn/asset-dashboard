@@ -2482,6 +2482,81 @@ describe('Rule: TabBar component without ?tab= deep-link support', () => {
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: seo-context.ts import restriction (deprecated module)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Prevents new imports of the deprecated seo-context.ts module. Existing
+// callers are grandfathered via the exclude list. New code must use
+// buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts.
+
+describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
+  const RULE = 'seo-context.ts import restriction (deprecated module)';
+
+  it('flags a single-quoted import of seo-context', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/new-feature.ts'),
+      lines(
+        "import { buildSeoContext } from './seo-context.js';",  // 1
+        "export function doStuff() { return buildSeoContext(); }",  // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags a double-quoted import of seo-context', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/other-feature.ts'),
+      lines(
+        'import { buildPageAnalysisContext } from "./seo-context.js";',  // 1
+        'export function run() { return buildPageAnalysisContext(); }',   // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects inline // seo-context-ok hatch on the import line', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/grandfathered-inline.ts'),
+      lines(
+        "import { buildSeoContext } from './seo-context.js'; // seo-context-ok",  // 1
+        "export function doStuff() { return buildSeoContext(); }",                 // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('respects // seo-context-ok on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/grandfathered-above.ts'),
+      lines(
+        "// seo-context-ok — grandfathered caller awaiting migration",  // 1
+        "import { buildSeoContext } from './seo-context.js';",          // 2
+        "export function doStuff() { return buildSeoContext(); }",      // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does not flag files that do not import seo-context', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/clean-feature.ts'),
+      lines(
+        "import { buildWorkspaceIntelligence } from './workspace-intelligence.js';",  // 1
+        "export function doStuff() { return buildWorkspaceIntelligence('ws1'); }",    // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -2509,6 +2584,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Test body has no assertion or explicit failure throw',
     // PR 2 deep-link guard
     'TabBar component without ?tab= deep-link support',
+    // IG-4 seo-context deprecation
+    'seo-context.ts import restriction (deprecated module)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
