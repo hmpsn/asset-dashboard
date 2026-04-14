@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
+import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { AuditHistory } from './audit/AuditHistory';
@@ -707,6 +708,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     });
 
   return (
+    <ErrorBoundary label="SEO Audit">
     <div className="space-y-8">
       {auditTabBar}
       {showNextSteps && data && (
@@ -1266,6 +1268,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }
 

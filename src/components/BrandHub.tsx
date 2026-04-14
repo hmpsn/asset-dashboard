@@ -6,6 +6,7 @@ import {
   Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map,
 } from 'lucide-react';
 import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator } from './ui';
+import { ErrorBoundary } from './ErrorBoundary';
 import { themeColor } from './ui/constants';
 import { workspaces } from '../api';
 import { queryKeys } from '../lib/queryKeys';
@@ -122,6 +123,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   };
 
   return (
+    <ErrorBoundary label="Brand Hub">
     <div className="space-y-8">
       <PageHeader
         title="Brand & AI Context"
@@ -553,5 +555,6 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
       </div>
       </>}
     </div>
+    </ErrorBoundary>
   );
 }

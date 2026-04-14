@@ -650,6 +650,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   ];
 
   return (
+    <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
     <CartProvider>
     <div className={`min-h-screen bg-[#0f1219] text-zinc-200 ${theme === 'light' ? 'dashboard-light' : ''}`}>
@@ -1308,5 +1309,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     </div>
     </CartProvider>
     </BetaProvider>
+    </ErrorBoundary>
   );
 }

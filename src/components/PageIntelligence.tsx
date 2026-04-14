@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { adminPath } from '../routes';
 import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
+import { ErrorBoundary } from './ErrorBoundary';
+import { queryKeys } from '../lib/queryKeys';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
@@ -423,7 +425,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
             },
           });
           // Invalidate strategy cache so persisted data shows up
-          queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
         } catch { /* persist is best-effort */ }
       }
       if (!csData.error) {
@@ -463,19 +465,19 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       // Refresh strategy cache periodically so analyzed count updates mid-run
       if (progress > 0 && progress - lastRefreshedAt.current >= 5) {
         lastRefreshedAt.current = progress;
-        queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       }
     } else if (job.status === 'done') {
       setBulkProgress(null);
       setShowNextSteps(true);
       bulkJobIdRef.current = null;
       lastRefreshedAt.current = 0;
-      queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
     } else if (job.status === 'error' || job.status === 'cancelled') {
       setBulkProgress(null);
       bulkJobIdRef.current = null;
       lastRefreshedAt.current = 0;
-      queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
     }
   }, [jobs, queryClient, workspaceId]);
 
@@ -502,7 +504,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
     };
     try {
       await keywords.patchStrategy(workspaceId, { pageMap: updated });
-      queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       setEditingPageId(null);
     } catch (err) {
       console.error('Save failed:', err);
@@ -601,6 +603,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }
 
   return (
+    <ErrorBoundary label="Page Intelligence">
     <div className="space-y-6">
       {/* tab-deeplink-ok — page intel tabs are not navigated to via ?tab= from other components */}
       <TabBar
@@ -1288,5 +1291,6 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

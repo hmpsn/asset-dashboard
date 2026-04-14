@@ -8,6 +8,7 @@ import {
   Settings, Clipboard, Pencil, CornerDownRight, Share2, Code2,
 } from 'lucide-react';
 import { ChartPointDetail } from './ChartPointDetail';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   MetricRing, MetricRingSvg, StatCard, CompactStatBar,
   PageHeader, SectionCard, DateRangeSelector, DataList,
@@ -82,6 +83,7 @@ export function Styleguide() {
   const [activeNav, setActiveNav] = useState('overview');
 
   return (
+    <ErrorBoundary label="Style Guide">
     <div className={theme === 'light' ? 'dashboard-light' : ''} style={{ minHeight: '100vh', background: theme === 'light' ? '#f8fafc' : '#0f1219' }}>
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-10">
         {/* Header */}
@@ -286,6 +288,7 @@ export function Styleguide() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-zinc-200 border-b border-zinc-800 pb-2">TabBar</h2>
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+            {/* tab-deeplink-ok — styleguide TabBar is for demonstration only, no deep-linking needed */}
             <TabBar
               tabs={[
                 { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -854,5 +857,6 @@ export function Styleguide() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
