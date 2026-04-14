@@ -27,7 +27,7 @@ import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
-import { upsertInsight, getInsights, deleteStaleInsightsByType } from './analytics-insights-store.js';
+import { upsertInsight, getInsights, deleteStaleInsightsByType, suppressInsights } from './analytics-insights-store.js';
 import { buildEnrichmentContext, enrichInsight } from './insight-enrichment.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { runFeedbackLoops } from './insight-feedback.js';
@@ -860,6 +860,129 @@ export async function getOrComputeInsights(
   return capWithDiversity(getInsights(workspaceId, insightType), insightType);
 }
 
+// ── Insight Validation Pass ──────────────────────────────────────
+// Deterministic quality gate: suppress contradictory, duplicate, and
+// low-confidence insights AFTER computation, BEFORE feedback loops.
+
+/** Severity rank for comparison — higher = stronger signal */
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  warning: 3,
+  opportunity: 2,
+  positive: 1,
+};
+
+/** Minimum impressions for a ranking_opportunity to be considered actionable */
+const MIN_RANKING_OPP_IMPRESSIONS = 100;
+
+/** Minimum absolute click loss for content_decay to be considered actionable */
+const MIN_DECAY_CLICK_LOSS = 10;
+
+/** Minimum estimated traffic gain for a ranking_opportunity to survive validation */
+const MIN_RANKING_OPP_TRAFFIC_GAIN = 5;
+
+/** Minimum estimated click gap for a ctr_opportunity to survive validation */
+const MIN_CTR_OPP_CLICK_GAP = 5;
+
+/**
+ * Contradiction pairs: when the same page appears under both insight types,
+ * suppress the weaker signal (lower severity, then lower impactScore).
+ */
+const CONTRADICTION_PAIRS: ReadonlyArray<[InsightType, InsightType]> = [
+  ['ranking_opportunity', 'content_decay'],
+  ['ctr_opportunity', 'content_decay'],
+];
+
+/**
+ * Pick the weaker insight from a pair based on severity rank, then impactScore.
+ * Returns the id of the insight to suppress, or null if they're equal.
+ */
+function pickWeaker(a: AnalyticsInsight, b: AnalyticsInsight): string | null {
+  const rankA = SEVERITY_RANK[a.severity] ?? 0;
+  const rankB = SEVERITY_RANK[b.severity] ?? 0;
+  if (rankA !== rankB) return rankA < rankB ? a.id : b.id;
+  const scoreA = a.impactScore ?? 0;
+  const scoreB = b.impactScore ?? 0;
+  if (scoreA !== scoreB) return scoreA < scoreB ? a.id : b.id;
+  return null; // truly equal — don't suppress either
+}
+
+export function validateInsightBatch(workspaceId: string): number {
+  const allInsights = getInsights(workspaceId);
+  if (allInsights.length === 0) return 0;
+
+  const toSuppress = new Set<string>();
+
+  // Build lookup: pageId → insights on that page
+  const byPage = new Map<string, AnalyticsInsight[]>();
+  for (const insight of allInsights) {
+    if (!insight.pageId) continue;
+    const list = byPage.get(insight.pageId);
+    if (list) list.push(insight);
+    else byPage.set(insight.pageId, [insight]);
+  }
+
+  // ── Rule 1: Contradiction suppression ──────────────────────────
+  for (const [typeA, typeB] of CONTRADICTION_PAIRS) {
+    for (const [, insights] of byPage) {
+      const a = insights.find(i => i.insightType === typeA && !toSuppress.has(i.id));
+      const b = insights.find(i => i.insightType === typeB && !toSuppress.has(i.id));
+      if (a && b) {
+        const weakerId = pickWeaker(a, b);
+        if (weakerId) toSuppress.add(weakerId);
+      }
+    }
+  }
+
+  // ── Rule 2: Severity clash on same page ────────────────────────
+  // If the same page has both a 'positive' and a 'critical' insight,
+  // suppress the positive one (the critical signal takes priority).
+  for (const [, insights] of byPage) {
+    const positives = insights.filter(i => i.severity === 'positive' && !toSuppress.has(i.id));
+    const criticals = insights.filter(i => i.severity === 'critical' && !toSuppress.has(i.id));
+    if (positives.length > 0 && criticals.length > 0) {
+      for (const p of positives) toSuppress.add(p.id);
+    }
+  }
+
+  // ── Rule 3: Low-confidence suppression ─────────────────────────
+  for (const insight of allInsights) {
+    if (toSuppress.has(insight.id)) continue;
+    const data = insight.data as Record<string, unknown>;
+
+    if (insight.insightType === 'ranking_opportunity') {
+      const impressions = (data.impressions as number) ?? 0;
+      const gain = (data.estimatedTrafficGain as number) ?? 0;
+      if (impressions < MIN_RANKING_OPP_IMPRESSIONS || gain < MIN_RANKING_OPP_TRAFFIC_GAIN) {
+        toSuppress.add(insight.id);
+      }
+    }
+
+    if (insight.insightType === 'content_decay') {
+      const baseline = (data.baselineClicks as number) ?? 0;
+      const current = (data.currentClicks as number) ?? 0;
+      if (Math.abs(baseline - current) < MIN_DECAY_CLICK_LOSS) {
+        toSuppress.add(insight.id);
+      }
+    }
+
+    if (insight.insightType === 'ctr_opportunity') {
+      const clickGap = (data.estimatedClickGap as number) ?? 0;
+      if (clickGap < MIN_CTR_OPP_CLICK_GAP) {
+        toSuppress.add(insight.id);
+      }
+    }
+  }
+
+  // ── Execute suppression ────────────────────────────────────────
+  const ids = Array.from(toSuppress);
+  const deleted = suppressInsights(workspaceId, ids);
+  if (deleted > 0) {
+    log.info({ workspaceId, suppressed: deleted }, 'Insight validation pass: suppressed contradictory/low-confidence insights');
+  }
+  return deleted;
+}
+
 /**
  * Compute all insight types for a workspace and persist to SQLite.
  * Enriches every insight with page titles, strategy alignment, pipeline
@@ -1166,6 +1289,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
     log.info({ workspaceId, count: serpOpps.length }, 'Computed SERP opportunities');
   }
+
+  // Quality gate: suppress contradictory/duplicate/low-confidence insights
+  validateInsightBatch(workspaceId);
 
   // Phase 2 feedback loops: push signals to Strategy & Pipeline
   // Non-fatal — runFeedbackLoops has its own try/catch

@@ -628,8 +628,9 @@
           "source": "User feedback — 2026-03-28",
           "est": "3-4h",
           "priority": "P2",
-          "status": "pending",
-          "notes": "After computing insights, run a lightweight AI review step that checks the batch for: duplicate pages surfaced under different insight types, contradictory signals (e.g. page flagged both as quick-win and as decaying), and low-confidence entries that should be suppressed. Goal: reduce noise before insights reach the client narrative layer. Cost mitigation: batch into a single prompt per workspace sync rather than per-insight. Consider caching the verdict with a TTL so it doesn't re-run every refresh. Depends on Phase 3 (#527) being stable."
+          "status": "done",
+          "shippedAt": "2026-04-14",
+          "notes": "Shipped — deterministic rules-based validation pass (validateInsightBatch) inserted into computeAndPersistInsights pipeline after all insight types computed, before feedback loops. Three rule categories: (1) contradiction suppression — ranking_opportunity+content_decay and ctr_opportunity+content_decay on same page suppress weaker signal, (2) severity clash — positive+critical on same page suppresses positive, (3) low-confidence suppression — ranking_opportunity <100 impressions or <5 traffic gain, content_decay <10 absolute click loss, ctr_opportunity <5 click gap. Added suppressInsights batch-delete helper to analytics-insights-store. 11 unit tests covering all rule categories + no-op scenarios."
         },
         {
           "id": 536,
