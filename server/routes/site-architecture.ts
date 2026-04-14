@@ -49,7 +49,7 @@ router.get('/api/site-architecture/:workspaceId/schema-coverage', requireWorkspa
           schemaPathSet.add(p);
           const types = page.suggestedSchemas?.map(s => s.type) || [];
           schemaTypeMap.set(p, types);
-        } catch { /* skip malformed URLs */ }
+        } catch (err) { /* skip malformed URLs */ }
       }
     }
 

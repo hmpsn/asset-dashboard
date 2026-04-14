@@ -13,7 +13,11 @@ import { getGA4TopPages } from './google-analytics.js';
 import { getRawKnowledge, buildPersonasContext } from './seo-context.js';
 import { getInsights } from './analytics-insights-store.js';
 import type { PageHealthData } from '../shared/types/analytics.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('helpers');
 // ── Page Path Utilities ──
 
 /** Normalize a page path: ensure leading slash, strip trailing slash (keep '/' as-is) */
@@ -242,7 +246,18 @@ export async function buildSchemaContext(
         for (const p of gscResults.value) {
           try {
             const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
-            gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
+            const existing = gscMap.get(urlPath);
+            if (existing) {
+              // Accumulate metrics for duplicate pathnames (www vs non-www, http vs https)
+              const prev = (existing as { _count?: number })._count ?? 1;
+              existing.clicks += p.clicks;
+              existing.impressions += p.impressions;
+              existing.position = (existing.position * prev + p.position) / (prev + 1);
+              existing.ctr = existing.impressions > 0 ? +((existing.clicks / existing.impressions) * 100).toFixed(1) : 0;
+              (existing as { _count?: number })._count = prev + 1;
+            } else {
+              gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
+            }
           } catch { /* skip malformed URLs */ }
         }
       }
@@ -280,7 +295,7 @@ export async function buildSchemaContext(
             });
           }
         }
-      } catch { /* intelligence layer not ready — skip */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/urlPath: programming error'); /* intelligence layer not ready — skip */ }
 
       // Store in cache (even if empty — avoids hammering APIs on sites with no connections)
       analyticsCache[cacheKey] = { maps: { gscMap, ga4Map, queryPageData, insightsMap }, ts: Date.now() };
@@ -309,7 +324,7 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
           if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
           trafficMap[urlPath].clicks += p.clicks;
           trafficMap[urlPath].impressions += p.impressions;
-        } catch { /* skip */ }
+        } catch { /* skip malformed URLs */ }
       }
     } catch { /* GSC unavailable */ }
   }
@@ -322,7 +337,7 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
         trafficMap[urlPath].pageviews += p.pageviews;
         trafficMap[urlPath].sessions += p.users;
       }
-    } catch { /* GA4 unavailable */ }
+    } catch { /* GA4 unavailable */ } // url-fetch-ok
   }
   auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
   return trafficMap;

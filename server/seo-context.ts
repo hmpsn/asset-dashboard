@@ -14,6 +14,7 @@ import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../shared/types
 import { getActivePatterns } from './copy-intelligence.js';
 import { listBlueprints } from './page-strategy.js';
 import { getSectionsForEntry } from './copy-review.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('seo-context');
 
@@ -308,14 +309,12 @@ export function buildSeoContext(
   const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy, copyIntelligenceBlock: copyIntelligenceBlock || undefined, blueprintBlock: blueprintBlock || undefined };
 
   // Cache result
-  if (workspaceId) {
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
-  }
+  seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
 
   // Shadow-mode intelligence delegation (§14, §16)
   // Fire-and-forget — don't await, don't block the return.
   // ALWAYS returns the original result — shadow mode is observation-only.
-  if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId && !internalOpts?._skipShadow) {
+  if (isFeatureEnabled('intelligence-shadow-mode') && !internalOpts?._skipShadow) {
     void (async () => {
       try {
         const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js'); // dynamic-import-ok — circular dep prevention in shadow-mode fire-and-forget
@@ -417,7 +416,8 @@ function readBrandDocs(workspaceFolder: string): string {
       if (content.length > 4000) break;
     }
     return content.slice(0, 4000);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'seo-context/readBrandDocs: programming error');
     return '';
   }
 }
@@ -485,7 +485,8 @@ function readKnowledgeDocs(workspaceFolder: string): string {
       if (content.length > 6000) break;
     }
     return content.slice(0, 6000);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'seo-context/readKnowledgeDocs: programming error');
     return '';
   }
 }

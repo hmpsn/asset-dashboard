@@ -6,6 +6,10 @@ import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { getUserById, type SafeUser } from './users.js';
 import { JWT_SECRET } from './jwt-config.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('auth');
 const JWT_EXPIRES_IN = '7d';
 
 export interface JwtPayload {
@@ -34,7 +38,8 @@ export function signToken(payload: JwtPayload): string {
 export function verifyToken(token: string): JwtPayload | null {
   try {
     return jwt.verify(token, JWT_SECRET) as JwtPayload;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'auth/verifyToken: programming error');
     return null;
   }
 }

@@ -2,7 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { getDataDir } from './data-dir.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('stripe-config');
 // --- Types ---
 
 export interface StripeProductPrice {
@@ -47,7 +51,8 @@ function decrypt(data: string): string {
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
     decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
     return decipher.update(Buffer.from(encHex, 'hex')) + decipher.final('utf8');
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'stripe-config/decrypt: programming error');
     return '';
   }
 }
@@ -63,7 +68,8 @@ function readRawConfig(): { secretKey: string; webhookSecret: string; publishabl
   if (!fs.existsSync(fp)) return null;
   try {
     return JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'stripe-config/readRawConfig: expected error — degrading gracefully');
     return null;
   }
 }

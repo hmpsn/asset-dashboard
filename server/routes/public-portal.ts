@@ -26,6 +26,7 @@ import { clearSeoContextCache } from '../seo-context.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-portal');
 
@@ -322,9 +323,9 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
             if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
             trafficMap[pagePath].clicks += p.clicks;
             trafficMap[pagePath].impressions += p.impressions;
-          } catch { /* skip malformed URLs */ }
+          } catch (err) { /* skip malformed URLs */ }
         }
-      } catch { /* GSC unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ }
     }
 
     if (ws.ga4PropertyId) {
@@ -336,7 +337,7 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
           trafficMap[pagePath].pageviews += p.pageviews;
           trafficMap[pagePath].sessions += p.users;
         }
-      } catch { /* GA4 unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: programming error'); /* GA4 unavailable */ }
     }
 
     res.json(trafficMap);

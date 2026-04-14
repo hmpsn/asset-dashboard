@@ -9,6 +9,7 @@ import { getBrief } from './content-brief.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('schema');
 
@@ -689,7 +690,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
             'itemListElement': items,
           });
         }
-      } catch { /* skip if URL parsing fails */ }
+      } catch (err) { /* skip if URL parsing fails */ }
     }
   }
 
@@ -752,7 +753,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
           log.info({ pagePath, childCount: children.length }, 'Injected CollectionPage for hub page');
         }
       }
-    } catch { /* skip if URL parsing fails */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'schema-suggester/pageUrl: programming error'); /* skip if URL parsing fails */ }
   }
 
   // D5: Sibling/Parent-Child Relationship Enrichment
@@ -804,7 +805,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
             log.info({ pagePath, childCount: children.length }, 'Enriched hasPart with child pages');
           }
         }
-      } catch { /* skip if URL parsing fails */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'schema-suggester/pageUrl: programming error'); /* skip if URL parsing fails */ }
     }
   }
 }
@@ -1015,7 +1016,7 @@ async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<Pa
     });
     if (!res.ok) return null;
     return await res.json() as PageMeta;
-  } catch { return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 async function fetchPublishedHtml(url: string): Promise<string | null> {
@@ -1023,7 +1024,7 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
     const res = await fetch(url, { redirect: 'follow' });
     if (!res.ok) return null;
     return await res.text();
-  } catch { return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
@@ -1036,7 +1037,7 @@ async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise
     if (!res.ok) return null;
     const data = await res.json() as { shortName?: string };
     return data.shortName || null;
-  } catch { return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 // Detect existing JSON-LD schemas in HTML
@@ -1055,7 +1056,7 @@ function extractExistingSchemas(html: string): { types: string[]; json: Record<s
           if (item['@type']) types.push(item['@type']);
         }
       }
-    } catch { /* malformed JSON-LD */ }
+    } catch (err) { /* malformed JSON-LD */ }
   }
   return { types, json };
 }
@@ -2374,7 +2375,8 @@ Return ONLY the raw JSON-LD. No markdown, no explanation.`;
     if (mdMatch) jsonStr = mdMatch[1].trim();
 
     // Validate it's parseable JSON (with placeholders as strings)
-    try { JSON.parse(jsonStr); } catch {
+    try { JSON.parse(jsonStr); } catch (err) {
+      log.debug({ err }, 'schema-suggester: expected error — degrading gracefully');
       log.error('AI returned invalid JSON');
       return null;
     }

@@ -15,6 +15,7 @@ import type {
   VoiceSampleContext,
 } from '../shared/types/brand-engine.js';
 import { DEFAULT_TIER_MAP } from '../shared/types/brand-engine.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('brand-identity');
 
@@ -94,7 +95,7 @@ function buildBrandContext(workspaceId: string): string {
         parts.push(`BRANDSCRIPT (${bs.frameworkType}):\n${filled.map(s => `${s.title}: ${s.content}`).join('\n')}`);
       }
     }
-  } catch { /* brandscript not yet available */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'brand-identity/buildBrandContext: programming error'); /* brandscript not yet available */ }
 
   // Voice profile context — use buildVoiceCalibrationContext so DNA/guardrails are
   // only injected here when profile.status !== 'calibrated'. When calibrated,
@@ -114,7 +115,7 @@ function buildBrandContext(workspaceId: string): string {
       if (dnaText) parts.push(dnaText.trim());
       if (guardrailsText) parts.push(guardrailsText.trim());
     }
-  } catch { /* voice profile not yet available */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'brand-identity: programming error'); /* voice profile not yet available */ }
 
   // Discovery extractions
   try {
@@ -125,7 +126,7 @@ function buildBrandContext(workspaceId: string): string {
         parts.push(`STORY ELEMENTS:\n${storyElements.map(e => `${e.category}: ${e.content}`).join('\n')}`);
       }
     }
-  } catch { /* extractions not yet available */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'brand-identity: programming error'); /* extractions not yet available */ }
 
   return parts.join('\n\n');
 }

@@ -25,8 +25,8 @@ export const brandscripts = {
   get: (wsId: string, id: string) => get<Brandscript>(`/api/brandscripts/${wsId}/${id}`),
   create: (wsId: string, body: { name: string; frameworkType?: string; sections?: { title: string; purpose?: string; content?: string }[] }) =>
     post<Brandscript>(`/api/brandscripts/${wsId}`, body),
-  updateSections: (wsId: string, id: string, sections: { id?: string; title: string; purpose?: string; content?: string }[]) =>
-    put<Brandscript>(`/api/brandscripts/${wsId}/${id}/sections`, { sections }),
+  updateSections: (wsId: string, id: string, sections: { id?: string; title: string; purpose?: string; content?: string }[], expectedUpdatedAt?: string) =>
+    put<Brandscript>(`/api/brandscripts/${wsId}/${id}/sections`, { sections, expectedUpdatedAt }),
   remove: (wsId: string, id: string) => del(`/api/brandscripts/${wsId}/${id}`),
   import: (wsId: string, body: { name?: string; rawText: string }) =>
     post<Brandscript>(`/api/brandscripts/${wsId}/import`, body),

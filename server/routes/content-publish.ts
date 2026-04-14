@@ -206,7 +206,8 @@ Return ONLY the JSON object with the mapping.`,
     try {
       const cleaned = result.text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
       mapping = JSON.parse(cleaned);
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'content-publish: expected error — degrading gracefully');
       return res.status(500).json({ error: 'Failed to parse AI suggestion' });
     }
 

@@ -22,6 +22,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow-cms');
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // --- CMS Collections ---
@@ -29,7 +30,8 @@ router.get('/api/webflow/collections/:siteId', requireWorkspaceAccessFromQuery()
   try {
     const collections = await listCollections(req.params.siteId);
     res.json(collections);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: GET /api/webflow/collections/:siteId: programming error');
     res.json([]);
   }
 });
@@ -38,7 +40,8 @@ router.get('/api/webflow/collections/:collectionId/schema', async (req, res) => 
   try {
     const schema = await getCollectionSchema(req.params.collectionId);
     res.json(schema);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: GET /api/webflow/collections/:collectionId/schema: programming error');
     res.json({ fields: [] });
   }
 });
@@ -49,7 +52,8 @@ router.get('/api/webflow/collections/:collectionId/items', async (req, res) => {
   try {
     const result = await listCollectionItems(req.params.collectionId, limit, offset);
     res.json(result);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: GET /api/webflow/collections/:collectionId/items: programming error');
     res.json({ items: [], total: 0 });
   }
 });
@@ -91,13 +95,13 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
           const sitemapUrls = await discoverSitemapUrls(base);
           if (sitemapUrls.length > 0) {
             sitemapPaths = new Set(sitemapUrls.map(u => {
-              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch { return ''; }
+              try { return new URL(u).pathname.replace(/\/$/, '').toLowerCase(); } catch (err) { return ''; }
             }).filter(Boolean));
             break; // use first successful sitemap
           }
-        } catch { /* try next base URL */ }
+        } catch (err) { /* try next base URL */ }
       }
-    } catch { /* sitemap fetch is best-effort */ }
+    } catch (err) { /* sitemap fetch is best-effort */ }
 
     const results: Array<{
       collectionId: string;

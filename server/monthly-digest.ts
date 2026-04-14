@@ -10,6 +10,7 @@ import type { Workspace } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('monthly-digest');
 
@@ -141,7 +142,7 @@ async function computeDigest(
       if (positiveInsights.length > 0) {
         topWinsBlock = `\nNotable wins this period:\n${positiveInsights.map(i => `- ${i.pageTitle ?? i.insightType}`).join('\n')}`;
       }
-    } catch { /* insights not available — skip */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-digest: programming error'); /* insights not available — skip */ }
   }
 
   const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics, learningsSummary, recentOutcomesCount, topWinsBlock, ws.id);

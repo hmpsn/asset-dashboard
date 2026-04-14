@@ -32,6 +32,7 @@ import { resolvePagePath } from '../helpers.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('content-requests');
 
@@ -145,7 +146,7 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
           pageMap.set(key, `${pagePath} — "${title}"`);
         }
       }
-    } catch { /* Webflow API unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests/getAllSitePages: programming error'); /* Webflow API unavailable */ }
   }
 
   // 3. Sitemap discovery (CMS pages: blog posts, case studies, etc.)
@@ -169,10 +170,10 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
               const title = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
               pageMap.set(key, `${pagePath} — "${title}"`);
             }
-          } catch { /* skip malformed URL */ }
+          } catch (err) { /* skip malformed URL */ }
         }
       }
-    } catch { /* sitemap unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* sitemap unavailable */ }
   }
 
   return Array.from(pageMap.values());
@@ -195,7 +196,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
           .filter(r => { const q = r.query.toLowerCase(); return request.targetKeyword.toLowerCase().split(' ').some(w => w.length > 2 && q.includes(w)); })
           .slice(0, 20)
           .map(r => ({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions }));
-      } catch { /* GSC unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: POST /api/content-requests/:workspaceId/:id/generate-brief: programming error'); /* GSC unavailable */ }
     }
 
     // Gather SEO keyword data if a provider is configured
@@ -219,7 +220,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       try {
         const pages = await getGA4LandingPages(ws.ga4PropertyId, 28, 25);
         if (pages.length > 0) ga4PagePerformance = pages;
-      } catch { /* GA4 unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GA4 unavailable */ }
     }
 
     // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
@@ -291,11 +292,11 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
         try {
           const url = new URL(p.page);
           gscPages.set(url.pathname, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
-        } catch {
+        } catch (err) {
           gscPages.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
         }
       }
-    } catch { /* GSC unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GSC unavailable */ }
   }
 
   // Batch-fetch GA4 landing pages (one API call)
@@ -306,7 +307,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
       for (const p of pages) {
         ga4Pages.set(p.landingPage, { sessions: p.sessions, users: p.users, bounceRate: p.bounceRate, avgEngagementTime: p.avgEngagementTime, conversions: p.conversions });
       }
-    } catch { /* GA4 unavailable */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* GA4 unavailable */ }
   }
 
   const now = Date.now();
@@ -375,7 +376,7 @@ export async function handleContentPerformance(workspaceId: string): Promise<{
         });
       }
     }
-  } catch { /* matrices not available — skip */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* matrices not available — skip */ }
 
   // Sort by GSC clicks descending, then by days since publish
   items.sort((a, b) => (b.gsc?.clicks || 0) - (a.gsc?.clicks || 0) || a.daysSincePublish - b.daysSincePublish);

@@ -10,6 +10,10 @@ import { getWorkspace } from '../workspaces.js';
 import { upload } from '../middleware.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('brand-docs');
 const router = Router();
 
 function getBrandDocsDir(workspaceId: string): string | null {
@@ -40,7 +44,8 @@ router.get('/api/brand-docs/:workspaceId', requireWorkspaceAccess('workspaceId')
         };
       });
     res.json({ files });
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'brand-docs: GET /api/brand-docs/:workspaceId: programming error');
     res.json({ files: [] });
   }
 });
@@ -62,7 +67,7 @@ router.post('/api/brand-docs/:workspaceId', requireWorkspaceAccess('workspaceId'
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext !== '.txt' && ext !== '.md') {
       // Skip non-text files silently
-      try { fs.unlinkSync(file.path); } catch { /* ignore */ }
+      try { fs.unlinkSync(file.path); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'brand-docs: programming error'); /* ignore */ }
       continue;
     }
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -98,7 +103,8 @@ router.delete('/api/brand-docs/:workspaceId/:fileName', requireWorkspaceAccess('
   try {
     fs.unlinkSync(filePath);
     res.json({ deleted: safeName });
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'brand-docs: DELETE /api/brand-docs/:workspaceId/:fileName: programming error');
     res.status(500).json({ error: 'Failed to delete file' });
   }
 });

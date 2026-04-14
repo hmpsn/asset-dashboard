@@ -90,6 +90,9 @@ const stmts = createStmtCache(() => ({
   stampData: db.prepare(
     `UPDATE analytics_insights SET data = ? WHERE id = ? AND workspace_id = ?`, // ws-scope-ok: both id and workspace_id in WHERE
   ),
+  deleteById: db.prepare(
+    `DELETE FROM analytics_insights WHERE id = ? AND workspace_id = ?`,
+  ),
 }));
 
 function rowToInsight(row: InsightRow): AnalyticsInsight {
@@ -267,6 +270,24 @@ export function resolveInsight(
 export function getUnresolvedInsights(workspaceId: string): AnalyticsInsight[] {
   const rows = stmts().selectUnresolved.all(workspaceId) as InsightRow[];
   return rows.map(rowToInsight);
+}
+
+/**
+ * Batch-delete insights by ID. Used by the validation pass to suppress
+ * contradictory, duplicate, or low-confidence entries after computation.
+ * Returns the total number of rows deleted.
+ */
+export function suppressInsights(workspaceId: string, ids: string[]): number {
+  if (ids.length === 0) return 0;
+  const run = db.transaction(() => {
+    let deleted = 0;
+    for (const id of ids) {
+      const info = stmts().deleteById.run(id, workspaceId);
+      deleted += info.changes;
+    }
+    return deleted;
+  });
+  return run();
 }
 
 /**

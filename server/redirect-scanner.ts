@@ -8,6 +8,7 @@ import { resolvePagePath } from './helpers.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('redirect-scanner');
 
@@ -101,14 +102,14 @@ async function traceRedirects(url: string, maxHops = 10): Promise<{ hops: Redire
         // Resolve relative redirects
         try {
           currentUrl = new URL(location, currentUrl).toString();
-        } catch {
+        } catch (err) {
           break;
         }
       } else {
         // Not a redirect — we've reached the final destination
         break;
       }
-    } catch {
+    } catch (err) {
       hops.push({ url: currentUrl, status: 0 });
       break;
     }
@@ -136,7 +137,7 @@ async function checkPageStatus(url: string): Promise<{ status: number | 'error';
       const location = res.headers.get('location');
       let resolvedLocation = location || undefined;
       if (location) {
-        try { resolvedLocation = new URL(location, url).toString(); } catch { /* keep as-is */ }
+        try { resolvedLocation = new URL(location, url).toString(); } catch (err) { /* keep as-is */ }
       }
       return { status: res.status, statusText: res.statusText, redirectsTo: resolvedLocation };
     }
@@ -255,7 +256,8 @@ export async function scanRedirects(siteId: string, workspaceId?: string, liveDo
     if (cmsUrls.length > 0) {
       log.info(`Redirect scanner: also checking ${cmsUrls.length} CMS pages`);
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'redirect-scanner: programming error');
     log.info('Redirect scanner: CMS discovery skipped');
   }
 
@@ -370,7 +372,7 @@ export async function scanRedirects(siteId: string, workspaceId?: string, liveDo
     if (typeof ps.status !== 'number') continue;
     if (ps.status >= 300 && ps.status < 400 && ps.redirectsTo) {
       // Already redirecting — check if destination is healthy
-      const destPath = (() => { try { return new URL(ps.redirectsTo).pathname; } catch { return null; } })();
+      const destPath = (() => { try { return new URL(ps.redirectsTo).pathname; } catch (err) { return null; } })();
       if (destPath) {
         const destPage = pageStatuses.find(p => p.path === destPath);
         if (destPage && (destPage.status === 'error' || (typeof destPage.status === 'number' && destPage.status >= 400))) {

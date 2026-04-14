@@ -3543,6 +3543,86 @@ describe('Rule: addActivity type not in CLIENT_VISIBLE_TYPES (public route)', ()
   });
 });
 
+describe('Rule: isProgrammingError near new URL() or fetch()', () => {
+  const RULE = 'isProgrammingError near new URL() or fetch()';
+
+  it('flags isProgrammingError in a catch wrapping new URL()', () => {
+    const file = write(
+      uniqPath('rule-url-fetch', 'server/my-feature.ts'),
+      lines(
+        "try {",
+        "  const u = new URL(externalInput);",
+        "} catch (err) {",
+        "  if (isProgrammingError(err)) log.warn({ err }, 'oops');",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('flags isProgrammingError in a catch wrapping fetch()', () => {
+    const file = write(
+      uniqPath('rule-url-fetch', 'server/my-fetcher.ts'),
+      lines(
+        "try {",
+        "  const res = await fetch(url);",
+        "} catch (err) {",
+        "  if (isProgrammingError(err)) log.warn({ err }, 'oops');",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag isProgrammingError in a catch without URL/fetch in try body', () => {
+    const file = write(
+      uniqPath('rule-url-fetch', 'server/safe.ts'),
+      lines(
+        "try {",
+        "  const data = await compute(input);",
+        "} catch (err) {",
+        "  if (isProgrammingError(err)) log.warn({ err }, 'bug');",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // url-fetch-ok inline hatch', () => {
+    const inline = write(
+      uniqPath('rule-url-fetch', 'server/hatched-inline.ts'),
+      lines(
+        "try {",
+        "  const u = new URL(input);",
+        "} catch (err) {",
+        "  if (isProgrammingError(err)) log.warn({ err }, 'oops'); // url-fetch-ok",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [inline])).toHaveLength(0);
+  });
+
+  it('respects // url-fetch-ok above-line hatch', () => {
+    const above = write(
+      uniqPath('rule-url-fetch', 'server/hatched-above.ts'),
+      lines(
+        "try {",
+        "  const res = await fetch(apiUrl);",
+        "} catch (err) {",
+        "  // url-fetch-ok — verified: only wraps internal API",
+        "  if (isProgrammingError(err)) log.warn({ err }, 'oops');",
+        "  return null;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [above])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3584,6 +3664,8 @@ describe('Meta: customCheck rule name registry', () => {
     'useGlobalAdminEvents called with workspace-scoped event name',
     // P3 expansion rules
     'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
+    // #576 catch-hardening guard
+    'isProgrammingError near new URL() or fetch()',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

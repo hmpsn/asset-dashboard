@@ -231,7 +231,8 @@ export function getOrSeedSiteTemplate(siteId: string, workspaceId?: string): Sch
     const wsId = workspaceId || snapshot.workspaceId;
     log.info(`Auto-seeded site template from existing homepage snapshot for site ${siteId}`);
     return saveSiteTemplate(siteId, wsId, orgNode, websiteNode as Record<string, unknown>);
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'schema-store/getOrSeedSiteTemplate: expected error — degrading gracefully');
     return null;
   }
 }

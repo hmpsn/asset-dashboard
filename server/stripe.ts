@@ -15,6 +15,7 @@ import {
 } from './content-subscriptions.js';
 import { CONTENT_SUB_PLANS, type ContentSubscription } from '../shared/types/content.js';
 import { WS_EVENTS } from './ws-events.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('stripe');
 
@@ -234,7 +235,8 @@ async function getOrCreateCustomer(stripe: Stripe, workspaceId: string): Promise
     try {
       await stripe.customers.retrieve(ws.stripeCustomerId);
       return ws.stripeCustomerId;
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'stripe/getOrCreateCustomer: programming error');
       // Customer deleted in Stripe — create a new one
     }
   }

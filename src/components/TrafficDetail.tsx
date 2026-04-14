@@ -11,6 +11,7 @@ import { fmtNum as formatNumber } from '../utils/formatNumbers';
 import { useAdminGA4 } from '../hooks/admin';
 import { useAnalyticsOverview } from '../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../hooks/admin/useInsightFeed';
+import { queryKeys } from '../lib/queryKeys';
 import { useToggleSet } from '../hooks/useToggleSet';
 import { AnnotatedTrendChart } from './charts/AnnotatedTrendChart';
 import type { TrendLine } from './charts/AnnotatedTrendChart';
@@ -74,7 +75,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
 
   const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
 
-  const retry = () => queryClient.invalidateQueries({ queryKey: ['admin-ga4-overview', workspaceId] });
+  const retry = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.ga4All(workspaceId) });
 
   // ── Not configured state ──
   if (!ga4PropertyId) {
@@ -288,8 +289,8 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 </div>
                 <div className="text-zinc-700">vs</div>
                 <div className="text-center flex-1">
-                  <div className="text-sm font-bold text-zinc-300">{overview.newUserPercentage}%</div>
-                  <div className="text-[10px] text-zinc-500">New Users</div>
+                  <div className="text-sm font-bold text-zinc-300">{(100 - overview.bounceRate).toFixed(1)}%</div>
+                  <div className="text-[10px] text-zinc-500">All Traffic</div>
                 </div>
               </div>
             </div>

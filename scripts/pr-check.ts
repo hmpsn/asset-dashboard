@@ -1249,19 +1249,80 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
-    name: 'Silent bare catch in workspace-intelligence assemblers',
+    name: 'Silent bare catch in server files',
     // Matches lines that open a bare catch block with no error variable — the most
     // dangerous pattern: no err reference means isProgrammingError() can never be called.
-    // Scoped to workspace-intelligence.ts only to avoid flagging the 200+ legitimate
-    // silent catches in other server files.
+    // Originally scoped to workspace-intelligence.ts, now expanded to all server files
+    // after the broad catch-hardening pass (#576) converted ~344 bare catches.
     // Suppression: append `// catch-ok` to the same line. Because the pattern is anchored
     // with `$`, adding any suffix prevents the regex from matching — so excludeLines is not
     // needed here but left as documentation of the convention.
     pattern: '\\} catch \\{$',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/workspace-intelligence.ts',
-    message: 'Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum.',
+    pathFilter: 'server/',
+    message: 'Bare `catch {` hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err), or log.debug for expected failures (JSON parse, migration). Annotate intentionally-silent catches with `// catch-ok`.',
     severity: 'error',
+  },
+  {
+    name: 'isProgrammingError near new URL() or fetch()',
+    // Catches that wrap `new URL()` on external input or `fetch()` on external
+    // URLs throw TypeError for expected failures (malformed URL, DNS, network).
+    // isProgrammingError() classifies these as code bugs — a false positive.
+    // See the caveats in server/errors.ts.
+    // Suppression: add `// url-fetch-ok` on the isProgrammingError line.
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// url-fetch-ok'],
+    message: 'isProgrammingError() in a catch block that wraps `new URL()` or `fetch()` may produce false positives — TypeError from malformed URLs or network failures is expected degradation, not a code bug. Verify the catch is not wrapping external input, or add `// url-fetch-ok` to suppress.',
+    severity: 'warn',
+    rationale: 'False-positive log.warn noise: network failures and user-supplied malformed URLs trigger TypeError alerts that obscure real code bugs.',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const urlOrFetchRe = /\bnew\s+URL\s*\(|\bfetch\s*\(/;
+      const isPECall = /isProgrammingError\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        // Walk backward from each isProgrammingError call to find the
+        // enclosing `catch`. Then walk backward from that catch to the
+        // matching `try` via brace-depth tracking. Only flag if the
+        // try body contains new URL( or fetch(.
+        for (let i = 0; i < lines.length; i++) {
+          if (!isPECall.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// url-fetch-ok')) continue;
+          // Skip comment lines (the caveats in errors.ts)
+          if (/^\s*\/\//.test(lines[i])) continue;
+          // Find enclosing catch — scan backward for `catch`
+          let catchLine = -1;
+          for (let j = i; j >= Math.max(0, i - 5); j--) {
+            if (/\bcatch\s*\(/.test(lines[j])) { catchLine = j; break; }
+          }
+          if (catchLine < 0) continue;
+          // Walk backward from catch to find matching try via brace depth
+          let depth = 0;
+          let tryLine = -1;
+          for (let j = catchLine; j >= 0; j--) {
+            for (let c = lines[j].length - 1; c >= 0; c--) {
+              if (lines[j][c] === '}') depth++;
+              else if (lines[j][c] === '{') depth--;
+            }
+            if (/\btry\s*\{/.test(lines[j]) && depth <= 0) { tryLine = j; break; }
+          }
+          if (tryLine < 0) continue;
+          // Check if try body contains new URL( or fetch(
+          for (let j = tryLine; j < catchLine; j++) {
+            if (urlOrFetchRe.test(lines[j])) {
+              hits.push({ file, line: i + 1, text: lines[i] });
+              break;
+            }
+          }
+        }
+      }
+      return hits;
+    },
   },
 
   // ─── New rules (2026-04-10 audit) ───

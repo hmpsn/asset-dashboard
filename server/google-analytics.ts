@@ -6,7 +6,6 @@
 
 import { getGlobalToken } from './google-auth.js';
 import { createLogger } from './logger.js';
-
 const log = createLogger('ga4');
 
 const GA4_API = 'https://analyticsdata.googleapis.com/v1beta';
@@ -883,7 +882,7 @@ export async function getTopDroppedGA4Page(
       return new URL(topPage).pathname.split('?')[0];
     }
     return topPage.split('?')[0];
-  } catch {
+  } catch (err) {
     return topPage.startsWith('/') ? topPage.split('?')[0] : null;
   }
 }
@@ -958,7 +957,7 @@ export async function getTopSpikedGA4Page(
       return new URL(topPage).pathname.split('?')[0];
     }
     return topPage.split('?')[0];
-  } catch {
+  } catch (err) {
     return topPage.startsWith('/') ? topPage.split('?')[0] : null;
   }
 }

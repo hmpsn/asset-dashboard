@@ -86,7 +86,7 @@ explicit justification.
 | Raw ai_estimate string in server files | regex-shell | Literal `'ai_estimate'`; grep succeeds. |
 | replaceAllPageKeywords called outside keyword-strategy route | regex-shell | Literal function name; grep succeeds. |
 | getBacklinksOverview called outside workspace-intelligence | regex-shell | Literal function name; grep succeeds. |
-| Silent bare catch in workspace-intelligence assemblers | regex-shell | Pattern `\} catch \{$`; end-anchor; grep succeeds. |
+| Silent bare catch in server files | regex-shell | Pattern `\} catch \{$`; end-anchor; grep succeeds. Expanded from workspace-intelligence.ts to all server/ files after #576 broad catch hardening. |
 | useGlobalAdminEvents import restriction | customCheck-fixture | P1.1 Round 2 fix — converted to customCheck with dual-quote regex and inline+above-line hatch. 6 fixture tests cover all paths. |
 | getOrCreate* function returns nullable | customCheck-fixture | P1.2 Round 2 fix — depth-tracked `findReturnRegionEnd()` walker replaced fragile `.search(/[{=]/)`. 11 fixture tests cover object-literal, Promise, Array, arrow, intersection, and non-null return shapes. |
 | Record<string, unknown> in shared/types | regex-shell | Pattern `Record<string,\s*unknown>`; grep succeeds. |

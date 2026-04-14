@@ -373,7 +373,7 @@ export async function discoverCmsUrls(
           const pageName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
           cmsAll.push({ url: sitemapUrl, path: parsed.pathname, pageName });
         }
-      } catch { /* skip malformed URLs */ }
+      } catch (err) { /* skip malformed URLs */ }
     }
 
     log.info(`sitemap: ${allUrls.length} URLs total, ${cmsAll.length} are CMS pages`);
@@ -409,12 +409,12 @@ export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
             const subText = await subRes.text();
             urls.push(...extractLocs(subText));
           }
-        } catch { /* skip failed sub-sitemap */ }
+        } catch (err) { /* skip failed sub-sitemap */ }
       }
     } else {
       urls.push(...extractLocs(text));
     }
-  } catch { /* sitemap fetch failed */ }
+  } catch (err) { /* sitemap fetch failed */ }
   return urls;
 }
 

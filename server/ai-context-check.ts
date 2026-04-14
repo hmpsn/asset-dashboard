@@ -10,7 +10,11 @@ import { getWorkspace } from './workspaces.js';
 import { countPageKeywords } from './page-keywords.js';
 import { getUploadRoot } from './data-dir.js';
 import { isAnyProviderConfigured } from './seo-data-provider.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('ai-context-check');
 export interface ContextSource {
   key: string;
   label: string;
@@ -86,7 +90,7 @@ export function checkAIContext(workspaceId: string): ContextCompleteness {
     if (fs.existsSync(kbDocsDir)) {
       kbFileCount = fs.readdirSync(kbDocsDir).filter(f => /\.(txt|md)$/i.test(f)).length;
     }
-  } catch { /* ignore */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'ai-context-check: programming error'); /* ignore */ }
   const hasKB = hasInlineKB || kbFileCount > 0;
   sources.push({
     key: 'knowledge-base',
@@ -107,7 +111,7 @@ export function checkAIContext(workspaceId: string): ContextCompleteness {
     if (fs.existsSync(brandDocsDir)) {
       brandFileCount = fs.readdirSync(brandDocsDir).filter(f => /\.(txt|md)$/i.test(f)).length;
     }
-  } catch { /* ignore */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'ai-context-check: programming error'); /* ignore */ }
   const hasVoice = hasInlineVoice || brandFileCount > 0;
   sources.push({
     key: 'brand-voice',

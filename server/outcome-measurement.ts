@@ -26,6 +26,7 @@ import type {
   ActionContext,
   ScoringConfig,
 } from '../shared/types/outcome-tracking.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('outcome-measurement');
 
@@ -93,7 +94,8 @@ async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnaps
     const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, 14);
     if (!rows.length) return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
     return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'outcome-measurement/fetchCurrentMetrics: programming error');
     return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
   }
 }
@@ -115,7 +117,8 @@ export async function fetchGscSnapshot(
     const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, days);
     if (!rows.length) return null;
     return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'outcome-measurement/fetchGscSnapshot: programming error');
     return null;
   }
 }

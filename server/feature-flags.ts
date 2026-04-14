@@ -2,6 +2,7 @@ import { FEATURE_FLAGS, type FeatureFlagKey } from '../shared/types/feature-flag
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 /**
  * Server-side feature flag resolution. Priority (highest → lowest):
@@ -62,7 +63,8 @@ function loadDbOverrides(): Partial<Record<FeatureFlagKey, boolean>> {
     dbOverrideCache = result;
     cacheExpiry = now + CACHE_TTL_MS;
     return result;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'feature-flags/loadDbOverrides: programming error');
     return {};
   }
 }

@@ -1,7 +1,11 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('jobs');
 export interface Job {
   id: string;
   type: string;
@@ -142,7 +146,7 @@ function pruneOldJobs() {
   for (const [id, job] of jobs) {
     if (now - new Date(job.updatedAt).getTime() > JOB_TTL_MS) {
       jobs.delete(id);
-      try { deleteStmt().run(id); } catch { /* best effort */ }
+      try { deleteStmt().run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/pruneOldJobs: programming error'); /* best effort */ }
     }
   }
   // If still over limit, remove oldest completed jobs
@@ -152,7 +156,7 @@ function pruneOldJobs() {
       .sort((a, b) => new Date(a[1].updatedAt).getTime() - new Date(b[1].updatedAt).getTime());
     for (const [id] of sorted) {
       jobs.delete(id);
-      try { deleteStmt().run(id); } catch { /* best effort */ }
+      try { deleteStmt().run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best effort */ }
       if (jobs.size <= MAX_JOBS) break;
     }
   }
@@ -274,7 +278,7 @@ export function clearCompletedJobs(): number {
   for (const [id, job] of jobs) {
     if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
       jobs.delete(id);
-      try { deleteStmt().run(id); } catch { /* best effort */ }
+      try { deleteStmt().run(id); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/clearCompletedJobs: programming error'); /* best effort */ }
       count++;
     }
   }

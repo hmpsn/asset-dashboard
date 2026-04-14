@@ -43,6 +43,7 @@ const createBrandscriptSchema = z.object({
 
 const updateSectionsSchema = z.object({
   sections: z.array(brandscriptSectionInputSchema),
+  expectedUpdatedAt: z.string().optional(),
 });
 
 const importBrandscriptSchema = z.object({
@@ -99,7 +100,18 @@ router.get('/api/brandscripts/:workspaceId/:id', requireWorkspaceAccess('workspa
 });
 
 router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess('workspaceId'), validate(updateSectionsSchema), (req, res) => {
-  const { sections } = req.body;
+  const { sections, expectedUpdatedAt } = req.body;
+
+  // Staleness check: if the caller passes the updatedAt it last saw, reject
+  // with 409 when the DB row has been modified since then.
+  if (expectedUpdatedAt) {
+    const current = getBrandscript(req.params.workspaceId, req.params.id);
+    if (!current) return res.status(404).json({ error: 'Not found' });
+    if (current.updatedAt > expectedUpdatedAt) {
+      return res.status(409).json({ error: 'This brandscript was updated by another session. Reload to see the latest changes.' });
+    }
+  }
+
   const result = updateBrandscriptSections(req.params.workspaceId, req.params.id, sections);
   if (!result) return res.status(404).json({ error: 'Not found' });
   broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });

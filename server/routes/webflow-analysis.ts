@@ -203,7 +203,7 @@ router.get('/api/webflow/redirect-scan/:siteId', requireWorkspaceAccessFromQuery
             try {
               const parsed = new URL(p.page);
               return { url: p.page, path: parsed.pathname, clicks: p.clicks, impressions: p.impressions };
-            } catch { return null; }
+            } catch (err) { return null; }
           }).filter(Boolean) as typeof gscGhostUrls;
           log.info(`Found ${gscPages.length} GSC pages to cross-check`);
         }

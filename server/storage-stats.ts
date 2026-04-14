@@ -8,7 +8,11 @@
 import fs from 'fs';
 import path from 'path';
 import { DATA_BASE, getUploadRoot, getOptRoot } from './data-dir.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('storage-stats');
 /* ── Types ── */
 
 export interface DirStats {
@@ -48,9 +52,9 @@ function dirSize(dirPath: string): { bytes: number; files: number } {
           bytes += fs.statSync(full).size;
           files++;
         }
-      } catch { /* skip inaccessible */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'storage-stats/dirSize: programming error'); /* skip inaccessible */ }
     }
-  } catch { /* directory doesn't exist */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'storage-stats/dirSize: programming error'); /* directory doesn't exist */ }
   return { bytes, files };
 }
 
@@ -130,7 +134,7 @@ export function getStorageReport(): StorageReport {
       totalBytes += uploadStats.bytes;
       totalFiles += uploadStats.files;
     }
-  } catch { /* ignore */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'storage-stats: programming error'); /* ignore */ }
 
   // Optimized images
   try {
@@ -146,7 +150,7 @@ export function getStorageReport(): StorageReport {
       totalBytes += optStats.bytes;
       totalFiles += optStats.files;
     }
-  } catch { /* ignore */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'storage-stats: programming error'); /* ignore */ }
 
   // Sort by size descending
   breakdown.sort((a, b) => b.bytes - a.bytes);
@@ -168,11 +172,11 @@ export function getStorageReport(): StorageReport {
             if (data.createdAt && (!oldestChatSession || data.createdAt < oldestChatSession)) {
               oldestChatSession = data.createdAt;
             }
-          } catch { /* skip */ }
+          } catch (err) { /* skip */ }
         }
       }
     }
-  } catch { /* ignore */ }
+  } catch (err) { /* ignore */ }
 
   const retentionDays = parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10);
 

@@ -94,7 +94,8 @@ export function parseJsonFallback<T>(
   if (raw == null || raw === '') return fallback;
   try {
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (err) {
+    log.debug({ err }, 'json-validation/parseJsonFallback: expected error — degrading gracefully');
     return fallback;
   }
 }

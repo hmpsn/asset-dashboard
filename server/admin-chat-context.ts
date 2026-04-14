@@ -40,6 +40,7 @@ import { getAllPatterns } from './copy-intelligence.js';
 import type { AnalyticsInsight, PageHealthData, QuickWinData, ContentDecayData, CannibalizationData, KeywordClusterData, CompetitorGapData, ConversionAttributionData } from '../shared/types/analytics.js';
 import type { IntelligenceSlice } from '../shared/types/intelligence.js';
 import { STUDIO_NAME } from './constants.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('admin-chat-context');
 
@@ -161,7 +162,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     .sort((a, b) => a.score - b.score);
   if (healthInsights.length > 0) {
     const lines = healthInsights.slice(0, 10).map(h => {
-      const title = h.pageTitle || (() => { try { return new URL(h.pageId || '').pathname; } catch { return h.pageId || '(unknown)'; } })();
+      const title = h.pageTitle || (() => { try { return new URL(h.pageId || '').pathname; } catch (err) { return h.pageId || '(unknown)'; } })();
       let line = `  ${title}: ${h.score}/100 (${h.trend}) — ${h.clicks} clicks, pos ${h.position?.toFixed?.(1) ?? h.position}`;
       if (h.strategyAlignment && h.strategyAlignment !== 'untracked') line += ` — strategy: ${h.strategyAlignment}`;
       if (h.pipelineStatus) line += ` — pipeline: ${h.pipelineStatus}`;
@@ -198,7 +199,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (decayInsights.length > 0) {
     const lines = decayInsights.slice(0, 8).map(d => {
       let path: string;
-      try { path = new URL(d.pageId || '').pathname; } catch { path = d.pageId || '(unknown)'; }
+      try { path = new URL(d.pageId || '').pathname; } catch (err) { path = d.pageId || '(unknown)'; }
       return `  ${path}: ${d.deltaPercent}% (${d.baselineClicks} → ${d.currentClicks} clicks)`;
     });
     sections.push(`CONTENT DECAY (pages losing traffic):\n${lines.join('\n')}`);
@@ -211,7 +212,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (cannibalization.length > 0) {
     const lines = cannibalization.slice(0, 8).map(c => {
       const pages = c.pages.map((p, i) => {
-        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch { return p; }
+        try { return `${new URL(p).pathname} (pos ${Math.round(c.positions[i])})`; } catch (err) { return p; }
       }).join(', ');
       return `  "${c.query}": ${pages}`;
     });
@@ -225,7 +226,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     .sort((a, b) => b.totalImpressions - a.totalImpressions);
   if (clusters.length > 0) {
     const lines = clusters.slice(0, 8).map(c => {
-      const pillar = c.pillarPage ? ` → pillar: ${(() => { try { return new URL(c.pillarPage).pathname; } catch { return c.pillarPage; } })()}` : '';
+      const pillar = c.pillarPage ? ` → pillar: ${(() => { try { return new URL(c.pillarPage).pathname; } catch (err) { return c.pillarPage; } })()}` : '';
       return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
     });
     sections.push(`KEYWORD CLUSTERS (topic groups from GSC queries):\n${lines.join('\n')}`);
@@ -252,7 +253,7 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (conversions.length > 0) {
     const lines = conversions.slice(0, 8).map(c => {
       let path: string;
-      try { path = new URL(c.pageId || '').pathname; } catch { path = c.pageId || '(unknown)'; }
+      try { path = new URL(c.pageId || '').pathname; } catch (err) { path = c.pageId || '(unknown)'; }
       return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR (${c.conversions} conversions, ${c.sessions} sessions)`;
     });
     sections.push(`CONVERSION ATTRIBUTION (pages driving conversions):\n${lines.join('\n')}`);
@@ -567,7 +568,7 @@ export async function assembleAdminContext(
                 dataSources.push('Audit Traffic Intelligence (high-traffic pages with SEO errors)');
               }
             }
-          } catch { /* non-critical */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
           // If analyzing a specific page, pull its audit data
           if (pageContext) {
@@ -593,7 +594,7 @@ export async function assembleAdminContext(
         sections.push(`DETECTED ANOMALIES (AI-flagged significant changes):\n${JSON.stringify(anomalies.slice(0, 8), null, 1)}`);
         dataSources.push('Detected Anomalies');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Analytics Intelligence (quick wins, decay, cannibalization, health scores)
@@ -607,7 +608,7 @@ export async function assembleAdminContext(
           dataSources.push('Analytics Intelligence (page health, quick wins, content decay, cannibalization)');
         }
       }
-    } catch { /* intelligence layer not ready — non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* intelligence layer not ready — non-critical */ }
   }
 
   // Content Pipeline (briefs + requests)
@@ -622,7 +623,7 @@ export async function assembleAdminContext(
         sections.push(`CONTENT BRIEFS (${briefs.length} total):\n${JSON.stringify(briefSummary, null, 1)}`);
         dataSources.push(`Content Briefs (${briefs.length} total — keywords, statuses, dates)`);
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
     try {
       const requests = listContentRequests(workspaceId);
@@ -635,7 +636,7 @@ export async function assembleAdminContext(
         sections.push(`CONTENT REQUESTS (${requests.length} total):\n${JSON.stringify(reqSummary, null, 1)}`);
         dataSources.push(`Content Requests (${requests.length} total — topics, statuses, pipeline)`);
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Rank Tracking
@@ -652,7 +653,7 @@ export async function assembleAdminContext(
         sections.push(`RANK TRACKING (latest positions):\n${JSON.stringify(rankSummary, null, 1)}`);
         dataSources.push('Rank Tracking (keyword positions, changes, pinned keywords)');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Activity Log
@@ -666,7 +667,7 @@ export async function assembleAdminContext(
         sections.push(`RECENT ACTIVITY LOG:\n${JSON.stringify(actSummary, null, 1)}`);
         dataSources.push('Activity Log (recent workspace events)');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Approvals
@@ -700,7 +701,7 @@ export async function assembleAdminContext(
           sections.push(`APPROVAL QUEUE SUMMARY: ${queue.pending} items pending${age}`);
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Content Decay
@@ -719,7 +720,7 @@ export async function assembleAdminContext(
         sections.push(`CONTENT DECAY (pages losing traffic):\n${JSON.stringify(decaySummary, null, 1)}`);
         dataSources.push(`Content Decay (${decay.decayingPages.length} pages declining)`);
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Work Orders
@@ -733,7 +734,7 @@ export async function assembleAdminContext(
         sections.push(`WORK ORDERS (${orders.length} total):\n${JSON.stringify(orderSummary, null, 1)}`);
         dataSources.push('Work Orders');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
     // Content Plan (templates + matrices)
     try {
@@ -760,7 +761,7 @@ export async function assembleAdminContext(
         sections.push(`CONTENT PLAN:\n${planParts.join('\n')}`);
         dataSources.push(`Content Plan (${templates.length} templates, ${matrices.length} matrices)`);
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Copy Pipeline (blueprints, copy status, intelligence patterns)
@@ -776,7 +777,8 @@ export async function assembleAdminContext(
             try {
               const copyStatus = getEntryCopyStatus(entry.id, workspaceId);
               entryLines.push(`  - ${entry.name}: ${copyStatus.overallStatus} (${copyStatus.approvedSections}/${copyStatus.totalSections} sections approved, ${copyStatus.approvalPercentage}%)`);
-            } catch {
+            } catch (err) {
+              if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error');
               entryLines.push(`  - ${entry.name}: (copy status unavailable)`);
             }
           }
@@ -794,12 +796,12 @@ export async function assembleAdminContext(
             );
             copyLines.push(patternSummary.join('\n'));
           }
-        } catch { /* copy_intelligence table may not exist yet */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* copy_intelligence table may not exist yet */ }
 
         sections.push(`COPY PIPELINE STATUS:\n${copyLines.join('\n')}`);
         dataSources.push(`Copy Pipeline (${blueprints.length} blueprint(s), section copy status, intelligence patterns)`);
       }
-    } catch { /* page_strategy / copy tables may not exist yet */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* page_strategy / copy tables may not exist yet */ }
   }
 
   // SEO Change Tracker
@@ -814,7 +816,7 @@ export async function assembleAdminContext(
         sections.push(`RECENT SEO CHANGES:\n${JSON.stringify(changeSummary, null, 1)}`);
         dataSources.push('SEO Change Tracker (recent title/meta/content edits)');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Recommendations
@@ -831,7 +833,7 @@ export async function assembleAdminContext(
           dataSources.push(`AI Recommendations (${active.length} active)`);
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Client Health (churn signals via intelligence slice)
@@ -858,7 +860,7 @@ export async function assembleAdminContext(
           dataSources.push('Client Health (composite score, churn risk, engagement, signals)');
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // Performance (via intelligence siteHealth slice)
@@ -894,7 +896,7 @@ export async function assembleAdminContext(
                 perfParts.push(`Dead link URLs (top ${Math.min(dead.length, 10)} of ${dead.length}):\n${deadDetail.join('\n')}`);
               }
             }
-          } catch { /* non-critical */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
           try {
             const speedSnap = getPageSpeed(ws.webflowSiteId);
@@ -910,7 +912,7 @@ export async function assembleAdminContext(
                 perfParts.push(`Worst-performing pages (PageSpeed):\n${worstDetail.join('\n')}`);
               }
             }
-          } catch { /* non-critical */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
 
           try {
             const weightSnap = getPageWeight(ws.webflowSiteId);
@@ -935,7 +937,7 @@ export async function assembleAdminContext(
                 );
               }
             }
-          } catch { /* non-critical */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
         }
 
         if (perfParts.length > 0) {
@@ -943,7 +945,7 @@ export async function assembleAdminContext(
           dataSources.push('Site Performance (Core Web Vitals, PageSpeed, per-URL dead links, page weight analysis)');
         }
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'admin-chat-context: programming error'); /* non-critical */ }
   }
 
   // ── Page-specific analysis results ──

@@ -24,6 +24,7 @@ import {
 } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('webflow-alt-text');
 
@@ -57,7 +58,7 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
               contextParts.push(`Page "${page.title}": ${snippet}`);
               if (contextParts.length >= 2) break;
             }
-          } catch { /* skip */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: POST /api/webflow/generate-alt/:assetId: programming error'); /* skip */ }
         }
 
         if (contextParts.length > 0) {
@@ -67,7 +68,7 @@ router.post('/api/webflow/generate-alt/:assetId', async (req, res) => {
           const site = sites.find(s => s.id === siteId);
           if (site) context = `Website: ${site.displayName}`;
         }
-      } catch { /* proceed without context */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: POST /api/webflow/generate-alt/:assetId: programming error'); /* proceed without context */ }
     }
 
     const response = await fetch(imageUrl);
@@ -136,7 +137,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
       const sites = await listSites(token);
       const site = sites.find(s => s.id === siteId);
       if (site) siteContext = `Website: ${site.displayName}`;
-    } catch { /* proceed without context */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: POST /api/webflow/bulk-generate-alt: programming error'); /* proceed without context */ }
   }
 
   const bulkWsId = bulkAltWsId || (siteId ? listWorkspaces().find(w => w.webflowSiteId === siteId)?.id : undefined);
@@ -178,9 +179,9 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
               assetContextMap.set(asset.assetId, `Page "${page.title}": ${snippet}`);
             }
           }
-        } catch { /* skip page */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* skip page */ }
       }
-    } catch { /* proceed without page context */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* proceed without page context */ }
   }
 
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -209,7 +210,7 @@ router.post('/api/webflow/bulk-generate-alt', async (req, res) => {
 
       const context = assetContextMap.get(asset.assetId) || siteContext || undefined;
       const altText = await generateAltText(tmpPath, context);
-      try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* ignore */ }
 
       done++;
       if (altText) {
@@ -271,7 +272,7 @@ async function repairCmsReferences(
     if (multiImageFields.length > 0 || richTextFields.length > 0) {
       try {
         currentItem = await getCollectionItem(collectionId, itemId, token);
-      } catch { /* proceed without current item data */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* proceed without current item data */ }
     }
 
     const fieldData: Record<string, unknown> = {};
@@ -323,7 +324,7 @@ async function repairCmsReferences(
   for (const [collectionId, itemIds] of updatedByCollection.entries()) {
     try {
       await publishCollectionItems(collectionId, itemIds, token);
-    } catch { /* publish is best-effort */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-alt-text: programming error'); /* publish is best-effort */ }
   }
 
   return { succeeded, failed };
