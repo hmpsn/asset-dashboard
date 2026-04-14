@@ -8,7 +8,6 @@ import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
-import { isProgrammingError } from './errors.js';
 
 const log = createLogger('competitor-schema');
 
@@ -79,7 +78,7 @@ function extractUrlsFromSitemap(xml: string, domain: string, maxUrls: number): s
       if (parsed.hostname === domain || parsed.hostname === `www.${domain}` || `www.${parsed.hostname}` === domain) {
         urls.push(url);
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'competitor-schema/extractUrlsFromSitemap: programming error'); /* invalid URL — skip */ }
+    } catch (err) { /* invalid URL — skip */ }
   }
   return urls;
 }
@@ -97,7 +96,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<string 
     if (!res.ok) return null;
     return await res.text();
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'competitor-schema/fetchWithTimeout: programming error');
+    /* network failure or timeout — expected */
     return null;
   } finally {
     clearTimeout(timer);

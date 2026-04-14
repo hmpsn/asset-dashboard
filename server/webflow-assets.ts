@@ -12,7 +12,6 @@ import { listWorkspaces } from './workspaces.js';
 import type * as WebflowPages from './webflow-pages.js';
 import type * as WebflowCms from './webflow-cms.js';
 import type { createHash as CreateHashFn } from 'crypto';
-import { isProgrammingError } from './errors.js';
 
 const log = createLogger('webflow-assets');
 
@@ -62,7 +61,7 @@ export async function getAsset(
     if (!res.ok) return null;
     return await res.json() as WebflowAsset;
   } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'webflow-assets/getAsset: programming error');
+    /* network failure — expected */
     return null;
   }
 }
@@ -245,7 +244,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
           offset += items.length;
           if (offset >= total || items.length === 0) break;
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-assets/collId: programming error'); /* skip */ }
+      } catch (err) { /* API call failed — skip collection */ }
     }
 
     log.info(`Scanning ${pageUrls.length} page URLs for asset references (${assetIds.size} assets)`);
@@ -267,10 +266,10 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
                 }
               }
             }
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-assets: programming error'); /* skip */ }
+          } catch (err) { /* CSS fetch failed — skip */ }
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-assets: programming error'); /* skip */ }
+    } catch (err) { /* network failure — skip CSS scan */ }
 
     // Fetch pages in parallel batches of 10
     const batchSize = 10;
@@ -288,7 +287,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
                 addUsage(id, ref);
               }
             }
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-assets: programming error'); /* skip */ }
+          } catch (err) { /* network failure — skip page */ }
         })
       );
       void results;
@@ -350,7 +349,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
         offset += items.length;
         if (offset >= total || items.length === 0) break;
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-assets: programming error'); /* skip failed collections */ }
+    } catch (err) { /* API call failed — skip collection */ }
   }
 
   return usageMap;

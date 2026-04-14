@@ -18,6 +18,11 @@
 // URLs. When the input comes from user data, scraped pages, or external APIs,
 // this is expected validation — not a code bug. Do NOT call isProgrammingError()
 // inside catch blocks that wrap `new URL()` on external/user-supplied strings.
+//
+// ⚠ TypeError caveat: Node.js `fetch()` throws TypeError for network failures
+// (DNS resolution, connection refused, TLS errors). When fetching external URLs
+// or third-party APIs, this is expected degradation — not a code bug. Do NOT call
+// isProgrammingError() inside catch blocks that wrap `fetch()` on external URLs.
 
 export function isProgrammingError(err: unknown): boolean {
   return (

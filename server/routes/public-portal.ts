@@ -323,7 +323,7 @@ router.get('/api/public/audit-traffic/:workspaceId', async (req, res) => {
             if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
             trafficMap[pagePath].clicks += p.clicks;
             trafficMap[pagePath].impressions += p.impressions;
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* skip malformed URLs */ }
+          } catch (err) { /* skip malformed URLs */ }
         }
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-portal: GET /api/public/audit-traffic/:workspaceId: programming error'); /* GSC unavailable */ }
     }

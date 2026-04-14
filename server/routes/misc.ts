@@ -92,7 +92,7 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
             if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
             trafficMap[path].clicks += p.clicks;
             trafficMap[path].impressions += p.impressions;
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* skip malformed URLs */ }
+          } catch (err) { /* skip malformed URLs */ }
         }
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ }
     }

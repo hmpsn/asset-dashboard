@@ -690,7 +690,7 @@ function injectCrossReferences(schema: Record<string, unknown>, siteUrl: string,
             'itemListElement': items,
           });
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'schema-suggester/pageUrl: programming error'); /* skip if URL parsing fails */ }
+      } catch (err) { /* skip if URL parsing fails */ }
     }
   }
 
@@ -1016,7 +1016,7 @@ async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<Pa
     });
     if (!res.ok) return null;
     return await res.json() as PageMeta;
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'schema-suggester/fetchPageMeta: programming error'); return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 async function fetchPublishedHtml(url: string): Promise<string | null> {
@@ -1024,7 +1024,7 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
     const res = await fetch(url, { redirect: 'follow' });
     if (!res.ok) return null;
     return await res.text();
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'schema-suggester/fetchPublishedHtml: programming error'); return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise<string | null> {
@@ -1037,7 +1037,7 @@ async function getSiteSubdomain(siteId: string, tokenOverride?: string): Promise
     if (!res.ok) return null;
     const data = await res.json() as { shortName?: string };
     return data.shortName || null;
-  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'schema-suggester/getSiteSubdomain: programming error'); return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 // Detect existing JSON-LD schemas in HTML

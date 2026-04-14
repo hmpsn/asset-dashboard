@@ -170,7 +170,7 @@ export async function getAllSitePages(ws: { id: string; webflowSiteId?: string; 
               const title = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
               pageMap.set(key, `${pagePath} — "${title}"`);
             }
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* skip malformed URL */ }
+          } catch (err) { /* skip malformed URL */ }
         }
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-requests: programming error'); /* sitemap unavailable */ }

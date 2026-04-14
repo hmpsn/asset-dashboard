@@ -17,7 +17,6 @@ import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
 import { STUDIO_BOT_UA } from './constants.js';
-import { isProgrammingError } from './errors.js';
 
 const log = createLogger('internal-links');
 
@@ -52,7 +51,7 @@ async function fetchSitemapUrls(baseUrl: string): Promise<Array<{ url: string; p
           ? lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
           : 'Home';
         urls.push({ url: loc, path, title });
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'internal-links/fetchSitemapUrls: programming error'); /* skip malformed URLs */ }
+      } catch (err) { /* skip malformed URLs */ }
     }
 
     log.info(`Sitemap: found ${urls.length} URLs from ${sitemapUrl}`);
@@ -136,7 +135,7 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
         try {
           const parsed = new URL(href, url);
           internalLinks.push(parsed.pathname);
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'internal-links: programming error'); /* skip */ }
+        } catch (err) { /* skip malformed URL */ }
       }
     }
 
@@ -195,7 +194,7 @@ export async function analyzeInternalLinks(
       for (const cms of cmsUrls) {
         pageUrls.push({ url: cms.url, path: cms.path, title: cms.pageName });
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'internal-links: programming error'); /* skip */ }
+    } catch (err) { /* CMS discovery failed — skip */ }
   }
 
   // Cap at 100 pages to keep fetch + AI costs reasonable

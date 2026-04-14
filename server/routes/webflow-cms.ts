@@ -99,9 +99,9 @@ router.get('/api/webflow/cms-seo/:siteId', requireWorkspaceAccessFromQuery(), as
             }).filter(Boolean));
             break; // use first successful sitemap
           }
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: programming error'); /* try next base URL */ }
+        } catch (err) { /* try next base URL */ }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms: GET /api/webflow/cms-seo/:siteId: programming error'); /* sitemap fetch is best-effort */ }
+    } catch (err) { /* sitemap fetch is best-effort */ }
 
     const results: Array<{
       collectionId: string;
