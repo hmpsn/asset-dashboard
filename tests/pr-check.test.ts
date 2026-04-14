@@ -3418,6 +3418,131 @@ describe('Rule: useGlobalAdminEvents called with workspace-scoped event name', (
   });
 });
 
+// ── P3: addActivity type not in CLIENT_VISIBLE_TYPES ─────────────────────────
+describe('Rule: addActivity type not in CLIENT_VISIBLE_TYPES (public route)', () => {
+  const RULE = 'addActivity type not in CLIENT_VISIBLE_TYPES (public route)';
+
+  it('flags addActivity with a type not in CLIENT_VISIBLE_TYPES', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-portal.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/submit', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Client chat started');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag addActivity with a CLIENT_VISIBLE_TYPES type', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-content.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/request', async (req, res) => {",
+        "  addActivity(wsId, 'content_requested', 'Client requested content');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-public route files', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/workspaces.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/update', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Internal session');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // client-visibility-ok above-line hatch', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-analytics.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/chat', async (req, res) => {",
+        "  // client-visibility-ok — intentionally admin-only",
+        "  addActivity(wsId, 'chat_session', 'Client chat started');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // client-visibility-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-analytics.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/chat', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Client chat started'); // client-visibility-ok",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple non-visible types in same file', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-portal.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/onboard', async (req, res) => {",
+        "  addActivity(wsId, 'client_onboarding_submitted', 'Onboarding done');",
+        "  res.json({ ok: true });",
+        "});",
+        "router.post('/feedback', async (req, res) => {",
+        "  addActivity(wsId, 'client_keyword_feedback', 'Keyword feedback');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(2);
+  });
+
+  it('does not flag when file has no addActivity calls', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-auth.ts'),
+      lines(
+        "router.post('/login', async (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('handles mixed visible and non-visible types correctly', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-content.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/request', async (req, res) => {",
+        "  addActivity(wsId, 'content_requested', 'Content requested');",
+        "  res.json({ ok: true });",
+        "});",
+        "router.post('/signal', async (req, res) => {",
+        "  addActivity(wsId, 'client_signal', 'Signal detected');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    // Only client_signal should be flagged, not content_requested
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3457,6 +3582,8 @@ describe('Meta: customCheck rule name registry', () => {
     // P2 expansion rules
     'Admin route mutation without addActivity',
     'useGlobalAdminEvents called with workspace-scoped event name',
+    // P3 expansion rules
+    'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

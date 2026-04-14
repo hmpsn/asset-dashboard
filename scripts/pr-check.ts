@@ -767,6 +767,25 @@ function loadWsEventValues(): Set<string> {
   return wsValues;
 }
 
+/** Extracts the set of activity-type string literals from the
+ *  `CLIENT_VISIBLE_TYPES` set declaration in `server/activity-log.ts`.
+ *  Returns an empty set if the file or declaration cannot be parsed. */
+function loadClientVisibleTypes(): Set<string> {
+  const activityPath = path.join(ROOT, 'server', 'activity-log.ts');
+  const content = readFileOrEmpty(activityPath);
+  if (!content) return new Set();
+  // Match the `CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([...])` block
+  const block = content.match(/const\s+CLIENT_VISIBLE_TYPES[^=]*=\s*new\s+Set\(\[([\s\S]*?)\]\)/);
+  if (!block) return new Set();
+  const values = new Set<string>();
+  const valueRe = /['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = valueRe.exec(block[1])) !== null) {
+    values.add(m[1]);
+  }
+  return values;
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -3106,6 +3125,51 @@ export const CHECKS: Check[] = [
             // Match computed keys: [WS_EVENTS.SOMETHING] or [WS_EVENTS['SOMETHING']]
             if (/\[\s*WS_EVENTS[.\[]/.test(line)) {
               hits.push({ file, line: j + 1, text: lines[j].trim() });
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ── P3: Activity type not in CLIENT_VISIBLE_TYPES ──────────────────────────
+  {
+    name: 'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['client-visibility-ok'],
+    message:
+      'addActivity() uses a type that is not in CLIENT_VISIBLE_TYPES — clients will never see this entry. ' +
+      'Add the type to CLIENT_VISIBLE_TYPES in server/activity-log.ts if clients should see it, ' +
+      'or add `// client-visibility-ok` to suppress.',
+    severity: 'warn',
+    rationale:
+      'Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES ' +
+      'create invisible entries — the activity is recorded but never shown to client-portal users. ' +
+      'This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types.',
+    claudeMdRef:
+      'Activity Log: new types must be added to CLIENT_VISIBLE_TYPES if clients should see them',
+    customCheck(files) {
+      const clientVisible = loadClientVisibleTypes();
+      if (clientVisible.size === 0) return []; // parse failure — bail silently
+      const hits: { file: string; line: number; text: string }[] = [];
+      for (const file of files) {
+        // Only inspect public-* route files (matches fileGlobs, but
+        // customCheck receives whatever the runner passes — enforce here too).
+        if (!/public-[^/\\]*\.ts$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          // Match: addActivity(workspaceId, 'type_name', ...)  or  addActivity(wsId, "type_name", ...)
+          const callRe = /addActivity\s*\([^,]+,\s*['"]([^'"]+)['"]/g;
+          let cm: RegExpExecArray | null;
+          while ((cm = callRe.exec(lines[i])) !== null) {
+            const activityType = cm[1];
+            if (!clientVisible.has(activityType)) {
+              if (hasHatch(lines, i, 'client-visibility-ok')) continue;
+              hits.push({ file, line: i + 1, text: lines[i].trim() });
             }
           }
         }
