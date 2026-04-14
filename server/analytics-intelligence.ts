@@ -893,6 +893,7 @@ export async function refreshContentDecayInsights(workspaceId: string): Promise<
       );
       const { data: _enrichedData, ...enrichmentRest } = enrichment;
       upsertInsight({
+        ...enrichmentRest,
         workspaceId,
         pageId: page.page,
         insightType: 'content_decay',
@@ -904,7 +905,6 @@ export async function refreshContentDecayInsights(workspaceId: string): Promise<
           currentPeriod: 'current_30d',
         },
         severity,
-        ...enrichmentRest,
       });
     }
 
@@ -1195,8 +1195,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       // A page dropping from 20→17 clicks (-15%) isn't actionable even though it exceeds
       // the decay engine's 10% threshold. Require minimum baseline AND minimum absolute loss.
       const significantDecay = decayAnalysis.decayingPages.filter(p =>
-        p.previousClicks >= 20 && // meaningful baseline
-        Math.abs(p.previousClicks - p.currentClicks) >= 5 // lost at least 5 clicks
+        p.previousClicks >= MIN_DECAY_BASELINE_CLICKS &&
+        Math.abs(p.previousClicks - p.currentClicks) >= MIN_DECAY_ABSOLUTE_LOSS
       );
       for (const page of significantDecay) {
         const severity: InsightSeverity =

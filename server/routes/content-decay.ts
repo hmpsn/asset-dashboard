@@ -26,11 +26,11 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
 
     // Refresh content_decay insights so the insights page reflects fresh data
     // immediately instead of waiting for the 24-hour staleness window.
-    try {
-      await refreshContentDecayInsights(ws.id);
-    } catch (err) {
-      log.warn({ err, workspaceId: ws.id }, 'Failed to refresh content decay insights after analysis');
-    }
+    // Fire-and-forget: the response returns the decay analysis, not insights,
+    // so we don't block the response on buildEnrichmentContext() latency.
+    refreshContentDecayInsights(ws.id)
+      .then(() => broadcastToWorkspace(ws.id, WS_EVENTS.INSIGHT_BRIDGE_UPDATED, { bridge: 'content_decay_refresh' }))
+      .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh content decay insights after analysis'));
 
     // Bridge #2: Create suggested briefs for top decaying pages
     fireBridge('bridge-decay-suggested-brief', ws.id, () => {
