@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { upsertAnomalyDigestInsight } from '../../server/analytics-insights-store.js';
+import { upsertAnomalyDigestInsight, upsertInsight } from '../../server/analytics-insights-store.js';
 import { getReportForInsight } from '../../server/diagnostic-store.js';
 
 const ctx = createTestContext(13320);
@@ -21,6 +21,7 @@ const { api, postJson } = ctx;
 
 let testWsId = '';
 let anomalyInsightId = '';
+let nonAnomalyInsightId = '';
 
 async function setFlag(enabled: boolean | null) {
   await api('/api/admin/feature-flags/deep-diagnostics', {
@@ -55,6 +56,17 @@ beforeAll(async () => {
     impactScore: 85,
   });
   anomalyInsightId = insight.id;
+
+  // Create a non-anomaly insight (ranking_opportunity) to test type validation
+  const nonAnomaly = upsertInsight({
+    workspaceId: testWsId,
+    pageId: '/blog/test',
+    insightType: 'ranking_opportunity',
+    data: { query: 'test query', currentPosition: 8, impressions: 500, estimatedTrafficGain: 100, pageUrl: '/blog/test' },
+    severity: 'opportunity',
+    domain: 'search',
+  });
+  nonAnomalyInsightId = nonAnomaly.id;
 }, 25_000);
 
 afterAll(async () => {
@@ -98,6 +110,17 @@ describe('deep-diagnostic job — validation', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Anomaly insight not found');
+  });
+
+  it('POST /api/jobs with deep-diagnostic and non-anomaly insightId returns 400', async () => {
+    await setFlag(true);
+    const res = await postJson('/api/jobs', {
+      type: 'deep-diagnostic',
+      params: { workspaceId: testWsId, insightId: nonAnomalyInsightId },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Insight must be of type anomaly_digest');
   });
 });
 

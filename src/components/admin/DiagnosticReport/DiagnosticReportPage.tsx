@@ -83,7 +83,37 @@ function DiagnosticReportDetail({ workspaceId, reportId }: { workspaceId: string
   if (isLoading) return <SectionCard><ReportSkeleton /></SectionCard>;
   if (isError || !data?.report) return <SectionCard><EmptyState title="Report not found" description="This diagnostic report could not be loaded." icon={Activity} /></SectionCard>;
 
-  return <ReportDetail report={data.report} />;
+  const report = data.report;
+
+  // Guard: only render the full detail view for completed reports.
+  // For running/pending reports, diagnosticContext is {} (the DB default), so
+  // ctx.periodComparison / ctx.internalLinks / ctx.backlinks are all undefined.
+  // Accessing .changePercent on undefined would throw a TypeError.
+  if (report.status === 'running' || report.status === 'pending') {
+    return (
+      <SectionCard>
+        <EmptyState
+          title="Diagnostic in progress"
+          description="Gathering data and analyzing root causes. This usually takes 30–60 seconds. The page will update automatically when complete."
+          icon={Activity}
+        />
+      </SectionCard>
+    );
+  }
+
+  if (report.status === 'failed') {
+    return (
+      <SectionCard>
+        <EmptyState
+          title="Diagnostic failed"
+          description={report.errorMessage ?? 'The diagnostic could not complete. Try running a new one from the insight feed.'}
+          icon={Activity}
+        />
+      </SectionCard>
+    );
+  }
+
+  return <ReportDetail report={report} />;
 }
 
 function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {

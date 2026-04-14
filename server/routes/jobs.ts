@@ -893,6 +893,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
 
         const anomalyInsight = getInsights(workspaceId).find((i: AnalyticsInsight) => i.id === insightId);
         if (!anomalyInsight) return res.status(404).json({ error: 'Anomaly insight not found' });
+        if (anomalyInsight.insightType !== 'anomaly_digest') return res.status(400).json({ error: 'Insight must be of type anomaly_digest' });
 
         const anomalyData = anomalyInsight.data as unknown as AnomalyDigestData;
         // Use anomalyData.affectedPage — anomalyInsight.pageId is the synthetic dedup key, not a real path

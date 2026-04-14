@@ -581,6 +581,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               durationDays,
               firstDetected,
               severity: a.severity,
+              // NOTE: affectedPage is intentionally omitted here. All current anomaly types
+              // (traffic_drop, impressions_drop, ctr_drop, position_decline, etc.) are
+              // site-wide aggregates from GSC/GA4 — no per-page breakdown is available at
+              // detection time without an additional API call with dimensions: ['page'].
+              // When affectedPage is undefined, the diagnostic orchestrator skips page-specific
+              // probes (position history, canonical, internal links) and runs site-wide probes
+              // only. To enable page-level diagnostics, detect the most-affected page here and
+              // set: affectedPage: path to the page with the biggest absolute metric drop.
             };
 
             const impactScore = computeImpactScore(insightSeverity, digestData as unknown as Record<string, unknown>);
