@@ -108,7 +108,7 @@ router.put('/api/brandscripts/:workspaceId/:id/sections', requireWorkspaceAccess
     const current = getBrandscript(req.params.workspaceId, req.params.id);
     if (!current) return res.status(404).json({ error: 'Not found' });
     if (current.updatedAt > expectedUpdatedAt) {
-      return res.status(409).json({ error: 'This brandscript was updated by another session. Reload to see changes, or save to overwrite.' });
+      return res.status(409).json({ error: 'This brandscript was updated by another session. Reload to see the latest changes.' });
     }
   }
 

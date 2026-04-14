@@ -228,7 +228,7 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
       toast('Section saved');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        toast('This brandscript was updated by another session. Reload to see changes, or save to overwrite.', 'error');
+        toast('This brandscript was updated by another session. Reload to see the latest changes.', 'error');
       } else {
         toast('Failed to save section', 'error');
       }
