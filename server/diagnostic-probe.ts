@@ -76,6 +76,10 @@ function normalizeUrl(url: string): string {
  * Crawl a set of pages and count how many contain <a href> links to the target URL.
  * Returns the count, the linking pages, and the deficit vs site median.
  *
+ * `siteMedian` is the median number of crawled pages that link to any given page
+ * within the crawl set — computed from a reverse-link map so it is directly
+ * comparable to `count` (both measure "inbound linking pages", not "outbound links").
+ *
  * @param targetPath - The path of the page we're investigating (e.g., "/blog/copilot-article")
  * @param pagesToCrawl - Full URLs of pages to check for links (top pages by traffic)
  * @param liveDomain - The live domain (e.g., "https://www.faros.ai")
@@ -87,7 +91,9 @@ export async function countInternalLinks(
 ): Promise<InternalLinksResult> {
   const pages = pagesToCrawl.slice(0, MAX_PAGES_TO_CRAWL);
   const linkingPages: string[] = [];
-  const allLinkCounts: number[] = [];
+  // Reverse link map: for each internal-link target found, how many crawled pages link to it.
+  // Used to compute a siteMedian that is comparable to `count` (both are inbound-page counts).
+  const inboundLinksMap = new Map<string, number>();
 
   await Promise.allSettled(
     pages.map(async (pageUrl) => {
@@ -99,8 +105,13 @@ export async function countInternalLinks(
           headers: { 'User-Agent': 'hmpsn-diagnostic-probe/1.0' },
         });
         const html = await res.text();
-        const { linksToTarget, totalInternalLinks } = countLinksInPage(html, targetPath, liveDomain);
-        allLinkCounts.push(totalInternalLinks);
+        const { linksToTarget, uniqueInternalTargets } = countLinksInPage(html, targetPath, liveDomain);
+
+        // Each unique target this page links to gets +1 in the reverse map
+        for (const target of uniqueInternalTargets) {
+          inboundLinksMap.set(target, (inboundLinksMap.get(target) ?? 0) + 1);
+        }
+
         if (linksToTarget > 0) {
           linkingPages.push(pageUrl);
         }
@@ -111,7 +122,8 @@ export async function countInternalLinks(
   );
 
   const count = linkingPages.length;
-  const siteMedian = computeMedian(allLinkCounts);
+  // Median inbound-linking-page count across all discovered targets — same unit as `count`
+  const siteMedian = computeMedian([...inboundLinksMap.values()]);
   const deficit = Math.max(0, siteMedian - count);
 
   log.info({ targetPath, count, siteMedian, deficit, crawled: pages.length }, 'Internal link count complete');
@@ -123,27 +135,28 @@ function countLinksInPage(
   html: string,
   targetPath: string,
   liveDomain: string,
-): { linksToTarget: number; totalInternalLinks: number } {
+): { linksToTarget: number; uniqueInternalTargets: Set<string> } {
   // Match all <a href="..."> tags
   const hrefRegex = /<a[^>]*href=["']([^"'#]+)["'][^>]*>/gi;
   let match: RegExpExecArray | null;
   let linksToTarget = 0;
-  let totalInternalLinks = 0;
+  const uniqueInternalTargets = new Set<string>();
   const normalizedTarget = targetPath.replace(/\/$/, '');
 
   while ((match = hrefRegex.exec(html)) !== null) {
     const href = match[1];
     // Check if internal link (relative path or same domain)
     if (href.startsWith('/') || href.startsWith(liveDomain)) {
-      totalInternalLinks++;
       const path = href.startsWith('/') ? href : new URL(href).pathname;
-      if (path.replace(/\/$/, '') === normalizedTarget) {
+      const normalizedPath = path.replace(/\/$/, '');
+      uniqueInternalTargets.add(normalizedPath);
+      if (normalizedPath === normalizedTarget) {
         linksToTarget++;
       }
     }
   }
 
-  return { linksToTarget, totalInternalLinks };
+  return { linksToTarget, uniqueInternalTargets };
 }
 
 function computeMedian(values: number[]): number {

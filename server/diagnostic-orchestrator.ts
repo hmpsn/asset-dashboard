@@ -105,7 +105,9 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
 
     const anomalyData = anomalyInsight.data as unknown as AnomalyDigestData;
     const anomalyType = anomalyData.anomalyType;
-    const affectedPagePath = anomalyInsight.pageId;
+    // NOTE: anomalyInsight.pageId is a synthetic dedup key (e.g. "anomaly:traffic_drop:clicks"),
+    // not a real page path. Use anomalyData.affectedPage for the actual URL path.
+    const affectedPagePath = anomalyData.affectedPage ?? null;
 
     // 2. Resolve credentials
     const creds = resolveCredentials(workspaceId);

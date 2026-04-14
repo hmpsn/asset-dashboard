@@ -895,7 +895,8 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
         if (!anomalyInsight) return res.status(404).json({ error: 'Anomaly insight not found' });
 
         const anomalyData = anomalyInsight.data as unknown as AnomalyDigestData;
-        const affectedPages = anomalyInsight.pageId ? [anomalyInsight.pageId] : [];
+        // Use anomalyData.affectedPage — anomalyInsight.pageId is the synthetic dedup key, not a real path
+        const affectedPages = anomalyData.affectedPage ? [anomalyData.affectedPage] : [];
 
         const report = createDiagnosticReport(workspaceId, insightId, anomalyData.anomalyType, affectedPages);
         const job = createJob('deep-diagnostic', { message: 'Starting deep diagnostic...', workspaceId });
