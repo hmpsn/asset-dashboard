@@ -2787,6 +2787,317 @@ describe('Rule: Duplicate globally-applied rate limiter in route file', () => {
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Port collision in integration tests
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Port collision in integration tests', () => {
+  const RULE = 'Port collision in integration tests';
+  // Helper to build createTestContext() calls in fixture strings without
+  // tripping the meta-port-uniqueness test, which scans every .test.ts
+  // file for the literal regex /createTestContext\s*\(\s*(\d+)/.
+  const ctc = (port: number) => `createTestContext(${port})`;
+
+  it('flags duplicate port numbers across test files', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/feature-a.test.ts'),
+      lines(
+        "import { createTestContext } from '../helpers';",
+        `const ctx = ${ctc(19999)};`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/feature-b.test.ts'),
+      lines(
+        "import { createTestContext } from '../helpers';",
+        `const ctx = ${ctc(19999)};`,
+      )
+    );
+    const hits = runRule(RULE, [file1, file2]);
+    expect(hits).toHaveLength(2); // both files flagged
+    expect(hits[0].file).toBe(file1);
+    expect(hits[1].file).toBe(file2);
+  });
+
+  it('respects inline // port-ok hatch', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/shared-a.test.ts'),
+      lines(
+        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-b`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/shared-b.test.ts'),
+      lines(
+        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-a`,
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('respects // port-ok hatch on line above', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/above-a.test.ts'),
+      lines(
+        "// port-ok — intentionally shared",
+        `const ctx = ${ctc(19997)};`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/above-b.test.ts'),
+      lines(
+        "// port-ok",
+        `const ctx = ${ctc(19997)};`,
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('does not flag unique in-range port numbers', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/unique-a.test.ts'),
+      lines(
+        `const ctx = ${ctc(13201)};`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/unique-b.test.ts'),
+      lines(
+        `const ctx = ${ctc(13202)};`,
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('flags a single port outside the documented 13201–13319 range', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/integration/out-of-range.test.ts'),
+      lines(
+        `const ctx = ${ctc(50000)};`,
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('does not flag files without createTestContext', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/unit/utils.test.ts'),
+      lines(
+        "import { describe, it, expect } from 'vitest';",
+        "describe('utils', () => { it('works', () => expect(1).toBe(1)); });",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Inline React Query string key (use queryKeys.*)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Inline React Query string key (use queryKeys.*)', () => {
+  const RULE = 'Inline React Query string key (use queryKeys.*)';
+
+  it('flags queryKey with inline string array', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useItems.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "export function useItems() {",
+        "  return useQuery({",
+        "    queryKey: ['items', workspaceId],",         // 4 — flagged
+        "    queryFn: () => api.getItems(workspaceId),",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('does not flag queryKey using queryKeys.* factory', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/usePages.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "import { queryKeys } from '../lib/queryKeys';",
+        "export function usePages(wsId: string) {",
+        "  return useQuery({",
+        "    queryKey: queryKeys.pages.list(wsId),",
+        "    queryFn: () => api.getPages(wsId),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag queryKey with spread queryKeys.* pattern', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useFiltered.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "import { queryKeys } from '../lib/queryKeys';",
+        "export function useFiltered(wsId: string, filter: string) {",
+        "  return useQuery({",
+        "    queryKey: [...queryKeys.pages.list(wsId), filter],",
+        "    queryFn: () => api.getFiltered(wsId, filter),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // querykey-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useSpecial.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "export function useSpecial() {",
+        "  return useQuery({",
+        "    queryKey: ['special-one-off'], // querykey-ok — intentional one-off",
+        "    queryFn: () => api.getSpecial(),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside src/', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'server/routes/items.ts'),
+      lines(
+        "const config = { queryKey: ['server-side'] };",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag the queryKeys definition file', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/lib/queryKeys.ts'),
+      lines(
+        "export const queryKeys = {",
+        "  pages: { list: (wsId: string) => ({ queryKey: ['pages', wsId] }) },",
+        "};",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag test files', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useItems.test.ts'),
+      lines(
+        "const wrapper = renderHook(() => useQuery({ queryKey: ['test'] }));",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Missing broadcastToWorkspace after DB write in route handler
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Missing broadcastToWorkspace after DB write in route handler', () => {
+  const RULE = 'Missing broadcastToWorkspace after DB write in route handler';
+
+  it('flags route handler with db.prepare().run but no broadcast', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/items.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/items', (req, res) => {",              // 2 — flagged
+        "  db.prepare('INSERT INTO items (name) VALUES (?)').run(req.body.name);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag route handler that calls broadcastToWorkspace', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/pages.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/pages', (req, res) => {",
+        "  db.prepare('INSERT INTO pages (title) VALUES (?)').run(req.body.title);",
+        "  broadcastToWorkspace(req.workspaceId, 'pages:updated');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag route handler that calls broadcast()', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/settings.ts'),
+      lines(
+        "const router = Router();",
+        "router.put('/api/settings', (req, res) => {",
+        "  db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(req.body.value, req.body.key);",
+        "  broadcast(req.workspaceId, 'settings:changed');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // broadcast-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/analytics.ts'),
+      lines(
+        "const router = Router();",
+        "// broadcast-ok — analytics writes don't need real-time updates",
+        "router.post('/api/analytics/track', (req, res) => {",
+        "  db.prepare('INSERT INTO events (type) VALUES (?)').run(req.body.type);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag GET routes (read-only)', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/readonly.ts'),
+      lines(
+        "const router = Router();",
+        "router.get('/api/items', (req, res) => {",
+        "  const items = db.prepare('SELECT * FROM items').all();",
+        "  res.json(items);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag route without db.prepare', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/proxy.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/proxy', (req, res) => {",
+        "  const result = await externalApi.send(req.body);",
+        "  res.json(result);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -2819,6 +3130,10 @@ describe('Meta: customCheck rule name registry', () => {
     // P0 expansion rules
     'requireAuth usage outside allowed route files',
     'Duplicate globally-applied rate limiter in route file',
+    // P1 expansion rules
+    'Port collision in integration tests',
+    'Inline React Query string key (use queryKeys.*)',
+    'Missing broadcastToWorkspace after DB write in route handler',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
