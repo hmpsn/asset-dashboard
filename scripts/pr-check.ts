@@ -204,6 +204,12 @@ const PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD = 250;
  *  balancer never reaches zero (e.g. malformed input). */
 const USE_EFFECT_BODY_LOOKAHEAD = 60;
 
+/** Max lines to scan after a `router.post/put/patch/delete` looking for a
+ *  `broadcastToWorkspace(` or `broadcast(` call (missing-broadcast rule).
+ *  Bounded to the next route declaration so handler bodies don't bleed.
+ *  250 lines matches the existing PUBLIC_PORTAL_ROUTE_BODY_LOOKAHEAD. */
+const ROUTE_BROADCAST_LOOKAHEAD = 250;
+
 // ─── Check definitions ────────────────────────────────────────────────────────
 
 export type CustomCheckMatch = { file: string; line: number; text: string };
@@ -2664,6 +2670,184 @@ export const CHECKS: Check[] = [
             hits.push({ file, line: i + 1, text: line.trim() });
             break; // one hit per limiter per line
           }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P1 expansion rule: port collision in integration tests.
+    //
+    // Every integration test file allocates a unique port via
+    // `createTestContext(NNNN)`. If two files share a port, the second test
+    // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
+    // all port allocations across every `*.test.ts` file and flags any
+    // duplicate. It also flags ports outside the documented range
+    // (13201–13319 per CLAUDE.md).
+    name: 'Port collision in integration tests',
+    pattern: '',
+    fileGlobs: ['*.test.ts'],
+    pathFilter: 'tests/',
+    excludeLines: ['// port-ok'],
+    message:
+      'Two or more test files use the same port in createTestContext(). ' +
+      'Each integration test must use a unique port to avoid EADDRINUSE in parallel CI runs. ' +
+      'Pick an unused port in the 13201–13319 range (grep existing ports first). ' +
+      'Suppress with // port-ok if this is intentionally shared.',
+    severity: 'error',
+    rationale:
+      'Duplicate test ports cause flaky CI: the second test file to bind gets EADDRINUSE, ' +
+      'producing intermittent failures that are hard to diagnose.',
+    claudeMdRef: '#testing-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Collect all port → [{ file, line }] mappings
+      const portMap = new Map<number, { file: string; line: number; text: string }[]>();
+      const portRe = /\bcreateTestContext\(\s*(\d+)\s*\)/;
+      for (const file of files) {
+        if (!file.endsWith('.test.ts')) continue;
+        // Skip the pr-check test harness — its fixture strings contain
+        // createTestContext() literals that aren't real port allocations.
+        if (file.endsWith('pr-check.test.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const m = portRe.exec(lines[i]);
+          if (!m) continue;
+          if (hasHatch(lines, i, '// port-ok')) continue;
+          const port = parseInt(m[1], 10);
+          if (!portMap.has(port)) portMap.set(port, []);
+          portMap.get(port)!.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      // Flag every occurrence of a port used more than once
+      for (const [, usages] of portMap) {
+        if (usages.length > 1) {
+          for (const u of usages) hits.push(u);
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P1 expansion rule: inline React Query string keys.
+    //
+    // All query keys must go through `queryKeys.*` from `src/lib/queryKeys.ts`.
+    // Inline array literals (`queryKey: ['some-key', ...]`) bypass the
+    // centralized factory, causing cache drift: invalidating via `queryKeys.X()`
+    // won't clear a cache entry created with a bare string literal.
+    //
+    // The rule scans `useQuery(`, `useInfiniteQuery(`, and
+    // `queryClient.invalidateQueries(` / `queryClient.setQueryData(` /
+    // `queryClient.getQueryData(` calls. It flags `queryKey: [` patterns
+    // where the array literal doesn't start with `queryKeys.`.
+    //
+    // Test files and the queryKeys definition file itself are excluded.
+    name: 'Inline React Query string key (use queryKeys.*)',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// querykey-ok'],
+    message:
+      'Query keys must use the centralized queryKeys.* factory from src/lib/queryKeys.ts. ' +
+      'Inline string arrays cause cache drift — invalidation via queryKeys.X() won\'t clear ' +
+      'entries created with bare literals. Replace with the appropriate queryKeys.* call. ' +
+      'Suppress with // querykey-ok if this is a one-off key that intentionally bypasses the factory.',
+    severity: 'error',
+    rationale:
+      'Inline query key literals drift from the centralized factory, causing stale-cache bugs ' +
+      'where invalidateQueries misses entries because the key arrays don\'t match.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/src/')) continue;
+        // Skip the queryKeys definition file itself
+        if (file.endsWith('lib/queryKeys.ts')) continue;
+        // Skip test files
+        if (file.includes('.test.')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Quick bail: if neither queryKey nor invalidateQueries appears, skip
+        if (!content.includes('queryKey') && !content.includes('invalidateQueries') &&
+            !content.includes('setQueryData') && !content.includes('getQueryData')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Match queryKey: ['...  (inline array with string literal)
+          if (!/queryKey:\s*\[/.test(line)) continue;
+          // Skip if it uses queryKeys.* (the correct pattern)
+          if (/queryKey:\s*queryKeys\./.test(line)) continue;
+          // Skip if it spreads queryKeys.* into the array (e.g. [...queryKeys.admin.X(), extra])
+          if (/queryKey:\s*\[\s*\.\.\.queryKeys\./.test(line)) continue;
+          // Skip comments
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          // Skip JSDoc examples
+          if (/^\s*\*/.test(line)) continue;
+          if (hasHatch(lines, i, '// querykey-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P1 expansion rule: missing broadcastToWorkspace after DB write in route files.
+    //
+    // Route handlers that perform DB writes (INSERT/UPDATE/DELETE via
+    // `db.prepare(...).run(`) should broadcast to connected clients so the
+    // real-time UI stays in sync. This rule scans `server/routes/*.ts` files,
+    // finds `router.post/put/patch/delete` handler bodies, checks for
+    // `db.prepare` calls, and flags if no `broadcastToWorkspace(` or
+    // `broadcast(` call follows within the same handler body.
+    //
+    // Public routes, health checks, and internal-only endpoints can suppress
+    // with `// broadcast-ok`.
+    name: 'Missing broadcastToWorkspace after DB write in route handler',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// broadcast-ok'],
+    message:
+      'This route handler writes to the DB (db.prepare().run) but never calls ' +
+      'broadcastToWorkspace() or broadcast(). Connected clients won\'t see the change ' +
+      'until they manually refresh. Add a broadcast call, or suppress with // broadcast-ok ' +
+      'if this endpoint intentionally doesn\'t need real-time updates (e.g. analytics, logging).',
+    severity: 'warn',
+    rationale:
+      'Route handlers that write to the DB without broadcasting leave connected clients ' +
+      'with stale data until they manually refresh.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        // Find all route handler start lines
+        const routeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) routeIdx.push(i);
+        }
+        for (let k = 0; k < routeIdx.length; k++) {
+          const start = routeIdx[k];
+          if (hasHatch(lines, start, '// broadcast-ok')) continue;
+          // Route body extends to the next route declaration or end of file
+          const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+          const routeBodyEnd = Math.min(nextStart, start + ROUTE_BROADCAST_LOOKAHEAD);
+          const routeBody = lines.slice(start, routeBodyEnd).join('\n');
+          // Must have a DB write
+          if (!/\bdb\.prepare\b/.test(routeBody)) continue;
+          if (!/\.run\s*\(/.test(routeBody)) continue;
+          // Check for broadcast call
+          if (/\bbroadcastToWorkspace\s*\(/.test(routeBody)) continue;
+          if (/\bbroadcast\s*\(/.test(routeBody)) continue;
+          hits.push({ file, line: start + 1, text: lines[start].trim() });
         }
       }
       return hits;
