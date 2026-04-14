@@ -3464,7 +3464,7 @@ describe('Rule: addActivity type not in CLIENT_VISIBLE_TYPES (public route)', ()
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('respects // client-visibility-ok hatch', () => {
+  it('respects // client-visibility-ok above-line hatch', () => {
     const file = write(
       uniqPath('rule-client-vis', 'server/routes/public-analytics.ts'),
       lines(
@@ -3472,6 +3472,20 @@ describe('Rule: addActivity type not in CLIENT_VISIBLE_TYPES (public route)', ()
         "router.post('/chat', async (req, res) => {",
         "  // client-visibility-ok — intentionally admin-only",
         "  addActivity(wsId, 'chat_session', 'Client chat started');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // client-visibility-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-analytics.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/chat', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Client chat started'); // client-visibility-ok",
         "  res.json({ ok: true });",
         "});",
       )

@@ -82,7 +82,7 @@ advisory but tracked.
 | 25 | TabBar component without ?tab= deep-link support | warn | custom | `src/components/` | `tab-deeplink-ok` | A ?tab= URL that the target component ignores is a silent navigation bug — the user sees the default tab instead of the requested one. |
 | 26 | Missing broadcastToWorkspace after DB write in route handler | warn | custom | `server/routes/` | `// broadcast-ok` | Route handlers that write to the DB without broadcasting leave connected clients with stale data until they manually refresh. |
 | 27 | Admin route mutation without addActivity | warn | custom | `server/routes/*.ts (excluding public-* and infrastructure routes)` | `// activity-ok` | Significant admin operations that skip addActivity() leave gaps in the workspace activity feed, making it impossible for team members to audit what changed and when. |
-| 28 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | — | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
+| 28 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
 
 ---
 

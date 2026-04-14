@@ -3136,8 +3136,9 @@ export const CHECKS: Check[] = [
   // ── P3: Activity type not in CLIENT_VISIBLE_TYPES ──────────────────────────
   {
     name: 'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
-    fileGlobs: ['public-*.ts'],
+    fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/',
+    excludeLines: ['client-visibility-ok'],
     message:
       'addActivity() uses a type that is not in CLIENT_VISIBLE_TYPES — clients will never see this entry. ' +
       'Add the type to CLIENT_VISIBLE_TYPES in server/activity-log.ts if clients should see it, ' +
