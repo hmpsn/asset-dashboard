@@ -259,6 +259,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/route-removal-checklist.md` | Seven update sites when removing or renaming a `Page` value |
 | `docs/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
 | `docs/rules/ai-dispatch-patterns.md` | AI-call-before-DB-write race, transaction guards, retry-on-unique patterns |
+| `docs/rules/development-patterns.md` | Operational patterns — React Query hooks, WebSocket wiring checklist, route templates, DB query patterns, auth decision tree, feature flag lifecycle, testing quick reference |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 
 ---
