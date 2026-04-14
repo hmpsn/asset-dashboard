@@ -32,6 +32,8 @@ import {
   submitContentRequestSchema,
   declineContentRequestSchema,
   requestChangesSchema,
+  approveContentRequestSchema,
+  upgradeContentRequestSchema,
   addCommentSchema,
   fromAuditSchema,
   addTrackedKeywordSchema,
@@ -184,7 +186,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', validate(dec
 });
 
 // Client approves a brief
-router.post('/api/public/content-request/:workspaceId/:id/approve', (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/approve', validate(approveContentRequestSchema), (req, res, next) => {
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
@@ -223,7 +225,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
 });
 
 // Client upgrades from brief_only to full_post
-router.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) => {
+router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res) => {
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
     serviceType: 'full_post',
     upgradedAt: new Date().toISOString(),
@@ -368,17 +370,6 @@ router.post('/api/public/content-request/:workspaceId/from-audit', validate(from
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'high', rationale });
 
   res.json({ ...request, topKeywords });
-});
-
-// --- Public Content Performance (show GSC/GA4 data for published items in client dashboard) ---
-router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
-  try {
-    const data = await handleContentPerformance(req.params.workspaceId);
-    res.json(data);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(err instanceof Error && msg === 'Workspace not found' ? 404 : 500).json({ error: msg });
-  }
 });
 
 // --- Public Tracked Keywords (client can view/add/remove) ---

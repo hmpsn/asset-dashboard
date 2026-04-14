@@ -60,6 +60,12 @@ export const fromAuditSchema = z.object({
   wordCount: z.number().optional(),
 });
 
+// POST /api/public/content-request/:workspaceId/:id/approve
+export const approveContentRequestSchema = z.object({});
+
+// POST /api/public/content-request/:workspaceId/:id/upgrade
+export const upgradeContentRequestSchema = z.object({});
+
 // POST /api/public/tracked-keywords/:workspaceId
 export const addTrackedKeywordSchema = z.object({
   keyword: z.string().min(2, 'Keyword must be at least 2 characters').max(120),
