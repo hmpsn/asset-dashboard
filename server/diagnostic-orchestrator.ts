@@ -28,6 +28,8 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
 import { updateJob } from './jobs.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
+import { rootCauseSchema, remediationActionSchema } from './schemas/diagnostics-schemas.js';
 import type {
   DiagnosticContext,
   DiagnosticRequest,
@@ -148,14 +150,19 @@ export async function runDiagnostic(request: DiagnosticRequest, jobId: string): 
     // 7. Update job, broadcast, log activity
     updateJob(jobId, { status: 'done', message: 'Diagnostic complete', result: { reportId } });
     broadcastToWorkspace(workspaceId, WS_EVENTS.DIAGNOSTIC_COMPLETE, { reportId, insightId });
-    addActivity(workspaceId, 'diagnostic_completed', `Deep diagnostic completed`,
-      `Found ${synthesis.rootCauses.length} root cause(s), ${synthesis.remediationActions.length} remediation action(s)`);
+    try {
+      addActivity(workspaceId, 'diagnostic_completed', `Deep diagnostic completed`,
+        `Found ${synthesis.rootCauses.length} root cause(s), ${synthesis.remediationActions.length} remediation action(s)`);
+    } catch (actErr) {
+      log.warn({ err: actErr }, 'Failed to log diagnostic completion activity — non-fatal');
+    }
 
     log.info({ workspaceId, reportId, rootCauses: synthesis.rootCauses.length }, 'Diagnostic completed');
   } catch (err) {
     log.error({ err, workspaceId, reportId }, 'Diagnostic orchestrator failed');
     markDiagnosticFailed(reportId, (err as Error).message);
     updateJob(jobId, { status: 'error', message: `Diagnostic failed: ${(err as Error).message}` });
+    broadcastToWorkspace(workspaceId, WS_EVENTS.DIAGNOSTIC_FAILED, { reportId, insightId });
   }
 }
 
@@ -313,10 +320,9 @@ async function gatherDiagnosticContext(
       finalUrl === '/error' ||
       finalUrl.startsWith('/404') ||
       finalUrl.startsWith('/not-found') ||
-      finalUrl.includes('/404.') ||                          // /404.html
+      finalUrl.includes('/404.');                          // /404.html
       // Title-based heuristic is not available here (HTML not re-fetched),
       // but these path patterns cover the overwhelming majority of soft 404s.
-      false;
     return {
       chain: affectedChain.hops?.map((h) => ({ url: h.url, status: h.status, location: null })) ?? [],
       finalStatus: lastHop?.status ?? 200,
@@ -465,11 +471,15 @@ Rules for remediation:
   });
 
   try {
-    const parsed = JSON.parse(result.text) as SynthesisResult;
-    if (!Array.isArray(parsed.rootCauses) || !Array.isArray(parsed.remediationActions)) {
-      throw new Error('Invalid synthesis structure');
+    const parsed = JSON.parse(result.text) as { rootCauses?: unknown; remediationActions?: unknown; adminReport?: unknown; clientSummary?: unknown };
+    const rootCauses = parseJsonSafeArray(JSON.stringify(parsed.rootCauses ?? []), rootCauseSchema, { field: 'rootCauses', table: 'diagnostic:synthesis' });
+    const remediationActions = parseJsonSafeArray(JSON.stringify(parsed.remediationActions ?? []), remediationActionSchema, { field: 'remediationActions', table: 'diagnostic:synthesis' });
+    const adminReport = typeof parsed.adminReport === 'string' ? parsed.adminReport : '';
+    const clientSummary = typeof parsed.clientSummary === 'string' ? parsed.clientSummary : '';
+    if (rootCauses.length === 0 && remediationActions.length === 0 && !adminReport) {
+      throw new Error('AI synthesis returned empty result');
     }
-    return parsed;
+    return { rootCauses, remediationActions, adminReport, clientSummary };
   } catch (err) {
     log.error({ err, preview: result.text.slice(0, 200) }, 'Failed to parse AI synthesis');
     return {

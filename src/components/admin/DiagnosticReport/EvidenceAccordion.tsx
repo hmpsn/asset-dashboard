@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { SectionCard } from '../../ui/SectionCard.js';
 import type { DiagnosticContext } from '../../../../shared/types/diagnostics.js';
@@ -9,7 +10,7 @@ interface Props {
 
 interface AccordionSectionProps {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   defaultOpen?: boolean;
 }
 

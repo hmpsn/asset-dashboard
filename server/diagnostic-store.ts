@@ -141,3 +141,18 @@ export function completeDiagnosticReport(
   });
   return getDiagnosticReport(id);
 }
+
+export function deleteDiagnosticReportsByWorkspace(workspaceId: string): void {
+  stmts().deleteByWorkspace.run(workspaceId);
+}
+
+/**
+ * Startup recovery sweep — resets any diagnostic_reports left in 'running' or 'pending'
+ * status to 'failed' after a server restart. Call once from initJobs or websocket init.
+ * ws-scope-ok: intentionally global across all workspaces (startup recovery only)
+ */
+export function recoverStuckDiagnosticReports(): void {
+  db.prepare( // ws-scope-ok: intentional global sweep — startup recovery only, no auth context
+    `UPDATE diagnostic_reports SET status = 'failed', error_message = 'Server restarted — diagnostic interrupted' WHERE status IN ('running', 'pending')`
+  ).run();
+}

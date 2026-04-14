@@ -5,6 +5,7 @@ import { StatCard } from '../../ui/StatCard.js';
 import { Skeleton } from '../../ui/Skeleton.js';
 import { EmptyState } from '../../ui/EmptyState.js';
 import { PageHeader } from '../../ui/PageHeader.js';
+import { Badge } from '../../ui/Badge.js';
 import { RootCauseCard } from './RootCauseCard.js';
 import { RemediationPlan } from './RemediationPlan.js';
 import { EvidenceAccordion } from './EvidenceAccordion.js';
@@ -49,14 +50,16 @@ function ReportDetail({ report }: { report: DiagnosticReport }) {
       </div>
 
       {/* Root Causes */}
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-300 mb-3">Root Causes</h2>
-        <div className="space-y-2">
-          {report.rootCauses.map((cause) => (
-            <RootCauseCard key={cause.rank} cause={cause} />
-          ))}
+      {report.rootCauses.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-300 mb-3">Root Causes</h2>
+          <div className="space-y-2">
+            {report.rootCauses.map((cause) => (
+              <RootCauseCard key={cause.rank} cause={cause} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Remediation Plan */}
       {report.remediationActions.length > 0 && (
@@ -114,6 +117,14 @@ function DiagnosticReportDetail({ workspaceId, reportId }: { workspaceId: string
   return <ReportDetail report={report} />;
 }
 
+// Clean the page path to a readable title for display
+const pageLabel = (pages: string[], fallback: string): string => {
+  const p = pages[0];
+  if (!p) return fallback;
+  // Strip leading slash, replace hyphens/underscores with spaces, title-case
+  return p.replace(/^\//, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || fallback;
+};
+
 function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
   const { data, isLoading } = useDiagnosticsList(workspaceId);
 
@@ -140,12 +151,13 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
           <SectionCard>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-zinc-200">{r.affectedPages[0] ?? r.anomalyType}</h3>
+                <h3 className="text-sm font-medium text-zinc-200">{pageLabel(r.affectedPages, r.anomalyType)}</h3>
                 <p className="text-xs text-zinc-500">{r.anomalyType} - {new Date(r.createdAt).toLocaleDateString()}</p>
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded ${r.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : r.status === 'failed' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                {r.status}
-              </span>
+              <Badge
+                label={r.status}
+                color={r.status === 'completed' ? 'emerald' : r.status === 'failed' ? 'red' : 'amber'}
+              />
             </div>
           </SectionCard>
         </Link>

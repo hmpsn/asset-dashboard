@@ -94,6 +94,7 @@ export const WS_EVENTS = {
 
   // Deep Diagnostics
   DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
+  DIAGNOSTIC_FAILED: 'diagnostic:failed',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

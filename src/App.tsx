@@ -24,7 +24,7 @@ import { ScannerReveal } from './components/ui/ScannerReveal';
 import { FeatureFlag } from './components/ui/FeatureFlag';
 import { EmptyState } from './components/ui/EmptyState';
 import { TabBar } from './components/ui/TabBar';
-import { Clipboard, Globe, Sparkles } from 'lucide-react';
+import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -378,7 +378,20 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
     if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'diagnostics') return <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'diagnostics') return (
+      <FeatureFlag
+        flag="deep-diagnostics"
+        fallback={
+          <EmptyState
+            icon={Activity}
+            title="Deep Diagnostics is rolling out"
+            description="This feature is not yet available for your workspace. Check back soon."
+          />
+        }
+      >
+        <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />
+      </FeatureFlag>
+    );
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;

@@ -359,6 +359,15 @@ export async function getTopDroppedGscPage(
     }
   }
 
+  // Also check pages that appeared in prev but not in cur (dropped to zero entirely)
+  const curPageKeys = new Set(curData.rows.map(r => r.keys[0]));
+  for (const [page, prevClicks] of prevByPage) {
+    if (!curPageKeys.has(page) && prevClicks > maxDrop) {
+      maxDrop = prevClicks;
+      topPage = page;
+    }
+  }
+
   if (!topPage) return null;
 
   try {

@@ -50,6 +50,7 @@ export const WS_EVENTS = {
 
   // Deep Diagnostics
   DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
+  DIAGNOSTIC_FAILED: 'diagnostic:failed',
 
   // Copy Pipeline (Phase 3 — copy generation, review, export, intelligence)
   COPY_SECTION_UPDATED: 'copy:section_updated',

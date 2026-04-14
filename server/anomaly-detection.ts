@@ -551,11 +551,11 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // can run page-specific probes (position history, canonical, internal links).
         let gscAffectedPage: string | null = null;
         let ga4AffectedPage: string | null = null;
-        if (detected.some(a => a.source === 'gsc') && ws.gscPropertyUrl) {
-          gscAffectedPage = await getTopDroppedGscPage(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS).catch(() => null);
+        if (detected.some(a => a.source === 'gsc' && (a.type === 'traffic_drop' || a.type === 'traffic_spike')) && ws.gscPropertyUrl) {
+          gscAffectedPage = await getTopDroppedGscPage(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopDroppedGscPage failed'); return null; });
         }
         if (detected.some(a => a.source === 'ga4' && (a.type === 'traffic_drop' || a.type === 'traffic_spike')) && ws.ga4PropertyId) {
-          ga4AffectedPage = await getTopDroppedGA4Page(ws.ga4PropertyId, COMPARISON_DAYS).catch(() => null);
+          ga4AffectedPage = await getTopDroppedGA4Page(ws.ga4PropertyId, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopDroppedGA4Page failed'); return null; });
         }
 
         // ── Write anomaly digest insights (deduped via unique index) ──

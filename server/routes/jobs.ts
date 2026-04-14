@@ -888,6 +888,9 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
 
         if (!isFeatureEnabled('deep-diagnostics')) return res.status(403).json({ error: 'Deep diagnostics feature not enabled' });
 
+        const ws = getWorkspace(workspaceId);
+        if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
         const activeJob = hasActiveJob('deep-diagnostic', workspaceId);
         if (activeJob) return res.status(409).json({ error: 'A diagnostic is already running for this workspace', jobId: activeJob.id });
 

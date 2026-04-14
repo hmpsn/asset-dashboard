@@ -24,6 +24,10 @@ export function useDiagnosticReport(workspaceId: string, reportId: string) {
     queryFn: () => diagnostics.get(workspaceId, reportId),
     staleTime: 5 * 60 * 1000,
     enabled: !!workspaceId && !!reportId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.report?.status;
+      return (status === 'running' || status === 'pending') ? 5000 : false;
+    },
   });
 }
 
@@ -60,6 +64,10 @@ export function useDiagnosticEvents(workspaceId: string) {
       qc.invalidateQueries({ queryKey: ['admin-diagnostic-for-insight', workspaceId] });
       qc.invalidateQueries({ queryKey: ['admin-diagnostics', workspaceId] });
       qc.invalidateQueries({ queryKey: ['admin-insights', workspaceId] });
+    },
+    [WS_EVENTS.DIAGNOSTIC_FAILED]: () => {
+      qc.invalidateQueries({ queryKey: ['admin-diagnostic-for-insight', workspaceId] });
+      qc.invalidateQueries({ queryKey: ['admin-diagnostics', workspaceId] });
     },
   });
 }

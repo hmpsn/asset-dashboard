@@ -8,6 +8,7 @@ import { initStripeBroadcast } from './stripe.js';
 import { startWatcher } from './processor.js';
 import { verifyToken, type JwtPayload } from './auth.js';
 import { getUserById } from './users.js';
+import { recoverStuckDiagnosticReports } from './diagnostic-store.js';
 
 // --- WebSocket state ---
 const clients = new Set<WebSocket>();
@@ -142,6 +143,7 @@ export function initWebSocket(server: Server): WebSocketServer {
 
   // Initialise subsystems that depend on broadcast
   initJobs(_broadcast);
+  recoverStuckDiagnosticReports();
   initActivityBroadcast(_broadcastToWorkspace);
   initAnomalyBroadcast(_broadcastToWorkspace);
   initStripeBroadcast(_broadcastToWorkspace);

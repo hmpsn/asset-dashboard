@@ -867,6 +867,15 @@ export async function getTopDroppedGA4Page(
     }
   }
 
+  // Also check pages that appeared in prev but not in cur (dropped to zero entirely)
+  const curPages = new Set(curData.rows.map(r => r.dimensionValues[0].value));
+  for (const [page, prevUsers] of prevByPage) {
+    if (!curPages.has(page) && prevUsers > maxDrop) {
+      maxDrop = prevUsers;
+      topPage = page;
+    }
+  }
+
   if (!topPage) return null;
   // GA4 landingPage may be a full URL or a path — normalize to pathname, strip query string
   try {

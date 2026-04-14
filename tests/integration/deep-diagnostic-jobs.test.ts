@@ -16,7 +16,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertAnomalyDigestInsight, upsertInsight } from '../../server/analytics-insights-store.js';
 import { getReportForInsight } from '../../server/diagnostic-store.js';
 
-const ctx = createTestContext(13320);
+const ctx = createTestContext(13261);
 const { api, postJson } = ctx;
 
 let testWsId = '';
@@ -156,4 +156,21 @@ describe('deep-diagnostic job — success', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }, 10_000); // extend timeout to allow runDiagnostic to finish
+});
+
+describe('deep-diagnostic job — cross-workspace isolation', () => {
+  it('POST /api/jobs with insightId from workspace A using workspace B ID returns 404', async () => {
+    await setFlag(true);
+    // anomalyInsightId belongs to testWsId — sending it with a different workspaceId must 404
+    const secondWs = createWorkspace('Cross-Workspace Isolation Test');
+    try {
+      const res = await postJson('/api/jobs', {
+        type: 'deep-diagnostic',
+        params: { workspaceId: secondWs.id, insightId: anomalyInsightId },
+      });
+      expect(res.status).toBe(404);
+    } finally {
+      deleteWorkspace(secondWs.id);
+    }
+  });
 });
