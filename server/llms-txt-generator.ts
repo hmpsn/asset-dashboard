@@ -209,8 +209,7 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
           });
           clearTimeout(timeout);
           return res.ok ? url : null;
-        } catch (err) {
-          if (isProgrammingError(err)) log.warn({ err }, 'llms-txt-generator/validateUrls: programming error');
+        } catch { // catch-ok: fetch() on external URL — TypeError expected for DNS/TLS failures
           return null;
         }
       })
