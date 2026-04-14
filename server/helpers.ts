@@ -246,8 +246,16 @@ export async function buildSchemaContext(
         for (const p of gscResults.value) {
           try {
             const urlPath = new URL(p.page).pathname.replace(/\/$/, '') || '/';
-            gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
-          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers: programming error'); /* skip malformed URLs */ }
+            const existing = gscMap.get(urlPath);
+            if (existing) {
+              // Accumulate metrics for duplicate pathnames (www vs non-www, http vs https)
+              existing.clicks += p.clicks;
+              existing.impressions += p.impressions;
+              existing.position = (existing.position + p.position) / 2; // rough average
+            } else {
+              gscMap.set(urlPath, { clicks: p.clicks, impressions: p.impressions, position: p.position, ctr: p.ctr });
+            }
+          } catch { /* skip malformed URLs */ }
         }
       }
 
