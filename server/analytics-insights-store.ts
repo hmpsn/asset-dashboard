@@ -279,12 +279,15 @@ export function getUnresolvedInsights(workspaceId: string): AnalyticsInsight[] {
  */
 export function suppressInsights(workspaceId: string, ids: string[]): number {
   if (ids.length === 0) return 0;
-  let deleted = 0;
-  for (const id of ids) {
-    const info = stmts().deleteById.run(id, workspaceId);
-    deleted += info.changes;
-  }
-  return deleted;
+  const run = db.transaction(() => {
+    let deleted = 0;
+    for (const id of ids) {
+      const info = stmts().deleteById.run(id, workspaceId);
+      deleted += info.changes;
+    }
+    return deleted;
+  });
+  return run();
 }
 
 /**

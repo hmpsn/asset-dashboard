@@ -15,6 +15,7 @@ import type {
   InsightDataMap,
   PageHealthData,
   QuickWinData,
+  ContentDecayData,
   CannibalizationData,
   ConversionAttributionData,
   CompetitorGapData,
@@ -914,8 +915,15 @@ export function validateInsightBatch(workspaceId: string): number {
   const toSuppress = new Set<string>();
 
   // Build lookup: pageId → insights on that page
+  // Skip resolved and bridge-sourced insights — they are protected from background cleanup
+  // (mirrors the deleteStaleByType guard: resolution_status IS NULL AND bridge_source IS NULL).
   const byPage = new Map<string, AnalyticsInsight[]>();
+  const protectedIds = new Set<string>();
   for (const insight of allInsights) {
+    if (insight.resolutionStatus === 'resolved' || insight.resolutionStatus === 'in_progress' || insight.bridgeSource) {
+      protectedIds.add(insight.id);
+      continue;
+    }
     if (!insight.pageId) continue;
     const list = byPage.get(insight.pageId);
     if (list) list.push(insight);
@@ -947,28 +955,25 @@ export function validateInsightBatch(workspaceId: string): number {
 
   // ── Rule 3: Low-confidence suppression ─────────────────────────
   for (const insight of allInsights) {
-    if (toSuppress.has(insight.id)) continue;
-    const data = insight.data as Record<string, unknown>;
+    if (toSuppress.has(insight.id) || protectedIds.has(insight.id)) continue;
 
     if (insight.insightType === 'ranking_opportunity') {
-      const impressions = (data.impressions as number) ?? 0;
-      const gain = (data.estimatedTrafficGain as number) ?? 0;
-      if (impressions < MIN_RANKING_OPP_IMPRESSIONS || gain < MIN_RANKING_OPP_TRAFFIC_GAIN) {
+      const d = insight.data as unknown as QuickWinData;
+      if (d.impressions < MIN_RANKING_OPP_IMPRESSIONS || d.estimatedTrafficGain < MIN_RANKING_OPP_TRAFFIC_GAIN) {
         toSuppress.add(insight.id);
       }
     }
 
     if (insight.insightType === 'content_decay') {
-      const baseline = (data.baselineClicks as number) ?? 0;
-      const current = (data.currentClicks as number) ?? 0;
-      if (Math.abs(baseline - current) < MIN_DECAY_CLICK_LOSS) {
+      const d = insight.data as unknown as ContentDecayData;
+      if (Math.abs(d.baselineClicks - d.currentClicks) < MIN_DECAY_CLICK_LOSS) {
         toSuppress.add(insight.id);
       }
     }
 
     if (insight.insightType === 'ctr_opportunity') {
-      const clickGap = (data.estimatedClickGap as number) ?? 0;
-      if (clickGap < MIN_CTR_OPP_CLICK_GAP) {
+      const d = insight.data as unknown as CtrOpportunityData;
+      if (d.estimatedClickGap < MIN_CTR_OPP_CLICK_GAP) {
         toSuppress.add(insight.id);
       }
     }

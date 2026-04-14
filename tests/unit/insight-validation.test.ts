@@ -5,7 +5,7 @@
  * and low-confidence insights after computation.
  */
 import { describe, it, expect } from 'vitest';
-import { upsertInsight, getInsights } from '../../server/analytics-insights-store.js';
+import { upsertInsight, getInsights, resolveInsight } from '../../server/analytics-insights-store.js';
 import { validateInsightBatch } from '../../server/analytics-intelligence.js';
 
 /** Helper: create a workspace with a unique ID for test isolation */
@@ -242,6 +242,105 @@ describe('validateInsightBatch — no-op scenarios', () => {
     });
 
     const suppressed = validateInsightBatch(workspaceId);
+    expect(suppressed).toBe(0);
+    expect(getInsights(workspaceId)).toHaveLength(2);
+  });
+});
+
+// ── Protected insights (resolved / bridge-sourced) ───────────────
+
+describe('validateInsightBatch — resolved & bridge-sourced protection', () => {
+  it('does NOT suppress a resolved insight even if it would normally be contradictory', () => {
+    const workspaceId = ws();
+    // ranking_opportunity on same page as content_decay — normally the weaker one is suppressed
+    const ro = upsertInsight({
+      workspaceId,
+      pageId: '/blog/protected',
+      insightType: 'ranking_opportunity',
+      data: { query: 'seo tips', currentPosition: 7, impressions: 500, estimatedTrafficGain: 100, pageUrl: '/blog/protected' },
+      severity: 'opportunity',
+    });
+    upsertInsight({
+      workspaceId,
+      pageId: '/blog/protected',
+      insightType: 'content_decay',
+      data: { baselineClicks: 100, currentClicks: 50, deltaPercent: -50, baselinePeriod: 'prev', currentPeriod: 'curr' },
+      severity: 'warning',
+    });
+
+    // Mark the ranking_opportunity as resolved — it should be protected
+    resolveInsight(ro.id, workspaceId, 'resolved', 'Fixed by team');
+
+    const suppressed = validateInsightBatch(workspaceId);
+    expect(suppressed).toBe(0);
+
+    const remaining = getInsights(workspaceId);
+    expect(remaining).toHaveLength(2);
+    expect(remaining.find((i) => i.id === ro.id)).toBeDefined();
+  });
+
+  it('does NOT suppress an in_progress insight even if it would normally be contradictory', () => {
+    const workspaceId = ws();
+    const ro = upsertInsight({
+      workspaceId,
+      pageId: '/blog/wip',
+      insightType: 'ranking_opportunity',
+      data: { query: 'kw', currentPosition: 7, impressions: 500, estimatedTrafficGain: 100, pageUrl: '/blog/wip' },
+      severity: 'opportunity',
+    });
+    upsertInsight({
+      workspaceId,
+      pageId: '/blog/wip',
+      insightType: 'content_decay',
+      data: { baselineClicks: 100, currentClicks: 50, deltaPercent: -50, baselinePeriod: 'prev', currentPeriod: 'curr' },
+      severity: 'warning',
+    });
+
+    resolveInsight(ro.id, workspaceId, 'in_progress');
+
+    const suppressed = validateInsightBatch(workspaceId);
+    expect(suppressed).toBe(0);
+
+    expect(getInsights(workspaceId)).toHaveLength(2);
+  });
+
+  it('does NOT suppress a bridge-sourced insight even if low-confidence', () => {
+    const workspaceId = ws();
+    // Low impressions would normally suppress this ranking_opportunity
+    upsertInsight({
+      workspaceId,
+      pageId: '/bridge/page',
+      insightType: 'ranking_opportunity',
+      data: { query: 'obscure', currentPosition: 12, impressions: 5, estimatedTrafficGain: 1, pageUrl: '/bridge/page' },
+      severity: 'opportunity',
+      bridgeSource: 'strategy-bridge',
+    });
+
+    const suppressed = validateInsightBatch(workspaceId);
+    expect(suppressed).toBe(0);
+    expect(getInsights(workspaceId)).toHaveLength(1);
+  });
+
+  it('does NOT suppress a bridge-sourced insight even if contradictory', () => {
+    const workspaceId = ws();
+    upsertInsight({
+      workspaceId,
+      pageId: '/bridge/conflict',
+      insightType: 'ranking_opportunity',
+      data: { query: 'kw', currentPosition: 7, impressions: 500, estimatedTrafficGain: 100, pageUrl: '/bridge/conflict' },
+      severity: 'opportunity',
+      bridgeSource: 'pipeline-bridge',
+    });
+    upsertInsight({
+      workspaceId,
+      pageId: '/bridge/conflict',
+      insightType: 'content_decay',
+      data: { baselineClicks: 100, currentClicks: 50, deltaPercent: -50, baselinePeriod: 'prev', currentPeriod: 'curr' },
+      severity: 'warning',
+    });
+
+    const suppressed = validateInsightBatch(workspaceId);
+    // The non-bridge content_decay is not contradictory with a protected insight, so nothing suppressed
     expect(suppressed).toBe(0);
     expect(getInsights(workspaceId)).toHaveLength(2);
   });
