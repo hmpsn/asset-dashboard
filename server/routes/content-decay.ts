@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 import { analyzeContentDecay, loadDecayAnalysis, generateBatchRecommendations } from '../content-decay.js';
+import { refreshContentDecayInsights } from '../analytics-intelligence.js';
 import { getWorkspace } from '../workspaces.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
@@ -22,6 +23,14 @@ router.post('/api/content-decay/:workspaceId/analyze', requireWorkspaceAccess('w
     const ws = getWorkspace(req.params.workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const analysis = await analyzeContentDecay(ws);
+
+    // Refresh content_decay insights so the insights page reflects fresh data
+    // immediately instead of waiting for the 24-hour staleness window.
+    try {
+      await refreshContentDecayInsights(ws.id);
+    } catch (err) {
+      log.warn({ err, workspaceId: ws.id }, 'Failed to refresh content decay insights after analysis');
+    }
 
     // Bridge #2: Create suggested briefs for top decaying pages
     fireBridge('bridge-decay-suggested-brief', ws.id, () => {

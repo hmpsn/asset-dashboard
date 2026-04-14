@@ -862,6 +862,59 @@ export async function getOrComputeInsights(
   return capWithDiversity(getInsights(workspaceId, insightType), insightType);
 }
 
+// ── Content Decay Insight Refresh ────────────────────────────────
+// Lightweight refresh of just the content_decay insight type.
+// Called after analyzeContentDecay() to immediately sync the insights
+// cache with fresh decay data, avoiding the 24-hour staleness window.
+
+const MIN_DECAY_BASELINE_CLICKS = 20;
+const MIN_DECAY_ABSOLUTE_LOSS = 5;
+
+export async function refreshContentDecayInsights(workspaceId: string): Promise<void> {
+  const decayAnalysis = loadDecayAnalysis(workspaceId);
+  const cycleStart = new Date().toISOString();
+
+  if (decayAnalysis && decayAnalysis.decayingPages.length > 0) {
+    const enrichCtx = await buildEnrichmentContext(workspaceId);
+
+    const significantDecay = decayAnalysis.decayingPages.filter(p =>
+      p.previousClicks >= MIN_DECAY_BASELINE_CLICKS &&
+      Math.abs(p.previousClicks - p.currentClicks) >= MIN_DECAY_ABSOLUTE_LOSS
+    );
+
+    for (const page of significantDecay) {
+      const severity: InsightSeverity =
+        page.severity === 'critical' ? 'critical'
+        : page.severity === 'warning' ? 'warning'
+        : 'opportunity';
+      const enrichment = enrichInsight(
+        { pageId: page.page, insightType: 'content_decay' as InsightType, severity, data: { baselineClicks: page.previousClicks, currentClicks: page.currentClicks, deltaPercent: page.clickDeclinePct, baselinePeriod: 'previous_30d', currentPeriod: 'current_30d' } },
+        enrichCtx,
+      );
+      const { data: _enrichedData, ...enrichmentRest } = enrichment;
+      upsertInsight({
+        workspaceId,
+        pageId: page.page,
+        insightType: 'content_decay',
+        data: {
+          baselineClicks: page.previousClicks,
+          currentClicks: page.currentClicks,
+          deltaPercent: page.clickDeclinePct,
+          baselinePeriod: 'previous_30d',
+          currentPeriod: 'current_30d',
+        },
+        severity,
+        ...enrichmentRest,
+      });
+    }
+
+    log.info({ workspaceId, count: significantDecay.length }, 'Refreshed content decay insights from fresh analysis');
+  }
+
+  // Prune stale decay insights that were not updated in this cycle
+  deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
+}
+
 // ── Insight Validation Pass ──────────────────────────────────────
 // Deterministic quality gate: suppress contradictory, duplicate, and
 // low-confidence insights AFTER computation, BEFORE feedback loops.

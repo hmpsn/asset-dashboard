@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 import { verifyToken } from '../auth.js';
+import { verifyAdminToken, APP_PASSWORD } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 
@@ -151,10 +152,13 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
 
   try {
     const type = req.query.type as InsightType | undefined;
-    // Only allow force recompute for authenticated admin users
-    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token; // as-any-ok: cookie-parser types not in Express.Request
-    const payload = token ? verifyToken(token) : null;
-    const force = req.query.force === 'true' && (payload?.role === 'admin' || payload?.role === 'owner');
+    // Only allow force recompute for authenticated admin users (JWT or HMAC)
+    const jwtToken = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token; // as-any-ok: cookie-parser types not in Express.Request
+    const payload = jwtToken ? verifyToken(jwtToken) : null;
+    const adminToken = (req.headers['x-auth-token'] || (req as any).cookies?.auth_token || '') as string; // as-any-ok: cookie-parser types
+    const isAdmin = !!(payload?.role === 'admin' || payload?.role === 'owner') ||
+      !!(adminToken && (adminToken === APP_PASSWORD || verifyAdminToken(adminToken)));
+    const force = req.query.force === 'true' && isAdmin;
     const insights = await getOrComputeInsights(ws.id, type, { force });
     res.json(insights);
   } catch (err) {
