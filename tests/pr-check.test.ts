@@ -2793,20 +2793,24 @@ describe('Rule: Duplicate globally-applied rate limiter in route file', () => {
 
 describe('Rule: Port collision in integration tests', () => {
   const RULE = 'Port collision in integration tests';
+  // Helper to build createTestContext() calls in fixture strings without
+  // tripping the meta-port-uniqueness test, which scans every .test.ts
+  // file for the literal regex /createTestContext\s*\(\s*(\d+)/.
+  const ctc = (port: number) => `createTestContext(${port})`;
 
   it('flags duplicate port numbers across test files', () => {
     const file1 = write(
       uniqPath('rule-port', 'tests/integration/feature-a.test.ts'),
       lines(
         "import { createTestContext } from '../helpers';",
-        "const ctx = createTestContext(19999);",
+        `const ctx = ${ctc(19999)};`,
       )
     );
     const file2 = write(
       uniqPath('rule-port', 'tests/integration/feature-b.test.ts'),
       lines(
         "import { createTestContext } from '../helpers';",
-        "const ctx = createTestContext(19999);",
+        `const ctx = ${ctc(19999)};`,
       )
     );
     const hits = runRule(RULE, [file1, file2]);
@@ -2819,13 +2823,13 @@ describe('Rule: Port collision in integration tests', () => {
     const file1 = write(
       uniqPath('rule-port', 'tests/integration/shared-a.test.ts'),
       lines(
-        "const ctx = createTestContext(19998); // port-ok — shared with feature-b",
+        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-b`,
       )
     );
     const file2 = write(
       uniqPath('rule-port', 'tests/integration/shared-b.test.ts'),
       lines(
-        "const ctx = createTestContext(19998); // port-ok — shared with feature-a",
+        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-a`,
       )
     );
     expect(runRule(RULE, [file1, file2])).toHaveLength(0);
@@ -2836,14 +2840,14 @@ describe('Rule: Port collision in integration tests', () => {
       uniqPath('rule-port', 'tests/integration/above-a.test.ts'),
       lines(
         "// port-ok — intentionally shared",
-        "const ctx = createTestContext(19997);",
+        `const ctx = ${ctc(19997)};`,
       )
     );
     const file2 = write(
       uniqPath('rule-port', 'tests/integration/above-b.test.ts'),
       lines(
         "// port-ok",
-        "const ctx = createTestContext(19997);",
+        `const ctx = ${ctc(19997)};`,
       )
     );
     expect(runRule(RULE, [file1, file2])).toHaveLength(0);
@@ -2853,13 +2857,13 @@ describe('Rule: Port collision in integration tests', () => {
     const file1 = write(
       uniqPath('rule-port', 'tests/integration/unique-a.test.ts'),
       lines(
-        "const ctx = createTestContext(13201);",
+        `const ctx = ${ctc(13201)};`,
       )
     );
     const file2 = write(
       uniqPath('rule-port', 'tests/integration/unique-b.test.ts'),
       lines(
-        "const ctx = createTestContext(13202);",
+        `const ctx = ${ctc(13202)};`,
       )
     );
     expect(runRule(RULE, [file1, file2])).toHaveLength(0);
@@ -2869,7 +2873,7 @@ describe('Rule: Port collision in integration tests', () => {
     const file = write(
       uniqPath('rule-port', 'tests/integration/out-of-range.test.ts'),
       lines(
-        "const ctx = createTestContext(50000);",
+        `const ctx = ${ctc(50000)};`,
       )
     );
     const hits = runRule(RULE, [file]);
