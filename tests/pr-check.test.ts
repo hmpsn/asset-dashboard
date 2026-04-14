@@ -3098,6 +3098,308 @@ describe('Rule: Missing broadcastToWorkspace after DB write in route handler', (
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// P2 Rule: Admin route mutation without addActivity
+// Extends the public-portal addActivity rule to all admin route files.
+// Files must be under server/routes/ and NOT be public-* or infrastructure.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Admin route mutation without addActivity', () => {
+  const RULE = 'Admin route mutation without addActivity';
+
+  it('flags a router.post with DB write but no addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/brandscript.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/brandscripts/:workspaceId', (req, res) => {",
+        "  db.prepare('INSERT INTO brandscripts (name) VALUES (?)').run(req.body.name);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags router.delete with DB write but no addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/insights.ts'),
+      lines(
+        "const router = Router();",
+        "router.delete('/api/insights/:id', (req, res) => {",
+        "  db.prepare('DELETE FROM insights WHERE id = ?').run(req.params.id);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag handler that calls addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/brandscript.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/brandscripts/:workspaceId', (req, res) => {",
+        "  db.prepare('INSERT INTO brandscripts (name) VALUES (?)').run(req.body.name);",
+        "  addActivity(req.params.workspaceId, 'brandscript_created', 'Created brandscript');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // activity-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/settings.ts'),
+      lines(
+        "const router = Router();",
+        "router.put('/api/settings', (req, res) => { // activity-ok — internal bookkeeping",
+        "  db.prepare('UPDATE settings SET value = ?').run(req.body.value);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // activity-ok hatch on line above', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/settings.ts'),
+      lines(
+        "const router = Router();",
+        "// activity-ok — settings don't need activity logging",
+        "router.put('/api/settings', (req, res) => {",
+        "  db.prepare('UPDATE settings SET value = ?').run(req.body.value);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag handler without db.prepare (no DB write)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/proxy.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/proxy', (req, res) => {",
+        "  const result = await externalApi.send(req.body);",
+        "  res.json(result);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag GET routes (read-only)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/items.ts'),
+      lines(
+        "const router = Router();",
+        "router.get('/api/items', (req, res) => {",
+        "  const items = db.prepare('SELECT * FROM items').all();",
+        "  res.json(items);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('skips public route files (covered by separate rule)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/public/thing', (req, res) => {",
+        "  db.prepare('INSERT INTO a VALUES (?)').run(req.body.x);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('skips infrastructure routes (auth.ts, users.ts, health.ts)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/auth.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/auth/login', (req, res) => {",
+        "  db.prepare('UPDATE users SET last_login = ?').run(Date.now());",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple handlers — only those missing addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/content.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/content', (req, res) => {",
+        "  db.prepare('INSERT INTO content (title) VALUES (?)').run(req.body.title);",
+        "  addActivity(req.params.workspaceId, 'content_created', 'Created content');",
+        "  res.json({ ok: true });",
+        "});",
+        "router.delete('/api/content/:id', (req, res) => {",
+        "  db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(7);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// P2 Rule: useGlobalAdminEvents called with workspace-scoped event name
+// Detects WS_EVENTS values (workspace-scoped) being passed as handler keys
+// to useGlobalAdminEvents(), which is dead code.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: useGlobalAdminEvents called with workspace-scoped event name', () => {
+  const RULE = 'useGlobalAdminEvents called with workspace-scoped event name';
+
+  it('flags a string-literal WS_EVENTS value used as handler key', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Dashboard.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function Dashboard() {",
+        "  useGlobalAdminEvents({",
+        "    'brandscript:updated': (data) => console.log(data),",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('flags computed WS_EVENTS.* key', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Dashboard.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        "function Dashboard() {",
+        "  useGlobalAdminEvents({",
+        "    [WS_EVENTS.BRANDSCRIPT_UPDATED]: (data) => console.log(data),",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('does not flag ADMIN_EVENTS values (correct usage)', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/App.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';",
+        "import { ADMIN_EVENTS } from './lib/wsEvents';",
+        "function App() {",
+        "  useGlobalAdminEvents({",
+        "    [ADMIN_EVENTS.QUEUE_UPDATE]: handleQueueUpdate,",
+        "    [ADMIN_EVENTS.WORKSPACE_CREATED]: handleWorkspaceCreated,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag ADMIN_EVENTS string-literal values', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/App.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';",
+        "function App() {",
+        "  useGlobalAdminEvents({",
+        "    'queue:update': handleQueueUpdate,",
+        "    'workspace:created': handleWorkspaceCreated,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag presence:update (not a WS_EVENTS value)', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/WorkspaceOverview.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function WorkspaceOverview() {",
+        "  useGlobalAdminEvents({ 'presence:update': handlePresenceUpdate });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // global-events-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Debug.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function Debug() {",
+        "  // global-events-ok — debug panel listens to all events",
+        "  useGlobalAdminEvents({",
+        "    'brandscript:updated': (data) => console.log(data),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple workspace-scoped events in same call', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Bad.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function Bad() {",
+        "  useGlobalAdminEvents({",
+        "    'activity:new': handleActivity,",
+        "    'brandscript:updated': handleBrandscript,",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+  });
+
+  it('does not flag files without useGlobalAdminEvents calls', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Normal.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "function Normal() {",
+        "  useWorkspaceEvents(workspaceId, {",
+        "    'brandscript:updated': handleBrandscript,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3134,6 +3436,9 @@ describe('Meta: customCheck rule name registry', () => {
     'Port collision in integration tests',
     'Inline React Query string key (use queryKeys.*)',
     'Missing broadcastToWorkspace after DB write in route handler',
+    // P2 expansion rules
+    'Admin route mutation without addActivity',
+    'useGlobalAdminEvents called with workspace-scoped event name',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

@@ -731,6 +731,32 @@ export const GLOBALLY_APPLIED_LIMITERS: ReadonlySet<string> = new Set([
 // when looking for a broadcastToWorkspace/broadcast call.
 const ROUTE_BROADCAST_LOOKAHEAD = 120;
 
+/** Max lines to scan forward when looking for an `addActivity(` call
+ *  in an admin route handler body. Reuses the same generous cap as the
+ *  public-portal rule — admin handlers can be similarly long. */
+const ADMIN_ACTIVITY_LOOKAHEAD = 250;
+
+/** Extracts all workspace-scoped event string values from `server/ws-events.ts`.
+ *  These are the values of the `WS_EVENTS` object — any handler key in a
+ *  `useGlobalAdminEvents({ ... })` call that matches one of these strings is
+ *  dead code (the hook doesn't subscribe to workspace rooms). */
+function loadWsEventValues(): Set<string> {
+  const wsEventsPath = path.join(ROOT, 'server', 'ws-events.ts');
+  const content = readFileOrEmpty(wsEventsPath);
+  if (!content) return new Set();
+  // Extract the WS_EVENTS block (ends at `} as const;`)
+  const wsBlock = content.match(/export\s+const\s+WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/)
+  if (!wsBlock) return new Set();
+  const values = new Set<string>();
+  // Match all string values: `KEY: 'value'` or `KEY: "value"`
+  const valueRe = /:\s*['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = valueRe.exec(wsBlock[1])) !== null) {
+    values.add(m[1]);
+  }
+  return values;
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -2929,6 +2955,149 @@ export const CHECKS: Check[] = [
           if (/\bbroadcastToWorkspace\s*\(/.test(routeBody)) continue;
           if (/\bbroadcast\s*\(/.test(routeBody)) continue;
           hits.push({ file, line: start + 1, text: lines[start].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ─── P2 expansion rules ───
+  {
+    // Extends the existing "Public-portal mutation without addActivity" rule
+    // to all admin route files. Public-portal.ts is excluded because it has
+    // its own dedicated rule with error severity.
+    name: 'Admin route mutation without addActivity',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    exclude: [
+      // Already covered by the dedicated public-portal rule (error severity).
+      'server/routes/public-portal.ts',
+      // Public routes — these serve unauthenticated client-portal traffic.
+      // Activity logging for public routes is a separate concern.
+      'server/routes/public-analytics.ts',
+      'server/routes/public-auth.ts',
+      'server/routes/public-chat.ts',
+      'server/routes/public-content.ts',
+      'server/routes/public-feedback.ts',
+      'server/routes/public-requests.ts',
+      // Infrastructure routes that don't represent user-visible mutations.
+      'server/routes/auth.ts',
+      'server/routes/users.ts',
+      'server/routes/health.ts',
+    ],
+    excludeLines: ['// activity-ok'],
+    message:
+      'This admin route handler performs a DB write (db.prepare().run) but never calls ' +
+      'addActivity(). Admin mutations should be logged to the activity feed so workspace ' +
+      'history is complete. Add an addActivity() call, or suppress with // activity-ok ' +
+      'if this endpoint intentionally doesn\'t need activity logging (e.g. internal bookkeeping, ' +
+      'analytics, settings that don\'t affect workspace content).',
+    severity: 'warn',
+    rationale:
+      'Significant admin operations that skip addActivity() leave gaps in the workspace ' +
+      'activity feed, making it impossible for team members to audit what changed and when.',
+    claudeMdRef: '#code-conventions',
+    displayScope: 'server/routes/*.ts (excluding public-* and infrastructure routes)',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        // Self-filter: only admin route files under server/routes/.
+        if (!file.includes('/server/routes/') && !file.includes('\\server\\routes\\')) continue;
+        // Skip public routes (covered by their own rule or not applicable).
+        const basename = path.basename(file);
+        if (/^public-/.test(basename)) continue;
+        // Skip infrastructure routes that aren't user-visible mutations.
+        if (['auth.ts', 'users.ts', 'health.ts'].includes(basename)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const routeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) routeIdx.push(i);
+        }
+        for (let k = 0; k < routeIdx.length; k++) {
+          const start = routeIdx[k];
+          if (hasHatch(lines, start, '// activity-ok')) continue;
+          const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+          const routeBodyEnd = Math.min(nextStart, start + ADMIN_ACTIVITY_LOOKAHEAD);
+          const routeBody = lines.slice(start, routeBodyEnd).join('\n');
+          // Must have a DB write — same gate as the broadcast rule.
+          if (!/\bdb\.prepare\b/.test(routeBody)) continue;
+          if (!/\.run\s*\(/.test(routeBody)) continue;
+          // Check for addActivity() call
+          if (/\baddActivity\s*\(/.test(routeBody)) continue;
+          hits.push({ file, line: start + 1, text: lines[start].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Extends the existing "useGlobalAdminEvents import restriction" rule.
+    // That rule catches *unauthorized imports*. This rule catches *wrong event
+    // names* in the authorized call sites — i.e. passing a workspace-scoped
+    // event (WS_EVENTS.*) to useGlobalAdminEvents, which is dead code because
+    // the hook doesn't subscribe to workspace rooms.
+    name: 'useGlobalAdminEvents called with workspace-scoped event name',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// global-events-ok'],
+    message:
+      'useGlobalAdminEvents() is being called with a workspace-scoped event name ' +
+      '(from WS_EVENTS). This handler is dead code — the hook doesn\'t send a ' +
+      '`subscribe` action, so broadcastToWorkspace events are never delivered. ' +
+      'Use useWorkspaceEvents(workspaceId, ...) for workspace-scoped events, or ' +
+      'suppress with // global-events-ok if this is intentional.',
+    severity: 'error',
+    rationale:
+      'Silent dead broadcast handlers: useGlobalAdminEvents never subscribes to a ' +
+      'workspace room, so workspace-scoped events (WS_EVENTS.*) are silently dropped ' +
+      'by the server\'s broadcastToWorkspace filter. The UI appears stale with no ' +
+      'error message.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const wsEventValues = loadWsEventValues();
+      if (wsEventValues.size === 0) return hits;
+      // Match `useGlobalAdminEvents({` to find call sites.
+      const callRe = /\buseGlobalAdminEvents\s*\(\s*\{/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !callRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!callRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// global-events-ok')) continue;
+          // Scan forward from the call site to find handler keys.
+          // The object literal typically spans a few lines:
+          //   useGlobalAdminEvents({
+          //     [ADMIN_EVENTS.QUEUE_UPDATE]: handler,
+          //     'queue:update': handler,
+          //   });
+          // We scan up to 30 lines or until we hit `});`.
+          const scanEnd = Math.min(lines.length, i + 30);
+          for (let j = i; j < scanEnd; j++) {
+            const line = lines[j];
+            // Stop at closing `});`
+            if (/\}\s*\)/.test(line) && j > i) break;
+            // Match string-literal keys: 'event:name' or "event:name"
+            const stringKeyRe = /['"]([^'"]+)['"]\s*:/g;
+            let km: RegExpExecArray | null;
+            while ((km = stringKeyRe.exec(line)) !== null) {
+              if (wsEventValues.has(km[1])) {
+                hits.push({ file, line: j + 1, text: lines[j].trim() });
+              }
+            }
+            // Match computed keys: [WS_EVENTS.SOMETHING] or [WS_EVENTS['SOMETHING']]
+            if (/\[\s*WS_EVENTS[.\[]/.test(line)) {
+              hits.push({ file, line: j + 1, text: lines[j].trim() });
+            }
+          }
         }
       }
       return hits;
