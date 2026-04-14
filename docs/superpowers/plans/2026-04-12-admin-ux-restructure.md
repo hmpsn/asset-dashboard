@@ -34,7 +34,7 @@ These issues were found by validating the plan against the actual codebase. Each
 ### Pre-requisite Tasks Added
 
 12. **Task 2.0: `useTabFromUrl(defaultTab)` hook** — needed by WorkspaceHome, Pipeline, Requests for URL-synced tabs.
-13. **Task 3.0: `useFirstVisit(key)` hook** — needed by all 4 guides + OnboardingChecklist.
+13. **Task 3.0: `useFirstVisit(key)` hook** — ~~needed by all 4 guides + OnboardingChecklist~~ **REMOVED: guides use the permanent tab pattern (see PR 4 decision below); OnboardingChecklist uses localStorage directly.**
 14. **Task 5.0: DB migration for approval events** — adds `events` JSON column to `approval_batches`.
 15. **Workspace health metrics**: Task 4.10 composes from existing hooks (useAuditSummary, useWorkspaceHomeData) rather than new endpoint.
 
@@ -777,29 +777,40 @@ Each task integrates NextStepsCard, ProgressIndicator, and/or ErrorRecoveryCard 
 
 ### Tasks 4.5–4.8 — Per-Tool Guides (Model: sonnet each, parallel)
 
-Follow the `ContentPipelineGuide.tsx` pattern exactly.
+**Pattern decision (2026-04-13):** All guides use the **permanent "Guide" tab pattern** — same as `SchemaWorkflowGuide.tsx` / `ContentPipelineGuide.tsx`. No first-visit overlays, no `useFirstVisit` hook. A "Guide" tab is always present in the host component's tab bar; users navigate to it explicitly. This eliminates Task 3.0 entirely.
 
-> **PR 2 lesson:** ContentPipelineGuide described tabs that had been moved elsewhere. Each guide's SECTIONS array must reference only features that actually exist as tabs/panels in its host component. Before writing any guide, read the host component's TABS array or render cases to verify current tab IDs and labels. After writing the guide, grep `src/components/` for the guide component name to ensure nothing else references stale content.
+> **PR 2 lesson:** Each guide's SECTIONS array must reference only features that actually exist as tabs/panels in its host component. Before writing any guide, read the host component's TABS array or render cases to verify current tab IDs and labels. After writing the guide, grep `src/components/` for the guide component name to ensure nothing else references stale content.
 
-**Task 4.5 — SchemaWorkflowGuide**
-**Owns:** `src/components/schema/SchemaWorkflowGuide.tsx` (NEW — already referenced in SchemaSuggester)
-- [ ] Create guide: Scan site → Review suggestions → Edit schema → Publish to Webflow → Validate with GSC
-- [ ] Integrate into SchemaSuggester: show on first visit when no scans exist
+**Task 4.5 — SchemaWorkflowGuide — ✅ COMPLETE**
+Already exists at `src/components/schema/SchemaWorkflowGuide.tsx` and is integrated as a "Guide" tab in SchemaSuggester (`schemaSubTab === 'guide'`). No work needed.
 
 **Task 4.6 — SeoAuditGuide**
-**Owns:** `src/components/audit/SeoAuditGuide.tsx` (NEW)
-- [ ] Create guide: Issue severity levels → How to prioritize → Fix options (accept/task/review) → Suppression rules
-- [ ] Integrate into SeoAudit: show on first visit when no audits run
+**Owns:** `src/components/audit/SeoAuditGuide.tsx` (NEW), modifies `src/components/SeoAudit.tsx`
+- Actual SeoAudit tabs: `audit`, `history`, `aeo-review`, `content-decay`
+- **CRITICAL — custom tab bar pattern:** SeoAudit does NOT use `TabBar` from `./ui`. It uses a hand-coded `auditTabBar` JSX variable (defined ~line 552) with manual `<button>` elements and a `<div>` divider. Add the "Guide" button following this same pattern at the end.
+- [ ] Create guide component (follow `SchemaWorkflowGuide.tsx` structure): Issue severity levels → How to prioritize → Fix options (accept/task/review) → Suppression rules → AEO review → Content decay
+- [ ] Add `'guide'` to `AuditSubTab` type definition (line 44) AND to the `valid` array at line 57 (`['audit', 'history', 'aeo-review', 'content-decay', 'guide']`)
+- [ ] Add "Guide" button to `auditTabBar` variable (line ~552) — follow the existing hand-coded button pattern, NOT TabBar component
+- [ ] Add `if (auditSubTab === 'guide') return <div>{auditTabBar}<SeoAuditGuide /></div>;` — place BEFORE the main render block, following the SchemaSuggester pattern at line 585
 
 **Task 4.7 — KeywordStrategyGuide**
-**Owns:** `src/components/strategy/KeywordStrategyGuide.tsx` (NEW)
-- [ ] Create guide: Configure SEMRush mode → Set business context → Generate → Interpret rankings → Next steps
-- [ ] Integrate into KeywordStrategy: show on first visit when no strategy exists
+**Owns:** `src/components/strategy/KeywordStrategyGuide.tsx` (NEW), modifies `src/components/KeywordStrategy.tsx`
+- KeywordStrategy is a single-view component (no sub-tabs, no existing TabBar). Adding requires building from scratch.
+- **Use `TabBar` from `./ui`** (already exported, `TabBar` is available — PageIntelligence uses this pattern).
+- [ ] Create guide component: Configure SEMRush mode → Set business context → Generate → Interpret rankings → Quick Wins → Next steps
+- [ ] Add `import { TabBar } from './ui';` to KeywordStrategy imports
+- [ ] Add `strategyTab` state: `const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');`
+- [ ] Add `<TabBar tabs={[{ id: 'analysis', label: 'Analysis' }, { id: 'guide', label: 'Guide' }]} active={strategyTab} onChange={(id) => setStrategyTab(id as 'analysis' | 'guide')} />` at the top of the return JSX
+- [ ] Wrap the existing content in `{strategyTab === 'analysis' && <...existing content...>}` and add `{strategyTab === 'guide' && <KeywordStrategyGuide />}`
 
 **Task 4.8 — PageIntelligenceGuide**
-**Owns:** `src/components/PageIntelligenceGuide.tsx` (NEW)
-- [ ] Create guide: How page analysis works → Reading optimization scores → Taking action → Linking to SEO Editor
-- [ ] Integrate into PageIntelligence: show on first visit
+**Owns:** `src/components/PageIntelligenceGuide.tsx` (NEW), modifies `src/components/PageIntelligence.tsx`
+- Actual PageIntelligence tabs: `pages`, `architecture` — uses `TabBar` from `./ui` (line 597)
+- [ ] Create guide component: How page analysis works → Reading optimization scores → Pages tab → Architecture tab → Taking action → Linking to SEO Editor
+- [ ] Update tab type: `useState<'pages' | 'architecture' | 'guide'>('pages')`
+- [ ] Add `{ id: 'guide', label: 'Guide' }` to the `tabs` array in `<TabBar>` (line 597–604)
+- [ ] Update `onChange` cast: `id as 'pages' | 'architecture' | 'guide'`
+- [ ] Add render block after existing architecture/pages blocks: `{activeTab === 'guide' && <PageIntelligenceGuide />}`
 
 ---
 
@@ -810,12 +821,15 @@ Follow the `ContentPipelineGuide.tsx` pattern exactly.
 - `src/components/SchemaSuggester.tsx` (add stepper)
 
 - [ ] **Step 1: Content creation workflow stepper**
-  - Steps: Strategy → Content Gaps → Brief → Post → Publish
+  - Steps: Strategy → Content Gaps → Brief → Post → Publish (these are cross-page nav links, not Pipeline tab IDs)
+  - ContentPipeline actual tabs: `planner | calendar | briefs | posts | subscriptions`
+  - Each stepper step should call `navigate()` — add `import { useNavigate } from 'react-router-dom';` (currently only `useSearchParams` is imported from react-router-dom, line 2)
   - Show at top of ContentPipeline when in brief or post creation flow
 
 - [ ] **Step 2: Schema deployment workflow stepper**
   - Steps: Scan → Review → Edit → Publish → Validate
-  - Show at top of SchemaSuggester during active workflow
+  - SchemaSuggester already has `'generator' | 'guide'` as `SchemaSubTab` — place stepper inside the `generator` sub-tab view, above the main content
+  - Show only when `schemaSubTab === 'generator'` and there is an active workflow
 
 ---
 
@@ -825,12 +839,13 @@ Follow the `ContentPipelineGuide.tsx` pattern exactly.
 - `src/components/WorkspaceHome.tsx` (add health bar)
 
 - [ ] **Step 1: Add WorkspaceHealthBar to WorkspaceHome**
-  - Compute health metrics from existing data:
-    - SEO Audit: has audit been run? How recent?
-    - Keyword Strategy: has strategy been generated?
-    - Schema: any schemas published?
-    - Content Pipeline: briefs created? posts published?
-    - Brand: brand voice configured?
+  - All data is already available via existing hooks — do NOT add new API calls:
+    - SEO Audit score/recency: `audit.siteScore` (from `useAuditSummary`)
+    - Strategy generated: `homeData` from `useWorkspaceHomeData`
+    - Schema / content pipeline: `intel?.contentPipeline` (from `useWorkspaceIntelligence`)
+    - Content Pipeline publish rate: `contentPipeline.publishedCells / contentPipeline.totalCells`
+    - Webflow linked: `webflowSiteId` prop (check `!webflowSiteId`)
+  - localStorage key pattern for OnboardingChecklist: `onboarding_checklist_completed_${workspaceId}` (underscores, lowercase — matches `seo_tip_seen_${workspaceId}_${tab}` convention)
   - Show "Recommended Next" based on lowest-completion areas
   - Place above or below the existing stat cards
 
@@ -840,10 +855,9 @@ Follow the `ContentPipelineGuide.tsx` pattern exactly.
 
 - [ ] **Step 1: `npm run typecheck && npx vite build`**
 - [ ] **Step 2: Verify OnboardingChecklist shows for new workspace**
-- [ ] **Step 3: Verify guides show on first visit to Schema, Audit, Strategy, PageIntel**
+- [ ] **Step 3: Verify Guide tab appears and renders in SeoAudit, KeywordStrategy, PageIntelligence**
 - [ ] **Step 4: Verify WorkflowStepper renders in Pipeline + Schema flows**
 - [ ] **Step 5: Verify WorkspaceHealthBar shows progress on Home**
-- [ ] **Step 6: Verify localStorage dismissal works (guides don't reappear)**
 - [ ] **Step 7: `npx vitest run` — full test suite**
 - [ ] **Step 8: `npx tsx scripts/pr-check.ts`**
 
