@@ -829,6 +829,10 @@ async function assembleSiteHealth(
   }
 
   // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
+  // TODO(IG-5): Desktop CWV is always null because getPageSpeed(siteId) returns a single
+  // snapshot keyed by siteId alone, holding only the last run (mobile OR desktop).
+  // Fixing this requires changing performance-store.ts to key snapshots by siteId + strategy.
+  // Deferred to Sprint IG-5 (strategic gaps).
   if (siteId) {
     try {
       const { getPageSpeed } = await import('./performance-store.js');
@@ -1920,6 +1924,18 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
       }
     }
 
+    // Top recent wins — standard and detailed
+    if (learnings.topWins && learnings.topWins.length > 0) {
+      const winLimit = verbosity === 'detailed' ? 5 : 3;
+      lines.push('Recent wins:');
+      for (const win of learnings.topWins.slice(0, winLimit)) {
+        const page = win.pageUrl ?? 'site';
+        const delta = win.delta;
+        const sign = delta.direction === 'improved' ? '+' : delta.direction === 'declined' ? '' : '';
+        lines.push(`  - ${win.actionType.replace(/_/g, ' ')} on ${page} → ${sign}${delta.delta_percent.toFixed(0)}% ${delta.primary_metric}`);
+      }
+    }
+
     // ROI attribution — detailed only
     if (learnings.roiAttribution && learnings.roiAttribution.length > 0 && verbosity === 'detailed') {
       lines.push('ROI highlights:');
@@ -1967,6 +1983,11 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     }
   }
 
+  // Suggested briefs count — standard and detailed
+  if (verbosity !== 'compact' && pipeline.suggestedBriefs != null && pipeline.suggestedBriefs > 0) {
+    lines.push(`Suggested briefs: ${pipeline.suggestedBriefs} pending topics identified`);
+  }
+
   if (verbosity === 'detailed') {
     const bs = pipeline.briefs.byStatus;
     lines.push(`Brief status: ${Object.entries(bs).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
@@ -1975,6 +1996,14 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     lines.push(`Matrix: ${pipeline.matrices.cellsPublished}/${pipeline.matrices.cellsPlanned} cells published`);
     if (pipeline.schemaDeployment) {
       lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
+    }
+
+    // Rewrite playbook patterns — detailed only
+    if (pipeline.rewritePlaybook?.patterns && pipeline.rewritePlaybook.patterns.length > 0) {
+      lines.push(`Rewrite playbook: ${pipeline.rewritePlaybook.patterns.length} learned patterns`);
+      for (const pattern of pipeline.rewritePlaybook.patterns.slice(0, 5)) {
+        lines.push(`  - ${pattern}`);
+      }
     }
     if (pipeline.cannibalizationWarnings && pipeline.cannibalizationWarnings.length > 0) {
       lines.push('Keyword cannibalization:');
@@ -2170,6 +2199,11 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
 
   lines.push(`Keyword: ${profile.primaryKeyword ?? 'none'} | Health: ${profile.optimizationScore ?? 'n/a'}`);
 
+  // Link health — all verbosity levels (concise)
+  if (profile.linkHealth) {
+    lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' (ORPHAN — no inbound links)' : ''}`);
+  }
+
   if (verbosity !== 'compact') {
     if (profile.rankHistory.current != null) {
       lines.push(`Position: ${profile.rankHistory.current} (${profile.rankHistory.trend})`);
@@ -2214,9 +2248,6 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
       lines.push(`Structural audit issues: ${profile.auditIssues.length}`);
     }
     lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
-    if (profile.linkHealth) {
-      lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' ⚠ orphan page' : ''}`);
-    }
     if (profile.seoEdits?.currentTitle) {
       lines.push(`Current title: ${profile.seoEdits.currentTitle}`);
     }

@@ -510,9 +510,8 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice
-  'forPage', 'topWins', 'winRateByActionType',
+  'forPage', 'winRateByActionType',
   // ContentPipelineSlice
-  'rewritePlaybook', 'suggestedBriefs',
   // SiteHealthSlice
   'aeoReadiness', 'redirectDetails',
   // PageProfileSlice
