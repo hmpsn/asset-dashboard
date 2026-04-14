@@ -8,6 +8,8 @@ import { post, put, del, getSafe, getOptional } from '../api/client';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../hooks/admin';
 import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
+import { seoBulkJobs } from '../api/seo';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import {
   ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
@@ -306,43 +308,86 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const bulkAbortRef = useRef<AbortController | null>(null);
+  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(null);
 
-  // Cleanup: abort any in-progress bulk operation on unmount
-  useEffect(() => () => { bulkAbortRef.current?.abort(); }, []);
+  // ── WebSocket handlers for background bulk accept ──
+  useWorkspaceEvents(workspaceId, {
+    'bulk-operation:progress': (rawData: unknown) => {
+      const d = rawData as { jobId: string; operation: string; done: number; total: number; failed?: number; applied?: string[] };
+      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
+        setBulkProgress({ done: d.done, total: d.total });
+        // Mark fixes as applied in real-time via WS
+        if (d.applied?.length) {
+          setAppliedFixes(prev => {
+            const next = new Set(prev);
+            for (const key of d.applied!) next.add(key);
+            return next;
+          });
+        }
+      }
+    },
+    'bulk-operation:complete': (rawData: unknown) => {
+      const d = rawData as { jobId: string; operation: string; applied: number; failed: number; total: number; appliedKeys?: string[] };
+      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
+        if (d.appliedKeys?.length) {
+          setAppliedFixes(prev => {
+            const next = new Set(prev);
+            for (const key of d.appliedKeys!) next.add(key);
+            return next;
+          });
+        }
+        setBulkApplying(false);
+        setBulkProgress(null);
+        setBulkAcceptJobId(null);
+      }
+    },
+    'bulk-operation:failed': (rawData: unknown) => {
+      const d = rawData as { jobId: string; operation: string; error: string };
+      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
+        setBulkApplying(false);
+        setBulkProgress(null);
+        setBulkAcceptJobId(null);
+      }
+    },
+  });
 
   const acceptAllSuggestions = async () => {
-    if (!data) return;
-    // Abort any previous bulk operation
-    bulkAbortRef.current?.abort();
-    bulkAbortRef.current = new AbortController();
-    const signal = bulkAbortRef.current.signal;
+    if (!data || !workspaceId) return;
     // Collect all fixable issues across all pages
-    const fixes: { pageId: string; issue: SeoIssue }[] = [];
+    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string }[] = [];
     for (const page of data.pages) {
       for (const issue of page.issues) {
         const fixKey = `${page.pageId}-${issue.check}`;
         if (issue.suggestedFix && !appliedFixes.has(fixKey)) {
-          fixes.push({ pageId: page.pageId, issue });
+          const text = editedSuggestions[fixKey] || issue.suggestedFix;
+          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message });
         }
       }
     }
     if (fixes.length === 0) return;
     setBulkApplying(true);
     setBulkProgress({ done: 0, total: fixes.length });
-    for (let i = 0; i < fixes.length; i++) {
-      if (signal.aborted) break;
-      await acceptSuggestion(fixes[i].pageId, fixes[i].issue);
-      setBulkProgress({ done: i + 1, total: fixes.length });
+    try {
+      const { jobId } = await seoBulkJobs.bulkAcceptFixes(workspaceId, {
+        workspaceId,
+        siteId,
+        fixes,
+      });
+      setBulkAcceptJobId(jobId);
+    } catch (err) {
+      console.error('Failed to start bulk accept:', err);
+      setBulkApplying(false);
+      setBulkProgress(null);
     }
-    setBulkApplying(false);
-    setBulkProgress(null);
   };
 
   const cancelBulkApply = () => {
-    bulkAbortRef.current?.abort();
+    if (bulkAcceptJobId) {
+      del(`/api/jobs/${bulkAcceptJobId}`).catch(() => {});
+    }
     setBulkApplying(false);
     setBulkProgress(null);
+    setBulkAcceptJobId(null);
   };
 
   const runAudit = async () => {

@@ -377,6 +377,18 @@ export const competitor = {
     getOptional<unknown>(`/api/competitor-compare-latest?myUrl=${encodeURIComponent(myUrl)}`),
 };
 
+// ── SEO Bulk Jobs (background operations) ──────────────────────
+export const seoBulkJobs = {
+  bulkAnalyze: (wsId: string, body: { workspaceId: string; pages: Array<{ pageId: string; title: string; slug?: string; seoTitle?: string; seoDescription?: string }> }) =>
+    post<{ jobId: string }>(`/api/seo/${wsId}/bulk-analyze`, body),
+
+  bulkRewrite: (wsId: string, body: { workspaceId: string; siteId: string; pages: Array<{ pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }>; field: 'title' | 'description' | 'both' }) =>
+    post<{ jobId: string }>(`/api/seo/${wsId}/bulk-rewrite`, body),
+
+  bulkAcceptFixes: (wsId: string, body: { workspaceId: string; siteId: string; fixes: Array<{ pageId: string; check: string; suggestedFix: string; message?: string }> }) =>
+    post<{ jobId: string }>(`/api/seo/${wsId}/bulk-accept-fixes`, body),
+};
+
 // ── SEO change tracker ──────────────────────────────────────────
 export const seoChangeTracker = {
   get: (wsId: string) =>
