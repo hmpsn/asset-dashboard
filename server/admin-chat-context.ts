@@ -263,7 +263,8 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
   if (anomalyInsights.length > 0) {
     const lines = anomalyInsights.slice(0, 8).map(a => {
       const data = a.data as Record<string, unknown>;
-      return `  ${data.anomalyType}: ${data.metric} deviated ${data.deviationPercent}% (ongoing for ${data.durationDays} day(s))`;
+      const pageSuffix = typeof data.affectedPage === 'string' ? ` (affected page: ${data.affectedPage})` : '';
+      return `  ${data.anomalyType}: ${data.metric} deviated ${data.deviationPercent}% (ongoing for ${data.durationDays} day(s))${pageSuffix}`;
     });
     sections.push(`ANOMALY DIGEST (active anomalies tracked in insight feed):\n${lines.join('\n')}`);
   }

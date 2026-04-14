@@ -16,6 +16,7 @@ import { getWorkspace } from './workspaces.js';
 import { getPageTrend, getQueryPageData, getSearchPeriodComparison, getAllGscPages } from './search-console.js';
 import { getGA4LandingPages } from './google-analytics.js';
 import { scanRedirects } from './redirect-scanner.js';
+import { resolveFullPageUrl } from './outcome-measurement.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { getInsights, stampDiagnosticReportId } from './analytics-insights-store.js';
 import { callOpenAI } from './openai-helpers.js';
@@ -191,9 +192,9 @@ async function gatherDiagnosticContext(
     internalLinks,
     intelligence,
   ] = await Promise.all([
-    // Position history
+    // Position history — GSC requires a full URL, not a bare pathname
     modules.includes('positionHistory') && hasGsc && affectedPagePath
-      ? getPageTrend(creds.siteId!, creds.gscSiteUrl!, affectedPagePath, 90).catch((e) => {
+      ? getPageTrend(creds.siteId!, creds.gscSiteUrl!, resolveFullPageUrl(affectedPagePath, { liveDomain: creds.liveDomain ?? undefined, gscPropertyUrl: creds.gscSiteUrl ?? undefined }), 90).catch((e) => {
           log.warn({ err: e }, 'Position history fetch failed');
           unavailableSources.push({ source: 'positionHistory', reason: (e as Error).message });
           return [] as PositionHistoryPoint[];
@@ -269,7 +270,12 @@ async function gatherDiagnosticContext(
             return { count: 0, siteMedian: 0, topLinkingPages: [], deficit: 0 };
           }
         })()
-      : Promise.resolve({ count: 0, siteMedian: 0, topLinkingPages: [], deficit: 0 }),
+      : (modules.includes('internalLinks')
+          ? (unavailableSources.push({
+              source: 'internalLinks',
+              reason: !affectedPagePath ? 'No affected page identified' : !hasDomain ? 'Live domain not configured' : 'Neither GA4 nor GSC configured',
+            }), Promise.resolve({ count: 0, siteMedian: 0, topLinkingPages: [], deficit: 0 }))
+          : Promise.resolve({ count: 0, siteMedian: 0, topLinkingPages: [], deficit: 0 })),
 
     // Intelligence (existing insights, baselines, and backlink profile via enrichWithBacklinks)
     buildWorkspaceIntelligence(workspaceId, { // bwi-all-ok: diagnostics needs seoContext (baselines, backlinks) + operational

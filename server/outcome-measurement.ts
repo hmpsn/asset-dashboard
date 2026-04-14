@@ -37,7 +37,7 @@ const LOWER_IS_BETTER_METRICS = new Set(['position']);
  * (e.g. `https://example.com/blog-post`) using the workspace's liveDomain.
  * GSC Search Analytics API requires full URLs for the `page` dimension filter.
  */
-function resolveFullPageUrl(pageUrl: string, ws: { liveDomain?: string; gscPropertyUrl?: string }): string {
+export function resolveFullPageUrl(pageUrl: string, ws: { liveDomain?: string; gscPropertyUrl?: string }): string {
   if (pageUrl.startsWith('http')) return pageUrl;
   const base = ws.liveDomain
     ? (ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`)

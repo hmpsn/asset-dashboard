@@ -378,6 +378,66 @@ export async function getTopDroppedGscPage(
 }
 
 /**
+ * Returns the pathname of the page with the largest absolute click *increase*
+ * between the current period and the prior equal-length period.
+ * Used to populate affectedPage for traffic_spike anomalies.
+ */
+export async function getTopSpikedGscPage(
+  siteId: string,
+  gscSiteUrl: string,
+  days: number = 28,
+): Promise<string | null> {
+  const token = await getValidToken(siteId);
+  if (!token) return null;
+
+  const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
+
+  const prevEnd = new Date(curStart);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - days + 1);
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+  const [curData, prevData] = await Promise.all([
+    gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
+      startDate: curStart, endDate: curEnd, dimensions: ['page'], rowLimit: 100, type: 'web',
+    }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
+    gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
+      startDate: fmt(prevStart), endDate: fmt(prevEnd), dimensions: ['page'], rowLimit: 100, type: 'web',
+    }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
+  ]);
+
+  if (!curData.rows?.length) return null;
+
+  // Build a map of previous-period clicks by page
+  const prevByPage = new Map<string, number>();
+  for (const row of (prevData.rows ?? [])) {
+    prevByPage.set(row.keys[0], row.clicks);
+  }
+
+  // Find the page with the largest absolute click increase
+  let topPage: string | null = null;
+  let maxSpike = 0;
+  for (const row of curData.rows) {
+    const prev = prevByPage.get(row.keys[0]) ?? 0;
+    const spike = row.clicks - prev; // positive = increased
+    if (spike > maxSpike) {
+      maxSpike = spike;
+      topPage = row.keys[0];
+    }
+  }
+
+  if (!topPage) return null;
+
+  try {
+    return new URL(topPage).pathname;
+  } catch {
+    return topPage.startsWith('/') ? topPage : null;
+  }
+}
+
+/**
  * Generic pagination helper for GSC API queries.
  * Fetches multiple pages of results using startRow, up to maxRows total.
  */

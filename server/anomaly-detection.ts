@@ -18,8 +18,8 @@ import crypto from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, type Workspace } from './workspaces.js';
-import { getSearchPeriodComparison, getTopDroppedGscPage } from './search-console.js';
-import { getGA4PeriodComparison, getGA4Conversions, getTopDroppedGA4Page } from './google-analytics.js';
+import { getSearchPeriodComparison, getTopDroppedGscPage, getTopSpikedGscPage } from './search-console.js';
+import { getGA4PeriodComparison, getGA4Conversions, getTopDroppedGA4Page, getTopSpikedGA4Page } from './google-analytics.js';
 import { listSnapshots } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
@@ -546,16 +546,25 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         }
 
         // ── Fetch most-affected page for page-level diagnostic context ──
-        // One API call per source type, not per anomaly. Results are used to populate
-        // affectedPage in the anomaly digest insight so the diagnostic orchestrator
-        // can run page-specific probes (position history, canonical, internal links).
-        let gscAffectedPage: string | null = null;
-        let ga4AffectedPage: string | null = null;
-        if (detected.some(a => a.source === 'gsc' && (a.type === 'traffic_drop' || a.type === 'traffic_spike')) && ws.gscPropertyUrl) {
-          gscAffectedPage = await getTopDroppedGscPage(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopDroppedGscPage failed'); return null; });
+        // One API call per source+direction, not per anomaly. Drop and spike anomalies
+        // require separate lookups — the page that dropped most is not the page that
+        // spiked most. Results are used to populate affectedPage in the anomaly digest
+        // insight so the diagnostic orchestrator can run page-specific probes.
+        let gscDropPage: string | null = null;
+        let gscSpikePage: string | null = null;
+        let ga4DropPage: string | null = null;
+        let ga4SpikePage: string | null = null;
+        if (detected.some(a => a.source === 'gsc' && a.type === 'traffic_drop') && ws.gscPropertyUrl) {
+          gscDropPage = await getTopDroppedGscPage(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopDroppedGscPage failed'); return null; });
         }
-        if (detected.some(a => a.source === 'ga4' && (a.type === 'traffic_drop' || a.type === 'traffic_spike')) && ws.ga4PropertyId) {
-          ga4AffectedPage = await getTopDroppedGA4Page(ws.ga4PropertyId, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopDroppedGA4Page failed'); return null; });
+        if (detected.some(a => a.source === 'gsc' && a.type === 'traffic_spike') && ws.gscPropertyUrl) {
+          gscSpikePage = await getTopSpikedGscPage(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopSpikedGscPage failed'); return null; });
+        }
+        if (detected.some(a => a.source === 'ga4' && a.type === 'traffic_drop') && ws.ga4PropertyId) {
+          ga4DropPage = await getTopDroppedGA4Page(ws.ga4PropertyId, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopDroppedGA4Page failed'); return null; });
+        }
+        if (detected.some(a => a.source === 'ga4' && a.type === 'traffic_spike') && ws.ga4PropertyId) {
+          ga4SpikePage = await getTopSpikedGA4Page(ws.ga4PropertyId, COMPARISON_DAYS).catch((err) => { log.warn({ err, workspaceId: ws.id }, 'getTopSpikedGA4Page failed'); return null; });
         }
 
         // ── Write anomaly digest insights (deduped via unique index) ──
@@ -594,13 +603,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               durationDays,
               firstDetected,
               severity: a.severity,
-              // Page path with the largest absolute metric drop in this period.
-              // Populated by getTopDroppedGscPage / getTopDroppedGA4Page (one API call
-              // per source per workspace per scan). When set, the diagnostic orchestrator
-              // runs page-specific probes (position history, canonical, internal links).
-              affectedPage: a.source === 'gsc' ? (gscAffectedPage ?? undefined)
-                : a.source === 'ga4' ? (ga4AffectedPage ?? undefined)
-                : undefined,
+              // Page most affected by this specific anomaly type — drop anomalies use
+              // the page with the largest absolute decrease; spike anomalies use the
+              // largest increase. One API call per source+direction per scan.
+              affectedPage: a.source === 'gsc'
+                ? (a.type === 'traffic_spike' ? (gscSpikePage ?? undefined) : (gscDropPage ?? undefined))
+                : a.source === 'ga4'
+                  ? (a.type === 'traffic_spike' ? (ga4SpikePage ?? undefined) : (ga4DropPage ?? undefined))
+                  : undefined,
             };
 
             const impactScore = computeImpactScore(insightSeverity, digestData as unknown as Record<string, unknown>);

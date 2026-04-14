@@ -887,3 +887,78 @@ export async function getTopDroppedGA4Page(
     return topPage.startsWith('/') ? topPage.split('?')[0] : null;
   }
 }
+
+/**
+ * Find the landing page with the largest absolute user *increase* between the
+ * current and previous period. Used by anomaly detection to populate
+ * `AnomalyDigestData.affectedPage` for traffic_spike anomalies.
+ *
+ * Makes 2 GA4 API calls — call once per workspace per detection run.
+ * Returns the page path (e.g. "/blog/article"), or null if no data is available.
+ */
+export async function getTopSpikedGA4Page(
+  propertyId: string,
+  days: number = 28,
+): Promise<string | null> {
+  const curEnd = dateStr(1);
+  const curStart = dateStr(days);
+  const curSpanMs = new Date(curEnd).getTime() - new Date(curStart).getTime();
+  const curSpanDays = Math.round(curSpanMs / (1000 * 60 * 60 * 24));
+  const prevEndDate = new Date(curStart);
+  prevEndDate.setDate(prevEndDate.getDate() - 1);
+  const prevStartDate = new Date(prevEndDate);
+  prevStartDate.setDate(prevStartDate.getDate() - curSpanDays + 1);
+  const fmtD = (d: Date) => d.toISOString().split('T')[0];
+
+  type PageRow = {
+    dimensionValues: Array<{ value: string }>;
+    metricValues: Array<{ value: string }>;
+  };
+
+  const [curData, prevData] = await Promise.all([
+    runReport(propertyId, {
+      dateRanges: [{ startDate: curStart, endDate: curEnd }],
+      dimensions: [{ name: 'landingPage' }],
+      metrics: [{ name: 'totalUsers' }],
+      orderBys: [{ metric: { metricName: 'totalUsers' }, desc: true }],
+      limit: 100,
+    }),
+    runReport(propertyId, {
+      dateRanges: [{ startDate: fmtD(prevStartDate), endDate: fmtD(prevEndDate) }],
+      dimensions: [{ name: 'landingPage' }],
+      metrics: [{ name: 'totalUsers' }],
+      orderBys: [{ metric: { metricName: 'totalUsers' }, desc: true }],
+      limit: 100,
+    }),
+  ]) as [{ rows?: PageRow[] }, { rows?: PageRow[] }];
+
+  if (!curData.rows?.length) return null;
+
+  const prevByPage = new Map<string, number>();
+  for (const row of (prevData.rows ?? [])) {
+    prevByPage.set(row.dimensionValues[0].value, parseInt(row.metricValues[0].value));
+  }
+
+  let topPage: string | null = null;
+  let maxSpike = 0;
+  for (const row of curData.rows) {
+    const page = row.dimensionValues[0].value;
+    const curUsers = parseInt(row.metricValues[0].value);
+    const prevUsers = prevByPage.get(page) ?? 0;
+    const spike = curUsers - prevUsers; // positive = increased
+    if (spike > maxSpike) {
+      maxSpike = spike;
+      topPage = page;
+    }
+  }
+
+  if (!topPage) return null;
+  try {
+    if (topPage.startsWith('http')) {
+      return new URL(topPage).pathname.split('?')[0];
+    }
+    return topPage.split('?')[0];
+  } catch {
+    return topPage.startsWith('/') ? topPage.split('?')[0] : null;
+  }
+}

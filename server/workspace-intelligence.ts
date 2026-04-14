@@ -944,6 +944,22 @@ async function assembleSiteHealth(
     log.debug({ workspaceId, err }, 'siteHealth: seo change tracker failed — skipping');
   }
 
+  // ── Recent diagnostic reports (diagnostic-store.ts) ──────────────────
+  let recentDiagnostics: SiteHealthSlice['recentDiagnostics'];
+  try {
+    const { listDiagnosticReports } = await import('./diagnostic-store.js');
+    const reports = listDiagnosticReports(workspaceId);
+    recentDiagnostics = reports.slice(0, 5).map(r => ({
+      insightId: r.insightId,
+      anomalyType: r.anomalyType,
+      status: r.status,
+      affectedPages: r.affectedPages,
+      completedAt: r.completedAt,
+    }));
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: diagnostic reports optional, degrading gracefully');
+  }
+
   return {
     auditScore,
     auditScoreDelta,
@@ -958,6 +974,7 @@ async function assembleSiteHealth(
     anomalyCount,
     anomalyTypes,
     seoChangeVelocity,
+    recentDiagnostics,
   };
 }
 
@@ -1963,6 +1980,13 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
   }
 
   if (verbosity === 'detailed') {
+    if (health.recentDiagnostics && health.recentDiagnostics.length > 0) {
+      const diagLines = health.recentDiagnostics.map(d => {
+        const pages = d.affectedPages.length > 0 ? ` on ${d.affectedPages.join(', ')}` : '';
+        return `  ${d.anomalyType} [${d.status}]${pages}`;
+      });
+      lines.push(`Recent diagnostics:\n${diagLines.join('\n')}`);
+    }
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
     if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${pct(health.cwvPassRate.mobile)}, desktop ${health.cwvPassRate.desktop != null ? pct(health.cwvPassRate.desktop) : 'n/a'}`);
