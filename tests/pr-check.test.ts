@@ -2774,20 +2774,32 @@ describe('Rule: Port collision in integration tests', () => {
     expect(runRule(RULE, [file1, file2])).toHaveLength(0);
   });
 
-  it('does not flag unique port numbers', () => {
+  it('does not flag unique in-range port numbers', () => {
     const file1 = write(
       uniqPath('rule-port', 'tests/integration/unique-a.test.ts'),
       lines(
-        "const ctx = createTestContext(19001);",
+        "const ctx = createTestContext(13201);",
       )
     );
     const file2 = write(
       uniqPath('rule-port', 'tests/integration/unique-b.test.ts'),
       lines(
-        "const ctx = createTestContext(19002);",
+        "const ctx = createTestContext(13202);",
       )
     );
     expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('flags a single port outside the documented 13201–13319 range', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/integration/out-of-range.test.ts'),
+      lines(
+        "const ctx = createTestContext(50000);",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
   });
 
   it('does not flag files without createTestContext', () => {

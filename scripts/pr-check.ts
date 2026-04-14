@@ -2659,14 +2659,14 @@ export const CHECKS: Check[] = [
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
+          // Skip comments before entering the inner loop
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (hasHatch(lines, i, '// limiter-ok')) continue;
           // Check if any globally-applied limiter name appears on this line
           for (const limiter of GLOBALLY_APPLIED_LIMITERS) {
             // Match as a word boundary to avoid partial matches
             const re = new RegExp(`\\b${limiter}\\b`);
             if (!re.test(line)) continue;
-            // Skip comments
-            if (/^\s*(\/\/|\*)/.test(line)) continue;
-            if (hasHatch(lines, i, '// limiter-ok')) continue;
             hits.push({ file, line: i + 1, text: line.trim() });
             break; // one hit per limiter per line
           }
@@ -2683,7 +2683,7 @@ export const CHECKS: Check[] = [
     // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
     // all port allocations across every `*.test.ts` file and flags any
     // duplicate. It also flags ports outside the documented range
-    // (13201–13319 per CLAUDE.md).
+    // (13201–13319 per CLAUDE.md) as a separate warning.
     name: 'Port collision in integration tests',
     pattern: '',
     fileGlobs: ['*.test.ts'],
@@ -2725,6 +2725,19 @@ export const CHECKS: Check[] = [
       for (const [, usages] of portMap) {
         if (usages.length > 1) {
           for (const u of usages) hits.push(u);
+        }
+      }
+      // Flag ports outside the documented 13201–13319 range
+      const PORT_MIN = 13201;
+      const PORT_MAX = 13319;
+      for (const [port, usages] of portMap) {
+        if (port < PORT_MIN || port > PORT_MAX) {
+          for (const u of usages) {
+            // Don't double-flag if already flagged as a duplicate
+            if (!hits.some((h) => h.file === u.file && h.line === u.line)) {
+              hits.push(u);
+            }
+          }
         }
       }
       return hits;
