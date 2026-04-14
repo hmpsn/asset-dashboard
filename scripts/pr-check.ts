@@ -736,25 +736,35 @@ const ROUTE_BROADCAST_LOOKAHEAD = 120;
  *  public-portal rule — admin handlers can be similarly long. */
 const ADMIN_ACTIVITY_LOOKAHEAD = 250;
 
-/** Extracts all workspace-scoped event string values from `server/ws-events.ts`.
- *  These are the values of the `WS_EVENTS` object — any handler key in a
- *  `useGlobalAdminEvents({ ... })` call that matches one of these strings is
- *  dead code (the hook doesn't subscribe to workspace rooms). */
+/** Extracts workspace-*only* event string values from `server/ws-events.ts`.
+ *  Returns WS_EVENTS values minus any values that also appear in ADMIN_EVENTS.
+ *  Values that exist in both objects (e.g. 'workspace:updated', 'request:created')
+ *  are legitimate admin-global events and must not be flagged. */
 function loadWsEventValues(): Set<string> {
   const wsEventsPath = path.join(ROOT, 'server', 'ws-events.ts');
   const content = readFileOrEmpty(wsEventsPath);
   if (!content) return new Set();
-  // Extract the WS_EVENTS block (ends at `} as const;`)
-  const wsBlock = content.match(/export\s+const\s+WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/)
-  if (!wsBlock) return new Set();
-  const values = new Set<string>();
-  // Match all string values: `KEY: 'value'` or `KEY: "value"`
   const valueRe = /:\s*['"]([^'"]+)['"]/g;
+
+  // Extract the WS_EVENTS block (ends at `} as const;`)
+  const wsBlock = content.match(/export\s+const\s+WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
+  if (!wsBlock) return new Set();
+  const wsValues = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = valueRe.exec(wsBlock[1])) !== null) {
-    values.add(m[1]);
+    wsValues.add(m[1]);
   }
-  return values;
+
+  // Extract the ADMIN_EVENTS block and subtract overlapping values.
+  const adminBlock = content.match(/export\s+const\s+ADMIN_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
+  if (adminBlock) {
+    valueRe.lastIndex = 0;
+    while ((m = valueRe.exec(adminBlock[1])) !== null) {
+      wsValues.delete(m[1]);
+    }
+  }
+
+  return wsValues;
 }
 
 export const CHECKS: Check[] = [

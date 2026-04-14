@@ -3338,6 +3338,24 @@ describe('Rule: useGlobalAdminEvents called with workspace-scoped event name', (
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
+  it('does not flag overlapping values that exist in both WS_EVENTS and ADMIN_EVENTS', () => {
+    // 'workspace:updated' and 'request:created' appear in both objects.
+    // They are legitimate admin-global events and must not be flagged.
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/AdminPanel.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function AdminPanel() {",
+        "  useGlobalAdminEvents({",
+        "    'workspace:updated': handleWorkspaceUpdated,",
+        "    'request:created': handleRequestCreated,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
   it('does not flag presence:update (not a WS_EVENTS value)', () => {
     const file = write(
       uniqPath('rule-ws-events', 'src/components/WorkspaceOverview.tsx'),
