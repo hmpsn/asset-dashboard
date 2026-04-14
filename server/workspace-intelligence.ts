@@ -1108,7 +1108,8 @@ async function assembleClientSignals(
     let responseTimeSum = 0;
     let resolvedBatchCount = 0;
     for (const batch of batches) {
-      const allResolved = batch.items.length > 0 && batch.items.every(
+      const items = batch.items ?? [];
+      const allResolved = items.length > 0 && items.every(
         i => i.status === 'approved' || i.status === 'applied',
       );
       if (allResolved && batch.createdAt && batch.updatedAt) {
@@ -1839,7 +1840,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
   // Guard must be verbosity-aware: only pass if there's content that will actually render
   // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
   const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
-  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
+  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0 || (learnings.topWins?.length ?? 0) > 0;
   const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0 || !!learnings.summary?.content || !!learnings.summary?.strategy || !!learnings.summary?.technical;
   const willRender =
     hasBaseContent ||
