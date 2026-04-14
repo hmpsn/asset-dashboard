@@ -19,6 +19,7 @@ import {
 } from '../client-users.js';
 import { sendEmail } from '../email.js';
 import { sanitizeString } from '../helpers.js';
+import { addActivity } from '../activity-log.js';
 import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, recordLoginFailure, clearLoginFailures } from '../middleware.js';
 import { verifyTurnstile } from '../middleware/turnstile.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
@@ -60,6 +61,7 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       secure: IS_PROD,
     });
+    addActivity(ws.id, 'portal_session', 'Client portal session started', 'Via shared password');
     return res.json({ ok: true });
   }
   return res.status(401).json({ error: 'Incorrect password' });
@@ -105,6 +107,7 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
     res.cookie(`client_user_token_${ws.id}`, token, {
       httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
     });
+    addActivity(ws.id, 'portal_session', 'Client portal session started', `Via client login: ${safe.email}`, undefined, { id: safe.id, name: safe.name });
     res.json({ ok: true, user: safe });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

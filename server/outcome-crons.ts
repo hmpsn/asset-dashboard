@@ -36,7 +36,28 @@ export function startOutcomeCrons() {
   const runMeasure = async () => {
     try {
       const { measurePendingOutcomes }: typeof OutcomeMeasurement = await import('./outcome-measurement.js'); // dynamic-import-ok
-      const { workspaceIds } = await measurePendingOutcomes();
+
+      // Build workspace priority map from cached intelligence: lowest compositeHealthScore = highest priority.
+      // Uses read-only cache peek — does NOT call buildWorkspaceIntelligence() to avoid circular dependency risk.
+      let workspacePriority: Map<string, number> | undefined;
+      try {
+        const { getPendingActions }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
+        const pending = getPendingActions();
+        const wsIds = [...new Set(pending.map(a => a.workspaceId))];
+        if (wsIds.length > 1) {
+          const { getWorkspaceHealthScore } = await import('./workspace-intelligence.js'); // dynamic-import-ok
+          workspacePriority = new Map<string, number>();
+          for (const wsId of wsIds) {
+            const score = getWorkspaceHealthScore(wsId);
+            if (score != null) workspacePriority.set(wsId, score);
+          }
+          if (workspacePriority.size === 0) workspacePriority = undefined;
+        }
+      } catch (prioErr) {
+        log.debug({ err: prioErr }, 'Failed to build workspace priority map — proceeding without prioritization');
+      }
+
+      const { workspaceIds } = await measurePendingOutcomes(undefined, workspacePriority);
 
       // Invalidate cache for every workspace that had pending measurements.
       // workspaceIds comes from the same getPendingActions() call that drives

@@ -829,6 +829,10 @@ async function assembleSiteHealth(
   }
 
   // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
+  // TODO(IG-5): Desktop CWV is always null because getPageSpeed(siteId) returns a single
+  // snapshot keyed by siteId alone, holding only the last run (mobile OR desktop).
+  // Fixing this requires changing performance-store.ts to key snapshots by siteId + strategy.
+  // Deferred to Sprint IG-5 (strategic gaps).
   if (siteId) {
     try {
       const { getPageSpeed } = await import('./performance-store.js');
@@ -1104,7 +1108,8 @@ async function assembleClientSignals(
     let responseTimeSum = 0;
     let resolvedBatchCount = 0;
     for (const batch of batches) {
-      const allResolved = batch.items.length > 0 && batch.items.every(
+      const items = batch.items ?? [];
+      const allResolved = items.length > 0 && items.every(
         i => i.status === 'approved' || i.status === 'applied',
       );
       if (allResolved && batch.createdAt && batch.updatedAt) {
@@ -1150,11 +1155,29 @@ async function assembleClientSignals(
       log.debug({ err, workspaceId }, 'assembleClientSignals: chat memory optional, degrading gracefully');
     }
 
+    let portalUsage: EngagementMetrics['portalUsage'] = null;
+    try {
+      const { countActivityByType } = await import('./activity-log.js');
+      const sessionCount = countActivityByType(workspaceId, 'portal_session', 30);
+      if (sessionCount > 0) {
+        // pageViews approximated from portal_session login events; featuresUsed derived from client-specific activity
+        const featuresUsed: string[] = [];
+        if (chatSessionCount > 0) featuresUsed.push('chat');
+        // Check for client-initiated feedback activity (not admin-only types) to detect dashboard usage
+        const feedbackCount = countActivityByType(workspaceId, 'client_keyword_feedback', 30)
+          + countActivityByType(workspaceId, 'client_content_gap_vote', 30);
+        if (feedbackCount > 0) featuresUsed.push('dashboard');
+        portalUsage = { pageViews: sessionCount, featuresUsed };
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleClientSignals: portal usage count optional, degrading gracefully');
+    }
+
     engagement = {
       lastLoginAt: latestLogin,
       loginFrequency,
       chatSessionCount,
-      portalUsage: null,
+      portalUsage,
     };
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: client users optional, degrading gracefully');
@@ -1835,7 +1858,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
   // Guard must be verbosity-aware: only pass if there's content that will actually render
   // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
   const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
-  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
+  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0 || (learnings.topWins?.length ?? 0) > 0;
   const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0 || !!learnings.summary?.content || !!learnings.summary?.strategy || !!learnings.summary?.technical;
   const willRender =
     hasBaseContent ||
@@ -1920,6 +1943,18 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
       }
     }
 
+    // Top recent wins — standard and detailed
+    if (learnings.topWins && learnings.topWins.length > 0) {
+      const winLimit = verbosity === 'detailed' ? 5 : 3;
+      lines.push('Recent wins:');
+      for (const win of learnings.topWins.slice(0, winLimit)) {
+        const page = win.pageUrl ?? 'site';
+        const delta = win.delta;
+        const sign = delta.direction === 'improved' ? '+' : delta.direction === 'declined' ? '-' : '';
+        lines.push(`  - ${win.actionType.replace(/_/g, ' ')} on ${page} → ${sign}${Math.abs(delta.delta_percent).toFixed(0)}% ${delta.primary_metric}`);
+      }
+    }
+
     // ROI attribution — detailed only
     if (learnings.roiAttribution && learnings.roiAttribution.length > 0 && verbosity === 'detailed') {
       lines.push('ROI highlights:');
@@ -1967,6 +2002,11 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     }
   }
 
+  // Suggested briefs count — standard and detailed
+  if (verbosity !== 'compact' && pipeline.suggestedBriefs != null && pipeline.suggestedBriefs > 0) {
+    lines.push(`Suggested briefs: ${pipeline.suggestedBriefs} pending topics identified`);
+  }
+
   if (verbosity === 'detailed') {
     const bs = pipeline.briefs.byStatus;
     lines.push(`Brief status: ${Object.entries(bs).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
@@ -1975,6 +2015,14 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     lines.push(`Matrix: ${pipeline.matrices.cellsPublished}/${pipeline.matrices.cellsPlanned} cells published`);
     if (pipeline.schemaDeployment) {
       lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
+    }
+
+    // Rewrite playbook patterns — detailed only
+    if (pipeline.rewritePlaybook?.patterns && pipeline.rewritePlaybook.patterns.length > 0) {
+      lines.push(`Rewrite playbook: ${pipeline.rewritePlaybook.patterns.length} learned patterns`);
+      for (const pattern of pipeline.rewritePlaybook.patterns.slice(0, 5)) {
+        lines.push(`  - ${pattern}`);
+      }
     }
     if (pipeline.cannibalizationWarnings && pipeline.cannibalizationWarnings.length > 0) {
       lines.push('Keyword cannibalization:');
@@ -2170,6 +2218,11 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
 
   lines.push(`Keyword: ${profile.primaryKeyword ?? 'none'} | Health: ${profile.optimizationScore ?? 'n/a'}`);
 
+  // Link health — all verbosity levels (concise)
+  if (profile.linkHealth) {
+    lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' (ORPHAN — no inbound links)' : ''}`);
+  }
+
   if (verbosity !== 'compact') {
     if (profile.rankHistory.current != null) {
       lines.push(`Position: ${profile.rankHistory.current} (${profile.rankHistory.trend})`);
@@ -2214,9 +2267,6 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
       lines.push(`Structural audit issues: ${profile.auditIssues.length}`);
     }
     lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
-    if (profile.linkHealth) {
-      lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' ⚠ orphan page' : ''}`);
-    }
     if (profile.seoEdits?.currentTitle) {
       lines.push(`Current title: ${profile.seoEdits.currentTitle}`);
     }
@@ -2559,6 +2609,21 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
 /** Cache stats for health endpoint (§18) */
 export function getIntelligenceCacheStats() {
   return intelligenceCache.stats();
+}
+
+/**
+ * Read-only peek at cached compositeHealthScore for a workspace.
+ * Returns null if no cached intelligence exists — does NOT trigger assembly.
+ * Used by outcome crons to prioritize measurement by workspace health.
+ */
+export function getWorkspaceHealthScore(workspaceId: string): number | null {
+  // Try the default cache key (all slices, no page path, 'all' learning domain)
+  const cacheKey = `intelligence:${workspaceId}:${[...ALL_SLICES].sort().join(',')}::all`;
+  const cached = intelligenceCache.peek(cacheKey);
+  if (cached?.clientSignals?.compositeHealthScore != null) {
+    return cached.clientSignals.compositeHealthScore;
+  }
+  return null;
 }
 
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────

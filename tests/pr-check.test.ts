@@ -36,6 +36,8 @@ import {
   findUnrenderedSliceFields,
   compareStudioConstants,
   BRAND_ENGINE_ROUTE_BASENAMES,
+  REQUIRE_AUTH_ALLOWED_BASENAMES,
+  GLOBALLY_APPLIED_LIMITERS,
   type Check,
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
@@ -2482,6 +2484,1065 @@ describe('Rule: TabBar component without ?tab= deep-link support', () => {
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: seo-context.ts import restriction (deprecated module)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Prevents new imports of the deprecated seo-context.ts module. Existing
+// callers are grandfathered via the exclude list. New code must use
+// buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts.
+
+describe('Rule: seo-context.ts import restriction (deprecated module)', () => {
+  const RULE = 'seo-context.ts import restriction (deprecated module)';
+
+  it('flags a single-quoted import of seo-context', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/new-feature.ts'),
+      lines(
+        "import { buildSeoContext } from './seo-context.js';",  // 1
+        "export function doStuff() { return buildSeoContext(); }",  // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('flags a double-quoted import of seo-context', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/other-feature.ts'),
+      lines(
+        'import { buildPageAnalysisContext } from "./seo-context.js";',  // 1
+        'export function run() { return buildPageAnalysisContext(); }',   // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects inline // seo-context-ok hatch on the import line', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/grandfathered-inline.ts'),
+      lines(
+        "import { buildSeoContext } from './seo-context.js'; // seo-context-ok",  // 1
+        "export function doStuff() { return buildSeoContext(); }",                 // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('respects // seo-context-ok on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/grandfathered-above.ts'),
+      lines(
+        "// seo-context-ok — grandfathered caller awaiting migration",  // 1
+        "import { buildSeoContext } from './seo-context.js';",          // 2
+        "export function doStuff() { return buildSeoContext(); }",      // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does not flag files that do not import seo-context', () => {
+    const file = write(
+      uniqPath('rule-seo-context', 'server/clean-feature.ts'),
+      lines(
+        "import { buildWorkspaceIntelligence } from './workspace-intelligence.js';",  // 1
+        "export function doStuff() { return buildWorkspaceIntelligence('ws1'); }",    // 2
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: requireAuth usage outside allowed route files
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: requireAuth usage outside allowed route files', () => {
+  const RULE = 'requireAuth usage outside allowed route files';
+
+  it('flags requireAuth usage in a non-allowed server route file', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/some-feature.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",                    // 1
+        "import { Router } from 'express';",                            // 2
+        "const router = Router();",                                     // 3
+        "router.get('/api/things', requireAuth, (req, res) => {",       // 4
+        "  res.json({ ok: true });",                                    // 5
+        "});",                                                          // 6
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('respects inline // auth-ok hatch on the usage line', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/special.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "const router = Router();",
+        "router.get('/api/things', requireAuth, handler); // auth-ok",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // auth-ok hatch on the line above', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/special2.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "const router = Router();",
+        "// auth-ok — intentionally JWT-only",
+        "router.get('/api/things', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag requireAuth in routes/auth.ts (allowed)', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/auth.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "router.get('/api/auth/me', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag requireAuth in routes/users.ts (allowed)', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/users.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "router.get('/api/users', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag brand-engine routes (covered by their own rule)', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/voice-calibration.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "router.get('/api/voice', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag server/auth.ts definition file', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/auth.ts'),
+      lines(
+        "export function requireAuth(req, res, next) {",
+        "  // JWT verification logic",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag import-only lines', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/other.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "// Just importing, not using",
+        "const router = Router();",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag comment-only references', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/client-signals.ts'),
+      lines(
+        "// Never add requireAuth to admin routes",
+        "const router = Router();",
+        "router.get('/api/signals', handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Duplicate globally-applied rate limiter in route file
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Duplicate globally-applied rate limiter in route file', () => {
+  const RULE = 'Duplicate globally-applied rate limiter in route file';
+
+  it('flags globalPublicLimiter import/usage in a route file', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-content.ts'),
+      lines(
+        "import { globalPublicLimiter } from '../middleware.js';",       // 1
+        "const router = Router();",                                     // 2
+        "router.get('/api/public/content', globalPublicLimiter, handler);", // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    // Should flag both the import line and the usage line
+    // Actually, import lines are flagged too since they indicate intent to use
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('flags publicApiLimiter in a route file', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-api.ts'),
+      lines(
+        "import { publicApiLimiter } from '../middleware.js';",          // 1
+        "const router = Router();",                                     // 2
+        "router.get('/api/public/data', publicApiLimiter, handler);",    // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags publicWriteLimiter in a route file', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-write.ts'),
+      lines(
+        "import { publicWriteLimiter } from '../middleware.js';",        // 1
+        "const router = Router();",                                     // 2
+        "router.post('/api/public/submit', publicWriteLimiter, handler);", // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('respects inline // limiter-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-special.ts'),
+      lines(
+        "import { globalPublicLimiter } from '../middleware.js'; // limiter-ok",
+        "router.get('/api/public/special', globalPublicLimiter, handler); // limiter-ok",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // limiter-ok hatch on the line above', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-above.ts'),
+      lines(
+        "// limiter-ok — intentional double-apply",
+        "import { globalPublicLimiter } from '../middleware.js';",
+        "// limiter-ok",
+        "router.get('/api/public/data', globalPublicLimiter, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag route-specific limiters (aiLimiter, loginLimiter, etc.)', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/ai.ts'),
+      lines(
+        "import { aiLimiter } from '../middleware.js';",
+        "const router = Router();",
+        "router.post('/api/admin-chat', aiLimiter, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag checkoutLimiter (not globally applied)', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/stripe.ts'),
+      lines(
+        "import { checkoutLimiter } from '../middleware.js';",
+        "router.post('/api/stripe/checkout', checkoutLimiter, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag comments mentioning globally-applied limiters', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-safe.ts'),
+      lines(
+        "// Do NOT import globalPublicLimiter here — it is applied globally",
+        "const router = Router();",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Port collision in integration tests
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Port collision in integration tests', () => {
+  const RULE = 'Port collision in integration tests';
+  // Helper to build createTestContext() calls in fixture strings without
+  // tripping the meta-port-uniqueness test, which scans every .test.ts
+  // file for the literal regex /createTestContext\s*\(\s*(\d+)/.
+  const ctc = (port: number) => `createTestContext(${port})`;
+
+  it('flags duplicate port numbers across test files', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/feature-a.test.ts'),
+      lines(
+        "import { createTestContext } from '../helpers';",
+        `const ctx = ${ctc(19999)};`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/feature-b.test.ts'),
+      lines(
+        "import { createTestContext } from '../helpers';",
+        `const ctx = ${ctc(19999)};`,
+      )
+    );
+    const hits = runRule(RULE, [file1, file2]);
+    expect(hits).toHaveLength(2); // both files flagged
+    expect(hits[0].file).toBe(file1);
+    expect(hits[1].file).toBe(file2);
+  });
+
+  it('respects inline // port-ok hatch', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/shared-a.test.ts'),
+      lines(
+        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-b`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/shared-b.test.ts'),
+      lines(
+        `const ctx = ${ctc(19998)}; // port-ok — shared with feature-a`,
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('respects // port-ok hatch on line above', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/above-a.test.ts'),
+      lines(
+        "// port-ok — intentionally shared",
+        `const ctx = ${ctc(19997)};`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/above-b.test.ts'),
+      lines(
+        "// port-ok",
+        `const ctx = ${ctc(19997)};`,
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('does not flag unique in-range port numbers', () => {
+    const file1 = write(
+      uniqPath('rule-port', 'tests/integration/unique-a.test.ts'),
+      lines(
+        `const ctx = ${ctc(13201)};`,
+      )
+    );
+    const file2 = write(
+      uniqPath('rule-port', 'tests/integration/unique-b.test.ts'),
+      lines(
+        `const ctx = ${ctc(13202)};`,
+      )
+    );
+    expect(runRule(RULE, [file1, file2])).toHaveLength(0);
+  });
+
+  it('flags a single port outside the documented 13201–13319 range', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/integration/out-of-range.test.ts'),
+      lines(
+        `const ctx = ${ctc(50000)};`,
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('does not flag files without createTestContext', () => {
+    const file = write(
+      uniqPath('rule-port', 'tests/unit/utils.test.ts'),
+      lines(
+        "import { describe, it, expect } from 'vitest';",
+        "describe('utils', () => { it('works', () => expect(1).toBe(1)); });",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Inline React Query string key (use queryKeys.*)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Inline React Query string key (use queryKeys.*)', () => {
+  const RULE = 'Inline React Query string key (use queryKeys.*)';
+
+  it('flags queryKey with inline string array', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useItems.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "export function useItems() {",
+        "  return useQuery({",
+        "    queryKey: ['items', workspaceId],",         // 4 — flagged
+        "    queryFn: () => api.getItems(workspaceId),",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('does not flag queryKey using queryKeys.* factory', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/usePages.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "import { queryKeys } from '../lib/queryKeys';",
+        "export function usePages(wsId: string) {",
+        "  return useQuery({",
+        "    queryKey: queryKeys.pages.list(wsId),",
+        "    queryFn: () => api.getPages(wsId),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag queryKey with spread queryKeys.* pattern', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useFiltered.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "import { queryKeys } from '../lib/queryKeys';",
+        "export function useFiltered(wsId: string, filter: string) {",
+        "  return useQuery({",
+        "    queryKey: [...queryKeys.pages.list(wsId), filter],",
+        "    queryFn: () => api.getFiltered(wsId, filter),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // querykey-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useSpecial.ts'),
+      lines(
+        "import { useQuery } from '@tanstack/react-query';",
+        "export function useSpecial() {",
+        "  return useQuery({",
+        "    queryKey: ['special-one-off'], // querykey-ok — intentional one-off",
+        "    queryFn: () => api.getSpecial(),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside src/', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'server/routes/items.ts'),
+      lines(
+        "const config = { queryKey: ['server-side'] };",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag the queryKeys definition file', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/lib/queryKeys.ts'),
+      lines(
+        "export const queryKeys = {",
+        "  pages: { list: (wsId: string) => ({ queryKey: ['pages', wsId] }) },",
+        "};",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag test files', () => {
+    const file = write(
+      uniqPath('rule-querykey', 'src/hooks/useItems.test.ts'),
+      lines(
+        "const wrapper = renderHook(() => useQuery({ queryKey: ['test'] }));",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Missing broadcastToWorkspace after DB write in route handler
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Missing broadcastToWorkspace after DB write in route handler', () => {
+  const RULE = 'Missing broadcastToWorkspace after DB write in route handler';
+
+  it('flags route handler with db.prepare().run but no broadcast', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/items.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/items', (req, res) => {",              // 2 — flagged
+        "  db.prepare('INSERT INTO items (name) VALUES (?)').run(req.body.name);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag route handler that calls broadcastToWorkspace', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/pages.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/pages', (req, res) => {",
+        "  db.prepare('INSERT INTO pages (title) VALUES (?)').run(req.body.title);",
+        "  broadcastToWorkspace(req.workspaceId, 'pages:updated');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag route handler that calls broadcast()', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/settings.ts'),
+      lines(
+        "const router = Router();",
+        "router.put('/api/settings', (req, res) => {",
+        "  db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(req.body.value, req.body.key);",
+        "  broadcast(req.workspaceId, 'settings:changed');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // broadcast-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/analytics.ts'),
+      lines(
+        "const router = Router();",
+        "// broadcast-ok — analytics writes don't need real-time updates",
+        "router.post('/api/analytics/track', (req, res) => {",
+        "  db.prepare('INSERT INTO events (type) VALUES (?)').run(req.body.type);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag GET routes (read-only)', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/readonly.ts'),
+      lines(
+        "const router = Router();",
+        "router.get('/api/items', (req, res) => {",
+        "  const items = db.prepare('SELECT * FROM items').all();",
+        "  res.json(items);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag route without db.prepare', () => {
+    const file = write(
+      uniqPath('rule-broadcast', 'server/routes/proxy.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/proxy', (req, res) => {",
+        "  const result = await externalApi.send(req.body);",
+        "  res.json(result);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// P2 Rule: Admin route mutation without addActivity
+// Extends the public-portal addActivity rule to all admin route files.
+// Files must be under server/routes/ and NOT be public-* or infrastructure.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Admin route mutation without addActivity', () => {
+  const RULE = 'Admin route mutation without addActivity';
+
+  it('flags a router.post with DB write but no addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/brandscript.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/brandscripts/:workspaceId', (req, res) => {",
+        "  db.prepare('INSERT INTO brandscripts (name) VALUES (?)').run(req.body.name);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags router.delete with DB write but no addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/insights.ts'),
+      lines(
+        "const router = Router();",
+        "router.delete('/api/insights/:id', (req, res) => {",
+        "  db.prepare('DELETE FROM insights WHERE id = ?').run(req.params.id);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag handler that calls addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/brandscript.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/brandscripts/:workspaceId', (req, res) => {",
+        "  db.prepare('INSERT INTO brandscripts (name) VALUES (?)').run(req.body.name);",
+        "  addActivity(req.params.workspaceId, 'brandscript_created', 'Created brandscript');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects inline // activity-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/settings.ts'),
+      lines(
+        "const router = Router();",
+        "router.put('/api/settings', (req, res) => { // activity-ok — internal bookkeeping",
+        "  db.prepare('UPDATE settings SET value = ?').run(req.body.value);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // activity-ok hatch on line above', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/settings.ts'),
+      lines(
+        "const router = Router();",
+        "// activity-ok — settings don't need activity logging",
+        "router.put('/api/settings', (req, res) => {",
+        "  db.prepare('UPDATE settings SET value = ?').run(req.body.value);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag handler without db.prepare (no DB write)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/proxy.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/proxy', (req, res) => {",
+        "  const result = await externalApi.send(req.body);",
+        "  res.json(result);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag GET routes (read-only)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/items.ts'),
+      lines(
+        "const router = Router();",
+        "router.get('/api/items', (req, res) => {",
+        "  const items = db.prepare('SELECT * FROM items').all();",
+        "  res.json(items);",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('skips public route files (covered by separate rule)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/public-portal.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/public/thing', (req, res) => {",
+        "  db.prepare('INSERT INTO a VALUES (?)').run(req.body.x);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('skips infrastructure routes (auth.ts, users.ts, health.ts)', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/auth.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/auth/login', (req, res) => {",
+        "  db.prepare('UPDATE users SET last_login = ?').run(Date.now());",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple handlers — only those missing addActivity', () => {
+    const file = write(
+      uniqPath('rule-admin-activity', 'server/routes/content.ts'),
+      lines(
+        "const router = Router();",
+        "router.post('/api/content', (req, res) => {",
+        "  db.prepare('INSERT INTO content (title) VALUES (?)').run(req.body.title);",
+        "  addActivity(req.params.workspaceId, 'content_created', 'Created content');",
+        "  res.json({ ok: true });",
+        "});",
+        "router.delete('/api/content/:id', (req, res) => {",
+        "  db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(7);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// P2 Rule: useGlobalAdminEvents called with workspace-scoped event name
+// Detects WS_EVENTS values (workspace-scoped) being passed as handler keys
+// to useGlobalAdminEvents(), which is dead code.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: useGlobalAdminEvents called with workspace-scoped event name', () => {
+  const RULE = 'useGlobalAdminEvents called with workspace-scoped event name';
+
+  it('flags a string-literal WS_EVENTS value used as handler key', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Dashboard.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function Dashboard() {",
+        "  useGlobalAdminEvents({",
+        "    'brandscript:updated': (data) => console.log(data),",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('flags computed WS_EVENTS.* key', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Dashboard.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "import { WS_EVENTS } from '../lib/wsEvents';",
+        "function Dashboard() {",
+        "  useGlobalAdminEvents({",
+        "    [WS_EVENTS.BRANDSCRIPT_UPDATED]: (data) => console.log(data),",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('does not flag ADMIN_EVENTS values (correct usage)', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/App.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';",
+        "import { ADMIN_EVENTS } from './lib/wsEvents';",
+        "function App() {",
+        "  useGlobalAdminEvents({",
+        "    [ADMIN_EVENTS.QUEUE_UPDATE]: handleQueueUpdate,",
+        "    [ADMIN_EVENTS.WORKSPACE_CREATED]: handleWorkspaceCreated,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag ADMIN_EVENTS string-literal values', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/App.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from './hooks/useGlobalAdminEvents';",
+        "function App() {",
+        "  useGlobalAdminEvents({",
+        "    'queue:update': handleQueueUpdate,",
+        "    'workspace:created': handleWorkspaceCreated,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag overlapping values that exist in both WS_EVENTS and ADMIN_EVENTS', () => {
+    // 'workspace:updated' and 'request:created' appear in both objects.
+    // They are legitimate admin-global events and must not be flagged.
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/AdminPanel.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function AdminPanel() {",
+        "  useGlobalAdminEvents({",
+        "    'workspace:updated': handleWorkspaceUpdated,",
+        "    'request:created': handleRequestCreated,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag presence:update (not a WS_EVENTS value)', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/WorkspaceOverview.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function WorkspaceOverview() {",
+        "  useGlobalAdminEvents({ 'presence:update': handlePresenceUpdate });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // global-events-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Debug.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function Debug() {",
+        "  // global-events-ok — debug panel listens to all events",
+        "  useGlobalAdminEvents({",
+        "    'brandscript:updated': (data) => console.log(data),",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple workspace-scoped events in same call', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Bad.tsx'),
+      lines(
+        "import { useGlobalAdminEvents } from '../hooks/useGlobalAdminEvents';",
+        "function Bad() {",
+        "  useGlobalAdminEvents({",
+        "    'activity:new': handleActivity,",
+        "    'brandscript:updated': handleBrandscript,",
+        "  });",
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+  });
+
+  it('does not flag files without useGlobalAdminEvents calls', () => {
+    const file = write(
+      uniqPath('rule-ws-events', 'src/components/Normal.tsx'),
+      lines(
+        "import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';",
+        "function Normal() {",
+        "  useWorkspaceEvents(workspaceId, {",
+        "    'brandscript:updated': handleBrandscript,",
+        "  });",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ── P3: addActivity type not in CLIENT_VISIBLE_TYPES ─────────────────────────
+describe('Rule: addActivity type not in CLIENT_VISIBLE_TYPES (public route)', () => {
+  const RULE = 'addActivity type not in CLIENT_VISIBLE_TYPES (public route)';
+
+  it('flags addActivity with a type not in CLIENT_VISIBLE_TYPES', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-portal.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/submit', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Client chat started');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag addActivity with a CLIENT_VISIBLE_TYPES type', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-content.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/request', async (req, res) => {",
+        "  addActivity(wsId, 'content_requested', 'Client requested content');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag non-public route files', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/workspaces.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/update', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Internal session');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // client-visibility-ok above-line hatch', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-analytics.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/chat', async (req, res) => {",
+        "  // client-visibility-ok — intentionally admin-only",
+        "  addActivity(wsId, 'chat_session', 'Client chat started');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // client-visibility-ok inline hatch', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-analytics.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/chat', async (req, res) => {",
+        "  addActivity(wsId, 'chat_session', 'Client chat started'); // client-visibility-ok",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags multiple non-visible types in same file', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-portal.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/onboard', async (req, res) => {",
+        "  addActivity(wsId, 'client_onboarding_submitted', 'Onboarding done');",
+        "  res.json({ ok: true });",
+        "});",
+        "router.post('/feedback', async (req, res) => {",
+        "  addActivity(wsId, 'client_keyword_feedback', 'Keyword feedback');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(2);
+  });
+
+  it('does not flag when file has no addActivity calls', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-auth.ts'),
+      lines(
+        "router.post('/login', async (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('handles mixed visible and non-visible types correctly', () => {
+    const file = write(
+      uniqPath('rule-client-vis', 'server/routes/public-content.ts'),
+      lines(
+        "import { addActivity } from '../../activity-log.js';",
+        "router.post('/request', async (req, res) => {",
+        "  addActivity(wsId, 'content_requested', 'Content requested');",
+        "  res.json({ ok: true });",
+        "});",
+        "router.post('/signal', async (req, res) => {",
+        "  addActivity(wsId, 'client_signal', 'Signal detected');",
+        "  res.json({ ok: true });",
+        "});",
+      )
+    );
+    // Only client_signal should be flagged, not content_requested
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -2509,6 +3570,20 @@ describe('Meta: customCheck rule name registry', () => {
     'Test body has no assertion or explicit failure throw',
     // PR 2 deep-link guard
     'TabBar component without ?tab= deep-link support',
+    // IG-4 seo-context deprecation
+    'seo-context.ts import restriction (deprecated module)',
+    // P0 expansion rules
+    'requireAuth usage outside allowed route files',
+    'Duplicate globally-applied rate limiter in route file',
+    // P1 expansion rules
+    'Port collision in integration tests',
+    'Inline React Query string key (use queryKeys.*)',
+    'Missing broadcastToWorkspace after DB write in route handler',
+    // P2 expansion rules
+    'Admin route mutation without addActivity',
+    'useGlobalAdminEvents called with workspace-scoped event name',
+    // P3 expansion rules
+    'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

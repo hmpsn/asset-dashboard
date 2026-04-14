@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **51** — 26 error, 25 warn.
+Total rules: **60** — 32 error, 28 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -42,6 +42,12 @@ advisory but tracked.
 | 24 | requireAuth in brand-engine route files (should be requireWorkspaceAccess) | error | custom | `server/routes/` | `// auth-ok` | requireAuth on brand-engine routes 401s every admin call because the admin panel authenticates via HMAC, not JWT. |
 | 25 | useEffect external-sync dirty guard against the live prop | error | custom | `src/` | `// sync-ok` | Comparing a dirty flag against the live prop (not a ref) prevents external-sync useEffects from ever firing after an update arrives — classic stale-state bug. |
 | 26 | Constants in sync (STUDIO_NAME, STUDIO_URL) | error | custom | `server/constants.ts + src/constants.ts` | — | STUDIO_NAME/STUDIO_URL drift silently desynchronizes the studio branding between the admin UI (src/) and server-generated content like emails and AI prompts (server/). |
+| 27 | seo-context.ts import restriction (deprecated module) | error | custom | `server/` | `// seo-context-ok` | seo-context.ts is being retired in favor of the unified workspace intelligence system. New callers must use the intelligence assembler. |
+| 28 | requireAuth usage outside allowed route files | error | custom | `server/` | `// auth-ok` | requireAuth on a non-JWT route silently rejects all admin-panel requests because the admin panel authenticates via HMAC token, not JWT. |
+| 29 | Duplicate globally-applied rate limiter in route file | error | custom | `server/routes/` | `// limiter-ok` | Double-applied rate limiters share the same in-memory bucket, so each request increments the counter twice — a 10 req/min limit silently becomes 5 req/min. |
+| 30 | Port collision in integration tests | error | custom | `tests/` | `// port-ok` | Duplicate test ports cause flaky CI: the second test file to bind gets EADDRINUSE, producing intermittent failures that are hard to diagnose. |
+| 31 | Inline React Query string key (use queryKeys.*) | error | custom | `src/` | `// querykey-ok` | Inline query key literals drift from the centralized factory, causing stale-cache bugs where invalidateQueries misses entries because the key arrays don't match. |
+| 32 | useGlobalAdminEvents called with workspace-scoped event name | error | custom | `src/` | `// global-events-ok` | Silent dead broadcast handlers: useGlobalAdminEvents never subscribes to a workspace room, so workspace-scoped events (WS_EVENTS.*) are silently dropped by the server's broadcastToWorkspace filter. The UI appears stale with no error message. |
 
 ---
 
@@ -74,6 +80,9 @@ advisory but tracked.
 | 23 | Bare brand-engine read in seo-context.ts (use safeBrandEngineRead) | warn | custom | `server/seo-context.ts` | `// safe-read-ok` | A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation. |
 | 24 | Test body has no assertion or explicit failure throw | warn | custom | `*.test.ts, *.test.tsx` | `// no-assertion-ok` | A vitest/jest test body with no assertion passes unconditionally — a broken implementation will not trip the suite. 2026-04-11 audit found 3 such silent-pass bodies in the stripe webhook suite claiming regression coverage they never had. |
 | 25 | TabBar component without ?tab= deep-link support | warn | custom | `src/components/` | `tab-deeplink-ok` | A ?tab= URL that the target component ignores is a silent navigation bug — the user sees the default tab instead of the requested one. |
+| 26 | Missing broadcastToWorkspace after DB write in route handler | warn | custom | `server/routes/` | `// broadcast-ok` | Route handlers that write to the DB without broadcasting leave connected clients with stale data until they manually refresh. |
+| 27 | Admin route mutation without addActivity | warn | custom | `server/routes/*.ts (excluding public-* and infrastructure routes)` | `// activity-ok` | Significant admin operations that skip addActivity() leave gaps in the workspace activity feed, making it impossible for team members to audit what changed and when. |
+| 28 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
 
 ---
 
