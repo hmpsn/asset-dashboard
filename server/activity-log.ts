@@ -98,7 +98,8 @@ export type ActivityType =
   | 'copy_suggestion_added'
   | 'copy_section_edited'
   | 'copy_pattern_removed'
-  | 'diagnostic_completed';
+  | 'diagnostic_completed'
+  | 'portal_session';
 
 export interface ActivityEntry {
   id: string;
@@ -171,6 +172,9 @@ const stmts = createStmtCache(() => ({
   hasRecent: db.prepare(
     `SELECT 1 FROM activity_log WHERE workspace_id = ? AND created_at > datetime('now', ? || ' days') LIMIT 1`,
   ),
+  countByType: db.prepare(
+    `SELECT COUNT(*) as count FROM activity_log WHERE workspace_id = ? AND type = ? AND created_at > datetime('now', ? || ' days')`,
+  ),
   countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
   // Global retention policy: prune the N oldest rows across all workspaces
   // to enforce the global activity-log size cap. Scoping to a single workspace
@@ -241,4 +245,10 @@ export function listClientActivity(workspaceId: string, limit = 50): ActivityEnt
 export function hasRecentActivity(workspaceId: string, withinDays: number = 30): boolean {
   const row = stmts().hasRecent.get(workspaceId, `-${withinDays}`);
   return row != null;
+}
+
+/** Count activity entries of a specific type within the last N days for a workspace. */
+export function countActivityByType(workspaceId: string, type: ActivityType, withinDays: number = 30): number {
+  const row = stmts().countByType.get(workspaceId, type, `-${withinDays}`) as { count: number };
+  return row.count;
 }
