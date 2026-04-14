@@ -603,13 +603,14 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               durationDays,
               firstDetected,
               severity: a.severity,
-              // Page most affected by this specific anomaly type — drop anomalies use
-              // the page with the largest absolute decrease; spike anomalies use the
-              // largest increase. One API call per source+direction per scan.
+              // Only traffic anomalies get a page-level affectedPage — the page lookup
+              // functions find the largest click/user change, which is only meaningful
+              // for traffic_drop/traffic_spike. Non-traffic types (impressions, CTR,
+              // position) get undefined to avoid probing the wrong page.
               affectedPage: a.source === 'gsc'
-                ? (a.type === 'traffic_spike' ? (gscSpikePage ?? undefined) : (gscDropPage ?? undefined))
+                ? (a.type === 'traffic_spike' ? (gscSpikePage ?? undefined) : a.type === 'traffic_drop' ? (gscDropPage ?? undefined) : undefined)
                 : a.source === 'ga4'
-                  ? (a.type === 'traffic_spike' ? (ga4SpikePage ?? undefined) : (ga4DropPage ?? undefined))
+                  ? (a.type === 'traffic_spike' ? (ga4SpikePage ?? undefined) : a.type === 'traffic_drop' ? (ga4DropPage ?? undefined) : undefined)
                   : undefined,
             };
 
