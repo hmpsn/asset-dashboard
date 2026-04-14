@@ -701,6 +701,32 @@ export const BRAND_ENGINE_ROUTE_BASENAMES: ReadonlySet<string> = new Set([
   'copy-pipeline.ts',
 ]);
 
+// ─── requireAuth allowlist ───────────────────────────────────────────────────
+// Files that legitimately use `requireAuth` (JWT-only middleware). Every other
+// server route file should use `requireWorkspaceAccess` or rely on the global
+// APP_PASSWORD HMAC gate. Brand-engine routes have their own dedicated rule
+// (see "requireAuth in brand-engine route files") so they are excluded here
+// to avoid double-flagging.
+//
+// Stored as basenames for harness testability (same rationale as
+// BRAND_ENGINE_ROUTE_BASENAMES above).
+export const REQUIRE_AUTH_ALLOWED_BASENAMES: ReadonlySet<string> = new Set([
+  'auth.ts',       // JWT login/refresh endpoints
+  'users.ts',      // user management — JWT-gated by design
+]);
+
+// ─── Globally-applied rate limiters ──────────────────────────────────────────
+// These three limiters are applied to ALL `/api/public/` routes in app.ts.
+// Importing and re-applying them inside individual route files increments the
+// same shared in-memory bucket twice, silently halving the effective rate limit
+// (e.g. 10 req/min becomes 5). See the warning comment in server/app.ts and
+// the `rateLimit()` implementation in server/middleware.ts.
+export const GLOBALLY_APPLIED_LIMITERS: ReadonlySet<string> = new Set([
+  'globalPublicLimiter',
+  'publicApiLimiter',
+  'publicWriteLimiter',
+]);
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -2531,6 +2557,116 @@ export const CHECKS: Check[] = [
           if (hasHatch(lines, i, 'tab-deeplink-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
           break; // one hit per file
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P0 expansion rule: requireAuth outside allowed files.
+    //
+    // `requireAuth` is JWT-only middleware. Most server routes are protected by
+    // the global APP_PASSWORD HMAC gate; using `requireAuth` on them would 401
+    // every admin call. Only `routes/auth.ts` and `routes/users.ts` legitimately
+    // need JWT-based auth. Brand-engine routes have their own dedicated rule
+    // ("requireAuth in brand-engine route files") so they are excluded here to
+    // avoid double-flagging.
+    //
+    // The definition file `server/auth.ts` is also excluded (it exports the
+    // function, not a usage site).
+    name: 'requireAuth usage outside allowed route files',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// auth-ok'],
+    message:
+      'requireAuth is JWT-only — most routes are protected by the global APP_PASSWORD HMAC gate. ' +
+      'Using requireAuth on an admin route will 401 every admin call. Use requireWorkspaceAccess ' +
+      'for workspace routes, or rely on the HMAC gate for admin routes. ' +
+      'Suppress with // auth-ok if this endpoint intentionally requires JWT.',
+    severity: 'error',
+    rationale:
+      'requireAuth on a non-JWT route silently rejects all admin-panel requests because the admin ' +
+      'panel authenticates via HMAC token, not JWT.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        // Only scan server route files
+        if (!file.includes('/server/')) continue;
+        const basename = path.basename(file);
+        // Skip allowed files (definition + legitimate JWT-only routes)
+        if (basename === 'auth.ts' && !file.includes('/routes/')) continue; // server/auth.ts definition
+        if (REQUIRE_AUTH_ALLOWED_BASENAMES.has(basename) && file.includes('/routes/')) continue;
+        // Skip brand-engine routes (covered by their own dedicated rule)
+        if (BRAND_ENGINE_ROUTE_BASENAMES.has(basename)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('requireAuth')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!/\brequireAuth\b/.test(line)) continue;
+          // Skip import statements — only flag usage sites
+          if (/^\s*import\b/.test(line)) continue;
+          // Skip comments (single-line // and JSDoc *)
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          // Skip function definitions (e.g. if auth.ts is misplaced)
+          if (/\bfunction\s+requireAuth\b/.test(line)) continue;
+          if (hasHatch(lines, i, '// auth-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P0 expansion rule: duplicate rate limiter on public routes.
+    //
+    // `globalPublicLimiter`, `publicApiLimiter`, and `publicWriteLimiter` are
+    // applied to ALL `/api/public/` routes in `server/app.ts`. If a route file
+    // imports and re-applies any of these, the shared in-memory bucket is
+    // incremented twice per request, silently halving the effective rate limit
+    // (e.g. 10 req/min becomes 5, 200 req/min becomes 100).
+    //
+    // Route-specific limiters like `loginLimiter`, `aiLimiter`, and
+    // `checkoutLimiter` are NOT globally applied, so importing them is fine.
+    name: 'Duplicate globally-applied rate limiter in route file',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// limiter-ok'],
+    message:
+      'globalPublicLimiter, publicApiLimiter, and publicWriteLimiter are applied globally in ' +
+      'server/app.ts to all /api/public/ routes. Importing or using them in a route file ' +
+      'increments the same shared bucket twice, silently halving the effective rate limit. ' +
+      'Remove the duplicate application. Suppress with // limiter-ok if intentional.',
+    severity: 'error',
+    rationale:
+      'Double-applied rate limiters share the same in-memory bucket, so each request increments ' +
+      'the counter twice — a 10 req/min limit silently becomes 5 req/min.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Check if any globally-applied limiter name appears on this line
+          for (const limiter of GLOBALLY_APPLIED_LIMITERS) {
+            // Match as a word boundary to avoid partial matches
+            const re = new RegExp(`\\b${limiter}\\b`);
+            if (!re.test(line)) continue;
+            // Skip comments
+            if (/^\s*(\/\/|\*)/.test(line)) continue;
+            if (hasHatch(lines, i, '// limiter-ok')) continue;
+            hits.push({ file, line: i + 1, text: line.trim() });
+            break; // one hit per limiter per line
+          }
         }
       }
       return hits;
