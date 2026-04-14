@@ -913,6 +913,10 @@ export async function refreshContentDecayInsights(workspaceId: string): Promise<
 
   // Prune stale decay insights that were not updated in this cycle
   deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
+
+  // Run the same quality gate as the full computation path to suppress
+  // contradictory, duplicate, and low-confidence insights.
+  validateInsightBatch(workspaceId);
 }
 
 // ── Insight Validation Pass ──────────────────────────────────────
