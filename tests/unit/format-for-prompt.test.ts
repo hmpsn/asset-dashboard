@@ -175,6 +175,9 @@ describe('formatForPrompt', () => {
     expect(result).toContain('content refreshed');
     expect(result).toContain('/blog/seo-guide');
     expect(result).toContain('traffic');
+    // Verify negative delta_percent for improvements renders correctly (no +-58%)
+    expect(result).toContain('+58% position');
+    expect(result).not.toContain('+-');
   });
 
   it('omits topWins in compact mode', () => {

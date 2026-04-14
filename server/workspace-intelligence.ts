@@ -1931,8 +1931,8 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
       for (const win of learnings.topWins.slice(0, winLimit)) {
         const page = win.pageUrl ?? 'site';
         const delta = win.delta;
-        const sign = delta.direction === 'improved' ? '+' : delta.direction === 'declined' ? '' : '';
-        lines.push(`  - ${win.actionType.replace(/_/g, ' ')} on ${page} → ${sign}${delta.delta_percent.toFixed(0)}% ${delta.primary_metric}`);
+        const sign = delta.direction === 'improved' ? '+' : delta.direction === 'declined' ? '-' : '';
+        lines.push(`  - ${win.actionType.replace(/_/g, ' ')} on ${page} → ${sign}${Math.abs(delta.delta_percent).toFixed(0)}% ${delta.primary_metric}`);
       }
     }
 
