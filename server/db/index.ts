@@ -41,10 +41,17 @@ db.pragma('foreign_keys = ON');
  *   2026-04 — 048 triple-prefix cleanup
  *     048-meeting-briefs.sql                → 054-meeting-briefs.sql
  *     048-site-intelligence-client-view.sql → 055-site-intelligence-client-view.sql
+ *   2026-04 — 035/036/037 collision fix (two files shared same numeric prefix)
+ *     035-schema-validations.sql  → 061-schema-validations.sql
+ *     036-llms-txt-cache.sql      → 062-llms-txt-cache.sql
+ *     037-llms-txt-freshness.sql  → 063-llms-txt-freshness.sql
  */
 const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
   ['048-meeting-briefs.sql', '054-meeting-briefs.sql'],
   ['048-site-intelligence-client-view.sql', '055-site-intelligence-client-view.sql'],
+  ['035-schema-validations.sql', '061-schema-validations.sql'],
+  ['036-llms-txt-cache.sql', '062-llms-txt-cache.sql'],
+  ['037-llms-txt-freshness.sql', '063-llms-txt-freshness.sql'],
 ];
 
 /**
