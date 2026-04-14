@@ -43,6 +43,22 @@ export const WS_EVENTS = {
   DISCOVERY_UPDATED: 'discovery:updated',
   VOICE_PROFILE_UPDATED: 'voice:updated',
   BRAND_IDENTITY_UPDATED: 'brand-identity:updated',
+
+  // Page Strategy (Phase 2 — blueprints)
+  BLUEPRINT_UPDATED: 'blueprint:updated',
+  BLUEPRINT_GENERATED: 'blueprint:generated',
+
+  // Deep Diagnostics
+  DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
+  DIAGNOSTIC_FAILED: 'diagnostic:failed',
+
+  // Copy Pipeline (Phase 3 — copy generation, review, export, intelligence)
+  COPY_SECTION_UPDATED: 'copy:section_updated',
+  COPY_METADATA_UPDATED: 'copy:metadata_updated',
+  COPY_BATCH_PROGRESS: 'copy:batch_progress',
+  COPY_BATCH_COMPLETE: 'copy:batch_complete',
+  COPY_INTELLIGENCE_UPDATED: 'copy:intelligence_updated',
+  COPY_EXPORT_COMPLETE: 'copy:export_complete',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

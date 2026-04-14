@@ -218,7 +218,7 @@ const PAGE_TYPE_CONCLUSION_INSTRUCTIONS: Record<string, string> = {
 
 // --- Shared anti-cliché and writing quality rules (injected into every prompt) ---
 
-const WRITING_QUALITY_RULES = `
+export const WRITING_QUALITY_RULES = `
 WRITING QUALITY RULES (apply to ALL content — violations will be rejected):
 
 FORBIDDEN PHRASES — never use these AI clichés:

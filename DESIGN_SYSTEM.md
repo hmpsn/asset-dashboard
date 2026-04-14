@@ -284,7 +284,47 @@ For switching between sub-views within a page.
 - Primary column: `text-zinc-300 font-medium`
 - Numeric columns: `text-right tabular-nums`
 
-### 11. Button
+### 11. OnboardingChecklist
+
+Full-screen modal overlay guiding users through initial workspace setup. Shown on first workspace visit until dismissed or all steps complete.
+
+- Overlay: `fixed inset-0 z-50 bg-black/60 backdrop-blur-sm`
+- Panel: `relative w-full max-w-lg bg-zinc-900 border border-zinc-800 shadow-2xl`, `borderRadius: '10px 24px 10px 24px'`
+- Progress bar: `bg-blue-500` (data color — read-only metric)
+- Completed step icon: `text-teal-400 CheckCircle` (action/completion)
+- Pending step icon: `text-zinc-600 Circle`
+- Celebration state: full-panel centered layout with `text-teal-400` checkmark, auto-dismisses after 2s
+- Accessibility: `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, focus trap, Escape key handler
+- Dismiss: backdrop click, Escape key, "Dismiss for now" footer link, or auto-dismiss on completion
+- Workspace scope: dismissed state stored in `localStorage` per workspace (`onboarding_checklist_dismissed_${workspaceId}`)
+- Props: `steps: OnboardingStep[]`, `onDismiss`, `onComplete?`, `title?`
+
+### 12. WorkflowStepper
+
+Horizontal numbered step indicator showing progress through a multi-step workflow. Read-only; steps with `onClick` are clickable to navigate.
+
+- Variants: default (`w-8 h-8` circles) and `compact` (`w-6 h-6`)
+- Current step: `bg-teal-500/10 border-2 border-teal-500 text-teal-400` + ring glow
+- Completed step: `bg-green-500/10 border-2 border-green-500/40 text-green-400` + `CheckCircle` icon
+- Future step: `bg-zinc-800/50 border-2 border-zinc-700 text-zinc-500`
+- Connector line: `h-px bg-zinc-700` between steps
+- Clickable steps show teal hover feedback (`group-hover:border-teal-500`)
+- Accessibility: `<nav aria-label="Workflow steps">`, `<ol role="list">`, `aria-current="step"` on current clickable step
+- Props: `steps: WorkflowStep[]`, `compact?: boolean`
+
+### 13. WorkspaceHealthBar
+
+Dashboard widget showing progress metrics for workspace health dimensions (SEO score, setup completion, content pipeline) with actionable recommendations.
+
+- Wraps `<SectionCard title="Workspace Health">`
+- Metric rows: `<button type="button">` with `cursor-pointer group` for clickable metrics
+- Progress bars: `bg-blue-500` fill (data color — read-only metrics), clamped to 0–100
+- Metric label hover: `group-hover:text-zinc-200` (on clickable rows)
+- Recommendations section: teal arrow `→` with `hover:text-teal-400` on each item
+- Accessibility: `role="progressbar"` on bar, `aria-valuenow/min/max`, `aria-label` on metric button
+- Props: `metrics: HealthMetric[]`, `recommendations?: { label, onClick, estimatedTime? }[]`
+
+### 14. Button
 
 | Variant | Classes |
 |---------|---------|

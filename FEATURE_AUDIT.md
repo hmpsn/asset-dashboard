@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **277 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **298 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -3233,9 +3233,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**278 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**298 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **278**. Last updated: April 2026.
+Current feature count: **298**. Last updated: April 2026.
 
 ---
 
@@ -3255,3 +3255,193 @@ Current feature count: **278**. Last updated: April 2026.
 **Agency value:** Programming errors in assembler catch blocks previously silenced TypeErrors and ReferenceErrors as empty-fallback degradation. After hardening, any renamed export or null-dereference in a slice assembler fires a Sentry alert immediately instead of silently returning stale/empty data to the AI prompt. Eliminates the silent data-loss class of bugs in the intelligence engine.
 
 **Mutual:** CI enforcement — the new `pr-check` rule prevents future bare catches from being introduced in workspace-intelligence.ts. Any contributor who writes `} catch {` in that file will see an error before the PR merges.
+
+---
+
+## Copy & Brand Engine — Phase 3: Full Copy Pipeline
+
+### 280. Copy Generation Pipeline
+**What it does:** AI-powered copy generation for every page in a client's site blueprint. Uses Claude Sonnet 4 (via `callAnthropic`) with an 8-layer context assembly: voice DNA, brand identity deliverables, brandscript, SEO context, content brief, page-type config, quality rules, and cross-page awareness. Generates section-by-section copy matching the blueprint's section plan (hero, problem, solution, features, CTA, FAQ, etc.). Each section gets AI annotations explaining creative decisions and quality flags (word count, readability, guardrail violations). SEO metadata (title, meta description, OG tags) generated alongside copy. Deferred initialization pattern prevents data loss on AI failure — existing approved copy is preserved until new generation succeeds, then written atomically in a `db.transaction()`.
+
+**Files:** `server/copy-generation.ts`, `server/copy-review.ts`, `server/db/migrations/058-copy-pipeline.sql`, `shared/types/copy-pipeline.ts`, `server/schemas/copy-pipeline.ts`
+
+**Agency value:** Transforms site blueprints from planning documents into live copy — every page gets AI-generated content matched to brand voice, SEO targets, and page-type best practices. Eliminates the blank-page problem for copywriters.
+
+**Client value:** Faster time-to-copy. Every page in their site strategy gets professionally written content informed by their brand voice, competitive landscape, and keyword targets.
+
+**Mutual:** Bridges the gap between strategy (blueprints) and execution (live copy), making the agency's deliverable pipeline end-to-end.
+
+---
+
+### 281. Copy Review & Steering
+**What it does:** Section-by-section copy review with inline editing, status management, and AI-powered regeneration with steering. Status machine: `pending → draft → client_review/approved`, `client_review → approved/revision_requested`, `revision_requested → draft`. Inline text editing auto-resets status to draft. Regenerate with steering notes — accumulated steering persists across regeneration cycles. Quality flags surface readability issues, word count violations, and guardrail breaches. Client suggestion system stores original + suggested text side-by-side.
+
+**Files:** `server/copy-review.ts`, `server/routes/copy-pipeline.ts`, `src/components/brand/CopyReviewPanel.tsx`, `src/hooks/admin/useCopyPipeline.ts`
+
+**Agency value:** Systematic review workflow replaces ad-hoc copy feedback. Steering notes guide AI regeneration instead of manual rewrites. Version tracking preserves history.
+
+**Client value:** Clear status visibility (draft/in-review/approved). Structured feedback mechanism via suggestions.
+
+---
+
+### 282. Batch Copy Generation
+**What it does:** Generate copy for multiple blueprint entries in a single operation. Entry selection with page-type labels, mode picker (all/selected), configurable batch size. Real-time progress tracking via WebSocket broadcasts. Rate-limited AI endpoints (3 req/min/IP). Background processing with job status tracking (`copy_batch_jobs` table).
+
+**Files:** `src/components/brand/BatchGenerationPanel.tsx`, `server/routes/copy-pipeline.ts`
+
+**Agency value:** Generate copy for an entire site blueprint in one click instead of page-by-page. Progress visibility prevents duplicate work.
+
+---
+
+### 283. Copy Export
+**What it does:** Export approved copy in multiple formats: CSV (with formula injection mitigation), Copy Deck (structured Markdown), and Webflow push. Scope selector: export all entries, selected entries, or single entry. CSV escapes values starting with `=`, `+`, `-`, `@` to prevent spreadsheet formula injection. Copy deck format organizes by page with section headings, SEO metadata, and AI annotations.
+
+**Files:** `server/copy-export.ts`, `src/components/brand/CopyExportPanel.tsx`
+
+**Agency value:** Client-ready deliverables in the format they need. Copy deck for review meetings, CSV for CMS import, Webflow push for direct publishing.
+
+---
+
+### 284. Copy Intelligence (Pattern Learning)
+**What it does:** Extracts recurring patterns from generated copy — terminology choices, tone markers, structural patterns, keyword usage. Patterns track frequency and can be toggled active/inactive. When frequency reaches >= 3, patterns surface as "Promote to Voice Guardrail" candidates. Promotion appends the pattern to the workspace's voice profile guardrails (tone boundaries or anti-patterns) in a single atomic transaction. Promotable patterns UI with one-click promotion button.
+
+**Files:** `server/copy-intelligence.ts`, `src/components/brand/CopyIntelligenceManager.tsx`
+
+**Agency value:** The system learns from each generation cycle. Recurring patterns get codified into voice guardrails automatically, improving future generations without manual voice profile maintenance.
+
+---
+
+### 285. Client Copy Review Portal
+**What it does:** Client-facing copy review interface extending the existing client portal. 4 public API routes: list entries with copy status, get sections filtered to client-visible statuses (client_review/approved only, internal reasoning omitted), approve sections, and suggest edits. React component with entry list, status badges, expand-to-review, approve button (teal), and inline suggest-changes form. Real-time updates via WebSocket. Client-friendly language throughout.
+
+**Files:** `src/components/client/ClientCopyReview.tsx`, `server/routes/public-portal.ts`
+
+**Agency value:** Clients can review and approve copy without back-and-forth emails. Suggestions are structured and trackable.
+
+**Client value:** Self-service review at their own pace. Clear approve/suggest workflow with real-time status updates.
+
+---
+
+### 286. Approved Copy → Voice Samples
+**What it does:** When a copy section is approved, automatically adds the copy text as a voice sample in the workspace's voice profile. Maps section types to voice context tags (hero→headline, CTA→cta, FAQ/body sections→body, about→about). FIFO cap of 3 `copy_approved` samples per context tag per workspace — oldest deleted before inserting new. Voice calibration improves over time as more copy is approved.
+
+**Files:** `server/copy-review.ts`
+
+**Agency value:** Voice profiles self-improve through the normal copy approval workflow. No manual sample curation needed.
+
+---
+
+### 287. Voice Feedback Loop
+**What it does:** Classifies steering notes as content feedback (structure/information changes) vs voice feedback (tone/style/personality) using GPT-4.1-mini. When voice feedback is detected, generates voice profile update suggestions (new guardrails or modifier adjustments) using the current voice DNA as context. Suggestions are flagged for review — never auto-applied.
+
+**Files:** `server/copy-voice-feedback.ts`
+
+**Agency value:** Steering feedback naturally informs voice profile evolution. Voice-related feedback is surfaced as actionable profile updates instead of being lost in steering history.
+
+---
+
+### 288. Questionnaire → Brandscript Auto-Population
+**What it does:** Maps onboarding questionnaire data to StoryBrand framework brandscript sections. Extracts from workspace knowledge base (about, services, differentiators, competitors), intelligence profile (industry, target audience), and persona definitions (pain points, goals, objections). Maps to 8 StoryBrand sections: Character, Problem, Guide, Plan, CTA, Failure, Success, Unique Value Proposition. Idempotent — returns existing brandscript if one already exists.
+
+**Files:** `server/brandscript.ts`
+
+**Agency value:** Brandscripts start pre-populated from onboarding data instead of blank. Reduces brand strategy workshop time.
+
+---
+
+### 289. Admin Chat Copy/Blueprint Awareness
+**What it does:** Adds `'copy'` context category to the admin chat AI advisor. When questions relate to copy, copywriting, blueprints, or section status, the chat assembles copy pipeline context: blueprint overview, per-entry copy status with approval percentages, active intelligence patterns. Wired into the `contentPipeline` intelligence slice for broader queries.
+
+**Files:** `server/admin-chat-context.ts`
+
+**Agency value:** Admin chat can answer "what's the copy status for [client]?" or "which pages still need copy?" using real pipeline data.
+
+---
+
+### 290. Content Decay → Copy Refresh
+**What it does:** Matches decaying pages (from content decay analysis) to blueprint entries via URL/slug normalization. For matched entries, AI (GPT-4.1-mini) analyzes current copy sections against decay signals and recommends per-section actions: rewrite, update, or keep. Prioritized by severity (high/medium/low) and action type. Batch analysis processes all decaying pages for a workspace.
+
+**Files:** `server/copy-refresh.ts`
+
+**Agency value:** Decay signals automatically surface which specific copy sections need refreshing, not just which pages. Targeted refresh instead of full rewrites.
+
+---
+
+### 291. Admin Shared UX Components (NextStepsCard, ProgressIndicator, ErrorState multi-action)
+**What it does:** Two new shared UI primitives and one extension integrated across 6 admin pages. **NextStepsCard** (`src/components/ui/NextStepsCard.tsx`): post-completion card displayed after AI operations succeed — shows contextual next-step actions (e.g. "Apply top fixes", "Review Quick Wins") with estimated times and teal hover accents. Dismissible. Uses `SectionCard` as outer shell with stagger animation support. **ProgressIndicator** (`src/components/ui/ProgressIndicator.tsx`): unified progress display for running operations — blue data-color bar (Three Laws compliant), deterministic or indeterminate modes, cancel button, auto-fades on completion after 3s. Returns null for idle/error (error is `ErrorState`'s job). **ErrorState `actions[]` extension**: backward-compatible multi-action support — `actions?: { label, onClick, variant?: 'primary'|'secondary' }[]` prop takes precedence over the existing singular `action` prop. All 3 components have full WAI-ARIA attributes (`role="progressbar"`, `role="alert"`, `aria-label`). **Integration**: SeoAudit (LoadingState + ErrorState + NextStepsCard), KeywordStrategy (ProgressIndicator replacing hand-rolled teal bar + ErrorState + NextStepsCard), SchemaSuggester (ProgressIndicator ×2 with cancel + ErrorState + NextStepsCard), ContentPipeline (LoadingState in 3 Suspense fallbacks), BrandHub (ProgressIndicator + ErrorState + NextStepsCard), PageIntelligence (ProgressIndicator with bulk cancel + ErrorState + NextStepsCard). Component tests: 22 tests across 3 test files.
+
+**Files:** `src/components/ui/NextStepsCard.tsx`, `src/components/ui/ProgressIndicator.tsx`, `src/components/ui/ErrorState.tsx`, `src/components/ui/index.ts`, `src/components/SeoAudit.tsx`, `src/components/KeywordStrategy.tsx`, `src/components/SchemaSuggester.tsx`, `src/components/ContentPipeline.tsx`, `src/components/BrandHub.tsx`, `src/components/PageIntelligence.tsx`, `tests/component/NextStepsCard.test.tsx`, `tests/component/ProgressIndicator.test.tsx`, `tests/component/ErrorState.test.tsx`
+
+**Agency value:** All admin AI operations now surface a consistent completion card pointing to obvious next actions — reduces context-switching after long-running operations. Unified error/progress UX across all 6 major tools instead of ad-hoc inline patterns.
+
+---
+
+## Admin UX — Onboarding & Guided Flows (PR4)
+
+### 292. OnboardingChecklist
+**What it does:** Modal-style overlay shown on first visit to a workspace (WorkspaceHome). 4-step setup checklist: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar tracks completion. Teal checkmarks for completed steps. Focus-trapped, closeable via Escape key or "Dismiss" button. Completion state and dismissal persisted to `localStorage` per workspace so the overlay never re-appears once dismissed. Auto-celebrates (confetti-style state) when all 4 steps are completed.
+
+**Files:** `src/components/ui/OnboardingChecklist.tsx`, integrated in `src/components/WorkspaceHome.tsx`
+
+**Agency value:** New workspace setup used to require knowing which tools to visit first. The checklist surfaces the four must-do setup steps in order, with direct navigation to each tool, reducing cold-start time and ensuring nothing is skipped when onboarding a new client.
+
+**Mutual:** Faster workspace activation = faster time-to-value for both agency and client.
+
+---
+
+### 293. WorkflowStepper
+**What it does:** Horizontal numbered stepper component showing progress through a multi-step workflow. Three visual states: green (completed), teal (current active step), zinc (future step). Compact variant (`compact` prop) for tighter layouts. Steps are clickable when `onStepClick` handler is provided. Used in ContentPipeline (4 steps: Strategy → Briefs → Posts → Publish) and SchemaSuggester generator view (5 steps: Scan → Review → Edit → Publish → Validate).
+
+**Files:** `src/components/ui/WorkflowStepper.tsx`, integrated in `src/components/ContentPipeline.tsx` and `src/components/SchemaSuggester.tsx`
+
+**Agency value:** Complex multi-step tools previously had no visual orientation. The stepper communicates where the user is in the workflow and what comes next, reducing confusion on first use of ContentPipeline and SchemaSuggester.
+
+**Mutual:** Shared primitive — any future multi-step tool can adopt WorkflowStepper instead of building custom progress UI.
+
+---
+
+### 294. WorkspaceHealthBar
+**What it does:** Multi-metric health progress bar section rendered below stat cards on WorkspaceHome. Shows per-metric progress bars for key workspace health signals (SEO health, content coverage, keyword coverage, etc.) with blue progress fills (data metric = blue per design system). Below the metrics, a "Recommended Next" section surfaces the single highest-priority action the admin should take, with a teal CTA button. Wrapped in `SectionCard`.
+
+**Files:** `src/components/ui/WorkspaceHealthBar.tsx`, integrated in `src/components/WorkspaceHome.tsx`
+
+**Agency value:** WorkspaceHome previously showed stat cards but no consolidated health summary or next-action prompt. WorkspaceHealthBar gives admins an at-a-glance health snapshot and a clear next step without navigating into individual tools.
+
+**Mutual:** Turns the workspace home into an actionable command surface rather than a passive data view.
+
+---
+
+### 295. SeoAuditGuide
+**What it does:** Guide sub-tab in SeoAudit's analysis section (alongside existing analysis tabs). 5 educational sections: issue severity levels, prioritization framework, fix options overview, AEO review guidance, and content decay explanation. Static reference content using the existing custom tab bar pattern from SeoAudit.
+
+**Files:** `src/components/audit/SeoAuditGuide.tsx`, integrated in `src/components/SeoAudit.tsx`
+
+**Agency value:** New team members or clients reviewing the audit can understand what each severity level means and how to prioritize fixes without leaving the tool.
+
+---
+
+### 296. KeywordStrategyGuide
+**What it does:** Guide tab in KeywordStrategy (TabBar added alongside existing analysis tab). 6 sections: reading the strategy, understanding intent badges, content gap prioritization, KD/volume interpretation, quick win identification, and implementation order.
+
+**Files:** `src/components/strategy/KeywordStrategyGuide.tsx`, integrated in `src/components/KeywordStrategy.tsx`
+
+**Agency value:** KeywordStrategy output is data-dense. The guide explains how to translate strategy data into action, making the tool useful even for team members unfamiliar with SEO keyword methodology.
+
+---
+
+### 297. PageIntelligenceGuide
+**What it does:** Guide tab in PageIntelligence (added to the existing pages|architecture tab set as a third tab). 6 sections: understanding page scores, reading architecture signals, interpreting link health, prioritization criteria, action recommendations, and integration with other tools.
+
+**Files:** `src/components/PageIntelligenceGuide.tsx`, integrated in `src/components/PageIntelligence.tsx`
+
+**Agency value:** PageIntelligence surfaces complex architecture and link health signals. The guide translates those signals into plain-language explanations and recommended actions, reducing the learning curve for the tool.
+
+
+---
+
+### 298. Deep Diagnostics
+**What it does:** Admin-triggered deep investigation from anomaly insights. Orchestrator gathers data from GSC, GA4, SEMRush, redirect scanner, site architecture, canonical/link probe, and workspace intelligence (including backlinks). GPT-4.1 synthesizes root causes with confidence levels, ranked remediation actions (P0-P3, effort/impact/owner), and client-facing narrative. Results stored in `diagnostic_reports` table.
+
+**Files:** `server/diagnostic-orchestrator.ts`, `server/diagnostic-store.ts`, `server/diagnostic-probe.ts`, `server/routes/diagnostics.ts`, `server/routes/jobs.ts` (deep-diagnostic case), `src/api/diagnostics.ts`, `src/hooks/admin/useDiagnostics.ts`, `src/components/admin/DiagnosticReport/` (4 components), `shared/types/diagnostics.ts`, `server/db/migrations/059-diagnostic-reports.sql`
+
+**Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. Dark-launched behind `deep-diagnostics` feature flag.

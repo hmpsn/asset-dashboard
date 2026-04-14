@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { get, postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
-import { type Page, adminPath, clientPath } from './routes';
+import { type Page, adminPath, clientPath, GLOBAL_TABS } from './routes';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
@@ -23,7 +23,8 @@ import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { FeatureFlag } from './components/ui/FeatureFlag';
 import { EmptyState } from './components/ui/EmptyState';
-import { Clipboard, Globe, Sparkles } from 'lucide-react';
+import { TabBar } from './components/ui/TabBar';
+import { Activity, Clipboard, Globe, Sparkles } from 'lucide-react';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -55,7 +56,6 @@ const ContentPerformance = lazyWithRetry(() => import('./components/ContentPerfo
 const LinksPanel = lazyWithRetry(() => import('./components/LinksPanel').then(m => ({ default: m.LinksPanel })));
 const RankTracker = lazyWithRetry(() => import('./components/RankTracker').then(m => ({ default: m.RankTracker })));
 const ContentManager = lazyWithRetry(() => import('./components/ContentManager').then(m => ({ default: m.ContentManager })));
-const ContentCalendar = lazyWithRetry(() => import('./components/ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const ContentSubscriptions = lazyWithRetry(() => import('./components/ContentSubscriptions').then(m => ({ default: m.ContentSubscriptions })));
 const ContentPipeline = lazyWithRetry(() => import('./components/ContentPipeline').then(m => ({ default: m.ContentPipeline })));
 const BrandHub = lazyWithRetry(() => import('./components/BrandHub').then(m => ({ default: m.BrandHub })));
@@ -65,6 +65,7 @@ const OutcomeDashboard = lazyWithRetry(() => import('./components/admin/outcomes
 const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes/OutcomesOverview'));
 const AdminInbox = lazyWithRetry(() => import('./components/admin/AdminInbox').then(m => ({ default: m.AdminInbox })));
 const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
+const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>;
@@ -156,7 +157,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
   const { data: queue = [] } = useQueue();
 
   // Derive tab and workspace ID from URL path
-  const GLOBAL_TABS = useMemo(() => new Set(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']), []);
   const { tab, urlWorkspaceId } = useMemo(() => {
     const p = location.pathname;
     const wsTabMatch = p.match(/^\/ws\/([^/]+)\/(.+)$/);
@@ -166,7 +166,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     const globalMatch = p.match(/^\/([^/]+)\/?$/);
     if (globalMatch && GLOBAL_TABS.has(globalMatch[1])) return { tab: globalMatch[1] as Page, urlWorkspaceId: undefined as string | undefined };
     return { tab: 'home' as Page, urlWorkspaceId: undefined as string | undefined };
-  }, [location.pathname, GLOBAL_TABS]);
+  }, [location.pathname]);
 
   const [fixContext, setFixContext] = useState<FixContext | null>(null);
   const clearFixContext = useCallback(() => setFixContext(null), []);
@@ -209,7 +209,10 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
 
   const [clipboardStatus, setClipboardStatus] = useState<string | null>(null);
   const [pendingContentRequests, setPendingContentRequests] = useState(0);
-  const [hasContentItems, setHasContentItems] = useState(false);
+  const [requestsSubTab, setRequestsSubTab] = useState<'signals' | 'requests'>('signals');
+
+  // Reset requests sub-tab when workspace changes so stale state doesn't persist
+  useEffect(() => { setRequestsSubTab('signals'); }, [urlWorkspaceId]); // effect-layout-ok — state reset on workspace switch, not layout derivation
 
   // Derive selected workspace from URL + React Query data
   const selected = useMemo(() => {
@@ -229,7 +232,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
       .then(badges => {
         if (cancelled) return;
         setPendingContentRequests(badges.pendingRequests);
-        setHasContentItems(badges.hasContent);
       })
       .catch((err) => { console.error('App operation failed:', err); });
     return () => { cancelled = true; };
@@ -341,7 +343,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'calendar', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-schema', 'seo-briefs', 'seo-ranks', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -374,7 +376,22 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     }
 
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
+    // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
     if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'diagnostics') return (
+      <FeatureFlag
+        flag="deep-diagnostics"
+        fallback={
+          <EmptyState
+            icon={Activity}
+            title="Deep Diagnostics is rolling out"
+            description="This feature is not yet available for your workspace. Check back soon."
+          />
+        }
+      >
+        <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />
+      </FeatureFlag>
+    );
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
@@ -385,7 +402,7 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'content-pipeline') return <ContentPipeline key={`pipeline-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'seo-briefs') return <ContentBriefs key={`briefs-${selected.id}`} workspaceId={selected.id} onRequestCountChange={setPendingContentRequests} fixContext={fixContext} clearFixContext={clearFixContext} />;
     if (tab === 'content') return <ContentManager key={`content-${selected.id}`} workspaceId={selected.id} />;
-    if (tab === 'calendar') return <ContentCalendar key={`calendar-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'calendar') return <Navigate to={adminPath(selected.id, 'content-pipeline') + '?tab=calendar'} replace />;
     if (tab === 'subscriptions') return <ContentSubscriptions key={`subs-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'brand') return (
       // Double-gated: Sidebar already hides the nav entry when the flag is
@@ -412,9 +429,18 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} />;
     if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'requests') return (
-      <div className="space-y-6 p-6 overflow-y-auto">
-        <AdminInbox workspaceId={selected.id} />
-        <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />
+      <div className="flex flex-col">
+        <TabBar
+          tabs={[
+            { id: 'signals', label: 'Signals' },
+            { id: 'requests', label: 'Requests' },
+          ]}
+          active={requestsSubTab}
+          onChange={(id) => setRequestsSubTab(id as 'signals' | 'requests')}
+          className="mb-6"
+        />
+        {requestsSubTab === 'signals' && <AdminInbox key={`inbox-${selected.id}`} workspaceId={selected.id} />}
+        {requestsSubTab === 'requests' && <RequestManager key={`requests-${selected.id}`} workspaceId={selected.id} />}
       </div>
     );
     if (tab === 'rewrite') return <PageRewriteChat key={`rewrite-${selected.id}`} workspaceId={selected.id} initialPageUrl={rewritePageUrl || undefined} focusMode={effectiveFocusMode} onFocusModeToggle={() => setFocusMode(f => !f)} onBack={() => { setRewritePageUrl(null); navigate(adminPath(selected.id, 'seo-audit')); }} />;
@@ -431,7 +457,6 @@ function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; th
         tab={tab}
         theme={theme}
         pendingContentRequests={pendingContentRequests}
-        hasContentItems={hasContentItems}
         onCreate={handleCreate}
         onDelete={handleDelete}
         onLinkSite={handleLinkSite}

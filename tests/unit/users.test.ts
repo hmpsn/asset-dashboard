@@ -1,7 +1,7 @@
 /**
  * Unit tests for server/users.ts — user CRUD, password hashing, verification.
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   createUser,
   getUserById,
@@ -16,13 +16,44 @@ import {
   userCount,
 } from '../../server/users.js';
 
+// All hardcoded test emails — cleaned up before & after each run so a prior
+// crashed run can never cause "email already exists" failures.
+const TEST_EMAILS = [
+  'test-create@example.com',
+  'upper@example.com',
+  'dup-test@example.com',
+  'admin-test@example.com',
+  'getbyid@example.com',
+  'update-user@example.com',
+  'update-dup-a@example.com',
+  'update-dup-b@example.com',
+  'change-pw@example.com',
+  'verify-pw@example.com',
+  'delete-test@example.com',
+  'login-record@example.com',
+];
+
+function cleanupTestUsers() {
+  for (const email of TEST_EMAILS) {
+    const user = getUserByEmail(email);
+    if (user) { try { deleteUser(user.id); } catch { /* skip */ } }
+  }
+}
+
 // Track users we create so we can clean up
 const createdUserIds: string[] = [];
+
+beforeAll(() => {
+  // Remove stale users from prior crashed runs
+  cleanupTestUsers();
+});
 
 afterAll(() => {
   for (const id of createdUserIds) {
     try { deleteUser(id); } catch { /* skip */ }
   }
+  // Belt-and-suspenders: also clean by email in case IDs weren't tracked
+  cleanupTestUsers();
 });
 
 // ── createUser ──

@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { Clipboard, FileText, RefreshCw, Map, Bot, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown } from 'lucide-react';
+import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
+import { LoadingState } from './ui';
 import { useContentPipeline } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
@@ -10,11 +12,12 @@ import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
+import { WorkflowStepper } from './ui';
+import { adminPath } from '../routes';
 import type { FixContext } from '../App';
 
-const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
-const LlmsTxtGenerator = lazyWithRetry(() => import('./LlmsTxtGenerator').then(m => ({ default: m.LlmsTxtGenerator })));
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
+const ContentCalendar = lazyWithRetry(() => import('./ContentCalendar').then(m => ({ default: m.ContentCalendar })));
 const ContentPipelineGuide = lazyWithRetry(() => import('./ContentPipelineGuide').then(m => ({ default: m.ContentPipelineGuide })));
 
 interface Props {
@@ -26,11 +29,10 @@ interface Props {
 
 const TABS = [
   { id: 'planner' as const, label: 'Planner', icon: Layers },
+  { id: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { id: 'briefs' as const, label: 'Briefs', icon: Clipboard },
   { id: 'posts' as const, label: 'Posts', icon: FileText },
   { id: 'subscriptions' as const, label: 'Subscriptions', icon: RefreshCw },
-  { id: 'architecture' as const, label: 'Architecture', icon: Map },
-  { id: 'llms-txt' as const, label: 'LLMs.txt', icon: Bot },
 ];
 
 type PipelineTab = typeof TABS[number]['id'];
@@ -44,7 +46,22 @@ const EXPORTS = [
 ] as const;
 
 export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext, clearFixContext }: Props) {
-  const [activeTab, setActiveTab] = useState<PipelineTab>('briefs');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
+    const param = searchParams.get('tab');
+    return TABS.some(t => t.id === param) ? (param as PipelineTab) : 'briefs';
+  });
+
+  // Clear ?tab= from URL on manual tab change so refresh shows last selection
+  const handleTabChange = (id: string) => {
+    setActiveTab(id as PipelineTab);
+    if (searchParams.has('tab')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      setSearchParams(next, { replace: true });
+    }
+  };
   const [exportOpen, setExportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);
@@ -96,8 +113,18 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
     setActiveTab('briefs');
   };
 
+  const contentWorkflowSteps = [
+    { number: 1, label: 'Strategy', completed: activeTab === 'briefs' || activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'planner', onClick: () => navigate(adminPath(workspaceId, 'seo-strategy')) },
+    { number: 2, label: 'Briefs', completed: activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'briefs', onClick: () => handleTabChange('briefs') },
+    { number: 3, label: 'Posts', completed: activeTab === 'subscriptions', current: activeTab === 'posts', onClick: () => handleTabChange('posts') },
+    { number: 4, label: 'Publish', completed: false, current: activeTab === 'subscriptions', onClick: () => handleTabChange('subscriptions') },
+  ];
+
   return (
     <div className="space-y-8">
+      {/* Calendar tab has no workflow phase — stepper only shown for pipeline tabs */}
+      {activeTab !== 'calendar' && <WorkflowStepper steps={contentWorkflowSteps} compact />}
+
       {/* Health summary bar */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
         <div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400" style={{ borderRadius: '10px 24px 10px 24px' }}>
@@ -147,7 +174,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
           return (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => handleTabChange(t.id)}
               className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
                 active
                   ? 'border-teal-400 text-teal-300'
@@ -188,8 +215,13 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
       {/* Tab content */}
       {activeTab === 'planner' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+        <Suspense fallback={<LoadingState size="lg" message="Loading..." />}>
           <ContentPlanner key={`planner-${workspaceId}`} workspaceId={workspaceId} />
+        </Suspense>
+      )}
+      {activeTab === 'calendar' && (
+        <Suspense fallback={<LoadingState size="lg" message="Loading..." />}>
+          <ContentCalendar key={`calendar-${workspaceId}`} workspaceId={workspaceId} />
         </Suspense>
       )}
       {activeTab === 'briefs' && (
@@ -200,16 +232,6 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       )}
       {activeTab === 'subscriptions' && (
         <ContentSubscriptions key={`subs-${workspaceId}`} workspaceId={workspaceId} />
-      )}
-      {activeTab === 'architecture' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
-          <SiteArchitecture key={`arch-${workspaceId}`} workspaceId={workspaceId} />
-        </Suspense>
-      )}
-      {activeTab === 'llms-txt' && (
-        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
-          <LlmsTxtGenerator key={`llms-${workspaceId}`} workspaceId={workspaceId} />
-        </Suspense>
       )}
       {/* Floating help button */}
       <button
@@ -232,7 +254,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
               </button>
             </div>
             <div className="p-5">
-              <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+              <Suspense fallback={<LoadingState size="sm" message="Loading..." />}>
                 <ContentPipelineGuide />
               </Suspense>
             </div>

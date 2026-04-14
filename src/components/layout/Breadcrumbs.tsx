@@ -5,12 +5,12 @@ import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
 const TAB_LABELS: Record<string, string> = {
   home: 'Home', brief: 'Meeting Brief', media: 'Assets', 'seo-audit': 'Site Audit', 'seo-editor': 'SEO Editor',
-  links: 'Links', 'seo-strategy': 'Strategy',
+  links: 'Links', 'seo-strategy': 'Strategy', 'page-intelligence': 'Page Intelligence',
   'seo-schema': 'Schema', 'seo-briefs': 'Content Briefs', content: 'Content', calendar: 'Calendar', subscriptions: 'Subscriptions', brand: 'Brand & AI', 'content-pipeline': 'Content Pipeline',
-  'seo-ranks': 'Rank Tracker', 'analytics-hub': 'Analytics', performance: 'Performance', 'content-perf': 'Content Performance',
+  'seo-ranks': 'Rank Tracker', 'analytics-hub': 'Search & Traffic', performance: 'Performance', 'content-perf': 'Content Performance',
   rewrite: 'Page Rewriter', 'workspace-settings': 'Workspace Settings', prospect: 'Prospect', roadmap: 'Roadmap',
   'ai-usage': 'AI Usage', requests: 'Requests', settings: 'Settings', revenue: 'Revenue',
-  outcomes: 'Outcomes', 'outcomes-overview': 'Outcomes Overview',
+  outcomes: 'Action Results', 'outcomes-overview': 'Team Outcomes', features: 'Features',
 };
 
 interface BreadcrumbsProps {

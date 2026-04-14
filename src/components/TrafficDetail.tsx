@@ -190,6 +190,7 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
         loading={feedLoading}
         domain="traffic"
         showFilterChips
+        workspaceId={workspaceId}
         limit={5}
       />
 

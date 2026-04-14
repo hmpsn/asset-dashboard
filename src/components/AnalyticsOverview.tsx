@@ -203,6 +203,7 @@ export function AnalyticsOverview({ workspaceId, siteId, gscPropertyUrl, ga4Prop
           summary={summary}
           loading={feedLoading}
           showPills
+          workspaceId={workspaceId}
           limit={showAllInsights ? undefined : 5}
           onViewAll={() => setShowAllInsights(true)}
         />

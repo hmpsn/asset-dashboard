@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, Suspense } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
   Loader2, Bell, FileText, AlertTriangle, ChevronDown,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing } from './ui';
+import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar } from './ui';
 import { themeColor } from './ui/constants';
 import { InsightsEngine } from './client/InsightsEngine';
+import { CartProvider } from './client/useCart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useAuditSummary } from '../hooks/useAuditSummary';
@@ -18,6 +19,9 @@ import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotation
 import { type Page, adminPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { WS_EVENTS } from '../lib/wsEvents';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+
+const MeetingBriefPage = lazyWithRetry(() => import('./admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -42,8 +46,16 @@ function fmt(n: number): string {
   return String(n);
 }
 
+const HOME_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'meeting-brief', label: 'Meeting Brief' },
+];
+
+type HomeTab = 'overview' | 'meeting-brief';
+
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { summary: seoStatus } = usePageEditStates(workspaceId);
   const { audit } = useAuditSummary(workspaceId);
@@ -53,6 +65,34 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const [now, setNow] = useState(() => new Date());
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [showSetupSuggestions, setShowSetupSuggestions] = useState(false);
+  const [activeTab, setActiveTab] = useState<HomeTab>(() => {
+    const param = searchParams.get('tab');
+    return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
+  });
+
+  const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
+  // Must be before any conditional early return (Rules of Hooks).
+  // Initialized from localStorage only — no async deps. OnboardingChecklist's
+  // own allComplete branch handles the "all steps done" celebration + auto-dismiss.
+  const [checklistVisible, setChecklistVisible] = useState(
+    () => !localStorage.getItem(storageKey)
+  );
+  // Sync visibility when workspaceId changes without remount (React Router reuses
+  // the same component instance across workspace switches). The !loading render
+  // guard prevents any flash — the component is in a loading state at switch time.
+  useEffect(() => {
+    setChecklistVisible(!localStorage.getItem(storageKey));
+  }, [storageKey]);
+
+  // Clear ?tab= from URL on manual tab change so refresh shows last selection
+  const handleTabChange = (id: string) => {
+    setActiveTab(id as HomeTab);
+    if (searchParams.has('tab')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   // Tick every 30s so relative timestamps stay fresh
   useEffect(() => {
@@ -160,8 +200,84 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
 
+  const onboardingSteps = [
+    {
+      id: 'webflow',
+      label: 'Link Webflow site',
+      description: 'Connect your Webflow site to enable SEO tools and page analysis.',
+      completed: !!webflowSiteId,
+      estimatedTime: '2 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'gsc',
+      label: 'Connect Google Search Console',
+      description: 'Get search performance data — clicks, impressions, and rankings.',
+      completed: !!gscPropertyUrl,
+      estimatedTime: '3 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'ga4',
+      label: 'Connect Google Analytics',
+      description: 'Track users, sessions, and conversions from organic traffic.',
+      completed: !!ga4PropertyId,
+      estimatedTime: '3 min',
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    {
+      id: 'audit',
+      label: 'Run your first SEO audit',
+      description: 'Get a full health score for your site — issues, warnings, and fixes.',
+      completed: !!(audit && audit.siteScore > 0),
+      estimatedTime: '1 min',
+      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
+    },
+  ];
+
+  // ── Workspace Health Bar ──
+  const healthMetrics = [
+    {
+      label: 'SEO Audit',
+      percent: audit?.siteScore ?? 0,
+      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
+    },
+    {
+      label: 'Setup',
+      percent: Math.round(([!!webflowSiteId, !!gscPropertyUrl, !!ga4PropertyId].filter(Boolean).length / 3) * 100),
+      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
+    },
+    ...(contentPipeline && contentPipeline.totalCells > 0 ? [{
+      label: 'Content',
+      percent: Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100),
+      onClick: () => navigate(adminPath(workspaceId, 'content')),
+    }] : []),
+  ];
+
+  const healthRecommendations = [
+    ...(!webflowSiteId ? [{ label: 'Link your Webflow site', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '2 min' }] : []),
+    ...(!gscPropertyUrl ? [{ label: 'Connect Google Search Console', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
+    ...(!ga4PropertyId ? [{ label: 'Connect Google Analytics', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
+    ...(audit && audit.siteScore < 60 ? [{ label: `Fix ${audit.errors} SEO errors`, onClick: () => navigate(adminPath(workspaceId, 'seo-audit')), estimatedTime: '30 min' }] : []),
+  ].slice(0, 3);
+
   return (
     <div className="space-y-8">
+      {checklistVisible && !loading && (
+        <OnboardingChecklist
+          steps={onboardingSteps}
+          onDismiss={() => {
+            localStorage.setItem(storageKey, '1');
+            setChecklistVisible(false);
+          }}
+          onComplete={() => {
+            // Write localStorage now so checklist won't reappear after the
+            // 2-second celebration — but don't set state here to keep the
+            // celebration visible until OnboardingChecklist auto-calls onDismiss.
+            localStorage.setItem(storageKey, '1');
+          }}
+        />
+      )}
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
@@ -193,6 +309,21 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         }
       />
 
+      <TabBar
+        tabs={HOME_TABS}
+        active={activeTab}
+        onChange={handleTabChange}
+        className="mb-2"
+      />
+
+      {activeTab === 'meeting-brief' ? (
+        <ErrorBoundary label="Meeting Brief">
+          <Suspense fallback={<div className="flex items-center justify-center py-24"><Loader2 className="w-5 h-5 animate-spin text-teal-400" /></div>}>
+            <MeetingBriefPage workspaceId={workspaceId} />
+          </Suspense>
+        </ErrorBoundary>
+      ) : (
+      <>
       {/* ── Weekly Accomplishments ── */}
       {weeklySummary && <WeeklyAccomplishments summary={weeklySummary} />}
 
@@ -341,6 +472,14 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         )}
       </div>
 
+      {/* ── Workspace Health Bar ── */}
+      {activeTab === 'overview' && healthMetrics.length > 0 && (
+        <WorkspaceHealthBar
+          metrics={healthMetrics}
+          recommendations={healthRecommendations.length > 0 ? healthRecommendations : undefined}
+        />
+      )}
+
       {/* ── Needs Attention ── */}
       {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
         const colorMap = { red: 'text-red-400', amber: 'text-amber-400', teal: 'text-teal-400', green: 'text-green-400' };
@@ -424,7 +563,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Action Plan (InsightsEngine) ── */}
       {workspaceId && (
         <ErrorBoundary label="Action Plan">
-          <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
+          <CartProvider>
+            <InsightsEngine workspaceId={workspaceId} tier="premium" compact onNavigate={(tab) => navigate(adminPath(workspaceId, tab as Page))} />
+          </CartProvider>
         </ErrorBoundary>
       )}
 
@@ -436,6 +577,8 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
 
       {/* ── Active Requests + Annotations ── */}
       <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} workspaceId={workspaceId} />
+      </>
+      )}
 
     </div>
   );

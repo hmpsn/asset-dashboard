@@ -148,6 +148,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 8. **Progressive disclosure** — show summary first, details on demand.
 9. **Extract shared interaction patterns** — when 2+ components implement the same user interaction (toggle logic, filter state, sort behavior), extract to a shared hook or utility. Don't let subagents independently re-implement the same logic — it drifts. Example: `useToggleSet(defaults, { min, max })` instead of 3 inline `useState<Set>` + toggle handlers.
 10. **AI prompt ↔ frontend rendering must be co-designed** — when a system prompt instructs the AI to format output a certain way (Markdown, JSON, prefixed labels), verify the frontend rendering matches. If a rewrite/insertion path uses `textContent` or `innerText`, the AI must be told to return plain prose, not Markdown. If a parsing path uses `match(/regex/)`, the AI's output format must be stable enough for the regex. Document the contract in the system prompt itself (e.g., "content is inserted into a live editor — no Markdown syntax").
+11. **`?tab=` deep-link two-halves contract** — when navigating to a component with `?tab=X` (via `navigate()`, `<Navigate>`, or any URL construction), the receiving component MUST read `useSearchParams` and initialize its tab state from the `'tab'` param. This is a two-halves contract: the sender appends `?tab=X`, the receiver reads it. Neither half alone is sufficient — a `?tab=` URL whose target ignores the param is a silent navigation bug (user sees the default tab instead of the requested one). Pattern: `const [searchParams] = useSearchParams(); const [tab, setTab] = useState(() => { const param = searchParams.get('tab'); return TABS.some(t => t.id === param) ? param : defaultTab; });`. Enforced by contract test (`tests/contract/tab-deep-link-wiring.test.ts`) and pr-check.
 
 ---
 
@@ -176,6 +177,8 @@ This project uses **two separate auth systems** that must never be mixed up:
 2. `server/routes/auth.ts` — `/api/auth/me` JWT session check
 
 **`requireWorkspaceAccess` is safe for all routes** — it explicitly passes through when no JWT user is present (HMAC auth users are covered by the global gate).
+
+**Rule: Admin mutations on workspace-scoped tables must take explicit `expectedWorkspaceId`.** `requireWorkspaceAccess(:id)` only verifies the caller has access to the `:id` workspace in the URL — it does NOT verify that nested `:userId` (or similar) path parameters actually belong to that workspace. Any exported mutation function in `server/client-users.ts` (`updateClientUser`, `changeClientPassword`, `deleteClientUser`, and any future `update*|delete*|change*`) must therefore accept `expectedWorkspaceId: string` as a required parameter and route the target `id` through the `assertUserInWorkspace(id, expectedWorkspaceId)` guard. The guard MUST return `null` uniformly for both "row not found" and "row belongs to a different workspace" so the endpoint cannot be used as a workspace-enumeration oracle. Without this, an admin authenticated for workspace A could call `PATCH|DELETE|password-change` against a user from workspace B by knowing only the UUID. Enforced by pr-check.
 
 ---
 

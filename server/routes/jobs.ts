@@ -57,6 +57,11 @@ import { getPageKeyword, upsertPageKeywordsBatch, clearAnalysisFields, countPage
 // Individual page analysis (frontend) still uses SEMRush via the keyword-analysis endpoint.
 import { createLogger } from '../logger.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { getInsights } from '../analytics-insights-store.js';
+import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
+import { runDiagnostic } from '../diagnostic-orchestrator.js';
+import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt } from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
@@ -871,6 +876,43 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             if (!isJobCancelled(paJob.id)) {
               updateJob(paJob.id, { status: 'error', error: err instanceof Error ? err.message : String(err), message: 'Page analysis failed' });
             }
+          }
+        })();
+        break;
+      }
+
+      case 'deep-diagnostic': {
+        const workspaceId = params.workspaceId as string;
+        const insightId = params.insightId as string;
+        if (!workspaceId || !insightId) return res.status(400).json({ error: 'workspaceId and insightId required' });
+
+        if (!isFeatureEnabled('deep-diagnostics')) return res.status(403).json({ error: 'Deep diagnostics feature not enabled' });
+
+        const ws = getWorkspace(workspaceId);
+        if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+        const activeJob = hasActiveJob('deep-diagnostic', workspaceId);
+        if (activeJob) return res.status(409).json({ error: 'A diagnostic is already running for this workspace', jobId: activeJob.id });
+
+        const anomalyInsight = getInsights(workspaceId).find((i: AnalyticsInsight) => i.id === insightId);
+        if (!anomalyInsight) return res.status(404).json({ error: 'Anomaly insight not found' });
+        if (anomalyInsight.insightType !== 'anomaly_digest') return res.status(400).json({ error: 'Insight must be of type anomaly_digest' });
+
+        const anomalyData = anomalyInsight.data as unknown as AnomalyDigestData;
+        // Use anomalyData.affectedPage — anomalyInsight.pageId is the synthetic dedup key, not a real path
+        const affectedPages = anomalyData.affectedPage ? [anomalyData.affectedPage] : [];
+
+        const report = createDiagnosticReport(workspaceId, insightId, anomalyData.anomalyType, affectedPages);
+        const job = createJob('deep-diagnostic', { message: 'Starting deep diagnostic...', workspaceId });
+        res.json({ jobId: job.id, reportId: report.id });
+
+        (async () => {
+          try {
+            await runDiagnostic({ workspaceId, insightId, reportId: report.id }, job.id);
+          } catch (err) {
+            log.error({ err }, 'Deep diagnostic failed');
+            markDiagnosticFailed(report.id, (err as Error).message);
+            updateJob(job.id, { status: 'error', message: 'Deep diagnostic failed' });
           }
         })();
         break;

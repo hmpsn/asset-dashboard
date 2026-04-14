@@ -87,6 +87,9 @@ const stmts = createStmtCache(() => ({
   deleteStaleByType: db.prepare(
     `DELETE FROM analytics_insights WHERE workspace_id = ? AND insight_type = ? AND computed_at < ? AND resolution_status IS NULL AND bridge_source IS NULL`,
   ),
+  stampData: db.prepare(
+    `UPDATE analytics_insights SET data = ? WHERE id = ? AND workspace_id = ?`, // ws-scope-ok: both id and workspace_id in WHERE
+  ),
 }));
 
 function rowToInsight(row: InsightRow): AnalyticsInsight {
@@ -264,4 +267,16 @@ export function resolveInsight(
 export function getUnresolvedInsights(workspaceId: string): AnalyticsInsight[] {
   const rows = stmts().selectUnresolved.all(workspaceId) as InsightRow[];
   return rows.map(rowToInsight);
+}
+
+/**
+ * Stamps a completed diagnostic report ID onto an anomaly digest insight's data blob.
+ * Called by the diagnostic orchestrator after completeDiagnosticReport() succeeds,
+ * so insight-narrative.ts can enrich the client summary with the report's clientSummary.
+ */
+export function stampDiagnosticReportId(workspaceId: string, insightId: string, reportId: string): void {
+  const row = stmts().selectById.get(insightId, workspaceId) as InsightRow | undefined;
+  if (!row) return;
+  const parsed = parseJsonFallback<Record<string, unknown>>(row.data, {});
+  stmts().stampData.run(JSON.stringify({ ...parsed, diagnosticReportId: reportId }), insightId, workspaceId);
 }

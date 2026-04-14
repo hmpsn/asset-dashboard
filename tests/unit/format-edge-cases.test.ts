@@ -127,6 +127,7 @@ describe('formatForPrompt with minimal learnings', () => {
     noGarbage(result);
   });
 
+  // no-assertion-ok — noGarbage() (defined at top of file) contains 3 expect() calls
   it('no NaN in output when overallWinRate is 0', () => {
     const result = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
     noGarbage(result);
@@ -141,6 +142,7 @@ describe('formatForPrompt with minimal contentPipeline', () => {
   };
 
   for (const verbosity of ['compact', 'standard', 'detailed'] as const) {
+    // no-assertion-ok — noGarbage() asserts internally via 3 expect() calls
     it(`no NaN/undefined/null at ${verbosity} verbosity`, () => {
       const result = formatForPrompt(intel, { verbosity, sections: ['contentPipeline'] });
       noGarbage(result);
@@ -161,6 +163,7 @@ describe('formatForPrompt with minimal siteHealth', () => {
   };
 
   for (const verbosity of ['compact', 'standard', 'detailed'] as const) {
+    // no-assertion-ok — noGarbage() asserts internally via 3 expect() calls
     it(`no NaN/undefined/null at ${verbosity} verbosity`, () => {
       const result = formatForPrompt(intel, { verbosity, sections: ['siteHealth'] });
       noGarbage(result);
@@ -181,6 +184,7 @@ describe('formatForPrompt with minimal clientSignals', () => {
   };
 
   for (const verbosity of ['compact', 'standard', 'detailed'] as const) {
+    // no-assertion-ok — noGarbage() asserts internally via 3 expect() calls
     it(`no NaN/undefined/null at ${verbosity} verbosity`, () => {
       const result = formatForPrompt(intel, { verbosity, sections: ['clientSignals'] });
       noGarbage(result);
@@ -201,6 +205,7 @@ describe('formatForPrompt with minimal operational', () => {
   };
 
   for (const verbosity of ['compact', 'standard', 'detailed'] as const) {
+    // no-assertion-ok — noGarbage() asserts internally via 3 expect() calls
     it(`no NaN/undefined/null at ${verbosity} verbosity`, () => {
       const result = formatForPrompt(intel, { verbosity, sections: ['operational'] });
       noGarbage(result);
@@ -239,6 +244,7 @@ describe('weCalledIt verbosity-dependent truncation', () => {
     expect(result).toContain('Schema adds rich results');
   });
 
+  // no-assertion-ok — noGarbage() asserts internally via 3 expect() calls
   it('no NaN/undefined/null in weCalledIt output', () => {
     const result = formatForPrompt(intel, { verbosity: 'detailed', sections: ['learnings'] });
     noGarbage(result);

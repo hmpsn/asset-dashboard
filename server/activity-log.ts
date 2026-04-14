@@ -82,7 +82,23 @@ export type ActivityType =
   | 'brand_deliverable_generated'
   | 'brand_deliverable_refined'
   | 'brand_deliverable_approved'
-  | 'brand_deliverable_reverted';
+  | 'brand_deliverable_reverted'
+  | 'blueprint_created'
+  | 'blueprint_updated'
+  | 'blueprint_deleted'
+  | 'blueprint_generated'
+  | 'blueprint_entry_added'
+  | 'blueprint_entry_updated'
+  | 'blueprint_entry_deleted'
+  | 'copy_generated'
+  | 'copy_approved'
+  | 'copy_batch_started'
+  | 'copy_batch_complete'
+  | 'copy_exported'
+  | 'copy_suggestion_added'
+  | 'copy_section_edited'
+  | 'copy_pattern_removed'
+  | 'diagnostic_completed';
 
 export interface ActivityEntry {
   id: string;

@@ -30,8 +30,9 @@
           "source": "ADMIN_UX_AUDIT P2-7",
           "est": "2-3h",
           "priority": "P1",
-          "notes": "7-step checklist on empty command center: create workspace, link Webflow, connect GSC, connect GA4, run audit, set client password, configure email.",
-          "status": "pending"
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — OnboardingChecklist modal overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, localStorage dismissal per workspace, auto-celebrate on completion. Feature #291.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
         },
         {
           "id": 119,
@@ -716,7 +717,7 @@
           "source": "PR #166 + PR #168 scaled-code-review (2026-04-11)",
           "est": "6-8h",
           "priority": "P2",
-          "notes": "Deferred findings from two back-to-back scaled code reviews on the voice-authority subsystem. Tracked together because they touch the same code paths and should be batched into a single hardening PR. ## Batch A — PR #166 review (5 items, original tracker): (A1) Add try/catch around getVoiceProfile() in buildSeoContext so a read failure doesn't crash the entire prompt-assembly hot path — currently an exception there propagates through every AI endpoint. (A2) BrandscriptTab stale-content toast: when a workspace's brandscript is modified in a second tab, the first tab's editor silently clobbers the newer version on save. Needs a last-updated timestamp check + toast offering reload-vs-overwrite. (A3) Remove vacuous `if (workspaceId)` guards in seo-context.ts — workspaceId is typed as string and non-null at all call sites, so these guards are dead code that misleads readers into thinking the parameter is optional. (A4) Shadow-mode voice parity check is currently skipped when the voice profile is authoritative (see comment in seo-context.ts line ~232) — add a dedicated voice-profile parity field so shadow-mode covers the whole prompt surface. (A5) Voice profile auto-creation UX: first GET /api/voice/:id creates a draft profile as a side effect. Move this to an explicit POST on the voice calibration page so the UX is intentional rather than surprising. ## Batch B — PR #168 review deferred items: 29 findings deferred after the Tier-1 sweep (C1 + I1-I5 + I17 were handled in the same commit stack as the PR #168 refactor). Breakdown: 14 `Important/Recommend` items (labelled I6 through I19 in the review thread) covering secondary refactors around the voice-authority single-snapshot path, plus residual cleanup opportunities surfaced by the deep-dive review — things like additional brand-voice authority-layer auditing in adjacent files, small type-narrowing improvements, and non-blocking observability gaps. 15 `Minor` items (labelled M1 through M15) covering style, naming, and doc polish that are safe to defer until the main refactor has soaked on staging. Full finding text (verbatim) lives in the PR #168 scaled-code-review thread; do NOT re-enumerate them here — work through them directly against that thread when the follow-up PR is opened. Recommended approach: open a single `chore/voice-review-followups` branch, group edits by module, and land as one PR with a checklist comment mapping each commit to the A#/I#/M# identifier it addresses.",
+          "notes": "Deferred findings from two back-to-back scaled code reviews on the voice-authority subsystem. Tracked together because they touch the same code paths and should be batched into a single hardening PR. ## Batch A — PR #166 review (5 items, original tracker): (A1) Add try/catch around getVoiceProfile() in buildSeoContext so a read failure doesn't crash the entire prompt-assembly hot path — currently an exception there propagates through every AI endpoint. (A2) BrandscriptTab stale-content toast: when a workspace's brandscript is modified in a second tab, the first tab's editor silently clobbers the newer version on save. Needs a last-updated timestamp check + toast offering reload-vs-overwrite. (A3) Remove vacuous `if (workspaceId)` guards in seo-context.ts — workspaceId is typed as string and non-null at all call sites, so these guards are dead code that misleads readers into thinking the parameter is optional. (A4) Shadow-mode voice parity check is currently skipped when the voice profile is authoritative (see comment in seo-context.ts line ~232) — add a dedicated voice-profile parity field so shadow-mode covers the whole prompt surface. (A5) Voice profile auto-creation UX: first GET /api/voice/:id creates a draft profile as a side effect. Move this to an explicit POST on the voice calibration page so the UX is intentional rather than surprising. ## Batch B — PR #168 review (13 Important items + 15 Minor items; C1 + I1-I5 + I17 were handled in the PR #168 refactor stack, excluded here). Important (ship after merge): (I6) Approved deliverable reset cascade missing — approving a new deliverable should reset downstream state, currently doesn't. (I7) CalibrationVariation.ratings column is never populated — schema has it, no write path writes to it. (I8) localFeedback state in RubricFeedback is dead UI — captured but never persisted or surfaced. (I9) PATCH extractions route missing atomicity + addActivity + cache invalidation — partial write on failure, no audit trail, stale reads. (I10) PUT sections route missing addActivity — activity log has no record of section edits. (I11) SteeringChat auto-summarization missing — forward-compatibility contract from Phase 1 spec addendum; long chats will exceed token budgets without summarization. (I12) Prompt injection defense not applied to discovery ingestion rawText — untrusted blob fed into AI prompts without sanitization. (I13) Brand-engine routes missing tier gating — Free-tier workspaces can hit Growth-tier features (brandscript + voice calibration). (I14) No rate limiting on brand-engine AI routes — expensive endpoints with no per-workspace throttle. (I15) rawText has no size limit at ingest — a megabyte blob will crash prompt assembly and run up OpenAI bill. (I16) err.message leakage in error responses on brand-engine routes — raw DB errors surfaced to client. (I18) docs/rules/pr-check-rule-authoring.md has stale CHECKS-array examples — references old format that no longer matches the generated rules. (I19) docs/superpowers/plans/COPY_ENGINE_GUARDRAILS.md references `.windsurf/rules/` path + stale `tsc --noEmit` command — paths moved and command is wrong (use `npm run typecheck`). Minor: (M1-M15) 15 items covering dead imports, comment typos, type narrowing, naming, and doc polish — enumerated in the PR #168 review thread; list in-place in the follow-up PR's commit checklist rather than duplicating here. Recommended approach: open a single `chore/voice-review-followups` branch, group edits by module, and land as one PR with a checklist comment mapping each commit to the A#/I#/M# identifier it addresses.",
           "status": "pending"
         },
         {
@@ -1141,8 +1142,8 @@
           "source": "docs/superpowers/plans/2026-03-27-page-strategy-engine.md",
           "est": "16-22h",
           "priority": "P1",
-          "notes": "Site Blueprint deliverable: page-by-page content plan tied to brandscript + keyword strategy. Intelligence-informed generation: cannibalization insights → consolidation, competitor gaps → prioritization, learnings → proven patterns. Auto-brief creation after blueprint generation. Prerequisite for Copy Pipeline Phase 3. Plan audit deferred until after Brandscript ships to staging.",
-          "status": "pending"
+          "notes": "Shipped — Site Blueprint deliverable with page-by-page content plan. Intelligence-informed generation. Auto-brief creation. Prerequisite for Copy Pipeline Phase 3.",
+          "status": "done"
         },
         {
           "id": "copy-pipeline-phase3",
@@ -1150,8 +1151,76 @@
           "source": "docs/superpowers/plans/2026-03-27-copy-pipeline.md",
           "est": "24-32h",
           "priority": "P1",
-          "notes": "Full page-level AI copy generation: per-page intelligence injection (content decay + CTR + SERP opportunity → copy structure), copy intelligence feedback loop (patterns back into prompts via buildCopyIntelligenceContext()), approved copy → voice sample loop. Uses buildSystemPrompt() for voice-calibrated output. Prerequisite: Page Strategy Engine shipped to staging. Plan audit deferred until after Page Strategy ships.",
-          "status": "pending"
+          "notes": "Shipped — Tier 1 (Tasks 1-19): 4 server modules (copy-generation, copy-review, copy-intelligence, copy-export), migration 058, Zod schemas, frontend API + hooks, 5 UI components (CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager, BlueprintDetail Copy tab). 21 integration tests. Tier 2 (Tasks 20-28): voice sample feedback loop, steering classification, pattern promotion, client copy review portal, questionnaire→brandscript, admin chat awareness, content decay→copy refresh, workspace intelligence wiring. Feature-flagged via copy-engine-pipeline. PR #173 (Tier 1) + PR for Tier 2.",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "sprint-admin-ux-pr4",
+      "name": "✅ SHIPPED — Admin UX PR4: Onboarding & Guided Flows",
+      "shippedAt": "2026-04-13",
+      "rationale": "Reduce cold-start friction and learning curve for new workspaces. Add workflow orientation to complex multi-step tools. Surface in-app educational guides alongside analysis views.",
+      "items": [
+        {
+          "id": 291,
+          "title": "OnboardingChecklist — workspace first-visit setup overlay",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Modal-style overlay on WorkspaceHome first visit. 4 steps: Connect Webflow, Connect GSC, Run First Audit, Set Client Password. Blue progress bar, teal checkmarks, focus trap, Escape key close, localStorage dismissal per workspace, auto-celebrate on completion.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 292,
+          "title": "WorkflowStepper — horizontal numbered stepper primitive",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1-2h",
+          "priority": "P1",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Shared UI primitive: horizontal stepper with green=completed/teal=current/zinc=future states, compact variant, clickable steps via onStepClick. Integrated in ContentPipeline (4 steps: Strategy→Briefs→Posts→Publish) and SchemaSuggester generator view (5 steps: Scan→Review→Edit→Publish→Validate).",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 293,
+          "title": "WorkspaceHealthBar — multi-metric health + recommended next action",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "2h",
+          "priority": "P1",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Progress bars for key workspace health metrics (blue fills per data-color law), Recommended Next section with teal CTA, SectionCard wrapper. Renders below stat cards on WorkspaceHome.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 294,
+          "title": "SeoAuditGuide — in-app guide tab for SeoAudit",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide sub-tab in SeoAudit analysis section (5 sections: issue severity, prioritization, fix options, AEO review, content decay). Uses existing custom tab bar pattern from SeoAudit.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 295,
+          "title": "KeywordStrategyGuide — in-app guide tab for KeywordStrategy",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide tab added to KeywordStrategy (TabBar added, analysis|guide). 6 sections: reading the strategy, intent badges, content gap prioritization, KD/volume interpretation, quick wins, implementation order.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
+        },
+        {
+          "id": 296,
+          "title": "PageIntelligenceGuide — in-app guide tab for PageIntelligence",
+          "source": "feat/admin-ux-pr4-onboarding",
+          "est": "1h",
+          "priority": "P2",
+          "notes": "Shipped in feat/admin-ux-pr4-onboarding — Guide tab added to PageIntelligence (pages|architecture|guide TabBar). 6 sections: page scores, architecture signals, link health, prioritization, action recommendations, tool integrations. Also fixed pre-existing purple color violations in PageIntelligence.",
+          "status": "done",
+          "shippedAt": "2026-04-13"
         }
       ]
     },

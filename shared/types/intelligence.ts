@@ -3,6 +3,7 @@
 // Spec: docs/superpowers/specs/unified-workspace-intelligence.md §3, §11
 
 import type { AnalyticsInsight, InsightType, InsightSeverity } from './analytics.js';
+import type { DiagnosticStatus } from './diagnostics.js';
 import type { KeywordStrategy, AudiencePersona, PageKeywordMap } from './workspace.js';
 import type {
   TrackedAction,
@@ -174,6 +175,7 @@ export interface ContentPipelineSlice {
   cannibalizationWarnings?: CannibalizationWarning[];
   decayAlerts?: DecayAlert[];
   suggestedBriefs?: number;
+  copyPipeline?: CopyPipelineSummary;
 }
 
 export interface SiteHealthSlice {
@@ -192,6 +194,16 @@ export interface SiteHealthSlice {
   anomalyCount?: number;
   anomalyTypes?: string[];
   seoChangeVelocity?: number;
+  /** Recent diagnostic reports (last 5, most recent first). Populated by assembleSiteHealth. */
+  recentDiagnostics?: Array<{
+    insightId: string | null;
+    anomalyType: string;
+    status: DiagnosticStatus;
+    affectedPages: string[];
+    completedAt: string | null;
+    /** Root cause titles from completed reports — the AI-synthesized findings. */
+    rootCauseTitles?: string[];
+  }>;
 }
 
 export interface ClientSignalsSlice {
@@ -457,4 +469,34 @@ export interface ContentPipelineSummary {
   requests: { pending: number; inProgress: number; delivered: number };
   workOrders: { active: number };
   seoEdits: { pending: number; applied: number; inReview: number };
+}
+
+// ── Copy pipeline summary (for workspace intelligence assembly) ────────
+
+export interface CopyPipelineSummary {
+  /** Total copy sections across all blueprint entries */
+  totalSections: number;
+  /** Count by status */
+  approvedSections: number;
+  draftSections: number;
+  clientReviewSections: number;
+  pendingSections: number;
+  revisionSections: number;
+  /** Already a percentage (e.g., 72 for 72%). Do NOT divide by 100. */
+  approvalRate: number;
+  /** Already a percentage. Approved sections where version === 1. */
+  firstTryApprovalRate: number;
+  /** Active intelligence patterns (terminology, tone, structure, keyword_usage) */
+  activePatternsCount: number;
+  /** Last batch job summary (null if no batch jobs exist) */
+  lastBatchJob: {
+    status: string;
+    /** Already a percentage (e.g., 80 for 80%). */
+    completionRate: number;
+    createdAt: string;
+  } | null;
+  /** Entries with all sections approved */
+  entriesWithCompleteCopy: number;
+  /** Entries with at least one section but not all approved */
+  entriesWithPendingCopy: number;
 }

@@ -38,6 +38,7 @@ import type {
   ROIAttribution,
   WeCalledItEntry,
   ContentPipelineSummary,
+  CopyPipelineSummary,
   SerpFeatures,
 } from '../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../shared/types/analytics.js';
@@ -93,6 +94,28 @@ const stmts = createStmtCache(() => ({
   ),
   clientBusinessPriorities: db.prepare(
     'SELECT priorities FROM client_business_priorities WHERE workspace_id = ?',
+  ),
+}));
+
+// Separate cache for copy pipeline tables — isolated so that missing tables
+// (environments without migration 058) don't break the main stmt cache.
+const copyStmts = createStmtCache(() => ({
+  sectionCounts: db.prepare(
+    `SELECT status, COUNT(*) as cnt, COALESCE(SUM(CASE WHEN version = 1 THEN 1 ELSE 0 END), 0) as first_version_cnt
+     FROM copy_sections WHERE workspace_id = ? GROUP BY status`,
+  ),
+  entryCounts: db.prepare(
+    `SELECT entry_id,
+       COUNT(*) as total,
+       COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) as approved
+     FROM copy_sections WHERE workspace_id = ? GROUP BY entry_id`,
+  ),
+  lastBatchJob: db.prepare(
+    `SELECT status, progress_json, created_at
+     FROM copy_batch_jobs WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1`,
+  ),
+  activePatternCount: db.prepare(
+    `SELECT COUNT(*) as cnt FROM copy_intelligence WHERE workspace_id = ? AND active = 1`,
   ),
 }));
 
@@ -609,6 +632,14 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     log.debug({ err, workspaceId }, 'assembleContentPipeline: suggested briefs optional, degrading gracefully');
   }
 
+  // Copy pipeline (copy_sections, copy_intelligence, copy_batch_jobs)
+  let copyPipeline: CopyPipelineSummary | undefined;
+  try {
+    copyPipeline = assembleCopyPipeline(workspaceId);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'assembleContentPipeline: copy pipeline optional, degrading gracefully');
+  }
+
   return {
     briefs: summary.briefs,
     posts: summary.posts,
@@ -622,6 +653,117 @@ async function assembleContentPipeline(workspaceId: string): Promise<ContentPipe
     cannibalizationWarnings,
     decayAlerts,
     suggestedBriefs,
+    copyPipeline,
+  };
+}
+
+/**
+ * Assemble copy pipeline metrics from copy_sections, copy_intelligence, and copy_batch_jobs.
+ * Synchronous — uses direct SQL via prepared statements (all tables are local SQLite).
+ * Gracefully returns undefined if the copy pipeline tables don't exist (older DBs).
+ */
+function assembleCopyPipeline(workspaceId: string): CopyPipelineSummary | undefined {
+  // Section status counts + first-version counts
+  type StatusRow = { status: string; cnt: number; first_version_cnt: number };
+  const statusRows = copyStmts().sectionCounts.all(workspaceId) as StatusRow[];
+
+  // If no rows at all, copy pipeline isn't in use for this workspace
+  if (statusRows.length === 0) return undefined;
+
+  let totalSections = 0;
+  let approvedSections = 0;
+  let draftSections = 0;
+  let clientReviewSections = 0;
+  let pendingSections = 0;
+  let revisionSections = 0;
+  let approvedFirstVersion = 0;
+
+  for (const row of statusRows) {
+    totalSections += row.cnt;
+    switch (row.status) {
+      case 'approved':
+        approvedSections = row.cnt;
+        approvedFirstVersion = row.first_version_cnt;
+        break;
+      case 'draft':
+        draftSections = row.cnt;
+        break;
+      case 'client_review':
+        clientReviewSections = row.cnt;
+        break;
+      case 'pending':
+        pendingSections = row.cnt;
+        break;
+      case 'revision_requested':
+        revisionSections = row.cnt;
+        break;
+    }
+  }
+
+  const approvalRate = totalSections > 0
+    ? Math.round((approvedSections / totalSections) * 100)
+    : 0;
+  const firstTryApprovalRate = approvedSections > 0
+    ? Math.round((approvedFirstVersion / approvedSections) * 100)
+    : 0;
+
+  // Active intelligence patterns count
+  let activePatternsCount = 0;
+  try {
+    const countRow = copyStmts().activePatternCount.get(workspaceId) as { cnt: number } | undefined;
+    activePatternsCount = countRow?.cnt ?? 0;
+  } catch (err) {
+    // copy_intelligence table may not exist in all environments
+    log.debug({ err, workspaceId }, 'copy_intelligence table unavailable');
+  }
+
+  // Last batch job
+  type BatchRow = { status: string; progress_json: string; created_at: string };
+  const batchRow = copyStmts().lastBatchJob.get(workspaceId) as BatchRow | undefined;
+  let lastBatchJob: CopyPipelineSummary['lastBatchJob'] = null;
+  if (batchRow) {
+    const progress = parseJsonSafe(batchRow.progress_json, z.object({
+      total: z.number(),
+      generated: z.number(),
+      reviewed: z.number(),
+      approved: z.number(),
+    }), { total: 0, generated: 0, reviewed: 0, approved: 0 }, { workspaceId, field: 'progress_json', table: 'copy_batch_jobs' });
+    const completionRate = progress.total > 0
+      ? Math.round((progress.generated / progress.total) * 100)
+      : 0;
+    lastBatchJob = {
+      status: batchRow.status,
+      completionRate,
+      createdAt: batchRow.created_at,
+    };
+  }
+
+  // Per-entry completion: entries with all sections approved vs entries still in progress
+  type EntryRow = { entry_id: string; total: number; approved: number };
+  const entryRows = copyStmts().entryCounts.all(workspaceId) as EntryRow[];
+  let entriesWithCompleteCopy = 0;
+  let entriesWithPendingCopy = 0;
+  for (const row of entryRows) {
+    if (row.total > 0 && row.approved === row.total) {
+      entriesWithCompleteCopy++;
+    } else if (row.total > 0) {
+      entriesWithPendingCopy++;
+    }
+  }
+
+  return {
+    totalSections,
+    approvedSections,
+    draftSections,
+    clientReviewSections,
+    pendingSections,
+    revisionSections,
+    approvalRate,
+    firstTryApprovalRate,
+    activePatternsCount,
+    lastBatchJob,
+    entriesWithCompleteCopy,
+    entriesWithPendingCopy,
   };
 }
 
@@ -802,6 +944,25 @@ async function assembleSiteHealth(
     log.debug({ workspaceId, err }, 'siteHealth: seo change tracker failed — skipping');
   }
 
+  // ── Recent diagnostic reports (diagnostic-store.ts) ──────────────────
+  let recentDiagnostics: SiteHealthSlice['recentDiagnostics'];
+  try {
+    const { listDiagnosticReports } = await import('./diagnostic-store.js');
+    const reports = listDiagnosticReports(workspaceId);
+    recentDiagnostics = reports.slice(0, 5).map(r => ({
+      insightId: r.insightId,
+      anomalyType: r.anomalyType,
+      status: r.status,
+      affectedPages: r.affectedPages,
+      completedAt: r.completedAt,
+      rootCauseTitles: r.status === 'completed' && r.rootCauses.length > 0
+        ? r.rootCauses.map(c => c.title)
+        : undefined,
+    }));
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: diagnostic reports optional, degrading gracefully');
+  }
+
   return {
     auditScore,
     auditScoreDelta,
@@ -816,6 +977,7 @@ async function assembleSiteHealth(
     anomalyCount,
     anomalyTypes,
     seoChangeVelocity,
+    recentDiagnostics,
   };
 }
 
@@ -1781,6 +1943,24 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     }
   }
 
+  // Copy pipeline sub-section
+  if (pipeline.copyPipeline) {
+    const cp = pipeline.copyPipeline;
+    lines.push(`Copy: ${cp.totalSections} sections (${cp.approvedSections} approved, ${cp.draftSections} draft, ${cp.clientReviewSections} in review)`);
+    lines.push(`Copy approval rate: ${cp.approvalRate}%, first-try: ${cp.firstTryApprovalRate}%`);
+    if (cp.entriesWithCompleteCopy > 0 || cp.entriesWithPendingCopy > 0) {
+      lines.push(`Pages: ${cp.entriesWithCompleteCopy} complete, ${cp.entriesWithPendingCopy} pending`);
+    }
+    if (verbosity !== 'compact') {
+      if (cp.activePatternsCount > 0) {
+        lines.push(`Learned copy patterns: ${cp.activePatternsCount} active`);
+      }
+      if (cp.lastBatchJob) {
+        lines.push(`Last batch: ${cp.lastBatchJob.status}, ${cp.lastBatchJob.completionRate}% complete`);
+      }
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -1803,6 +1983,16 @@ function formatSiteHealthSection(health: SiteHealthSlice, verbosity: PromptVerbo
   }
 
   if (verbosity === 'detailed') {
+    if (health.recentDiagnostics && health.recentDiagnostics.length > 0) {
+      const diagLines = health.recentDiagnostics.map(d => {
+        const pages = d.affectedPages.length > 0 ? ` on ${d.affectedPages.join(', ')}` : '';
+        const causes = d.rootCauseTitles && d.rootCauseTitles.length > 0
+          ? ` → ${d.rootCauseTitles.join('; ')}`
+          : '';
+        return `  ${d.anomalyType} [${d.status}]${pages}${causes}`;
+      });
+      lines.push(`Recent diagnostics:\n${diagLines.join('\n')}`);
+    }
     if (health.schemaErrors > 0) lines.push(`Schema errors: ${health.schemaErrors}`);
     if (health.seoChangeVelocity != null) lines.push(`SEO change velocity: ${health.seoChangeVelocity} changes (30d)`);
     if (health.cwvPassRate.mobile != null) lines.push(`CWV pass rate: mobile ${pct(health.cwvPassRate.mobile)}, desktop ${health.cwvPassRate.desktop != null ? pct(health.cwvPassRate.desktop) : 'n/a'}`);

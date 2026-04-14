@@ -1,9 +1,13 @@
+import type { ContentPageType, TemplateSection } from '../../../shared/types/content';
+
+export type { TemplateSection };
+
 export interface ContentTemplate {
   id: string;
   workspaceId: string;
   name: string;
   description?: string;
-  pageType: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource' | 'provider-profile' | 'procedure-guide' | 'pricing-page';
+  pageType: ContentPageType;
   variables: TemplateVariable[];
   sections: TemplateSection[];
   urlPattern: string;
@@ -21,16 +25,6 @@ export interface TemplateVariable {
   name: string;
   label: string;
   description?: string;
-}
-
-export interface TemplateSection {
-  id: string;
-  name: string;
-  headingTemplate: string;
-  guidance: string;
-  wordCountTarget: number;
-  order: number;
-  cmsFieldSlug?: string;
 }
 
 export interface ContentMatrix {

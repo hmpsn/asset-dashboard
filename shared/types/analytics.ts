@@ -340,6 +340,14 @@ export interface AnomalyDigestData {
   durationDays: number;
   firstDetected: string;
   severity: string;
+  /**
+   * The specific page path affected (e.g. "/blog/article"), if the anomaly is
+   * page-level. Undefined for site-wide anomalies. Do NOT use anomalyInsight.pageId
+   * for this — that field holds a synthetic dedup key like "anomaly:traffic_drop:clicks".
+   */
+  affectedPage?: string;
+  /** Set when a deep diagnostic has been run for this anomaly */
+  diagnosticReportId?: string;
 }
 
 /** Data shape for audit_finding insights (bridge-generated from scheduled audits) */

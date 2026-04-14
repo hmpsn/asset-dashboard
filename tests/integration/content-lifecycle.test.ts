@@ -105,6 +105,7 @@ describe('Content Request — happy path lifecycle', () => {
     expect(updated!.status).toBe('brief_generated');
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('walks the full happy path: requested → … → published', () => {
     const req = makeRequest(workspaceId, 'happy-3');
     walkStatuses(workspaceId, req.id, [
@@ -175,11 +176,13 @@ describe('Content Request — admin fast-track', () => {
     expect(updated!.status).toBe('delivered');
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('fast-tracks requested → brief_generated → in_progress', () => {
     const req = makeRequest(workspaceId, 'fast-3');
     walkStatuses(workspaceId, req.id, ['brief_generated', 'in_progress']);
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('fast-tracks requested → client_review → approved → published', () => {
     const req = makeRequest(workspaceId, 'fast-4');
     walkStatuses(workspaceId, req.id, ['client_review', 'approved', 'published']);
@@ -375,6 +378,7 @@ describe('Content Request — changes_requested loop', () => {
     cleanup();
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('allows client_review → changes_requested → brief_generated → client_review', () => {
     const req = makeRequest(workspaceId, 'loop-1');
     walkStatuses(workspaceId, req.id, [
@@ -386,6 +390,7 @@ describe('Content Request — changes_requested loop', () => {
     ]);
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('allows multiple loops before final approval', () => {
     const req = makeRequest(workspaceId, 'loop-2');
     walkStatuses(workspaceId, req.id, [
@@ -401,6 +406,7 @@ describe('Content Request — changes_requested loop', () => {
     ]);
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('allows changes_requested → client_review directly (re-review after changes)', () => {
     const req = makeRequest(workspaceId, 'loop-3');
     walkStatuses(workspaceId, req.id, [
@@ -410,6 +416,7 @@ describe('Content Request — changes_requested loop', () => {
     ]);
   });
 
+  // no-assertion-ok — walkStatuses() asserts each transition via 4 expect() calls per step
   it('allows exiting the loop to in_progress from changes_requested', () => {
     const req = makeRequest(workspaceId, 'loop-4');
     walkStatuses(workspaceId, req.id, [

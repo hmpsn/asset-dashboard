@@ -599,6 +599,46 @@
       "tier": "growth",
       "impact": "medium",
       "clientFacing": false
+    },
+    {
+      "id": 61,
+      "title": "AI Copy Generation Pipeline",
+      "oneLiner": "Voice-calibrated AI copy for every page in a site blueprint — section-by-section generation with 8-layer context, review workflow, batch processing, and multi-format export",
+      "category": "content",
+      "painPoints": ["content-creation", "brand-voice", "copywriting"],
+      "tier": "premium",
+      "impact": "high",
+      "clientFacing": true
+    },
+    {
+      "id": 62,
+      "title": "Client Copy Review Portal",
+      "oneLiner": "Self-service copy review where clients approve sections or suggest edits — real-time status updates, structured feedback, no email back-and-forth",
+      "category": "content",
+      "painPoints": ["client-collaboration", "approvals", "copywriting"],
+      "tier": "premium",
+      "impact": "high",
+      "clientFacing": true
+    },
+    {
+      "id": 63,
+      "title": "Copy Intelligence & Voice Learning",
+      "oneLiner": "Extracts patterns from generated copy, promotes recurring patterns to voice guardrails, and feeds approved copy back as voice samples — the system improves with every generation",
+      "category": "content",
+      "painPoints": ["brand-voice", "content-quality"],
+      "tier": "premium",
+      "impact": "medium",
+      "clientFacing": false
+    },
+    {
+      "id": 64,
+      "title": "Deep Diagnostics",
+      "oneLiner": "AI-powered root cause analysis for traffic anomalies — gathers GSC position history, redirect chains, internal links, backlinks, and recent activity, then synthesizes ranked root causes and a prioritized remediation plan",
+      "category": "seo",
+      "painPoints": ["traffic-drops", "technical-seo", "reporting"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": false
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2, ChevronDown, ChevronRight, Target, AlertCircle,
@@ -7,7 +7,7 @@ import {
   Shield, DollarSign, ArrowUp, ArrowDown, ArrowUpRight, Code2, Plus,
 } from 'lucide-react';
 import { adminPath } from '../routes';
-import { scoreColorClass, scoreBgBarClass, MetricRing } from './ui';
+import { scoreColorClass, scoreBgBarClass, MetricRing, TabBar, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { normalizePath, resolvePagePath } from '../lib/pathUtils';
 import { get, post } from '../api/client';
 import { keywords, rankTracking } from '../api/seo';
@@ -15,8 +15,12 @@ import { useKeywordStrategy } from '../hooks/admin';
 import { SeoCopyPanel } from './strategy/SeoCopyPanel';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 import type { FixContext } from '../App';
 import type { MetricsSource } from '../../shared/types/keywords.js';
+import { PageIntelligenceGuide } from './PageIntelligenceGuide';
+
+const SiteArchitecture = lazyWithRetry(() => import('./SiteArchitecture').then(m => ({ default: m.SiteArchitecture })));
 
 // ── Types ──
 
@@ -196,6 +200,9 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const { data: keywordData, isLoading: strategyLoading } = useKeywordStrategy(workspaceId);
   const strategy = keywordData?.strategy || null;
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'pages' | 'architecture' | 'guide'>('pages');
+
   // All pages from webflow (static + CMS)
   const [allPages, setAllPages] = useState<PageMeta[]>([]);
   const [pagesLoading, setPagesLoading] = useState(true);
@@ -208,6 +215,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   const cancelBulkRef = useRef(false);
   const { jobs, startJob, cancelJob: cancelBgJob } = useBackgroundTasks();
   const bulkJobIdRef = useRef<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showNextSteps, setShowNextSteps] = useState(false);
 
   // Page list UI state
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -351,6 +360,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   // ── AI Analysis ──
   const analyzePage = async (page: UnifiedPage) => {
+    setAnalysisError(null);
+    setShowNextSteps(false);
     setAnalyzing(prev => new Set(prev).add(page.id));
     try {
       let pageContent = '';
@@ -420,6 +431,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       }
     } catch (err) {
       console.error('Analysis failed:', err);
+      setAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
       setAnalyzing(prev => { const n = new Set(prev); n.delete(page.id); return n; });
     }
@@ -428,6 +440,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   // ── Bulk Analysis via Background Job ──
   const analyzeAllPages = async (forceRefresh = false) => {
     cancelBulkRef.current = false;
+    setAnalysisError(null);
+    setShowNextSteps(false);
     setBulkProgress({ done: 0, total: unifiedPages.length });
     const jobId = await startJob('page-analysis', { siteId, workspaceId, forceRefresh });
     if (jobId) {
@@ -453,6 +467,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
       }
     } else if (job.status === 'done') {
       setBulkProgress(null);
+      setShowNextSteps(true);
       bulkJobIdRef.current = null;
       lastRefreshedAt.current = 0;
       queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
@@ -586,22 +601,43 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* tab-deeplink-ok — page intel tabs are not navigated to via ?tab= from other components */}
+      <TabBar
+        tabs={[
+          { id: 'pages', label: 'Pages' },
+          { id: 'architecture', label: 'Architecture' },
+          { id: 'guide', label: 'Guide' },
+        ]}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as 'pages' | 'architecture' | 'guide')}
+      />
+
+      {activeTab === 'architecture' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-5 h-5 border-2 rounded-full animate-spin border-zinc-800 border-t-teal-400" /></div>}>
+          <SiteArchitecture key={`arch-${workspaceId}`} workspaceId={workspaceId} />
+        </Suspense>
+      )}
+
+      {activeTab === 'guide' && <PageIntelligenceGuide />}
+
+      {activeTab === 'pages' && (
+      <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-zinc-200">Page Intelligence</h3>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {unifiedPages.length} pages
-            {cmsCount > 0 && <span className="text-purple-400"> · {cmsCount} CMS</span>}
+            {cmsCount > 0 && <span className="text-blue-400"> · {cmsCount} CMS</span>}
             {withStrategy > 0 && <span> · {withStrategy} with strategy</span>}
             {analyzedCount > 0 && <span className="text-teal-400"> · {analyzedCount} analyzed</span>}
           </p>
         </div>
         {/* Analyze All */}
         {bulkProgress ? (
-          <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+          <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
             <span className="text-xs text-zinc-300">Analyzing {bulkProgress.done}/{bulkProgress.total}...</span>
             <button onClick={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
           </div>
@@ -611,7 +647,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               <button
                 onClick={() => analyzeAllPages(false)}
                 disabled={analyzing.size > 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Analyze Remaining ({unifiedPages.length - analyzedCount})
@@ -623,7 +659,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-40 ${
                 analyzedCount > 0
                   ? 'bg-zinc-700 hover:bg-zinc-600 text-zinc-200'
-                  : 'bg-purple-600/80 hover:bg-purple-500/80 text-white'
+                  : 'bg-teal-600/80 hover:bg-teal-500/80 text-white'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -632,6 +668,38 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           </div>
         )}
       </div>
+      {bulkProgress && (
+        <ProgressIndicator
+          status="running"
+          detail={`Analyzing ${bulkProgress.done}/${bulkProgress.total}...`}
+          percent={bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}
+          onCancel={() => { if (bulkJobIdRef.current) cancelBgJob(bulkJobIdRef.current); else cancelBulkRef.current = true; }}
+        />
+      )}
+
+      {analysisError && (
+        <ErrorState
+          type="general"
+          title="Page Analysis Failed"
+          message={analysisError}
+          actions={[{ label: 'Dismiss', onClick: () => { setAnalysisError(null); }, variant: 'secondary' }]}
+        />
+      )}
+
+      {showNextSteps && !bulkProgress && (
+        <NextStepsCard
+          title="Analysis complete"
+          variant="success"
+          onDismiss={() => setShowNextSteps(false)}
+          staggerIndex={0}
+          steps={[
+            {
+              label: 'Go to SEO Editor',
+              onClick: () => navigate(adminPath(workspaceId, 'seo-editor')),
+            },
+          ]}
+        />
+      )}
 
       {/* Fix These First — impact-ranked priority queue */}
       {fixQueue.length > 0 && (
@@ -726,7 +794,7 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-zinc-300 truncate">{page.title}</span>
                       {page.source === 'cms' && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20 shrink-0">CMS</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">CMS</span>
                       )}
                     </div>
                     <span className="text-[11px] text-zinc-500 font-mono">{page.path}</span>
@@ -1217,6 +1285,8 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
           </div>
         )}
       </div>
+      </div>
+      )}
     </div>
   );
 }

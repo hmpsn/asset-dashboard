@@ -13,6 +13,7 @@ import { listBatches } from '../approvals.js';
 import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { broadcast, broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS, ADMIN_EVENTS } from '../ws-events.js';
 import {
   listClientUsers,
   createClientUser,
@@ -180,7 +181,7 @@ const createWorkspaceSchema = z.object({
 router.post('/api/workspaces', validate(createWorkspaceSchema), (req, res) => {
   const { name, webflowSiteId, webflowSiteName } = req.body;
   const ws = createWorkspace(name, webflowSiteId, webflowSiteName);
-  broadcast('workspace:created', ws);
+  broadcast(ADMIN_EVENTS.WORKSPACE_CREATED, ws);
   res.json(ws);
 });
 
@@ -229,15 +230,15 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   });
   // Strip token from response to avoid leaking to frontend
   const safe = { ...ws, webflowToken: undefined, clientPassword: undefined, hasPassword: !!ws.clientPassword };
-  broadcast('workspace:updated', safe);
-  broadcastToWorkspace(req.params.id, 'workspace:updated', safe);
+  broadcast(WS_EVENTS.WORKSPACE_UPDATED, safe);
+  broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, safe);
   res.json(safe);
 });
 
 router.delete('/api/workspaces/:id', requireWorkspaceAccess(), (req, res) => {
   const ok = deleteWorkspace(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Not found' });
-  broadcast('workspace:deleted', { id: req.params.id });
+  broadcast(ADMIN_EVENTS.WORKSPACE_DELETED, { id: req.params.id });
   res.json({ ok: true });
 });
 
@@ -318,7 +319,7 @@ const businessProfileSchema = z.object({
 router.put('/api/workspaces/:id/business-profile', requireWorkspaceAccess(), validate(businessProfileSchema), (req, res) => {
   const ws = updateWorkspace(req.params.id, { businessProfile: req.body });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  broadcastToWorkspace(req.params.id, 'workspace:updated', { businessProfile: ws.businessProfile });
+  broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, { businessProfile: ws.businessProfile });
   res.json({ businessProfile: ws.businessProfile });
 });
 
@@ -333,7 +334,7 @@ router.put('/api/workspaces/:id/intelligence-profile', requireWorkspaceAccess(),
   const ws = updateWorkspace(req.params.id, { intelligenceProfile: req.body });
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   invalidateIntelligenceCache(req.params.id);
-  broadcastToWorkspace(req.params.id, 'workspace:updated', { intelligenceProfile: ws.intelligenceProfile });
+  broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, { intelligenceProfile: ws.intelligenceProfile });
   res.json({ intelligenceProfile: ws.intelligenceProfile });
 });
 

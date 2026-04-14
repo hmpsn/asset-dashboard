@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **46** — 26 error, 20 warn.
+Total rules: **51** — 26 error, 25 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -69,6 +69,11 @@ advisory but tracked.
 | 18 | Layout-driving state set in useEffect | warn | custom | `src/` | `// effect-layout-ok` | One-frame layout flash: the browser paints with stale layout state, then the effect runs and re-lays-out, producing visible jitter. |
 | 19 | Assembled-but-never-rendered slice fields | warn | custom | `shared/types/intelligence.ts + server/workspace-intelligence.ts` | — | A slice field present in the type but absent from the formatter is assembled but never reaches the AI prompt — silent data loss. |
 | 20 | callCreativeAI without json: flag in files that use parseJsonFallback | warn | custom | `server/` | — | callCreativeAI without an explicit json: flag silently drifts between models that return valid JSON and ones that wrap it in prose. |
+| 21 | Admin mutation on client_users missing expectedWorkspaceId param | warn | custom | `server/client-users.ts` | `// ws-authz-ok` | Without an in-function cross-workspace guard on admin mutations, an admin auth'd for workspace A can mutate a user in workspace B by passing the foreign UUID through a workspace-A URL. |
+| 22 | Inline voice-profile authority check (use isVoiceProfileAuthoritative helper) | warn | pattern | `server/seo-context.ts` | `// voice-authority-ok` | Inline authority checks drift: the shadow-mode copy missed the `hasExplicitConfig` gate, silently dropping the legacy brand voice for samples-only draft profiles (PR #168 bug). |
+| 23 | Bare brand-engine read in seo-context.ts (use safeBrandEngineRead) | warn | custom | `server/seo-context.ts` | `// safe-read-ok` | A missing brand-engine table in a non-production env crashes the entire buildSeoContext call tree, and an unnarrowed catch would hide real programming bugs as silent degradation. |
+| 24 | Test body has no assertion or explicit failure throw | warn | custom | `*.test.ts, *.test.tsx` | `// no-assertion-ok` | A vitest/jest test body with no assertion passes unconditionally — a broken implementation will not trip the suite. 2026-04-11 audit found 3 such silent-pass bodies in the stripe webhook suite claiming regression coverage they never had. |
+| 25 | TabBar component without ?tab= deep-link support | warn | custom | `src/components/` | `tab-deeplink-ok` | A ?tab= URL that the target component ignores is a silent navigation bug — the user sees the default tab instead of the requested one. |
 
 ---
 

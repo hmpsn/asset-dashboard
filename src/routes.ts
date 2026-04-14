@@ -19,12 +19,13 @@ export type Page =
   | 'revenue'
   | 'features'
   | 'outcomes'
-  | 'outcomes-overview';
+  | 'outcomes-overview'
+  | 'diagnostics';
 
 export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'brand';
 
 /** Global tabs that don't belong to a specific workspace */
-const GLOBAL_TABS = new Set<string>(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']);
+export const GLOBAL_TABS = new Set<string>(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']);
 
 /** Build an admin dashboard path */
 export function adminPath(workspaceId: string, tab: Page = 'home'): string {
