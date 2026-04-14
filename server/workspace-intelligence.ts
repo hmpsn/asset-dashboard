@@ -1155,11 +1155,27 @@ async function assembleClientSignals(
       log.debug({ err, workspaceId }, 'assembleClientSignals: chat memory optional, degrading gracefully');
     }
 
+    let portalUsage: EngagementMetrics['portalUsage'] = null;
+    try {
+      const { countActivityByType } = await import('./activity-log.js');
+      const sessionCount = countActivityByType(workspaceId, 'portal_session', 30);
+      if (sessionCount > 0) {
+        // pageViews approximated from portal_session login events; featuresUsed derived from chat + feedback activity
+        const featuresUsed: string[] = [];
+        if (chatSessionCount > 0) featuresUsed.push('chat');
+        const { hasRecentActivity } = await import('./activity-log.js');
+        if (hasRecentActivity(workspaceId, 30)) featuresUsed.push('dashboard');
+        portalUsage = { pageViews: sessionCount, featuresUsed };
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleClientSignals: portal usage count optional, degrading gracefully');
+    }
+
     engagement = {
       lastLoginAt: latestLogin,
       loginFrequency,
       chatSessionCount,
-      portalUsage: null,
+      portalUsage,
     };
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: client users optional, degrading gracefully');

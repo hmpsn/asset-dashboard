@@ -300,9 +300,19 @@ export interface ClientIntelligence {
 
   // Growth+ only
   learningHighlights?: ClientLearningHighlights | null;
+  rankTrackingSummary?: RankTrackingSummary | null;
+  serpOpportunities?: number | null;
 
   // Premium only
   siteHealthSummary?: ClientSiteHealthSummary | null;
+  contentDecayAlerts?: ClientDecayAlert[] | null;
+}
+
+export interface ClientDecayAlert {
+  pageUrl: string;
+  clickDrop: number;
+  detectedAt: string;
+  hasRefreshBrief: boolean;
 }
 
 // ── New supporting types (Phase 3A) ─────────────────────────────────
