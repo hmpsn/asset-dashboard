@@ -2618,7 +2618,7 @@ export function getIntelligenceCacheStats() {
  */
 export function getWorkspaceHealthScore(workspaceId: string): number | null {
   // Try the default cache key (all slices, no page path, 'all' learning domain)
-  const cacheKey = `intelligence:${workspaceId}:${ALL_SLICES.sort().join(',')}::all`;
+  const cacheKey = `intelligence:${workspaceId}:${[...ALL_SLICES].sort().join(',')}::all`;
   const cached = intelligenceCache.peek(cacheKey);
   if (cached?.clientSignals?.compositeHealthScore != null) {
     return cached.clientSignals.compositeHealthScore;
