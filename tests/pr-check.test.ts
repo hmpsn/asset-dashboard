@@ -36,6 +36,8 @@ import {
   findUnrenderedSliceFields,
   compareStudioConstants,
   BRAND_ENGINE_ROUTE_BASENAMES,
+  REQUIRE_AUTH_ALLOWED_BASENAMES,
+  GLOBALLY_APPLIED_LIMITERS,
   type Check,
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
@@ -2482,6 +2484,234 @@ describe('Rule: TabBar component without ?tab= deep-link support', () => {
   });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: requireAuth usage outside allowed route files
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: requireAuth usage outside allowed route files', () => {
+  const RULE = 'requireAuth usage outside allowed route files';
+
+  it('flags requireAuth usage in a non-allowed server route file', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/some-feature.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",                    // 1
+        "import { Router } from 'express';",                            // 2
+        "const router = Router();",                                     // 3
+        "router.get('/api/things', requireAuth, (req, res) => {",       // 4
+        "  res.json({ ok: true });",                                    // 5
+        "});",                                                          // 6
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('respects inline // auth-ok hatch on the usage line', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/special.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "const router = Router();",
+        "router.get('/api/things', requireAuth, handler); // auth-ok",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // auth-ok hatch on the line above', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/special2.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "const router = Router();",
+        "// auth-ok — intentionally JWT-only",
+        "router.get('/api/things', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag requireAuth in routes/auth.ts (allowed)', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/auth.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "router.get('/api/auth/me', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag requireAuth in routes/users.ts (allowed)', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/users.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "router.get('/api/users', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag brand-engine routes (covered by their own rule)', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/voice-calibration.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "router.get('/api/voice', requireAuth, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag server/auth.ts definition file', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/auth.ts'),
+      lines(
+        "export function requireAuth(req, res, next) {",
+        "  // JWT verification logic",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag import-only lines', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/other.ts'),
+      lines(
+        "import { requireAuth } from '../auth.js';",
+        "// Just importing, not using",
+        "const router = Router();",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag comment-only references', () => {
+    const file = write(
+      uniqPath('rule-requireauth', 'server/routes/client-signals.ts'),
+      lines(
+        "// Never add requireAuth to admin routes",
+        "const router = Router();",
+        "router.get('/api/signals', handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Duplicate globally-applied rate limiter in route file
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Duplicate globally-applied rate limiter in route file', () => {
+  const RULE = 'Duplicate globally-applied rate limiter in route file';
+
+  it('flags globalPublicLimiter import/usage in a route file', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-content.ts'),
+      lines(
+        "import { globalPublicLimiter } from '../middleware.js';",       // 1
+        "const router = Router();",                                     // 2
+        "router.get('/api/public/content', globalPublicLimiter, handler);", // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    // Should flag both the import line and the usage line
+    // Actually, import lines are flagged too since they indicate intent to use
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].file).toBe(file);
+  });
+
+  it('flags publicApiLimiter in a route file', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-api.ts'),
+      lines(
+        "import { publicApiLimiter } from '../middleware.js';",          // 1
+        "const router = Router();",                                     // 2
+        "router.get('/api/public/data', publicApiLimiter, handler);",    // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flags publicWriteLimiter in a route file', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-write.ts'),
+      lines(
+        "import { publicWriteLimiter } from '../middleware.js';",        // 1
+        "const router = Router();",                                     // 2
+        "router.post('/api/public/submit', publicWriteLimiter, handler);", // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('respects inline // limiter-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-special.ts'),
+      lines(
+        "import { globalPublicLimiter } from '../middleware.js'; // limiter-ok",
+        "router.get('/api/public/special', globalPublicLimiter, handler); // limiter-ok",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects // limiter-ok hatch on the line above', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-above.ts'),
+      lines(
+        "// limiter-ok — intentional double-apply",
+        "import { globalPublicLimiter } from '../middleware.js';",
+        "// limiter-ok",
+        "router.get('/api/public/data', globalPublicLimiter, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag route-specific limiters (aiLimiter, loginLimiter, etc.)', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/ai.ts'),
+      lines(
+        "import { aiLimiter } from '../middleware.js';",
+        "const router = Router();",
+        "router.post('/api/admin-chat', aiLimiter, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag checkoutLimiter (not globally applied)', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/stripe.ts'),
+      lines(
+        "import { checkoutLimiter } from '../middleware.js';",
+        "router.post('/api/stripe/checkout', checkoutLimiter, handler);",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag comments mentioning globally-applied limiters', () => {
+    const file = write(
+      uniqPath('rule-limiter', 'server/routes/public-safe.ts'),
+      lines(
+        "// Do NOT import globalPublicLimiter here — it is applied globally",
+        "const router = Router();",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -2509,6 +2739,9 @@ describe('Meta: customCheck rule name registry', () => {
     'Test body has no assertion or explicit failure throw',
     // PR 2 deep-link guard
     'TabBar component without ?tab= deep-link support',
+    // P0 expansion rules
+    'requireAuth usage outside allowed route files',
+    'Duplicate globally-applied rate limiter in route file',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
