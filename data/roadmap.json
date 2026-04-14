@@ -726,8 +726,8 @@
           "source": "PIE Group 3 code review",
           "est": "0.5h",
           "priority": "P2",
-          "notes": "5 public-portal mutation endpoints have no addActivity() call: POST /onboarding/:id, POST /keyword-feedback (single + bulk), POST /business-priorities, POST /content-gap-vote. Admin has zero visibility into client portal engagement. The business-profile PATCH was fixed in PR #146; the rest need the same treatment. Quick — import exists, just add the calls with appropriate ActivityType values.",
-          "status": "pending"
+          "notes": "All 5 public-portal mutation endpoints now have addActivity() calls: POST /onboarding/:id (line 187), POST /keyword-feedback single (line 389) + bulk (line 430), POST /business-priorities (line 508), POST /content-gap-vote (line 616).",
+          "status": "done"
         },
         {
           "id": 532,
@@ -744,8 +744,8 @@
           "source": "pr-check.ts",
           "est": "0.25h",
           "priority": "P3",
-          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. 2/8 occurrences fixed (internal-links.ts, llms-txt-generator.ts). Remaining 6: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts. Quick find-and-replace.",
-          "status": "pending"
+          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. All 8 occurrences now use constants. Remaining 6 fixed: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts.",
+          "status": "done"
         },
         {
           "id": 400,

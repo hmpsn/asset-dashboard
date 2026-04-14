@@ -63,15 +63,11 @@ These slices are fully assembled by `buildWorkspaceIntelligence()` but have few 
 
 These fields have placeholder values in the assembler but could be populated from existing DB data.
 
-### 5. `clientSignals.approvalPatterns.avgResponseTime`
+### 5. `clientSignals.approvalPatterns.avgResponseTime` — ✅ DONE (PR #180)
 
-**Currently:** Hardcoded `null`.
-
-**What's needed:** If the `approvals` table has `created_at` and `resolved_at` timestamps, this is a single `AVG(resolved_at - created_at)` query.
+**Status:** Completed. Computes from batch-level `updatedAt - createdAt` for fully-resolved approval batches.
 
 **Value:** Tells you which clients are responsive vs ghosting. Feeds into churn prediction.
-
-**Effort:** ~1h — one SQL query + assembler wiring.
 
 ---
 
@@ -87,15 +83,11 @@ These fields have placeholder values in the assembler but could be populated fro
 
 ---
 
-### 7. `pageProfile.linkHealth` — Inbound/Outbound Link Counts
+### 7. `pageProfile.linkHealth` — Inbound/Outbound Link Counts — ✅ DONE (PR #180)
 
-**Currently:** Hardcoded `{ inbound: 0, outbound: 0, orphan: false }`.
+**Status:** Completed. Reads real counts from cached `InternalLinkResult` via performance-store, with fallback to site-architecture orphan check.
 
-**What's needed:** If `internal-links` analysis stores per-page link counts, wire a JOIN into the pageProfile assembler.
-
-**Value:** Orphan page detection, internal linking strategy. Data likely already exists from internal link audits.
-
-**Effort:** ~2h — query + assembler wiring.
+**Value:** Orphan page detection, internal linking strategy.
 
 ---
 
@@ -204,10 +196,10 @@ Today the intelligence layer is a one-way feed: assembler → API → frontend. 
 | 1 | compositeHealthScore dashboard | 3-5h | High | Post-3B |
 | 2 | weCalledIt client card | 2-4h | High | Post-3B |
 | 3 | cannibalizationWarnings alerts | 2-3h | Medium-High | Post-3B |
-| 4 | avgResponseTime wiring | 1h | Medium | Post-3B |
+| 4 | ~~avgResponseTime wiring~~ | ~~1h~~ | ~~Medium~~ | ✅ PR #180 |
 | 5 | Deprecate seo-context.ts | 1h | Cleanup | Phase 4 |
 | 6 | portalUsage wiring | 1-2h | Medium | Post-3B |
-| 7 | linkHealth wiring | 2h | Medium | Post-3B |
+| 7 | ~~linkHealth wiring~~ | ~~2h~~ | ~~Medium~~ | ✅ PR #180 |
 | 8 | actionBacklog escalation | 1-2h | Medium | Post-3B |
 | 9 | SEO audit + cannibalization | 1h | Medium | Post-3B |
 | 10 | Server-side intelligence consumers | 8-12h | High (long-term) | Phase 4+ |
