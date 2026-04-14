@@ -153,8 +153,10 @@ function countLinksInPage(
     const href = match[1];
     // Check if internal link (relative path or same domain)
     if (href.startsWith('/') || href.startsWith(liveDomain)) {
-      const path = href.startsWith('/') ? href : new URL(href).pathname;
-      const normalizedPath = path.replace(/\/$/, '');
+      // Strip query strings for both relative and absolute URLs so
+      // /blog/article?ref=nav matches target /blog/article consistently.
+      const rawPath = href.startsWith('/') ? href : new URL(href).pathname;
+      const normalizedPath = rawPath.split('?')[0].replace(/\/$/, '');
       uniqueInternalTargets.add(normalizedPath);
       if (normalizedPath === normalizedTarget) {
         linksToTarget++;
