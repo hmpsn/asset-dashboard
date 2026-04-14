@@ -13,6 +13,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('webflow-audit');
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { isProgrammingError } from '../errors.js';
 const router = Router();
 
 // --- Asset Audit ---
@@ -197,7 +198,8 @@ router.get('/api/webflow/page-weight/:siteId', requireWorkspaceAccessFromQuery()
     };
     savePageWeight(req.params.siteId, result);
     res.json(result);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-audit: GET /api/webflow/page-weight/:siteId: programming error');
     res.status(500).json({ error: 'Page weight analysis failed' });
   }
 });

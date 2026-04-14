@@ -74,7 +74,7 @@ export function flushCreditsToDisk(): void {
   const today = new Date().toISOString().slice(0, 10);
   const filePath = path.join(CREDIT_DIR, `${today}.json`);
   let existing: CreditEntry[] = [];
-  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file */ }
+  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch (err) { /* new file */ }
   existing.push(...pendingCreditWrites);
   fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
   pendingCreditWrites = [];
@@ -146,7 +146,7 @@ function readCache<T>(workspaceId: string, key: string, maxAgeHours = 168): T | 
     const age = (Date.now() - new Date(raw.cachedAt).getTime()) / (1000 * 60 * 60);
     if (age > maxAgeHours) return null;
     return raw.data as T;
-  } catch { return null; }
+  } catch (err) { return null; }
 }
 
 function writeCache(workspaceId: string, key: string, data: unknown): void {
@@ -729,10 +729,10 @@ function loadCreditsFromDisk(since?: string, days?: number): CreditEntry[] {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(CREDIT_DIR, f), 'utf-8'));
         if (Array.isArray(data)) entries.push(...data);
-      } catch { /* skip corrupt file */ }
+      } catch (err) { /* skip corrupt file */ }
     }
     return entries;
-  } catch { return []; }
+  } catch (err) { return []; }
 }
 
 export function getDataForSeoUsage(workspaceId?: string, since?: string): {

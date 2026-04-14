@@ -7,7 +7,11 @@ import { listWorkspaces } from './workspaces.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { STUDIO_NAME, STUDIO_URL } from './constants.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('reports');
 export type ActionStatus = 'planned' | 'in-progress' | 'completed';
 export type ActionPriority = 'high' | 'medium' | 'low';
 
@@ -396,7 +400,8 @@ export async function extractSiteLogo(baseUrl: string): Promise<string | null> {
     }
 
     return null;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'reports/extractSiteLogo: programming error');
     return null;
   }
 }
@@ -406,7 +411,7 @@ function resolveUrl(base: string, relative: string): string {
   if (relative.startsWith('//')) return 'https:' + relative;
   try {
     return new URL(relative, base).toString();
-  } catch {
+  } catch (err) {
     return relative;
   }
 }

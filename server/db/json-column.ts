@@ -10,7 +10,7 @@ export function parseJsonColumn<T>(val: string | null | undefined, fallback: T):
   if (val == null) return fallback;
   try {
     return JSON.parse(val) as T;
-  } catch {
+  } catch { // catch-ok — JSON parse failure is expected degradation for corrupt column values
     return fallback;
   }
 }

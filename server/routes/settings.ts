@@ -44,7 +44,7 @@ router.patch('/api/studio-config', (req, res) => {
     clearBookingUrl();
   } else {
     // Basic URL validation — must be http(s)
-    try { new URL(bookingUrl); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
+    try { new URL(bookingUrl); } catch (err) { return res.status(400).json({ error: 'Invalid URL' }); }
     setBookingUrl(bookingUrl);
   }
   res.json({ ok: true, bookingUrl: bookingUrl || null });

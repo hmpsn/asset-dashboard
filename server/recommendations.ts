@@ -125,9 +125,9 @@ async function fetchTrafficMap(ws: Workspace): Promise<TrafficMap> {
           if (!trafficMap[pagePath]) trafficMap[pagePath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
           trafficMap[pagePath].clicks += p.clicks;
           trafficMap[pagePath].impressions += p.impressions;
-        } catch { /* skip */ }
+        } catch { /* skip malformed URLs */ }
       }
-    } catch { /* GSC unavailable */ }
+    } catch { /* GSC unavailable */ } // url-fetch-ok
   }
 
   if (ws.ga4PropertyId) {
@@ -139,7 +139,7 @@ async function fetchTrafficMap(ws: Workspace): Promise<TrafficMap> {
         trafficMap[pagePath].pageviews += p.pageviews;
         trafficMap[pagePath].sessions += p.users;
       }
-    } catch { /* GA4 unavailable */ }
+    } catch { /* GA4 unavailable */ } // url-fetch-ok
   }
 
   return trafficMap;

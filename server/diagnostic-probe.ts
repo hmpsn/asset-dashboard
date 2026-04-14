@@ -9,7 +9,6 @@
 
 import { createLogger } from './logger.js';
 import type { InternalLinksResult } from '../shared/types/diagnostics.js';
-
 const log = createLogger('diagnostic-probe');
 
 const PROBE_TIMEOUT_MS = 10_000;
@@ -71,7 +70,7 @@ function normalizeUrl(url: string): string {
   try {
     const u = new URL(url);
     return `${u.origin}${u.pathname}`.replace(/\/$/, '');
-  } catch {
+  } catch (err) {
     return url.replace(/\/$/, '');
   }
 }

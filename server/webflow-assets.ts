@@ -60,7 +60,8 @@ export async function getAsset(
     const res = await webflowFetch(`/assets/${assetId}`, {}, tokenOverride);
     if (!res.ok) return null;
     return await res.json() as WebflowAsset;
-  } catch {
+  } catch (err) {
+    /* network failure — expected */
     return null;
   }
 }
@@ -243,7 +244,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
           offset += items.length;
           if (offset >= total || items.length === 0) break;
         }
-      } catch { /* skip */ }
+      } catch (err) { /* API call failed — skip collection */ }
     }
 
     log.info(`Scanning ${pageUrls.length} page URLs for asset references (${assetIds.size} assets)`);
@@ -265,10 +266,10 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
                 }
               }
             }
-          } catch { /* skip */ }
+          } catch (err) { /* CSS fetch failed — skip */ }
         }
       }
-    } catch { /* skip */ }
+    } catch (err) { /* network failure — skip CSS scan */ }
 
     // Fetch pages in parallel batches of 10
     const batchSize = 10;
@@ -286,7 +287,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
                 addUsage(id, ref);
               }
             }
-          } catch { /* skip */ }
+          } catch (err) { /* network failure — skip page */ }
         })
       );
       void results;
@@ -348,7 +349,7 @@ export async function scanAssetUsage(siteId: string, tokenOverride?: string): Pr
         offset += items.length;
         if (offset >= total || items.length === 0) break;
       }
-    } catch { /* skip failed collections */ }
+    } catch (err) { /* API call failed — skip collection */ }
   }
 
   return usageMap;

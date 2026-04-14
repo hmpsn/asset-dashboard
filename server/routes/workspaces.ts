@@ -56,6 +56,7 @@ import type { Workspace } from '../workspaces.js';
 import type { ScrapedPage } from '../web-scraper.js';
 import { createLogger } from '../logger.js';
 import { recordAction, getActionBySource } from '../outcome-tracking.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('workspaces');
 
@@ -128,13 +129,13 @@ router.get('/api/workspace-overview', (_req, res) => {
       const signals = listChurnSignals(ws.id);
       churnCritical = signals.filter(s => s.severity === 'critical').length;
       churnWarning = signals.filter(s => s.severity === 'warning').length;
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
     // Client signals (new = unreviewed)
     let clientSignalsNew = 0;
     try {
       clientSignalsNew = listClientSignals(ws.id).filter(s => s.status === 'new').length;
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
     const trialEnd = ws.trialEndsAt ? new Date(ws.trialEndsAt) : null;
     const isTrial = trialEnd ? trialEnd > new Date() : false;
@@ -215,7 +216,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
           }
         }
       }
-    } catch { /* best-effort live domain resolution */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: PATCH /api/workspaces/:id: programming error'); /* best-effort live domain resolution */ }
   }
   const ws = updateWorkspace(req.params.id, updates);
   if (!ws) return res.status(404).json({ error: 'Not found' });
@@ -281,9 +282,9 @@ async function scrapeWorkspaceSite(ws: Workspace): Promise<{ scraped: ScrapedPag
           if (priorityPatterns.some(pat => pat.test(pagePath))) prioritized.push(url);
           else rest.push(url);
         }
-      } catch { /* skip */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* skip */ }
     }
-  } catch { /* sitemap unavailable */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* sitemap unavailable */ }
 
   const urlsToScrape = [...prioritized.slice(0, 12), ...rest.slice(0, 3)];
   if (urlsToScrape.length === 0) throw new Error('No pages found to scrape');
@@ -380,7 +381,7 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     // even when instructed not to. parseJsonFallback does bare JSON.parse and silently
     // returns {} on fenced output, leaving the frontend fields blank with no error shown.
     let suggestion: { industry?: string; goals?: string[]; targetAudience?: string } = {};
-    try { suggestion = parseAIJson(result.text); } catch { /* malformed — fall through to empty fields */ }
+    try { suggestion = parseAIJson(result.text); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* malformed — fall through to empty fields */ }
 
     return res.json({
       industry: typeof suggestion.industry === 'string' ? suggestion.industry : '',
@@ -605,7 +606,8 @@ Rules:
         name: string; description: string; painPoints: string[]; goals: string[];
         objections: string[]; preferredContentFormat?: string; buyingStage?: string;
       }>>(aiResult.text);
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error');
       return res.status(500).json({ error: 'AI returned invalid JSON — try again' });
     }
 

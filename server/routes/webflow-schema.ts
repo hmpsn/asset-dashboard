@@ -40,6 +40,7 @@ import {
   getValidations,
   deleteValidation,
 } from '../schema-validator.js';
+import { isProgrammingError } from '../errors.js';
 
 const router = Router();
 const log = createLogger('webflow-schema');
@@ -53,7 +54,7 @@ router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceAccessFrom
       try {
         const arch = await getCachedArchitecture(ctx.workspaceId);
         ctx._architectureTree = arch.tree;
-      } catch { /* architecture not available — proceed without */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: GET /api/webflow/schema-suggestions/:siteId: programming error'); /* architecture not available — proceed without */ }
     }
     const result = await generateSchemaSuggestions(req.params.siteId, token, ctx, pageKeywordMap, undefined, undefined, gscMap, ga4Map, queryPageData, insightsMap);
     res.json(result);
@@ -107,7 +108,7 @@ router.post('/api/webflow/schema-suggestions/:siteId/page', requireWorkspaceAcce
       try {
         const arch = await getCachedArchitecture(ctx.workspaceId);
         ctx._architectureTree = arch.tree;
-      } catch { /* proceed without architecture */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: POST /api/webflow/schema-suggestions/:siteId/page: programming error'); /* proceed without architecture */ }
     }
     const result = await generateSchemaForPage(req.params.siteId, pageId, token, ctx, gscMap, ga4Map, queryPageData, insightsMap);
     if (!result) return res.status(404).json({ error: 'Page not found' });
@@ -184,7 +185,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
           saveSiteTemplate(req.params.siteId, ctx.workspaceId || '', orgNode, websiteNode);
           log.info('Auto-saved site template from homepage publish');
         }
-      } catch { /* best-effort */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* best-effort */ }
     }
 
     // Log to activity feed + track edit status
@@ -230,7 +231,7 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceAccessFromQue
     try {
       const llmsWs = listWorkspaces().find(w => w.webflowSiteId === req.params.siteId);
       if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
-    } catch { /* non-critical — response already sent */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema publish error');
@@ -379,7 +380,7 @@ router.post('/api/webflow/schema-plan/:siteId', requireWorkspaceAccessFromQuery(
     let architectureResult;
     try {
       architectureResult = await getCachedArchitecture(ws.id);
-    } catch { /* proceed without — plan will fall back to direct API calls */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: POST /api/webflow/schema-plan/:siteId: programming error'); /* proceed without — plan will fall back to direct API calls */ }
 
     // Gather current schema types from existing snapshot for competitor gap analysis
     const existingSnapshot = getSchemaSnapshot(req.params.siteId);

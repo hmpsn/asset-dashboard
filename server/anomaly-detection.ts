@@ -27,11 +27,13 @@ import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
 import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { computeImpactScore } from './insight-enrichment.js';
 import type * as AnalyticsInsightsStore from './analytics-insights-store.js';
 import { invalidateIntelligenceCache } from './workspace-intelligence.js';
 import type { AnomalyDigestData, InsightSeverity, InsightDomain } from '../shared/types/analytics.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('anomaly');
 
@@ -364,7 +366,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
         const totalCurrent = convs.reduce((s, c) => s + c.conversions, 0);
         // Get previous period conversions
         const prevStart = new Date();
-        prevStart.setDate(prevStart.getDate() - COMPARISON_DAYS * 2 - 1);
+        prevStart.setDate(prevStart.getDate() - COMPARISON_DAYS * 2);
         const prevEnd = new Date();
         prevEnd.setDate(prevEnd.getDate() - COMPARISON_DAYS - 1);
         const fmt = (d: Date) => d.toISOString().split('T')[0];
@@ -383,7 +385,8 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'anomaly-detection: programming error');
       // Conversions not set up or API unavailable — skip
     }
   }
@@ -445,7 +448,8 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string): P
       feature: 'anomaly-summary',
     });
     return result.text;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'anomaly-detection/generateAiSummary: programming error');
     return undefined;
   }
 }
@@ -644,7 +648,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
-              .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+              .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
 
             if (recentAnomalies.length === 0) return 0;
 
@@ -704,6 +708,62 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
     log.info(`Detected ${allNew.length} new anomalies across ${workspaces.length} workspaces`);
   } else {
     log.info(`No new anomalies detected`);
+  }
+
+  // ── Bridge #10 reversal: remove anomaly boost when anomalies age out ──
+  // For every workspace, check if recent (<24h) anomalies still exist.
+  // If none remain AND insights have an 'anomaly' score adjustment, reverse it (delta=0).
+  // This prevents stale +10 boosts from lingering indefinitely after anomalies resolve.
+  // Gated behind same feature flag as the boost itself — no point reversing if boosts were never applied.
+  if (!isFeatureEnabled('bridge-anomaly-boost')) {
+    log.debug('Bridge #10 reversal skipped — bridge-anomaly-boost flag OFF');
+  } else
+  for (const ws of workspaces) {
+    try {
+      const recentForWs = listAnomalies(ws.id, false)
+        .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+      if (recentForWs.length > 0) continue; // Still has active recent anomalies — keep boost
+
+      const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const allInsights = fetchInsights(ws.id);
+      let reversed = 0;
+      for (const insight of allInsights) {
+        if (insight.resolutionStatus === 'resolved') continue;
+        const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+        const adj = dataObj._scoreAdjustments as Record<string, number> | undefined;
+        if (!adj || typeof adj !== 'object' || !('anomaly' in adj)) continue;
+
+        // Remove the anomaly boost (delta=0 deletes the key)
+        const { data: newData, adjustedScore } = applyScoreAdjustment(
+          dataObj, insight.impactScore ?? 50, 'anomaly', 0,
+        );
+        if (adjustedScore !== insight.impactScore) {
+          updateInsight({
+            workspaceId: insight.workspaceId,
+            pageId: insight.pageId,
+            insightType: insight.insightType,
+            data: newData as never,
+            severity: insight.severity,
+            pageTitle: insight.pageTitle,
+            strategyKeyword: insight.strategyKeyword,
+            strategyAlignment: insight.strategyAlignment,
+            auditIssues: insight.auditIssues,
+            pipelineStatus: insight.pipelineStatus,
+            anomalyLinked: false,
+            impactScore: adjustedScore,
+            domain: insight.domain,
+            bridgeSource: insight.bridgeSource,
+          });
+          reversed++;
+        }
+      }
+      if (reversed > 0) {
+        log.info({ workspaceId: ws.id, reversed }, 'Reversed stale anomaly boost on insights');
+        invalidateIntelligenceCache(ws.id);
+      }
+    } catch (reverseErr) {
+      log.debug({ err: reverseErr, workspaceId: ws.id }, 'Anomaly boost reversal failed — non-critical');
+    }
   }
 
   // Prune old anomalies (older than 60 days)

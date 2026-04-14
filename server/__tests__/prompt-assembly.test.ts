@@ -14,7 +14,7 @@ beforeAll(() => {
   // This makes the test self-contained so it doesn't depend on migration order.
   try {
     db.prepare(`ALTER TABLE workspaces ADD COLUMN custom_prompt_notes TEXT`).run();
-  } catch {
+  } catch { // catch-ok — column-exists error is expected in test setup
     // Column already exists — this is fine
   }
 });

@@ -29,6 +29,7 @@ import {
 import type { CopySection, CopyMetadata, QualityFlag, GeneratedPageCopy } from '../shared/types/copy-pipeline.js';
 import type { SectionPlanItem, SiteBlueprint, BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { IntelligencePatternType } from '../shared/types/copy-pipeline.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('copy-generation');
 
@@ -62,7 +63,8 @@ export async function generateCopyForEntry(
       const voiceCtx = buildVoiceCalibrationContext(profile);
       if (voiceCtx.guardrailsText) guardrailsText = voiceCtx.guardrailsText;
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // voice_profiles table may not exist in all environments — graceful degradation
   }
 
@@ -226,7 +228,8 @@ ${context}`;
       const voiceCtx = buildVoiceCalibrationContext(profile);
       if (voiceCtx.guardrailsText) guardrailsText = voiceCtx.guardrailsText;
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // voice_profiles table may not exist in all environments — graceful degradation
   }
 
@@ -364,7 +367,8 @@ export async function buildCopyGenerationContext(
         );
       }
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation/buildCopyGenerationContext: programming error');
     // brandscript table may not exist in all environments — graceful degradation
   }
 
@@ -380,7 +384,8 @@ export async function buildCopyGenerationContext(
         parts.push(`VOICE CALIBRATION:${voiceParts.join('')}`);
       }
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // voice_profiles table may not exist in all environments — graceful degradation
   }
 
@@ -393,7 +398,8 @@ export async function buildCopyGenerationContext(
         .join('\n\n');
       parts.push(`BRAND IDENTITY DELIVERABLES:\n${deliverableLines}`);
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // brand_identity_deliverables table may not exist in all environments — graceful degradation
   }
 
@@ -477,7 +483,8 @@ export async function buildCopyGenerationContext(
         `CROSS-PAGE CONSISTENCY (approved copy from other pages — match tone and avoid repetition):\n${approvedSections.slice(0, 6).join('\n\n')}`,
       );
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // graceful degradation
   }
 
@@ -499,7 +506,8 @@ export async function buildCopyGenerationContext(
         parts.push(`SEO INTELLIGENCE:\n${seoParts.join('\n\n')}`);
       }
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // graceful degradation
   }
 
@@ -518,7 +526,8 @@ export async function buildCopyGenerationContext(
         .join('\n');
       parts.push(`COPY INTELLIGENCE PATTERNS (learned from previous generation feedback):\n${patternLines}`);
     }
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'copy-generation: programming error');
     // copy_intelligence table may not exist in all environments — graceful degradation
   }
 

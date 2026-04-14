@@ -514,6 +514,9 @@ async function assembleLearnings(
     roiAttribution,
     topWins,
     weCalledIt,
+    winRateByActionType: Object.fromEntries(
+      (summary?.overall.topActionTypes ?? []).map(t => [t.type, t.winRate]),
+    ),
   };
 }
 
@@ -826,6 +829,10 @@ async function assembleSiteHealth(
   }
 
   // ── PageSpeed / CWV (performance-store.ts / getPageSpeed) ───────────
+  // TODO(IG-5): Desktop CWV is always null because getPageSpeed(siteId) returns a single
+  // snapshot keyed by siteId alone, holding only the last run (mobile OR desktop).
+  // Fixing this requires changing performance-store.ts to key snapshots by siteId + strategy.
+  // Deferred to Sprint IG-5 (strategic gaps).
   if (siteId) {
     try {
       const { getPageSpeed } = await import('./performance-store.js');
@@ -963,6 +970,29 @@ async function assembleSiteHealth(
     log.debug({ workspaceId, err }, 'siteHealth: diagnostic reports optional, degrading gracefully');
   }
 
+  // ── AEO readiness (aeo-page-review saved reviews) ──────────────────────
+  let aeoReadiness: SiteHealthSlice['aeoReadiness'];
+  try {
+    const fs = await import('fs');
+    const pathMod = await import('path');
+    const { getDataDir } = await import('./data-dir.js');
+    const reviewDir = getDataDir('aeo-reviews');
+    const reviewFile = pathMod.default.join(reviewDir, `${workspaceId}.json`);
+    if (fs.default.existsSync(reviewFile)) {
+      const raw = JSON.parse(fs.default.readFileSync(reviewFile, 'utf-8'));
+      const pages: Array<{ overallScore?: number }> = raw?.pages ?? [];
+      if (pages.length > 0) {
+        const passing = pages.filter(p => (p.overallScore ?? 0) >= 70).length;
+        aeoReadiness = {
+          pagesChecked: pages.length,
+          passingRate: passing / pages.length,
+        };
+      }
+    }
+  } catch (err) {
+    log.debug({ workspaceId, err }, 'siteHealth: AEO readiness optional, degrading gracefully');
+  }
+
   return {
     auditScore,
     auditScoreDelta,
@@ -972,6 +1002,7 @@ async function assembleSiteHealth(
     orphanPages,
     cwvPassRate,
     redirectDetails,
+    aeoReadiness,
     schemaValidation,
     performanceSummary,
     anomalyCount,
@@ -1070,9 +1101,30 @@ async function assembleClientSignals(
         if (item.status === 'approved') approved++;
       }
     }
+
+    // Compute avgResponseTime from batch-level timestamps.
+    // Batch-level approximation: for batches where all items are approved/applied,
+    // use (updatedAt - createdAt) as response time. There is no per-item resolved_at column.
+    let responseTimeSum = 0;
+    let resolvedBatchCount = 0;
+    for (const batch of batches) {
+      const items = batch.items ?? [];
+      const allResolved = items.length > 0 && items.every(
+        i => i.status === 'approved' || i.status === 'applied',
+      );
+      if (allResolved && batch.createdAt && batch.updatedAt) {
+        const created = new Date(batch.createdAt).getTime();
+        const updated = new Date(batch.updatedAt).getTime();
+        if (updated > created) {
+          responseTimeSum += updated - created;
+          resolvedBatchCount++;
+        }
+      }
+    }
+
     approvalPatterns = {
       approvalRate: total > 0 ? approved / total : 0,
-      avgResponseTime: null,
+      avgResponseTime: resolvedBatchCount > 0 ? Math.round(responseTimeSum / resolvedBatchCount) : null,
     };
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: approval patterns optional, degrading gracefully');
@@ -1103,11 +1155,29 @@ async function assembleClientSignals(
       log.debug({ err, workspaceId }, 'assembleClientSignals: chat memory optional, degrading gracefully');
     }
 
+    let portalUsage: EngagementMetrics['portalUsage'] = null;
+    try {
+      const { countActivityByType } = await import('./activity-log.js');
+      const sessionCount = countActivityByType(workspaceId, 'portal_session', 30);
+      if (sessionCount > 0) {
+        // pageViews approximated from portal_session login events; featuresUsed derived from client-specific activity
+        const featuresUsed: string[] = [];
+        if (chatSessionCount > 0) featuresUsed.push('chat');
+        // Check for client-initiated feedback activity (not admin-only types) to detect dashboard usage
+        const feedbackCount = countActivityByType(workspaceId, 'client_keyword_feedback', 30)
+          + countActivityByType(workspaceId, 'client_content_gap_vote', 30);
+        if (feedbackCount > 0) featuresUsed.push('dashboard');
+        portalUsage = { pageViews: sessionCount, featuresUsed };
+      }
+    } catch (err) {
+      log.debug({ err, workspaceId }, 'assembleClientSignals: portal usage count optional, degrading gracefully');
+    }
+
     engagement = {
       lastLoginAt: latestLogin,
       loginFrequency,
       chatSessionCount,
-      portalUsage: null,
+      portalUsage,
     };
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleClientSignals: client users optional, degrading gracefully');
@@ -1788,7 +1858,7 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
   // Guard must be verbosity-aware: only pass if there's content that will actually render
   // at the requested verbosity. roiAttribution and weCalledIt are standard/detailed-only.
   const hasBaseContent = !!learnings.recentTrend || !!learnings.confidence || learnings.overallWinRate > 0;
-  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0;
+  const hasStandardContent = learnings.topActionTypes.length > 0 || (learnings.weCalledIt?.length ?? 0) > 0 || (learnings.topWins?.length ?? 0) > 0;
   const hasDetailedContent = (learnings.roiAttribution?.length ?? 0) > 0 || !!learnings.summary?.content || !!learnings.summary?.strategy || !!learnings.summary?.technical;
   const willRender =
     hasBaseContent ||
@@ -1873,6 +1943,18 @@ function formatLearningsSection(learnings: LearningsSlice, verbosity: PromptVerb
       }
     }
 
+    // Top recent wins — standard and detailed
+    if (learnings.topWins && learnings.topWins.length > 0) {
+      const winLimit = verbosity === 'detailed' ? 5 : 3;
+      lines.push('Recent wins:');
+      for (const win of learnings.topWins.slice(0, winLimit)) {
+        const page = win.pageUrl ?? 'site';
+        const delta = win.delta;
+        const sign = delta.direction === 'improved' ? '+' : delta.direction === 'declined' ? '-' : '';
+        lines.push(`  - ${win.actionType.replace(/_/g, ' ')} on ${page} → ${sign}${Math.abs(delta.delta_percent).toFixed(0)}% ${delta.primary_metric}`);
+      }
+    }
+
     // ROI attribution — detailed only
     if (learnings.roiAttribution && learnings.roiAttribution.length > 0 && verbosity === 'detailed') {
       lines.push('ROI highlights:');
@@ -1920,6 +2002,11 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     }
   }
 
+  // Suggested briefs count — standard and detailed
+  if (verbosity !== 'compact' && pipeline.suggestedBriefs != null && pipeline.suggestedBriefs > 0) {
+    lines.push(`Suggested briefs: ${pipeline.suggestedBriefs} pending topics identified`);
+  }
+
   if (verbosity === 'detailed') {
     const bs = pipeline.briefs.byStatus;
     lines.push(`Brief status: ${Object.entries(bs).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
@@ -1928,6 +2015,14 @@ function formatContentPipelineSection(pipeline: ContentPipelineSlice, verbosity:
     lines.push(`Matrix: ${pipeline.matrices.cellsPublished}/${pipeline.matrices.cellsPlanned} cells published`);
     if (pipeline.schemaDeployment) {
       lines.push(`Schema: ${pipeline.schemaDeployment.deployed}/${pipeline.schemaDeployment.planned} deployed`);
+    }
+
+    // Rewrite playbook patterns — detailed only
+    if (pipeline.rewritePlaybook?.patterns && pipeline.rewritePlaybook.patterns.length > 0) {
+      lines.push(`Rewrite playbook: ${pipeline.rewritePlaybook.patterns.length} learned patterns`);
+      for (const pattern of pipeline.rewritePlaybook.patterns.slice(0, 5)) {
+        lines.push(`  - ${pattern}`);
+      }
     }
     if (pipeline.cannibalizationWarnings && pipeline.cannibalizationWarnings.length > 0) {
       lines.push('Keyword cannibalization:');
@@ -2123,6 +2218,11 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
 
   lines.push(`Keyword: ${profile.primaryKeyword ?? 'none'} | Health: ${profile.optimizationScore ?? 'n/a'}`);
 
+  // Link health — all verbosity levels (concise)
+  if (profile.linkHealth) {
+    lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' (ORPHAN — no inbound links)' : ''}`);
+  }
+
   if (verbosity !== 'compact') {
     if (profile.rankHistory.current != null) {
       lines.push(`Position: ${profile.rankHistory.current} (${profile.rankHistory.trend})`);
@@ -2167,9 +2267,6 @@ function formatPageProfileSection(profile: PageProfileSlice, verbosity: PromptVe
       lines.push(`Structural audit issues: ${profile.auditIssues.length}`);
     }
     lines.push(`Schema: ${profile.schemaStatus} | Content: ${profile.contentStatus ?? 'none'} | CWV: ${profile.cwvStatus ?? 'n/a'}`);
-    if (profile.linkHealth) {
-      lines.push(`Links: ${profile.linkHealth.inbound} inbound, ${profile.linkHealth.outbound} outbound${profile.linkHealth.orphan ? ' ⚠ orphan page' : ''}`);
-    }
     if (profile.seoEdits?.currentTitle) {
       lines.push(`Current title: ${profile.seoEdits.currentTitle}`);
     }
@@ -2292,27 +2389,58 @@ async function assemblePageProfile(
     log.debug({ err, workspaceId }, 'assemblePageProfile: schema status optional, degrading gracefully');
   }
 
-  // Link health — SiteNode doesn't carry link counts; use orphanPaths from architecture result
+  // Link health — prefer cached InternalLinkResult (from performance-store) which has real
+  // inbound/outbound counts per page. Fall back to site-architecture orphan check if no
+  // internal-links snapshot exists for this workspace's site.
   let linkHealth = { inbound: 0, outbound: 0, orphan: false };
   try {
-    const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
-    const arch = await Promise.race([
-      getCachedArchitecture(workspaceId),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
-    ]);
-    if (arch) {
-      const nodes: SiteNode[] = flattenTree(arch.tree);
-      const nodeExists = nodes.some(n => n.path === pagePath);
-      if (nodeExists) {
-        linkHealth = {
-          inbound: 0, // Not available from site architecture tree
-          outbound: 0,
-          orphan: arch.orphanPaths?.includes(pagePath) ?? false,
-        };
+    const { getWorkspace: getWsForLinks } = await import('./workspaces.js');
+    const wsForLinks = getWsForLinks(workspaceId);
+    let foundFromLinkData = false;
+    if (wsForLinks?.webflowSiteId) {
+      try {
+        const { getInternalLinks } = await import('./performance-store.js');
+        const linkSnapshot = getInternalLinks(wsForLinks.webflowSiteId);
+        const linkData = linkSnapshot?.result as import('./internal-links.js').InternalLinkResult | null;
+        if (linkData?.pageHealth) {
+          const normalizedPath = pagePath === '/' ? '/' : pagePath.replace(/\/$/, '');
+          const entry = linkData.pageHealth.find(
+            ph => (ph.path === '/' ? '/' : ph.path.replace(/\/$/, '')) === normalizedPath,
+          );
+          if (entry) {
+            linkHealth = {
+              inbound: entry.inboundLinks,
+              outbound: entry.outboundLinks,
+              orphan: entry.isOrphan,
+            };
+            foundFromLinkData = true;
+          }
+        }
+      } catch (err) {
+        log.debug({ err, workspaceId }, 'assemblePageProfile: internal-links snapshot optional, degrading gracefully');
+      }
+    }
+    // Fallback: site-architecture orphan check (no inbound/outbound counts available)
+    if (!foundFromLinkData) {
+      const { getCachedArchitecture, flattenTree } = await import('./site-architecture.js');
+      const arch = await Promise.race([
+        getCachedArchitecture(workspaceId),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (arch) {
+        const nodes: SiteNode[] = flattenTree(arch.tree);
+        const nodeExists = nodes.some(n => n.path === pagePath);
+        if (nodeExists) {
+          linkHealth = {
+            inbound: 0,
+            outbound: 0,
+            orphan: arch.orphanPaths?.includes(pagePath) ?? false,
+          };
+        }
       }
     }
   } catch (err) {
-    log.debug({ err, workspaceId }, 'assemblePageProfile: site architecture optional, degrading gracefully');
+    log.debug({ err, workspaceId }, 'assemblePageProfile: link health optional, degrading gracefully');
   }
 
   // SEO edits
@@ -2481,6 +2609,21 @@ export function invalidateIntelligenceCache(workspaceId: string): void {
 /** Cache stats for health endpoint (§18) */
 export function getIntelligenceCacheStats() {
   return intelligenceCache.stats();
+}
+
+/**
+ * Read-only peek at cached compositeHealthScore for a workspace.
+ * Returns null if no cached intelligence exists — does NOT trigger assembly.
+ * Used by outcome crons to prioritize measurement by workspace health.
+ */
+export function getWorkspaceHealthScore(workspaceId: string): number | null {
+  // Try the default cache key (all slices, no page path, 'all' learning domain)
+  const cacheKey = `intelligence:${workspaceId}:${[...ALL_SLICES].sort().join(',')}::all`;
+  const cached = intelligenceCache.peek(cacheKey);
+  if (cached?.clientSignals?.compositeHealthScore != null) {
+    return cached.clientSignals.compositeHealthScore;
+  }
+  return null;
 }
 
 // ── Formatting helpers for migrated callers (Phase 3B) ───────────────────

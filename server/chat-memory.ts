@@ -7,7 +7,11 @@ import db from './db/index.js';
 import { callOpenAI } from './openai-helpers.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('chat-memory');
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -276,7 +280,8 @@ export async function generateSessionSummary(
     session.summary = result.text;
     saveSession(session);
     return result.text;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'chat-memory/generateSessionSummary: programming error');
     return null;
   }
 }

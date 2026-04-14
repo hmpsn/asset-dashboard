@@ -17,6 +17,7 @@ import { DATA_BASE, getUploadRoot } from './data-dir.js';
 import db from './db/index.js';
 import { createLogger } from './logger.js';
 import type * as S3Mod from '@aws-sdk/client-s3';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('backup');
 
@@ -162,7 +163,7 @@ async function uploadToS3(backupDir: string, timestamp: string): Promise<void> {
     log.info({ bucket, key }, 'S3 backup upload complete');
   } finally {
     // Clean up local archive regardless of success/failure
-    try { fs.unlinkSync(archivePath); } catch { /* already gone */ }
+    try { fs.unlinkSync(archivePath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'backup: programming error'); /* already gone */ }
   }
 
   // Prune old S3 backups beyond retention period
@@ -214,7 +215,7 @@ function pruneOldBackups(): number {
         fs.rmSync(dirPath, { recursive: true, force: true });
         pruned++;
       }
-    } catch { /* skip */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'backup/pruneOldBackups: programming error'); /* skip */ }
   }
 
   return pruned;

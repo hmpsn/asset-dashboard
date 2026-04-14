@@ -8,6 +8,7 @@ import { getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import type { CmsImageScanResult, CmsImageAsset, CmsCollectionImageInfo } from '../../shared/types/cms-images.ts';
 import type * as WebflowClient from '../webflow-client.js';
+import { isProgrammingError } from '../errors.js';
 
 const router = Router();
 const log = createLogger('webflow-cms-images');
@@ -16,7 +17,7 @@ function displayNameFromUrl(url: string): string {
   try {
     const pathname = new URL(url).pathname;
     return pathname.split('/').pop()?.split('?')[0] || url;
-  } catch {
+  } catch (err) {
     return url.split('/').pop()?.split('?')[0] || url;
   }
 }
@@ -53,7 +54,8 @@ async function fetchAssetMap(
       offset += limit;
     }
     return { byId, byUrl };
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'webflow-cms-images/fetchAssetMap: programming error');
     return { byId: new Map(), byUrl: new Map() };
   }
 }

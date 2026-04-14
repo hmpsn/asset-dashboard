@@ -33,7 +33,7 @@ function loadMetadata(): Record<string, AssetMetadata> {
     if (fs.existsSync(METADATA_FILE)) {
       return JSON.parse(fs.readFileSync(METADATA_FILE, 'utf-8'));
     }
-  } catch { /* ignore corrupt file */ }
+  } catch (err) { /* ignore corrupt file */ }
   return {};
 }
 

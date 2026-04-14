@@ -6,9 +6,11 @@ import {
   Save, Loader2, FileText,
 } from 'lucide-react';
 import { brandscripts } from '../../api/brand-engine';
+import { ApiError } from '../../api/client';
 import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton } from '../ui';
 import { useToast } from '../Toast';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface Props {
   workspaceId: string;
@@ -224,8 +226,12 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
     try {
       await onSave({ ...section, content });
       toast('Section saved');
-    } catch {
-      toast('Failed to save section', 'error');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        toast('This brandscript was updated by another session. Reload to see the latest changes.', 'error');
+      } else {
+        toast('Failed to save section', 'error');
+      }
     } finally {
       setSaving(false);
     }
@@ -321,6 +327,7 @@ function BrandscriptDetail({ workspaceId, brandscript, onBack, onUpdated }: Bran
         purpose: s.purpose,
         content: s.content,
       })),
+      brandscript.updatedAt,
     );
     onUpdated(result);
   };
@@ -574,25 +581,25 @@ export function BrandscriptTab({ workspaceId }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: items = [], isLoading: loadingList } = useQuery({
-    queryKey: ['admin-brandscripts', workspaceId],
+    queryKey: queryKeys.admin.brandscripts(workspaceId),
     queryFn: () => brandscripts.list(workspaceId),
   });
 
   const { data: templates = [], isLoading: loadingTemplates } = useQuery({
-    queryKey: ['admin-brandscript-templates'],
+    queryKey: queryKeys.admin.brandscriptTemplates(),
     queryFn: () => brandscripts.templates(),
     staleTime: 5 * 60 * 1000,
   });
 
   useWorkspaceEvents(workspaceId, {
     'brandscript:updated': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-brandscripts', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandscripts(workspaceId) });
     },
   });
 
   const handleCreated = (bs: Brandscript) => {
     queryClient.setQueryData<Brandscript[]>(
-      ['admin-brandscripts', workspaceId],
+      queryKeys.admin.brandscripts(workspaceId),
       (old) => [bs, ...(old ?? [])],
     );
     setSelectedId(bs.id);
@@ -600,7 +607,7 @@ export function BrandscriptTab({ workspaceId }: Props) {
 
   const handleDeleted = (id: string) => {
     queryClient.setQueryData<Brandscript[]>(
-      ['admin-brandscripts', workspaceId],
+      queryKeys.admin.brandscripts(workspaceId),
       prev => prev ? prev.filter(b => b.id !== id) : [],
     );
     if (selectedId === id) setSelectedId(null);
@@ -608,7 +615,7 @@ export function BrandscriptTab({ workspaceId }: Props) {
 
   const handleUpdated = (bs: Brandscript) => {
     queryClient.setQueryData<Brandscript[]>(
-      ['admin-brandscripts', workspaceId],
+      queryKeys.admin.brandscripts(workspaceId),
       prev => prev ? prev.map(b => b.id === bs.id ? bs : b) : [bs],
     );
   };

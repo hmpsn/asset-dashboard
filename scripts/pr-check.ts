@@ -503,16 +503,18 @@ const SLICE_FORMATTER_MAP: Array<{ sliceName: string; formatterName: string }> =
  *  rendering handled differently — e.g. destructured `const { bySeverity } = ...`
  *  which the property-access regex can't catch). */
 const KNOWN_UNRENDERED_FIELDS = new Set([
-  // SeoContextSlice
-  'backlinkProfile', 'serpFeatures', 'keywordRecommendations',
+  // SeoContextSlice — backlinkProfile and serpFeatures are now rendered by formatSeoContextSection()
+  'keywordRecommendations',
   // InsightsSlice
   'byType', 'forPage',
   // bySeverity: rendered via `const { bySeverity } = insights` (destructuring, not .bySeverity)
   'bySeverity',
   // LearningsSlice
-  'forPage', 'topWins', 'winRateByActionType',
+  'forPage', 'winRateByActionType',
   // ContentPipelineSlice
-  'rewritePlaybook', 'suggestedBriefs',
+  // rewritePlaybook: formatter exists in formatContentPipelineSection but assembler doesn't populate it yet
+  // (workspace.rewritePlaybook is a TEXT column, needs parsing into { patterns, lastUsedAt } shape)
+  'rewritePlaybook',
   // SiteHealthSlice
   'aeoReadiness', 'redirectDetails',
   // PageProfileSlice
@@ -699,6 +701,91 @@ export const BRAND_ENGINE_ROUTE_BASENAMES: ReadonlySet<string> = new Set([
   'copy-pipeline.ts',
 ]);
 
+// ─── requireAuth allowlist ───────────────────────────────────────────────────
+// Files that legitimately use `requireAuth` (JWT-only middleware). Every other
+// server route file should use `requireWorkspaceAccess` or rely on the global
+// APP_PASSWORD HMAC gate. Brand-engine routes have their own dedicated rule
+// (see "requireAuth in brand-engine route files") so they are excluded here
+// to avoid double-flagging.
+//
+// Stored as basenames for harness testability (same rationale as
+// BRAND_ENGINE_ROUTE_BASENAMES above).
+export const REQUIRE_AUTH_ALLOWED_BASENAMES: ReadonlySet<string> = new Set([
+  'auth.ts',       // JWT login/refresh endpoints
+  'users.ts',      // user management — JWT-gated by design
+]);
+
+// ─── Globally-applied rate limiters ──────────────────────────────────────────
+// These three limiters are applied to ALL `/api/public/` routes in app.ts.
+// Importing and re-applying them inside individual route files increments the
+// same shared in-memory bucket twice, silently halving the effective rate limit
+// (e.g. 10 req/min becomes 5). See the warning comment in server/app.ts and
+// the `rateLimit()` implementation in server/middleware.ts.
+export const GLOBALLY_APPLIED_LIMITERS: ReadonlySet<string> = new Set([
+  'globalPublicLimiter',
+  'publicApiLimiter',
+  'publicWriteLimiter',
+]);
+
+// Maximum number of lines to scan forward in a route handler body
+// when looking for a broadcastToWorkspace/broadcast call.
+const ROUTE_BROADCAST_LOOKAHEAD = 120;
+
+/** Max lines to scan forward when looking for an `addActivity(` call
+ *  in an admin route handler body. Reuses the same generous cap as the
+ *  public-portal rule — admin handlers can be similarly long. */
+const ADMIN_ACTIVITY_LOOKAHEAD = 250;
+
+/** Extracts workspace-*only* event string values from `server/ws-events.ts`.
+ *  Returns WS_EVENTS values minus any values that also appear in ADMIN_EVENTS.
+ *  Values that exist in both objects (e.g. 'workspace:updated', 'request:created')
+ *  are legitimate admin-global events and must not be flagged. */
+function loadWsEventValues(): Set<string> {
+  const wsEventsPath = path.join(ROOT, 'server', 'ws-events.ts');
+  const content = readFileOrEmpty(wsEventsPath);
+  if (!content) return new Set();
+  const valueRe = /:\s*['"]([^'"]+)['"]/g;
+
+  // Extract the WS_EVENTS block (ends at `} as const;`)
+  const wsBlock = content.match(/export\s+const\s+WS_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
+  if (!wsBlock) return new Set();
+  const wsValues = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = valueRe.exec(wsBlock[1])) !== null) {
+    wsValues.add(m[1]);
+  }
+
+  // Extract the ADMIN_EVENTS block and subtract overlapping values.
+  const adminBlock = content.match(/export\s+const\s+ADMIN_EVENTS\s*=\s*\{([\s\S]*?)\}\s*as\s+const/);
+  if (adminBlock) {
+    valueRe.lastIndex = 0;
+    while ((m = valueRe.exec(adminBlock[1])) !== null) {
+      wsValues.delete(m[1]);
+    }
+  }
+
+  return wsValues;
+}
+
+/** Extracts the set of activity-type string literals from the
+ *  `CLIENT_VISIBLE_TYPES` set declaration in `server/activity-log.ts`.
+ *  Returns an empty set if the file or declaration cannot be parsed. */
+function loadClientVisibleTypes(): Set<string> {
+  const activityPath = path.join(ROOT, 'server', 'activity-log.ts');
+  const content = readFileOrEmpty(activityPath);
+  if (!content) return new Set();
+  // Match the `CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([...])` block
+  const block = content.match(/const\s+CLIENT_VISIBLE_TYPES[^=]*=\s*new\s+Set\(\[([\s\S]*?)\]\)/);
+  if (!block) return new Set();
+  const values = new Set<string>();
+  const valueRe = /['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = valueRe.exec(block[1])) !== null) {
+    values.add(m[1]);
+  }
+  return values;
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Purple in client components',
@@ -750,6 +837,7 @@ export const CHECKS: Check[] = [
       'server/routes/content-publish.ts', // AI response text parser: parses Claude field-mapping suggestion (not DB columns)
       'server/stripe-config.ts', // disk file: AES-encrypted Stripe config file (not DB columns)
       'server/diagnostic-orchestrator.ts', // AI response text parser (GPT-4.1 synthesis result), not DB columns
+      'server/workspace-intelligence.ts', // disk file: AEO review JSON from aeo-reviews/ directory (not DB columns)
     ],
     message: 'Use parseJsonSafe() or parseJsonFallback() from server/db/json-validation.ts.',
     severity: 'error',
@@ -1161,19 +1249,80 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
-    name: 'Silent bare catch in workspace-intelligence assemblers',
+    name: 'Silent bare catch in server files',
     // Matches lines that open a bare catch block with no error variable — the most
     // dangerous pattern: no err reference means isProgrammingError() can never be called.
-    // Scoped to workspace-intelligence.ts only to avoid flagging the 200+ legitimate
-    // silent catches in other server files.
+    // Originally scoped to workspace-intelligence.ts, now expanded to all server files
+    // after the broad catch-hardening pass (#576) converted ~344 bare catches.
     // Suppression: append `// catch-ok` to the same line. Because the pattern is anchored
     // with `$`, adding any suffix prevents the regex from matching — so excludeLines is not
     // needed here but left as documentation of the convention.
     pattern: '\\} catch \\{$',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/workspace-intelligence.ts',
-    message: 'Bare `catch {` in workspace-intelligence.ts hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err) for dynamic-import blocks, or log.debug at minimum.',
+    pathFilter: 'server/',
+    message: 'Bare `catch {` hides TypeError/ReferenceError as silent degradation. Use `catch (err)` and call isProgrammingError(err), or log.debug for expected failures (JSON parse, migration). Annotate intentionally-silent catches with `// catch-ok`.',
     severity: 'error',
+  },
+  {
+    name: 'isProgrammingError near new URL() or fetch()',
+    // Catches that wrap `new URL()` on external input or `fetch()` on external
+    // URLs throw TypeError for expected failures (malformed URL, DNS, network).
+    // isProgrammingError() classifies these as code bugs — a false positive.
+    // See the caveats in server/errors.ts.
+    // Suppression: add `// url-fetch-ok` on the isProgrammingError line.
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// url-fetch-ok'],
+    message: 'isProgrammingError() in a catch block that wraps `new URL()` or `fetch()` may produce false positives — TypeError from malformed URLs or network failures is expected degradation, not a code bug. Verify the catch is not wrapping external input, or add `// url-fetch-ok` to suppress.',
+    severity: 'warn',
+    rationale: 'False-positive log.warn noise: network failures and user-supplied malformed URLs trigger TypeError alerts that obscure real code bugs.',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const urlOrFetchRe = /\bnew\s+URL\s*\(|\bfetch\s*\(/;
+      const isPECall = /isProgrammingError\s*\(/;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        // Walk backward from each isProgrammingError call to find the
+        // enclosing `catch`. Then walk backward from that catch to the
+        // matching `try` via brace-depth tracking. Only flag if the
+        // try body contains new URL( or fetch(.
+        for (let i = 0; i < lines.length; i++) {
+          if (!isPECall.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// url-fetch-ok')) continue;
+          // Skip comment lines (the caveats in errors.ts)
+          if (/^\s*\/\//.test(lines[i])) continue;
+          // Find enclosing catch — scan backward for `catch`
+          let catchLine = -1;
+          for (let j = i; j >= Math.max(0, i - 5); j--) {
+            if (/\bcatch\s*\(/.test(lines[j])) { catchLine = j; break; }
+          }
+          if (catchLine < 0) continue;
+          // Walk backward from catch to find matching try via brace depth
+          let depth = 0;
+          let tryLine = -1;
+          for (let j = catchLine; j >= 0; j--) {
+            for (let c = lines[j].length - 1; c >= 0; c--) {
+              if (lines[j][c] === '}') depth++;
+              else if (lines[j][c] === '{') depth--;
+            }
+            if (/\btry\s*\{/.test(lines[j]) && depth <= 0) { tryLine = j; break; }
+          }
+          if (tryLine < 0) continue;
+          // Check if try body contains new URL( or fetch(
+          for (let j = tryLine; j < catchLine; j++) {
+            if (urlOrFetchRe.test(lines[j])) {
+              hits.push({ file, line: i + 1, text: lines[i] });
+              break;
+            }
+          }
+        }
+      }
+      return hits;
+    },
   },
 
   // ─── New rules (2026-04-10 audit) ───
@@ -2528,6 +2677,562 @@ export const CHECKS: Check[] = [
           if (hasHatch(lines, i, 'tab-deeplink-ok')) continue;
           hits.push({ file, line: i + 1, text: lines[i].trim() });
           break; // one hit per file
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'seo-context.ts import restriction (deprecated module)',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'server/',
+    // Existing callers that are already imported — these are grandfathered until migrated.
+    // seo-context.ts itself and workspace-intelligence.ts (shadow-mode comparison) are allowed.
+    exclude: [
+      'server/seo-context.ts',
+      'server/workspace-intelligence.ts',
+      'server/prompt-assembly.ts',
+      'server/admin-chat-context.ts',
+      'server/helpers.ts',
+      'server/copy-review.ts',
+      'server/internal-links.ts',
+      'server/aeo-page-review.ts',
+      'server/deep-diagnostic.ts',
+      'server/schema-generator.ts',
+      'server/content-brief.ts',
+      'server/routes/ai-chat.ts',
+      'server/routes/content-generation.ts',
+      'server/routes/seo-audit.ts',
+      'server/routes/schema-generator.ts',
+      'server/routes/content-matrix.ts',
+      'server/routes/aeo-review.ts',
+      'server/routes/copy-generation.ts',
+      'server/routes/page-strategy.ts',
+      'server/routes/content-brief.ts',
+      'server/routes/ai-rewrite.ts',
+      'server/routes/internal-links.ts',
+      'server/routes/diagnostics.ts',
+      'server/routes/public-analytics.ts',
+      'server/routes/workspaces.ts',
+      'server/routes/voice-calibration.ts',
+      'server/routes/webflow-seo.ts',
+      'server/routes/discovery-ingestion.ts',
+      'server/routes/google.ts',
+      'server/routes/webflow-keywords.ts',
+      'server/routes/copy-pipeline.ts',
+      'server/routes/brandscript.ts',
+      'server/routes/brand-identity.ts',
+      'server/routes/jobs.ts',
+      'server/routes/public-portal.ts',
+      'server/routes/keyword-strategy.ts',
+      'tests/',
+    ],
+    excludeLines: ['// seo-context-ok'],
+    message: 'seo-context.ts is deprecated — use buildWorkspaceIntelligence() + formatForPrompt() from workspace-intelligence.ts instead. Add // seo-context-ok on the import line if this is a grandfathered caller awaiting migration.',
+    severity: 'error',
+    rationale: 'seo-context.ts is being retired in favor of the unified workspace intelligence system. New callers must use the intelligence assembler.',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const importRe = /from\s+['"][^'"]*seo-context/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!importRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// seo-context-ok')) continue;
+          hits.push({ file, line: i + 1, text: lines[i] });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P0 expansion rule: requireAuth outside allowed files.
+    //
+    // `requireAuth` is JWT-only middleware. Most server routes are protected by
+    // the global APP_PASSWORD HMAC gate; using `requireAuth` on them would 401
+    // every admin call. Only `routes/auth.ts` and `routes/users.ts` legitimately
+    // need JWT-based auth. Brand-engine routes have their own dedicated rule
+    // ("requireAuth in brand-engine route files") so they are excluded here to
+    // avoid double-flagging.
+    //
+    // The definition file `server/auth.ts` is also excluded (it exports the
+    // function, not a usage site).
+    name: 'requireAuth usage outside allowed route files',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['// auth-ok'],
+    message:
+      'requireAuth is JWT-only — most routes are protected by the global APP_PASSWORD HMAC gate. ' +
+      'Using requireAuth on an admin route will 401 every admin call. Use requireWorkspaceAccess ' +
+      'for workspace routes, or rely on the HMAC gate for admin routes. ' +
+      'Suppress with // auth-ok if this endpoint intentionally requires JWT.',
+    severity: 'error',
+    rationale:
+      'requireAuth on a non-JWT route silently rejects all admin-panel requests because the admin ' +
+      'panel authenticates via HMAC token, not JWT.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        // Only scan server route files
+        if (!file.includes('/server/')) continue;
+        const basename = path.basename(file);
+        // Skip allowed files (definition + legitimate JWT-only routes)
+        if (basename === 'auth.ts' && !file.includes('/routes/')) continue; // server/auth.ts definition
+        if (REQUIRE_AUTH_ALLOWED_BASENAMES.has(basename) && file.includes('/routes/')) continue;
+        // Skip brand-engine routes (covered by their own dedicated rule)
+        if (BRAND_ENGINE_ROUTE_BASENAMES.has(basename)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !content.includes('requireAuth')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!/\brequireAuth\b/.test(line)) continue;
+          // Skip import statements — only flag usage sites
+          if (/^\s*import\b/.test(line)) continue;
+          // Skip comments (single-line // and JSDoc *)
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          // Skip function definitions (e.g. if auth.ts is misplaced)
+          if (/\bfunction\s+requireAuth\b/.test(line)) continue;
+          if (hasHatch(lines, i, '// auth-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P0 expansion rule: duplicate rate limiter on public routes.
+    //
+    // `globalPublicLimiter`, `publicApiLimiter`, and `publicWriteLimiter` are
+    // applied to ALL `/api/public/` routes in `server/app.ts`. If a route file
+    // imports and re-applies any of these, the shared in-memory bucket is
+    // incremented twice per request, silently halving the effective rate limit
+    // (e.g. 10 req/min becomes 5, 200 req/min becomes 100).
+    //
+    // Route-specific limiters like `loginLimiter`, `aiLimiter`, and
+    // `checkoutLimiter` are NOT globally applied, so importing them is fine.
+    name: 'Duplicate globally-applied rate limiter in route file',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// limiter-ok'],
+    message:
+      'globalPublicLimiter, publicApiLimiter, and publicWriteLimiter are applied globally in ' +
+      'server/app.ts to all /api/public/ routes. Importing or using them in a route file ' +
+      'increments the same shared bucket twice, silently halving the effective rate limit. ' +
+      'Remove the duplicate application. Suppress with // limiter-ok if intentional.',
+    severity: 'error',
+    rationale:
+      'Double-applied rate limiters share the same in-memory bucket, so each request increments ' +
+      'the counter twice — a 10 req/min limit silently becomes 5 req/min.',
+    claudeMdRef: '#auth-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Skip comments before entering the inner loop
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          if (hasHatch(lines, i, '// limiter-ok')) continue;
+          // Check if any globally-applied limiter name appears on this line
+          for (const limiter of GLOBALLY_APPLIED_LIMITERS) {
+            // Match as a word boundary to avoid partial matches
+            const re = new RegExp(`\\b${limiter}\\b`);
+            if (!re.test(line)) continue;
+            hits.push({ file, line: i + 1, text: line.trim() });
+            break; // one hit per limiter per line
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P1 expansion rule: port collision in integration tests.
+    //
+    // Every integration test file allocates a unique port via
+    // `createTestContext(NNNN)`. If two files share a port, the second test
+    // to bind gets EADDRINUSE and the CI run is flaky. This rule collects
+    // all port allocations across every `*.test.ts` file and flags any
+    // duplicate. It also flags ports outside the documented range
+    // (13201–13319 per CLAUDE.md) as a separate warning.
+    name: 'Port collision in integration tests',
+    pattern: '',
+    fileGlobs: ['*.test.ts'],
+    pathFilter: 'tests/',
+    excludeLines: ['// port-ok'],
+    message:
+      'Two or more test files use the same port in createTestContext(). ' +
+      'Each integration test must use a unique port to avoid EADDRINUSE in parallel CI runs. ' +
+      'Pick an unused port in the 13201–13319 range (grep existing ports first). ' +
+      'Suppress with // port-ok if this is intentionally shared.',
+    severity: 'error',
+    rationale:
+      'Duplicate test ports cause flaky CI: the second test file to bind gets EADDRINUSE, ' +
+      'producing intermittent failures that are hard to diagnose.',
+    claudeMdRef: '#testing-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Collect all port → [{ file, line }] mappings
+      const portMap = new Map<number, { file: string; line: number; text: string }[]>();
+      const portRe = /\bcreateTestContext\(\s*(\d+)\s*\)/;
+      for (const file of files) {
+        if (!file.endsWith('.test.ts')) continue;
+        // Skip the pr-check test harness — its fixture strings contain
+        // createTestContext() literals that aren't real port allocations.
+        if (file.endsWith('pr-check.test.ts')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const m = portRe.exec(lines[i]);
+          if (!m) continue;
+          if (hasHatch(lines, i, '// port-ok')) continue;
+          const port = parseInt(m[1], 10);
+          if (!portMap.has(port)) portMap.set(port, []);
+          portMap.get(port)!.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      // Flag every occurrence of a port used more than once
+      for (const [, usages] of portMap) {
+        if (usages.length > 1) {
+          for (const u of usages) hits.push(u);
+        }
+      }
+      // Flag ports outside the documented 13201–13319 range
+      const PORT_MIN = 13201;
+      const PORT_MAX = 13319;
+      for (const [port, usages] of portMap) {
+        if (port < PORT_MIN || port > PORT_MAX) {
+          for (const u of usages) {
+            // Don't double-flag if already flagged as a duplicate
+            if (!hits.some((h) => h.file === u.file && h.line === u.line)) {
+              hits.push(u);
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P1 expansion rule: inline React Query string keys.
+    //
+    // All query keys must go through `queryKeys.*` from `src/lib/queryKeys.ts`.
+    // Inline array literals (`queryKey: ['some-key', ...]`) bypass the
+    // centralized factory, causing cache drift: invalidating via `queryKeys.X()`
+    // won't clear a cache entry created with a bare string literal.
+    //
+    // The rule scans `useQuery(`, `useInfiniteQuery(`, and
+    // `queryClient.invalidateQueries(` / `queryClient.setQueryData(` /
+    // `queryClient.getQueryData(` calls. It flags `queryKey: [` patterns
+    // where the array literal doesn't start with `queryKeys.`.
+    //
+    // Test files and the queryKeys definition file itself are excluded.
+    name: 'Inline React Query string key (use queryKeys.*)',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// querykey-ok'],
+    message:
+      'Query keys must use the centralized queryKeys.* factory from src/lib/queryKeys.ts. ' +
+      'Inline string arrays cause cache drift — invalidation via queryKeys.X() won\'t clear ' +
+      'entries created with bare literals. Replace with the appropriate queryKeys.* call. ' +
+      'Suppress with // querykey-ok if this is a one-off key that intentionally bypasses the factory.',
+    severity: 'error',
+    rationale:
+      'Inline query key literals drift from the centralized factory, causing stale-cache bugs ' +
+      'where invalidateQueries misses entries because the key arrays don\'t match.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        if (!file.includes('/src/')) continue;
+        // Skip the queryKeys definition file itself
+        if (file.endsWith('lib/queryKeys.ts')) continue;
+        // Skip test files
+        if (file.includes('.test.')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        // Quick bail: if neither queryKey nor invalidateQueries appears, skip
+        if (!content.includes('queryKey') && !content.includes('invalidateQueries') &&
+            !content.includes('setQueryData') && !content.includes('getQueryData')) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Match queryKey: ['...  (inline array with string literal)
+          if (!/queryKey:\s*\[/.test(line)) continue;
+          // Skip if it uses queryKeys.* (the correct pattern)
+          if (/queryKey:\s*queryKeys\./.test(line)) continue;
+          // Skip if it spreads queryKeys.* into the array (e.g. [...queryKeys.admin.X(), extra])
+          if (/queryKey:\s*\[\s*\.\.\.queryKeys\./.test(line)) continue;
+          // Skip comments
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          // Skip JSDoc examples
+          if (/^\s*\*/.test(line)) continue;
+          if (hasHatch(lines, i, '// querykey-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // P1 expansion rule: missing broadcastToWorkspace after DB write in route files.
+    //
+    // Route handlers that perform DB writes (INSERT/UPDATE/DELETE via
+    // `db.prepare(...).run(`) should broadcast to connected clients so the
+    // real-time UI stays in sync. This rule scans `server/routes/*.ts` files,
+    // finds `router.post/put/patch/delete` handler bodies, checks for
+    // `db.prepare` calls, and flags if no `broadcastToWorkspace(` or
+    // `broadcast(` call follows within the same handler body.
+    //
+    // Public routes, health checks, and internal-only endpoints can suppress
+    // with `// broadcast-ok`.
+    name: 'Missing broadcastToWorkspace after DB write in route handler',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['// broadcast-ok'],
+    message:
+      'This route handler writes to the DB (db.prepare().run) but never calls ' +
+      'broadcastToWorkspace() or broadcast(). Connected clients won\'t see the change ' +
+      'until they manually refresh. Add a broadcast call, or suppress with // broadcast-ok ' +
+      'if this endpoint intentionally doesn\'t need real-time updates (e.g. analytics, logging).',
+    severity: 'warn',
+    rationale:
+      'Route handlers that write to the DB without broadcasting leave connected clients ' +
+      'with stale data until they manually refresh.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        if (!file.includes('/server/routes/') && !file.includes('/routes/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        // Find all route handler start lines
+        const routeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) routeIdx.push(i);
+        }
+        for (let k = 0; k < routeIdx.length; k++) {
+          const start = routeIdx[k];
+          if (hasHatch(lines, start, '// broadcast-ok')) continue;
+          // Route body extends to the next route declaration or end of file
+          const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+          const routeBodyEnd = Math.min(nextStart, start + ROUTE_BROADCAST_LOOKAHEAD);
+          const routeBody = lines.slice(start, routeBodyEnd).join('\n');
+          // Must have a DB write
+          if (!/\bdb\.prepare\b/.test(routeBody)) continue;
+          if (!/\.run\s*\(/.test(routeBody)) continue;
+          // Check for broadcast call
+          if (/\bbroadcastToWorkspace\s*\(/.test(routeBody)) continue;
+          if (/\bbroadcast\s*\(/.test(routeBody)) continue;
+          hits.push({ file, line: start + 1, text: lines[start].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ─── P2 expansion rules ───
+  {
+    // Extends the existing "Public-portal mutation without addActivity" rule
+    // to all admin route files. Public-portal.ts is excluded because it has
+    // its own dedicated rule with error severity.
+    name: 'Admin route mutation without addActivity',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    exclude: [
+      // Already covered by the dedicated public-portal rule (error severity).
+      'server/routes/public-portal.ts',
+      // Public routes — these serve unauthenticated client-portal traffic.
+      // Activity logging for public routes is a separate concern.
+      'server/routes/public-analytics.ts',
+      'server/routes/public-auth.ts',
+      'server/routes/public-chat.ts',
+      'server/routes/public-content.ts',
+      'server/routes/public-feedback.ts',
+      'server/routes/public-requests.ts',
+      // Infrastructure routes that don't represent user-visible mutations.
+      'server/routes/auth.ts',
+      'server/routes/users.ts',
+      'server/routes/health.ts',
+    ],
+    excludeLines: ['// activity-ok'],
+    message:
+      'This admin route handler performs a DB write (db.prepare().run) but never calls ' +
+      'addActivity(). Admin mutations should be logged to the activity feed so workspace ' +
+      'history is complete. Add an addActivity() call, or suppress with // activity-ok ' +
+      'if this endpoint intentionally doesn\'t need activity logging (e.g. internal bookkeeping, ' +
+      'analytics, settings that don\'t affect workspace content).',
+    severity: 'warn',
+    rationale:
+      'Significant admin operations that skip addActivity() leave gaps in the workspace ' +
+      'activity feed, making it impossible for team members to audit what changed and when.',
+    claudeMdRef: '#code-conventions',
+    displayScope: 'server/routes/*.ts (excluding public-* and infrastructure routes)',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const routeRe = /\brouter\.(post|put|patch|delete)\s*\(/i;
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        // Self-filter: only admin route files under server/routes/.
+        if (!file.includes('/server/routes/') && !file.includes('\\server\\routes\\')) continue;
+        // Skip public routes (covered by their own rule or not applicable).
+        const basename = path.basename(file);
+        if (/^public-/.test(basename)) continue;
+        // Skip infrastructure routes that aren't user-visible mutations.
+        if (['auth.ts', 'users.ts', 'health.ts'].includes(basename)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        const routeIdx: number[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          if (routeRe.test(lines[i])) routeIdx.push(i);
+        }
+        for (let k = 0; k < routeIdx.length; k++) {
+          const start = routeIdx[k];
+          if (hasHatch(lines, start, '// activity-ok')) continue;
+          const nextStart = k + 1 < routeIdx.length ? routeIdx[k + 1] : lines.length;
+          const routeBodyEnd = Math.min(nextStart, start + ADMIN_ACTIVITY_LOOKAHEAD);
+          const routeBody = lines.slice(start, routeBodyEnd).join('\n');
+          // Must have a DB write — same gate as the broadcast rule.
+          if (!/\bdb\.prepare\b/.test(routeBody)) continue;
+          if (!/\.run\s*\(/.test(routeBody)) continue;
+          // Check for addActivity() call
+          if (/\baddActivity\s*\(/.test(routeBody)) continue;
+          hits.push({ file, line: start + 1, text: lines[start].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // Extends the existing "useGlobalAdminEvents import restriction" rule.
+    // That rule catches *unauthorized imports*. This rule catches *wrong event
+    // names* in the authorized call sites — i.e. passing a workspace-scoped
+    // event (WS_EVENTS.*) to useGlobalAdminEvents, which is dead code because
+    // the hook doesn't subscribe to workspace rooms.
+    name: 'useGlobalAdminEvents called with workspace-scoped event name',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    pathFilter: 'src/',
+    excludeLines: ['// global-events-ok'],
+    message:
+      'useGlobalAdminEvents() is being called with a workspace-scoped event name ' +
+      '(from WS_EVENTS). This handler is dead code — the hook doesn\'t send a ' +
+      '`subscribe` action, so broadcastToWorkspace events are never delivered. ' +
+      'Use useWorkspaceEvents(workspaceId, ...) for workspace-scoped events, or ' +
+      'suppress with // global-events-ok if this is intentional.',
+    severity: 'error',
+    rationale:
+      'Silent dead broadcast handlers: useGlobalAdminEvents never subscribes to a ' +
+      'workspace room, so workspace-scoped events (WS_EVENTS.*) are silently dropped ' +
+      'by the server\'s broadcastToWorkspace filter. The UI appears stale with no ' +
+      'error message.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const wsEventValues = loadWsEventValues();
+      if (wsEventValues.size === 0) return hits;
+      // Match `useGlobalAdminEvents({` to find call sites.
+      const callRe = /\buseGlobalAdminEvents\s*\(\s*\{/;
+      for (const file of files) {
+        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content || !callRe.test(content)) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!callRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, '// global-events-ok')) continue;
+          // Scan forward from the call site to find handler keys.
+          // The object literal typically spans a few lines:
+          //   useGlobalAdminEvents({
+          //     [ADMIN_EVENTS.QUEUE_UPDATE]: handler,
+          //     'queue:update': handler,
+          //   });
+          // We scan up to 30 lines or until we hit `});`.
+          const scanEnd = Math.min(lines.length, i + 30);
+          for (let j = i; j < scanEnd; j++) {
+            const line = lines[j];
+            // Stop at closing `});`
+            if (/\}\s*\)/.test(line) && j > i) break;
+            // Match string-literal keys: 'event:name' or "event:name"
+            const stringKeyRe = /['"]([^'"]+)['"]\s*:/g;
+            let km: RegExpExecArray | null;
+            while ((km = stringKeyRe.exec(line)) !== null) {
+              if (wsEventValues.has(km[1])) {
+                hits.push({ file, line: j + 1, text: lines[j].trim() });
+              }
+            }
+            // Match computed keys: [WS_EVENTS.SOMETHING] or [WS_EVENTS['SOMETHING']]
+            if (/\[\s*WS_EVENTS[.\[]/.test(line)) {
+              hits.push({ file, line: j + 1, text: lines[j].trim() });
+            }
+          }
+        }
+      }
+      return hits;
+    },
+  },
+
+  // ── P3: Activity type not in CLIENT_VISIBLE_TYPES ──────────────────────────
+  {
+    name: 'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/routes/',
+    excludeLines: ['client-visibility-ok'],
+    message:
+      'addActivity() uses a type that is not in CLIENT_VISIBLE_TYPES — clients will never see this entry. ' +
+      'Add the type to CLIENT_VISIBLE_TYPES in server/activity-log.ts if clients should see it, ' +
+      'or add `// client-visibility-ok` to suppress.',
+    severity: 'warn',
+    rationale:
+      'Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES ' +
+      'create invisible entries — the activity is recorded but never shown to client-portal users. ' +
+      'This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types.',
+    claudeMdRef:
+      'Activity Log: new types must be added to CLIENT_VISIBLE_TYPES if clients should see them',
+    customCheck(files) {
+      const clientVisible = loadClientVisibleTypes();
+      if (clientVisible.size === 0) return []; // parse failure — bail silently
+      const hits: { file: string; line: number; text: string }[] = [];
+      for (const file of files) {
+        // Only inspect public-* route files (matches fileGlobs, but
+        // customCheck receives whatever the runner passes — enforce here too).
+        if (!/public-[^/\\]*\.ts$/.test(file)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          // Match: addActivity(workspaceId, 'type_name', ...)  or  addActivity(wsId, "type_name", ...)
+          const callRe = /addActivity\s*\([^,]+,\s*['"]([^'"]+)['"]/g;
+          let cm: RegExpExecArray | null;
+          while ((cm = callRe.exec(lines[i])) !== null) {
+            const activityType = cm[1];
+            if (!clientVisible.has(activityType)) {
+              if (hasHatch(lines, i, 'client-visibility-ok')) continue;
+              hits.push({ file, line: i + 1, text: lines[i].trim() });
+            }
+          }
         }
       }
       return hits;

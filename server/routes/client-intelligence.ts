@@ -16,10 +16,14 @@ import type {
   ClientPipelineStatus,
   ClientLearningHighlights,
   ClientSiteHealthSummary,
+  ClientDecayAlert,
   InsightsSlice,
   ContentPipelineSlice,
   LearningsSlice,
   SiteHealthSlice,
+  SeoContextSlice,
+  RankTrackingSummary,
+  DecayAlert,
 } from '../../shared/types/intelligence.js';
 
 const router = Router();
@@ -89,6 +93,33 @@ function formatSiteHealthForClient(health: SiteHealthSlice): ClientSiteHealthSum
   };
 }
 
+function formatRankTrackingForClient(seoContext: SeoContextSlice): RankTrackingSummary | null {
+  const rt = seoContext.rankTracking;
+  if (!rt) return null;
+  return {
+    trackedKeywords: rt.trackedKeywords,
+    avgPosition: rt.avgPosition,
+    positionChanges: rt.positionChanges,
+  };
+}
+
+function formatDecayAlertsForClient(pipeline: ContentPipelineSlice): ClientDecayAlert[] | null {
+  const alerts = pipeline.decayAlerts;
+  if (!alerts || alerts.length === 0) return null;
+  return alerts.slice(0, 10).map((a: DecayAlert) => ({
+    pageUrl: a.pageUrl,
+    clickDrop: a.clickDrop,
+    detectedAt: a.detectedAt,
+    hasRefreshBrief: a.hasRefreshBrief,
+  }));
+}
+
+function countSerpOpportunities(seoContext: SeoContextSlice): number | null {
+  const sf = seoContext.serpFeatures;
+  if (!sf) return null;
+  return sf.featuredSnippets + sf.peopleAlsoAsk + sf.videoCarousel + (sf.localPack ? 1 : 0);
+}
+
 // GET /api/public/intelligence/:workspaceId
 router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -96,10 +127,10 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
 
   const tier = (ws.tier ?? 'free') as 'free' | 'growth' | 'premium';
 
-  const slices: Array<'insights' | 'contentPipeline' | 'learnings' | 'siteHealth'> = [
+  const slices: Array<'insights' | 'contentPipeline' | 'learnings' | 'siteHealth' | 'seoContext'> = [
     'insights',
     'contentPipeline',
-    ...(tier !== 'free' ? (['learnings'] as const) : []),
+    ...(tier !== 'free' ? (['learnings', 'seoContext'] as const) : []),
     ...(tier === 'premium' ? (['siteHealth'] as const) : []),
   ];
 
@@ -114,9 +145,12 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
       pipelineStatus: intel.contentPipeline ? formatPipelineForClient(intel.contentPipeline) : null,
       ...(tier !== 'free' && {
         learningHighlights: intel.learnings ? formatLearningsForClient(intel.learnings) : null,
+        rankTrackingSummary: intel.seoContext ? formatRankTrackingForClient(intel.seoContext) : null,
+        serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
       }),
       ...(tier === 'premium' && {
         siteHealthSummary: intel.siteHealth ? formatSiteHealthForClient(intel.siteHealth) : null,
+        contentDecayAlerts: intel.contentPipeline ? formatDecayAlertsForClient(intel.contentPipeline) : null,
       }),
     };
 

@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 import { verifyToken } from '../auth.js';
+import { verifyAdminToken, APP_PASSWORD } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { createLogger } from '../logger.js';
 
@@ -62,6 +63,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 import { getBookingUrl } from '../studio-config.js';
 import { parseJsonSafe } from '../db/json-validation.js';
+import { isProgrammingError } from '../errors.js';
 
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.
@@ -150,10 +152,13 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
 
   try {
     const type = req.query.type as InsightType | undefined;
-    // Only allow force recompute for authenticated admin users
-    const token = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token; // as-any-ok: cookie-parser types not in Express.Request
-    const payload = token ? verifyToken(token) : null;
-    const force = req.query.force === 'true' && (payload?.role === 'admin' || payload?.role === 'owner');
+    // Only allow force recompute for authenticated admin users (JWT or HMAC)
+    const jwtToken = req.headers.authorization?.replace('Bearer ', '') || (req as any).cookies?.token; // as-any-ok: cookie-parser types not in Express.Request
+    const payload = jwtToken ? verifyToken(jwtToken) : null;
+    const adminToken = (req.headers['x-auth-token'] || (req as any).cookies?.auth_token || '') as string; // as-any-ok: cookie-parser types
+    const isAdmin = !!(payload?.role === 'admin' || payload?.role === 'owner') ||
+      !!(adminToken && (adminToken === APP_PASSWORD || verifyAdminToken(adminToken)));
+    const force = req.query.force === 'true' && isAdmin;
     const insights = await getOrComputeInsights(ws.id, type, { force });
     res.json(insights);
   } catch (err) {
@@ -310,7 +315,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
               pagesWithTraffic.map(p => `• ${p.slug} — ${p.issues} issues | ${p.traffic!.clicks} clicks, ${p.traffic!.pageviews} pageviews`).join('\n');
           }
         }
-      } catch { /* non-critical */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical */ }
     }
 
     const teamName = STUDIO_NAME;
@@ -343,7 +348,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
         }
         contentPlanSection = '\n\nCONTENT PLAN:\n' + parts.join('\n');
       }
-    } catch { /* non-critical */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical */ }
 
     // --- Data inventory (shared across modes) ---
     const dataInventory = `DATA YOU HAVE ACCESS TO:
@@ -520,7 +525,7 @@ ${JSON.stringify(context, null, 2)}`;
           notifyTeamClientSignal(ws.id, ws.name ?? ws.id, detectedIntent, question.trim().slice(0, 200));
         }
       }
-    } catch { /* non-critical — never block chat response */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-analytics: programming error'); /* non-critical — never block chat response */ }
 
     res.json({ answer, sessionId: sessionId || undefined, detectedIntent });
   } catch (err) {

@@ -12,7 +12,11 @@ import { JWT_SECRET } from './jwt-config.js';
 
 export type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
 import type { ClientRole, ClientUser, SafeClientUser } from '../shared/types/users.ts';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('client-users');
 const SALT_ROUNDS = 12;
 const CLIENT_JWT_EXPIRES = '24h';
 
@@ -289,7 +293,8 @@ export function verifyClientToken(token: string): ClientJwtPayload | null {
     // Must have clientUserId to distinguish from internal user tokens
     if (!payload.clientUserId) return null;
     return payload;
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'client-users/verifyClientToken: programming error');
     return null;
   }
 }

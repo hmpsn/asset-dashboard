@@ -223,7 +223,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 
 - **Write tests alongside code** — new routes need integration tests, new state transitions need guard tests, new shared type fields need contract tests. Use the existing infrastructure; don't hand-roll mocks when a factory exists.
 - **Test infrastructure** — mock factories in `tests/mocks/` (webflow, stripe, openai, anthropic, google, semrush), seed fixtures in `tests/fixtures/` (workspace-seed, auth-seed, content-seed, approval-seed), HTTP test helper `createTestContext(port)` in `tests/integration/helpers.ts`.
-- **Port uniqueness** — each integration test file using `createTestContext()` must use a unique port. Check existing ports with `grep -r 'createTestContext(' tests/` before allocating. Current range: 13201–13316.
+- **Port uniqueness** — each integration test file using `createTestContext()` must use a unique port. Check existing ports with `grep -r 'createTestContext(' tests/` before allocating. Current range: 13201–13319.
 - **External API error tests** — mock the API to return an error, then assert the operation records `failed`/`error` status, not success (FM-2 pattern).
 - **Cleanup** — all `beforeAll` resource creation must be paired with `afterAll` cleanup. Use `seedWorkspace().cleanup()` or `deleteWorkspace(id)`. Never leave orphaned test data.
 
@@ -259,6 +259,7 @@ This project uses **two separate auth systems** that must never be mixed up:
 | `docs/rules/route-removal-checklist.md` | Seven update sites when removing or renaming a `Page` value |
 | `docs/rules/multi-agent-coordination.md` | Parallel agent protocol, file ownership, cross-phase contracts, spec-plan sync |
 | `docs/rules/ai-dispatch-patterns.md` | AI-call-before-DB-write race, transaction guards, retry-on-unique patterns |
+| `docs/rules/development-patterns.md` | Operational patterns — React Query hooks, WebSocket wiring checklist, route templates, DB query patterns, auth decision tree, feature flag lifecycle, testing quick reference |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 
 ---

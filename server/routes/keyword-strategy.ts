@@ -53,6 +53,7 @@ import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-le
 import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -147,7 +148,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
     const lines = opts.keywordClusters.slice(0, 10).map(c => {
       let pillar = '';
       if (c.pillarPage) {
-        try { pillar = ` → pillar: ${new URL(c.pillarPage).pathname}`; } catch { pillar = ` → pillar: ${c.pillarPage}`; }
+        try { pillar = ` → pillar: ${new URL(c.pillarPage).pathname}`; } catch (err) { pillar = ` → pillar: ${c.pillarPage}`; }
       }
       return `  "${c.label}" (${c.queries.length} queries, ${c.totalImpressions} imp, avg pos ${Math.round(c.avgPosition)})${pillar}`;
     });
@@ -176,7 +177,7 @@ export function buildStrategyIntelligenceBlock(opts: StrategyIntelligenceInput):
   if (opts.conversionPages && opts.conversionPages.length > 0) {
     const lines = opts.conversionPages.slice(0, 10).map(c => {
       let path: string;
-      try { path = new URL(c.pageUrl).pathname; } catch { path = c.pageUrl; }
+      try { path = new URL(c.pageUrl).pathname; } catch (err) { path = c.pageUrl; }
       return `  ${path}: ${c.conversionRate.toFixed(1)}% CVR, ${c.conversions} conversions (${c.sessions} sessions)`;
     });
     sections.push(`CONVERSION DATA (pages driving business outcomes — protect and prioritize keywords for these "money pages"):\n${lines.join('\n')}`);
@@ -233,7 +234,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
   const sendProgress = (step: string, detail: string, progress: number) => {
     log.info(`[${step}] ${detail} (${Math.round(progress * 100)}%)`);
     if (wantsStream) {
-      try { res.write(`data: ${JSON.stringify({ step, detail, progress })}\n\n`); } catch { /* connection dropped */ }
+      try { res.write(`data: ${JSON.stringify({ step, detail, progress })}\n\n`); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy/sendProgress: programming error'); /* connection dropped */ }
     }
   };
 
@@ -261,7 +262,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             log.info(`Auto-resolved liveDomain: ${liveDomain}`);
           }
         }
-      } catch { /* best-effort */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* best-effort */ }
     }
     const subdomain = await getSiteSubdomain(ws.webflowSiteId, token);
     const baseUrl = liveDomain
@@ -325,7 +326,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             if (SKIP_PATTERNS.some(r => r.test(path))) { skippedUtility++; continue; }
 
             allPaths.add(path);
-          } catch { /* skip invalid URLs */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip invalid URLs */ }
         }
         if (skippedUtility > 0) log.info(`Skipped ${skippedUtility} utility/index pages`);
       } catch (err) {
@@ -447,7 +448,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                 .trim()
                 .slice(0, SNIPPET_LIMIT);
             }
-          } catch {
+          } catch (err) {
+            if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
             if (!wfMeta) return null; // Skip unreachable sitemap-only pages
           }
         }
@@ -523,7 +525,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         countryBreakdown = countries;
         periodComparison = comparison;
         sendProgress('search_data', `Got ${gscData.length} query rows, ${devices.length} devices, ${countries.length} countries from GSC`, 0.50);
-      } catch {
+      } catch (err) {
+        if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
         sendProgress('search_data', 'GSC unavailable — continuing without it', 0.50);
         log.info('Keyword strategy: GSC data unavailable, proceeding without it');
       }
@@ -550,7 +553,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         ga4Conversions = conversions;
         ga4EventsByPage = eventPages;
         sendProgress('search_data', `Got ${landing.length} organic landing pages, ${conversions.length} conversion events from GA4`, 0.52);
-      } catch {
+      } catch (err) {
+        if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
         sendProgress('search_data', 'GA4 organic data unavailable — continuing without it', 0.52);
       }
     }
@@ -767,7 +771,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
 
     // Start keepalive now that we're entering the long-running AI phase
     keepalive = wantsStream ? setInterval(() => {
-      try { res.write(`: keepalive\n\n`); } catch { /* connection closed */ }
+      try { res.write(`: keepalive\n\n`); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* connection closed */ }
     }, 10_000) : null;
 
     // Keyword pool — declared outside try so enrichment code can access it after batching
@@ -874,7 +878,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         const p = new URL(r.page).pathname;
         if (!gscByPath.has(p)) gscByPath.set(p, []);
         gscByPath.get(p)!.push({ query: r.query, position: r.position, clicks: r.clicks, impressions: r.impressions });
-      } catch { /* skip */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ }
     }
 
     // Build SEMRush keyword reference for batch prompts — give the AI real search terms to pick from
@@ -888,7 +892,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
           const p = new URL(k.url).pathname;
           if (!semrushByPath.has(p)) semrushByPath.set(p, []);
           semrushByPath.get(p)!.push(k);
-        } catch { /* skip */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ }
         keywordPool.set(k.keyword.toLowerCase(), { volume: k.volume, difficulty: k.difficulty, source: 'semrush' });
       }
     }
@@ -1038,7 +1042,8 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           log.info(`Batch ${batchIdx + 1}: ${fromPool} keywords from pool, ${invented} invented`);
         }
         return Array.isArray(parsed) ? parsed : [];
-      } catch {
+      } catch (err) {
+        log.debug({ err }, 'keyword-strategy: expected error — degrading gracefully');
         log.error({ detail: raw.slice(0, 200) }, `Batch ${batchIdx + 1} returned invalid JSON:`);
         return batch.map(p => ({
           pagePath: p.path,
@@ -1296,7 +1301,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
             }
           }
         }
-      } catch { /* non-critical */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical */ }
     }
 
     const hasSemrush = semrushContext.length > 0;
@@ -1328,7 +1333,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
           performanceDeltas: undefined,
         });
       }
-    } catch { /* non-critical — strategy works without intelligence data */ }
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical — strategy works without intelligence data */ }
 
     const masterPrompt = `You are a senior SEO strategist. Page-level keywords have already been assigned. Now provide the site-level strategy.
 ${businessSection}
@@ -1392,10 +1397,11 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     let masterData;
     try {
       masterData = JSON.parse(masterRaw);
-    } catch {
+    } catch (err) {
+      log.debug({ err }, 'keyword-strategy: expected error — degrading gracefully');
       log.error({ detail: masterRaw.slice(0, 300) }, 'Master returned invalid JSON');
       const errMsg = 'AI returned invalid JSON in master synthesis';
-      if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
+      if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg, raw: masterRaw.slice(0, 500) });
     }
 
@@ -1435,7 +1441,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     if (!strategy?.pageMap) {
       const errMsg = 'Strategy generation produced no results';
-      if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch { /* closed */ } return; }
+      if (wantsStream) { try { res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* closed */ } return; }
       return res.status(500).json({ error: errMsg });
     }
 
@@ -1444,7 +1450,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
     if (gscData.length > 0) {
       for (const pm of strategy.pageMap) {
         const matchingRows = gscData.filter(r => {
-          try { return new URL(r.page).pathname === pm.pagePath; } catch { return false; }
+          try { return new URL(r.page).pathname === pm.pagePath; } catch (err) { return false; }
         });
         if (matchingRows.length > 0) {
           const kwMatch = matchingRows.find(r => r.query.toLowerCase().includes(pm.primaryKeyword.toLowerCase()));
@@ -1690,7 +1696,7 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
           if (!gscByQuery.has(q)) gscByQuery.set(q, []);
           try {
             gscByQuery.get(q)!.push({ page: new URL(r.page).pathname, position: r.position, impressions: r.impressions, clicks: r.clicks });
-          } catch { /* skip */ }
+          } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* skip */ }
         }
         for (const [query, pages] of gscByQuery) {
           if (pages.length >= 2 && pages.some(p => p.impressions > 10)) {
@@ -1899,7 +1905,7 @@ Rules:
           for (const m of extra) {
             found.push({ keyword: m.keyword, volume: m.volume, difficulty: m.difficulty });
           }
-        } catch { /* non-critical */ }
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* non-critical */ }
       }
       siteKeywordMetrics = found;
     }
@@ -2094,7 +2100,7 @@ Rules:
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
     if (wantsStream) {
-      try { res.write(`data: ${JSON.stringify({ error: msg })}\n\n`); res.end(); } catch { /* already closed */ }
+      try { res.write(`data: ${JSON.stringify({ error: msg })}\n\n`); res.end(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error'); /* already closed */ }
       return;
     }
     res.status(500).json({ error: msg });

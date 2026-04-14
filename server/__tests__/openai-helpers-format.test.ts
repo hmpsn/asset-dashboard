@@ -32,7 +32,7 @@ describe('callOpenAI response_format', () => {
         responseFormat: { type: 'json_object' },
         maxRetries: 0,
       });
-    } catch {
+    } catch { // catch-ok — test intentionally ignores mock-fetch errors
       // Expected — mock fetch may not return perfect shape
     }
 
@@ -52,7 +52,7 @@ describe('callOpenAI response_format', () => {
         feature: 'test-no-format',
         maxRetries: 0,
       });
-    } catch {
+    } catch { // catch-ok — test intentionally ignores mock-fetch errors
       // Expected — mock fetch may not return perfect shape
     }
 

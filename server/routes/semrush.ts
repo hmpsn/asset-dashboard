@@ -14,6 +14,7 @@ import { createLogger } from '../logger.js';
 import { getUploadRoot } from '../data-dir.js';
 import fs from 'fs';
 import path from 'path';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('semrush-routes');
 
@@ -149,7 +150,7 @@ router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
   // Check cache directory for existing entries
   const cacheDir = path.join(getUploadRoot(), ws.id, '.semrush-cache');
   let cacheFiles: string[] = [];
-  try { cacheFiles = fs.readdirSync(cacheDir).sort(); } catch { /* no cache dir */ }
+  try { cacheFiles = fs.readdirSync(cacheDir).sort(); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'semrush/competitors: programming error'); /* no cache dir */ }
 
   const domainOverviewKeys = cacheFiles.filter((f: string) => f.startsWith('domain_overview'));
   const backlinkKeys = cacheFiles.filter((f: string) => f.startsWith('backlinks_'));
@@ -161,7 +162,7 @@ router.get('/api/semrush/diagnose/:workspaceId', (req, res) => {
     try {
       const raw = JSON.parse(fs.readFileSync(path.join(cacheDir, f), 'utf-8'));
       cachedData[f] = { cachedAt: raw.cachedAt, data: raw.data };
-    } catch { cachedData[f] = 'unreadable'; }
+    } catch (err) { cachedData[f] = 'unreadable'; }
   }
 
   res.json({

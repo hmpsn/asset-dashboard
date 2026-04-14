@@ -125,7 +125,7 @@ export function initWebSocket(server: Server): WebSocketServer {
           const info = clientPresence.get(ws);
           if (info) info.lastSeen = new Date().toISOString();
         }
-      } catch { /* ignore malformed messages */ }
+      } catch (err) { /* ignore malformed messages */ }
     });
 
     ws.on('close', () => {

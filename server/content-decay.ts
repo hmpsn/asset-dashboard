@@ -7,6 +7,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages } from './search-console.js';
+import type { CustomDateRange } from './google-analytics.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import type { Workspace } from './workspaces.js';
@@ -105,35 +106,57 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
     throw new Error('GSC not configured for this workspace');
   }
 
-  // Get page-level data for current 30 days
-  const currentPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30);
+  // Compute non-overlapping date ranges for decay comparison
+  // Current: last 30 days (with 3-day GSC delay)
+  // Previous: the 30 days before that
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const curEnd = new Date();
+  curEnd.setDate(curEnd.getDate() - 3); // GSC ~3 day delay
+  const curStart = new Date(curEnd);
+  curStart.setDate(curStart.getDate() - 30);
+  const prevEnd = new Date(curStart);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - 30);
 
-  // Build map of current period pages
-  const currentMap = new Map<string, { clicks: number; impressions: number; ctr: number; position: number }>();
+  const currentDateRange: CustomDateRange = { startDate: fmt(curStart), endDate: fmt(curEnd) };
+  const previousDateRange: CustomDateRange = { startDate: fmt(prevStart), endDate: fmt(prevEnd) };
+
+  // Get page-level data for current 30 days
+  const currentPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30, currentDateRange);
+
+  // Build map of current period pages — accumulate metrics for duplicate pathnames
+  // (GSC may return separate rows for www vs non-www, http vs https, etc.)
+  const currentMap = new Map<string, { clicks: number; impressions: number; ctr: number; position: number; _count: number }>();
   for (const p of currentPages) {
-    try {
-      const url = new URL(p.page);
-      currentMap.set(url.pathname, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
-    } catch {
-      currentMap.set(p.page, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position });
+    let path: string;
+    try { path = new URL(p.page).pathname; } catch { path = p.page; }
+    const existing = currentMap.get(path);
+    if (existing) {
+      existing.clicks += p.clicks;
+      existing.impressions += p.impressions;
+      // Running average position across URL variants
+      existing.position = (existing.position * existing._count + p.position) / (existing._count + 1);
+      existing._count += 1;
+    } else {
+      currentMap.set(path, { clicks: p.clicks, impressions: p.impressions, ctr: p.ctr, position: p.position, _count: 1 });
     }
   }
 
-  // Get previous period pages (30 days before current 30 days = 60 days ago to 30 days ago)
-  const prevPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 60);
-  const prevMap = new Map<string, { clicks: number; impressions: number; position: number }>();
+  // Get previous period pages (non-overlapping 30d window before current period)
+  const prevPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30, previousDateRange);
+  const prevMap = new Map<string, { clicks: number; impressions: number; position: number; _count: number }>();
   for (const p of prevPages) {
-    try {
-      const url = new URL(p.page);
-      const path = url.pathname;
-      // Only store if not in prevMap yet, or accumulate
-      if (!prevMap.has(path)) {
-        prevMap.set(path, { clicks: p.clicks, impressions: p.impressions, position: p.position });
-      }
-    } catch {
-      if (!prevMap.has(p.page)) {
-        prevMap.set(p.page, { clicks: p.clicks, impressions: p.impressions, position: p.position });
-      }
+    let path: string;
+    try { path = new URL(p.page).pathname; } catch { path = p.page; }
+    const existing = prevMap.get(path);
+    if (existing) {
+      existing.clicks += p.clicks;
+      existing.impressions += p.impressions;
+      existing.position = (existing.position * existing._count + p.position) / (existing._count + 1);
+      existing._count += 1;
+    } else {
+      prevMap.set(path, { clicks: p.clicks, impressions: p.impressions, position: p.position, _count: 1 });
     }
   }
 

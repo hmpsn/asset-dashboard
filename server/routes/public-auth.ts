@@ -19,11 +19,13 @@ import {
 } from '../client-users.js';
 import { sendEmail } from '../email.js';
 import { sanitizeString } from '../helpers.js';
+import { addActivity } from '../activity-log.js';
 import { signClientSession, clientLoginLimiter, IS_PROD, checkLoginLockout, recordLoginFailure, clearLoginFailures } from '../middleware.js';
 import { verifyTurnstile } from '../middleware/turnstile.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('public-auth');
 
@@ -50,7 +52,7 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
   if (match) {
     // Migrate legacy plaintext password to bcrypt on successful login
     if (!isHash) {
-      try { updateWorkspace(ws.id, { clientPassword: await bcrypt.hash(password, 12) }); } catch { /* best-effort migration */ }
+      try { updateWorkspace(ws.id, { clientPassword: await bcrypt.hash(password, 12) }); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'public-auth: POST /api/public/auth/:id: programming error'); /* best-effort migration */ }
     }
     // Issue signed session cookie for server-side verification
     const sessionToken = signClientSession(ws.id);
@@ -60,6 +62,7 @@ router.post('/api/public/auth/:id', clientLoginLimiter, async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       secure: IS_PROD,
     });
+    addActivity(ws.id, 'portal_session', 'Client portal session started', 'Via shared password');
     return res.json({ ok: true });
   }
   return res.status(401).json({ error: 'Incorrect password' });
@@ -105,6 +108,7 @@ router.post('/api/public/client-login/:id', clientLoginLimiter, verifyTurnstile,
     res.cookie(`client_user_token_${ws.id}`, token, {
       httpOnly: true, sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000, secure: IS_PROD,
     });
+    addActivity(ws.id, 'portal_session', 'Client portal session started', `Via client login: ${safe.email}`, undefined, { id: safe.id, name: safe.name });
     res.json({ ok: true, user: safe });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

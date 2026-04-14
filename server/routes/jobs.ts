@@ -65,6 +65,7 @@ import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/ana
 import { buildWorkspaceIntelligence, invalidateIntelligenceCache, formatKeywordsForPrompt, formatPageMapForPrompt, formatForPrompt } from '../workspace-intelligence.js';
 import type { default as SharpConstructor } from 'sharp';
 import type * as SvgoMod from 'svgo';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('jobs');
 
@@ -251,7 +252,7 @@ router.post('/api/jobs', async (req, res) => {
             const tmpPath = `/tmp/compressed_${Date.now()}_${newFileName}`;
             fs.writeFileSync(tmpPath, compressed);
             const uploadResult = await uploadAsset(siteId, tmpPath, newFileName, altText, compressToken);
-            try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+            try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
 
             if (!uploadResult.success) {
               updateJob(job.id, { status: 'error', error: uploadResult.error, message: 'Upload failed' });
@@ -358,7 +359,7 @@ router.post('/api/jobs', async (req, res) => {
                 const tmpPath = `/tmp/bulk_alt_${Date.now()}${imgExt}`;
                 fs.writeFileSync(tmpPath, buffer);
                 const altTextResult = await generateAltText(tmpPath, jobAltContext || undefined);
-                try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+                try { fs.unlinkSync(tmpPath); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* ignore */ }
                 if (altTextResult) {
                   await updateAsset(asset.assetId, { altText: altTextResult }, token);
                   results.push({ assetId: asset.assetId, altText: altTextResult, updated: true });
@@ -408,7 +409,7 @@ router.post('/api/jobs', async (req, res) => {
               try {
                 const sub = await getSiteSubdomain(seoSiteId, token);
                 if (sub) bulkBaseUrl = `https://${sub}.webflow.io`;
-              } catch { /* best-effort */ }
+              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best-effort */ }
             }
             const bulkBrandName = getBrandName(bulkWs);
 
@@ -441,7 +442,7 @@ router.post('/api/jobs', async (req, res) => {
                         .trim()
                         .slice(0, 800);
                     }
-                  } catch { /* best-effort */ }
+                  } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
                 }
                 const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
                 const brandNote = bulkBrandName ? `\nBrand name is "${bulkBrandName}" — use this exact name, never an abbreviated version.` : '';
@@ -577,7 +578,7 @@ router.post('/api/jobs', async (req, res) => {
               try {
                 const arch = await getCachedArchitecture(ctx.workspaceId);
                 ctx._architectureTree = arch.tree;
-              } catch { /* proceed without architecture */ }
+              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs/schemaWsId: programming error'); /* proceed without architecture */ }
             }
             // Debounced incremental save — persist partial results every 10s
             let lastSaveTime = 0;
@@ -668,7 +669,7 @@ router.post('/api/jobs', async (req, res) => {
                     source: 'cms',
                   });
                 }
-              } catch { /* CMS discovery failed — continue with static pages */ }
+              } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* CMS discovery failed — continue with static pages */ }
             }
 
             // 2. Skip already-analyzed pages (unless forceRefresh)
@@ -715,7 +716,7 @@ router.post('/api/jobs', async (req, res) => {
 
             // Resolve subdomain ONCE before the loop (was being called per-page — ~256 redundant API calls)
             let webflowSubdomain: string | null = null;
-            try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch { /* skip */ }
+            try { webflowSubdomain = await getSiteSubdomain(paSiteId, paToken); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* skip */ }
 
             for (let i = 0; i < toAnalyze.length; i += BATCH) {
               if (isJobCancelled(paJob.id)) break;

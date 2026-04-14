@@ -5,7 +5,11 @@
 
 import { getValidToken } from './google-auth.js';
 import type { CustomDateRange } from './google-analytics.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('search-console');
 const GSC_API = 'https://www.googleapis.com/webmasters/v3';
 
 interface SearchAnalyticsRow {
@@ -372,7 +376,7 @@ export async function getTopDroppedGscPage(
 
   try {
     return new URL(topPage).pathname;
-  } catch {
+  } catch (err) {
     return topPage.startsWith('/') ? topPage : null;
   }
 }
@@ -432,7 +436,7 @@ export async function getTopSpikedGscPage(
 
   try {
     return new URL(topPage).pathname;
-  } catch {
+  } catch (err) {
     return topPage.startsWith('/') ? topPage : null;
   }
 }
@@ -663,7 +667,8 @@ export async function getSearchTypeBreakdown(
           position: +row.position.toFixed(1),
         });
       }
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'search-console/getSearchTypeBreakdown: programming error');
       // Some search types may not be available for all properties
     }
   }

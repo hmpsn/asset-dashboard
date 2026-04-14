@@ -61,7 +61,7 @@ async function fetchPublishedHtml(url: string): Promise<string | null> {
     const res = await fetch(url, { redirect: 'follow' });
     if (!res.ok) return null;
     return await res.text();
-  } catch { return null; }
+  } catch (err) { /* network failure — expected */ return null; }
 }
 
 export function isCheckableUrl(href: string): boolean {

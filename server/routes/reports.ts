@@ -31,6 +31,7 @@ import { renderSalesReportHTML } from '../sales-report-html.js';
 import { runSeoAudit } from '../seo-audit.js';
 import { listWorkspaces, getTokenForSite } from '../workspaces.js';
 import { createLogger } from '../logger.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('reports');
 
@@ -65,10 +66,10 @@ router.get('/api/sales-reports', (_req, res) => {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(reportsDir, f), 'utf-8'));
         return { id: data.id, url: data.url, siteName: data.siteName, siteScore: data.siteScore, totalPages: data.totalPages, errors: data.errors, warnings: data.warnings, generatedAt: data.generatedAt };
-      } catch { return null; }
+      } catch (err) { return null; }
     }).filter(Boolean);
     res.json(summaries);
-  } catch { res.json([]); }
+  } catch (err) { res.json([]); }
 });
 
 router.get('/api/sales-report/:id', (req, res) => {
@@ -78,7 +79,7 @@ router.get('/api/sales-report/:id', (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' });
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     res.json(data);
-  } catch { res.status(500).json({ error: 'Failed to load report' }); }
+  } catch (err) { res.status(500).json({ error: 'Failed to load report' }); }
 });
 
 router.get('/api/sales-report/:id/html', (req, res) => {
@@ -90,7 +91,7 @@ router.get('/api/sales-report/:id/html', (req, res) => {
     const html = renderSalesReportHTML(data);
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
-  } catch { res.status(500).send('Failed to render report'); }
+  } catch (err) { res.status(500).send('Failed to render report'); }
 });
 
 // --- Reports & Snapshots ---
@@ -115,7 +116,7 @@ router.post('/api/reports/:siteId/save', async (req, res) => {
             logoUrl = (await extractSiteLogo(`https://${siteData.shortName}.webflow.io`)) || undefined;
           }
         }
-      } catch { /* logo extraction is best-effort */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'reports: POST /api/reports/:siteId/save: programming error'); /* logo extraction is best-effort */ }
     }
 
     const snapshot = saveSnapshot(siteId, siteName || siteId, audit, logoUrl);

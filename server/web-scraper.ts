@@ -4,7 +4,11 @@
  */
 
 import { STUDIO_BOT_UA } from './constants.js';
+import { isProgrammingError } from './errors.js';
+import { createLogger } from './logger.js';
 
+
+const log = createLogger('web-scraper');
 export interface ScrapedPage {
   url: string;
   title: string;
@@ -53,7 +57,8 @@ export async function scrapeUrl(url: string): Promise<ScrapedPage | null> {
     if (!res.ok) return null;
     const html = await res.text();
     return parseHtml(url, html);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'web-scraper/scrapeUrl: programming error');
     return null;
   }
 }
@@ -149,7 +154,8 @@ export async function scrapeSerpData(query: string): Promise<SerpData | null> {
     }
 
     return parseSerpHtml(query, html);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'web-scraper/scrapeSerpData: programming error');
     return null;
   }
 }

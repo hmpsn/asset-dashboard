@@ -15,6 +15,7 @@ import type {
   InsightDataMap,
   PageHealthData,
   QuickWinData,
+  ContentDecayData,
   CannibalizationData,
   ConversionAttributionData,
   CompetitorGapData,
@@ -27,7 +28,7 @@ import type { GA4LandingPage } from './google-analytics.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
 import { getGA4TopPages, getGA4LandingPages } from './google-analytics.js';
-import { upsertInsight, getInsights, deleteStaleInsightsByType } from './analytics-insights-store.js';
+import { upsertInsight, getInsights, deleteStaleInsightsByType, suppressInsights } from './analytics-insights-store.js';
 import { buildEnrichmentContext, enrichInsight } from './insight-enrichment.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { runFeedbackLoops } from './insight-feedback.js';
@@ -36,6 +37,7 @@ import { getWorkspace } from './workspaces.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { extractBrandTokens, isBrandedQuery } from './competitor-brand-filter.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 // ── Shared types for computation results ─────────────────────────
 
@@ -59,7 +61,7 @@ function normalizePageUrl(url: string): string {
     // Strip trailing slash (keep root '/')
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     return `${u.origin}${path}`;
-  } catch {
+  } catch (err) {
     // Not a valid URL — strip trailing slash as best-effort
     return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
   }
@@ -176,7 +178,7 @@ export function computePageHealthScores(
     let pagePath: string;
     try {
       pagePath = new URL(page.page).pathname;
-    } catch {
+    } catch (err) {
       pagePath = page.page;
     }
 
@@ -750,7 +752,7 @@ export function computeSerpOpportunities(
     let pathname: string;
     try {
       pathname = new URL(page.page).pathname;
-    } catch {
+    } catch (err) {
       pathname = page.page;
     }
 
@@ -858,6 +860,190 @@ export async function getOrComputeInsights(
   }
 
   return capWithDiversity(getInsights(workspaceId, insightType), insightType);
+}
+
+// ── Content Decay Insight Refresh ────────────────────────────────
+// Lightweight refresh of just the content_decay insight type.
+// Called after analyzeContentDecay() to immediately sync the insights
+// cache with fresh decay data, avoiding the 24-hour staleness window.
+
+const MIN_DECAY_BASELINE_CLICKS = 20;
+const MIN_DECAY_ABSOLUTE_LOSS = 5;
+
+export async function refreshContentDecayInsights(workspaceId: string): Promise<void> {
+  const decayAnalysis = loadDecayAnalysis(workspaceId);
+  const cycleStart = new Date().toISOString();
+
+  if (decayAnalysis && decayAnalysis.decayingPages.length > 0) {
+    const enrichCtx = await buildEnrichmentContext(workspaceId);
+
+    const significantDecay = decayAnalysis.decayingPages.filter(p =>
+      p.previousClicks >= MIN_DECAY_BASELINE_CLICKS &&
+      Math.abs(p.previousClicks - p.currentClicks) >= MIN_DECAY_ABSOLUTE_LOSS
+    );
+
+    for (const page of significantDecay) {
+      const severity: InsightSeverity =
+        page.severity === 'critical' ? 'critical'
+        : page.severity === 'warning' ? 'warning'
+        : 'opportunity';
+      const enrichment = enrichInsight(
+        { pageId: page.page, insightType: 'content_decay' as InsightType, severity, data: { baselineClicks: page.previousClicks, currentClicks: page.currentClicks, deltaPercent: page.clickDeclinePct, baselinePeriod: 'previous_30d', currentPeriod: 'current_30d' } },
+        enrichCtx,
+      );
+      const { data: _enrichedData, ...enrichmentRest } = enrichment;
+      upsertInsight({
+        ...enrichmentRest,
+        workspaceId,
+        pageId: page.page,
+        insightType: 'content_decay',
+        data: {
+          baselineClicks: page.previousClicks,
+          currentClicks: page.currentClicks,
+          deltaPercent: page.clickDeclinePct,
+          baselinePeriod: 'previous_30d',
+          currentPeriod: 'current_30d',
+        },
+        severity,
+      });
+    }
+
+    log.info({ workspaceId, count: significantDecay.length }, 'Refreshed content decay insights from fresh analysis');
+  }
+
+  // Prune stale decay insights that were not updated in this cycle
+  deleteStaleInsightsByType(workspaceId, 'content_decay', cycleStart);
+
+  // Run the same quality gate as the full computation path to suppress
+  // contradictory, duplicate, and low-confidence insights.
+  validateInsightBatch(workspaceId);
+}
+
+// ── Insight Validation Pass ──────────────────────────────────────
+// Deterministic quality gate: suppress contradictory, duplicate, and
+// low-confidence insights AFTER computation, BEFORE feedback loops.
+
+/** Severity rank for comparison — higher = stronger signal */
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  warning: 3,
+  opportunity: 2,
+  positive: 1,
+};
+
+/** Minimum impressions for a ranking_opportunity to be considered actionable */
+const MIN_RANKING_OPP_IMPRESSIONS = 100;
+
+/** Minimum absolute click loss for content_decay to be considered actionable */
+const MIN_DECAY_CLICK_LOSS = 10;
+
+/** Minimum estimated traffic gain for a ranking_opportunity to survive validation */
+const MIN_RANKING_OPP_TRAFFIC_GAIN = 5;
+
+/** Minimum estimated click gap for a ctr_opportunity to survive validation */
+const MIN_CTR_OPP_CLICK_GAP = 5;
+
+/**
+ * Contradiction pairs: when the same page appears under both insight types,
+ * suppress the weaker signal (lower severity, then lower impactScore).
+ */
+const CONTRADICTION_PAIRS: ReadonlyArray<[InsightType, InsightType]> = [
+  ['ranking_opportunity', 'content_decay'],
+  ['ctr_opportunity', 'content_decay'],
+];
+
+/**
+ * Pick the weaker insight from a pair based on severity rank, then impactScore.
+ * Returns the id of the insight to suppress, or null if they're equal.
+ */
+function pickWeaker(a: AnalyticsInsight, b: AnalyticsInsight): string | null {
+  const rankA = SEVERITY_RANK[a.severity] ?? 0;
+  const rankB = SEVERITY_RANK[b.severity] ?? 0;
+  if (rankA !== rankB) return rankA < rankB ? a.id : b.id;
+  const scoreA = a.impactScore ?? 0;
+  const scoreB = b.impactScore ?? 0;
+  if (scoreA !== scoreB) return scoreA < scoreB ? a.id : b.id;
+  return null; // truly equal — don't suppress either
+}
+
+export function validateInsightBatch(workspaceId: string): number {
+  const allInsights = getInsights(workspaceId);
+  if (allInsights.length === 0) return 0;
+
+  const toSuppress = new Set<string>();
+
+  // Build lookup: pageId → insights on that page
+  // Skip resolved and bridge-sourced insights — they are protected from background cleanup
+  // (mirrors the deleteStaleByType guard: resolution_status IS NULL AND bridge_source IS NULL).
+  const byPage = new Map<string, AnalyticsInsight[]>();
+  const protectedIds = new Set<string>();
+  for (const insight of allInsights) {
+    if (insight.resolutionStatus === 'resolved' || insight.resolutionStatus === 'in_progress' || insight.bridgeSource) {
+      protectedIds.add(insight.id);
+      continue;
+    }
+    if (!insight.pageId) continue;
+    const list = byPage.get(insight.pageId);
+    if (list) list.push(insight);
+    else byPage.set(insight.pageId, [insight]);
+  }
+
+  // ── Rule 1: Contradiction suppression ──────────────────────────
+  for (const [typeA, typeB] of CONTRADICTION_PAIRS) {
+    for (const [, insights] of byPage) {
+      const a = insights.find(i => i.insightType === typeA && !toSuppress.has(i.id));
+      const b = insights.find(i => i.insightType === typeB && !toSuppress.has(i.id));
+      if (a && b) {
+        const weakerId = pickWeaker(a, b);
+        if (weakerId) toSuppress.add(weakerId);
+      }
+    }
+  }
+
+  // ── Rule 2: Severity clash on same page ────────────────────────
+  // If the same page has both a 'positive' and a 'critical' insight,
+  // suppress the positive one (the critical signal takes priority).
+  for (const [, insights] of byPage) {
+    const positives = insights.filter(i => i.severity === 'positive' && !toSuppress.has(i.id));
+    const criticals = insights.filter(i => i.severity === 'critical' && !toSuppress.has(i.id));
+    if (positives.length > 0 && criticals.length > 0) {
+      for (const p of positives) toSuppress.add(p.id);
+    }
+  }
+
+  // ── Rule 3: Low-confidence suppression ─────────────────────────
+  for (const insight of allInsights) {
+    if (toSuppress.has(insight.id) || protectedIds.has(insight.id)) continue;
+
+    if (insight.insightType === 'ranking_opportunity') {
+      const d = insight.data as unknown as QuickWinData;
+      if (d.impressions < MIN_RANKING_OPP_IMPRESSIONS || d.estimatedTrafficGain < MIN_RANKING_OPP_TRAFFIC_GAIN) {
+        toSuppress.add(insight.id);
+      }
+    }
+
+    if (insight.insightType === 'content_decay') {
+      const d = insight.data as unknown as ContentDecayData;
+      if (Math.abs(d.baselineClicks - d.currentClicks) < MIN_DECAY_CLICK_LOSS) {
+        toSuppress.add(insight.id);
+      }
+    }
+
+    if (insight.insightType === 'ctr_opportunity') {
+      const d = insight.data as unknown as CtrOpportunityData;
+      if (d.estimatedClickGap < MIN_CTR_OPP_CLICK_GAP) {
+        toSuppress.add(insight.id);
+      }
+    }
+  }
+
+  // ── Execute suppression ────────────────────────────────────────
+  const ids = Array.from(toSuppress);
+  const deleted = suppressInsights(workspaceId, ids);
+  if (deleted > 0) {
+    log.info({ workspaceId, suppressed: deleted }, 'Insight validation pass: suppressed contradictory/low-confidence insights');
+  }
+  return deleted;
 }
 
 /**
@@ -1013,8 +1199,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
       // A page dropping from 20→17 clicks (-15%) isn't actionable even though it exceeds
       // the decay engine's 10% threshold. Require minimum baseline AND minimum absolute loss.
       const significantDecay = decayAnalysis.decayingPages.filter(p =>
-        p.previousClicks >= 20 && // meaningful baseline
-        Math.abs(p.previousClicks - p.currentClicks) >= 5 // lost at least 5 clicks
+        p.previousClicks >= MIN_DECAY_BASELINE_CLICKS &&
+        Math.abs(p.previousClicks - p.currentClicks) >= MIN_DECAY_ABSOLUTE_LOSS
       );
       for (const page of significantDecay) {
         const severity: InsightSeverity =
@@ -1151,7 +1337,8 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
         `SELECT DISTINCT page_path FROM schema_page_types WHERE workspace_id = ?`,
       ).all(workspaceId) as Array<{ page_path: string }>;
       pagesWithSchema = new Set(rows.map(r => r.page_path));
-    } catch {
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'analytics-intelligence: programming error');
       // schema_page_types table may not exist — proceed with empty set
     }
     const serpOpps = computeSerpOpportunities(normGscPages, pagesWithSchema);
@@ -1166,6 +1353,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     deleteStaleInsightsByType(workspaceId, 'serp_opportunity', cycleStart);
     log.info({ workspaceId, count: serpOpps.length }, 'Computed SERP opportunities');
   }
+
+  // Quality gate: suppress contradictory/duplicate/low-confidence insights
+  validateInsightBatch(workspaceId);
 
   // Phase 2 feedback loops: push signals to Strategy & Pipeline
   // Non-fatal — runFeedbackLoops has its own try/catch

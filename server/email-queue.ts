@@ -19,6 +19,7 @@ import {
   isOverdueForMorning,
 } from './email-throttle.js';
 import { createLogger } from './logger.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('email-queue');
 
@@ -67,14 +68,14 @@ function loadQueue(): EmailEvent[] {
       const raw = fs.readFileSync(QUEUE_FILE, 'utf-8');
       return JSON.parse(raw) as EmailEvent[];
     }
-  } catch { /* fresh start */ }
+  } catch (err) { /* fresh start */ }
   return [];
 }
 
 function clearPersistedQueue() {
   try {
     if (fs.existsSync(QUEUE_FILE)) fs.unlinkSync(QUEUE_FILE);
-  } catch { /* ignore */ }
+  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'email-queue/clearPersistedQueue: programming error'); /* ignore */ }
 }
 
 // ── Core ──

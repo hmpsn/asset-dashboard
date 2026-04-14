@@ -559,7 +559,7 @@ function migrateApprovals(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -611,7 +611,7 @@ function migrateContentBriefs(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -679,7 +679,7 @@ function migrateContentRequests(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -733,7 +733,7 @@ function migrateContentPosts(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -781,7 +781,7 @@ function migrateWorkOrders(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -825,7 +825,7 @@ function migrateRecommendations(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let record: any;
-      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!record || typeof record !== 'object') continue;
       const info = insert.run({
         workspace_id: record.workspaceId || wsId,
@@ -848,7 +848,7 @@ function migrateAnnotations(): number {
   let total = 0;
   // Annotations are stored at UPLOAD_ROOT/<wsId>/.annotations.json
   let dirs: string[];
-  try { dirs = fs.readdirSync(uploadRoot); } catch { return 0; }
+  try { dirs = fs.readdirSync(uploadRoot); } catch (err) { return 0; }
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO annotations
@@ -861,7 +861,7 @@ function migrateAnnotations(): number {
       const annoFile = path.join(uploadRoot, wsId, '.annotations.json');
       if (!fs.existsSync(annoFile)) continue;
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(annoFile, 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(annoFile, 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -899,7 +899,7 @@ function migrateSeoChanges(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -938,7 +938,7 @@ function migrateContentDecay(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let record: any;
-      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!record || typeof record !== 'object') continue;
       const info = insert.run({
         workspace_id: record.workspaceId || wsId,
@@ -974,7 +974,7 @@ function migrateRoiHistory(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -1013,7 +1013,7 @@ function migrateFeedback(): number {
     for (const file of files) {
       const wsId = path.basename(file, '.json');
       let records: any[];
-      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+      try { records = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch (err) { continue; }
       if (!Array.isArray(records)) continue;
       for (const r of records) {
         const info = insert.run({
@@ -1043,7 +1043,7 @@ function migrateRankTracking(): number {
   const uploadRoot = getUploadRoot();
   let total = 0;
   let dirs: string[];
-  try { dirs = fs.readdirSync(uploadRoot); } catch { return 0; }
+  try { dirs = fs.readdirSync(uploadRoot); } catch (err) { return 0; }
 
   const insertConfig = db.prepare(`
     INSERT OR IGNORE INTO rank_tracking_config
@@ -1073,7 +1073,7 @@ function migrateRankTracking(): number {
           });
           total += info.changes;
           console.log(`[migrate] rank-tracking config for ${wsId}`);
-        } catch { /* skip */ }
+        } catch (err) { /* skip */ }
       }
 
       // Migrate snapshots
@@ -1092,7 +1092,7 @@ function migrateRankTracking(): number {
             }
             console.log(`[migrate] rank-tracking snapshots for ${wsId}: ${snapshots.length}`);
           }
-        } catch { /* skip */ }
+        } catch (err) { /* skip */ }
       }
     }
   });
@@ -1117,7 +1117,7 @@ function migrateAuditSnapshots(): number {
 
   let total = 0;
   const sites = fs.readdirSync(reportsDir).filter(f => {
-    try { return fs.statSync(path.join(reportsDir, f)).isDirectory(); } catch { return false; }
+    try { return fs.statSync(path.join(reportsDir, f)).isDirectory(); } catch (err) { return false; }
   });
 
   const insertAll = db.transaction(() => {
@@ -1243,7 +1243,7 @@ function migratePerformanceSnapshots(): number {
   const insertAll = db.transaction(() => {
     // Scan subdirectories (page-weight, pagespeed, pagespeed-single, link-check, internal-links, competitor)
     const subs = fs.readdirSync(perfDir).filter(f => {
-      try { return fs.statSync(path.join(perfDir, f)).isDirectory(); } catch { return false; }
+      try { return fs.statSync(path.join(perfDir, f)).isDirectory(); } catch (err) { return false; }
     });
 
     for (const sub of subs) {
@@ -1287,7 +1287,7 @@ function migrateChatSessions(): number {
   let total = 0;
   const insertAll = db.transaction(() => {
     const workspaces = fs.readdirSync(chatDir).filter(f => {
-      try { return fs.statSync(path.join(chatDir, f)).isDirectory(); } catch { return false; }
+      try { return fs.statSync(path.join(chatDir, f)).isDirectory(); } catch (err) { return false; }
     });
 
     for (const wsId of workspaces) {

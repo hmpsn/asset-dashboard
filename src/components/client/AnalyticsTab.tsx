@@ -165,7 +165,7 @@ export function AnalyticsTab({
       <StatCard size="hero" icon={LineChartIcon} label="Sessions" value={ga4Overview.totalSessions.toLocaleString()} valueColor="text-blue-400" delta={ga4Comparison?.changePercent.sessions} deltaLabel="%" staggerIndex={1} />
       <StatCard size="hero" label="Page Views" value={ga4Overview.totalPageviews.toLocaleString()} valueColor="text-teal-400" delta={ga4Comparison?.changePercent.pageviews} deltaLabel="%" staggerIndex={2} />
       <StatCard size="hero" icon={Clock} label="Avg Duration" value={`${Math.floor(ga4Overview.avgSessionDuration / 60)}m ${Math.floor(ga4Overview.avgSessionDuration % 60)}s`} valueColor="text-amber-400" staggerIndex={3} />
-      <StatCard size="hero" icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate ? -ga4Comparison.change.bounceRate : undefined} deltaLabel="pp" staggerIndex={4} />
+      <StatCard size="hero" icon={ArrowDownRight} label="Bounce Rate" value={`${ga4Overview.bounceRate}%`} valueColor={ga4Overview.bounceRate > 60 ? 'text-red-400' : 'text-emerald-400'} delta={ga4Comparison?.change.bounceRate || undefined} deltaLabel="pp" invertDelta staggerIndex={4} />
       <StatCard size="hero" icon={UserPlus} label="New Users" value={`${ga4Overview.newUserPercentage}%`} valueColor="text-teal-400" staggerIndex={5} />
     </div>
 

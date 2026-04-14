@@ -14,7 +14,6 @@ import { callOpenAI, parseAIJson } from './openai-helpers.js';
 import { createLogger } from './logger.js';
 import type { BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { CopySection } from '../shared/types/copy-pipeline.js';
-
 const log = createLogger('copy-refresh');
 
 // ── Types ──
@@ -63,7 +62,7 @@ function normalizePath(raw: string): string {
   try {
     const url = new URL(path, 'https://placeholder.com');
     path = url.pathname;
-  } catch {
+  } catch (err) {
     // Already a path segment — use as-is
   }
 

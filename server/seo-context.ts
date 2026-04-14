@@ -14,6 +14,7 @@ import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../shared/types
 import { getActivePatterns } from './copy-intelligence.js';
 import { listBlueprints } from './page-strategy.js';
 import { getSectionsForEntry } from './copy-review.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('seo-context');
 
@@ -118,6 +119,7 @@ function isVoiceProfileAuthoritative(profile: VoiceProfile | null, voiceProfileB
   return hasExplicitConfig && voiceProfileBlock.length > 0; // voice-authority-ok — helper body is the canonical authority site
 }
 
+/** @deprecated Use `buildWorkspaceIntelligence()` from `workspace-intelligence.ts` instead. */
 export interface SeoContext {
   /** Keyword strategy block for AI prompts */
   keywordBlock: string;
@@ -157,7 +159,10 @@ export interface SeoContext {
 const seoContextCache = new Map<string, { value: SeoContext; expiry: number }>();
 const SEO_CONTEXT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-/** Clear cached SEO context. Call when workspace settings change. */
+/**
+ * Clear cached SEO context. Call when workspace settings change.
+ * @deprecated Use `invalidateIntelligenceCache()` from `workspace-intelligence.ts` instead.
+ */
 export function clearSeoContextCache(workspaceId?: string): void {
   if (workspaceId) {
     // Clear all keys for this workspace (any pagePath variant)
@@ -176,6 +181,7 @@ export function clearSeoContextCache(workspaceId?: string): void {
  * @param pagePath - optional page path to find page-specific keywords
  * @param learningsDomain - which learning domain to inject (default 'strategy'); pass 'content' from content generation callers
  */
+/** @deprecated Use `buildWorkspaceIntelligence()` + `formatForPrompt()` from `workspace-intelligence.ts` instead. */
 export function buildSeoContext(
   workspaceId?: string,
   pagePath?: string,
@@ -303,14 +309,12 @@ export function buildSeoContext(
   const result: SeoContext = { keywordBlock, brandVoiceBlock: effectiveBrandVoice, businessContext, personasBlock, knowledgeBlock, fullContext, strategy, copyIntelligenceBlock: copyIntelligenceBlock || undefined, blueprintBlock: blueprintBlock || undefined };
 
   // Cache result
-  if (workspaceId) {
-    seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
-  }
+  seoContextCache.set(`${workspaceId}:${pagePath || ''}:${learningsDomain}`, { value: result, expiry: Date.now() + SEO_CONTEXT_TTL_MS });
 
   // Shadow-mode intelligence delegation (§14, §16)
   // Fire-and-forget — don't await, don't block the return.
   // ALWAYS returns the original result — shadow mode is observation-only.
-  if (isFeatureEnabled('intelligence-shadow-mode') && workspaceId && !internalOpts?._skipShadow) {
+  if (isFeatureEnabled('intelligence-shadow-mode') && !internalOpts?._skipShadow) {
     void (async () => {
       try {
         const { buildWorkspaceIntelligence } = await import('./workspace-intelligence.js'); // dynamic-import-ok — circular dep prevention in shadow-mode fire-and-forget
@@ -412,7 +416,8 @@ function readBrandDocs(workspaceFolder: string): string {
       if (content.length > 4000) break;
     }
     return content.slice(0, 4000);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'seo-context/readBrandDocs: programming error');
     return '';
   }
 }
@@ -420,6 +425,7 @@ function readBrandDocs(workspaceFolder: string): string {
 /**
  * Get raw brand voice content for a workspace (inline + brand-docs/ files, no header).
  * Use this when you need the raw text — e.g. for intelligence slice storage that adds its own header.
+ * @deprecated Use `buildWorkspaceIntelligence()` seoContext.brandVoice from `workspace-intelligence.ts` instead.
  */
 export function getRawBrandVoice(workspaceId: string): string {
   const ws = getWorkspace(workspaceId);
@@ -434,6 +440,7 @@ export function getRawBrandVoice(workspaceId: string): string {
 /**
  * Get raw knowledge content for a workspace (inline + knowledge-docs/ files, no header).
  * Use this when you need the raw text — e.g. for schema generation prompts that add their own header.
+ * @deprecated Use `buildWorkspaceIntelligence()` seoContext.knowledgeBase from `workspace-intelligence.ts` instead.
  */
 export function getRawKnowledge(workspaceId: string): string {
   const ws = getWorkspace(workspaceId);
@@ -449,6 +456,7 @@ export function getRawKnowledge(workspaceId: string): string {
 /**
  * Build a global knowledge base block for AI chatbot prompts.
  * Combines the workspace's knowledgeBase field + any .txt/.md files in knowledge-docs/.
+ * @deprecated Use `formatKnowledgeBaseForPrompt()` from `workspace-intelligence.ts` instead.
  */
 export function buildKnowledgeBase(workspaceId?: string): string {
   if (!workspaceId) return '';
@@ -477,7 +485,8 @@ function readKnowledgeDocs(workspaceFolder: string): string {
       if (content.length > 6000) break;
     }
     return content.slice(0, 6000);
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'seo-context/readKnowledgeDocs: programming error');
     return '';
   }
 }
@@ -485,6 +494,7 @@ function readKnowledgeDocs(workspaceFolder: string): string {
 /**
  * Shared instruction block for AI chat prompts — teaches the model to emit
  * rich fenced code blocks that the frontend renders as interactive components.
+ * @deprecated Move to a shared prompt-constants module; seo-context.ts is being retired.
  */
 export const RICH_BLOCKS_PROMPT = `
 RICH RESPONSE BLOCKS — You can embed interactive visualizations in your responses using special fenced code blocks. Use them when they make data clearer, but don't force them — plain markdown is fine for simple answers.
@@ -516,6 +526,7 @@ RULES FOR RICH BLOCKS:
 /**
  * Build an audience personas block for AI prompts.
  * Returns structured persona data including pain points, goals, and objections.
+ * @deprecated Use `formatPersonasForPrompt()` from `workspace-intelligence.ts` instead.
  */
 export function buildPersonasContext(workspaceId?: string): string {
   if (!workspaceId) return '';
@@ -538,6 +549,7 @@ export function buildPersonasContext(workspaceId?: string): string {
  * Build a page-specific analysis context block for AI rewrite prompts.
  * Pulls persisted optimizationIssues + recommendations from the keyword strategy pageMap.
  * This ensures AI rewrites address the platform's own recommendations.
+ * @deprecated Use `buildWorkspaceIntelligence()` pageProfile slice from `workspace-intelligence.ts` instead.
  */
 export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string): string {
   if (!workspaceId || !pagePath) return '';
@@ -589,6 +601,7 @@ export function buildPageAnalysisContext(workspaceId?: string, pagePath?: string
 /**
  * Build a full keyword map string for prompts that need cross-page awareness
  * (e.g., internal links, content briefs to avoid cannibalization).
+ * @deprecated Use `formatPageMapForPrompt()` from `workspace-intelligence.ts` instead.
  */
 export function buildKeywordMapContext(workspaceId?: string): string {
   if (!workspaceId) return '';
@@ -605,6 +618,7 @@ export function buildKeywordMapContext(workspaceId?: string): string {
 /**
  * Build a brand narrative block from the workspace's active brandscript.
  * Uses the most recently created brandscript. Returns '' if none exists or no sections have content.
+ * @deprecated Use `buildWorkspaceIntelligence()` seoContext slice from `workspace-intelligence.ts` instead.
  */
 export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   // Graceful degradation if brandscripts table doesn't exist (test envs).
@@ -650,6 +664,7 @@ export function buildBrandscriptContext(workspaceId: string, emphasis: ContextEm
  * value that must NOT trigger a re-read. A truthy check would re-read the DB for every caller
  * that correctly passed `null`, defeating the optimization.
  */
+/** @deprecated Use `buildWorkspaceIntelligence()` seoContext slice from `workspace-intelligence.ts` instead. */
 export function buildVoiceProfileContext(
   workspaceId: string,
   emphasis: ContextEmphasis = 'full',
@@ -711,6 +726,7 @@ export function buildVoiceProfileContext(
  * Build a copy intelligence context block from the workspace's active learned patterns.
  * Groups patterns by type and formats them for prompt injection.
  * Returns '' if no active patterns exist.
+ * @deprecated Use `buildWorkspaceIntelligence()` seoContext slice from `workspace-intelligence.ts` instead.
  */
 export function buildCopyIntelligenceContext(workspaceId: string): string {
   const patterns = getActivePatterns(workspaceId);
@@ -729,6 +745,7 @@ export function buildCopyIntelligenceContext(workspaceId: string): string {
  * If a pagePath is provided, finds the matching entry by name (normalized) or primary keyword
  * and includes approved copy samples.
  * Returns '' if no blueprints exist.
+ * @deprecated Use `buildWorkspaceIntelligence()` seoContext slice from `workspace-intelligence.ts` instead.
  */
 export function buildBlueprintContext(workspaceId: string, pagePath?: string): string {
   const blueprints = listBlueprints(workspaceId);
@@ -784,6 +801,7 @@ export function buildBlueprintContext(workspaceId: string, pagePath?: string): s
 /**
  * Build a brand identity block for AI prompts from approved brand identity deliverables.
  * Only includes deliverables with status 'approved'. Returns '' if none exist.
+ * @deprecated Use `buildWorkspaceIntelligence()` seoContext slice from `workspace-intelligence.ts` instead.
  */
 export function buildIdentityContext(workspaceId: string, emphasis: ContextEmphasis = 'full'): string {
   // Graceful degradation if brand_identity_deliverables table doesn't exist (test envs).

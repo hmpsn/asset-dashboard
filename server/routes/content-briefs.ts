@@ -29,6 +29,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import { recordAction } from '../outcome-tracking.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from '../workspace-learnings.js';
 import { isFeatureEnabled } from '../feature-flags.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('content-briefs');
 
@@ -89,7 +90,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
         relatedQueries = overview.topQueries
           .filter(q => { const ql = q.query.toLowerCase(); return targetKeyword.toLowerCase().split(' ').some((w: string) => w.length > 2 && ql.includes(w)); })
           .slice(0, 20);
-      } catch { /* GSC not available */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-briefs: POST /api/content-briefs/:workspaceId/generate: programming error'); /* GSC not available */ }
     }
 
     // Fetch all published pages (Webflow API + sitemap CMS pages) for internal link suggestions
@@ -137,7 +138,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
             topPageUrls.push(`https://${domain}${p.landingPage}`);
           }
         }
-      } catch { /* GA4 not available */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'content-briefs: programming error'); /* GA4 not available */ }
     }
 
     // Run all scraping in parallel

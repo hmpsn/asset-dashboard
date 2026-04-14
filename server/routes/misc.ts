@@ -25,6 +25,7 @@ import {
 } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
+import { isProgrammingError } from '../errors.js';
 
 const log = createLogger('misc');
 
@@ -91,9 +92,9 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
             if (!trafficMap[path]) trafficMap[path] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
             trafficMap[path].clicks += p.clicks;
             trafficMap[path].impressions += p.impressions;
-          } catch { /* skip malformed URLs */ }
+          } catch (err) { /* skip malformed URLs */ }
         }
-      } catch { /* GSC unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: GET /api/audit-traffic/:siteId: programming error'); /* GSC unavailable */ }
     }
 
     // Fetch GA4 top pages
@@ -106,7 +107,7 @@ router.get('/api/audit-traffic/:siteId', async (req, res) => {
           trafficMap[path].pageviews += p.pageviews;
           trafficMap[path].sessions += p.users; // users as proxy for sessions at page level
         }
-      } catch { /* GA4 unavailable */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* GA4 unavailable */ }
     }
 
     res.json(trafficMap);
@@ -162,13 +163,13 @@ router.post('/api/smart-name', async (req, res) => {
                 }
                 if (usedOnPages.length >= 3) break;
               }
-            } catch { /* skip page */ }
+            } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* skip page */ }
           }
           if (usedOnPages.length > 0) {
             contextParts.push(`Used on these pages:\n${usedOnPages.join('\n')}`);
           }
         }
-      } catch { /* skip context fetch */ }
+      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* skip context fetch */ }
     }
 
     const promptText = `Suggest an SEO-friendly filename for this web image.
@@ -270,7 +271,7 @@ router.post('/api/upload/:workspaceId/clipboard', upload.single('file'), async (
   }
 
   // Clean up temp file if still exists
-  try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch { /* ignore */ }
+  try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'misc: programming error'); /* ignore */ }
 
   broadcast('files:uploaded', {
     workspace: req.params.workspaceId,

@@ -26,6 +26,7 @@ import type {
   ActionContext,
   ScoringConfig,
 } from '../shared/types/outcome-tracking.js';
+import { isProgrammingError } from './errors.js';
 
 const log = createLogger('outcome-measurement');
 
@@ -93,7 +94,8 @@ async function fetchCurrentMetrics(action: TrackedAction): Promise<BaselineSnaps
     const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, 14);
     if (!rows.length) return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
     return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'outcome-measurement/fetchCurrentMetrics: programming error');
     return { ...action.baselineSnapshot, captured_at: new Date().toISOString() };
   }
 }
@@ -115,7 +117,8 @@ export async function fetchGscSnapshot(
     const rows = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, fullUrl, days);
     if (!rows.length) return null;
     return { ...averageGscRows(rows), captured_at: new Date().toISOString() };
-  } catch {
+  } catch (err) {
+    if (isProgrammingError(err)) log.warn({ err }, 'outcome-measurement/fetchGscSnapshot: programming error');
     return null;
   }
 }
@@ -406,6 +409,8 @@ async function scoreActionAtCheckpoint(
 
 export async function measurePendingOutcomes(
   scoringConfigOverride?: Partial<ScoringConfig>,
+  /** Optional workspace priority map: workspaceId → sort score (lower = higher priority). */
+  workspacePriority?: ReadonlyMap<string, number>,
 ): Promise<{ measured: number; errors: number; workspaceIds: string[] }> {
   const pendingActions = getPendingActions();
 
@@ -413,6 +418,17 @@ export async function measurePendingOutcomes(
   // intelligence caches for workspaces that were actually measured, regardless
   // of whether getPendingActions is called independently elsewhere.
   const workspaceIds = [...new Set(pendingActions.map(a => a.workspaceId))];
+
+  // Sort actions by workspace health priority (lowest compositeHealthScore first)
+  // so the sickest workspaces get measured before healthier ones.
+  if (workspacePriority && workspacePriority.size > 0) {
+    pendingActions.sort((a, b) => {
+      const pa = workspacePriority.get(a.workspaceId) ?? 100;
+      const pb = workspacePriority.get(b.workspaceId) ?? 100;
+      return pa - pb;
+    });
+    log.info({ prioritized: workspacePriority.size }, 'Sorted pending actions by compositeHealthScore');
+  }
 
   log.info({ count: pendingActions.length }, 'Starting outcome measurement run');
 

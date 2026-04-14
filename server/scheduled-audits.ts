@@ -139,6 +139,45 @@ async function runScheduledAudit(schedule: AuditSchedule) {
       `${effectiveAudit.totalPages} pages, ${effectiveAudit.errors} errors, ${effectiveAudit.warnings} warnings`,
       { score: effectiveAudit.siteScore, previousScore: snapshot.previousScore, scheduled: true });
 
+    // ── Auto-resolve audit_finding insights for pages/site that are now clean ──
+    // When an audit runs and a page no longer has critical/warning issues, resolve
+    // its audit_finding insight. Similarly, when the site score improves above 70,
+    // resolve the site-level audit_finding insight.
+    fireBridge('bridge-audit-auto-resolve', ws.id, async () => {
+      const { getInsights: fetchAll, resolveInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const allInsights = fetchAll(ws.id);
+      const auditFindings = allInsights.filter(
+        i => i.insightType === 'audit_finding' && i.resolutionStatus !== 'resolved',
+      );
+      if (auditFindings.length === 0) return { modified: 0 };
+
+      // Build set of page IDs that still have critical/warning issues
+      const pagesWithIssues = new Set<string>();
+      for (const page of effectiveAudit.pages) {
+        if (page.issues?.some(i => i.severity === 'error' || i.severity === 'warning')) {
+          pagesWithIssues.add(page.pageId);
+        }
+      }
+
+      let resolved = 0;
+      for (const insight of auditFindings) {
+        const data = (insight.data ?? {}) as Record<string, unknown>;
+        if (data.scope === 'page' && insight.pageId && !pagesWithIssues.has(insight.pageId)) {
+          // Page is now clean — auto-resolve
+          resolveInsight(insight.id, ws.id, 'resolved', 'Auto-resolved: page passed audit with no critical/warning issues', 'bridge-audit-auto-resolve');
+          resolved++;
+        } else if (data.scope === 'site' && !insight.pageId && effectiveAudit.siteScore >= 70) {
+          // Site score is healthy — auto-resolve site-level insight
+          resolveInsight(insight.id, ws.id, 'resolved', `Auto-resolved: site health score improved to ${effectiveAudit.siteScore}/100`, 'bridge-audit-auto-resolve');
+          resolved++;
+        }
+      }
+      if (resolved > 0) {
+        log.info({ workspaceId: ws.id, resolved }, 'Auto-resolved audit_finding insights for clean pages/site');
+      }
+      return { modified: resolved };
+    });
+
     // ── Bridge #12: Audit → page_health insights ──────────────────────
     fireBridge('bridge-audit-page-health', ws.id, async () => {
       const { upsertInsight, getInsights }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
