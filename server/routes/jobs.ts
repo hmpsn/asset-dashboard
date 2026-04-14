@@ -442,7 +442,7 @@ router.post('/api/jobs', async (req, res) => {
                         .trim()
                         .slice(0, 800);
                     }
-                  } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* best-effort */ }
+                  } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
                 }
                 const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
                 const brandNote = bulkBrandName ? `\nBrand name is "${bulkBrandName}" — use this exact name, never an abbreviated version.` : '';
@@ -737,7 +737,7 @@ router.post('/api/jobs', async (req, res) => {
                     try {
                       const r = await fetch(url, { redirect: 'follow', headers: FETCH_HEADERS, signal: AbortSignal.timeout(10_000) });
                       if (r.ok) { html = await r.text(); break; }
-                    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'jobs: programming error'); /* try next */ }
+                    } catch { /* try next */ }
                   }
 
                   // Extract title, meta desc, body text

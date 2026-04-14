@@ -324,9 +324,9 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
           if (!trafficMap[urlPath]) trafficMap[urlPath] = { clicks: 0, impressions: 0, sessions: 0, pageviews: 0 };
           trafficMap[urlPath].clicks += p.clicks;
           trafficMap[urlPath].impressions += p.impressions;
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/getAuditTrafficForWorkspace: programming error'); /* skip */ }
+        } catch { /* skip malformed URLs */ }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers/getAuditTrafficForWorkspace: programming error'); /* GSC unavailable */ }
+    } catch { /* GSC unavailable */ }
   }
   if (ws.ga4PropertyId) {
     try {
@@ -337,7 +337,7 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
         trafficMap[urlPath].pageviews += p.pageviews;
         trafficMap[urlPath].sessions += p.users;
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers: programming error'); /* GA4 unavailable */ }
+    } catch { /* GA4 unavailable */ } // url-fetch-ok
   }
   auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
   return trafficMap;

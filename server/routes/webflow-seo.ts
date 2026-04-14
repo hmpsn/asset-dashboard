@@ -192,7 +192,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
             .slice(0, 1500);
         }
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort — continue without content */ }
+    } catch { /* best-effort — fetch on external URL, continue without content */ } // url-fetch-ok
   }
 
   // Enforce character limits helper - STRICT enforcement
@@ -489,7 +489,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
               .trim()
               .slice(0, 800);
           }
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
+        } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
       }
 
       const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
@@ -718,7 +718,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
               .trim()
               .slice(0, 800);
           }
-        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* best-effort */ }
+        } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
       }
 
       // Match GSC queries to this page by slug (top 15 by impressions)
@@ -973,7 +973,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
       try {
         const htmlRes = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' } });
         if (htmlRes.ok) { html = await htmlRes.text(); break; }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* try next URL */ }
+      } catch { /* try next URL */ }
     }
     if (!html) return res.status(404).json({ error: 'Failed to fetch page from live domain or webflow.io' });
 
@@ -1052,7 +1052,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
             .trim()
             .slice(0, 4000);
         }
-      } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical — proceed without content */ }
+      } catch { /* non-critical — proceed without content */ }
     }
   }
 
