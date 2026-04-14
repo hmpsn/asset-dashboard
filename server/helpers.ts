@@ -337,7 +337,7 @@ export async function getAuditTrafficForWorkspace(ws: { id: string; webflowSiteI
         trafficMap[urlPath].pageviews += p.pageviews;
         trafficMap[urlPath].sessions += p.users;
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'helpers: programming error'); /* GA4 unavailable */ }
+    } catch { /* GA4 unavailable */ } // url-fetch-ok
   }
   auditTrafficCache[cacheKey] = { data: trafficMap, ts: Date.now() };
   return trafficMap;

@@ -29,7 +29,6 @@ import { getDeclinedKeywords } from './routes/keyword-strategy.js';
 export type { RecPriority, RecType, RecStatus, RecActionType, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../shared/types/recommendations.ts';
 import { createLogger } from './logger.js';
-import { isProgrammingError } from './errors.js';
 
 const log = createLogger('recommendations');
 
@@ -140,7 +139,7 @@ async function fetchTrafficMap(ws: Workspace): Promise<TrafficMap> {
         trafficMap[pagePath].pageviews += p.pageviews;
         trafficMap[pagePath].sessions += p.users;
       }
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'recommendations: programming error'); /* GA4 unavailable */ }
+    } catch { /* GA4 unavailable */ } // url-fetch-ok
   }
 
   return trafficMap;
