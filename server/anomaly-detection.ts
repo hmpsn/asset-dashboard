@@ -18,8 +18,8 @@ import crypto from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { listWorkspaces, type Workspace } from './workspaces.js';
-import { getSearchPeriodComparison } from './search-console.js';
-import { getGA4PeriodComparison, getGA4Conversions } from './google-analytics.js';
+import { getSearchPeriodComparison, getTopDroppedGscPage } from './search-console.js';
+import { getGA4PeriodComparison, getGA4Conversions, getTopDroppedGA4Page } from './google-analytics.js';
 import { listSnapshots } from './reports.js';
 import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
@@ -545,6 +545,19 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
           });
         }
 
+        // ── Fetch most-affected page for page-level diagnostic context ──
+        // One API call per source type, not per anomaly. Results are used to populate
+        // affectedPage in the anomaly digest insight so the diagnostic orchestrator
+        // can run page-specific probes (position history, canonical, internal links).
+        let gscAffectedPage: string | null = null;
+        let ga4AffectedPage: string | null = null;
+        if (detected.some(a => a.source === 'gsc') && ws.gscPropertyUrl) {
+          gscAffectedPage = await getTopDroppedGscPage(ws.id, ws.gscPropertyUrl, COMPARISON_DAYS).catch(() => null);
+        }
+        if (detected.some(a => a.source === 'ga4' && (a.type === 'traffic_drop' || a.type === 'traffic_spike')) && ws.ga4PropertyId) {
+          ga4AffectedPage = await getTopDroppedGA4Page(ws.ga4PropertyId, COMPARISON_DAYS).catch(() => null);
+        }
+
         // ── Write anomaly digest insights (deduped via unique index) ──
         for (const a of detected) {
           try {
@@ -581,14 +594,13 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               durationDays,
               firstDetected,
               severity: a.severity,
-              // NOTE: affectedPage is intentionally omitted here. All current anomaly types
-              // (traffic_drop, impressions_drop, ctr_drop, position_decline, etc.) are
-              // site-wide aggregates from GSC/GA4 — no per-page breakdown is available at
-              // detection time without an additional API call with dimensions: ['page'].
-              // When affectedPage is undefined, the diagnostic orchestrator skips page-specific
-              // probes (position history, canonical, internal links) and runs site-wide probes
-              // only. To enable page-level diagnostics, detect the most-affected page here and
-              // set: affectedPage: path to the page with the biggest absolute metric drop.
+              // Page path with the largest absolute metric drop in this period.
+              // Populated by getTopDroppedGscPage / getTopDroppedGA4Page (one API call
+              // per source per workspace per scan). When set, the diagnostic orchestrator
+              // runs page-specific probes (position history, canonical, internal links).
+              affectedPage: a.source === 'gsc' ? (gscAffectedPage ?? undefined)
+                : a.source === 'ga4' ? (ga4AffectedPage ?? undefined)
+                : undefined,
             };
 
             const impactScore = computeImpactScore(insightSeverity, digestData as unknown as Record<string, unknown>);

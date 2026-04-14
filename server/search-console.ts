@@ -305,6 +305,70 @@ export async function getAllGscPages(
 }
 
 /**
+ * Identify the page with the largest absolute click drop between the current and
+ * previous period. Used by anomaly detection to populate `AnomalyDigestData.affectedPage`
+ * so the diagnostic orchestrator can run page-specific probes (position history,
+ * canonical, internal links).
+ *
+ * Makes 2 GSC API calls — call once per workspace per detection run and cache the result.
+ * Returns the URL pathname of the most-affected page, or null if no page data is available.
+ */
+export async function getTopDroppedGscPage(
+  siteId: string,
+  gscSiteUrl: string,
+  days: number = 28,
+): Promise<string | null> {
+  const token = await getValidToken(siteId);
+  if (!token) return null;
+
+  const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
+
+  const prevEnd = new Date(curStart);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - days + 1);
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+  const encodedSiteUrl = encodeURIComponent(gscSiteUrl);
+  const [curData, prevData] = await Promise.all([
+    gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
+      startDate: curStart, endDate: curEnd, dimensions: ['page'], rowLimit: 100, type: 'web',
+    }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
+    gscFetch(`${GSC_API}/sites/${encodedSiteUrl}/searchAnalytics/query`, token, {
+      startDate: fmt(prevStart), endDate: fmt(prevEnd), dimensions: ['page'], rowLimit: 100, type: 'web',
+    }) as Promise<{ rows?: SearchAnalyticsRow[] }>,
+  ]);
+
+  if (!curData.rows?.length || !prevData.rows?.length) return null;
+
+  // Build a map of previous-period clicks by page
+  const prevByPage = new Map<string, number>();
+  for (const row of prevData.rows) {
+    prevByPage.set(row.keys[0], row.clicks);
+  }
+
+  // Find the page with the largest absolute click drop
+  let topPage: string | null = null;
+  let maxDrop = 0;
+  for (const row of curData.rows) {
+    const prev = prevByPage.get(row.keys[0]) ?? 0;
+    const drop = prev - row.clicks; // positive = dropped
+    if (drop > maxDrop) {
+      maxDrop = drop;
+      topPage = row.keys[0];
+    }
+  }
+
+  if (!topPage) return null;
+
+  try {
+    return new URL(topPage).pathname;
+  } catch {
+    return topPage.startsWith('/') ? topPage : null;
+  }
+}
+
+/**
  * Generic pagination helper for GSC API queries.
  * Fetches multiple pages of results using startRow, up to maxRows total.
  */

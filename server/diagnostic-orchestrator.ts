@@ -13,7 +13,7 @@
 
 import { createLogger } from './logger.js';
 import { getWorkspace } from './workspaces.js';
-import { getPageTrend, getQueryPageData, getSearchPeriodComparison } from './search-console.js';
+import { getPageTrend, getQueryPageData, getSearchPeriodComparison, getAllGscPages } from './search-console.js';
 import { getGA4LandingPages } from './google-analytics.js';
 import { scanRedirects } from './redirect-scanner.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
@@ -236,13 +236,24 @@ async function gatherDiagnosticContext(
       : Promise.resolve(null),
 
     // Internal link counting
-    modules.includes('internalLinks') && affectedPagePath && hasDomain && hasGa4
+    modules.includes('internalLinks') && affectedPagePath && hasDomain && (hasGa4 || (hasGsc && creds.gscSiteUrl))
       ? (async () => {
           try {
-            const topPages = await getGA4LandingPages(creds.ga4PropertyId!, 28, 20).catch(() => []);
-            const crawlUrls = topPages.length > 0
-              ? topPages.map((p) => `${creds.liveDomain}${p.landingPage}`)
-              : [];
+            let crawlUrls: string[] = [];
+
+            if (hasGa4) {
+              // Preferred: GA4 landing pages give engagement-weighted crawl targets
+              const topPages = await getGA4LandingPages(creds.ga4PropertyId!, 28, 20).catch(() => []);
+              crawlUrls = topPages.map((p) => `${creds.liveDomain}${p.landingPage}`);
+            } else if (creds.gscSiteUrl) {
+              // Fallback: GSC top pages by clicks when no GA4 is connected
+              const gscPages = await getAllGscPages(creds.siteId!, creds.gscSiteUrl, 28).catch(() => []);
+              crawlUrls = gscPages
+                .sort((a, b) => b.clicks - a.clicks)
+                .slice(0, 20)
+                .map((p) => `${creds.liveDomain}${new URL(p.page).pathname}`);
+            }
+
             if (crawlUrls.length === 0) return { count: 0, siteMedian: 0, topLinkingPages: [], deficit: 0 };
             return countInternalLinks(affectedPagePath, crawlUrls, creds.liveDomain!);
           } catch (e) {
@@ -289,9 +300,23 @@ async function gatherDiagnosticContext(
       return { chain: [], finalStatus: 200, canonical: canonicalResult?.canonical ?? null, isSoftFourOhFour: false };
     }
     const lastHop = affectedChain.hops?.[affectedChain.hops.length - 1];
-    const isSoftFourOhFour = affectedChain.finalUrl === '/' ||
-      affectedChain.finalUrl?.endsWith('.com/') ||
-      affectedChain.finalUrl?.endsWith('.com');
+    const finalUrl = affectedChain.finalUrl ?? '';
+    const isSoftFourOhFour =
+      // Redirected to homepage (root or locale variants)
+      finalUrl === '/' ||
+      finalUrl.match(/^\/[a-z]{2}\/?$/) !== null ||         // /en, /fr/, /de
+      finalUrl.endsWith('.com/') ||
+      finalUrl.endsWith('.com') ||
+      // Redirected to a dedicated error page
+      finalUrl === '/404' ||
+      finalUrl === '/not-found' ||
+      finalUrl === '/error' ||
+      finalUrl.startsWith('/404') ||
+      finalUrl.startsWith('/not-found') ||
+      finalUrl.includes('/404.') ||                          // /404.html
+      // Title-based heuristic is not available here (HTML not re-fetched),
+      // but these path patterns cover the overwhelming majority of soft 404s.
+      false;
     return {
       chain: affectedChain.hops?.map((h) => ({ url: h.url, status: h.status, location: null })) ?? [],
       finalStatus: lastHop?.status ?? 200,
