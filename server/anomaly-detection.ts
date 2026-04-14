@@ -365,7 +365,7 @@ async function detectForWorkspace(ws: Workspace): Promise<Anomaly[]> {
         const totalCurrent = convs.reduce((s, c) => s + c.conversions, 0);
         // Get previous period conversions
         const prevStart = new Date();
-        prevStart.setDate(prevStart.getDate() - COMPARISON_DAYS * 2 - 1);
+        prevStart.setDate(prevStart.getDate() - COMPARISON_DAYS * 2);
         const prevEnd = new Date();
         prevEnd.setDate(prevEnd.getDate() - COMPARISON_DAYS - 1);
         const fmt = (d: Date) => d.toISOString().split('T')[0];

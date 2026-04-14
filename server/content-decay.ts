@@ -7,6 +7,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages } from './search-console.js';
+import type { CustomDateRange } from './google-analytics.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import type { Workspace } from './workspaces.js';
@@ -105,8 +106,24 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
     throw new Error('GSC not configured for this workspace');
   }
 
+  // Compute non-overlapping date ranges for decay comparison
+  // Current: last 30 days (with 3-day GSC delay)
+  // Previous: the 30 days before that
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const curEnd = new Date();
+  curEnd.setDate(curEnd.getDate() - 3); // GSC ~3 day delay
+  const curStart = new Date(curEnd);
+  curStart.setDate(curStart.getDate() - 30);
+  const prevEnd = new Date(curStart);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - 30);
+
+  const currentDateRange: CustomDateRange = { startDate: fmt(curStart), endDate: fmt(curEnd) };
+  const previousDateRange: CustomDateRange = { startDate: fmt(prevStart), endDate: fmt(prevEnd) };
+
   // Get page-level data for current 30 days
-  const currentPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30);
+  const currentPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30, currentDateRange);
 
   // Build map of current period pages
   const currentMap = new Map<string, { clicks: number; impressions: number; ctr: number; position: number }>();
@@ -119,8 +136,8 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
     }
   }
 
-  // Get previous period pages (30 days before current 30 days = 60 days ago to 30 days ago)
-  const prevPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 60);
+  // Get previous period pages (non-overlapping 30d window before current period)
+  const prevPages = await getAllGscPages(ws.webflowSiteId, ws.gscPropertyUrl, 30, previousDateRange);
   const prevMap = new Map<string, { clicks: number; impressions: number; position: number }>();
   for (const p of prevPages) {
     try {
