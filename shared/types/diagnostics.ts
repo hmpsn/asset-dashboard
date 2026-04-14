@@ -102,7 +102,8 @@ export interface BacklinksResult {
 export interface SiteBaselines {
   avgInternalLinks: number;
   medianPosition: number;
-  avgBacklinks: number;
+  /** Total backlinks for the domain (not a per-page average). Named for AI clarity. */
+  totalBacklinks: number;
 }
 
 export interface ActivityEntry {

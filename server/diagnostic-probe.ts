@@ -39,6 +39,12 @@ export async function probeCanonical(url: string): Promise<CanonicalProbeResult>
 
     const html = await res.text();
     const canonical = extractCanonical(html);
+    // Intentionally compare canonical against the *original* input URL, not the final
+    // redirect destination. fetch() follows redirects, so `res.status` reflects the
+    // final response, but `url` is what the diagnostic was asked to probe.
+    // selfReferencing = false on a redirect chain (e.g. /old → /new with canonical=/new)
+    // is the correct signal: the canonical doesn't match the URL we were asked to check,
+    // which is exactly what we want to surface in the redirect/canonical section.
     const normalizedUrl = normalizeUrl(url);
     const normalizedCanonical = canonical ? normalizeUrl(canonical) : null;
 

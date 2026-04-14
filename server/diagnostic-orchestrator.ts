@@ -316,7 +316,7 @@ async function gatherDiagnosticContext(
   const siteBaselines: SiteBaselines = {
     avgInternalLinks: (internalLinks as InternalLinksResult).siteMedian,
     medianPosition: intelligence?.seoContext?.rankTracking?.avgPosition ?? 0,
-    avgBacklinks: backlinkProfile?.totalBacklinks ?? 0,
+    totalBacklinks: backlinkProfile?.totalBacklinks ?? 0,
   };
 
   // Recent activity from intelligence
