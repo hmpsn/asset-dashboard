@@ -9,8 +9,19 @@
  * - POST /api/admin/storage/prune-reports (prune report snapshots)
  * - POST /api/admin/storage/prune-activity (prune activity logs)
  */
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createTestContext } from './helpers.js';
+
+// Use an isolated temp data dir so the synchronous storage-stats/pruning
+// functions operate on an empty directory rather than ~/.asset-dashboard
+// (which can contain tens-of-thousands of files on a dev machine and causes
+// multi-minute timeouts). DATA_DIR is picked up by createTestContext via
+// process.env spread into the spawned server process.
+const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'health-routes-test-'));
+process.env.DATA_DIR = TEST_DATA_DIR;
 
 const ctx = createTestContext(13217);
 const { api, postJson } = ctx;
@@ -21,6 +32,8 @@ beforeAll(async () => {
 
 afterAll(() => {
   ctx.stopServer();
+  // Clean up isolated temp data dir
+  try { fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 describe('Health endpoint', () => {
@@ -39,10 +52,7 @@ describe('Health endpoint', () => {
 });
 
 describe('Admin storage stats', () => {
-  // TODO: re-enable once getStorageReport() is made async or a ?lite=true mode is added.
-  // On dev machines with large data dirs (~20k+ files) the synchronous stat() loop exceeds
-  // any practical timeout. CI passes because the data dir is empty.
-  it.skip('GET /api/admin/storage-stats returns report', async () => {
+  it('GET /api/admin/storage-stats returns report', async () => {
     const res = await api('/api/admin/storage-stats');
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -51,25 +61,21 @@ describe('Admin storage stats', () => {
 });
 
 describe('Admin storage pruning', () => {
-  // TODO: re-enable once pruneChatSessions() is made async.
-  // On dev machines with large chat-sessions dirs the synchronous JSON read loop exceeds 15s.
-  it.skip('POST /api/admin/storage/prune-chat with default params', async () => {
+  it('POST /api/admin/storage/prune-chat with default params', async () => {
     const res = await postJson('/api/admin/storage/prune-chat', {});
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('maxAgeDays');
   }, 15_000);
 
-  // TODO: re-enable once pruneChatSessions() is made async.
-  it.skip('POST /api/admin/storage/prune-chat with custom maxAgeDays', async () => {
+  it('POST /api/admin/storage/prune-chat with custom maxAgeDays', async () => {
     const res = await postJson('/api/admin/storage/prune-chat', { maxAgeDays: 30 });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.maxAgeDays).toBe(30);
   }, 15_000);
 
-  // TODO: re-enable once pruneBackups() avoids synchronous dirSize() on large backup dirs.
-  it.skip('POST /api/admin/storage/prune-backups with default params', async () => {
+  it('POST /api/admin/storage/prune-backups with default params', async () => {
     const res = await postJson('/api/admin/storage/prune-backups', {});
     expect(res.status).toBe(200);
     const body = await res.json();
