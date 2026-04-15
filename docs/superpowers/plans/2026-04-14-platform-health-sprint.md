@@ -1093,6 +1093,33 @@ npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-chec
 
 After PR 3: `scaled-code-review`, merge to `staging`.
 
+### PR 3 Follow-Up Tasks (post-merge, before PR 4)
+
+These structural improvements were identified during the PR 3 review cycle. They address recurring root causes — not one-off bugs — and should be done before implementing new features that touch the same components.
+
+#### Follow-Up A — `competitorDomainsAtLastFetch` field for accurate domain-change detection
+
+**Context:** `shouldFetchCompetitorData` currently uses timestamp-only to decide whether to re-fetch competitor data. The original code attempted domain-change detection but used `keywordGaps` as a proxy — which is lossy (competitors with zero gaps don't appear). We reverted to timestamp-only (correct), but this means adding/removing a competitor domain won't trigger a re-fetch until the 7-day cache expires.
+
+**Work:**
+- [ ] Add `competitorDomainsAtLastFetch: string[] | null` to the workspace type (`shared/types/workspace.ts`) and DB schema (new migration)
+- [ ] Write the value in `keyword-strategy.ts` at the same point `competitorLastFetchedAt` is written
+- [ ] Update `shouldFetchCompetitorData` to compare `ws.competitorDomains` against `ws.competitorDomainsAtLastFetch` (direct signal, not a proxy)
+- [ ] Add integration test: adding a new domain to a workspace with fresh cache should trigger re-fetch
+
+**Model:** haiku | **Owns:** `server/routes/keyword-strategy.ts`, `server/workspaces.ts`, `shared/types/workspace.ts`, new migration
+
+#### Follow-Up B — Mechanize post-commit side effect guard (pr-check rule)
+
+**Context:** `dismissAnomaly` was missing a try/catch around `reverseAnomalyBoostIfNoneRemain`, causing a side-effect error to surface as a failed dismiss. The periodic scan had the pattern right. This is a general risk: any function call that follows a committed DB write but is not inside a transaction can propagate a 500 if it throws.
+
+**Work:**
+- [ ] Add a pr-check rule: flag any direct function call that follows a `.run()` DB commit and makes further DB writes, without a surrounding try/catch
+- [ ] Or document the convention in `docs/rules/bridge-authoring.md` with a clear code template for post-commit side effects: `try { sideEffect() } catch (err) { log.warn(...) }`
+- [ ] Verify all existing post-commit side effect call sites follow the pattern (grep: `.run(` followed within 5 lines by a function call not in a try block)
+
+**Model:** sonnet | **Owns:** `scripts/pr-check.ts`, `docs/rules/bridge-authoring.md`
+
 ---
 
 ## PR 4: Intelligence & Infrastructure
