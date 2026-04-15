@@ -48,6 +48,11 @@ export const WS_EVENTS = {
   BLUEPRINT_UPDATED: 'blueprint:updated',
   BLUEPRINT_GENERATED: 'blueprint:generated',
 
+  // Bulk Operations
+  BULK_OPERATION_PROGRESS: 'bulk-operation:progress',
+  BULK_OPERATION_COMPLETE: 'bulk-operation:complete',
+  BULK_OPERATION_FAILED: 'bulk-operation:failed',
+
   // Deep Diagnostics
   DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
   DIAGNOSTIC_FAILED: 'diagnostic:failed',

@@ -41,6 +41,7 @@ export const queryKeys = {
     roi: (wsId: string) => ['admin-roi', wsId] as const,
 
     // SEO / Audit
+    auditAll: () => ['admin-audit'] as const,
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,
     auditSchedule: (wsId: string) => ['admin-audit-schedule', wsId] as const,
@@ -51,6 +52,7 @@ export const queryKeys = {
     webflowAssets: (siteId: string) => ['admin-webflow-assets', siteId] as const,
     assetAudit: (siteId: string) => ['admin-asset-audit', siteId] as const,
     seoEditor: (siteId: string) => ['seo-editor', siteId] as const,
+    seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
     analyticsAnnotations: (wsId: string) => ['analytics-annotations', wsId] as const,

@@ -199,15 +199,21 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
 
   log.info({ workspaceId, sourceId, sourceType: source.sourceType }, 'processing source with AI');
 
-  const result = await callOpenAI({
-    model: 'gpt-4.1-mini',
-    messages: [{ role: 'user', content: prompt }],
-    maxTokens: 4000,
-    temperature: 0.2,
-    responseFormat: { type: 'json_object' },
-    feature: 'discovery-extraction',
-    workspaceId,
-  });
+  let result;
+  try {
+    result = await callOpenAI({
+      model: 'gpt-4.1-mini',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 4000,
+      temperature: 0.2,
+      responseFormat: { type: 'json_object' },
+      feature: 'discovery-extraction',
+      workspaceId,
+    });
+  } catch (err) {
+    log.error({ err, workspaceId, sourceId }, 'AI extraction failed — skipping source');
+    result = { text: '{}' };
+  }
 
   const parsed = parseJsonFallback<{ extractions: { extraction_type: string; category: string; content: string; source_quote?: string }[] }>(
     result.text,

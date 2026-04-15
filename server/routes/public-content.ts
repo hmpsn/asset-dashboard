@@ -26,6 +26,19 @@ import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import { validate } from '../middleware/validate.js';
+import {
+  createContentRequestSchema,
+  submitContentRequestSchema,
+  declineContentRequestSchema,
+  requestChangesSchema,
+  approveContentRequestSchema,
+  upgradeContentRequestSchema,
+  addCommentSchema,
+  fromAuditSchema,
+  addTrackedKeywordSchema,
+  removeTrackedKeywordSchema,
+} from '../schemas/public-content.js';
 
 
 const log = createLogger('public-content');
@@ -87,7 +100,7 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
 });
 
 // --- Public Content Topic Requests (client picks topics from strategy) ---
-router.post('/api/public/content-request/:workspaceId', (req, res) => {
+router.post('/api/public/content-request/:workspaceId', validate(createContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const topic = sanitizeString(req.body.topic, 200);
@@ -126,7 +139,7 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
 });
 
 // Client submits their own topic request
-router.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
+router.post('/api/public/content-request/:workspaceId/submit', validate(submitContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const topic = sanitizeString(req.body.topic, 200);
@@ -152,7 +165,7 @@ router.post('/api/public/content-request/:workspaceId/submit', (req, res) => {
 });
 
 // Client declines a recommended topic
-router.post('/api/public/content-request/:workspaceId/:id/decline', (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/decline', validate(declineContentRequestSchema), (req, res, next) => {
   const reason = sanitizeString(req.body.reason, 1000);
   let updated;
   try {
@@ -173,7 +186,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', (req, res, n
 });
 
 // Client approves a brief
-router.post('/api/public/content-request/:workspaceId/:id/approve', (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/approve', validate(approveContentRequestSchema), (req, res, next) => {
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, { status: 'approved' });
@@ -191,7 +204,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', (req, res, n
 });
 
 // Client requests changes on a brief
-router.post('/api/public/content-request/:workspaceId/:id/request-changes', (req, res, next) => {
+router.post('/api/public/content-request/:workspaceId/:id/request-changes', validate(requestChangesSchema), (req, res, next) => {
   const feedback = sanitizeString(req.body.feedback, 2000);
   let updated;
   try {
@@ -212,7 +225,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', (req
 });
 
 // Client upgrades from brief_only to full_post
-router.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) => {
+router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upgradeContentRequestSchema), (req, res) => {
   const updated = updateContentRequest(req.params.workspaceId, req.params.id, {
     serviceType: 'full_post',
     upgradedAt: new Date().toISOString(),
@@ -225,7 +238,7 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', (req, res) =
 });
 
 // Client or team adds a comment
-router.post('/api/public/content-request/:workspaceId/:id/comment', (req, res) => {
+router.post('/api/public/content-request/:workspaceId/:id/comment', validate(addCommentSchema), (req, res) => {
   const content = sanitizeString(req.body.content, 2000);
   const author = validateEnum(req.body.author, ['client', 'team'], 'client');
   if (!content) return res.status(400).json({ error: 'content is required' });
@@ -293,7 +306,7 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
 });
 
 // --- Pre-populate content request from audit issues ---
-router.post('/api/public/content-request/:workspaceId/from-audit', async (req, res) => {
+router.post('/api/public/content-request/:workspaceId/from-audit', validate(fromAuditSchema), async (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -359,17 +372,6 @@ router.post('/api/public/content-request/:workspaceId/from-audit', async (req, r
   res.json({ ...request, topKeywords });
 });
 
-// --- Public Content Performance (show GSC/GA4 data for published items in client dashboard) ---
-router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
-  try {
-    const data = await handleContentPerformance(req.params.workspaceId);
-    res.json(data);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(err instanceof Error && msg === 'Workspace not found' ? 404 : 500).json({ error: msg });
-  }
-});
-
 // --- Public Tracked Keywords (client can view/add/remove) ---
 router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
@@ -377,7 +379,7 @@ router.get('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   res.json({ keywords: getTrackedKeywords(ws.id) });
 });
 
-router.post('/api/public/tracked-keywords/:workspaceId', (req, res) => {
+router.post('/api/public/tracked-keywords/:workspaceId', validate(addTrackedKeywordSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();
@@ -387,7 +389,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', (req, res) => {
   res.json({ keywords });
 });
 
-router.delete('/api/public/tracked-keywords/:workspaceId', (req, res) => {
+router.delete('/api/public/tracked-keywords/:workspaceId', validate(removeTrackedKeywordSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const keyword = sanitizeString(req.body?.keyword || '').toLowerCase().trim();

@@ -3238,6 +3238,39 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // P1 expansion rule: discarded updatePageSeo return value.
+    //
+    // `updatePageSeo()` (imported from server/webflow.ts) returns
+    // `{ success: boolean, error?: string }` rather than throwing on Webflow
+    // API failures. A bare `await updatePageSeo(...)` (no assignment) silently
+    // treats Webflow API errors as success — the caller proceeds on the happy
+    // path with no indication that the page was not actually updated.
+    //
+    // PR #1 of the Platform Health Sprint fixed 4 such call sites in
+    // server/routes/webflow-seo.ts; this rule prevents recurrence wherever
+    // the function is called in the future.
+    //
+    // Escape hatch: `// seo-ok` on the same line or one line above, for any
+    // legitimate fire-and-forget case (e.g. a best-effort cache warm where
+    // failure is intentionally not surfaced to the caller — justify why).
+    name: 'Discarded updatePageSeo return value',
+    pattern: 'await updatePageSeo\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['= await updatePageSeo(', '// seo-ok'],
+    message:
+      'updatePageSeo() returns { success, error } — it does NOT throw on Webflow API failure. ' +
+      'A bare `await updatePageSeo(...)` silently treats Webflow errors as success. ' +
+      'Capture the return value: `const result = await updatePageSeo(...);` and check `result.success`. ' +
+      'Suppress with // seo-ok only for legitimate fire-and-forget calls (add a comment explaining why).',
+    severity: 'error',
+    rationale:
+      'updatePageSeo() returns rather than throws on Webflow API errors. Discarding the return value ' +
+      'silently treats failures as success, causing incorrect "applied" counts and phantom successful operations. ' +
+      'PR #1 Platform Health Sprint fixed 4 such sites; this rule prevents recurrence.',
+    claudeMdRef: '#code-conventions',
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

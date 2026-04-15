@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
@@ -15,7 +15,7 @@ import {
 } from '../seo-suggestions.js';
 import { getLatestSnapshot } from '../reports.js';
 import { runSeoAudit } from '../seo-audit.js';
-import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatPersonasForPrompt, formatPageMapForPrompt, formatForPrompt, formatKnowledgeBaseForPrompt, invalidateIntelligenceCache } from '../workspace-intelligence.js';
 import { getQueryPageData } from '../search-console.js';
 import { updatePageSeo, getSiteSubdomain } from '../webflow.js';
 import {
@@ -27,12 +27,16 @@ import {
 } from '../workspaces.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { addActivity } from '../activity-log.js';
-import { getPageKeyword } from '../page-keywords.js';
+import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
+import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
+import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
+import { validate, z } from '../middleware/validate.js';
 
 const log = createLogger('webflow-seo');
 
@@ -520,12 +524,16 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
         const seoFields = field === 'description'
           ? { seo: { description: text } }
           : { seo: { title: text } };
-        await updatePageSeo(page.pageId, seoFields, token);
-        if (ws) {
-          updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
-          recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+        const seoResult = await updatePageSeo(page.pageId, seoFields, token);
+        if (!seoResult.success) {
+          results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error });
+        } else {
+          if (ws) {
+            updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
+            recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+          }
+          results.push({ pageId: page.pageId, text, applied: true });
         }
-        results.push({ pageId: page.pageId, text, applied: true });
       } else {
         results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
       }
@@ -589,7 +597,11 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFrom
       const seoFields = field === 'description'
         ? { seo: { description: newValue } }
         : { seo: { title: newValue } };
-      await updatePageSeo(page.pageId, seoFields, token);
+      const seoResult = await updatePageSeo(page.pageId, seoFields, token);
+      if (!seoResult.success) {
+        results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue: '', applied: false, error: seoResult.error });
+        continue;
+      }
 
       if (ws) {
         updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply', fields: [field], updatedBy: 'admin' });
@@ -884,7 +896,7 @@ router.get('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
 });
 
 // --- SEO Suggestions: Select a variation ---
-router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', async (req, res) => {
+router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId, suggestionId } = req.params;
   const { selectedIndex } = req.body as { selectedIndex: number };
   if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
@@ -896,7 +908,7 @@ router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', async (r
 });
 
 // --- SEO Suggestions: Apply selected suggestions to Webflow ---
-router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) => {
+router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { suggestionIds } = req.body as { suggestionIds?: string[] };
 
@@ -920,7 +932,11 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) 
       const seoFields = s.field === 'description'
         ? { seo: { description: text } }
         : { seo: { title: text } };
-      await updatePageSeo(s.pageId, seoFields, token);
+      const seoResult = await updatePageSeo(s.pageId, seoFields, token);
+      if (!seoResult.success) {
+        results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: seoResult.error });
+        continue;
+      }
 
       const ws = getWorkspace(workspaceId);
       if (ws) {
@@ -943,7 +959,7 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) 
 });
 
 // --- SEO Suggestions: Dismiss suggestions ---
-router.delete('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
+router.delete('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { suggestionIds } = req.body as { suggestionIds?: string[] } || {};
   const dismissed = dismissSuggestions(workspaceId, suggestionIds);
@@ -1142,6 +1158,680 @@ Return ONLY valid JSON, no markdown fences.`;
     log.error({ err: err }, 'SEO copy generator error');
     res.status(500).json({ error: 'SEO copy generation failed' });
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Bulk background job endpoints — run server-side with WS progress
+// ═══════════════════════════════════════════════════════════════════
+
+const bulkAnalyzeSchema = z.object({
+  pages: z.array(z.object({
+    pageId: z.string().min(1),
+    title: z.string(),
+    slug: z.string().optional(),
+    seoTitle: z.string().optional(),
+    seoDescription: z.string().optional(),
+  })).min(1).max(500),
+});
+
+router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('workspaceId'), validate(bulkAnalyzeSchema), async (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const { pages } = req.body;
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const existing = hasActiveJob('seo-bulk-analyze', workspaceId);
+  if (existing) return res.status(409).json({ error: 'A bulk analyze job is already running', jobId: existing.id });
+
+  const job = createJob('seo-bulk-analyze', {
+    message: `Analyzing ${pages.length} pages...`,
+    total: pages.length,
+    workspaceId,
+  });
+  const ac = registerAbort(job.id);
+  res.json({ jobId: job.id });
+
+  // Fire-and-forget background processing
+  (async () => {
+    try {
+      updateJob(job.id, { status: 'running', message: 'Building workspace context...' });
+
+      const siteId = ws.webflowSiteId || '';
+      const token = getTokenForSite(siteId) || undefined;
+
+      // Build workspace context once (not per-page)
+      const slices = ['seoContext', 'learnings'] as const;
+      const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
+      const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: slices });
+      const kwMapCtx = formatPageMapForPrompt(intel.seoContext);
+
+      // Resolve live URL base
+      let baseUrl = '';
+      if (ws.liveDomain) {
+        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+      } else if (siteId) {
+        try {
+          const sub = await getSiteSubdomain(siteId, token);
+          if (sub) baseUrl = `https://${sub}.webflow.io`;
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-analyze: programming error'); }
+      }
+
+      let done = 0;
+      let failed = 0;
+
+      for (const page of pages) {
+        if (isJobCancelled(job.id) || ac.signal.aborted) break;
+
+        try {
+          // Fetch page HTML for content (best-effort)
+          let pageContent = '';
+          if (baseUrl && page.slug) {
+            try {
+              const htmlRes = await fetch(`${baseUrl}/${page.slug}`, {
+                redirect: 'follow',
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HmpsnStudioBot/1.0)' },
+                signal: AbortSignal.timeout(10_000),
+              });
+              if (htmlRes.ok) {
+                const html = await htmlRes.text();
+                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                const body = bodyMatch ? bodyMatch[1] : html;
+                pageContent = body
+                  .replace(/<script[\s\S]*?<\/script>/gi, '')
+                  .replace(/<style[\s\S]*?<\/style>/gi, '')
+                  .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+                  .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+                  .replace(/<[^>]+>/g, ' ')
+                  .replace(/&[a-z]+;/gi, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+                  .slice(0, 3000);
+              }
+            } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
+          }
+
+          const effectiveTitle = page.seoTitle || page.title;
+          const effectiveMeta = page.seoDescription || '';
+
+          const prompt = `You are an expert SEO strategist. Analyze this web page and provide a keyword analysis.
+
+Page title: ${page.title}
+SEO title: ${effectiveTitle || '(same as page title)'}
+Meta description: ${effectiveMeta || '(none)'}
+URL slug: /${page.slug || ''}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapCtx}
+
+Provide your analysis as a JSON object:
+{
+  "primaryKeyword": "the single best target keyword",
+  "primaryKeywordPresence": { "inTitle": true/false, "inMeta": true/false, "inContent": true/false, "inSlug": true/false },
+  "secondaryKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
+  "longTailKeywords": ["phrase1", "phrase2", "phrase3"],
+  "searchIntent": "informational | transactional | navigational | commercial",
+  "searchIntentConfidence": 0.0-1.0,
+  "contentGaps": ["gap1"],
+  "competitorKeywords": ["comp kw1", "comp kw2"],
+  "optimizationScore": 0-100,
+  "optimizationIssues": ["issue1"],
+  "recommendations": ["rec1", "rec2"],
+  "estimatedDifficulty": "low | medium | high",
+  "keywordDifficulty": 0-100,
+  "monthlyVolume": 0,
+  "topicCluster": "broader topic cluster"
+}
+
+IMPORTANT: Return ONLY valid JSON.`;
+
+          const aiResult = await callOpenAI({
+            model: 'gpt-4.1-mini',
+            messages: [
+              { role: 'system', content: 'You are an expert SEO keyword analyst. Return valid JSON only.' },
+              { role: 'user', content: prompt },
+            ],
+            maxTokens: 600,
+            temperature: 0.3,
+            feature: 'bulk-page-analysis',
+            workspaceId,
+          });
+
+          const raw = aiResult.text || '{}';
+          const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          let analysis: Record<string, unknown>;
+          try {
+            analysis = JSON.parse(cleaned);
+          } catch (err) {
+            log.debug({ err, pageId: page.pageId }, 'bulk-analyze: expected error — AI returned invalid JSON, skipping');
+            failed++;
+            done++;
+            updateJob(job.id, {
+              progress: done,
+              message: `Analyzed ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
+            });
+            broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
+              jobId: job.id,
+              operation: 'bulk-analyze',
+              done,
+              total: pages.length,
+              failed,
+            });
+            continue;
+          }
+
+          // Persist analysis to keyword strategy
+          const pagePath = page.slug ? `/${page.slug}` : '/';
+          const existing = getPageKeyword(workspaceId, pagePath);
+          upsertPageKeyword(workspaceId, {
+            pagePath,
+            pageTitle: existing?.pageTitle || page.title,
+            primaryKeyword: (analysis.primaryKeyword as string) || existing?.primaryKeyword || '',
+            secondaryKeywords: (analysis.secondaryKeywords as string[]) || existing?.secondaryKeywords || [],
+            searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+            optimizationIssues: (analysis.optimizationIssues as string[]) || [],
+            recommendations: (analysis.recommendations as string[]) || [],
+            contentGaps: (analysis.contentGaps as string[]) || [],
+            optimizationScore: analysis.optimizationScore as number | undefined,
+            analysisGeneratedAt: new Date().toISOString(),
+            primaryKeywordPresence: analysis.primaryKeywordPresence as { inTitle: boolean; inMeta: boolean; inContent: boolean; inSlug: boolean } | undefined,
+            longTailKeywords: (analysis.longTailKeywords as string[]) || [],
+            competitorKeywords: (analysis.competitorKeywords as string[]) || [],
+            estimatedDifficulty: analysis.estimatedDifficulty as string | undefined,
+            keywordDifficulty: analysis.keywordDifficulty as number | undefined,
+            monthlyVolume: analysis.monthlyVolume as number | undefined,
+            topicCluster: analysis.topicCluster as string | undefined,
+            searchIntentConfidence: analysis.searchIntentConfidence as number | undefined,
+            ...(existing?.currentPosition != null ? { currentPosition: existing.currentPosition } : {}),
+            ...(existing?.impressions != null ? { impressions: existing.impressions } : {}),
+          });
+
+          done++;
+        } catch (err) {
+          log.error({ err, pageId: page.pageId }, 'bulk-analyze: page analysis failed');
+          failed++;
+          done++;
+        }
+
+        updateJob(job.id, {
+          progress: done,
+          message: `Analyzed ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
+        });
+        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
+          jobId: job.id,
+          operation: 'bulk-analyze',
+          done,
+          total: pages.length,
+          failed,
+        });
+      }
+
+      // Invalidate intelligence cache so UI picks up new data
+      invalidateIntelligenceCache(workspaceId);
+
+      updateJob(job.id, {
+        status: 'done',
+        progress: done,
+        message: `Analysis complete: ${done - failed}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}`,
+        result: { analyzed: done - failed, failed, total: pages.length },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
+        jobId: job.id,
+        operation: 'bulk-analyze',
+        analyzed: done - failed,
+        failed,
+        total: pages.length,
+      });
+
+      addActivity(workspaceId, 'page_analysis',
+        `Bulk page analysis: ${done - failed}/${pages.length} pages analyzed`,
+        `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
+        { analyzed: done - failed, failed, total: pages.length },
+      );
+    } catch (err) {
+      log.error({ err }, 'bulk-analyze: job failed');
+      updateJob(job.id, { status: 'error', error: String(err) });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId: job.id,
+        operation: 'bulk-analyze',
+        error: String(err),
+      });
+    }
+  })();
+});
+
+// ── Bulk AI Rewrite (background job) ──
+
+const bulkRewriteSchema = z.object({
+  siteId: z.string().min(1),
+  pages: z.array(z.object({
+    pageId: z.string().min(1),
+    title: z.string(),
+    slug: z.string().optional(),
+    currentSeoTitle: z.string().optional(),
+    currentDescription: z.string().optional(),
+  })).min(1).max(500),
+  field: z.enum(['title', 'description', 'both']),
+});
+
+router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('workspaceId'), validate(bulkRewriteSchema), async (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const { siteId, pages, field } = req.body;
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+
+  const existingJob = hasActiveJob('seo-bulk-rewrite', workspaceId);
+  if (existingJob) return res.status(409).json({ error: 'A bulk rewrite job is already running', jobId: existingJob.id });
+
+  const job = createJob('seo-bulk-rewrite', {
+    message: `Generating ${field} variations for ${pages.length} pages...`,
+    total: pages.length,
+    workspaceId,
+  });
+  const ac = registerAbort(job.id);
+  res.json({ jobId: job.id });
+
+  (async () => {
+    try {
+      updateJob(job.id, { status: 'running', message: 'Building workspace context...' });
+
+      const token = getTokenForSite(siteId) || undefined;
+      let baseUrl = '';
+      if (ws.liveDomain) {
+        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
+      } else {
+        try {
+          const sub = await getSiteSubdomain(siteId, token);
+          if (sub) baseUrl = `https://${sub}.webflow.io`;
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-rewrite: programming error'); }
+      }
+
+      const inlineBrandName = getBrandName(ws);
+      const isBothMode = field === 'both';
+      const maxLen = field === 'description' ? 160 : 60;
+      const CONCURRENCY = 3;
+
+      // Fetch GSC data once
+      let allGscData: Array<{ query: string; page: string; clicks: number; impressions: number; ctr: number; position: number }> = [];
+      if (ws.gscPropertyUrl && ws.webflowSiteId) {
+        try {
+          allGscData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
+        } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'bulk-rewrite: programming error'); }
+      }
+
+      // Character limit enforcement helper
+      const enforceLimit = (text: string, max: number): string => {
+        const t = text.replace(/^["']|["']$/g, '').trim();
+        if (t.length <= max) return t;
+        const truncated = t.slice(0, max);
+        const lastSpace = truncated.lastIndexOf(' ');
+        return lastSpace > max * 0.6 ? truncated.slice(0, lastSpace) : truncated;
+      };
+
+      // Sibling title map
+      const siblingTitles: Record<string, string[]> = {};
+      for (const p of pages) {
+        const siblingValues = isBothMode
+          ? [p.currentSeoTitle || p.title || '', p.currentDescription || ''].filter(Boolean)
+          : [field === 'title' ? (p.currentSeoTitle || p.title || '') : (p.currentDescription || '')].filter(Boolean);
+        for (const val of siblingValues) {
+          for (const other of pages) {
+            if (other.pageId === p.pageId) continue;
+            if (!siblingTitles[other.pageId]) siblingTitles[other.pageId] = [];
+            if (siblingTitles[other.pageId].length < 8) {
+              siblingTitles[other.pageId].push(val);
+            }
+          }
+        }
+      }
+
+      // Pre-assemble workspace-level seoContext once
+      const wsIntelRw = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
+      const wsRwSeo = wsIntelRw.seoContext;
+
+      const suggestions: SeoSuggestion[] = [];
+      let done = 0;
+      let failed = 0;
+
+      for (let i = 0; i < pages.length; i += CONCURRENCY) {
+        if (isJobCancelled(job.id) || ac.signal.aborted) break;
+        const batch = pages.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.allSettled(batch.map(async (page: { pageId: string; title: string; slug?: string; currentSeoTitle?: string; currentDescription?: string }) => {
+          if (isJobCancelled(job.id)) return null;
+
+          const rwPagePath = page.slug ? `/${page.slug}` : undefined;
+          const rwSeo = wsRwSeo ? { ...wsRwSeo } : undefined;
+          if (rwSeo && rwPagePath && rwSeo.strategy?.pageMap?.length) {
+            const kw = rwSeo.strategy.pageMap.find(p => p.pagePath.toLowerCase() === rwPagePath.toLowerCase());
+            if (kw) rwSeo.pageKeywords = kw;
+          }
+          const keywordBlock = formatKeywordsForPrompt(rwSeo);
+          const bvBlock = rwSeo?.effectiveBrandVoiceBlock ?? '';
+          const rwPersonasBlock = formatPersonasForPrompt(rwSeo?.personas ?? []);
+          const rwKnowledgeBlock = formatKnowledgeBaseForPrompt(rwSeo?.knowledgeBase);
+
+          // Fetch page content (best-effort)
+          let contentExcerpt = '';
+          if (baseUrl && page.slug) {
+            try {
+              const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
+              if (htmlRes.ok) {
+                const html = await htmlRes.text();
+                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                const body = bodyMatch ? bodyMatch[1] : html;
+                contentExcerpt = body
+                  .replace(/<script[\s\S]*?<\/script>/gi, '')
+                  .replace(/<style[\s\S]*?<\/style>/gi, '')
+                  .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+                  .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+                  .replace(/<[^>]+>/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+                  .slice(0, 800);
+              }
+            } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
+          }
+
+          // Match GSC queries to this page
+          let gscBlock = '';
+          let ctrFlag = '';
+          if (allGscData.length > 0 && page.slug) {
+            const pageQueries = allGscData
+              .filter(r => r.page.includes(page.slug!) || (page.slug === '' && r.page.endsWith('/')))
+              .sort((a, b) => b.impressions - a.impressions)
+              .slice(0, 15);
+            if (pageQueries.length > 0) {
+              gscBlock = `\n\nREAL SEARCH QUERIES:\n${pageQueries.map(q => `- "${q.query}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%)`).join('\n')}`;
+              const totalImpr = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
+              const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
+              const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
+              const avgPos = pageQueries.reduce((sum, q) => sum + q.position * q.impressions, 0) / (totalImpr || 1);
+              if (totalImpr >= 50) {
+                const expectedCtr = avgPos <= 3 ? 8 : avgPos <= 5 ? 5 : avgPos <= 10 ? 2.5 : 1;
+                if (avgCtr < expectedCtr * 0.7) {
+                  ctrFlag = `\n\n⚠️ CTR UNDERPERFORMANCE: ${avgCtr.toFixed(1)}% CTR (expected ~${expectedCtr}% for position ${avgPos.toFixed(0)}).`;
+                }
+              }
+            }
+          }
+
+          // Sibling context
+          let siblingBlock = '';
+          const siblings = siblingTitles[page.pageId];
+          if (siblings && siblings.length > 0) {
+            siblingBlock = `\n\nOTHER TITLES ON THIS SITE (differentiate):\n${siblings.map(t => `- "${t}"`).join('\n')}`;
+          }
+
+          const contentSection = contentExcerpt ? `\nPage content excerpt: ${contentExcerpt}` : '';
+          const brandNote = inlineBrandName ? `\nBrand name is "${inlineBrandName}" — use this exact name.` : '';
+          const locationRule = `\n- LOCATION RULE: If this page's keyword targets a city/region, use THAT location.`;
+          const rwExtraContext = [rwPersonasBlock, rwKnowledgeBlock, gscBlock, ctrFlag, siblingBlock].filter(Boolean).join('');
+
+          if (isBothMode) {
+            const oldTitle = page.currentSeoTitle || '';
+            const oldDesc = page.currentDescription || '';
+            const prompt = `Write 3 paired SEO title + meta description sets for "${page.title}". Current title: "${oldTitle}". Current description: "${oldDesc}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- TITLE: 50-60 chars (NEVER exceed 60). Front-load primary keyword.\n- DESCRIPTION: 150-160 chars (NEVER exceed 160).\n- Each pair must take a different angle${locationRule}\n\nReturn ONLY a JSON array of 3 objects with "title" and "description" keys.`;
+            const aiText = await callCreativeAI({
+              systemPrompt: buildSystemPrompt(workspaceId, 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 objects with "title" and "description" keys.'),
+              userPrompt: prompt,
+              maxTokens: 800,
+              feature: 'seo-bulk-rewrite-both',
+              workspaceId,
+            });
+            let pairs: Array<{ title: string; description: string }>;
+            try {
+              const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+              pairs = Array.isArray(parsed)
+                ? parsed.map((p: { title?: string; description?: string }) => ({
+                    title: enforceLimit(String(p.title || ''), 60),
+                    description: enforceLimit(String(p.description || ''), 160),
+                  }))
+                : [];
+            } catch (err) {
+              log.debug({ err }, 'bulk-rewrite: expected error — AI returned invalid JSON for paired mode');
+              pairs = [];
+            }
+            if (!pairs.length) return null;
+            while (pairs.length < 3) pairs.push(pairs[0]);
+            const titleSugg = saveSuggestion({
+              workspaceId, siteId, pageId: page.pageId,
+              pageTitle: page.title, pageSlug: page.slug || '',
+              field: 'title', currentValue: oldTitle, variations: pairs.map(p => p.title),
+            });
+            const descSugg = saveSuggestion({
+              workspaceId, siteId, pageId: page.pageId,
+              pageTitle: page.title, pageSlug: page.slug || '',
+              field: 'description', currentValue: oldDesc, variations: pairs.map(p => p.description),
+            });
+            return [titleSugg, descSugg];
+          }
+
+          // Single-field mode
+          const oldValue = field === 'title' ? (page.currentSeoTitle || '') : (page.currentDescription || '');
+          const prompt = field === 'description'
+            ? `Write 3 meta descriptions (150-160 chars) for "${page.title}". Current: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}${locationRule}\nReturn ONLY a JSON array of 3 strings.`
+            : `Write 3 SEO titles (50-60 chars) for "${page.title}". Current: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}${locationRule}\nReturn ONLY a JSON array of 3 strings.`;
+          const aiText = await callCreativeAI({
+            systemPrompt: buildSystemPrompt(workspaceId, 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 strings.'),
+            userPrompt: prompt,
+            maxTokens: 400,
+            feature: 'seo-bulk-rewrite',
+            workspaceId,
+          });
+          let variations: string[];
+          try {
+            const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+            variations = Array.isArray(parsed)
+              ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
+              : [enforceLimit(String(parsed), maxLen)];
+          } catch (err) {
+            log.debug({ err }, 'bulk-rewrite: expected error — AI returned invalid JSON for single-field mode');
+            const single = enforceLimit(aiText, maxLen);
+            variations = single ? [single] : [];
+          }
+          if (!variations.length) return null;
+          while (variations.length < 3) variations.push(variations[0]);
+          const suggestion = saveSuggestion({
+            workspaceId, siteId, pageId: page.pageId,
+            pageTitle: page.title, pageSlug: page.slug || '',
+            field: field as 'title' | 'description', currentValue: oldValue, variations,
+          });
+          return [suggestion];
+        }));
+
+        for (const r of batchResults) {
+          if (r.status === 'fulfilled' && r.value) {
+            suggestions.push(...r.value);
+          } else if (r.status === 'rejected') {
+            failed++;
+          } else if (r.status === 'fulfilled' && r.value === null) {
+            failed++;
+          }
+          done++;
+          updateJob(job.id, {
+            progress: done,
+            message: `Generated variations for ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
+          });
+          broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
+            jobId: job.id,
+            operation: 'bulk-rewrite',
+            done,
+            total: pages.length,
+            failed,
+            field,
+          });
+        }
+      }
+
+      log.info(`Bulk rewrite job: ${suggestions.length} suggestions, ${failed} errors for ${pages.length} pages`);
+
+      updateJob(job.id, {
+        status: 'done',
+        progress: done,
+        message: `Generated ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
+        result: { suggestions: suggestions.length, failed, total: pages.length, field },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
+        jobId: job.id,
+        operation: 'bulk-rewrite',
+        generated: suggestions.length,
+        failed,
+        total: pages.length,
+        field,
+      });
+
+      addActivity(workspaceId, 'seo_updated',
+        `Bulk SEO rewrite: ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
+        `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
+        { generated: suggestions.length, failed, total: pages.length, field },
+      );
+    } catch (err) {
+      log.error({ err }, 'bulk-rewrite: job failed');
+      updateJob(job.id, { status: 'error', error: String(err) });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId: job.id,
+        operation: 'bulk-rewrite',
+        error: String(err),
+      });
+    }
+  })();
+});
+
+// ── Bulk Accept Fixes (background job — SeoAudit accept-all) ──
+
+const bulkAcceptFixesSchema = z.object({
+  siteId: z.string().min(1),
+  fixes: z.array(z.object({
+    pageId: z.string().min(1),
+    check: z.string().min(1),
+    suggestedFix: z.string().min(1),
+    message: z.string().optional(),
+    pageSlug: z.string().optional(),
+    pageName: z.string().optional(),
+  })).min(1).max(500),
+});
+
+router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('workspaceId'), validate(bulkAcceptFixesSchema), async (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  const { siteId, fixes } = req.body;
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const existingJob = hasActiveJob('seo-bulk-accept-fixes', workspaceId);
+  if (existingJob) return res.status(409).json({ error: 'A bulk accept job is already running', jobId: existingJob.id });
+
+  const token = getTokenForSite(siteId) || undefined;
+  if (!token) return res.status(500).json({ error: 'No Webflow API token configured' });
+
+  const job = createJob('seo-bulk-accept-fixes', {
+    message: `Applying ${fixes.length} fixes...`,
+    total: fixes.length,
+    workspaceId,
+  });
+  const ac = registerAbort(job.id);
+  res.json({ jobId: job.id });
+
+  (async () => {
+    try {
+      updateJob(job.id, { status: 'running', message: 'Applying fixes to Webflow...' });
+
+      let done = 0;
+      let failed = 0;
+      const applied: string[] = [];
+
+      for (const fix of fixes) {
+        if (isJobCancelled(job.id) || ac.signal.aborted) break;
+
+        try {
+          const fields: Record<string, unknown> = {};
+          if (fix.check === 'title') {
+            fields.seo = { title: fix.suggestedFix };
+          } else if (fix.check === 'meta-description') {
+            fields.seo = { description: fix.suggestedFix };
+          } else if (fix.check === 'og-tags' && fix.message?.includes('title')) {
+            fields.openGraph = { title: fix.suggestedFix };
+          } else if (fix.check === 'og-tags' && fix.message?.includes('description')) {
+            fields.openGraph = { description: fix.suggestedFix };
+          }
+
+          if (Object.keys(fields).length > 0) {
+            const seoResult = await updatePageSeo(fix.pageId, fields, token);
+            if (!seoResult.success) {
+              log.warn({ pageId: fix.pageId, check: fix.check, error: seoResult.error }, 'bulk-accept-fixes: Webflow update failed');
+              failed++;
+            } else {
+              const appliedKey = `${fix.pageId}-${fix.check}`;
+              applied.push(appliedKey);
+
+              // Track the change
+              if (ws) {
+                const changedField = fix.check === 'meta-description' ? 'description' : fix.check;
+                updatePageState(ws.id, fix.pageId, {
+                  status: 'live', source: 'audit', fields: [changedField], updatedBy: 'admin',
+                });
+                recordSeoChange(ws.id, fix.pageId, fix.pageSlug || '', fix.pageName || '', [changedField], 'audit-fix');
+              }
+            }
+          } else {
+            // Unrecognized check type — skip Webflow update but still count progress
+            log.debug({ pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: unrecognized check type, skipping');
+          }
+          done++;
+        } catch (err) {
+          log.error({ err, pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: fix failed');
+          failed++;
+          done++;
+        }
+
+        updateJob(job.id, {
+          progress: done,
+          message: `Applied ${done}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}...`,
+        });
+        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
+          jobId: job.id,
+          operation: 'bulk-accept-fixes',
+          done,
+          total: fixes.length,
+          failed,
+          appliedKey: applied[applied.length - 1] ?? null,
+        });
+      }
+
+      updateJob(job.id, {
+        status: 'done',
+        progress: done,
+        message: `Applied ${applied.length}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}`,
+        result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
+      });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
+        jobId: job.id,
+        operation: 'bulk-accept-fixes',
+        applied: applied.length,
+        failed,
+        total: fixes.length,
+        appliedKeys: applied,
+      });
+
+      if (applied.length > 0) {
+        addActivity(workspaceId, 'seo_updated',
+          `Bulk audit fix: ${applied.length} fixes applied`,
+          `Background job applied ${applied.length}/${fixes.length} audit fixes to Webflow`,
+          { applied: applied.length, failed, total: fixes.length },
+        );
+      }
+    } catch (err) {
+      log.error({ err }, 'bulk-accept-fixes: job failed');
+      updateJob(job.id, { status: 'error', error: String(err) });
+      broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+        jobId: job.id,
+        operation: 'bulk-accept-fixes',
+        error: String(err),
+      });
+    }
+  })();
 });
 
 export default router;
