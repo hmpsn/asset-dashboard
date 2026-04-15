@@ -1651,20 +1651,19 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
             failed++;
           }
           done++;
+          updateJob(job.id, {
+            progress: done,
+            message: `Generated variations for ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
+          });
+          broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
+            jobId: job.id,
+            operation: 'bulk-rewrite',
+            done,
+            total: pages.length,
+            failed,
+            field,
+          });
         }
-
-        updateJob(job.id, {
-          progress: done,
-          message: `Generated variations for ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
-        });
-        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
-          jobId: job.id,
-          operation: 'bulk-rewrite',
-          done,
-          total: pages.length,
-          failed,
-          field,
-        });
       }
 
       log.info(`Bulk rewrite job: ${suggestions.length} suggestions, ${failed} errors for ${pages.length} pages`);
