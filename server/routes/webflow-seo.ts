@@ -524,12 +524,16 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
         const seoFields = field === 'description'
           ? { seo: { description: text } }
           : { seo: { title: text } };
-        await updatePageSeo(page.pageId, seoFields, token);
-        if (ws) {
-          updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
-          recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+        const seoResult = await updatePageSeo(page.pageId, seoFields, token);
+        if (!seoResult.success) {
+          results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error });
+        } else {
+          if (ws) {
+            updatePageState(ws.id, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'admin' });
+            recordSeoChange(ws.id, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+          }
+          results.push({ pageId: page.pageId, text, applied: true });
         }
-        results.push({ pageId: page.pageId, text, applied: true });
       } else {
         results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
       }
@@ -593,7 +597,11 @@ router.post('/api/webflow/seo-pattern-apply/:siteId', requireWorkspaceAccessFrom
       const seoFields = field === 'description'
         ? { seo: { description: newValue } }
         : { seo: { title: newValue } };
-      await updatePageSeo(page.pageId, seoFields, token);
+      const seoResult = await updatePageSeo(page.pageId, seoFields, token);
+      if (!seoResult.success) {
+        results.push({ pageId: page.pageId, oldValue: page.currentValue, newValue: '', applied: false, error: seoResult.error });
+        continue;
+      }
 
       if (ws) {
         updatePageState(ws.id, page.pageId, { status: 'live', source: 'pattern-apply', fields: [field], updatedBy: 'admin' });
@@ -924,7 +932,11 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) 
       const seoFields = s.field === 'description'
         ? { seo: { description: text } }
         : { seo: { title: text } };
-      await updatePageSeo(s.pageId, seoFields, token);
+      const seoResult = await updatePageSeo(s.pageId, seoFields, token);
+      if (!seoResult.success) {
+        results.push({ pageId: s.pageId, field: s.field, text: '', applied: false, error: seoResult.error });
+        continue;
+      }
 
       const ws = getWorkspace(workspaceId);
       if (ws) {
@@ -1735,17 +1747,22 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesS
           }
 
           if (Object.keys(fields).length > 0) {
-            await updatePageSeo(fix.pageId, fields, token);
-            const appliedKey = `${fix.pageId}-${fix.check}`;
-            applied.push(appliedKey);
+            const seoResult = await updatePageSeo(fix.pageId, fields, token);
+            if (!seoResult.success) {
+              log.warn({ pageId: fix.pageId, check: fix.check, error: seoResult.error }, 'bulk-accept-fixes: Webflow update failed');
+              failed++;
+            } else {
+              const appliedKey = `${fix.pageId}-${fix.check}`;
+              applied.push(appliedKey);
 
-            // Track the change
-            if (ws) {
-              const changedField = fix.check === 'meta-description' ? 'description' : fix.check;
-              updatePageState(ws.id, fix.pageId, {
-                status: 'live', source: 'audit', fields: [changedField], updatedBy: 'admin',
-              });
-              recordSeoChange(ws.id, fix.pageId, '', '', [changedField], 'audit-fix');
+              // Track the change
+              if (ws) {
+                const changedField = fix.check === 'meta-description' ? 'description' : fix.check;
+                updatePageState(ws.id, fix.pageId, {
+                  status: 'live', source: 'audit', fields: [changedField], updatedBy: 'admin',
+                });
+                recordSeoChange(ws.id, fix.pageId, '', '', [changedField], 'audit-fix');
+              }
             }
             done++;
           }
