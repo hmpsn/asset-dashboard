@@ -99,7 +99,8 @@ export type ActivityType =
   | 'copy_section_edited'
   | 'copy_pattern_removed'
   | 'diagnostic_completed'
-  | 'portal_session';
+  | 'portal_session'
+  | 'action_backlog_alert';
 
 export interface ActivityEntry {
   id: string;
