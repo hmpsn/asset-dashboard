@@ -1043,7 +1043,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
             }
             // Pre-enrich from pool — if the keyword is in our pool, apply the data now
             const poolMatch = keywordPool.get(pm.primaryKeyword?.toLowerCase());
-            if (poolMatch) {
+            if (poolMatch && poolMatch.source !== 'gsc') {
               pm.volume = poolMatch.volume;
               pm.difficulty = poolMatch.difficulty;
               fromPool++;
