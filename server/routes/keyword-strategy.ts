@@ -99,10 +99,16 @@ function getPagesNeedingAnalysis<T extends { path: string }>(
 export function shouldFetchCompetitorData(ws: Workspace): boolean {
   if (!ws.competitorLastFetchedAt) return true;
 
-  // Direct domain-change signal: re-fetch immediately if domains changed
-  const currentDomains = (ws.competitorDomains ?? []).slice().sort().join(',');
-  const lastFetchDomains = (ws.competitorDomainsAtLastFetch ?? []).slice().sort().join(',');
-  if (currentDomains !== lastFetchDomains) return true;
+  // Direct domain-change signal: re-fetch immediately if domains changed.
+  // Skip when competitorDomainsAtLastFetch is null — this is the pre-migration state
+  // for existing workspaces (migration 064 adds the column as NULL). Comparing null
+  // against current domains would always appear as a "change" and force a costly
+  // API re-fetch on every workspace that had data fetched before the migration.
+  if (ws.competitorDomainsAtLastFetch !== null && ws.competitorDomainsAtLastFetch !== undefined) {
+    const currentDomains = (ws.competitorDomains ?? []).slice().sort().join(',');
+    const lastFetchDomains = ws.competitorDomainsAtLastFetch.slice().sort().join(',');
+    if (currentDomains !== lastFetchDomains) return true;
+  }
 
   const cutoff = new Date(Date.now() - COMPETITOR_CACHE_DAYS * 24 * 60 * 60 * 1000);
   if (new Date(ws.competitorLastFetchedAt) < cutoff) return true;
