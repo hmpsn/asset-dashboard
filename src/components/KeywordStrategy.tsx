@@ -663,6 +663,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             workspaceId={workspaceId}
             competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
             semrushAvailable={semrushAvailable}
+            cachedKeywordGaps={strategy?.keywordGaps}
           />
 
           {/* ── Site Keywords ── */}
