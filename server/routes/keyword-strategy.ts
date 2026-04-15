@@ -98,12 +98,15 @@ function getPagesNeedingAnalysis<T extends { path: string }>(
 
 export function shouldFetchCompetitorData(ws: Workspace): boolean {
   if (!ws.competitorLastFetchedAt) return true;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - COMPETITOR_CACHE_DAYS);
+
+  // Direct domain-change signal: re-fetch immediately if domains changed
+  const currentDomains = (ws.competitorDomains ?? []).slice().sort().join(',');
+  const lastFetchDomains = (ws.competitorDomainsAtLastFetch ?? []).slice().sort().join(',');
+  if (currentDomains !== lastFetchDomains) return true;
+
+  const cutoff = new Date(Date.now() - COMPETITOR_CACHE_DAYS * 24 * 60 * 60 * 1000);
   if (new Date(ws.competitorLastFetchedAt) < cutoff) return true;
 
-  // Timestamp is the only reliable signal — keywordGaps is an incomplete proxy
-  // (competitors with zero gaps don't appear there, causing false re-fetches).
   return false;
 }
 
@@ -703,7 +706,10 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         }
 
         if (fetchCompetitors && (competitorKeywordData.length > 0 || keywordGaps.length > 0)) {
-          updateWorkspace(ws.id, { competitorLastFetchedAt: new Date().toISOString() });
+          updateWorkspace(ws.id, {
+            competitorLastFetchedAt: new Date().toISOString(),
+            competitorDomainsAtLastFetch: ws.competitorDomains ?? [],
+          });
         }
 
         // Full mode only: related keywords for deeper topic expansion
@@ -2285,6 +2291,7 @@ const feedbackSchema = z.object({
   declinedBy: z.string().optional(),
 });
 
+// broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
 router.post('/api/webflow/keyword-feedback/:workspaceId', validate(feedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -2318,6 +2325,7 @@ const bulkFeedbackSchema = z.object({
   declinedBy: z.string().optional(),
 });
 
+// broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
 router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeedbackSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -2348,6 +2356,7 @@ router.post('/api/webflow/keyword-feedback/:workspaceId/bulk', validate(bulkFeed
 });
 
 // Delete feedback (un-decline a keyword)
+// broadcast-ok: keyword feedback is internal bookkeeping, not workspace content — no real-time update needed // activity-ok: keyword approve/decline is transient feedback state, not a workspace activity event
 router.delete('/api/webflow/keyword-feedback/:workspaceId/:keyword', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
