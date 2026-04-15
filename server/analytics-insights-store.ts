@@ -120,6 +120,37 @@ function rowToInsight(row: InsightRow): AnalyticsInsight {
   };
 }
 
+/**
+ * Extract UpsertInsightParams from an existing AnalyticsInsight row.
+ *
+ * Use this when re-upserting an existing insight with modifications (e.g., score
+ * adjustment reversal). Spread the result and override only the fields you're
+ * changing. This prevents silently dropping fields like `resolutionSource` that
+ * default to `null` when omitted from `upsertInsight()`.
+ */
+export function cloneInsightParams(insight: AnalyticsInsight): UpsertInsightParams {
+  return {
+    workspaceId: insight.workspaceId,
+    pageId: insight.pageId,
+    insightType: insight.insightType,
+    // Safe: insight.data was parsed from DB and matches the insightType. The
+    // AnalyticsInsight interface types it as Record<string, unknown> but
+    // UpsertInsightParams needs the mapped union. Callers override this anyway.
+    data: insight.data as never,
+    severity: insight.severity,
+    pageTitle: insight.pageTitle,
+    strategyKeyword: insight.strategyKeyword,
+    strategyAlignment: insight.strategyAlignment,
+    auditIssues: insight.auditIssues,
+    pipelineStatus: insight.pipelineStatus,
+    anomalyLinked: insight.anomalyLinked,
+    impactScore: insight.impactScore,
+    domain: insight.domain,
+    resolutionSource: insight.resolutionSource,
+    bridgeSource: insight.bridgeSource,
+  };
+}
+
 export interface UpsertInsightParams {
   workspaceId: string;
   pageId: string | null;
