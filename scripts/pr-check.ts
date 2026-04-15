@@ -3429,7 +3429,11 @@ function resolveCheckFileList(check: Check): string[] {
     const pattern = glob.replace('**/', '');
     for (const f of getFiles(baseDir, pattern)) {
       if (isExcluded(f, check.exclude)) continue;
-      if (EXCLUDED_DIRS.some(d => d !== pathFilterDir && f.includes(`/${d}/`))) continue;
+      // Use the relative path for EXCLUDED_DIRS checks so that running from
+      // inside a worktree (e.g. `.claude/worktrees/<name>/`) doesn't cause every
+      // file to be silently excluded because the absolute path contains `/.claude/`.
+      const rel = path.relative(ROOT, f);
+      if (EXCLUDED_DIRS.some(d => d !== pathFilterDir && (rel === d || rel.startsWith(d + '/') || rel.includes('/' + d + '/')))) continue;
       if (EXCLUDED_FILES.some(ef => f.endsWith('/' + ef))) continue;
       all.add(f);
     }

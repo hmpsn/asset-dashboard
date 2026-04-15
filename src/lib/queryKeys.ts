@@ -74,6 +74,18 @@ export const queryKeys = {
     blueprint: (wsId: string, blueprintId: string) => ['admin-blueprint', wsId, blueprintId] as const,
     blueprintVersions: (wsId: string, blueprintId: string) => ['admin-blueprint-versions', wsId, blueprintId] as const,
 
+    // Copy Pipeline
+    copySections: (wsId: string, entryId: string) => ['admin-copy-sections', wsId, entryId] as const,
+    copySectionsAll: (wsId: string) => ['admin-copy-sections', wsId] as const,
+    copyStatus: (wsId: string, entryId: string) => ['admin-copy-status', wsId, entryId] as const,
+    copyStatusAll: (wsId: string) => ['admin-copy-status', wsId] as const,
+    copyMetadata: (wsId: string, entryId: string) => ['admin-copy-metadata', wsId, entryId] as const,
+    copyMetadataAll: (wsId: string) => ['admin-copy-metadata', wsId] as const,
+    copyIntelligence: (wsId: string) => ['admin-copy-intelligence', wsId] as const,
+    copyPromotable: (wsId: string) => ['admin-copy-promotable', wsId] as const,
+    copyBatch: (wsId: string, batchId: string) => ['admin-copy-batch', wsId, batchId] as const,
+    copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
+
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
     cmsCollections: (siteId: string) => ['cms-collections', siteId] as const,

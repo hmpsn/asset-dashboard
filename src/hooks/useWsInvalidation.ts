@@ -151,5 +151,29 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.meetingBrief(workspaceId) });
     },
+    [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_METADATA_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyMetadataAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_BATCH_PROGRESS]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_BATCH_COMPLETE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_INTELLIGENCE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(workspaceId) });
+    },
   });
 }
