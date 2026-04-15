@@ -35,7 +35,7 @@ function TrendLabel({ trend }: { trend: 'improving' | 'stable' | 'declining' }) 
 }
 
 export default function OutcomeScorecard({ workspaceId }: Props) {
-  const { data: scorecard, isLoading, error } = useOutcomeScorecard(workspaceId);
+  const { data: scorecard, isLoading, error, refetch } = useOutcomeScorecard(workspaceId);
 
   if (isLoading) {
     return (
@@ -63,6 +63,14 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
         icon={BarChart2}
         title="Could not load scorecard"
         description="There was a problem loading outcome data. Try refreshing the page."
+        action={
+          <button
+            onClick={() => refetch()}
+            className="text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+          >
+            Retry
+          </button>
+        }
       />
     );
   }

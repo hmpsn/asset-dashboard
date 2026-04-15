@@ -38,11 +38,16 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(() => {
+    setLoadError(false);
     get<ActionItem[]>(`/api/reports/snapshot/${snapshotId}/actions`)
       .then(d => { if (Array.isArray(d)) setItems(d); })
-      .catch((err) => { console.error('ActionItemsPanel operation failed:', err); });
+      .catch((err) => {
+        console.error('ActionItemsPanel operation failed:', err);
+        setLoadError(true);
+      });
   }, [snapshotId]);
 
   useEffect(() => { load(); }, [load]);
@@ -146,6 +151,13 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
         </div>
       )}
 
+      {/* Load error */}
+      {loadError && (
+        <div className="px-4 py-2 border-b border-zinc-800 text-[11px] text-red-400/80">
+          Couldn't load action items. <button onClick={load} className="underline hover:text-red-400">Retry</button>
+        </div>
+      )}
+
       {/* Items list */}
       <div className="divide-y divide-zinc-800/50">
         {sorted.map(item => {
@@ -170,7 +182,21 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
           );
         })}
         {items.length === 0 && !adding && (
-          <EmptyState icon={ListChecks} title="No action items yet" description='Click "Add" to track work for this report.' className="py-6" />
+          <EmptyState
+            icon={ListChecks}
+            title="No action items yet"
+            description='Track work items for this audit report.'
+            className="py-6"
+            action={
+              <button
+                onClick={() => setAdding(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                Add Item
+              </button>
+            }
+          />
         )}
       </div>
     </div>

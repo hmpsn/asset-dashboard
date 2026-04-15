@@ -306,19 +306,37 @@ export function InboxTab({
 
       {/* Empty state when filtered view has nothing */}
       {filter === 'approvals' && !hasApprovals && !approvalsLoading && (
-        <EmptyState icon={ClipboardCheck} title="No SEO changes to review yet." description={`${STUDIO_NAME} will send proposed changes here for your approval.`} />
-      )}
-      {filter === 'requests' && !hasRequests && !requestsLoading && (
-        <EmptyState icon={MessageSquare} title="No requests yet." description={`Submit a request and ${STUDIO_NAME} will respond here.`} />
-      )}
-      {!betaMode && filter === 'content' && contentRequests.length === 0 && (
-        <EmptyState icon={FileText} title="No content requests yet." description={effectiveTier === 'free' ? 'Upgrade to Growth to request content briefs and blog posts.' : `Request content from the Strategy tab or ask ${STUDIO_NAME}.`} />
+        <EmptyState
+          icon={ClipboardCheck}
+          title="No SEO changes to review yet."
+          description={`${STUDIO_NAME} will send proposed changes here for your approval. You'll get notified when something needs your attention.`}
+          action={
+            <button
+              onClick={() => setFilter('requests')}
+              className="mt-2 px-4 py-2 rounded-lg bg-teal-600/20 border border-teal-500/30 text-teal-400 text-xs font-medium hover:bg-teal-600/30 transition-colors"
+            >
+              Submit a Request Instead
+            </button>
+          }
+        />
       )}
       {filter === 'content-plan' && planReviewCount === 0 && (
         <EmptyState icon={Layers} title="No content plan items to review." description="When your team sends content for review, items will appear here." />
       )}
       {filter === 'all' && !hasApprovals && !hasRequests && contentRequests.length === 0 && planReviewCount === 0 && !approvalsLoading && !requestsLoading && (
-        <EmptyState icon={Inbox} title="Your inbox is empty." description={betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`} />
+        <EmptyState
+          icon={Inbox}
+          title="Your inbox is empty."
+          description={betaMode ? `SEO changes and requests will appear here as ${STUDIO_NAME} works on your site.` : `SEO changes, requests, and content items will appear here as ${STUDIO_NAME} works on your site.`}
+          action={
+            <button
+              onClick={() => setFilter('requests')}
+              className="mt-2 px-4 py-2 rounded-lg bg-teal-600/20 border border-teal-500/30 text-teal-400 text-xs font-medium hover:bg-teal-600/30 transition-colors"
+            >
+              Submit a Request
+            </button>
+          }
+        />
       )}
     </div>
   );

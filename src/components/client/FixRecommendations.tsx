@@ -360,18 +360,22 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
   const [trafficLoaded, setTrafficLoaded] = useState(!workspaceId);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [serverRecs, setServerRecs] = useState<ServerRecommendation[] | null>(null);
+  const [serverRecsError, setServerRecsError] = useState(false);
 
   // Fetch server recommendations
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
+    setServerRecsError(false);
     getOptional<{ recommendations?: ServerRecommendation[] }>(`/api/public/recommendations/${workspaceId}`)
       .then(data => {
         if (!cancelled && data?.recommendations && Array.isArray(data.recommendations)) {
           setServerRecs(data.recommendations);
         }
       })
-      .catch((err) => { console.error('FixRecommendations operation failed:', err); });
+      .catch(() => {
+        if (!cancelled) setServerRecsError(true);
+      });
     return () => { cancelled = true; };
   }, [workspaceId]);
 
@@ -422,6 +426,11 @@ export function FixRecommendations({ auditDetail, tier, workspaceId }: FixRecomm
         {hasTrafficData && totalHighTraffic > 0 && (
           <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
             Based on your traffic data, we've identified <span className="text-teal-400 font-medium">{totalHighTraffic} high-traffic pages</span> with fixable SEO issues. Prioritizing these will have the biggest impact on your organic performance.
+          </p>
+        )}
+        {serverRecsError && (
+          <p className="text-[11px] text-red-400/80 mt-1.5">
+            Couldn't load personalized recommendations — showing general fixes based on your audit. Try refreshing the page.
           </p>
         )}
       </div>

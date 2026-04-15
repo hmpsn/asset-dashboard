@@ -63,18 +63,21 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
   const [declineReason, setDeclineReason] = useState<{ keyword: string; source: string } | null>(null);
   const [declineReasonText, setDeclineReasonText] = useState('');
+  const [feedbackLoadError, setFeedbackLoadError] = useState(false);
 
   // Load existing feedback on mount
-  useEffect(() => {
+  const loadFeedback = useCallback(() => {
     if (!workspaceId) return;
+    setFeedbackLoadError(false);
     kwFeedbackApi.get(workspaceId)
       .then((items) => {
         const map = new Map<string, 'approved' | 'declined' | 'requested'>();
         for (const item of items as KeywordFeedback[]) map.set(item.keyword, item.status);
         setKeywordFeedback(map);
       })
-      .catch(() => { /* silent */ });
+      .catch(() => { setFeedbackLoadError(true); });
   }, [workspaceId]);
+  useEffect(() => { loadFeedback(); }, [loadFeedback]);
 
   const submitFeedback = useCallback(async (keyword: string, status: 'approved' | 'declined', source: string, reason?: string) => {
     if (!workspaceId) return;
@@ -145,8 +148,18 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [trackedKeywords, setTrackedKeywords] = useState<{ query: string; pinned: boolean; addedAt: string }[]>([]);
   const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
   const [addingKeyword, setAddingKeyword] = useState(false);
+  const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
 
   // Load business priorities + tracked keywords on mount
+  const loadTrackedKeywords = useCallback(() => {
+    if (!workspaceId) return;
+    setTrackedKeywordsError(false);
+    trackedKwApi.get(workspaceId)
+      .then((data) => {
+        setTrackedKeywords(data.keywords || []);
+      })
+      .catch(() => { setTrackedKeywordsError(true); });
+  }, [workspaceId]);
   useEffect(() => {
     if (!workspaceId) return;
     bizPrioritiesApi.get(workspaceId)
@@ -155,13 +168,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         setPrioritiesLoaded(true);
       })
       .catch(() => setPrioritiesLoaded(true));
-
-    trackedKwApi.get(workspaceId)
-      .then((data) => {
-        setTrackedKeywords(data.keywords || []);
-      })
-      .catch(() => { /* silent */ });
-  }, [workspaceId]);
+    loadTrackedKeywords();
+  }, [workspaceId, loadTrackedKeywords]);
 
   const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
     if (!workspaceId) return;
@@ -362,6 +370,24 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           </button>
         </div>
       </div>
+
+      {/* ── LOAD ERRORS (surfaced at top so errors aren't hidden behind collapsed sections) ── */}
+      {(feedbackLoadError || trackedKeywordsError) && (
+        <div className="space-y-1">
+          {feedbackLoadError && (
+            <p className="text-[11px] text-red-400/80">
+              Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly.{' '}
+              <button onClick={loadFeedback} className="underline hover:text-red-400">Retry</button>
+            </p>
+          )}
+          {trackedKeywordsError && (
+            <p className="text-[11px] text-red-400/80">
+              Couldn't load your tracked keywords.{' '}
+              <button onClick={loadTrackedKeywords} className="underline hover:text-red-400">Retry</button>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── BUSINESS PRIORITIES (client driver's seat) ── */}
       {workspaceId && prioritiesLoaded && (
