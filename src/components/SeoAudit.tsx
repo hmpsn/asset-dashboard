@@ -52,7 +52,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { startJob, jobs } = useBackgroundTasks();
+  const { startJob, jobs, cancelJob } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -382,7 +382,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   const cancelBulkApply = () => {
     if (bulkAcceptJobId) {
-      del(`/api/jobs/${bulkAcceptJobId}`).catch(() => {});
+      cancelJob(bulkAcceptJobId);
     }
     setBulkApplying(false);
     setBulkProgress(null);

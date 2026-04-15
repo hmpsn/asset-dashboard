@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { put, post, del } from '../api/client';
+import { put, post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Loader2, Upload, Check, AlertCircle, Wand2, Sparkles, RefreshCw,
@@ -8,6 +8,7 @@ import type { FixContext } from '../App';
 import { seoSuggestions, keywords, seoBulkJobs } from '../api/seo';
 import { workspaces } from '../api';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
@@ -41,6 +42,7 @@ interface Props {
 export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
+  const { cancelJob } = useBackgroundTasks();
   
   // React Query hook replaces manual data fetching
   const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
@@ -136,6 +138,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         );
         setBulkMode('idle');
         setBulkRewriteJobId(null);
+        setBulkProgress({ done: 0, total: 0 });
         refetchSuggestions();
         setTimeout(() => setBulkResults(null), 8000);
       }
@@ -151,6 +154,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
         setBulkMode('idle');
         setBulkRewriteJobId(null);
+        setBulkProgress({ done: 0, total: 0 });
         setBulkResults('Bulk rewrite failed: ' + d.error);
         setTimeout(() => setBulkResults(null), 5000);
       }
@@ -590,6 +594,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     } catch (err) {
       console.error('Failed to start bulk rewrite:', err);
       setBulkMode('idle');
+      setBulkProgress({ done: 0, total: 0 });
       setBulkResults('Failed to start bulk rewrite.');
       setTimeout(() => setBulkResults(null), 5000);
     }
@@ -864,7 +869,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
               <span className="text-xs text-zinc-300">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
-              <button onClick={() => { if (bulkAnalyzeJobId) { del(`/api/jobs/${bulkAnalyzeJobId}`).catch(() => {}); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); } }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
+              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); } }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
             </div>
           ) : (
             <button
