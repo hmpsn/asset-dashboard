@@ -100,6 +100,47 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         }
         return { modified: resolved };
       });
+
+      // ── Bridge #12: Audit → page_health insights (refresh stale data) ──
+      fireBridge('bridge-audit-page-health', auditWs.id, async () => {
+        const { upsertInsight: upsert, getInsights: fetchInsights }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
+        const existing = fetchInsights(auditWs.id);
+
+        // Map critical/warning audit issues to audit_finding insights
+        const criticalPages = result.pages
+          .filter((p: { issues?: Array<{ severity: string }> }) => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
+
+        let created = 0;
+        for (const page of criticalPages.slice(0, 20)) { // Cap at 20 to avoid flooding
+          const pageIssues = page.issues?.filter((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning') ?? [];
+          if (pageIssues.length === 0) continue;
+
+          // Deduplicate: skip if identical audit_finding insight exists for this page
+          const existingForPage = existing.find(
+            i => i.insightType === 'audit_finding' && i.pageId === page.pageId && i.resolutionStatus !== 'resolved',
+          );
+          if (existingForPage) continue;
+
+          upsert({
+            workspaceId: auditWs.id,
+            insightType: 'audit_finding',
+            pageId: page.pageId,
+            pageTitle: page.page,
+            severity: pageIssues.some((i: { severity: string }) => i.severity === 'error') ? 'critical' : 'warning',
+            data: {
+              scope: 'page',
+              issueCount: pageIssues.length,
+              issueMessages: pageIssues.map((i: { message: string }) => i.message).join('; '),
+              source: 'bridge_12_audit_page_health',
+            },
+            impactScore: pageIssues.some((i: { severity: string }) => i.severity === 'error') ? 80 : 50,
+            bridgeSource: 'bridge-audit-page-health',
+          });
+          created++;
+        }
+
+        return { modified: created };
+      });
     }
     res.json(result);
   } catch (err) {
