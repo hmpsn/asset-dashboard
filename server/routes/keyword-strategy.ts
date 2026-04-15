@@ -102,14 +102,9 @@ export function shouldFetchCompetitorData(ws: Workspace): boolean {
   cutoff.setDate(cutoff.getDate() - COMPETITOR_CACHE_DAYS);
   if (new Date(ws.competitorLastFetchedAt) < cutoff) return true;
 
-  // Force re-fetch if the competitor list has changed since last run.
-  // Compare current workspace competitors against domains present in cached gaps.
-  const currentDomains = ws.competitorDomains ?? [];
-  if (currentDomains.length === 0) return false;
-  const cachedGapDomains = new Set(
-    (ws.keywordStrategy?.keywordGaps ?? []).map(g => g.competitorDomain)
-  );
-  return currentDomains.some(d => !cachedGapDomains.has(d));
+  // Timestamp is the only reliable signal — keywordGaps is an incomplete proxy
+  // (competitors with zero gaps don't appear there, causing false re-fetches).
+  return false;
 }
 
 // ── Strategy Intelligence Block ──────────────────────────────────

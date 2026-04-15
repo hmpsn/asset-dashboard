@@ -205,7 +205,13 @@ export function dismissAnomaly(workspaceId: string, id: string): boolean {
   if (info.changes > 0) {
     // After dismissal, check if any recent undismissed anomalies remain.
     // If none, reverse the anomaly boost on all insights for this workspace.
-    reverseAnomalyBoostIfNoneRemain(workspaceId);
+    // Non-critical: dismiss already committed — wrap so reversal errors don't
+    // surface as a failed dismiss (same pattern as periodic scan reversal).
+    try {
+      reverseAnomalyBoostIfNoneRemain(workspaceId);
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Anomaly boost reversal after dismiss failed — non-critical');
+    }
   }
   return info.changes > 0;
 }
