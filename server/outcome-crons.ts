@@ -76,8 +76,8 @@ export function startOutcomeCrons() {
       // Check action backlog thresholds per workspace.
       // Alert when pending count exceeds ACTION_BACKLOG_THRESHOLD or the oldest
       // pending item is older than ACTION_AGE_THRESHOLD_DAYS days.
-      // Groups the already-fetched getPendingActions() data by workspaceId to avoid
-      // redundant per-workspace DB queries (getWorkspaceCounts + getActionsByWorkspace).
+      // Makes a fresh getPendingActions() call and groups by workspaceId to check thresholds
+      // without redundant per-workspace DB queries (getWorkspaceCounts + getActionsByWorkspace).
       try {
         const { getPendingActions }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
         const { addActivity, countActivityByType }: typeof ActivityLog = await import('./activity-log.js'); // dynamic-import-ok
@@ -94,12 +94,11 @@ export function startOutcomeCrons() {
         }
 
         for (const [wsId, wsPending] of pendingByWs) {
-          const pendingActions = wsPending.filter(a => !a.measurementComplete);
-          const pendingCount = pendingActions.length;
+          const pendingCount = wsPending.length;
           if (pendingCount === 0) continue;
 
           // Find the age of the oldest pending action
-          const oldestMs = pendingActions.reduce((min, a) => {
+          const oldestMs = wsPending.reduce((min, a) => {
             const t = new Date(a.createdAt).getTime();
             return t < min ? t : min;
           }, Infinity);

@@ -20,7 +20,7 @@ export type * from './outcome-tracking.ts';
 export type * from './copy-pipeline.ts';
 export type * from './diagnostics.ts';
 export type * from './page-strategy.ts';
-export type * from './feature-flags.ts';
+export * from './feature-flags.ts';
 export type * from './features.ts';
 export type * from './narrative.ts';
 export type * from './cms-images.ts';

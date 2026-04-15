@@ -346,7 +346,11 @@ export interface EngagementMetrics {
   lastLoginAt: string | null;
   loginFrequency: 'daily' | 'weekly' | 'monthly' | 'inactive';
   chatSessionCount: number;
-  portalUsage: { pageViews: number; featuresUsed: string[] } | null;
+  portalUsage: {
+    /** Distinct calendar days with client portal activity (not literal page views). */
+    pageViews: number;
+    featuresUsed: string[];
+  } | null;
 }
 
 /** Internal computation type for composite health scoring.
