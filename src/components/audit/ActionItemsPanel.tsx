@@ -170,7 +170,21 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
           );
         })}
         {items.length === 0 && !adding && (
-          <EmptyState icon={ListChecks} title="No action items yet" description='Click "Add" to track work for this report.' className="py-6" />
+          <EmptyState
+            icon={ListChecks}
+            title="No action items yet"
+            description='Track work items for this audit report.'
+            className="py-6"
+            action={
+              <button
+                onClick={() => setAdding(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                Add Item
+              </button>
+            }
+          />
         )}
       </div>
     </div>

@@ -424,7 +424,23 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
           })}
         </div>
       ) : keywords.length > 0 ? (
-        <EmptyState icon={TrendingUp} title="Keywords added but no rank data yet" description="Capture a snapshot to start tracking" className="py-8" />
+        <EmptyState
+          icon={TrendingUp}
+          title="Keywords added but no rank data yet"
+          description="Capture a snapshot to start tracking"
+          className="py-8"
+          action={
+            <button
+              onClick={takeSnapshot}
+              disabled={!hasGsc || snapshotting}
+              title={!hasGsc ? 'Connect Google Search Console in Workspace Settings to enable snapshots' : undefined}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {snapshotting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              {snapshotting ? 'Capturing...' : 'Take First Snapshot'}
+            </button>
+          }
+        />
       ) : (
         <EmptyState icon={Target} title="No keywords tracked yet" description="Add keywords above, or generate a Keyword Strategy from the sidebar to discover target keywords" className="py-8" />
       )}

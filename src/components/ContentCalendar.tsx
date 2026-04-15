@@ -4,8 +4,10 @@ import {
   Sparkles, PenLine, Eye, CheckCircle2, Clock, Send, Globe,
   Calendar as CalendarIcon, Layers,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useContentCalendar } from '../hooks/admin';
 import { EmptyState } from './ui';
+import { adminPath } from '../routes';
 
 // ── Types ──
 
@@ -83,9 +85,10 @@ function relativeDate(iso: string): string {
 // ── Component ──
 
 export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  
+
   // React Query hook replaces manual useEffect fetching
   const { data: items = [], isLoading } = useContentCalendar(workspaceId);
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all');
@@ -350,7 +353,20 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
 
       {/* Empty state */}
       {items.length === 0 && !isLoading && (
-        <EmptyState icon={CalendarIcon} title="No content items yet" description="Create a content brief to get started" />
+        <EmptyState
+          icon={CalendarIcon}
+          title="No content items yet"
+          description="Create a content brief to get started"
+          action={
+            <button
+              onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'))}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+            >
+              <PenLine className="w-3 h-3" />
+              Create a Brief
+            </button>
+          }
+        />
       )}
     </div>
   );
