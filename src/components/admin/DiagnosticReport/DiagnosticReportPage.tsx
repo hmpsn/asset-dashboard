@@ -9,7 +9,7 @@ import { Badge } from '../../ui/Badge.js';
 import { RootCauseCard } from './RootCauseCard.js';
 import { RemediationPlan } from './RemediationPlan.js';
 import { EvidenceAccordion } from './EvidenceAccordion.js';
-import { useDiagnosticReport, useDiagnosticsList, useDiagnosticEvents } from '../../../hooks/admin/useDiagnostics.js';
+import { useDiagnosticReport, useDiagnosticsList } from '../../../hooks/admin/useDiagnostics.js';
 import type { DiagnosticReport } from '../../../../shared/types/diagnostics.js';
 
 interface Props {
@@ -169,10 +169,6 @@ function DiagnosticReportList({ workspaceId }: { workspaceId: string }) {
 export function DiagnosticReportPage({ workspaceId }: Props) {
   const [searchParams] = useSearchParams();
   const reportId = searchParams.get('report');
-
-  // Single shared handler — invalidates diagnostics, forInsight, and insights caches
-  // with workspace-scoped query keys. No need for a separate useWorkspaceEvents here.
-  useDiagnosticEvents(workspaceId);
 
   if (reportId) {
     return <DiagnosticReportDetail workspaceId={workspaceId} reportId={reportId} />;

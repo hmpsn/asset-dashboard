@@ -175,5 +175,19 @@ export function useWsInvalidation(workspaceId: string | undefined) {
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(workspaceId) });
     },
+    [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
+      // BUG FIX: prior code invalidated ['admin-insights', workspaceId] which matches no
+      // registered query. The real insight feed key is queryKeys.admin.insightFeed(),
+      // so diagnostic completion now correctly refreshes the feed.
+      qc.invalidateQueries({ queryKey: queryKeys.admin.insightFeed(workspaceId) });
+    },
+    [WS_EVENTS.DIAGNOSTIC_FAILED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
+    },
   });
 }
