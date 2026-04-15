@@ -38,11 +38,16 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(() => {
+    setLoadError(false);
     get<ActionItem[]>(`/api/reports/snapshot/${snapshotId}/actions`)
       .then(d => { if (Array.isArray(d)) setItems(d); })
-      .catch((err) => { console.error('ActionItemsPanel operation failed:', err); });
+      .catch((err) => {
+        console.error('ActionItemsPanel operation failed:', err);
+        setLoadError(true);
+      });
   }, [snapshotId]);
 
   useEffect(() => { load(); }, [load]);
@@ -143,6 +148,13 @@ export function ActionItemsPanel({ snapshotId }: { snapshotId: string }) {
               <button onClick={addItem} className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-400 text-[#0f1219]">Add</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Load error */}
+      {loadError && (
+        <div className="px-4 py-2 border-b border-zinc-800 text-[11px] text-red-400/80">
+          Couldn't load action items. <button onClick={load} className="underline hover:text-red-400">Retry</button>
         </div>
       )}
 

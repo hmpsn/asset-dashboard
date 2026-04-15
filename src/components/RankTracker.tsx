@@ -193,7 +193,10 @@ export function RankTracker({ workspaceId, hasGsc }: Props) {
       ]);
       if (Array.isArray(kw)) setKeywords(kw);
       if (Array.isArray(ranks)) setLatestRanks(ranks);
-    } catch (err) { console.error('RankTracker operation failed:', err); }
+    } catch (err) {
+      console.error('RankTracker operation failed:', err);
+      setError('Failed to load rank data');
+    }
     setLoading(false);
   };
 

@@ -367,6 +367,22 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         </div>
       </div>
 
+      {/* ── LOAD ERRORS (surfaced at top so errors aren't hidden behind collapsed sections) ── */}
+      {(feedbackLoadError || trackedKeywordsError) && (
+        <div className="space-y-1">
+          {feedbackLoadError && (
+            <p className="text-[11px] text-red-400/80">
+              Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly. Try refreshing.
+            </p>
+          )}
+          {trackedKeywordsError && (
+            <p className="text-[11px] text-red-400/80">
+              Couldn't load your tracked keywords. Try refreshing if they're missing.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ── BUSINESS PRIORITIES (client driver's seat) ── */}
       {workspaceId && prioritiesLoaded && (
         <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
@@ -1066,13 +1082,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                 ) : null;
               })()}
-              {/* Tracked keywords load error */}
-              {trackedKeywordsError && (
-                <p className="text-[11px] text-red-400/80 mb-2">
-                  Couldn't load your tracked keywords. Try refreshing if they're missing.
-                </p>
-              )}
-
               {/* Add keyword input */}
               {workspaceId && (
                 <form
@@ -1112,13 +1121,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </form>
               )}
             </div>
-
-            {/* Keyword feedback load error */}
-            {feedbackLoadError && (
-              <p className="text-[11px] text-red-400/80 mb-2">
-                Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly. Try refreshing.
-              </p>
-            )}
 
             {/* Page Performance Map */}
             <PageKeywordMapContent
