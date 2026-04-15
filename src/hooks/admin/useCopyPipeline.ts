@@ -154,14 +154,6 @@ export function useStartBatch(wsId: string, blueprintId: string) {
   });
 }
 
-// ═══ WEBSOCKET INVALIDATION ═══
-
-/** @deprecated Use useWsInvalidation (Task 1.4). Kept as a no-op stub until BlueprintDetail.tsx migrates. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function useCopyPipelineEvents(_wsId: string): void {
-  // Logic moved to useWsInvalidation (Task 1.4)
-}
-
 export function useExportCopy(wsId: string, blueprintId: string) {
   const { toast } = useToast();
   return useMutation({
