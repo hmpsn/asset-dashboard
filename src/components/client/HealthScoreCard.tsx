@@ -13,7 +13,7 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
   const label =
     rounded >= 80
       ? 'Your site is performing well across key SEO signals.'
-      : score >= 60
+      : rounded >= 60
         ? 'Your site has room for improvement in some areas.'
         : 'Your site needs attention to improve search performance.';
 

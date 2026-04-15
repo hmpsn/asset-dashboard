@@ -40,6 +40,16 @@ describe('HealthScoreCard', () => {
     expect(screen.getByText(/needs attention/i)).toBeInTheDocument();
   });
 
+  it('uses rounded score for label threshold — 59.5 rounds to 60 and shows "room for improvement"', () => {
+    render(<HealthScoreCard score={59.5} />);
+    // Displayed score should be 60
+    const all = screen.getAllByText('60');
+    expect(all.length).toBeGreaterThanOrEqual(1);
+    // Label must match the "60" tier, not "below 60"
+    expect(screen.getByText(/room for improvement/i)).toBeInTheDocument();
+    expect(screen.queryByText(/needs attention/i)).toBeNull();
+  });
+
   it('renders nothing when score is null', () => {
     const { container } = render(<HealthScoreCard score={null} />);
     expect(container.firstChild).toBeNull();
