@@ -211,8 +211,8 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
       workspaceId,
     });
   } catch (err) {
-    log.error({ err, workspaceId, sourceId }, 'AI extraction failed — skipping source');
-    result = { text: '{}' };
+    log.error({ err, workspaceId, sourceId }, 'AI extraction failed — source will remain unprocessed for retry');
+    return []; // leave source unprocessed so next invocation retries
   }
 
   const parsed = parseJsonFallback<{ extractions: { extraction_type: string; category: string; content: string; source_quote?: string }[] }>(

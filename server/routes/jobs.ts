@@ -464,12 +464,16 @@ router.post('/api/jobs', async (req, res) => {
                 if (text.length > maxLen) { const t = text.slice(0, maxLen); const ls = t.lastIndexOf(' '); text = ls > maxLen * 0.6 ? t.slice(0, ls) : t; }
                 if (text) {
                   const seoFields = field === 'description' ? { seo: { description: text } } : { seo: { title: text } };
-                  await updatePageSeo(page.pageId, seoFields, token);
-                  if (bwsId) {
-                    updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
-                    recordSeoChange(bwsId, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+                  const seoResult = await updatePageSeo(page.pageId, seoFields, token);
+                  if (!seoResult.success) {
+                    results.push({ pageId: page.pageId, text: '', applied: false, error: seoResult.error ?? 'Webflow API error' });
+                  } else {
+                    if (bwsId) {
+                      updatePageState(bwsId, page.pageId, { status: 'live', source: 'bulk-fix', fields: [field], updatedBy: 'system' });
+                      recordSeoChange(bwsId, page.pageId, page.slug || '', page.title || '', [field], 'bulk-fix');
+                    }
+                    results.push({ pageId: page.pageId, text, applied: true });
                   }
-                  results.push({ pageId: page.pageId, text, applied: true });
                 } else {
                   results.push({ pageId: page.pageId, text: '', applied: false, error: 'Empty AI response' });
                 }

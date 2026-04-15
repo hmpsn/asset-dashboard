@@ -47,9 +47,10 @@ export const requestChangesSchema = z.object({
 });
 
 // POST /api/public/content-request/:workspaceId/:id/comment
+// Note: 'author' is intentionally absent — the handler hardcodes 'client' regardless of input
+// (unauthenticated public endpoint). Keeping 'author' in the schema would imply 'team' is accepted.
 export const addCommentSchema = z.object({
   content: z.string().min(1, 'content is required').max(2000),
-  author: z.enum(['client', 'team']).optional().default('client'),
 });
 
 // POST /api/public/content-request/:workspaceId/from-audit

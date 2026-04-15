@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar } from './ui';
 import { themeColor } from './ui/constants';
+import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { InsightsEngine } from './client/InsightsEngine';
 import { CartProvider } from './client/useCart';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -19,6 +20,7 @@ import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotation
 import { type Page, adminPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { WS_EVENTS } from '../lib/wsEvents';
+import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 
 const MeetingBriefPage = lazyWithRetry(() => import('./admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
@@ -61,7 +63,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const { audit } = useAuditSummary(workspaceId);
   const { data: homeData, isLoading: loading, isFetching: refreshing, dataUpdatedAt } = useWorkspaceHomeData(workspaceId);
   const { data: roiData } = useAdminROI(workspaceId);
-  const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth', 'contentPipeline']);
+  const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth', 'contentPipeline', 'clientSignals']);
   const [now, setNow] = useState(() => new Date());
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [showSetupSuggestions, setShowSetupSuggestions] = useState(false);
@@ -101,7 +103,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   }, []);
 
   // Real-time workspace events — invalidate the single query
-  const invalidateHome = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
+  const invalidateHome = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
   useWorkspaceEvents(workspaceId, {
     'activity:new': invalidateHome,
     'approval:update': invalidateHome,
@@ -111,7 +113,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     'content-request:created': invalidateHome,
     'content-request:update': invalidateHome,
     'audit:complete': invalidateHome,
-    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => queryClient.invalidateQueries({ queryKey: ['admin-intelligence', workspaceId] }),
+    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) }),
   });
 
   // Derive data from query result
@@ -198,7 +200,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const isStale = ageMs > 60 * 60 * 1000; // >1 hour
   const freshnessLabel = !lastFetched ? '' : ageMs < 60_000 ? 'Just now' : ageMs < 3_600_000 ? `${Math.floor(ageMs / 60_000)}m ago` : `${Math.floor(ageMs / 3_600_000)}h ago`;
 
-  const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['admin-workspace-home', workspaceId] });
+  const handleRefresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
 
   const onboardingSteps = [
     {
@@ -308,6 +310,13 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           </div>
         }
       />
+
+      {intel?.clientSignals?.compositeHealthScore != null && (
+        <div className="flex items-center gap-2">
+          <WorkspaceHealthBadge score={intel.clientSignals.compositeHealthScore} />
+          <span className="text-xs text-zinc-500">Overall Health</span>
+        </div>
+      )}
 
       <TabBar
         tabs={HOME_TABS}

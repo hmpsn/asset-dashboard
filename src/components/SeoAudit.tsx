@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../routes';
-import { redirects as redirectsApi } from '../api/misc';
+import { redirects as redirectsApi, jobs as jobsApi } from '../api/misc';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
@@ -9,6 +9,7 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../hooks/admin';
 import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
 import { seoBulkJobs } from '../api/seo';
+import { queryKeys } from '../lib/queryKeys';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
 import {
@@ -102,7 +103,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to suppress issue:', err); }
     setActionMenuKey(null);
   };
@@ -111,7 +112,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     try {
       const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to unsuppress issue:', err); }
   };
 
@@ -121,7 +122,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const pattern = `${prefix}/*`;
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pagePattern: pattern, reason: `Pattern: ${pattern}` });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to suppress pattern:', err); }
     setActionMenuKey(null);
   };
@@ -302,14 +303,16 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setScheduleSaving(true);
     try {
       const updated = await put<AuditSchedule>(`/api/audit-schedules/${workspaceId}`, { enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold });
-      queryClient.setQueryData(['admin-audit-schedule', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSchedule(workspaceId), updated);
     } catch (err) { console.error('Failed to save schedule:', err); }
     finally { setScheduleSaving(false); }
   };
 
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(null);
+  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-accept-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
   const [bulkError, setBulkError] = useState<string | null>(null);
 
   // ── WebSocket handlers for background bulk accept ──
@@ -337,6 +340,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         setBulkApplying(false);
         setBulkProgress(null);
         setBulkAcceptJobId(null);
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
       }
     },
     [WS_EVENTS.BULK_OPERATION_FAILED]: (rawData: unknown) => {
@@ -350,6 +354,26 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       }
     },
   });
+
+  // Persist active bulk accept job ID so it survives remount (nav away + back)
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkAcceptJobId ? sessionStorage.setItem(`seo-bulk-accept-job-${workspaceId}`, bulkAcceptJobId) : sessionStorage.removeItem(`seo-bulk-accept-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkAcceptJobId, workspaceId]);
+
+  // On remount, query server to recover progress UI for any restored job ID
+  const mountAcceptJobId = useRef(bulkAcceptJobId);
+  useEffect(() => {
+    const acceptId = mountAcceptJobId.current;
+    if (!acceptId) return;
+    const TERMINAL = new Set(['done', 'error', 'cancelled']);
+    jobsApi.get(acceptId)
+      .then(job => {
+        if (TERMINAL.has(job.status)) { setBulkAcceptJobId(null); }
+        else { setBulkApplying(true); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+      })
+      .catch(() => setBulkAcceptJobId(null));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; ref captures initial value
 
   const acceptAllSuggestions = async () => {
     if (!data || !workspaceId) return;
@@ -1180,7 +1204,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             if (s.pagePattern) {
               try {
                 const { suppressions: updated } = await del<{ suppressions: typeof suppressions }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check: s.check, pagePattern: s.pagePattern });
-                queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+                if (workspaceId) queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
               } catch (err) { console.error('Failed to unsuppress:', err); }
             } else {
               await unsuppressIssue(s.check, s.pageSlug);

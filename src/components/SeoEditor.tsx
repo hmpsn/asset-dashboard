@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions, keywords, seoBulkJobs } from '../api/seo';
-import { workspaces } from '../api';
+import { workspaces, jobs } from '../api';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { WS_EVENTS } from '../lib/wsEvents';
@@ -93,14 +93,54 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [analyzedPages, setAnalyzedPages] = useState<Set<string>>(new Set());
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(null);
-  const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(null);
+  const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-analyze-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
+  const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-rewrite-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
   useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+
+  // Persist active bulk job IDs so they survive remount (nav away + back)
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkAnalyzeJobId ? sessionStorage.setItem(`seo-bulk-analyze-job-${workspaceId}`, bulkAnalyzeJobId) : sessionStorage.removeItem(`seo-bulk-analyze-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkAnalyzeJobId, workspaceId]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkRewriteJobId ? sessionStorage.setItem(`seo-bulk-rewrite-job-${workspaceId}`, bulkRewriteJobId) : sessionStorage.removeItem(`seo-bulk-rewrite-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkRewriteJobId, workspaceId]);
+
+  // On remount, query server to recover progress UI for any restored job IDs
+  const mountAnalyzeJobId = useRef(bulkAnalyzeJobId);
+  const mountRewriteJobId = useRef(bulkRewriteJobId);
+  useEffect(() => {
+    const analyzeId = mountAnalyzeJobId.current;
+    const rewriteId = mountRewriteJobId.current;
+    if (!analyzeId && !rewriteId) return;
+    const TERMINAL = new Set(['done', 'error', 'cancelled']);
+    if (analyzeId) {
+      jobs.get(analyzeId)
+        .then(job => {
+          if (TERMINAL.has(job.status)) { setBulkAnalyzeJobId(null); }
+          else { setBulkAnalyzeProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+        })
+        .catch(() => setBulkAnalyzeJobId(null));
+    }
+    if (rewriteId) {
+      jobs.get(rewriteId)
+        .then(job => {
+          if (TERMINAL.has(job.status)) { setBulkRewriteJobId(null); }
+          else { setBulkMode('rewriting'); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+        })
+        .catch(() => setBulkRewriteJobId(null));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; refs capture initial values
 
   // Clear approval selection when CMS filter toggles — prevents hidden pages from being silently submitted
   useEffect(() => {
@@ -129,7 +169,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       }
       if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
         const failed = d.failed || 0;
-        const generated = d.generated || (d.total - failed);
+        const generated = d.generated ?? (d.total - failed);
         const fieldLabel = d.field === 'both' ? 'title + description' : (d.field || 'title');
         setBulkResults(
           failed > 0
@@ -826,7 +866,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           {summary.live > 0 && <StatusBadge status="live" />}
           {summary.live > 0 && <span className="text-teal-400">{summary.live}</span>}
           {summary.inReview > 0 && <StatusBadge status="in-review" />}
-          {summary.inReview > 0 && <span className="text-purple-400">{summary.inReview}</span>}
+          {summary.inReview > 0 && <span className="text-amber-400">{summary.inReview}</span>}
           {summary.approved > 0 && <StatusBadge status="approved" />}
           {summary.approved > 0 && <span className="text-emerald-400/80">{summary.approved}</span>}
           {summary.rejected > 0 && <StatusBadge status="rejected" />}
@@ -866,8 +906,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {workspaceId && (
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
               <span className="text-xs text-zinc-300">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
               <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
             </div>
@@ -875,7 +915,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             <button
               onClick={analyzeAllPages}
               disabled={analyzing.size > 0 || analyzedPages.size === pages.length}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
             >
               <Sparkles className="w-3.5 h-3.5" />
               {analyzedPages.size === pages.length && pages.length > 0
