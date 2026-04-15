@@ -628,6 +628,15 @@
           "status": "pending"
         },
         {
+          "id": 587,
+          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
+          "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
+          "status": "pending"
+        },
+        {
           "id": 537,
           "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
           "source": "PIE Group 3 code review",
