@@ -869,7 +869,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
             <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
               <span className="text-xs text-zinc-300">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
-              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); } }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
+              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
             </div>
           ) : (
             <button
