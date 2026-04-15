@@ -97,6 +97,7 @@ export const queryKeys = {
     intelligenceAll: (wsId: string) => ['admin-intelligence', wsId] as const,
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
     notifications: () => ['admin-notifications'] as const,
+    featureFlags: () => ['admin-feature-flags'] as const,
   },
 
   // ── Client ────────────────────────────────────────────────────────
@@ -139,5 +140,6 @@ export const queryKeys = {
     recommendations: (wsId: string) => ['recommendations', wsId] as const,
     pageEditStates: (wsId: string, isPublic: boolean) =>
       ['page-edit-states', wsId, isPublic ? 'public' : 'admin'] as const,
+    featureFlags: () => ['feature-flags'] as const,
   },
 } as const;

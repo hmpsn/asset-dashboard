@@ -21,6 +21,7 @@ import {
   countMissingField,
 } from '../hooks/admin/seoEditorFilters';
 import { StatusBadge, LoadingState, EmptyState } from './ui';
+import { useToast } from './Toast';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
@@ -43,6 +44,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
   const { cancelJob } = useBackgroundTasks();
+  const { toast } = useToast();
   
   // React Query hook replaces manual data fetching
   const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
@@ -241,8 +243,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           const draftDate = new Date(draft.savedAt);
           const lastModified = new Date(); // We don't have page last modified, so use draft if it exists
           if (draftDate <= lastModified) {
-            seoTitle = draft.seoTitle;
-            seoDescription = draft.seoDescription;
+            // Sanitize: JSON.parse can return null for fields that were stored as null
+            seoTitle = draft.seoTitle ?? seoTitle;
+            seoDescription = draft.seoDescription ?? seoDescription;
             dirty = true; // Mark as dirty since it differs from Webflow
           }
         }
@@ -670,12 +673,18 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     // API — sitemap pages have synthetic IDs, template pages' collectionId is a page-level
     // attribute, not a CMS item ID. Exclude them entirely from the approval workflow.
     if (!page || !edit || page.source === 'cms') return;
+    // Use ?? '' to guard against null values that could survive from a stale sessionStorage cache
+    const proposedTitle = edit.seoTitle ?? '';
+    const proposedDesc = edit.seoDescription ?? '';
+    const currentTitle = page.seo?.title ?? '';
+    const currentDesc = page.seo?.description ?? '';
+    const pageSlug = page.slug ?? '';
     const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
-    if (edit.seoTitle !== (page.seo?.title || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
+    if (proposedTitle !== currentTitle) {
+      items.push({ pageId, pageTitle: page.title, pageSlug, field: 'seoTitle', currentValue: currentTitle, proposedValue: proposedTitle });
     }
-    if (edit.seoDescription !== (page.seo?.description || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription });
+    if (proposedDesc !== currentDesc) {
+      items.push({ pageId, pageTitle: page.title, pageSlug, field: 'seoDescription', currentValue: currentDesc, proposedValue: proposedDesc });
     }
     if (items.length === 0) return;
     setSendingPage(prev => new Set(prev).add(pageId));
@@ -684,7 +693,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setSentPage(prev => new Set(prev).add(pageId));
       refreshStates();
       setTimeout(() => setSentPage(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 4000);
-    } catch (err) { console.error('SeoEditor operation failed:', err); }
+    } catch (err) {
+      console.error('SeoEditor sendPageToClient failed:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to send for review';
+      toast(msg);
+    }
     setSendingPage(prev => { const n = new Set(prev); n.delete(pageId); return n; });
   };
 
@@ -702,23 +715,29 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         const page = pages.find(p => p.id === pageId);
         const edit = edits[pageId];
         if (!page || !edit) continue;
+        // Use ?? '' to guard against null values that could survive from a stale sessionStorage cache
+        const proposedTitle = edit.seoTitle ?? '';
+        const proposedDesc = edit.seoDescription ?? '';
+        const currentTitle = page.seo?.title ?? '';
+        const currentDesc = page.seo?.description ?? '';
+        const pageSlug = page.slug ?? '';
         // Include title if changed from original
-        if (edit.seoTitle !== (page.seo?.title || '')) {
+        if (proposedTitle !== currentTitle) {
           items.push({
-            pageId, pageTitle: page.title, pageSlug: page.slug,
-            field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle,
+            pageId, pageTitle: page.title, pageSlug,
+            field: 'seoTitle', currentValue: currentTitle, proposedValue: proposedTitle,
           });
         }
         // Include description if changed from original
-        if (edit.seoDescription !== (page.seo?.description || '')) {
+        if (proposedDesc !== currentDesc) {
           items.push({
-            pageId, pageTitle: page.title, pageSlug: page.slug,
-            field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription,
+            pageId, pageTitle: page.title, pageSlug,
+            field: 'seoDescription', currentValue: currentDesc, proposedValue: proposedDesc,
           });
         }
       }
       if (items.length === 0) {
-        alert('No changes detected on selected pages. Edit SEO fields first.');
+        toast('No changes detected on selected pages. Edit SEO fields first.');
         setSendingApproval(false);
         return;
       }
@@ -731,7 +750,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
-      alert('Failed to send for approval');
+      const msg = err instanceof Error ? err.message : 'Failed to send for approval';
+      toast(msg);
     } finally {
       setSendingApproval(false);
     }
@@ -1016,7 +1036,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               pageRecs={recsLoaded ? recsForPage(page.slug) : []}
               pageState={getState(page.id)} variations={variations[page.id]}
               showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
-              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
+              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && ((edits[page.id].seoTitle ?? '') !== (page.seo?.title ?? '') || (edits[page.id].seoDescription ?? '') !== (page.seo?.description ?? '')))}
               onSendToClient={sendPageToClient}
               onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
               onUpdateField={updateField} onSave={page.source === 'cms' ? undefined : savePage} isCmsPage={page.source === 'cms'} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}
