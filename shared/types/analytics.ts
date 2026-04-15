@@ -244,6 +244,11 @@ export interface PageHealthData {
   pageviews: number;
   bounceRate: number;
   avgEngagementTime: number;
+  /** Audit-derived enrichment — present only when populated by bridge-audit-page-health */
+  auditSnapshotId?: string;
+  errorCount?: number;
+  warningCount?: number;
+  topIssues?: string[];
 }
 
 /** Data shape for ranking_opportunity insights (formerly quick_win) */
