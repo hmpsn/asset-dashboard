@@ -176,6 +176,7 @@ export interface Workspace {
   keywordStrategy?: KeywordStrategy;
   competitorDomains?: string[];
   competitorLastFetchedAt?: string | null;
+  competitorDomainsAtLastFetch?: string[] | null;
   personas?: AudiencePersona[];
   // Feature toggles
   clientPortalEnabled?: boolean;

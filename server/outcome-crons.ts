@@ -10,11 +10,15 @@ import type * as WorkspaceLearnings from './workspace-learnings.js';
 import type * as ExternalDetection from './external-detection.js';
 import type * as OutcomePlaybooks from './outcome-playbooks.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
+import type * as ActivityLog from './activity-log.js';
 
 const log = createLogger('outcome-crons');
 
 const DAILY_MS = 24 * 60 * 60 * 1000;
 const WEEKLY_MS = 7 * DAILY_MS;
+
+const ACTION_BACKLOG_THRESHOLD = 20;
+const ACTION_AGE_THRESHOLD_DAYS = 14;
 
 let measureInterval: ReturnType<typeof setInterval> | null = null;
 let learningsInterval: ReturnType<typeof setInterval> | null = null;
@@ -38,7 +42,7 @@ export function startOutcomeCrons() {
       const { measurePendingOutcomes }: typeof OutcomeMeasurement = await import('./outcome-measurement.js'); // dynamic-import-ok
 
       // Build workspace priority map from cached intelligence: lowest compositeHealthScore = highest priority.
-      // Uses read-only cache peek — does NOT call buildWorkspaceIntelligence() to avoid circular dependency risk.
+      // Uses read-only cache peek — does NOT invoke the intelligence assembler to avoid circular dependency risk.
       let workspacePriority: Map<string, number> | undefined;
       try {
         const { getPendingActions }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
@@ -67,6 +71,62 @@ export function startOutcomeCrons() {
       }
       if (workspaceIds.length > 0) {
         log.info({ count: workspaceIds.length }, 'Invalidated intelligence cache for measured workspaces');
+      }
+
+      // Check action backlog thresholds per workspace.
+      // Alert when pending count exceeds ACTION_BACKLOG_THRESHOLD or the oldest
+      // pending item is older than ACTION_AGE_THRESHOLD_DAYS days.
+      // Makes a fresh getPendingActions() call and groups by workspaceId to check thresholds
+      // without redundant per-workspace DB queries (getWorkspaceCounts + getActionsByWorkspace).
+      try {
+        const { getPendingActions }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
+        const { addActivity, countActivityByType }: typeof ActivityLog = await import('./activity-log.js'); // dynamic-import-ok
+        const allPending = getPendingActions();
+        const nowMs = Date.now();
+        const ageThresholdMs = ACTION_AGE_THRESHOLD_DAYS * DAILY_MS;
+
+        // Group pending actions by workspaceId — single pass, no per-workspace DB queries.
+        const pendingByWs = new Map<string, (typeof allPending)[number][]>();
+        for (const action of allPending) {
+          const group = pendingByWs.get(action.workspaceId) ?? [];
+          group.push(action);
+          pendingByWs.set(action.workspaceId, group);
+        }
+
+        for (const [wsId, wsPending] of pendingByWs) {
+          const pendingCount = wsPending.length;
+          if (pendingCount === 0) continue;
+
+          // Find the age of the oldest pending action
+          const oldestMs = wsPending.reduce((min, a) => {
+            const t = new Date(a.createdAt).getTime();
+            return t < min ? t : min;
+          }, Infinity);
+          const oldestAgeDays = isFinite(oldestMs) ? Math.floor((nowMs - oldestMs) / DAILY_MS) : 0;
+
+          const countBreached = pendingCount >= ACTION_BACKLOG_THRESHOLD;
+          const ageBreached = isFinite(oldestMs) && (nowMs - oldestMs) >= ageThresholdMs;
+
+          if (countBreached || ageBreached) {
+            log.warn(
+              { workspaceId: wsId, pendingCount, oldestAgeDays, countBreached, ageBreached },
+              'Action backlog threshold exceeded',
+            );
+            // Deduplicate: only fire the alert if no alert was sent in the last 7 days.
+            const recentAlerts = countActivityByType(wsId, 'action_backlog_alert', 7);
+            if (recentAlerts === 0) {
+              addActivity(
+                wsId,
+                'action_backlog_alert',
+                'Action backlog threshold exceeded',
+                `${pendingCount} pending action(s); oldest is ${oldestAgeDays} day(s) old.`,
+                { pendingCount, oldestAgeDays, countBreached, ageBreached },
+              );
+            }
+          }
+        }
+      } catch (alertErr) {
+        log.warn({ err: alertErr }, 'Failed to check action backlog thresholds');
       }
     } catch (err) {
       log.error({ err }, 'Failed to measure pending outcomes');
