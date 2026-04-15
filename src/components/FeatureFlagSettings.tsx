@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, RotateCcw, Loader2 } from 'lucide-react';
 import { put, get } from '../api/client';
 import { useToast } from './Toast';
+import { queryKeys } from '../lib/queryKeys';
 
 interface FlagMeta {
   key: string;
@@ -63,8 +64,13 @@ const FLAG_GROUPS: Array<{ label: string; keys: string[] }> = [
       'bridge-action-annotation',
       'bridge-annotation-to-insight',
       'bridge-audit-site-health',
+      'bridge-audit-auto-resolve',
       'bridge-client-signal',
     ],
+  },
+  {
+    label: 'Deep Diagnostics',
+    keys: ['deep-diagnostics'],
   },
   {
     label: 'Platform Intelligence Enhancements',
@@ -109,11 +115,14 @@ const FLAG_LABELS: Record<string, string> = {
   'bridge-action-annotation':        '#13: Action recorded → analytics annotation',
   'bridge-annotation-to-insight':    '#14: Annotation → insight correlation',
   'bridge-audit-site-health':        '#15: Audit → site health insight',
+  'bridge-audit-auto-resolve':       'IG-4: Auto-resolve audit_finding insights on clean audit',
   'bridge-client-signal':            '#16: Client feedback → signal insights',
   // Platform Intelligence Enhancements
   'smart-placeholders':   'Smart placeholders (admin chips + client ghost text)',
   'client-brand-section': 'Client portal — Brand tab (business profile)',
   'seo-editor-unified':   'SEO editor — merged static + CMS with collection filter',
+  // Deep Diagnostics
+  'deep-diagnostics':     'Deep diagnostics mode',
 };
 
 const SOURCE_LABEL: Record<FlagMeta['source'], string> = {
@@ -131,7 +140,7 @@ export function FeatureFlagSettings() {
   const { toast } = useToast();
 
   const { data: flags, isLoading, isError, error } = useQuery({
-    queryKey: ['admin-feature-flags'],
+    queryKey: queryKeys.admin.featureFlags(),
     queryFn: fetchAdminFlags,
   });
 
@@ -139,8 +148,8 @@ export function FeatureFlagSettings() {
     mutationFn: ({ key, enabled }: { key: string; enabled: boolean | null }) =>
       put(`/api/admin/feature-flags/${key}`, { enabled }),
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['admin-feature-flags'] });
-      qc.invalidateQueries({ queryKey: ['feature-flags'] });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.featureFlags() });
+      qc.invalidateQueries({ queryKey: queryKeys.shared.featureFlags() });
       const action = vars.enabled === null ? 'reset to default' : vars.enabled ? 'enabled' : 'disabled';
       toast(`${vars.key} ${action}`);
     },

@@ -26,6 +26,9 @@ import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 
+/** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
+const VOLUME_THRESHOLD = 10;
+
 interface PageKeywordMap {
   pagePath: string;
   pageTitle: string;
@@ -162,7 +165,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       if (!res.ok || !res.body) {
         // Non-streaming error response (429, 400, 500, etc.) or no streaming support
         const data = await res.json();
-        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); }
+        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); }
         return;
       }
 
@@ -183,7 +186,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           try {
             const evt = JSON.parse(line.slice(6));
             if (evt.error) { setError(evt.error); break; }
-            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); setShowNextSteps(true); break; }
+            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); setShowNextSteps(true); break; }
             if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
           } catch (err) { console.error('KeywordStrategy operation failed:', err); }
         }
@@ -235,22 +238,27 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
   // Computed metrics
   const pageMap: PageKeywordMap[] = strategy?.pageMap || [];
-  const ranked = pageMap.filter((p: PageKeywordMap) => p.currentPosition);
+  // Filter out pages with known-low search volume to reduce noise in rendered cards.
+  // Pages without volume data (undefined) are kept — they haven't been enriched yet.
+  const filteredPageMap = pageMap.filter(
+    (p: PageKeywordMap) => (p.volume ?? VOLUME_THRESHOLD) >= VOLUME_THRESHOLD
+  );
+  const ranked = filteredPageMap.filter((p: PageKeywordMap) => p.currentPosition);
   const avgPos = ranked.length > 0 ? ranked.reduce((s: number, p: PageKeywordMap) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
-  const totalImpressions = pageMap.reduce((s: number, p: PageKeywordMap) => s + (p.impressions || 0), 0);
-  const totalClicks = pageMap.reduce((s: number, p: PageKeywordMap) => s + (p.clicks || 0), 0);
+  const totalImpressions = filteredPageMap.reduce((s: number, p: PageKeywordMap) => s + (p.impressions || 0), 0);
+  const totalClicks = filteredPageMap.reduce((s: number, p: PageKeywordMap) => s + (p.clicks || 0), 0);
   const top3 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 3);
   const top10 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 10 && (p.currentPosition || 0) > 3);
   const top20 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 20 && (p.currentPosition || 0) > 10);
   const beyond20 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 0) > 20);
-  const notRankingCount = pageMap.length - ranked.length;
+  const notRankingCount = filteredPageMap.length - ranked.length;
 
   const lowHangingFruit = ranked
     .filter((p: PageKeywordMap) => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
     .sort((a: PageKeywordMap, b: PageKeywordMap) => (b.impressions || 0) - (a.impressions || 0))
     .slice(0, 6);
 
-  const intentCounts = pageMap.reduce((acc: Record<string, number>, p: PageKeywordMap) => {
+  const intentCounts = filteredPageMap.reduce((acc: Record<string, number>, p: PageKeywordMap) => {
     const intent = p.searchIntent || 'unknown';
     acc[intent] = (acc[intent] || 0) + 1;
     return acc;
@@ -572,7 +580,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
 
           {/* ── Summary Dashboard ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard size="hero" label="Pages Mapped" value={strategy.pageMap.length} />
+            <StatCard size="hero" label="Pages Mapped" value={filteredPageMap.length} sub={filteredPageMap.length < strategy.pageMap.length ? `${strategy.pageMap.length - filteredPageMap.length} below threshold` : undefined} />
             <StatCard size="hero" label="Impressions" value={totalImpressions.toLocaleString()} icon={Eye} sub="last 90 days" />
             <StatCard size="hero" label="Clicks" value={totalClicks.toLocaleString()} icon={MousePointerClick} sub={totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : undefined} />
             <StatCard size="hero" label="Avg Position" value={ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'} icon={Trophy} valueColor={positionColor(avgPos)} sub={`${ranked.length} pages ranking`} />
@@ -583,14 +591,14 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             <div className="bg-zinc-900 border border-zinc-800 p-4" style={{ borderRadius: '10px 24px 10px 24px' }}>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-zinc-300">Ranking Distribution</h4>
-                <span className="text-[11px] text-zinc-500">{ranked.length} of {strategy.pageMap.length} pages with ranking data</span>
+                <span className="text-[11px] text-zinc-500">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>
               </div>
               <div className="flex h-4 rounded-full overflow-hidden bg-zinc-800">
-                {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / strategy.pageMap.length) * 100}%` }} />}
-                {top10.length > 0 && <div className="bg-green-500 h-full transition-all" style={{ width: `${(top10.length / strategy.pageMap.length) * 100}%` }} />}
-                {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / strategy.pageMap.length) * 100}%` }} />}
-                {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / strategy.pageMap.length) * 100}%` }} />}
-                {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / strategy.pageMap.length) * 100}%` }} />}
+                {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / filteredPageMap.length) * 100}%` }} />}
+                {top10.length > 0 && <div className="bg-green-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
+                {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
+                {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / filteredPageMap.length) * 100}%` }} />}
+                {notRankingCount > 0 && <div className="bg-zinc-700 h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
               </div>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="flex items-center gap-1.5 text-[11px]"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> <span className="text-emerald-400 font-medium">{top3.length}</span> <span className="text-zinc-500">Top 3</span></span>
@@ -655,6 +663,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
             workspaceId={workspaceId}
             competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
             semrushAvailable={semrushAvailable}
+            cachedKeywordGaps={strategy?.keywordGaps}
           />
 
           {/* ── Site Keywords ── */}

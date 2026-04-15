@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **61** — 32 error, 29 warn.
+Total rules: **63** — 34 error, 29 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -48,6 +48,8 @@ advisory but tracked.
 | 30 | Port collision in integration tests | error | custom | `tests/` | `// port-ok` | Duplicate test ports cause flaky CI: the second test file to bind gets EADDRINUSE, producing intermittent failures that are hard to diagnose. |
 | 31 | Inline React Query string key (use queryKeys.*) | error | custom | `src/` | `// querykey-ok` | Inline query key literals drift from the centralized factory, causing stale-cache bugs where invalidateQueries misses entries because the key arrays don't match. |
 | 32 | useGlobalAdminEvents called with workspace-scoped event name | error | custom | `src/` | `// global-events-ok` | Silent dead broadcast handlers: useGlobalAdminEvents never subscribes to a workspace room, so workspace-scoped events (WS_EVENTS.*) are silently dropped by the server's broadcastToWorkspace filter. The UI appears stale with no error message. |
+| 33 | Discarded updatePageSeo return value | error | pattern | `server/` | `// seo-ok` | updatePageSeo() returns rather than throws on Webflow API errors. Discarding the return value silently treats failures as success, causing incorrect "applied" counts and phantom successful operations. PR #1 Platform Health Sprint fixed 4 such sites; this rule prevents recurrence. |
+| 34 | Re-upsert without cloneInsightParams | error | custom | `server/` | — | upsertInsight defaults omitted optional fields to null. When re-upserting from an existing AnalyticsInsight record, manually copying fields one-by-one silently drops any field the author does not think to include. cloneInsightParams maps all fields in one place. |
 
 ---
 

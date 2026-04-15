@@ -3238,6 +3238,84 @@ export const CHECKS: Check[] = [
       return hits;
     },
   },
+  {
+    // P1 expansion rule: discarded updatePageSeo return value.
+    //
+    // `updatePageSeo()` (imported from server/webflow.ts) returns
+    // `{ success: boolean, error?: string }` rather than throwing on Webflow
+    // API failures. A bare `await updatePageSeo(...)` (no assignment) silently
+    // treats Webflow API errors as success — the caller proceeds on the happy
+    // path with no indication that the page was not actually updated.
+    //
+    // PR #1 of the Platform Health Sprint fixed 4 such call sites in
+    // server/routes/webflow-seo.ts; this rule prevents recurrence wherever
+    // the function is called in the future.
+    //
+    // Escape hatch: `// seo-ok` on the same line or one line above, for any
+    // legitimate fire-and-forget case (e.g. a best-effort cache warm where
+    // failure is intentionally not surfaced to the caller — justify why).
+    name: 'Discarded updatePageSeo return value',
+    pattern: 'await updatePageSeo\\(',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    excludeLines: ['= await updatePageSeo(', '// seo-ok'],
+    message:
+      'updatePageSeo() returns { success, error } — it does NOT throw on Webflow API failure. ' +
+      'A bare `await updatePageSeo(...)` silently treats Webflow errors as success. ' +
+      'Capture the return value: `const result = await updatePageSeo(...);` and check `result.success`. ' +
+      'Suppress with // seo-ok only for legitimate fire-and-forget calls (add a comment explaining why).',
+    severity: 'error',
+    rationale:
+      'updatePageSeo() returns rather than throws on Webflow API errors. Discarding the return value ' +
+      'silently treats failures as success, causing incorrect "applied" counts and phantom successful operations. ' +
+      'PR #1 Platform Health Sprint fixed 4 such sites; this rule prevents recurrence.',
+    claudeMdRef: '#code-conventions',
+  },
+  {
+    // Re-upserting an existing insight by manually copying fields drops any field
+    // the author forgets (e.g. resolutionSource). Use cloneInsightParams(insight)
+    // to get all fields, then spread and override. See PR #201 code review.
+    //
+    // Detection: upsertInsight({ followed within 20 lines by `insight.workspaceId`
+    // (the hallmark of manual field copying) without `...cloneInsightParams` spread.
+    //
+    // Escape hatch: `// clone-ok` on the upsertInsight line.
+    name: 'Re-upsert without cloneInsightParams',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    exclude: ['server/analytics-insights-store.ts'],
+    message:
+      'Re-upserting an existing insight without cloneInsightParams() silently drops fields ' +
+      '(e.g. resolutionSource). Use: upsertInsight({ ...cloneInsightParams(insight), <overrides> }). ' +
+      'Suppress with // clone-ok if you are intentionally building a partial upsert.',
+    severity: 'error',
+    rationale:
+      'upsertInsight defaults omitted optional fields to null. When re-upserting from an existing ' +
+      'AnalyticsInsight record, manually copying fields one-by-one silently drops any field the author ' +
+      'does not think to include. cloneInsightParams maps all fields in one place.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const matches: CustomCheckMatch[] = [];
+      for (const file of files) {
+        let lines: string[];
+        try { lines = readFileSync(file, 'utf-8').split('\n'); } catch { continue; }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.includes('upsertInsight(') && !line.includes('updateInsight(')) continue;
+          if (line.includes('cloneInsightParams') || line.includes('cloneParams') || line.includes('// clone-ok')) continue;
+          // Look ahead up to 20 lines for manual field copies from an existing insight
+          const window = lines.slice(i + 1, i + 21).join('\n');
+          if (window.includes('insight.workspaceId') || window.includes('insight.pageId')) {
+            // Confirm it's NOT using spread with cloneInsightParams on the next line
+            const spreadLine = lines[i + 1] ?? '';
+            if (spreadLine.includes('cloneInsightParams') || spreadLine.includes('cloneParams')) continue;
+            matches.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+      return matches;
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

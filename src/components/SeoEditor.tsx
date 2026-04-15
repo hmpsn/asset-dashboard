@@ -5,8 +5,12 @@ import {
   Loader2, Upload, Check, AlertCircle, Wand2, Sparkles, RefreshCw,
 } from 'lucide-react';
 import type { FixContext } from '../App';
-import { seoSuggestions, keywords } from '../api/seo';
-import { workspaces } from '../api';
+import { seoSuggestions, keywords, seoBulkJobs } from '../api/seo';
+import { workspaces, jobs } from '../api';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { WS_EVENTS } from '../lib/wsEvents';
+import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { useSeoEditor } from '../hooks/admin';
@@ -17,6 +21,7 @@ import {
   countMissingField,
 } from '../hooks/admin/seoEditorFilters';
 import { StatusBadge, LoadingState, EmptyState } from './ui';
+import { useToast } from './Toast';
 import { PageEditRow } from './editor/PageEditRow';
 import { BulkOperations } from './editor/BulkOperations';
 import { ApprovalPanel } from './editor/ApprovalPanel';
@@ -38,6 +43,8 @@ interface Props {
 export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
   const queryClient = useQueryClient();
+  const { cancelJob } = useBackgroundTasks();
+  const { toast } = useToast();
   
   // React Query hook replaces manual data fetching
   const { data: pages = [], isLoading: loading } = useSeoEditor(siteId, workspaceId);
@@ -88,7 +95,12 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [analyzedPages, setAnalyzedPages] = useState<Set<string>>(new Set());
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
-  const cancelBulkAnalyzeRef = useRef(false);
+  const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-analyze-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
+  const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-rewrite-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
@@ -96,14 +108,104 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
 
+  // Persist active bulk job IDs so they survive remount (nav away + back)
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkAnalyzeJobId ? sessionStorage.setItem(`seo-bulk-analyze-job-${workspaceId}`, bulkAnalyzeJobId) : sessionStorage.removeItem(`seo-bulk-analyze-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkAnalyzeJobId, workspaceId]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkRewriteJobId ? sessionStorage.setItem(`seo-bulk-rewrite-job-${workspaceId}`, bulkRewriteJobId) : sessionStorage.removeItem(`seo-bulk-rewrite-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkRewriteJobId, workspaceId]);
+
+  // On remount, query server to recover progress UI for any restored job IDs
+  const mountAnalyzeJobId = useRef(bulkAnalyzeJobId);
+  const mountRewriteJobId = useRef(bulkRewriteJobId);
+  useEffect(() => {
+    const analyzeId = mountAnalyzeJobId.current;
+    const rewriteId = mountRewriteJobId.current;
+    if (!analyzeId && !rewriteId) return;
+    const TERMINAL = new Set(['done', 'error', 'cancelled']);
+    if (analyzeId) {
+      jobs.get(analyzeId)
+        .then(job => {
+          if (TERMINAL.has(job.status)) { setBulkAnalyzeJobId(null); }
+          else { setBulkAnalyzeProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+        })
+        .catch(() => setBulkAnalyzeJobId(null));
+    }
+    if (rewriteId) {
+      jobs.get(rewriteId)
+        .then(job => {
+          if (TERMINAL.has(job.status)) { setBulkRewriteJobId(null); }
+          else { setBulkMode('rewriting'); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+        })
+        .catch(() => setBulkRewriteJobId(null));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; refs capture initial values
+
   // Clear approval selection when CMS filter toggles — prevents hidden pages from being silently submitted
   useEffect(() => {
     setApprovalSelected(new Set());
   }, [showCmsOnly]);
 
+  // ── WebSocket handlers for background bulk operations ──
+  useWorkspaceEvents(workspaceId, {
+    [WS_EVENTS.BULK_OPERATION_PROGRESS]: (data: unknown) => {
+      const d = data as { jobId: string; operation: string; done: number; total: number; failed?: number; field?: string };
+      if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
+        setBulkAnalyzeProgress({ done: d.done, total: d.total });
+      }
+      if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
+        setBulkProgress({ done: d.done, total: d.total });
+      }
+    },
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
+      const d = data as { jobId: string; operation: string; analyzed?: number; generated?: number; failed?: number; total: number; field?: string };
+      if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
+        setBulkAnalyzeProgress(prev => prev ? { ...prev, done: prev.total } : null);
+        setBulkAnalyzeJobId(null);
+        // Refresh keyword strategy so analyzed badges appear
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
+        setTimeout(() => setBulkAnalyzeProgress(null), 3000);
+      }
+      if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
+        const failed = d.failed || 0;
+        const generated = d.generated ?? (d.total - failed);
+        const fieldLabel = d.field === 'both' ? 'title + description' : (d.field || 'title');
+        setBulkResults(
+          failed > 0
+            ? `Generated ${generated}/${d.total} ${fieldLabel} variations (${failed} failed) — review in the suggestions panel.`
+            : `Generated ${generated}/${d.total} ${fieldLabel} variations — review in the suggestions panel.`
+        );
+        setBulkMode('idle');
+        setBulkRewriteJobId(null);
+        setBulkProgress({ done: 0, total: 0 });
+        refetchSuggestions();
+        setTimeout(() => setBulkResults(null), 8000);
+      }
+    },
+    [WS_EVENTS.BULK_OPERATION_FAILED]: (data: unknown) => {
+      const d = data as { jobId: string; operation: string; error: string };
+      if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
+        setBulkAnalyzeProgress(null);
+        setBulkAnalyzeJobId(null);
+        setBulkResults('Bulk analysis failed: ' + d.error);
+        setTimeout(() => setBulkResults(null), 5000);
+      }
+      if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
+        setBulkMode('idle');
+        setBulkRewriteJobId(null);
+        setBulkProgress({ done: 0, total: 0 });
+        setBulkResults('Bulk rewrite failed: ' + d.error);
+        setTimeout(() => setBulkResults(null), 5000);
+      }
+    },
+  });
+
   // SEO Suggestions (persistent bulk rewrite variations)
   const { data: suggestionsData, refetch: refetchSuggestions } = useQuery({
-    queryKey: ['seo-suggestions', workspaceId],
+    queryKey: queryKeys.admin.seoSuggestions(workspaceId!),
     queryFn: () => seoSuggestions.list(workspaceId!),
     enabled: !!workspaceId,
     staleTime: 30_000,
@@ -141,8 +243,9 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           const draftDate = new Date(draft.savedAt);
           const lastModified = new Date(); // We don't have page last modified, so use draft if it exists
           if (draftDate <= lastModified) {
-            seoTitle = draft.seoTitle;
-            seoDescription = draft.seoDescription;
+            // Sanitize: JSON.parse can return null for fields that were stored as null
+            seoTitle = draft.seoTitle ?? seoTitle;
+            seoDescription = draft.seoDescription ?? seoDescription;
             dirty = true; // Mark as dirty since it differs from Webflow
           }
         }
@@ -258,7 +361,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       // Refresh page edit states to reflect the new 'live' status
       refreshStates();
       // Invalidate audit cache so the audit reflects updated SEO status
-      queryClient.invalidateQueries({ queryKey: ['admin-audit'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
       setTimeout(() => setSaved(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 2000);
     } catch (err) {
       console.error('Save failed:', err);
@@ -326,7 +429,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   // Fetch keyword strategy to know which pages already have persisted analysis
   const { data: strategyData } = useQuery({
-    queryKey: ['keyword-strategy', workspaceId],
+    queryKey: queryKeys.admin.keywordStrategy(workspaceId!),
     queryFn: () => keywords.webflowStrategy(workspaceId!) as Promise<{ pageMap?: Array<{ pagePath: string; analysisGeneratedAt?: string }> }>,
     enabled: !!workspaceId,
     staleTime: 60_000,
@@ -374,7 +477,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         // Mark page as analyzed
         setAnalyzedPages(prev => new Set(prev).add(pageId));
         // Refresh strategy query so UI updates
-        queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) });
       }
     } catch (err) {
       console.error('Page analysis failed:', err);
@@ -384,16 +487,25 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   };
 
   const analyzeAllPages = async () => {
-    cancelBulkAnalyzeRef.current = false;
+    if (!workspaceId) return;
     const toAnalyze = pages.filter(p => !analyzedPages.has(p.id));
+    if (toAnalyze.length === 0) return;
     setBulkAnalyzeProgress({ done: 0, total: toAnalyze.length });
-    for (let i = 0; i < toAnalyze.length; i++) {
-      if (cancelBulkAnalyzeRef.current) break;
-      setBulkAnalyzeProgress({ done: i, total: toAnalyze.length });
-      await analyzePage(toAnalyze[i].id);
+    try {
+      const { jobId } = await seoBulkJobs.bulkAnalyze(workspaceId, {
+        pages: toAnalyze.map(p => ({
+          pageId: p.id,
+          title: p.title,
+          slug: p.slug,
+          seoTitle: edits[p.id]?.seoTitle || p.seo?.title || '',
+          seoDescription: edits[p.id]?.seoDescription || p.seo?.description || '',
+        })),
+      });
+      setBulkAnalyzeJobId(jobId);
+    } catch (err) {
+      console.error('Failed to start bulk analyze:', err);
+      setBulkAnalyzeProgress(null);
     }
-    setBulkAnalyzeProgress(prev => prev ? { ...prev, done: prev.total } : null);
-    setTimeout(() => setBulkAnalyzeProgress(null), 3000);
   };
 
   const handlePublish = async () => {
@@ -432,7 +544,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       });
       const applied = data.results?.filter((r: { applied: boolean }) => r.applied).length || 0;
       setBulkResults(`AI generated ${field === 'title' ? 'titles' : 'descriptions'} for ${applied} of ${pagesNeedingFix.length} pages and pushed to Webflow.`);
-      queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) });
       setTimeout(() => setBulkResults(null), 5000);
     } catch (err) {
       console.error('SeoEditor operation failed:', err);
@@ -491,52 +603,44 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       );
       const applied = data.results?.filter(r => r.applied).length || 0;
       setBulkResults(`Pattern applied to ${applied}/${bulkPreview.length} pages.`);
-      queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) });
     } catch { setBulkResults('Pattern apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setPatternText(''); setTimeout(() => setBulkResults(null), 5000); }
   };
 
-  // ── Bulk AI Rewrite — calls the same single-page aiRewrite for each selected page ──
+  // ── Bulk AI Rewrite — background job with WS progress ──
   const bulkAiRewrite = async (field: 'title' | 'description' | 'both') => {
+    if (!workspaceId) return;
     const selectedIds = filterWritableIds(Array.from(approvalSelected), pages);
     if (selectedIds.length === 0) return;
     setBulkField(field === 'both' ? 'title' : field);
     setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: selectedIds.length });
 
-    // Auto-expand all selected pages so users can watch results appear
-    setExpanded(prev => {
-      const next = new Set(prev);
-      for (const id of selectedIds) next.add(id);
-      return next;
-    });
-
-    let completed = 0;
-    let failed = 0;
-    const CONCURRENCY = 3;
-
-    // Process pages in concurrent batches of 3
-    for (let i = 0; i < selectedIds.length; i += CONCURRENCY) {
-      const batch = selectedIds.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(pageId => aiRewrite(pageId, field))
-      );
-      for (const r of results) {
-        if (r.status === 'rejected') failed++;
-        completed++;
-      }
-      setBulkProgress({ done: completed, total: selectedIds.length });
+    try {
+      const { jobId } = await seoBulkJobs.bulkRewrite(workspaceId, {
+        siteId,
+        pages: selectedIds.map(id => {
+          const page = pages.find(p => p.id === id);
+          const edit = edits[id];
+          return {
+            pageId: id,
+            title: page?.title || '',
+            slug: page?.slug,
+            currentSeoTitle: edit?.seoTitle || page?.seo?.title || '',
+            currentDescription: edit?.seoDescription || page?.seo?.description || '',
+          };
+        }),
+        field,
+      });
+      setBulkRewriteJobId(jobId);
+    } catch (err) {
+      console.error('Failed to start bulk rewrite:', err);
+      setBulkMode('idle');
+      setBulkProgress({ done: 0, total: 0 });
+      setBulkResults('Failed to start bulk rewrite.');
+      setTimeout(() => setBulkResults(null), 5000);
     }
-
-    const fieldLabel = field === 'both' ? 'title + description' : field;
-    const succeeded = completed - failed;
-    setBulkResults(
-      failed > 0
-        ? `Generated ${succeeded}/${selectedIds.length} ${fieldLabel} variations (${failed} failed) — review in each page card below.`
-        : `Generated ${succeeded}/${selectedIds.length} ${fieldLabel} variations — review in each page card below.`
-    );
-    setBulkMode('idle');
-    setTimeout(() => setBulkResults(null), 8000);
   };
 
   const applyBulkRewrite = async () => {
@@ -556,7 +660,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
       }
       setBulkResults(`Applied ${staticItems.length} ${bulkField === 'title' ? 'title' : 'description'} changes.`);
-      queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) });
     } catch { setBulkResults('Apply failed.'); }
     finally { setBulkMode('idle'); setBulkPreview([]); setTimeout(() => setBulkResults(null), 5000); }
   };
@@ -569,12 +673,18 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     // API — sitemap pages have synthetic IDs, template pages' collectionId is a page-level
     // attribute, not a CMS item ID. Exclude them entirely from the approval workflow.
     if (!page || !edit || page.source === 'cms') return;
+    // Use ?? '' to guard against null values that could survive from a stale sessionStorage cache
+    const proposedTitle = edit.seoTitle ?? '';
+    const proposedDesc = edit.seoDescription ?? '';
+    const currentTitle = page.seo?.title ?? '';
+    const currentDesc = page.seo?.description ?? '';
+    const pageSlug = page.slug ?? '';
     const items: Array<{ pageId: string; pageTitle: string; pageSlug: string; field: 'seoTitle' | 'seoDescription'; currentValue: string; proposedValue: string }> = [];
-    if (edit.seoTitle !== (page.seo?.title || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle });
+    if (proposedTitle !== currentTitle) {
+      items.push({ pageId, pageTitle: page.title, pageSlug, field: 'seoTitle', currentValue: currentTitle, proposedValue: proposedTitle });
     }
-    if (edit.seoDescription !== (page.seo?.description || '')) {
-      items.push({ pageId, pageTitle: page.title, pageSlug: page.slug, field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription });
+    if (proposedDesc !== currentDesc) {
+      items.push({ pageId, pageTitle: page.title, pageSlug, field: 'seoDescription', currentValue: currentDesc, proposedValue: proposedDesc });
     }
     if (items.length === 0) return;
     setSendingPage(prev => new Set(prev).add(pageId));
@@ -583,7 +693,11 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setSentPage(prev => new Set(prev).add(pageId));
       refreshStates();
       setTimeout(() => setSentPage(prev => { const n = new Set(prev); n.delete(pageId); return n; }), 4000);
-    } catch (err) { console.error('SeoEditor operation failed:', err); }
+    } catch (err) {
+      console.error('SeoEditor sendPageToClient failed:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to send for review';
+      toast(msg);
+    }
     setSendingPage(prev => { const n = new Set(prev); n.delete(pageId); return n; });
   };
 
@@ -601,23 +715,29 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         const page = pages.find(p => p.id === pageId);
         const edit = edits[pageId];
         if (!page || !edit) continue;
+        // Use ?? '' to guard against null values that could survive from a stale sessionStorage cache
+        const proposedTitle = edit.seoTitle ?? '';
+        const proposedDesc = edit.seoDescription ?? '';
+        const currentTitle = page.seo?.title ?? '';
+        const currentDesc = page.seo?.description ?? '';
+        const pageSlug = page.slug ?? '';
         // Include title if changed from original
-        if (edit.seoTitle !== (page.seo?.title || '')) {
+        if (proposedTitle !== currentTitle) {
           items.push({
-            pageId, pageTitle: page.title, pageSlug: page.slug,
-            field: 'seoTitle', currentValue: page.seo?.title || '', proposedValue: edit.seoTitle,
+            pageId, pageTitle: page.title, pageSlug,
+            field: 'seoTitle', currentValue: currentTitle, proposedValue: proposedTitle,
           });
         }
         // Include description if changed from original
-        if (edit.seoDescription !== (page.seo?.description || '')) {
+        if (proposedDesc !== currentDesc) {
           items.push({
-            pageId, pageTitle: page.title, pageSlug: page.slug,
-            field: 'seoDescription', currentValue: page.seo?.description || '', proposedValue: edit.seoDescription,
+            pageId, pageTitle: page.title, pageSlug,
+            field: 'seoDescription', currentValue: currentDesc, proposedValue: proposedDesc,
           });
         }
       }
       if (items.length === 0) {
-        alert('No changes detected on selected pages. Edit SEO fields first.');
+        toast('No changes detected on selected pages. Edit SEO fields first.');
         setSendingApproval(false);
         return;
       }
@@ -630,7 +750,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       setTimeout(() => setApprovalSent(false), 4000);
     } catch (err) {
       console.error('Failed to send for approval:', err);
-      alert('Failed to send for approval');
+      const msg = err instanceof Error ? err.message : 'Failed to send for approval';
+      toast(msg);
     } finally {
       setSendingApproval(false);
     }
@@ -695,7 +816,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         )}
         <div className="flex-1" />
         <button
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] })}
+          onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) })}
           className="p-1.5 rounded text-zinc-500 hover:text-teal-400 hover:bg-zinc-800 transition-colors"
           title="Refresh pages from Webflow"
         >
@@ -765,7 +886,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           {summary.live > 0 && <StatusBadge status="live" />}
           {summary.live > 0 && <span className="text-teal-400">{summary.live}</span>}
           {summary.inReview > 0 && <StatusBadge status="in-review" />}
-          {summary.inReview > 0 && <span className="text-purple-400">{summary.inReview}</span>}
+          {summary.inReview > 0 && <span className="text-amber-400">{summary.inReview}</span>}
           {summary.approved > 0 && <StatusBadge status="approved" />}
           {summary.approved > 0 && <span className="text-emerald-400/80">{summary.approved}</span>}
           {summary.rejected > 0 && <StatusBadge status="rejected" />}
@@ -805,16 +926,16 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       {workspaceId && (
         <div className="flex items-center gap-3">
           {bulkAnalyzeProgress ? (
-            <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
               <span className="text-xs text-zinc-300">Analyzing {bulkAnalyzeProgress.done}/{bulkAnalyzeProgress.total} pages...</span>
-              <button onClick={() => { cancelBulkAnalyzeRef.current = true; }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
+              <button onClick={() => { if (bulkAnalyzeJobId) { cancelJob(bulkAnalyzeJobId); setBulkAnalyzeJobId(null); setBulkAnalyzeProgress(null); queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId!) }); } }} className="text-[11px] text-red-400 hover:text-red-300 ml-2">Cancel</button>
             </div>
           ) : (
             <button
               onClick={analyzeAllPages}
               disabled={analyzing.size > 0 || analyzedPages.size === pages.length}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600/80 hover:bg-teal-500/80 text-white rounded-lg transition-colors disabled:opacity-40"
             >
               <Sparkles className="w-3.5 h-3.5" />
               {analyzedPages.size === pages.length && pages.length > 0
@@ -871,7 +992,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
           suggestions={suggestionsData.suggestions}
           counts={suggestionsData.counts}
           onRefresh={() => refetchSuggestions()}
-          onApplied={() => queryClient.invalidateQueries({ queryKey: ['seo-editor', siteId] })}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.seoEditor(siteId) })}
         />
       )}
 
@@ -885,6 +1006,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         onSetPatternText={setPatternText} onPreviewPattern={previewPattern}
         onApplyPattern={applyPattern} onApplyBulkRewrite={applyBulkRewrite}
         onBulkAiRewrite={bulkAiRewrite}
+        onCancelRewrite={() => { if (bulkRewriteJobId) { cancelJob(bulkRewriteJobId); setBulkRewriteJobId(null); } setBulkMode('idle'); setBulkProgress({ done: 0, total: 0 }); }}
         onClearPreview={() => { setBulkMode('idle'); setBulkPreview([]); }}
       />
 
@@ -914,7 +1036,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               pageRecs={recsLoaded ? recsForPage(page.slug) : []}
               pageState={getState(page.id)} variations={variations[page.id]}
               showApprovalCheckbox={!!workspaceId} isSendingToClient={sendingPage.has(page.id)}
-              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && (edits[page.id].seoTitle !== (page.seo?.title || '') || edits[page.id].seoDescription !== (page.seo?.description || '')))}
+              isSentToClient={sentPage.has(page.id)} hasChanges={!!(edits[page.id] && ((edits[page.id].seoTitle ?? '') !== (page.seo?.title ?? '') || (edits[page.id].seoDescription ?? '') !== (page.seo?.description ?? '')))}
               onSendToClient={sendPageToClient}
               onToggleExpand={toggleExpand} onToggleApprovalSelect={toggleApprovalSelect}
               onUpdateField={updateField} onSave={page.source === 'cms' ? undefined : savePage} isCmsPage={page.source === 'cms'} onSaveDraft={saveDraft} onAiRewrite={aiRewrite}

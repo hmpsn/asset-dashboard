@@ -555,6 +555,36 @@
           "priority": "P1",
           "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.",
           "status": "pending"
+        },
+        {
+          "id": 588,
+          "title": "Composite Health Score Dashboard — admin badge + client card",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "Shipped — compositeHealthScore (0-100, 40% churn + 30% ROI + 30% engagement) surfaced in admin WorkspaceHome (badge next to workspace name) and client OverviewTab (HealthScoreCard with MetricRing, contextual messaging, legend). Wired into ClientIntelligence type + endpoint for Growth+ tiers. Feature #81.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 589,
+          "title": "Prediction Showcase Card (weCalledIt) — client dashboard",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "2-4h",
+          "priority": "P1",
+          "notes": "Shipped — PredictionShowcaseCard shows top 5 predictions that came true from outcome tracking. Wired into ClientIntelligence.weCalledIt for Growth+ tiers. Empty state with Trophy icon when no predictions yet. Feature #82.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 590,
+          "title": "Cannibalization Warning Alerts — admin content pipeline",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — CannibalizationAlert component in ContentPipeline with severity-based color coding (red/amber/blue for high/medium/low), TierGate for Growth+. Shows affected keywords and competing page paths. Feature #83.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
         }
       ]
     },
@@ -588,8 +618,9 @@
           "source": "PR #162 typecheck cleanup",
           "est": "1h",
           "priority": "P3",
-          "notes": "server/reports.ts uses `as never` to spread a legacy PageHealthData shape into AnalyticsInsight.data. The in-memory report-builder interface doesn't match the persisted insight shape. Either extend the InsightDataMap entry to cover the report fields or transform the object explicitly at the boundary. Blocked on #580 (the Record<string, unknown> → union tightening).",
-          "status": "pending"
+          "notes": "Shipped — PR 3 Platform Health Sprint. Extended PageHealthData interface with optional audit-enrichment fields (auditSnapshotId, errorCount, warningCount, topIssues) and removed the `as never` cast.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
         },
         {
           "id": 583,
@@ -628,13 +659,22 @@
           "status": "pending"
         },
         {
+          "id": 587,
+          "title": "Shared WebSocket event bus — eliminate per-hook WS connections",
+          "source": "Platform Health Sprint PR1 Devin review (2026-04-14)",
+          "est": "2-3h",
+          "priority": "P2",
+          "notes": "useWorkspaceEvents() creates a new WebSocket connection per call. SeoEditor + SeoAudit (and other multi-hook components) each open dedicated WS connections, scaling linearly with component count. Fix: lift workspace WS connection to a shared React context (or use the existing event bus pattern) so all hooks share one connection per workspaceId. Not urgent — connections close on unmount, but it's wasteful and could cause scaling issues with many concurrent users.",
+          "status": "pending"
+        },
+        {
           "id": 537,
           "title": "Backfill addActivity() calls on all public-portal mutation endpoints",
           "source": "PIE Group 3 code review",
           "est": "0.5h",
           "priority": "P2",
-          "notes": "5 public-portal mutation endpoints have no addActivity() call: POST /onboarding/:id, POST /keyword-feedback (single + bulk), POST /business-priorities, POST /content-gap-vote. Admin has zero visibility into client portal engagement. The business-profile PATCH was fixed in PR #146; the rest need the same treatment. Quick — import exists, just add the calls with appropriate ActivityType values.",
-          "status": "pending"
+          "notes": "All 5 public-portal mutation endpoints now have addActivity() calls: POST /onboarding/:id (line 187), POST /keyword-feedback single (line 389) + bulk (line 430), POST /business-priorities (line 508), POST /content-gap-vote (line 616).",
+          "status": "done"
         },
         {
           "id": 532,
@@ -651,8 +691,8 @@
           "source": "pr-check.ts",
           "est": "0.25h",
           "priority": "P3",
-          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. 2/8 occurrences fixed (internal-links.ts, llms-txt-generator.ts). Remaining 6: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts. Quick find-and-replace.",
-          "status": "pending"
+          "notes": "STUDIO_URL and STUDIO_BOT_UA constants added to server/constants.ts. All 8 occurrences now use constants. Remaining 6 fixed: web-scraper.ts (UA), sales-report-html.ts (2x), brief-export-html.ts, post-export-html.ts, reports.ts.",
+          "status": "done"
         },
         {
           "id": 400,
@@ -4174,8 +4214,9 @@
           "est": "2-3h",
           "priority": "P2",
           "sprint": "E",
-          "notes": "Bridge #12 and #15 create audit_finding insights marked in_progress, but there's no logic to auto-resolve them when subsequent audit runs show the issues are fixed. Stale in_progress findings accumulate. Needs a resolve-on-clean-audit mechanism.",
-          "status": "pending"
+          "notes": "Shipped — PR 3 Platform Health Sprint. Added bridge-audit-auto-resolve trigger after on-demand audit completion. Resolves page-level findings when page no longer has issues, and site-level findings when score >= 70. Integration test at tests/integration/audit-insight-resolution.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
         },
         {
           "id": "bridge-12-dedup-data-refresh",
@@ -4184,8 +4225,9 @@
           "est": "1-2h",
           "priority": "P2",
           "sprint": "E",
-          "notes": "The dedup check (existingForPage → continue) prevents upsertInsight from running, so audit issue data is never refreshed when issues change between runs. Should upsert with updated data instead of skipping entirely, while preserving resolution state.",
-          "status": "pending"
+          "notes": "Shipped — PR 3 Platform Health Sprint. Added bridge-audit-page-health trigger after on-demand audit completion. Creates new audit_finding insights for pages with critical/warning issues. Dedup skips pages with existing unresolved findings (does NOT refresh issue data for already-tracked pages — future enhancement).",
+          "status": "done",
+          "shippedAt": "2026-04-15"
         },
         {
           "id": "anomaly-boost-reversal-mechanism",
@@ -4194,8 +4236,9 @@
           "est": "3-4h",
           "priority": "P2",
           "sprint": "E",
-          "notes": "Bridge #10 applies +10 anomaly boost to matching insights but never reverses it when anomalies age out or are dismissed. Boosted scores remain inflated permanently. Needs a decay or reversal mechanism (e.g., remove boost when no recent anomalies match, or time-decay the boost).",
-          "status": "pending"
+          "notes": "Shipped — PR 3 Platform Health Sprint. reverseAnomalyBoostIfNoneRemain() called after dismissAnomaly(). When no recent undismissed anomalies remain, removes 'anomaly' score adjustment key via applyScoreAdjustment(data, score, 'anomaly', 0). Integration test at tests/integration/anomaly-boost-reversal.test.ts.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
         },
         {
           "id": "pie-group2-strategy-card-context",
@@ -4237,8 +4280,9 @@
           "est": "1-2h",
           "priority": "P2",
           "sprint": "A",
-          "status": "pending",
-          "notes": "SEMRush and DataForSEO round sub-threshold search volume to 0 rather than reporting the real number. Cards currently display '0/mo' which implies zero demand — but 0 can coexist with real GSC impressions, competitor rankings, and a high-priority AI rationale, creating a contradiction that undermines trust. Fix: (1) Display '<10/mo' instead of '0/mo' when volume === 0 in both StrategyTab.tsx and ContentGaps.tsx — this is the accurate meaning (below threshold, not actually zero). (2) Predicted impact line currently returns null when volume=0 (impact = 0 * 0.103 = 0, fails the < 10 guard). When volume is 0 but gap.impressions > 0, use impressions as a fallback signal: show '~{impressions} existing impr — opportunity confirmed via GSC' instead of hiding the line entirely. Touches: src/components/client/StrategyTab.tsx, src/components/strategy/ContentGaps.tsx."
+          "status": "done",
+          "shippedAt": "2026-04-15",
+          "notes": "Shipped — PR 3 Platform Health Sprint. Added VOLUME_THRESHOLD=10 filter in KeywordStrategy.tsx. Pages with known volume < 10 are filtered from the rendering path. Pages without volume data (not yet enriched) pass through to avoid silently hiding unvalidated entries. Also fixed pre-existing inline queryKey strings → queryKeys.admin.keywordStrategy() factory calls."
         },
         {
           "id": "seo-provider-hybrid-capability-routing",

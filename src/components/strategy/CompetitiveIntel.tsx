@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../../api/client';
 import {
   Loader2, TrendingUp, Globe, Search, Link2,
   DollarSign, Target, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { SectionCard, StatCard } from '../ui';
+import { queryKeys } from '../../lib/queryKeys';
 
 interface DomainOverview {
   domain: string;
@@ -56,6 +58,8 @@ interface Props {
   workspaceId: string;
   competitors: string[];
   semrushAvailable: boolean;
+  /** Keyword gaps from the stored strategy — used as fallback when the live API call fails or returns empty */
+  cachedKeywordGaps?: KeywordGap[];
 }
 
 function fmtNum(n: number): string {
@@ -88,33 +92,20 @@ function ComparisonBar({ myVal, theirVal, label }: { myVal: number; theirVal: nu
   );
 }
 
-export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }: Props) {
-  const [data, setData] = useState<IntelResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, cachedKeywordGaps }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const fetchIntel = async () => {
-    if (!competitors.length || !semrushAvailable) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const comps = competitors.join(',');
-      const result = await get<IntelResponse>(`/api/semrush/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(comps)}`);
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch competitive data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const queryClient = useQueryClient();
   const competitorKey = competitors.join(',');
-  useEffect(() => {
-    if (competitors.length > 0 && semrushAvailable) {
-      fetchIntel();
-    }
-  }, [workspaceId, competitorKey, semrushAvailable]); // fetchIntel is stable — reads from closure
+
+  const { data, isLoading, error, refetch } = useQuery<IntelResponse>({
+    queryKey: queryKeys.admin.competitiveIntel(workspaceId, competitorKey),
+    queryFn: () => get<IntelResponse>(`/api/semrush/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
+    enabled: competitors.length > 0 && semrushAvailable,
+    staleTime: 48 * 60 * 60 * 1000, // 48h — matches server-side cache
+    retry: 1,
+  });
+
+  const errorMsg = error instanceof Error ? error.message : error ? String(error) : null;
 
   if (!semrushAvailable) {
     return (
@@ -144,7 +135,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SectionCard>
         <div className="flex flex-col items-center justify-center py-10 gap-2">
@@ -156,21 +147,25 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
     );
   }
 
-  if (error) {
+  // When the live API errors or returns no data, fall back to cached keyword gaps from the strategy blob
+  const effectiveGaps = (data?.keywordGaps?.length ? data.keywordGaps : cachedKeywordGaps) ?? [];
+  const usingFallbackGaps = effectiveGaps.length > 0 && !data?.keywordGaps?.length && !!cachedKeywordGaps?.length;
+
+  if (errorMsg && effectiveGaps.length === 0) {
     return (
       <SectionCard>
         <div className="text-center py-6">
-          <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchIntel} className="mt-2 text-xs text-teal-400 hover:underline">Retry</button>
+          <p className="text-sm text-red-400">{errorMsg}</p>
+          <button onClick={() => refetch()} className="mt-2 text-xs text-teal-400 hover:underline">Retry</button>
         </div>
       </SectionCard>
     );
   }
 
-  if (!data) return null;
+  if (!data && effectiveGaps.length === 0) return null;
 
-  const myDomain = data.domains.find(d => d.isOwn);
-  const compDomains = data.domains.filter(d => !d.isOwn);
+  const myDomain = data?.domains.find(d => d.isOwn);
+  const compDomains = data?.domains.filter(d => !d.isOwn) ?? [];
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => {
@@ -188,7 +183,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
           <Target className="w-4 h-4 text-teal-400" />
           <h3 className="text-sm font-semibold text-zinc-200">Competitive Intelligence</h3>
         </div>
-        <button onClick={fetchIntel} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitiveIntel(workspaceId) }); }} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
           Refresh
         </button>
       </div>
@@ -265,7 +260,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
       })}
 
       {/* Keyword Gaps */}
-      {data.keywordGaps.length > 0 && (
+      {effectiveGaps.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleExpand('gaps')}
@@ -274,13 +269,14 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
             {expanded.has('gaps') ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
             <Target className="w-4 h-4 text-amber-400" />
             <span className="text-sm font-medium text-zinc-200 flex-1 text-left">Keyword Gaps</span>
-            <span className="text-[11px] text-zinc-500">{data.keywordGaps.length} opportunities</span>
+            {usingFallbackGaps && <span className="text-[10px] text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
+            <span className="text-[11px] text-zinc-500">{effectiveGaps.length} opportunities</span>
           </button>
           {expanded.has('gaps') && (
             <div className="px-4 pb-4 border-t border-zinc-800 pt-3">
               <p className="text-[11px] text-zinc-500 mb-3">Keywords your competitors rank for that you don't — sorted by traffic potential.</p>
               <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {data.keywordGaps.map((gap, i) => (
+                {effectiveGaps.map((gap, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-zinc-950/50 rounded-lg">
                     <span className="flex-1 text-zinc-300 truncate">{gap.keyword}</span>
                     <span className="text-zinc-500 font-mono">{fmtNum(gap.volume)}/mo</span>
@@ -294,9 +290,19 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
         </div>
       )}
 
-      <p className="text-[11px] text-zinc-600 text-right">
-        Data via SEMRush · Cached 48h · {data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : ''}
-      </p>
+      <div className="flex items-center justify-between">
+        {errorMsg && effectiveGaps.length > 0 && (
+          <p className="text-[11px] text-amber-500/70">
+            Live fetch failed — showing cached data.{' '}
+            <button onClick={() => refetch()} className="text-teal-400 hover:underline">Retry</button>
+          </p>
+        )}
+        <p className="text-[11px] text-zinc-600 text-right ml-auto">
+          Data via SEMRush · {usingFallbackGaps
+            ? 'Keyword gaps from last strategy run'
+            : data?.fetchedAt ? `Cached 48h · ${new Date(data.fetchedAt).toLocaleString()}` : ''}
+        </p>
+      </div>
     </div>
   );
 }

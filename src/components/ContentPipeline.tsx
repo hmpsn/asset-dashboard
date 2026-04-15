@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
 import { LoadingState } from './ui';
-import { useContentPipeline } from '../hooks/admin';
+import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
@@ -12,8 +12,10 @@ import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
+import { CannibalizationAlert } from './admin/CannibalizationAlert';
 import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
+import { useWorkspaceIntelligence } from '../hooks/admin';
 import type { FixContext } from '../App';
 
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
@@ -71,6 +73,13 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
   // React Query hook replaces manual data fetching
   const { data: pipelineData } = useContentPipeline(workspaceId);
+
+  // Workspace tier — from cached workspaces list (no extra fetch)
+  const { data: workspaces = [] } = useWorkspaces();
+  const workspaceTier = (workspaces.find(w => w.id === workspaceId)?.tier ?? 'free') as 'free' | 'growth' | 'premium';
+
+  // Intelligence layer — cannibalization warnings
+  const { data: intel } = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
 
   // Invalidate AI suggested briefs when intelligence signals update
   useWorkspaceEvents(workspaceId, {
@@ -162,6 +171,12 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
           </button>
         </div>
       )}
+
+      {/* Cannibalization warnings from intelligence */}
+      <CannibalizationAlert
+        warnings={intel?.contentPipeline?.cannibalizationWarnings}
+        tier={workspaceTier}
+      />
 
       {/* AI-suggested briefs from insight engine */}
       <AiSuggested workspaceId={workspaceId} onCreateBrief={handleCreateBrief} />

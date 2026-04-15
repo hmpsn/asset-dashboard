@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { FEATURE_FLAGS } from '../../shared/types/feature-flags';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
+import { queryKeys } from '../lib/queryKeys';
 
 async function fetchFeatureFlags(): Promise<Record<FeatureFlagKey, boolean>> {
   const res = await fetch('/api/feature-flags');
@@ -19,7 +20,7 @@ async function fetchFeatureFlags(): Promise<Record<FeatureFlagKey, boolean>> {
  */
 export function useFeatureFlag(flag: FeatureFlagKey): boolean {
   const { data } = useQuery({
-    queryKey: ['feature-flags'],
+    queryKey: queryKeys.shared.featureFlags(),
     queryFn: fetchFeatureFlags,
     staleTime: Infinity,
     gcTime: Infinity,

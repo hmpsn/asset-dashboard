@@ -102,14 +102,9 @@ export function shouldFetchCompetitorData(ws: Workspace): boolean {
   cutoff.setDate(cutoff.getDate() - COMPETITOR_CACHE_DAYS);
   if (new Date(ws.competitorLastFetchedAt) < cutoff) return true;
 
-  // Force re-fetch if the competitor list has changed since last run.
-  // Compare current workspace competitors against domains present in cached gaps.
-  const currentDomains = ws.competitorDomains ?? [];
-  if (currentDomains.length === 0) return false;
-  const cachedGapDomains = new Set(
-    (ws.keywordStrategy?.keywordGaps ?? []).map(g => g.competitorDomain)
-  );
-  return currentDomains.some(d => !cachedGapDomains.has(d));
+  // Timestamp is the only reliable signal — keywordGaps is an incomplete proxy
+  // (competitors with zero gaps don't appear there, causing false re-fetches).
+  return false;
 }
 
 // ── Strategy Intelligence Block ──────────────────────────────────
@@ -1048,7 +1043,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
             }
             // Pre-enrich from pool — if the keyword is in our pool, apply the data now
             const poolMatch = keywordPool.get(pm.primaryKeyword?.toLowerCase());
-            if (poolMatch) {
+            if (poolMatch && poolMatch.source !== 'gsc') {
               pm.volume = poolMatch.volume;
               pm.difficulty = poolMatch.difficulty;
               fromPool++;
@@ -1574,24 +1569,42 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
 
     // Enrich contentGaps with SEMRush volume/difficulty + GSC impressions
     if (strategy.contentGaps && strategy.contentGaps.length > 0) {
-      // SEMRush: look up volume/KD from existing domain data first, then bulk-fetch missing
-      const kwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
+      // Enrich content gaps with volume/KD from the keyword pool first (has data from
+      // competitor gaps, competitor keywords, GSC, related keywords), then domain organic
+      // data, then bulk API fetch as last resort. The keyword pool is the richest source
+      // because it aggregates all data gathered during this strategy run.
+      const domainKwLookup = new Map(semrushDomainData.map(k => [k.keyword.toLowerCase(), k]));
       const missingCgKws: string[] = [];
+      let poolEnriched = 0;
       for (const cg of strategy.contentGaps) {
-        const m = kwLookup.get(cg.targetKeyword.toLowerCase());
-        if (m) {
-          cg.volume = m.volume;
-          cg.difficulty = m.difficulty;
-        } else {
-          missingCgKws.push(cg.targetKeyword);
+        const kwLower = cg.targetKeyword.toLowerCase();
+        // Priority 1: keyword pool (competitor gaps, competitor keywords, related keywords).
+        // SKIP GSC-sourced entries — their "volume" is actually GSC impressions, not real
+        // search volume. Using impressions would severely undervalue high-volume keywords
+        // and set difficulty to 0 (hardcoded for GSC entries), misleading downstream sorts.
+        const poolHit = keywordPool.get(kwLower);
+        if (poolHit && poolHit.volume > 0 && poolHit.source !== 'gsc') {
+          cg.volume = poolHit.volume;
+          cg.difficulty = poolHit.difficulty;
+          poolEnriched++;
+          continue;
         }
+        // Priority 2: domain organic data
+        const domainHit = domainKwLookup.get(kwLower);
+        if (domainHit) {
+          cg.volume = domainHit.volume;
+          cg.difficulty = domainHit.difficulty;
+          continue;
+        }
+        missingCgKws.push(cg.targetKeyword);
       }
+      log.info(`Content gap enrichment: ${poolEnriched} from keyword pool, ${strategy.contentGaps.length - poolEnriched - missingCgKws.length} from domain data, ${missingCgKws.length} need API lookup`);
       if (missingCgKws.length > 0 && provider && semrushMode !== 'none') {
         try {
           const cgMetrics = await provider.getKeywordMetrics(missingCgKws.slice(0, 30), ws.id);
           const cgMap = new Map(cgMetrics.map(m => [m.keyword.toLowerCase(), m]));
           for (const cg of strategy.contentGaps) {
-            if (!cg.volume) {
+            if (cg.volume == null) {
               const m = cgMap.get(cg.targetKeyword.toLowerCase());
               if (m) {
                 cg.volume = m.volume;
@@ -1933,8 +1946,12 @@ Rules:
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
       const withVolume = strategy.contentGaps
         .filter((cg: { volume?: number; impressions?: number }) =>
-          cg.volume === undefined && cg.impressions === undefined ||
-          (cg.volume && cg.volume > 0) || (cg.impressions && cg.impressions > 0)
+          // Keep: no enrichment data at all (unenriched), OR positive volume, OR positive impressions.
+          // Items enriched to volume=0 with no impressions ARE dropped — if SEMRush/pool says
+          // volume is 0 and GSC shows no impressions, the keyword has no proven demand.
+          (cg.volume == null && cg.impressions == null) ||
+          (cg.volume != null && cg.volume > 0) ||
+          (cg.impressions != null && cg.impressions > 0)
         );
       if (withVolume.length > 0) {
         // Sort by volume descending, then priority

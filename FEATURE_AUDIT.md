@@ -979,6 +979,71 @@ A comprehensive value assessment of every feature in the platform — **298 feat
 
 ---
 
+### 81. Composite Health Score Dashboard
+
+**Status:** Shipped (PR 2 — Platform Health Sprint)
+**What it does:** Surfaces the composite health score (0-100, weighted: 40% churn risk + 30% ROI trend + 30% engagement) in both admin and client views. Admin: health badge next to workspace name in WorkspaceHome. Client: prominent HealthScoreCard at top of OverviewTab with score, contextual message, and legend.
+**Files:** `src/components/admin/WorkspaceHealthBadge.tsx`, `src/components/client/HealthScoreCard.tsx`, `src/components/WorkspaceHome.tsx` (wiring), `src/components/client/OverviewTab.tsx` (wiring), `shared/types/intelligence.ts` (ClientIntelligence), `server/routes/client-intelligence.ts` (endpoint)
+**Agency value:** At-a-glance workspace health for admin triage. Client-facing "credit score for SEO" builds trust and urgency.
+**Client value:** Clients see a single number representing their SEO health, with plain-language explanation of what it means.
+
+---
+
+### 82. Prediction Showcase Card (weCalledIt)
+
+**Status:** Shipped (PR 2 — Platform Health Sprint)
+**What it does:** Client-facing card that showcases predictions that came true — "We predicted X would happen, and it did." Shows top 5 strongest predictions with outcome text and confirmation date. Empty state encourages patience while building track record.
+**Files:** `src/components/client/PredictionShowcaseCard.tsx`, `src/components/client/OverviewTab.tsx` (wiring), `shared/types/intelligence.ts` (ClientIntelligence.weCalledIt), `server/routes/client-intelligence.ts` (endpoint)
+**Agency value:** Demonstrates strategy accuracy to clients, reducing churn and building trust.
+**Client value:** Clients see concrete proof that recommendations are working — builds confidence in the agency relationship.
+
+---
+
+### 83. Cannibalization Warning Alerts
+
+**Status:** Shipped (PR 2 — Platform Health Sprint)
+**What it does:** Admin-facing alert in ContentPipeline that shows keyword cannibalization warnings — when multiple pages compete for the same keyword. Color-coded by severity (red/amber/blue), tier-gated (Growth+), shows affected keywords and competing page paths.
+**Files:** `src/components/admin/CannibalizationAlert.tsx`, `src/components/ContentPipeline.tsx` (wiring)
+**Agency value:** Proactive detection of keyword competition between client pages, enabling consolidation recommendations.
+
+---
+
+### 84. Audit Finding Auto-Resolution
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** When an on-demand SEO audit re-runs, audit_finding insights that are no longer detected are automatically resolved. Mirrors the scheduled-audit auto-resolve pattern. Also triggers bridge-audit-page-health to refresh stale page health data after audit completion.
+**Files:** `server/routes/webflow-seo.ts` (bridge triggers), `tests/integration/audit-insight-resolution.test.ts`
+**Agency value:** Eliminates stale audit findings cluttering the insights feed. Health data stays current without manual intervention.
+
+---
+
+### 85. Anomaly Boost Reversal
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** When anomalies are dismissed and no recent undismissed anomalies remain, the +10 score boosts applied to related insights are immediately reversed. Previously, boosts were only cleaned up on the next 12-hour periodic scan, causing score inflation.
+**Files:** `server/anomaly-detection.ts` (reverseAnomalyBoostIfNoneRemain), `tests/integration/anomaly-boost-reversal.test.ts`
+**Agency value:** Accurate insight scores — dismissing anomalies immediately restores correct priority ordering instead of leaving inflated scores until the next scan cycle.
+
+---
+
+### 86. Strategy Cards Volume Threshold
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** Filters keyword strategy cards with monthly search volume below 10 from the rendering path. Pages without volume data (not yet enriched) pass through to avoid silently hiding unvalidated entries.
+**Files:** `src/components/KeywordStrategy.tsx`
+**Agency value:** Reduces noise in strategy views by hiding keywords with negligible search traffic.
+
+---
+
+### 87. PageHealthData Type Safety
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** Replaced `as never` type escape hatch in reports.ts by adding audit-enrichment fields (auditSnapshotId, errorCount, warningCount, topIssues) as optional properties on the PageHealthData interface.
+**Files:** `shared/types/analytics.ts`, `server/reports.ts`
+**Agency value:** Type safety — eliminates the last `as never` cast in the codebase for this data shape.
+
+---
+
 ## Future Additions
 
 Items to revisit as budget/tier upgrades allow or when priorities shift.
@@ -1798,7 +1863,7 @@ When the user asks to update this document with recent features, follow this pro
 
 ### 151. LLMs.txt Generator
 **What it does:** Generates two-tier llms.txt files — `llms.txt` (index with one-line descriptions) and `llms-full.txt` (with AI-generated per-page summaries) — following the llms.txt spec for AI consumption. Pulls data from workspace config, all published pages (Webflow static + CMS, up to 500 — no cap), keyword strategy enrichment, and planned content from matrices. **AI summaries**: GPT-4.1-mini generates 2–3 sentence summaries per page capturing expertise signals and target audience; cached in SQLite to avoid redundant API calls on re-generation. **URL validation**: HEAD requests filter broken links before including them in output. **Two-tier output**: `llms.txt` is a lightweight index; `llms-full.txt` has full inline summaries for deep AI understanding. **Auto-regeneration**: background regeneration triggers after schema publish, keyword strategy updates, and content matrix cell status changes — fire-and-forget, does not block the triggering request. **Freshness indicator**: `lastGeneratedAt` timestamp stored per workspace; UI shows "Generated Xh ago" with amber warning when stale (>3 days). Admin UI has generate, copy, separate download buttons for each tier, and a tab toggle to preview index vs. full output. Accessible via "LLMs.txt" sub-tab in Content Pipeline.
-**Files:** `server/llms-txt-generator.ts`, `server/routes/llms-txt.ts`, `src/components/LlmsTxtGenerator.tsx`, `src/api/content.ts`, `server/db/migrations/036-llms-txt-cache.sql`, `server/db/migrations/037-llms-txt-freshness.sql`
+**Files:** `server/llms-txt-generator.ts`, `server/routes/llms-txt.ts`, `src/components/LlmsTxtGenerator.tsx`, `src/api/content.ts`, `server/db/migrations/062-llms-txt-cache.sql`, `server/db/migrations/063-llms-txt-freshness.sql`
 
 **Agency value:** One-click generation of a production-quality llms.txt with AI summaries — a differentiator for SEO-forward clients who want their sites optimized for AI search engines (Perplexity, ChatGPT, Google AI Overviews). Auto-regeneration keeps it fresh without manual effort.
 

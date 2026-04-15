@@ -25,7 +25,7 @@ import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
-import { upsertAnomalyDigestInsight, getInsight } from './analytics-insights-store.js';
+import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
@@ -202,12 +202,85 @@ export function getAnomalyById(id: string): Anomaly | null {
 
 export function dismissAnomaly(workspaceId: string, id: string): boolean {
   const info = stmts().dismiss.run(new Date().toISOString(), id, workspaceId);
+  if (info.changes > 0) {
+    // After dismissal, check if any recent undismissed anomalies remain.
+    // If none, reverse the anomaly boost on all insights for this workspace.
+    // Non-critical: dismiss already committed — wrap so reversal errors don't
+    // surface as a failed dismiss (same pattern as periodic scan reversal).
+    try {
+      reverseAnomalyBoostIfNoneRemain(workspaceId);
+    } catch (err) {
+      log.warn({ err, workspaceId }, 'Anomaly boost reversal after dismiss failed — non-critical');
+    }
+  }
   return info.changes > 0;
 }
 
 export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
   const info = stmts().acknowledge.run(new Date().toISOString(), id, workspaceId);
   return info.changes > 0;
+}
+
+/**
+ * Reverse anomaly score boosts when no recent undismissed anomalies remain for a workspace.
+ *
+ * Called after dismissAnomaly() to ensure boosts are removed immediately rather than
+ * waiting for the next periodic scan. Uses applyScoreAdjustment with delta=0 to remove
+ * the 'anomaly' key from _scoreAdjustments, which restores the original base score.
+ *
+ * ── bridge-anomaly-boost feature flag checklist ──
+ * All functions that apply or reverse anomaly boosts MUST gate on
+ * isFeatureEnabled('bridge-anomaly-boost'). When adding a new boost/reversal
+ * code path, add the gate and update this list:
+ *   1. reverseAnomalyBoostIfNoneRemain() — dismiss-triggered reversal (below)
+ *   2. debouncedAnomalyBoost() call in runAnomalyScan() — boost application
+ *   3. Bridge #10 reversal loop in runAnomalyScan() — periodic scan reversal
+ *
+ * Exported for testing — not intended for direct use outside this module.
+ */
+export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
+  // Respect the feature flag — if boost behavior is disabled, skip reversal too
+  if (!isFeatureEnabled('bridge-anomaly-boost')) return 0;
+
+  // Only consider anomalies detected within the last 24h — older undismissed anomalies
+  // are stale and should not keep boosts alive indefinitely.
+  // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL),
+  // so no need to filter dismissedAt again.
+  const recentForWs = listAnomalies(workspaceId, false)
+    .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+
+  if (recentForWs.length > 0) return 0; // Still has active recent anomalies — keep boost
+
+  const allInsights = getInsights(workspaceId);
+  let reversed = 0;
+
+  for (const insight of allInsights) {
+    if (insight.resolutionStatus === 'resolved') continue;
+    const dataObj = (insight.data ?? {}) as Record<string, unknown>;
+    const adj = dataObj._scoreAdjustments as Record<string, number> | undefined;
+    if (!adj || typeof adj !== 'object' || !('anomaly' in adj)) continue;
+
+    // Remove the anomaly boost (delta=0 deletes the key)
+    const { data: newData, adjustedScore } = applyScoreAdjustment(
+      dataObj, insight.impactScore ?? 50, 'anomaly', 0,
+    );
+    if (adjustedScore !== insight.impactScore) {
+      upsertInsight({
+        ...cloneInsightParams(insight),
+        data: newData as never,
+        anomalyLinked: false,
+        impactScore: adjustedScore,
+      });
+      reversed++;
+    }
+  }
+
+  if (reversed > 0) {
+    log.info({ workspaceId, reversed }, 'Reversed anomaly boost on insights after dismissal');
+    invalidateIntelligenceCache(workspaceId);
+  }
+
+  return reversed;
 }
 
 export function clearOldAnomalies(daysOld = 60): number {
@@ -644,7 +717,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // anomaly→InsightDomain logic at lines 555-561.
         debouncedAnomalyBoost(ws.id, async () => {
           const modifiedCount = await withWorkspaceLock(ws.id, async () => {
-            const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+            const { getInsights: fetchInsights, upsertInsight: updateInsight, cloneInsightParams: cloneParams }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
@@ -676,20 +749,10 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               );
               if (adjustedScore !== insight.impactScore) {
                 updateInsight({
-                  workspaceId: insight.workspaceId,
-                  pageId: insight.pageId,
-                  insightType: insight.insightType,
+                  ...cloneParams(insight),
                   data: newData as never,
-                  severity: insight.severity,
-                  pageTitle: insight.pageTitle,
-                  strategyKeyword: insight.strategyKeyword,
-                  strategyAlignment: insight.strategyAlignment,
-                  auditIssues: insight.auditIssues,
-                  pipelineStatus: insight.pipelineStatus,
                   anomalyLinked: true,
                   impactScore: adjustedScore,
-                  domain: insight.domain,
-                  bridgeSource: insight.bridgeSource,
                 });
                 modified++;
               }
@@ -724,7 +787,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
       if (recentForWs.length > 0) continue; // Still has active recent anomalies — keep boost
 
-      const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const { getInsights: fetchInsights, upsertInsight: updateInsight, cloneInsightParams: cloneParams }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
       const allInsights = fetchInsights(ws.id);
       let reversed = 0;
       for (const insight of allInsights) {
@@ -739,20 +802,10 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         );
         if (adjustedScore !== insight.impactScore) {
           updateInsight({
-            workspaceId: insight.workspaceId,
-            pageId: insight.pageId,
-            insightType: insight.insightType,
+            ...cloneParams(insight),
             data: newData as never,
-            severity: insight.severity,
-            pageTitle: insight.pageTitle,
-            strategyKeyword: insight.strategyKeyword,
-            strategyAlignment: insight.strategyAlignment,
-            auditIssues: insight.auditIssues,
-            pipelineStatus: insight.pipelineStatus,
             anomalyLinked: false,
             impactScore: adjustedScore,
-            domain: insight.domain,
-            bridgeSource: insight.bridgeSource,
           });
           reversed++;
         }

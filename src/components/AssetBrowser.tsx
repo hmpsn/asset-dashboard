@@ -8,6 +8,7 @@ import {
   Loader2, Minimize2, FolderOpen, Search, Database,
 } from 'lucide-react';
 import { EmptyState } from './ui';
+import { ErrorBoundary } from './ErrorBoundary';
 import { queryKeys } from '../lib/queryKeys';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { OrganizePreview } from './assets/OrganizePreview';
@@ -97,7 +98,7 @@ function AssetBrowser({ siteId }: Props) {
   }, [cmsImageData]);
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
-    queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
+    queryClient.setQueryData<Asset[]>(queryKeys.admin.webflowAssets(siteId), old => updater(old ?? []));
   const updateCmsAssets = (assetId: string, patch: Partial<{ altText: string }>) =>
     queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId), old => {
       if (!old) return old;
@@ -112,7 +113,7 @@ function AssetBrowser({ siteId }: Props) {
         },
       };
     });
-  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: ['admin-webflow-assets', siteId] });
+  const refreshAssets = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.webflowAssets(siteId) });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortField>('createdOn');
@@ -528,6 +529,7 @@ function AssetBrowser({ siteId }: Props) {
   }
 
   return (
+    <ErrorBoundary label="Asset Browser">
     <div className="space-y-8">
       {/* Stats bar */}
       <div className="flex items-center gap-4 text-sm">
@@ -741,6 +743,7 @@ function AssetBrowser({ siteId }: Props) {
         )}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
 

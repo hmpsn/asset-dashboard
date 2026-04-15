@@ -138,6 +138,9 @@ export const churnSignals = {
 export const jobs = {
   list: () => get<unknown[]>('/api/jobs'),
 
+  get: (jobId: string) =>
+    get<{ id: string; status: 'pending' | 'running' | 'done' | 'error' | 'cancelled'; progress?: number; total?: number }>(`/api/jobs/${jobId}`),
+
   create: (body: Record<string, unknown>) =>
     post<unknown>('/api/jobs', body),
 

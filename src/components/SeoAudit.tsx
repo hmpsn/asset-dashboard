@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../routes';
-import { redirects as redirectsApi } from '../api/misc';
+import { redirects as redirectsApi, jobs as jobsApi } from '../api/misc';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../hooks/admin';
 import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
+import { seoBulkJobs } from '../api/seo';
+import { queryKeys } from '../lib/queryKeys';
+import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../lib/wsEvents';
 import {
   ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
@@ -17,6 +21,7 @@ import {
 } from 'lucide-react';
 import { StatCard, scoreColorClass, scoreBgBarClass, ErrorState, LoadingState, NextStepsCard } from './ui';
 import { StatusBadge } from './ui/StatusBadge';
+import { ErrorBoundary } from './ErrorBoundary';
 import { statusBorderClass } from './ui/statusConfig';
 import { usePageEditStates } from '../hooks/usePageEditStates';
 import { AuditHistory } from './audit/AuditHistory';
@@ -48,7 +53,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { startJob, jobs } = useBackgroundTasks();
+  const { startJob, jobs, cancelJob } = useBackgroundTasks();
   const auditJobId = useRef<string | null>(null);
   const [data, setData] = useState<SeoAuditResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -98,7 +103,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to suppress issue:', err); }
     setActionMenuKey(null);
   };
@@ -107,7 +112,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     try {
       const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to unsuppress issue:', err); }
   };
 
@@ -117,7 +122,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const pattern = `${prefix}/*`;
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pagePattern: pattern, reason: `Pattern: ${pattern}` });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to suppress pattern:', err); }
     setActionMenuKey(null);
   };
@@ -298,50 +303,114 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setScheduleSaving(true);
     try {
       const updated = await put<AuditSchedule>(`/api/audit-schedules/${workspaceId}`, { enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold });
-      queryClient.setQueryData(['admin-audit-schedule', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSchedule(workspaceId), updated);
     } catch (err) { console.error('Failed to save schedule:', err); }
     finally { setScheduleSaving(false); }
   };
 
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const bulkAbortRef = useRef<AbortController | null>(null);
+  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-accept-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
-  // Cleanup: abort any in-progress bulk operation on unmount
-  useEffect(() => () => { bulkAbortRef.current?.abort(); }, []);
+  // ── WebSocket handlers for background bulk accept ──
+  useWorkspaceEvents(workspaceId, {
+    [WS_EVENTS.BULK_OPERATION_PROGRESS]: (rawData: unknown) => {
+      const d = rawData as { jobId: string; operation: string; done: number; total: number; failed?: number; appliedKey?: string | null };
+      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
+        setBulkProgress({ done: d.done, total: d.total });
+        // Mark fix as applied in real-time via WS (one key per progress event)
+        if (d.appliedKey) {
+          setAppliedFixes(prev => new Set([...prev, d.appliedKey!]));
+        }
+      }
+    },
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (rawData: unknown) => {
+      const d = rawData as { jobId: string; operation: string; applied: number; failed: number; total: number; appliedKeys?: string[] };
+      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
+        if (d.appliedKeys?.length) {
+          setAppliedFixes(prev => {
+            const next = new Set(prev);
+            for (const key of d.appliedKeys!) next.add(key);
+            return next;
+          });
+        }
+        setBulkApplying(false);
+        setBulkProgress(null);
+        setBulkAcceptJobId(null);
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
+      }
+    },
+    [WS_EVENTS.BULK_OPERATION_FAILED]: (rawData: unknown) => {
+      const d = rawData as { jobId: string; operation: string; error: string };
+      if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
+        setBulkApplying(false);
+        setBulkProgress(null);
+        setBulkAcceptJobId(null);
+        setBulkError('Bulk fix application failed: ' + d.error);
+        setTimeout(() => setBulkError(null), 8000);
+      }
+    },
+  });
+
+  // Persist active bulk accept job ID so it survives remount (nav away + back)
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkAcceptJobId ? sessionStorage.setItem(`seo-bulk-accept-job-${workspaceId}`, bulkAcceptJobId) : sessionStorage.removeItem(`seo-bulk-accept-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkAcceptJobId, workspaceId]);
+
+  // On remount, query server to recover progress UI for any restored job ID
+  const mountAcceptJobId = useRef(bulkAcceptJobId);
+  useEffect(() => {
+    const acceptId = mountAcceptJobId.current;
+    if (!acceptId) return;
+    const TERMINAL = new Set(['done', 'error', 'cancelled']);
+    jobsApi.get(acceptId)
+      .then(job => {
+        if (TERMINAL.has(job.status)) { setBulkAcceptJobId(null); }
+        else { setBulkApplying(true); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+      })
+      .catch(() => setBulkAcceptJobId(null));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; ref captures initial value
 
   const acceptAllSuggestions = async () => {
-    if (!data) return;
-    // Abort any previous bulk operation
-    bulkAbortRef.current?.abort();
-    bulkAbortRef.current = new AbortController();
-    const signal = bulkAbortRef.current.signal;
+    if (!data || !workspaceId) return;
     // Collect all fixable issues across all pages
-    const fixes: { pageId: string; issue: SeoIssue }[] = [];
+    const fixes: { pageId: string; check: string; suggestedFix: string; message?: string; pageSlug?: string; pageName?: string }[] = [];
     for (const page of data.pages) {
       for (const issue of page.issues) {
         const fixKey = `${page.pageId}-${issue.check}`;
         if (issue.suggestedFix && !appliedFixes.has(fixKey)) {
-          fixes.push({ pageId: page.pageId, issue });
+          const text = editedSuggestions[fixKey] || issue.suggestedFix;
+          fixes.push({ pageId: page.pageId, check: issue.check, suggestedFix: text, message: issue.message, pageSlug: page.slug, pageName: page.page });
         }
       }
     }
     if (fixes.length === 0) return;
     setBulkApplying(true);
     setBulkProgress({ done: 0, total: fixes.length });
-    for (let i = 0; i < fixes.length; i++) {
-      if (signal.aborted) break;
-      await acceptSuggestion(fixes[i].pageId, fixes[i].issue);
-      setBulkProgress({ done: i + 1, total: fixes.length });
+    try {
+      const { jobId } = await seoBulkJobs.bulkAcceptFixes(workspaceId, {
+        siteId,
+        fixes,
+      });
+      setBulkAcceptJobId(jobId);
+    } catch (err) {
+      console.error('Failed to start bulk accept:', err);
+      setBulkApplying(false);
+      setBulkProgress(null);
     }
-    setBulkApplying(false);
-    setBulkProgress(null);
   };
 
   const cancelBulkApply = () => {
-    bulkAbortRef.current?.abort();
+    if (bulkAcceptJobId) {
+      cancelJob(bulkAcceptJobId);
+    }
     setBulkApplying(false);
     setBulkProgress(null);
+    setBulkAcceptJobId(null);
   };
 
   const runAudit = async () => {
@@ -707,6 +776,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     });
 
   return (
+    <ErrorBoundary label="SEO Audit">
     <div className="space-y-8">
       {auditTabBar}
       {showNextSteps && data && (
@@ -1083,6 +1153,17 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         onRunAudit={runAudit}
       />
 
+      {/* Bulk operation error banner */}
+      {bulkError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>{bulkError}</span>
+          <button onClick={() => setBulkError(null)} className="ml-auto p-0.5 rounded hover:bg-white/10">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Share URL banner */}
       {shareUrl && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'rgba(45,212,191,0.1)', border: '1px solid rgba(46,217,195,0.2)' }}>
@@ -1123,7 +1204,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             if (s.pagePattern) {
               try {
                 const { suppressions: updated } = await del<{ suppressions: typeof suppressions }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check: s.check, pagePattern: s.pagePattern });
-                queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+                if (workspaceId) queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
               } catch (err) { console.error('Failed to unsuppress:', err); }
             } else {
               await unsuppressIssue(s.check, s.pageSlug);
@@ -1266,6 +1347,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }
 

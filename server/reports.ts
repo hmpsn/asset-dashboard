@@ -193,12 +193,11 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
                   pageviews: 0,
                   bounceRate: 0,
                   avgEngagementTime: 0,
-                  // Audit-derived enrichment (not part of the canonical PageHealthData shape)
                   auditSnapshotId: id,
                   errorCount,
                   warningCount,
                   topIssues: issues.slice(0, 5).map(i => i.message),
-                } as never,
+                },
                 severity,
                 impactScore: 100 - score,
                 domain: 'cross',

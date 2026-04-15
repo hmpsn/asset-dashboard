@@ -95,6 +95,11 @@ export const WS_EVENTS = {
   // Deep Diagnostics
   DIAGNOSTIC_COMPLETE: 'diagnostic:complete',
   DIAGNOSTIC_FAILED: 'diagnostic:failed',
+
+  // Bulk SEO operations (background job progress)
+  BULK_OPERATION_PROGRESS: 'bulk-operation:progress',
+  BULK_OPERATION_COMPLETE: 'bulk-operation:complete',
+  BULK_OPERATION_FAILED: 'bulk-operation:failed',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

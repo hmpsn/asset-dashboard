@@ -3623,6 +3623,140 @@ describe('Rule: isProgrammingError near new URL() or fetch()', () => {
   });
 });
 
+// ═══════════════���════════════════════════════════════════════════════════════
+// Pattern rule: Discarded updatePageSeo return value
+// ═══════════════════════════════���════════════════════════════════════════════
+describe('Pattern rule: Discarded updatePageSeo return value', () => {
+  const RULE = CHECKS.find(c => c.name === 'Discarded updatePageSeo return value')!;
+
+  it('rule exists in CHECKS array', () => {
+    expect(RULE).toBeDefined();
+    expect(RULE.pattern).toBeTruthy();
+  });
+
+  it('flags a bare await updatePageSeo() call', () => {
+    const dir = path.join(TMPDIR, 'update-seo-bare/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'test.ts'), [
+      'async function applyFix() {',
+      '  await updatePageSeo(pageId, fields, token);',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'update-seo-bare'), RULE);
+    expect(hits.length).toBe(1);
+  });
+
+  it('allows assigned return value (= await updatePageSeo)', () => {
+    const dir = path.join(TMPDIR, 'update-seo-assigned/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'test.ts'), [
+      'async function applyFix() {',
+      '  const result = await updatePageSeo(pageId, fields, token);',
+      '  if (!result.success) failed++;',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'update-seo-assigned'), RULE);
+    expect(hits.length).toBe(0);
+  });
+
+  it('allows bare call with // seo-ok inline escape hatch', () => {
+    const dir = path.join(TMPDIR, 'update-seo-hatch/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'test.ts'), [
+      'async function fireAndForget() {',
+      '  await updatePageSeo(pageId, fields, token); // seo-ok — best-effort cache warm',
+      '}',
+    ].join('\n'));
+    const hits = checkDirectory(path.join(TMPDIR, 'update-seo-hatch'), RULE);
+    expect(hits.length).toBe(0);
+  });
+
+  it('has pathFilter configured to restrict to server/', () => {
+    // pathFilter is applied at CLI level (resolveCheckFileList), not by
+    // checkDirectory. Verify the rule is configured correctly.
+    expect(RULE.pathFilter).toBe('server/');
+  });
+});
+
+describe('Rule: Re-upsert without cloneInsightParams', () => {
+  const RULE = 'Re-upsert without cloneInsightParams';
+
+  it('flags upsertInsight that copies insight.workspaceId manually', () => {
+    const file = write(
+      uniqPath('rule-clone-insight', 'server/my-bridge.ts'),
+      lines(
+        'import { upsertInsight } from "./analytics-insights-store.js";',
+        'export function reverseBoost(insight: any) {',
+        '  upsertInsight({',
+        '    workspaceId: insight.workspaceId,',
+        '    pageId: insight.pageId,',
+        '    insightType: insight.insightType,',
+        '    data: newData,',
+        '    severity: insight.severity,',
+        '    impactScore: adjustedScore,',
+        '  });',
+        '}',
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('does not flag upsertInsight using cloneInsightParams spread', () => {
+    const file = write(
+      uniqPath('rule-clone-insight', 'server/my-bridge-ok.ts'),
+      lines(
+        'import { upsertInsight, cloneInsightParams } from "./analytics-insights-store.js";',
+        'export function reverseBoost(insight: any, newData: any, adjustedScore: number) {',
+        '  upsertInsight({',
+        '    ...cloneInsightParams(insight),',
+        '    data: newData,',
+        '    impactScore: adjustedScore,',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag new insight creation (no insight.workspaceId in window)', () => {
+    const file = write(
+      uniqPath('rule-clone-insight', 'server/my-bridge-new.ts'),
+      lines(
+        'import { upsertInsight } from "./analytics-insights-store.js";',
+        'export function createInsight(wsId: string) {',
+        '  upsertInsight({',
+        '    workspaceId: wsId,',
+        '    pageId: null,',
+        '    insightType: "page_health",',
+        '    data: { score: 80 },',
+        '    severity: "positive",',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows suppression with // clone-ok inline escape hatch', () => {
+    const file = write(
+      uniqPath('rule-clone-insight', 'server/my-bridge-hatch.ts'),
+      lines(
+        'import { upsertInsight } from "./analytics-insights-store.js";',
+        'export function partialUpdate(insight: any, newData: any) {',
+        '  upsertInsight({ // clone-ok — intentional partial upsert',
+        '    workspaceId: insight.workspaceId,',
+        '    pageId: insight.pageId,',
+        '    data: newData,',
+        '  });',
+        '}',
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
@@ -3666,6 +3800,8 @@ describe('Meta: customCheck rule name registry', () => {
     'addActivity type not in CLIENT_VISIBLE_TYPES (public route)',
     // #576 catch-hardening guard
     'isProgrammingError near new URL() or fetch()',
+    // PR #201 re-upsert field-drop guard
+    'Re-upsert without cloneInsightParams',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
