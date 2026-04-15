@@ -1008,6 +1008,42 @@ A comprehensive value assessment of every feature in the platform — **298 feat
 
 ---
 
+### 84. Audit Finding Auto-Resolution
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** When an on-demand SEO audit re-runs, audit_finding insights that are no longer detected are automatically resolved. Mirrors the scheduled-audit auto-resolve pattern. Also triggers bridge-audit-page-health to refresh stale page health data after audit completion.
+**Files:** `server/routes/webflow-seo.ts` (bridge triggers), `tests/integration/audit-insight-resolution.test.ts`
+**Agency value:** Eliminates stale audit findings cluttering the insights feed. Health data stays current without manual intervention.
+
+---
+
+### 85. Anomaly Boost Reversal
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** When anomalies are dismissed and no recent undismissed anomalies remain, the +10 score boosts applied to related insights are immediately reversed. Previously, boosts were only cleaned up on the next 12-hour periodic scan, causing score inflation.
+**Files:** `server/anomaly-detection.ts` (reverseAnomalyBoostIfNoneRemain), `tests/integration/anomaly-boost-reversal.test.ts`
+**Agency value:** Accurate insight scores — dismissing anomalies immediately restores correct priority ordering instead of leaving inflated scores until the next scan cycle.
+
+---
+
+### 86. Strategy Cards Volume Threshold
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** Filters keyword strategy cards with monthly search volume below 10 from the rendering path. Pages without volume data (not yet enriched) pass through to avoid silently hiding unvalidated entries.
+**Files:** `src/components/KeywordStrategy.tsx`
+**Agency value:** Reduces noise in strategy views by hiding keywords with negligible search traffic.
+
+---
+
+### 87. PageHealthData Type Safety
+
+**Status:** Shipped (PR 3 — Platform Health Sprint)
+**What it does:** Replaced `as never` type escape hatch in reports.ts by adding audit-enrichment fields (auditSnapshotId, errorCount, warningCount, topIssues) as optional properties on the PageHealthData interface.
+**Files:** `shared/types/analytics.ts`, `server/reports.ts`
+**Agency value:** Type safety — eliminates the last `as never` cast in the codebase for this data shape.
+
+---
+
 ## Future Additions
 
 Items to revisit as budget/tier upgrades allow or when priorities shift.
