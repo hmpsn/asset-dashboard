@@ -16,6 +16,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { upsertInsight, getInsights } from '../../server/analytics-insights-store.js';
 import { applyScoreAdjustment } from '../../server/insight-score-adjustments.js';
 import db from '../../server/db/index.js';
+import { setFlagOverride } from '../../server/feature-flags.js';
 
 const ctx = createTestContext(13253);
 const { postJson } = ctx;
@@ -23,15 +24,19 @@ const { postJson } = ctx;
 let testWsId = '';
 
 beforeAll(async () => {
+  // Enable bridge-anomaly-boost BEFORE server starts so the server's first
+  // cache load picks up the flag as true (no 10s cache expiry delay).
+  setFlagOverride('bridge-anomaly-boost', true);
   await ctx.startServer();
   const ws = createWorkspace('Anomaly Boost Reversal Test');
   testWsId = ws.id;
 }, 25_000);
 
 afterAll(() => {
-  // Clean up test data
+  // Clean up test data and restore flag to default
   db.prepare('DELETE FROM anomalies WHERE workspace_id = ?').run(testWsId);
   db.prepare('DELETE FROM analytics_insights WHERE workspace_id = ?').run(testWsId);
+  setFlagOverride('bridge-anomaly-boost', null);
   deleteWorkspace(testWsId);
   ctx.stopServer();
 });

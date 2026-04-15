@@ -7,7 +7,7 @@
  *
  * Usage in bridges:
  *   const { data, adjustedScore } = applyScoreAdjustment(insight.data, insight.impactScore, 'outcome', -10);
- *   upsertInsight({ ...insight, data, impactScore: adjustedScore });
+ *   upsertInsight({ ...cloneInsightParams(insight), data, impactScore: adjustedScore });
  */
 
 export interface ScoreAdjustmentResult {

@@ -25,7 +25,7 @@ import { addActivity } from './activity-log.js';
 import { callOpenAI } from './openai-helpers.js';
 import { notifyAnomalyAlert } from './email.js';
 import { createLogger } from './logger.js';
-import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight } from './analytics-insights-store.js';
+import { upsertAnomalyDigestInsight, getInsight, getInsights, upsertInsight, cloneInsightParams } from './analytics-insights-store.js';
 import { debouncedAnomalyBoost, withWorkspaceLock } from './bridge-infrastructure.js';
 import { isFeatureEnabled } from './feature-flags.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
@@ -222,6 +222,14 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * waiting for the next periodic scan. Uses applyScoreAdjustment with delta=0 to remove
  * the 'anomaly' key from _scoreAdjustments, which restores the original base score.
  *
+ * ── bridge-anomaly-boost feature flag checklist ──
+ * All functions that apply or reverse anomaly boosts MUST gate on
+ * isFeatureEnabled('bridge-anomaly-boost'). When adding a new boost/reversal
+ * code path, add the gate and update this list:
+ *   1. reverseAnomalyBoostIfNoneRemain() — dismiss-triggered reversal (below)
+ *   2. debouncedAnomalyBoost() call in runAnomalyScan() — boost application
+ *   3. Bridge #10 reversal loop in runAnomalyScan() — periodic scan reversal
+ *
  * Exported for testing — not intended for direct use outside this module.
  */
 export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
@@ -230,7 +238,8 @@ export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
 
   // Only consider anomalies detected within the last 24h — older undismissed anomalies
   // are stale and should not keep boosts alive indefinitely.
-  // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL).
+  // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL),
+  // so no need to filter dismissedAt again.
   const recentForWs = listAnomalies(workspaceId, false)
     .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
 
@@ -251,21 +260,10 @@ export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
     );
     if (adjustedScore !== insight.impactScore) {
       upsertInsight({
-        workspaceId: insight.workspaceId,
-        pageId: insight.pageId,
-        insightType: insight.insightType,
+        ...cloneInsightParams(insight),
         data: newData as never,
-        severity: insight.severity,
-        pageTitle: insight.pageTitle,
-        strategyKeyword: insight.strategyKeyword,
-        strategyAlignment: insight.strategyAlignment,
-        auditIssues: insight.auditIssues,
-        pipelineStatus: insight.pipelineStatus,
         anomalyLinked: false,
         impactScore: adjustedScore,
-        domain: insight.domain,
-        bridgeSource: insight.bridgeSource,
-        resolutionSource: insight.resolutionSource,
       });
       reversed++;
     }
@@ -713,7 +711,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         // anomaly→InsightDomain logic at lines 555-561.
         debouncedAnomalyBoost(ws.id, async () => {
           const modifiedCount = await withWorkspaceLock(ws.id, async () => {
-            const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+            const { getInsights: fetchInsights, upsertInsight: updateInsight, cloneInsightParams: cloneParams }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
             const allInsights = fetchInsights(ws.id);
 
             const recentAnomalies = listAnomalies(ws.id, false)
@@ -745,20 +743,10 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
               );
               if (adjustedScore !== insight.impactScore) {
                 updateInsight({
-                  workspaceId: insight.workspaceId,
-                  pageId: insight.pageId,
-                  insightType: insight.insightType,
+                  ...cloneParams(insight),
                   data: newData as never,
-                  severity: insight.severity,
-                  pageTitle: insight.pageTitle,
-                  strategyKeyword: insight.strategyKeyword,
-                  strategyAlignment: insight.strategyAlignment,
-                  auditIssues: insight.auditIssues,
-                  pipelineStatus: insight.pipelineStatus,
                   anomalyLinked: true,
                   impactScore: adjustedScore,
-                  domain: insight.domain,
-                  bridgeSource: insight.bridgeSource,
                 });
                 modified++;
               }
@@ -793,7 +781,7 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
       if (recentForWs.length > 0) continue; // Still has active recent anomalies — keep boost
 
-      const { getInsights: fetchInsights, upsertInsight: updateInsight }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
+      const { getInsights: fetchInsights, upsertInsight: updateInsight, cloneInsightParams: cloneParams }: typeof AnalyticsInsightsStore = await import('./analytics-insights-store.js'); // dynamic-import-ok
       const allInsights = fetchInsights(ws.id);
       let reversed = 0;
       for (const insight of allInsights) {
@@ -808,20 +796,10 @@ export async function runAnomalyDetection(force = false): Promise<{ total: numbe
         );
         if (adjustedScore !== insight.impactScore) {
           updateInsight({
-            workspaceId: insight.workspaceId,
-            pageId: insight.pageId,
-            insightType: insight.insightType,
+            ...cloneParams(insight),
             data: newData as never,
-            severity: insight.severity,
-            pageTitle: insight.pageTitle,
-            strategyKeyword: insight.strategyKeyword,
-            strategyAlignment: insight.strategyAlignment,
-            auditIssues: insight.auditIssues,
-            pipelineStatus: insight.pipelineStatus,
             anomalyLinked: false,
             impactScore: adjustedScore,
-            domain: insight.domain,
-            bridgeSource: insight.bridgeSource,
           });
           reversed++;
         }

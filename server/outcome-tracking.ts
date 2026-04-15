@@ -304,7 +304,7 @@ export function recordOutcome(params: {
       const workspaceId = actionRow.workspace_id;
       debouncedOutcomeReweight(workspaceId, async () => {
         const modifiedCount = await withWorkspaceLock(workspaceId, async () => {
-          const { getInsights, upsertInsight } = await import('./analytics-insights-store.js'); // dynamic-import-ok: avoids circular dep
+          const { getInsights, upsertInsight, cloneInsightParams } = await import('./analytics-insights-store.js'); // dynamic-import-ok: avoids circular dep
           const insights = getInsights(workspaceId);
           const nonResolved = insights.filter(i => i.resolutionStatus !== 'resolved');
 
@@ -337,20 +337,9 @@ export function recordOutcome(params: {
               );
               if (adjustedScore !== insight.impactScore) {
                 upsertInsight({
-                  workspaceId: insight.workspaceId,
-                  pageId: insight.pageId,
-                  insightType: insight.insightType,
+                  ...cloneInsightParams(insight),
                   data: newData as never,
-                  severity: insight.severity,
-                  pageTitle: insight.pageTitle,
-                  strategyKeyword: insight.strategyKeyword,
-                  strategyAlignment: insight.strategyAlignment,
-                  auditIssues: insight.auditIssues,
-                  pipelineStatus: insight.pipelineStatus,
-                  anomalyLinked: insight.anomalyLinked,
                   impactScore: adjustedScore,
-                  domain: insight.domain,
-                  bridgeSource: insight.bridgeSource,
                 });
                 modified++;
               }
