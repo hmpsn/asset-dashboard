@@ -1803,7 +1803,7 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('w
       updateJob(job.id, {
         status: 'done',
         progress: done,
-        message: `Applied ${done - failed}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}`,
+        message: `Applied ${applied.length}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}`,
         result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
       });
       broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_COMPLETE, {
