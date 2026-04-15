@@ -1,0 +1,943 @@
+# Libraries
+
+- `server/activity-log.ts`
+  - function initActivityBroadcast: (fn) => void
+  - function addActivity: (workspaceId, type, title, description?, metadata?, unknown>, actor?) => ActivityEntry
+  - function listActivity: (workspaceId?, limit) => ActivityEntry[]
+  - function listClientActivity: (workspaceId, limit) => ActivityEntry[]
+  - function hasRecentActivity: (workspaceId, withinDays) => boolean
+  - interface ActivityEntry
+  - _...1 more_
+- `server/admin-chat-context.ts`
+  - function classifyQuestion: (question) => Set<ContextCategory>
+  - function extractUrl: (question) => string | null
+  - function buildInsightsContext: (insights) => string
+  - function assembleAdminContext: (workspaceId, question, days) => Promise<AssembledContext>
+  - function buildSystemPrompt: (ws, assembled, days, priorContext) => string
+  - interface AssembledContext
+- `server/aeo-page-review.ts`
+  - function reviewPage: (pageUrl, pageTitle, html, auditIssues, workspaceId) => Promise<AeoPageReview>
+  - function reviewSitePages: (workspaceId, pages, onProgress?, total, current) => void
+  - interface AeoPageChange
+  - interface AeoPageReview
+  - interface AeoSiteReview
+  - type AeoChangeType
+  - _...1 more_
+- `server/ai-context-check.ts`
+  - function checkAIContext: (workspaceId) => ContextCompleteness
+  - interface ContextSource
+  - interface ContextCompleteness
+- `server/ai.ts`
+  - function callAI: (opts) => Promise<AICallResult>
+  - interface AICallOptions
+  - interface AICallResult
+- `server/alttext.ts` — function generateAltText: (filePath, context?) => Promise<string | null>
+- `server/analytics-annotations.ts`
+  - function createAnnotation: (opts) => void
+  - function getAnnotations: (workspaceId, opts?) => Annotation[]
+  - function updateAnnotation: (id, workspaceId, opts) => boolean
+  - function deleteAnnotation: (id, workspaceId) => boolean
+  - interface Annotation
+  - type AnnotationCategory
+- `server/analytics-data.ts`
+  - function fetchSearchOverview: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchPerformanceTrend: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchSearchDevices: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchSearchCountries: (siteId, gscUrl, days, limit, dateRange?) => void
+  - function fetchSearchTypes: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchSearchComparison: (siteId, gscUrl, days, dateRange?) => void
+- `server/analytics-insights-store.ts`
+  - function upsertInsight: (params) => AnalyticsInsight
+  - function getInsights: (workspaceId, insightType?) => AnalyticsInsight[]
+  - function getInsight: (workspaceId, pageId, insightType) => AnalyticsInsight | undefined
+  - function deleteInsightsForWorkspace: (workspaceId) => number
+  - function deleteStaleInsightsByType: (workspaceId, insightType, olderThan) => number
+  - function upsertAnomalyDigestInsight: (params) => AnalyticsInsight
+  - _...5 more_
+- `server/analytics-intelligence.ts`
+  - function isStale: (computedAt, maxAgeMs) => boolean
+  - function computePageHealthScores: (gscPages, ga4Pages) => ComputedInsight<PageHealthData>[]
+  - function computeRankingOpportunities: (queryPageData) => ComputedInsight<QuickWinData>[]
+  - function computeCannibalizationInsights: (queryPageData) => ComputedInsight<CannibalizationData>[]
+  - function computeConversionAttributionInsights: (landingPages) => ComputedInsight<ConversionAttributionData>[]
+  - function computeCompetitorGapInsights: (gapData, ourQueryData) => ComputedInsight<CompetitorGapData>[]
+  - _...5 more_
+- `server/annotations.ts`
+  - function listAnnotations: (workspaceId) => Annotation[]
+  - function addAnnotation: (workspaceId, date, label, description?, color?) => Annotation
+  - function deleteAnnotation: (workspaceId, annotationId) => boolean
+  - interface Annotation
+- `server/anomaly-detection.ts`
+  - function initAnomalyBroadcast: (fn, event, data) => void
+  - function listAnomalies: (workspaceId?, includeDismissed) => Anomaly[]
+  - function dismissAnomaly: (id) => boolean
+  - function acknowledgeAnomaly: (id) => boolean
+  - function clearOldAnomalies: (daysOld) => number
+  - function runAnomalyDetection: (force) => Promise<
+  - _...5 more_
+- `server/anthropic-helpers.ts` — function callAnthropic: (opts) => Promise<AnthropicChatResult>, function isAnthropicConfigured: () => boolean
+- `server/api-cache.ts`
+  - function createApiCache: (options) => ApiCache
+  - interface ApiCacheOptions
+  - interface ApiCache
+  - const apiCache
+- `server/app.ts` — function createApp: () => express.Express
+- `server/approval-reminders.ts` — function startApprovalReminders: () => void, function stopApprovalReminders: () => void
+- `server/approvals.ts`
+  - function createBatch: (workspaceId, siteId, name, items, 'id' | 'status' | 'createdAt' | 'updatedAt'>[]) => ApprovalBatch
+  - function listBatches: (workspaceId) => ApprovalBatch[]
+  - function getBatch: (workspaceId, batchId) => ApprovalBatch | undefined
+  - function updateItem: (workspaceId, batchId, itemId, update, 'status' | 'clientValue' | 'clientNote'>>) => ApprovalBatch | null
+  - function markBatchApplied: (workspaceId, batchId, itemIds) => ApprovalBatch | null
+  - function deleteBatch: (workspaceId, batchId) => boolean
+- `server/audit-page.ts`
+  - function isContentPage: (slug) => boolean
+  - function auditPage: (pageId, pageName, slug, url, meta, html) => PageSeoResult
+  - function isExcludedPage: (slug, title?) => boolean
+  - interface SeoIssue
+  - interface PageSeoResult
+  - type Severity
+  - _...2 more_
+- `server/auth.ts`
+  - function signToken: (payload) => string
+  - function verifyToken: (token) => JwtPayload | null
+  - function requireAuth: (req, res, next) => void
+  - function requireRole: (...roles) => void
+  - function requireWorkspaceAccess: (paramName) => void
+  - function requireWorkspaceAccessFromQuery: (queryParam) => void
+  - _...2 more_
+- `server/backup.ts` — function runBackup: () => Promise<, function startBackupScheduler: () => void
+- `server/bridge-infrastructure.ts`
+  - function executeBridge: (flag, workspaceId, fn, opts?) => Promise<void>
+  - function fireBridge: (flag, workspaceId, fn, opts?) => void
+  - function debounceBridge: (flag, delayMs) => (workspaceId: string, fn: BridgeCallback) => void
+  - function withWorkspaceLock: (workspaceId, fn) => void
+  - function getBridgeFlags: () => Record<string, boolean>
+  - function readSubCache: (workspaceId, key) => T | null
+  - _...9 more_
+- `server/brief-export-html.ts` — function renderBriefHTML: (brief) => string, function renderBriefHTMLForPDF: (brief) => string
+- `server/broadcast.ts`
+  - function setBroadcast: (bc, bcWs) => void
+  - function broadcast: (event, data) => void
+  - function broadcastToWorkspace: (workspaceId, event, data) => void
+- `server/cannibalization-detection.ts`
+  - function detectMatrixCannibalization: (workspaceId, matrixId) => CannibalizationReport
+  - function checkKeywordCannibalization: (workspaceId, keyword) => CannibalizationConflict[]
+  - interface CannibalizationConflict
+  - interface CannibalizationReport
+- `server/chat-memory.ts`
+  - function cleanupOldChatSessions: (maxAgeDays) => number
+  - function getSession: (workspaceId, sessionId) => ChatSession | null
+  - function saveSession: (session) => void
+  - function deleteSession: (workspaceId, sessionId) => boolean
+  - function listSessions: (workspaceId, channel?) => SessionSummary[]
+  - function addMessage: (workspaceId, sessionId, channel, role, content) => ChatSession
+  - _...8 more_
+- `server/churn-signals.ts`
+  - function listChurnSignals: (workspaceId?) => ChurnSignal[]
+  - function dismissSignal: (signalId) => boolean
+  - function startChurnSignalScheduler: () => void
+  - function stopChurnSignalScheduler: () => void
+  - interface ChurnSignal
+  - type SignalType
+  - _...1 more_
+- `server/client-signals-store.ts`
+  - function createClientSignal: (input) => ClientSignal
+  - function listClientSignals: (workspaceId?) => ClientSignal[]
+  - function getSignalById: (id) => ClientSignal | null
+  - function updateSignalStatus: (id, status) => boolean
+  - function countNewSignals: (workspaceId) => number
+  - function countAllSignals: (workspaceId) => number
+  - _...2 more_
+- `server/client-users.ts`
+  - function listClientUsers: (workspaceId) => SafeClientUser[]
+  - function getClientUserById: (id) => ClientUser | null
+  - function getClientUserByEmail: (email, workspaceId) => ClientUser | null
+  - function getSafeClientUser: (id) => SafeClientUser | null
+  - function createClientUser: (email, password, name, workspaceId, role, invitedBy?) => Promise<SafeClientUser>
+  - function updateClientUser: (id, updates, 'name' | 'email' | 'role' | 'avatarUrl'>>) => Promise<SafeClientUser | null>
+  - _...11 more_
+- `server/competitor-schema.ts`
+  - function crawlCompetitorSchemas: (domain, maxPages) => Promise<CompetitorSchemaResult>
+  - function compareSchemas: (ours, theirs) => SchemaComparison
+  - interface CompetitorSchemaResult
+  - interface SchemaComparison
+- `server/content-brief.ts`
+  - function buildBriefIntelligenceBlock: (opts) => string
+  - function listBriefs: (workspaceId) => ContentBrief[]
+  - function getBrief: (workspaceId, briefId) => ContentBrief | undefined
+  - function updateBrief: (workspaceId, briefId, updates, 'id' | 'workspaceId' | 'createdAt'>>) => ContentBrief | null
+  - function deleteBrief: (workspaceId, briefId) => boolean
+  - function buildStrategyCardBlock: (ctx) => string
+  - _...4 more_
+- `server/content-calendar-intelligence.ts` — function suggestPublishDates: (opts) => PublishSuggestion[]
+- `server/content-decay.ts`
+  - function loadDecayAnalysis: (workspaceId) => DecayAnalysis | null
+  - function analyzeContentDecay: (ws) => Promise<DecayAnalysis>
+  - function generateRefreshRecommendation: (ws, page) => Promise<string>
+  - function generateBatchRecommendations: (ws, analysis, maxPages) => Promise<DecayAnalysis>
+  - interface DecayingPage
+  - interface DecayAnalysis
+- `server/content-image.ts` — function generateFeaturedImage: (post, siteId, tokenOverride?) => Promise<ImageResult>
+- `server/content-matrices.ts`
+  - function getSchemaTypesForTemplate: (templatePageType) => string[]
+  - function listMatrices: (workspaceId) => ContentMatrix[]
+  - function getMatrix: (workspaceId, matrixId) => ContentMatrix | undefined
+  - function createMatrix: (workspaceId, data) => ContentMatrix
+  - function updateMatrix: (workspaceId, matrixId, updates, 'name' | 'dimensions' | 'urlPattern' | 'keywordPattern' | 'cells'>>) => ContentMatrix | undefined
+  - function updateMatrixCell: (workspaceId, matrixId, cellId, updates, 'targetKeyword' | 'customKeyword' | 'status' | 'statusHistory' | 'briefId' | 'postId' | 'keywordValidation' | 'keywordCandidates' | 'recommendedKeyword' | 'clientFlag' | 'clientFlaggedAt'>>) => ContentMatrix | undefined
+  - _...1 more_
+- `server/content-posts-ai.ts`
+  - function callCreativeAI: (opts) => Promise<string>
+  - function buildVoiceContext: (workspaceId) => Promise<string>
+  - function buildBriefContextBlock: (brief, siteDomain?) => string
+  - function generateIntroduction: (brief, voiceCtx, workspaceId, siteDomain?) => Promise<string>
+  - function generateSection: (brief, section, sectionIndex, previousSections, voiceCtx, workspaceId, siteDomain?) => Promise<string>
+  - function generateConclusion: (brief, voiceCtx, workspaceId, siteDomain?) => Promise<string>
+  - _...5 more_
+- `server/content-posts-db.ts`
+  - function listPosts: (workspaceId) => GeneratedPost[]
+  - function getPost: (workspaceId, postId) => GeneratedPost | undefined
+  - function savePost: (workspaceId, post) => void
+  - function updatePostField: (workspaceId, postId, updates, 'id' | 'workspaceId' | 'createdAt'>>) => GeneratedPost | null
+  - function deletePost: (workspaceId, postId) => boolean
+  - function snapshotPostVersion: (post, trigger, triggerDetail?) => PostVersion
+  - _...4 more_
+- `server/content-posts.ts`
+  - function generatePost: (workspaceId, brief, existingPostId?) => Promise<GeneratedPost>
+  - function regenerateSection: (workspaceId, postId, sectionIndex, brief) => Promise<GeneratedPost | null>
+  - function exportPostMarkdown: (post) => string
+  - function exportPostHTML: (post) => string
+- `server/content-requests.ts`
+  - function listContentRequests: (workspaceId) => ContentTopicRequest[]
+  - function getContentRequest: (workspaceId, id) => ContentTopicRequest | undefined
+  - function createContentRequest: (workspaceId, data) => ContentTopicRequest
+  - function updateContentRequest: (workspaceId, id, updates, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>) => ContentTopicRequest | null
+  - function deleteContentRequest: (workspaceId, id) => boolean
+  - function addComment: (workspaceId, requestId, author, content) => ContentTopicRequest | null
+- `server/content-subscriptions.ts`
+  - function createContentSubscription: (workspaceId, data) => ContentSubscription
+  - function getContentSubscription: (id) => ContentSubscription | null
+  - function getContentSubscriptionByStripeId: (stripeSubId) => ContentSubscription | null
+  - function listContentSubscriptions: (workspaceId) => ContentSubscription[]
+  - function listActiveContentSubscriptions: () => ContentSubscription[]
+  - function updateContentSubscription: (id, updates, 'status' | 'stripeSubscriptionId' | 'stripePriceId' | 'plan' | 'postsPerMonth' |
+    'priceUsd' | 'currentPeriodStart' | 'currentPeriodEnd' | 'postsDeliveredThisPeriod' |
+    'topicSource' | 'preferredPageTypes' | 'notes'
+  >>) => ContentSubscription | null
+  - _...3 more_
+- `server/content-templates.ts`
+  - function listTemplates: (workspaceId) => ContentTemplate[]
+  - function getTemplate: (workspaceId, templateId) => ContentTemplate | null
+  - function createTemplate: (workspaceId, data, string>;
+    toneAndStyle?) => ContentTemplate
+  - function updateTemplate: (workspaceId, templateId, updates, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>>) => ContentTemplate | null
+  - function deleteTemplate: (workspaceId, templateId) => boolean
+  - function duplicateTemplate: (workspaceId, templateId, newName?) => ContentTemplate | null
+- `server/data-dir.ts`
+  - function getDataDir: (subdir) => string
+  - function getUploadRoot: () => string
+  - function getOptRoot: () => string
+  - const DATA_BASE: string
+- `server/data-retention.ts` — function startDataRetentionCrons: () => void, function stopDataRetentionCrons: () => void
+- `server/db/index.ts` — function runMigrations: () => void
+- `server/db/json-column.ts` — function parseJsonColumn: (val, fallback) => T, function stringifyJsonColumn: (val) => string | null
+- `server/db/json-validation.ts`
+  - function parseJsonSafe: (raw, schema, fallback, context?) => T | F
+  - function parseJsonSafeArray: (raw, itemSchema, context?) => T[]
+  - function parseJsonFallback: (raw, fallback) => T
+- `server/db/outcome-mappers.ts`
+  - function rowToTrackedAction: (row) => TrackedAction
+  - function rowToActionOutcome: (row) => ActionOutcome
+  - function rowToActionPlaybook: (row) => ActionPlaybook
+  - function rowToWorkspaceLearnings: (row) => WorkspaceLearnings | null
+  - interface TrackedActionRow
+  - interface ActionOutcomeRow
+  - _...2 more_
+- `server/db/stmt-cache.ts` — function createStmtCache: (build) => void
+- `server/email-queue.ts`
+  - function registerSendFn: (fn) => void
+  - function queueEmail: (event) => void
+  - function flushAll: () => void
+  - function restoreQueue: () => void
+  - function getQueueStats: () => void
+- `server/email-templates.ts`
+  - function renderDigest: (type, events) => void
+  - function renderMonthlyReport: (data) => void
+  - function renderApprovalReminder: (data) => void
+  - interface EmailEvent
+  - type EmailEventType
+- `server/email-throttle.ts`
+  - function getThrottleCategory: (type) => ThrottleCategory
+  - function canSend: (recipient, category) => ThrottleResult
+  - function recordSend: (recipient, category, emailType, workspaceId, eventCount) => void
+  - function getLastSendTime: (recipient, category) => Date | null
+  - function cleanupOldSends: () => number
+  - function msUntilMorning: () => number
+  - _...6 more_
+- `server/email.ts`
+  - function isEmailConfigured: () => boolean
+  - function getNotificationEmail: () => string | undefined
+  - function sendEmail: (to, subject, html) => Promise<boolean>
+  - function initEmailQueue: () => void
+  - function notifyTeamNewRequest: (opts) => void
+  - function notifyClientTeamResponse: (opts) => void
+  - _...16 more_
+- `server/external-detection.ts` — function detectExternalExecutions: () => Promise<
+- `server/feature-flags.ts`
+  - function isFeatureEnabled: (flag) => boolean
+  - function getAllFlags: () => Record<FeatureFlagKey, boolean>
+  - function getAllFlagsWithMeta: () => Array<
+  - function setFlagOverride: (key, enabled) => void
+- `server/feedback.ts`
+  - function listFeedback: (workspaceId) => FeedbackItem[]
+  - function getFeedbackItem: (workspaceId, id) => FeedbackItem | undefined
+  - function createFeedback: (workspaceId, data) => FeedbackItem
+  - function updateFeedbackStatus: (workspaceId, id, status) => FeedbackItem | null
+  - function addFeedbackReply: (workspaceId, id, author, content) => FeedbackItem | null
+  - function deleteFeedback: (workspaceId, id) => boolean
+  - _...5 more_
+- `server/google-analytics.ts`
+  - function listGA4Properties: () => Promise<GA4Property[]>
+  - function getGA4Overview: (propertyId, days, dateRange?) => Promise<GA4Overview>
+  - function getGA4DailyTrend: (propertyId, days, dateRange?) => Promise<GA4DailyTrend[]>
+  - function getGA4TopPages: (propertyId, days, limit, dateRange?) => Promise<GA4TopPage[]>
+  - function getGA4TopSources: (propertyId, days, limit, dateRange?) => Promise<GA4TopSource[]>
+  - function getGA4DeviceBreakdown: (propertyId, days, dateRange?) => Promise<GA4DeviceBreakdown[]>
+  - _...25 more_
+- `server/google-auth.ts`
+  - function getGoogleCredentials: () => void
+  - function getAuthUrl: (siteId) => string | null
+  - function getGlobalAuthUrl: () => string | null
+  - function exchangeCode: (code, siteId) => Promise<
+  - function getValidToken: (siteId) => Promise<string | null>
+  - function isConnected: (siteId) => boolean
+  - _...4 more_
+- `server/helpers.ts`
+  - function normalizePath: (p) => string
+  - function matchPagePath: (a, b) => boolean
+  - function findPageMapEntry: (pageMap, path) => T | undefined
+  - function resolvePagePath: (page) => string
+  - function sanitizeString: (val, maxLen) => string
+  - function validateEnum: (val, allowed, fallback) => T
+  - _...10 more_
+- `server/html-to-richtext.ts` — function assemblePostHtml: (post) => string, function generateSlug: (title) => string
+- `server/insight-enrichment.ts`
+  - function cleanSlugToTitle: (urlOrPath) => string
+  - function classifyDomain: (type) => InsightDomain
+  - function computeImpactScore: (severity, data, unknown>) => number
+  - function resolvePageTitle: (pageId, titleMap, string>) => string | null
+  - function checkStrategyAlignment: (pageId, strategyPageMap, PageKeywordMap>, actualKeyword?) => StrategyAlignmentResult
+  - function checkPipelineStatus: (pageId, briefs, posts) => AnalyticsInsight['pipelineStatus']
+  - _...6 more_
+- `server/insight-feedback.ts`
+  - function runFeedbackLoops: (workspaceId) => void
+  - function buildStrategySignals: (insights) => StrategySignal[]
+  - function buildPipelineSignals: (insights) => PipelineSignal[]
+- `server/insight-narrative.ts` — function buildClientInsights: (workspaceId) => ClientInsight[]
+- `server/insight-score-adjustments.ts`
+  - function applyScoreAdjustment: (currentData, unknown>, currentImpactScore, bridgeKey, delta) => ScoreAdjustmentResult
+  - function computeAdjustedScore: (data, unknown>, currentImpactScore) => number
+  - interface ScoreAdjustmentResult
+- `server/intelligence-cache.ts` — function singleFlight: (key, fn) => void, class LRUCache
+- `server/intelligence-crons.ts` — function startIntelligenceCrons: () => void, function stopIntelligenceCrons: () => void
+- `server/internal-links.ts`
+  - function analyzeInternalLinks: (siteId, workspaceId?, tokenOverride?) => Promise<InternalLinkResult>
+  - interface PageContent
+  - interface LinkSuggestion
+  - interface PageLinkHealth
+  - interface InternalLinkResult
+- `server/jobs.ts`
+  - function initJobs: (broadcast) => void
+  - function createJob: (type, opts?) => Job
+  - function updateJob: (id, update, 'id' | 'type' | 'createdAt'>>) => void
+  - function getJob: (id) => Job | undefined
+  - function listJobs: (workspaceId?) => Job[]
+  - function registerAbort: (jobId) => AbortController
+  - _...6 more_
+- `server/keyword-metrics-cache.ts`
+  - function getCachedMetrics: (keyword, database, maxAgeHours) => CachedKeywordMetrics | null
+  - function getCachedMetricsBatch: (keywords, database, maxAgeHours) => Map<string, CachedKeywordMetrics>
+  - function cacheMetrics: (metrics, database) => void
+  - function cacheMetricsBatch: (items, database) => void
+  - function cleanupStaleEntries: (maxAgeDays) => number
+  - interface CachedKeywordMetrics
+- `server/keyword-recommendations.ts` — function getKeywordRecommendations: (workspaceId, seedKeyword, options) => Promise<KeywordRecommendationResult>, interface KeywordRecommendationResult
+- `server/link-checker.ts`
+  - function getSiteDomains: (siteId, token) => Promise<SiteDomainInfo | null>
+  - function checkSiteLinks: (siteId, workspaceId?, domain?) => Promise<LinkCheckResult>
+  - interface DeadLink
+  - interface LinkCheckResult
+  - interface SiteDomainInfo
+- `server/llms-txt-generator.ts`
+  - function upsertSummary: (workspaceId, pageUrl, summary) => void
+  - function getSummary: (workspaceId, pageUrl) => void
+  - function getSummaries: (workspaceId) => void
+  - function deleteSummary: (workspaceId, pageUrl) => boolean
+  - function cleanupOldLlmsTxt: (maxAgeDays) => number
+  - function setLastGenerated: (workspaceId, trigger?) => void
+  - _...8 more_
+- `server/logger.ts` — function createLogger: (module) => pino.Logger
+- `server/middleware/fingerprint.ts` — function fingerprintMiddleware: (req, _res, next) => void
+- `server/middleware/request-logger.ts` — function requestLogger: (req, res, next) => void
+- `server/middleware/turnstile.ts` — function verifyTurnstile: (req, res, next) => void
+- `server/middleware/validate.ts` — function validate: (schema) => RequestHandler
+- `server/middleware.ts`
+  - function rateLimit: (windowMs, maxRequests, keyMode) => void
+  - function checkLoginLockout: (email) => void
+  - function recordLoginFailure: (email) => boolean
+  - function clearLoginFailures: (email) => void
+  - function signClientSession: (workspaceId) => string
+  - function verifyClientSession: (workspaceId, token) => boolean
+  - _...15 more_
+- `server/monthly-digest.ts` — function generateMonthlyDigest: (ws, month?, // "March 2026" — defaults to current month) => Promise<MonthlyDigestData>
+- `server/monthly-report.ts`
+  - function generateReportHTML: (data) => string
+  - function startMonthlyReports: () => void
+  - function stopMonthlyReports: () => void
+  - function triggerMonthlyReport: (workspaceId) => Promise<
+  - function getMonthlyReportHTML: (reportId) => string | null
+  - function listMonthlyReports: (workspaceId) => SavedMonthlyReport[]
+  - _...1 more_
+- `server/openai-helpers.ts`
+  - function flushToDisk: () => void
+  - function logTokenUsage: (usage, 'timestamp'>) => void
+  - function getTokenUsage: (workspaceId?, since?) => void
+  - function getUsageByDay: (workspaceId?, days) => Array<
+  - function getUsageByFeature: (workspaceId?, since?) => Array<
+  - function callOpenAI: (opts) => Promise<OpenAIChatResult>
+  - _...2 more_
+- `server/outcome-backfill.ts`
+  - function backfillPublishedContent: (workspaceId) => number
+  - function backfillResolvedInsights: (workspaceId) => number
+  - function backfillCompletedRecommendations: (workspaceId) => number
+  - function runBackfill: (workspaceId?) => BackfillResult
+  - interface BackfillResult
+- `server/outcome-crons.ts` — function startOutcomeCrons: () => void, function stopOutcomeCrons: () => void
+- `server/outcome-measurement.ts`
+  - function fetchGscSnapshot: (workspaceId, pageUrl, days) => Promise<BaselineSnapshot | null>
+  - function captureBaselineFromGsc: (actionId, workspaceId, pageUrl) => Promise<void>
+  - function isDueForCheckpoint: (action, checkpointDays) => boolean
+  - function computeDelta: (baseline, current, primaryMetric) => DeltaSummary
+  - function scoreOutcome: (actionType, delta, checkpointDays, config) => void
+  - function measurePendingOutcomes: (scoringConfigOverride?) => Promise<
+- `server/outcome-playbooks.ts`
+  - function getPlaybooks: (workspaceId) => ActionPlaybook[]
+  - function detectPlaybookPatterns: (workspaceId) => void
+  - function suggestPlaybook: (workspaceId, trigger) => ActionPlaybook | null
+  - function detectAllWorkspacePlaybooks: () => Promise<void>
+- `server/outcome-scoring-defaults.ts` — function resolveScoringConfig: (override) => ScoringConfig, const DEFAULT_SCORING_CONFIG: ScoringConfig
+- `server/outcome-tracking.ts`
+  - function recordAction: (params) => TrackedAction
+  - function getAction: (id) => TrackedAction | null
+  - function getActionsByWorkspace: (workspaceId) => TrackedAction[]
+  - function getActionsByWorkspaceAndType: (workspaceId, actionType) => TrackedAction[]
+  - function getActionsByPage: (workspaceId, pageUrl) => TrackedAction[]
+  - function getActionBySource: (sourceType, sourceId) => TrackedAction | null
+  - _...13 more_
+- `server/page-keywords.ts`
+  - function listPageKeywords: (workspaceId) => PageKeywordMap[]
+  - function getPageKeyword: (workspaceId, pagePath) => PageKeywordMap | undefined
+  - function upsertPageKeyword: (workspaceId, entry) => void
+  - function upsertPageKeywordsBatch: (workspaceId, entries) => void
+  - function upsertAndCleanPageKeywords: (workspaceId, entries) => void
+  - function replaceAllPageKeywords: (workspaceId, entries) => void
+  - _...7 more_
+- `server/pagespeed.ts`
+  - function extractCwvAssessment: (data, unknown>) => CwvAssessmentResult
+  - function runSinglePageSpeed: (url, strategy, pageTitle) => Promise<PageSpeedResult | null>
+  - function runSiteSpeed: (siteId, strategy, maxPages, workspaceId?) => Promise<SiteSpeedResult>
+  - interface CoreWebVitals
+  - interface PageSpeedResult
+  - interface Opportunity
+  - _...4 more_
+- `server/payments.ts`
+  - function createPayment: (_workspaceId, data, 'id' | 'createdAt'>) => PaymentRecord
+  - function updatePayment: (workspaceId, id, updates) => PaymentRecord | null
+  - function getPayment: (workspaceId, id) => PaymentRecord | undefined
+  - function listPayments: (workspaceId) => PaymentRecord[]
+  - function listAllPayments: () => PaymentRecord[]
+  - function deletePayment: (id) => boolean
+  - _...2 more_
+- `server/performance-store.ts`
+  - function savePageWeight: (siteId, result) => void
+  - function getPageWeight: (siteId) => void
+  - function savePageSpeed: (siteId, result) => void
+  - function getPageSpeed: (siteId) => void
+  - function saveSinglePageSpeed: (siteId, pageKey, result) => void
+  - function getSinglePageSpeed: (siteId, pageKey) => void
+  - _...9 more_
+- `server/post-export-html.ts` — function renderPostHTML: (post) => string
+- `server/processor.ts`
+  - function getMetadata: () => Record<string, AssetMetadata>
+  - function getQueue: () => QueueItem[]
+  - function startWatcher: (broadcast) => void
+  - function triggerOptimize: (filePath) => Promise<void>
+  - interface QueueItem
+- `server/providers/dataforseo-provider.ts`
+  - function flushCreditsToDisk: () => void
+  - function getDataForSeoUsage: (workspaceId?, since?) => void
+  - function getDataForSeoByDay: (workspaceId?, days) => Array<
+  - class DataForSeoProvider
+- `server/providers/semrush-provider.ts` — class SemrushProvider
+- `server/rank-tracking.ts`
+  - function getTrackedKeywords: (workspaceId) => TrackedKeyword[]
+  - function addTrackedKeyword: (workspaceId, query, pinned) => TrackedKeyword[]
+  - function removeTrackedKeyword: (workspaceId, query) => TrackedKeyword[]
+  - function togglePinKeyword: (workspaceId, query) => TrackedKeyword[]
+  - function storeRankSnapshot: (workspaceId, date, queries) => void
+  - function getRankHistory: (workspaceId, queryFilter?, limit) => void
+  - _...4 more_
+- `server/recommendations.ts`
+  - function loadRecommendations: (workspaceId) => RecommendationSet | null
+  - function saveRecommendations: (set) => void
+  - function updateRecommendationStatus: (workspaceId, recId, status) => Recommendation | null
+  - function dismissRecommendation: (workspaceId, recId) => boolean
+  - function generateRecommendations: (workspaceId) => Promise<RecommendationSet>
+- `server/redirect-scanner.ts`
+  - function scanRedirects: (siteId, workspaceId?, liveDomain?, gscGhostUrls?) => Promise<RedirectScanResult>
+  - interface RedirectHop
+  - interface RedirectChain
+  - interface OrphanRedirect
+  - interface PageStatus
+  - interface RedirectScanResult
+  - _...1 more_
+- `server/redirect-store.ts`
+  - function saveRedirectSnapshot: (siteId, result) => RedirectSnapshot
+  - function getRedirectSnapshot: (siteId) => RedirectSnapshot | null
+  - interface RedirectSnapshot
+- `server/reports.ts`
+  - function cleanupOldSnapshots: (maxAgeDays) => number
+  - function saveSnapshot: (siteId, siteName, audit, logoUrl?) => AuditSnapshot
+  - function addActionItem: (snapshotId, item) => ActionItem | null
+  - function updateActionItem: (snapshotId, itemId, updates, 'title' | 'description' | 'status' | 'priority' | 'category'>>) => ActionItem | null
+  - function deleteActionItem: (snapshotId, itemId) => boolean
+  - function getActionItems: (snapshotId) => ActionItem[]
+  - _...11 more_
+- `server/requests.ts`
+  - function listRequests: (workspaceId?) => ClientRequest[]
+  - function getRequest: (id) => ClientRequest | undefined
+  - function createRequest: (workspaceId, data) => ClientRequest
+  - function updateRequest: (id, updates, 'status' | 'priority' | 'category'>>) => ClientRequest | null
+  - function getAttachmentsDir: () => string
+  - function addAttachmentsToRequest: (requestId, attachments) => ClientRequest | null
+  - _...2 more_
+- `server/roi-attribution.ts`
+  - function recordOptimization: (params) => string
+  - function measureOutcome: (attributionId, params) => void
+  - function getROIAttributionsRaw: (workspaceId, limit) => Array<
+  - function getROIHighlights: (workspaceId, limit) => ROIHighlight[]
+  - function getUnmeasuredOptimizations: () => ROIAttributionRow[]
+- `server/roi.ts`
+  - function computeROI: (workspaceId) => ROIData | null
+  - interface ROIData
+  - interface PageROI
+  - interface ContentROIMetrics
+  - interface ContentItemROI
+- `server/sales-audit.ts`
+  - function runSalesAudit: (inputUrl, maxPages) => Promise<SalesAuditResult>
+  - interface SalesIssue
+  - interface SalesPageResult
+  - interface SalesAuditResult
+  - type Severity
+  - type CheckCategory
+- `server/sales-report-html.ts` — function renderSalesReportHTML: (report) => string
+- `server/scheduled-audits.ts`
+  - function getSchedule: (workspaceId) => AuditSchedule | null
+  - function listSchedules: () => AuditSchedule[]
+  - function upsertSchedule: (workspaceId, updates, 'workspaceId'>>) => AuditSchedule
+  - function deleteSchedule: (workspaceId) => boolean
+  - function startScheduler: () => void
+  - function stopScheduler: () => void
+  - _...1 more_
+- `server/schema-plan.ts`
+  - function generateSchemaPlan: (ctx) => Promise<SchemaSitePlan>
+  - function buildPlanContextForPage: (plan, pagePath) => string
+  - interface PlanContext
+- `server/schema-queue.ts`
+  - function generateSchemaSkeleton: (cell, template, siteUrl) => Record<string, unknown>
+  - function queueSchemaPreGeneration: (workspaceId, matrixId, cellId) => Promise<void>
+  - function listPendingSchemas: (workspaceId) => void
+  - function markSchemaApplied: (cellId) => void
+  - function markSchemaStale: (cellId) => void
+- `server/schema-store.ts`
+  - function saveSchemaSnapshot: (siteId, workspaceId, results) => SchemaSnapshot
+  - function getSchemaSnapshot: (siteId) => SchemaSnapshot | null
+  - function updatePageSchemaInSnapshot: (siteId, pageId, updatedSchema, unknown>) => boolean
+  - function saveSiteTemplate: (siteId, workspaceId, organizationNode, unknown>, websiteNode, unknown>) => SchemaSiteTemplate
+  - function getSiteTemplate: (siteId) => SchemaSiteTemplate | null
+  - function getOrSeedSiteTemplate: (siteId, workspaceId?) => SchemaSiteTemplate | null
+  - _...18 more_
+- `server/schema-suggester.ts`
+  - function checkRichResultsEligibility: (schema, unknown>) => RichResultEligibility[]
+  - function extractFaqOpportunities: (queryPageData, pageUrl) => Array<
+  - function buildSchemaIntelligenceBlock: (ctx) => string
+  - function extractEeatFromBrief: (brief) => EeatData | null
+  - function generateSchemaForPage: (siteId, pageId, tokenOverride?, ctx, gscMap?, {...}, ga4Map?, {...}, queryPageData?, insightsMap?, {...}) => Promise<SchemaPageSuggestion | null>
+  - function generateSchemaSuggestions: (siteId, tokenOverride?, ctx, pageKeywordMap?, onProgress?, done, message) => void
+  - _...9 more_
+- `server/schema-validator.ts`
+  - function upsertValidation: (opts) => void
+  - function getValidation: (workspaceId, pageId) => void
+  - function getValidations: (workspaceId) => void
+  - function deleteValidation: (workspaceId, pageId) => boolean
+  - function validateForGoogleRichResults: (schema, unknown>) => ValidationResult
+  - function validateEntityConsistency: (schemas, unknown> }>) => ConsistencyResult
+  - _...2 more_
+- `server/search-console.ts`
+  - function listGscSites: (siteId) => Promise<Array<
+  - function getSearchOverview: (siteId, gscSiteUrl, days, options, dateRange?) => Promise<SearchOverview>
+  - function getQueryPageData: (siteId, gscSiteUrl, days, opts?) => Promise<QueryPageRow[]>
+  - function getAllGscPages: (siteId, gscSiteUrl, days, dateRange?) => Promise<SearchPage[]>
+  - function paginateGscQuery: (fetchPage, rowLimit) => void
+  - function getPerformanceTrend: (siteId, gscSiteUrl, days, dateRange?) => Promise<PerformanceTrend[]>
+  - _...14 more_
+- `server/semrush.ts`
+  - function flushCreditsToDisk: () => void
+  - function getSemrushUsage: (workspaceId?, since?) => void
+  - function getSemrushByDay: (workspaceId?, days) => Array<
+  - function isSemrushConfigured: () => boolean
+  - function getKeywordOverview: (keywords, workspaceId, database) => Promise<KeywordMetrics[]>
+  - function getDomainOrganicKeywords: (domain, workspaceId, limit, database) => Promise<DomainKeyword[]>
+  - _...21 more_
+- `server/sentry.ts`
+  - function initSentry: () => void
+  - function setupSentryErrorHandler: (app) => void
+  - const isSentryEnabled
+- `server/seo-audit-html.ts`
+  - function stripHiddenElements: (html) => string
+  - function extractTag: (html, tag) => string[]
+  - function extractMetaContent: (html, nameOrProp) => string | null
+  - function countWords: (html) => number
+  - function extractLinks: (html) => void
+  - function extractImgTags: (html) => void
+  - _...3 more_
+- `server/seo-audit.ts`
+  - function runSeoAudit: (siteId, tokenOverride?, workspaceId?, skipLinkCheck) => Promise<SeoAuditResult>
+  - interface CwvMetricSummary
+  - interface CwvStrategyResult
+  - interface CwvSummary
+  - interface SeoAuditResult
+- `server/seo-change-tracker.ts`
+  - function recordSeoChange: (workspaceId, pageId, pageSlug, pageTitle, fields, source) => SeoChangeEvent
+  - function getSeoChanges: (workspaceId, limit) => SeoChangeEvent[]
+  - function getSeoChangeImpact: (workspaceId, gscSiteUrl, siteId, limit, sourceFilter?) => Promise<PageImpact[]>
+  - function getSchemaImpactSummary: (workspaceId, gscSiteUrl, siteId, limit) => Promise<SchemaImpactSummary>
+  - interface SeoChangeEvent
+  - interface PageImpact
+  - _...1 more_
+- `server/seo-context.ts`
+  - function clearSeoContextCache: (workspaceId?) => void
+  - function buildSeoContext: (workspaceId?, pagePath?, learningsDomain, internalOpts?) => SeoContext
+  - function getRawBrandVoice: (workspaceId) => string
+  - function getRawKnowledge: (workspaceId) => string
+  - function buildKnowledgeBase: (workspaceId?) => string
+  - function buildPersonasContext: (workspaceId?) => string
+  - _...4 more_
+- `server/seo-data-provider.ts`
+  - function registerProvider: (name, provider) => void
+  - function getProvider: (name) => SeoDataProvider | undefined
+  - function getConfiguredProvider: (preferred?) => SeoDataProvider | null
+  - function markCapabilityDisabled: (providerName, capability, ttlMs) => void
+  - function isCapabilityDisabled: (providerName, capability) => boolean
+  - function clearCapabilityDisabled: (providerName, capability) => void
+  - _...14 more_
+- `server/seo-suggestions.ts`
+  - function saveSuggestion: (opts) => SeoSuggestion
+  - function listSuggestions: (workspaceId, field?) => SeoSuggestion[]
+  - function selectVariation: (suggestionId, selectedIndex) => boolean
+  - function selectVariationByPage: (workspaceId, pageId, field, selectedIndex) => boolean
+  - function getSelectedSuggestions: (workspaceId) => SeoSuggestion[]
+  - function markApplied: (suggestionIds) => void
+  - _...3 more_
+- `server/site-architecture.ts`
+  - function getAncestorChain: (tree, targetPath) => SiteNode[]
+  - function getParentNode: (tree, targetPath) => SiteNode | null
+  - function getSiblingNodes: (tree, targetPath) => SiteNode[]
+  - function getChildNodes: (tree, parentPath) => SiteNode[]
+  - function flattenTree: (tree, includeRoot) => SiteNode[]
+  - function getCachedArchitecture: (workspaceId) => Promise<SiteArchitectureResult>
+  - _...5 more_
+- `server/startup.ts` — function startSchedulers: () => void
+- `server/storage-stats.ts`
+  - function getStorageReport: () => StorageReport
+  - function pruneChatSessions: (maxAgeDays) => PruneResult
+  - function pruneBackups: (retainDays) => PruneResult
+  - function pruneReportSnapshots: (keepPerSite) => PruneResult
+  - function pruneActivityLogs: (maxAgeDays) => PruneResult
+  - interface DirStats
+  - _...2 more_
+- `server/stripe-config.ts`
+  - function getStripeConfig: () => StripeConfig | null
+  - function getStripeConfigSafe: () => void
+  - function saveStripeKeys: (secretKey?, webhookSecret?, publishableKey?) => void
+  - function saveStripeProducts: (products) => void
+  - function clearStripeConfig: () => void
+  - function getStripeSecretKey: () => string
+  - _...5 more_
+- `server/stripe.ts`
+  - function initStripeBroadcast: (fn) => void
+  - function isStripeConfigured: () => boolean
+  - function getProductConfig: (type) => ProductConfig | null
+  - function listProducts: () => ProductConfig[]
+  - function createCheckoutSession: (params) => Promise<
+  - function createCartCheckoutSession: (params) => Promise<
+  - _...10 more_
+- `server/studio-config.ts`
+  - function getStudioConfig: (key) => string | null
+  - function setStudioConfig: (key, value) => void
+  - function deleteStudioConfig: (key) => void
+  - function getBookingUrl: () => string | null
+  - function setBookingUrl: (url) => void
+  - function clearBookingUrl: () => void
+- `server/suggested-briefs-store.ts`
+  - function createSuggestedBrief: (params) => SuggestedBrief
+  - function listSuggestedBriefs: (workspaceId, includeAll) => SuggestedBrief[]
+  - function getSuggestedBrief: (id, workspaceId) => SuggestedBrief | null
+  - function updateSuggestedBrief: (id, workspaceId, status) => SuggestedBrief | null
+  - function dismissSuggestedBrief: (id, workspaceId) => SuggestedBrief | null
+  - function snoozeSuggestedBrief: (id, workspaceId, until) => SuggestedBrief | null
+- `server/trial-reminders.ts` — function startTrialReminders: () => void, function stopTrialReminders: () => void
+- `server/usage-tracking.ts`
+  - function getLimit: (tier, feature) => number
+  - function getUsageCount: (workspaceId, feature) => number
+  - function incrementUsage: (workspaceId, feature) => number
+  - function checkUsageLimit: (workspaceId, tier, feature) => void
+  - function getUsageSummary: (workspaceId, tier) => Record<UsageFeature,
+  - type UsageFeature
+- `server/users.ts`
+  - function listUsers: () => SafeUser[]
+  - function getUserById: (id) => User | null
+  - function getUserByEmail: (email) => User | null
+  - function getSafeUser: (id) => SafeUser | null
+  - function createUser: (email, password, name, role, workspaceIds) => Promise<SafeUser>
+  - function updateUser: (id, updates, 'name' | 'email' | 'role' | 'workspaceIds' | 'avatarUrl'>>) => Promise<SafeUser | null>
+  - _...5 more_
+- `server/web-scraper.ts`
+  - function scrapeUrl: (url) => Promise<ScrapedPage | null>
+  - function scrapeUrls: (urls, concurrency) => Promise<ScrapedPage[]>
+  - function scrapeSerpData: (query) => Promise<SerpData | null>
+  - function buildReferenceContext: (pages) => string
+  - function buildStyleExampleContext: (pages) => string
+  - function buildSerpContext: (serp) => string
+  - _...3 more_
+- `server/webflow-assets.ts`
+  - function listAssets: (siteId, tokenOverride?) => Promise<WebflowAsset[]>
+  - function getAsset: (assetId, tokenOverride?) => Promise<WebflowAsset | null>
+  - function updateAsset: (assetId, updates, tokenOverride?) => Promise<
+  - function listAssetFolders: (siteId, tokenOverride?) => Promise<AssetFolder[]>
+  - function createAssetFolder: (siteId, displayName, parentFolderId?, tokenOverride?) => Promise<
+  - function moveAssetToFolder: (assetId, parentFolderId, tokenOverride?) => Promise<
+  - _...5 more_
+- `server/webflow-client.ts` — function getToken: () => string | null, function webflowFetch: (endpoint, options, tokenOverride?) => Promise<Response>
+- `server/webflow-cms.ts`
+  - function listCollections: (siteId, tokenOverride?) => Promise<Array<
+  - function getCollectionItem: (collectionId, itemId, tokenOverride?) => Promise<Record<string, unknown> | null>
+  - function listCollectionItems: (collectionId, limit, offset, tokenOverride?) => Promise<
+  - function getCollectionSchema: (collectionId, tokenOverride?) => Promise<
+  - function createCollectionItem: (collectionId, fieldData, unknown>, isDraft, tokenOverride?) => Promise<
+  - function updateCollectionItem: (collectionId, itemId, fieldData, unknown>, tokenOverride?) => Promise<
+  - _...1 more_
+- `server/webflow-pages.ts`
+  - function listPages: (siteId, tokenOverride?) => Promise<WebflowPage[]>
+  - function filterPublishedPages: (pages) => WebflowPage[]
+  - function getPageDomNodes: (pageId, tokenOverride?) => Promise<DomNode[]>
+  - function getPageDom: (pageId, tokenOverride?) => Promise<string>
+  - function updatePageSeo: (pageId, fields, tokenOverride?) => Promise<
+  - function getPageMeta: (pageId, tokenOverride?) => Promise<Record<string, unknown> | null>
+  - _...11 more_
+- `server/websocket.ts` — function getPresence: () => Record<string, Array<, function initWebSocket: (server) => WebSocketServer
+- `server/work-orders.ts`
+  - function listWorkOrders: (workspaceId) => WorkOrder[]
+  - function getWorkOrder: (workspaceId, orderId) => WorkOrder | undefined
+  - function createWorkOrder: (workspaceId, data) => WorkOrder
+  - function updateWorkOrder: (workspaceId, orderId, updates, 'status' | 'assignedTo' | 'notes' | 'completedAt'>>) => WorkOrder | null
+- `server/workspace-data.ts`
+  - function getWorkspacePages: (workspaceId, siteId) => Promise<WebflowPageArray>
+  - function getWorkspaceAllPages: (workspaceId, siteId) => Promise<WebflowPageArray>
+  - function invalidatePageCache: (workspaceId) => void
+  - function getPageCacheStats: () => void
+  - function getContentPipelineSummary: (workspaceId) => ContentPipelineSummary
+  - function invalidateContentPipelineCache: (workspaceId) => void
+- `server/workspace-intelligence.ts`
+  - function buildWorkspaceIntelligence: (workspaceId, opts?) => Promise<WorkspaceIntelligence>
+  - function formatForPrompt: (intelligence, opts?) => string
+  - function buildIntelPrompt: (workspaceId, slices, opts?, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget' | 'learningsDomain'>) => Promise<string>
+  - function invalidateIntelligenceCache: (workspaceId) => void
+  - function getIntelligenceCacheStats: () => void
+  - function formatBrandVoiceForPrompt: (brandVoice) => string
+  - _...4 more_
+- `server/workspace-learnings.ts`
+  - function computeWorkspaceLearnings: (workspaceId) => WorkspaceLearnings
+  - function getWorkspaceLearnings: (workspaceId, _domain?) => WorkspaceLearnings | null
+  - function formatLearningsForPrompt: (learnings, domain) => string
+  - function getWorkspaceIdsWithOutcomes: () => string[]
+  - function recomputeAllWorkspaceLearnings: () => Promise<void>
+- `server/workspaces.ts`
+  - function getBrandName: (ws, 'name' | 'webflowSiteName'> | null | undefined) => string
+  - function getClientPortalUrl: (ws) => string | undefined
+  - function getTokenForSite: (siteId) => string | null
+  - function listWorkspaces: () => Workspace[]
+  - function createWorkspace: (name, webflowSiteId?, webflowSiteName?) => Workspace
+  - function updateWorkspace: (id, updates, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>) => Workspace | null
+  - _...10 more_
+- `src/api/analytics.ts`
+  - function fetchClientIntelligence: (workspaceId) => Promise<ClientIntelligence>
+  - const gsc
+  - const ga4
+  - const gscAdmin
+- `src/api/client.ts`
+  - function get: (url, signal?) => Promise<T>
+  - function post: (url, body?, signal?) => Promise<T>
+  - function patch: (url, body, signal?) => Promise<T>
+  - function put: (url, body, signal?) => Promise<T>
+  - function del: (url, body?, signal?) => Promise<T>
+  - function postForm: (url, formData, signal?) => Promise<T>
+  - _...3 more_
+- `src/hooks/admin/useActionQueue.ts` — function useActionQueue: (workspaceId) => void
+- `src/hooks/admin/useAdminAssets.ts`
+  - function useWebflowAssets: (siteId) => void
+  - function useAssetAudit: (siteId, enabled) => void
+  - function useCmsImages: (siteId, enabled) => void
+- `src/hooks/admin/useAdminBriefs.ts` — function useAdminBriefsList: (wsId) => void, function useAdminRequestsList: (wsId) => void
+- `src/hooks/admin/useAdminGA4.ts` — function useAdminGA4: (workspaceId, days, enabled) => AdminGA4Data, interface AdminGA4Data
+- `src/hooks/admin/useAdminPosts.ts`
+  - function useAdminPostsList: (wsId) => void
+  - function useAdminPost: (wsId, postId) => void
+  - function useAdminPostVersions: (wsId, postId, enabled) => void
+  - function usePublishTarget: (wsId) => void
+- `src/hooks/admin/useAdminROI.ts` — function useAdminROI: (workspaceId) => void
+- `src/hooks/admin/useAdminSearch.ts` — function useAdminSearch: (siteId, gscSiteUrl, days) => AdminSearchData, interface AdminSearchData
+- `src/hooks/admin/useAdminSeo.ts`
+  - function useAuditTrafficMap: (siteId) => void
+  - function useAuditSuppressions: (workspaceId) => void
+  - function useAuditSchedule: (workspaceId) => void
+  - function useSchemaSnapshot: (siteId) => void
+  - function useWebflowPages: (siteId) => void
+  - interface AuditSchedule
+  - _...1 more_
+- `src/hooks/admin/useAiSuggestedBriefs.ts` — function useAiSuggestedBriefs: (workspaceId) => void
+- `src/hooks/admin/useAnalyticsAnnotations.ts`
+  - function useAnalyticsAnnotations: (workspaceId) => void
+  - function useCreateAnnotation: (workspaceId) => void
+  - function useUpdateAnnotation: (workspaceId) => void
+  - function useDeleteAnnotation: (workspaceId) => void
+  - interface Annotation
+- `src/hooks/admin/useAnalyticsOverview.ts` — function useAnalyticsOverview: (workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days) => AnalyticsOverviewData, interface AnalyticsOverviewData
+- `src/hooks/admin/useAnomalyAlerts.ts` — function useAnomalyAlerts: (workspaceId, isAdmin) => void
+- `src/hooks/admin/useClientSignals.ts`
+  - function useClientSignals: (workspaceId) => void
+  - function useUpdateSignalStatus: (workspaceId) => void
+  - function useCreateClientSignal: (workspaceId) => void
+- `src/hooks/admin/useCmsEditor.ts` — function useCmsEditor: (siteId, workspaceId?) => void, function useCmsCollections: (siteId) => void
+- `src/hooks/admin/useContentCalendar.ts` — function useContentCalendar: (workspaceId) => void
+- `src/hooks/admin/useContentPipeline.ts` — function useContentPipeline: (workspaceId) => void
+- `src/hooks/admin/useHealthCheck.ts` — function useHealthCheck: () => void, const HEALTH_KEY
+- `src/hooks/admin/useInsightFeed.ts`
+  - function cleanSlugToTitle: (url) => string
+  - function transformToFeedInsight: (insight) => FeedInsight
+  - function computeSummaryCounts: (feed) => SummaryCount[]
+  - function useInsightFeed: (workspaceId, enabled) => InsightFeedResult
+- `src/hooks/admin/useIntelligenceSignals.ts` — function useIntelligenceSignals: (workspaceId) => void
+- `src/hooks/admin/useKeywordStrategy.ts` — function useKeywordStrategy: (workspaceId) => void
+- `src/hooks/admin/useNotifications.ts` — function useNotifications: () => void, interface NotificationItem
+- `src/hooks/admin/useOutcomes.ts`
+  - function useOutcomeScorecard: (wsId) => void
+  - function useOutcomeActions: (wsId, type?, score?) => void
+  - function useOutcomeAction: (wsId, actionId) => void
+  - function useOutcomeTopWins: (wsId) => void
+  - function useOutcomeTimeline: (wsId) => void
+  - function useOutcomeLearnings: (wsId) => void
+  - _...3 more_
+- `src/hooks/admin/useQueue.ts` — function useQueue: () => void, const QUEUE_KEY
+- `src/hooks/admin/useSchemaValidation.ts` — function useSchemaValidations: (siteId) => void, function useValidateSchema: (siteId) => void
+- `src/hooks/admin/useSeoEditor.ts` — function useSeoEditor: (siteId, workspaceId?) => void, interface PageMeta
+- `src/hooks/admin/useWorkspaceHome.ts` — function useWorkspaceHomeData: (workspaceId) => void
+- `src/hooks/admin/useWorkspaceIntelligence.ts` — function useWorkspaceIntelligence: (workspaceId, slices?, pagePath?, learningsDomain?) => void
+- `src/hooks/admin/useWorkspaceOverview.ts` — function useWorkspaceOverviewData: () => void, interface WorkspaceOverviewData
+- `src/hooks/admin/useWorkspaces.ts`
+  - function useWorkspaces: () => void
+  - function useCreateWorkspace: () => void
+  - function useDeleteWorkspace: () => void
+  - function useLinkSite: () => void
+  - function useUnlinkSite: () => void
+  - const WORKSPACES_KEY
+- `src/hooks/client/useClientGA4.ts` — function useClientGA4: (wsId, days, dateRange, enabled) => void, interface ClientGA4Data
+- `src/hooks/client/useClientInsights.ts` — function useClientInsights: (workspaceId) => void
+- `src/hooks/client/useClientIntelligence.ts` — function useClientIntelligence: (workspaceId) => void
+- `src/hooks/client/useClientOutcomes.ts` — function useClientOutcomeSummary: (wsId) => void, function useClientOutcomeWins: (wsId) => void
+- `src/hooks/client/useClientQueries.ts`
+  - function useClientActivity: (wsId, enabled) => void
+  - function useClientRankHistory: (wsId, enabled) => void
+  - function useClientLatestRanks: (wsId, enabled) => void
+  - function useClientAnnotations: (wsId, enabled) => void
+  - function useClientAnomalies: (wsId, enabled) => void
+  - function useClientApprovals: (wsId, enabled) => void
+  - _...10 more_
+- `src/hooks/client/useClientSearch.ts` — function useClientSearch: (wsId, days, dateRange, enabled) => void, interface ClientSearchData
+- `src/hooks/client/useMonthlyDigest.ts` — function useMonthlyDigest: (workspaceId) => void
+- `src/hooks/shared/useGA4Base.ts` — function useGA4Base: ({...}, days, dateRange, enabled, keyPrefix, includeEvents, landingOpts, }) => void, interface GA4BaseOptions
+- `src/hooks/useAuditSummary.ts`
+  - function useAuditSummary: (workspaceId) => void
+  - function auditSummaryKey
+  - interface AuditSummaryData
+- `src/hooks/useAuth.ts` — function useAuth: () => void, function authHeaders: () => Record<string, string>
+- `src/hooks/useChat.ts`
+  - function useChat: (deps) => ChatState & ChatActions
+  - interface ChatDeps
+  - interface ChatState
+  - interface ChatActions
+- `src/hooks/useClientAuth.ts`
+  - function useClientAuth: (workspaceId, ws, loadDashboardData) => void
+  - interface ClientUser
+  - interface ClientAuthState
+  - interface ClientAuthActions
+- `src/hooks/useClientData.ts`
+  - function useClientData: (workspaceId) => void
+  - interface ActivityLogItem
+  - interface RankHistoryEntry
+  - interface LatestRank
+  - interface AnnotationItem
+  - interface AnomalyItem
+  - _...1 more_
+- `src/hooks/useContentRequests.ts` — function useContentRequests: ({...}, setContentRequests, setToast }) => void
+- `src/hooks/useFeatureFlag.ts` — function useFeatureFlag: (flag) => boolean
+- `src/hooks/usePageEditStates.ts`
+  - function usePageEditStates: (workspaceId, isPublic) => void
+  - function pageEditStatesKey
+  - interface PageEditState
+  - interface PageEditSummary
+- `src/hooks/usePayments.ts`
+  - function usePayments: (workspaceId, ws, setToast) => void
+  - interface PricingModalData
+  - interface StripePaymentData
+  - interface PricingData
+  - interface PaymentsState
+  - interface PaymentsActions
+- `src/hooks/useRecommendations.ts` — function useRecommendations: (workspaceId?) => void, interface Recommendation
+- `src/hooks/useToast.ts` — function useToast: (duration) => void
+- `src/hooks/useToggleSet.ts` — function useToggleSet: (defaults, {...}, max) => [Set<string>, (key: string) => void]
+- `src/hooks/useWebSocket.ts` — function useWebSocket: (handlers, EventHandler>) => void
+- `src/hooks/useWorkspaceEvents.ts` — function useWorkspaceEvents: (workspaceId, handlers, EventHandler>, identity?) => void, interface WsIdentity
+- `src/hooks/useWsInvalidation.ts` — function useWsInvalidation: (workspaceId) => void
+- `src/lib/character-validation.ts`
+  - function validateCharacterCount: (text, max) => CharacterValidation
+  - function truncateSmart: (text, max) => string
+  - function getColorClass: (percentage) => string
+  - interface CharacterValidation
+- `src/lib/kdFraming.ts` — function kdFraming: (kd) => string | undefined, function kdTooltip: (kd) => string
+- `src/lib/loadingPhrases.ts` — function pickPhrase: (exclude?) => string, const LOADING_PHRASES: readonly string[]
+- `src/lib/pathUtils.ts`
+  - function normalizePath: (p) => string
+  - function matchPagePath: (a, b) => boolean
+  - function resolvePagePath: (page) => string
+- `src/lib/utils.ts` — function cn: (...inputs) => void
+- `src/routes.ts`
+  - function adminPath: (workspaceId, tab) => string
+  - function clientPath: (workspaceId, tab?, betaMode?) => string
+  - type Page
+  - type ClientTab
+- `src/utils/formatNumbers.ts`
+  - function fmtNum: (n) => string
+  - function fmtMoney: (value) => string
+  - function fmtMoneyFull: (value) => string

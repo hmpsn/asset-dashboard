@@ -45,11 +45,11 @@ PR 4: Intelligence & Infrastructure
   Sequential:
     Task 4.4 (Barrel exports — shared/types/index.ts)
   Parallel after 4.4:
-    Task 4.1 (portalUsage)  ∥  Task 4.2 (actionBacklog)  ∥  Task 4.3 (Cannibalization prompt)  ∥  Task 4.5 (Dead code)
+    Task 4.1 (portalUsage)  ∥  Task 4.2 (actionBacklog)  ∥  Task 4.3 (Cannibalization prompt)  ∥  Task 4.5 (Dead code)  ∥  Task 4.6 (competitorDomainsAtLastFetch — from PR3 follow-up A)
 
 PR 5: Infrastructure Plans
   Sequential (each modifies CI/config files):
-    Task 5.1 (Pre-commit hooks) → Task 5.2 (CI coverage) → Task 5.3 (pr-check audit)
+    Task 5.1 (Pre-commit hooks) → Task 5.2 (CI coverage) → Task 5.3 (pr-check audit + PR3 follow-up B post-commit guard)
 
 PR 6: Test & Doc Cleanup
   Parallel (all independent):
@@ -1093,35 +1093,6 @@ npm run typecheck && npx vite build && npx vitest run && npx tsx scripts/pr-chec
 
 After PR 3: `scaled-code-review`, merge to `staging`.
 
-### PR 3 Follow-Up Tasks (post-merge, before PR 4)
-
-These structural improvements were identified during the PR 3 review cycle. They address recurring root causes — not one-off bugs — and should be done before implementing new features that touch the same components.
-
-#### Follow-Up A — `competitorDomainsAtLastFetch` field for accurate domain-change detection
-
-**Context:** `shouldFetchCompetitorData` currently uses timestamp-only to decide whether to re-fetch competitor data. The original code attempted domain-change detection but used `keywordGaps` as a proxy — which is lossy (competitors with zero gaps don't appear). We reverted to timestamp-only (correct), but this means adding/removing a competitor domain won't trigger a re-fetch until the 7-day cache expires.
-
-**Work:**
-- [ ] Add `competitorDomainsAtLastFetch: string[] | null` to the workspace type (`shared/types/workspace.ts`) and DB schema (new migration)
-- [ ] Write the value in `keyword-strategy.ts` at the same point `competitorLastFetchedAt` is written
-- [ ] Update `shouldFetchCompetitorData` to compare `ws.competitorDomains` against `ws.competitorDomainsAtLastFetch` (direct signal, not a proxy)
-- [ ] Add integration test: adding a new domain to a workspace with fresh cache should trigger re-fetch
-
-**Model:** haiku | **Owns:** `server/routes/keyword-strategy.ts`, `server/workspaces.ts`, `shared/types/workspace.ts`, new migration
-
-#### Follow-Up B — Mechanize post-commit side effect guard (pr-check rule)
-
-**Context:** `dismissAnomaly` was missing a try/catch around `reverseAnomalyBoostIfNoneRemain`, causing a side-effect error to surface as a failed dismiss. The periodic scan had the pattern right. This is a general risk: any function call that follows a committed DB write but is not inside a transaction can propagate a 500 if it throws.
-
-**Work:**
-- [ ] Add a pr-check rule: flag any direct function call that follows a `.run()` DB commit and makes further DB writes, without a surrounding try/catch
-- [ ] Or document the convention in `docs/rules/bridge-authoring.md` with a clear code template for post-commit side effects: `try { sideEffect() } catch (err) { log.warn(...) }`
-- [ ] Verify all existing post-commit side effect call sites follow the pattern (grep: `.run(` followed within 5 lines by a function call not in a try block)
-
-**Model:** sonnet | **Owns:** `scripts/pr-check.ts`, `docs/rules/bridge-authoring.md`
-
----
-
 ## PR 4: Intelligence & Infrastructure
 
 ### Task 4.4 — Barrel Export Completion (Model: haiku)
@@ -1324,6 +1295,85 @@ git commit -m "chore: remove dead test-deduplication.ts script"
 
 ---
 
+### Task 4.6 — competitorDomainsAtLastFetch for accurate domain-change detection (Model: haiku)
+
+**Owns:** `server/routes/keyword-strategy.ts`, `server/workspaces.ts`, `shared/types/workspace.ts`, new migration
+**Must not touch:** Other workspace fields, other intelligence files.
+
+**Context:** `shouldFetchCompetitorData` uses timestamp-only to decide re-fetch. Adding/removing a competitor domain won't trigger a re-fetch until the 7-day cache expires. This adds a direct domain-change signal so new domains force an immediate re-fetch.
+
+- [ ] **Step 1: Read current state**
+
+Read `server/routes/keyword-strategy.ts` around `shouldFetchCompetitorData` and the point where `competitorLastFetchedAt` is written. Also read `shared/types/workspace.ts` for the current `Workspace` type shape and `server/workspaces.ts` for the `updateWorkspace` pattern.
+
+- [ ] **Step 2: Add migration**
+
+Create `server/db/migrations/064-competitor-domains-at-last-fetch.sql`:
+```sql
+ALTER TABLE workspaces ADD COLUMN competitor_domains_at_last_fetch TEXT;
+```
+
+- [ ] **Step 3: Update workspace type and mapper**
+
+In `shared/types/workspace.ts`, add:
+```typescript
+competitorDomainsAtLastFetch: string[] | null;
+```
+
+In `server/workspaces.ts`, update the `rowToWorkspace()` mapper to parse the new column:
+```typescript
+competitorDomainsAtLastFetch: row.competitor_domains_at_last_fetch
+  ? JSON.parse(row.competitor_domains_at_last_fetch)
+  : null,
+```
+
+- [ ] **Step 4: Write the value on fetch**
+
+In `keyword-strategy.ts`, at the same point `competitorLastFetchedAt` is written:
+```typescript
+updateWorkspace(ws.id, {
+  competitorLastFetchedAt: new Date().toISOString(),
+  competitorDomainsAtLastFetch: ws.competitorDomains ?? [],
+});
+```
+
+- [ ] **Step 5: Update shouldFetchCompetitorData**
+
+```typescript
+export function shouldFetchCompetitorData(ws: Workspace): boolean {
+  if (!ws.competitorLastFetchedAt) return true;
+
+  // Direct domain-change signal: if domains changed since last fetch, re-fetch immediately
+  const currentDomains = (ws.competitorDomains ?? []).slice().sort().join(',');
+  const lastFetchDomains = (ws.competitorDomainsAtLastFetch ?? []).slice().sort().join(',');
+  if (currentDomains !== lastFetchDomains) return true;
+
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  if (new Date(ws.competitorLastFetchedAt) < cutoff) return true;
+
+  return false;
+}
+```
+
+- [ ] **Step 6: Add integration test**
+
+In `tests/integration/keyword-strategy.test.ts` (or new file at port 13322 if none exists), add test: workspace with fresh cache but changed `competitorDomains` vs `competitorDomainsAtLastFetch` → `shouldFetchCompetitorData` returns true.
+
+- [ ] **Step 7: Verify**
+
+```bash
+npm run typecheck && npx vitest run
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add server/db/migrations/064-competitor-domains-at-last-fetch.sql shared/types/workspace.ts server/workspaces.ts server/routes/keyword-strategy.ts
+git commit -m "feat: add competitorDomainsAtLastFetch for accurate domain-change detection"
+```
+
+---
+
 ### PR 4 Verification
 
 ```bash
@@ -1372,7 +1422,7 @@ Follow the existing plan. Key steps:
 
 **Plan:** `docs/superpowers/plans/2026-04-10-pr-check-audit-and-backfill.md`
 
-**Owns:** `scripts/pr-check.ts`, `docs/rules/automated-rules.md`.
+**Owns:** `scripts/pr-check.ts`, `docs/rules/automated-rules.md`, `docs/rules/bridge-authoring.md`.
 **Must not touch:** Application source code (this PR only adds rules, not fixes).
 
 Follow the existing plan for PR A scope only. Key steps:
@@ -1380,6 +1430,14 @@ Follow the existing plan for PR A scope only. Key steps:
 - [ ] Regenerate automated-rules.md
 - [ ] Run full-scan to inventory violations (document, don't fix)
 - [ ] Commit
+
+**Also in this task — Follow-Up B: Post-commit side effect guard**
+
+**Context:** `dismissAnomaly` was missing a try/catch around `reverseAnomalyBoostIfNoneRemain`. Any function call that follows a committed `.run()` DB write but is not inside a transaction can propagate a 500 if it throws.
+
+- [ ] Add a pr-check rule flagging function calls that follow `.run()` without a surrounding try/catch (pattern: `.run(` within 5 lines of a non-transaction function call)
+- [ ] Add code template to `docs/rules/bridge-authoring.md`: `try { sideEffect() } catch (err) { log.warn(...) }` pattern for post-commit side effects
+- [ ] Grep existing call sites to verify compliance; document any violations as inventory (fix in a follow-up, not here)
 
 ---
 

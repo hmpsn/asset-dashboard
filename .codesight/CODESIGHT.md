@@ -1,0 +1,1860 @@
+# asset-dashboard — AI Context Map
+
+> **Stack:** express | none | react | typescript
+
+> 512 routes | 0 models | 211 components | 200 lib files | 67 env vars | 23 middleware | 2802 import links
+> **Token savings:** this file is ~32,100 tokens. Without it, AI exploration would cost ~410,600 tokens. **Saves ~378,500 tokens per conversation.**
+
+---
+
+# Routes
+
+- `POST` `/api/stripe/webhook` params() [auth, payment, upload]
+- `GET` `/api/presence` params() [auth, payment, upload]
+- `POST` `/api/foo`
+- `GET` `/api/public/activity/:workspaceId` params(workspaceId)
+- `GET` `/api/activity` params()
+- `POST` `/api/activity` params()
+- `POST` `/api/aeo-review/:workspaceId/page` params(workspaceId) [auth]
+- `GET` `/api/aeo-review/:workspaceId` params(workspaceId) [auth]
+- `POST` `/api/aeo-review/:workspaceId/site` params(workspaceId) [auth]
+- `GET` `/deduplication` params() [auth, cache, ai]
+- `GET` `/usage` params() [auth, cache, ai]
+- `GET` `/summary` params() [auth, cache, ai]
+- `POST` `/api/admin-chat` params() [auth, ai]
+- `GET` `/api/ai/context/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/ai/usage` params() [auth, ai]
+- `GET` `/api/ai/time-saved` params() [auth, ai]
+- `GET` `/api/public/annotations/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/annotations/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/annotations/:workspaceId` params(workspaceId) [auth, db]
+- `DELETE` `/api/annotations/:workspaceId/:id` params(workspaceId, id) [auth, db]
+- `GET` `/api/anomalies` params() [auth]
+- `GET` `/api/anomalies/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/public/anomalies/:workspaceId` params(workspaceId) [auth]
+- `POST` `/api/anomalies/:anomalyId/dismiss` params(anomalyId) [auth]
+- `POST` `/api/anomalies/:anomalyId/acknowledge` params(anomalyId) [auth]
+- `POST` `/api/anomalies/scan` params() [auth]
+- `POST` `/api/approvals/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/approvals/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/approvals/:workspaceId/:batchId` params(workspaceId, batchId) [auth, db]
+- `DELETE` `/api/approvals/:workspaceId/:batchId` params(workspaceId, batchId) [auth, db]
+- `POST` `/api/approvals/:workspaceId/:batchId/remind` params(workspaceId, batchId) [auth, db]
+- `GET` `/api/public/approvals/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/public/approvals/:workspaceId/:batchId` params(workspaceId, batchId) [auth, db]
+- `PATCH` `/api/public/approvals/:workspaceId/:batchId/:itemId` params(workspaceId, batchId, itemId) [auth, db]
+- `POST` `/api/public/approvals/:workspaceId/:batchId/apply` params(workspaceId, batchId) [auth, db]
+- `GET` `/api/audit-schedules` params() [auth, db]
+- `GET` `/api/audit-schedules/:workspaceId` params(workspaceId) [auth, db]
+- `PUT` `/api/audit-schedules/:workspaceId` params(workspaceId) [auth, db]
+- `DELETE` `/api/audit-schedules/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/auth/login` params() [auth]
+- `POST` `/api/auth/logout` params() [auth]
+- `GET` `/api/auth/check` params() [auth]
+- `POST` `/api/auth/setup` params() [auth]
+- `GET` `/api/auth/setup-status` params() [auth]
+- `POST` `/api/auth/user-login` params() [auth]
+- `POST` `/api/auth/user-logout` params() [auth]
+- `GET` `/api/auth/me` params() [auth]
+- `GET` `/api/backlinks/:workspaceId` params(workspaceId)
+- `GET` `/api/brand-docs/:workspaceId` params(workspaceId) [auth, db, upload]
+- `POST` `/api/brand-docs/:workspaceId` params(workspaceId) [auth, db, upload]
+- `DELETE` `/api/brand-docs/:workspaceId/:fileName` params(workspaceId, fileName) [auth, db, upload]
+- `GET` `/api/churn-signals` params() [auth]
+- `GET` `/api/churn-signals/:workspaceId` params(workspaceId) [auth]
+- `POST` `/api/churn-signals/:signalId/dismiss` params(signalId) [auth]
+- `GET` `/api/public/intelligence/:workspaceId` params(workspaceId)
+- `GET` `/api/client-signals/detail/:id` params(id) [auth, ai]
+- `GET` `/api/client-signals/:workspaceId` params(workspaceId) [auth, ai]
+- `PATCH` `/api/client-signals/:id/status` params(id) [auth, ai]
+- `POST` `/api/public/signal/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/competitor-schema/:workspaceId` params(workspaceId) [auth, cache]
+- `GET` `/api/content-briefs/:workspaceId` params(workspaceId) [auth, db, payment]
+- `GET` `/api/content-briefs/:workspaceId/suggested` params(workspaceId) [auth, db, payment]
+- `GET` `/api/content-briefs/:workspaceId/:briefId` params(workspaceId, briefId) [auth, db, payment]
+- `PATCH` `/api/content-briefs/:workspaceId/:briefId` params(workspaceId, briefId) [auth, db, payment]
+- `POST` `/api/content-briefs/:workspaceId/generate` params(workspaceId) [auth, db, payment]
+- `POST` `/api/content-briefs/:workspaceId/:briefId/regenerate` params(workspaceId, briefId) [auth, db, payment]
+- `POST` `/api/content-briefs/:workspaceId/:briefId/regenerate-outline` params(workspaceId, briefId) [auth, db, payment]
+- `GET` `/api/content-briefs/:workspaceId/:briefId/export` params(workspaceId, briefId) [auth, db, payment]
+- `POST` `/api/content-briefs/:workspaceId/:briefId/send-to-client` params(workspaceId, briefId) [auth, db, payment]
+- `DELETE` `/api/content-briefs/:workspaceId/:briefId` params(workspaceId, briefId) [auth, db, payment]
+- `POST` `/api/content-briefs/:workspaceId/validate-keyword` params(workspaceId) [auth, db, payment]
+- `POST` `/api/content-briefs/:workspaceId/validate-keywords` params(workspaceId) [auth, db, payment]
+- `POST` `/api/content-decay/:workspaceId/analyze` params(workspaceId) [auth, cache]
+- `GET` `/api/content-decay/:workspaceId` params(workspaceId) [auth, cache]
+- `POST` `/api/content-decay/:workspaceId/recommendations` params(workspaceId) [auth, cache]
+- `GET` `/api/public/content-decay/:workspaceId` params(workspaceId) [auth, cache]
+- `GET` `/api/content-matrices/:workspaceId` params(workspaceId) [auth, db, queue]
+- `GET` `/api/content-matrices/:workspaceId/:matrixId` params(workspaceId, matrixId) [auth, db, queue]
+- `POST` `/api/content-matrices/:workspaceId` params(workspaceId) [auth, db, queue]
+- `PUT` `/api/content-matrices/:workspaceId/:matrixId` params(workspaceId, matrixId) [auth, db, queue]
+- `PATCH` `/api/content-matrices/:workspaceId/:matrixId/cells/:cellId` params(workspaceId, matrixId, cellId) [auth, db, queue]
+- `POST` `/api/content-matrices/:workspaceId/:matrixId/cells/:cellId/recommend-keywords` params(workspaceId, matrixId, cellId) [auth, db, queue]
+- `POST` `/api/content-matrices/:workspaceId/recommend-keywords` params(workspaceId) [auth, db, queue]
+- `GET` `/api/content-matrices/:workspaceId/:matrixId/cannibalization` params(workspaceId, matrixId) [auth, db, queue]
+- `POST` `/api/content-matrices/:workspaceId/check-cannibalization` params(workspaceId) [auth, db, queue]
+- `DELETE` `/api/content-matrices/:workspaceId/:matrixId` params(workspaceId, matrixId) [auth, db, queue]
+- `GET` `/api/public/content-plan/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/public/content-plan/:workspaceId/:matrixId` params(workspaceId, matrixId) [auth]
+- `POST` `/api/public/content-plan/:workspaceId/:matrixId/cells/:cellId/flag` params(workspaceId, matrixId, cellId) [auth]
+- `POST` `/api/content-plan/:workspaceId/:matrixId/send-template-review` params(workspaceId, matrixId) [auth]
+- `POST` `/api/content-plan/:workspaceId/:matrixId/send-samples` params(workspaceId, matrixId) [auth]
+- `POST` `/api/content-plan/:workspaceId/:matrixId/batch-approve` params(workspaceId, matrixId) [auth]
+- `GET` `/api/content-posts/:workspaceId` params(workspaceId) [auth, db, payment, ai]
+- `GET` `/api/content-posts/:workspaceId/:postId` params(workspaceId, postId) [auth, db, payment, ai]
+- `POST` `/api/content-posts/:workspaceId/generate` params(workspaceId) [auth, db, payment, ai]
+- `POST` `/api/content-posts/:workspaceId/:postId/regenerate-section` params(workspaceId, postId) [auth, db, payment, ai]
+- `PATCH` `/api/content-posts/:workspaceId/:postId` params(workspaceId, postId) [auth, db, payment, ai]
+- `GET` `/api/content-posts/:workspaceId/:postId/export/markdown` params(workspaceId, postId) [auth, db, payment, ai]
+- `GET` `/api/content-posts/:workspaceId/:postId/export/html` params(workspaceId, postId) [auth, db, payment, ai]
+- `GET` `/api/content-posts/:workspaceId/:postId/export/pdf` params(workspaceId, postId) [auth, db, payment, ai]
+- `POST` `/api/content-posts/:workspaceId/:postId/ai-review` params(workspaceId, postId) [auth, db, payment, ai]
+- `GET` `/api/content-posts/:workspaceId/:postId/versions` params(workspaceId, postId) [auth, db, payment, ai]
+- `GET` `/api/content-posts/:workspaceId/:postId/versions/:versionId` params(workspaceId, postId, versionId) [auth, db, payment, ai]
+- `POST` `/api/content-posts/:workspaceId/:postId/versions/:versionId/revert` params(workspaceId, postId, versionId) [auth, db, payment, ai]
+- `POST` `/api/content-posts/:workspaceId/:postId/score-voice` params(workspaceId, postId) [auth, db, payment, ai]
+- `DELETE` `/api/content-posts/:workspaceId/:postId` params(workspaceId, postId) [auth, db, payment, ai]
+- `POST` `/api/content-posts/:workspaceId/:postId/publish-to-webflow` params(workspaceId, postId) [auth, ai]
+- `POST` `/api/webflow/suggest-field-mapping/:siteId` params(siteId) [auth, ai]
+- `GET` `/api/webflow/publish-collections/:siteId` params(siteId) [auth, ai]
+- `GET` `/api/webflow/publish-schema/:collectionId` params(collectionId) [auth, ai]
+- `GET` `/api/content-requests/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/content-requests/:workspaceId/:id` params(workspaceId, id) [auth, db]
+- `PATCH` `/api/content-requests/:workspaceId/:id` params(workspaceId, id) [auth, db]
+- `DELETE` `/api/content-requests/:workspaceId/:id` params(workspaceId, id) [auth, db]
+- `POST` `/api/content-requests/:workspaceId/:id/generate-brief` params(workspaceId, id) [auth, db]
+- `GET` `/api/content-performance/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/content-performance/:workspaceId/:requestId/trend` params(workspaceId, requestId) [auth, db]
+- `GET` `/api/content-subscriptions/:workspaceId` params(workspaceId) [auth, db, payment]
+- `GET` `/api/content-subscription/:id` params(id) [auth, db, payment]
+- `POST` `/api/content-subscriptions/:workspaceId` params(workspaceId) [auth, db, payment]
+- `PATCH` `/api/content-subscription/:id` params(id) [auth, db, payment]
+- `DELETE` `/api/content-subscription/:id` params(id) [auth, db, payment]
+- `POST` `/api/content-subscription/:id/delivered` params(id) [auth, db, payment]
+- `GET` `/api/public/content-plans` params() [auth, db, payment]
+- `GET` `/api/public/content-subscription/:workspaceId` params(workspaceId) [auth, db, payment]
+- `POST` `/api/public/content-subscribe/:workspaceId` params(workspaceId) [auth, db, payment]
+- `GET` `/api/content-templates/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/content-templates/:workspaceId/:templateId` params(workspaceId, templateId) [auth, db]
+- `POST` `/api/content-templates/:workspaceId` params(workspaceId) [auth, db]
+- `PUT` `/api/content-templates/:workspaceId/:templateId` params(workspaceId, templateId) [auth, db]
+- `DELETE` `/api/content-templates/:workspaceId/:templateId` params(workspaceId, templateId) [auth, db]
+- `POST` `/api/content-templates/:workspaceId/:templateId/duplicate` params(workspaceId, templateId) [auth, db]
+- `GET` `/api/export/:workspaceId/briefs` params(workspaceId) [auth]
+- `GET` `/api/export/:workspaceId/requests` params(workspaceId) [auth]
+- `GET` `/api/export/:workspaceId/activity` params(workspaceId) [auth]
+- `GET` `/api/export/:workspaceId/strategy` params(workspaceId) [auth]
+- `GET` `/api/export/:workspaceId/payments` params(workspaceId) [auth]
+- `GET` `/api/export/:workspaceId/matrices` params(workspaceId) [auth]
+- `GET` `/api/export/:workspaceId/templates` params(workspaceId) [auth]
+- `GET` `/api/debug/prompt` params() [auth]
+- `GET` `/api/features` params()
+- `GET` `/api/feature-flags` params()
+- `GET` `/api/admin/feature-flags` params()
+- `PUT` `/api/admin/feature-flags/:key` params(key)
+- `GET` `/api/feedback` params() [auth, db]
+- `GET` `/api/feedback/:workspaceId` params(workspaceId) [auth, db]
+- `PATCH` `/api/feedback/:workspaceId/:id` params(workspaceId, id) [auth, db]
+- `POST` `/api/feedback/:workspaceId/:id/reply` params(workspaceId, id) [auth, db]
+- `DELETE` `/api/feedback/:workspaceId/:id` params(workspaceId, id) [auth, db]
+- `GET` `/api/google/status/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/auth-url` params() [auth, db, ai]
+- `GET` `/api/google/status` params() [auth, db, ai]
+- `POST` `/api/google/disconnect` params() [auth, db, ai]
+- `GET` `/api/google/gsc-sites` params() [auth, db, ai]
+- `GET` `/api/google/auth-url/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/callback` params() [auth, db, ai]
+- `POST` `/api/google/disconnect/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/ga4-properties` params() [auth, db, ai]
+- `GET` `/api/google/gsc-sites/:siteId` params(siteId) [auth, db, ai]
+- `POST` `/api/google/search-chat/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/search-overview/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/performance-trend/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/search-devices/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/search-countries/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/search-types/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/search-comparison/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/google/annotations/:workspaceId` params(workspaceId) [auth, db, ai]
+- `POST` `/api/google/annotations/:workspaceId` params(workspaceId) [auth, db, ai]
+- `PATCH` `/api/google/annotations/:workspaceId/:id` params(workspaceId, id) [auth, db, ai]
+- `DELETE` `/api/google/annotations/:workspaceId/:id` params(workspaceId, id) [auth, db, ai]
+- `GET` `/api/public/analytics-annotations/:workspaceId` params(workspaceId) [auth, db, ai]
+- `GET` `/api/health/diag` params() [auth, db, queue, payment, upload, ai]
+- `GET` `/api/health` params() [auth, db, queue, payment, upload, ai]
+- `GET` `/api/admin/storage-stats` params() [auth, db, queue, payment, upload, ai]
+- `POST` `/api/admin/storage/prune-chat` params() [auth, db, queue, payment, upload, ai]
+- `POST` `/api/admin/storage/prune-backups` params() [auth, db, queue, payment, upload, ai]
+- `POST` `/api/admin/storage/prune-reports` params() [auth, db, queue, payment, upload, ai]
+- `POST` `/api/admin/storage/prune-activity` params() [auth, db, queue, payment, upload, ai]
+- `GET` `/api/admin/db-export` params() [auth, db, queue, payment, upload, ai]
+- `POST` `/api/admin/db-import` params() [auth, db, queue, payment, upload, ai]
+- `GET` `/api/insights/:workspaceId/queue` params(workspaceId) [auth, queue]
+- `PUT` `/api/insights/:workspaceId/:insightId/resolve` params(workspaceId, insightId) [auth, queue]
+- `GET` `/api/intelligence/health` params() [auth, cache]
+- `GET` `/api/intelligence/:workspaceId` params(workspaceId) [auth, cache]
+- `GET` `/api/jobs` params() [auth, db, cache, queue, upload, ai]
+- `GET` `/api/jobs/:id` params(id) [auth, db, cache, queue, upload, ai]
+- `DELETE` `/api/jobs/completed` params() [auth, db, cache, queue, upload, ai]
+- `DELETE` `/api/jobs/:id` params(id) [auth, db, cache, queue, upload, ai]
+- `POST` `/api/jobs` params() [auth, db, cache, queue, upload, ai]
+- `POST` `/api/webflow/keyword-strategy/:workspaceId` params(workspaceId) [auth, db, cache, queue, ai]
+- `GET` `/api/webflow/keyword-strategy/:workspaceId` params(workspaceId) [auth, db, cache, queue, ai]
+- `GET` `/api/webflow/keyword-strategy/:workspaceId/diff` params(workspaceId) [auth, db, cache, queue, ai]
+- `PATCH` `/api/webflow/keyword-strategy/:workspaceId` params(workspaceId) [auth, db, cache, queue, ai]
+- `GET` `/api/webflow/keyword-feedback/:workspaceId` params(workspaceId) [auth, db, cache, queue, ai]
+- `POST` `/api/webflow/keyword-feedback/:workspaceId` params(workspaceId) [auth, db, cache, queue, ai]
+- `POST` `/api/webflow/keyword-feedback/:workspaceId/bulk` params(workspaceId) [auth, db, cache, queue, ai]
+- `DELETE` `/api/webflow/keyword-feedback/:workspaceId/:keyword` params(workspaceId, keyword) [auth, db, cache, queue, ai]
+- `GET` `/api/webflow/keyword-strategy/:workspaceId/signals` params(workspaceId) [auth, db, cache, queue, ai]
+- `GET` `/api/llms-txt/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/llms-txt/:workspaceId/download` params(workspaceId) [auth]
+- `GET` `/api/llms-txt/:workspaceId/download-full` params(workspaceId) [auth]
+- `GET` `/api/llms-txt/:workspaceId/freshness` params(workspaceId) [auth]
+- `GET` `/api/public/page-states/:workspaceId` params(workspaceId) [auth, upload, ai]
+- `POST` `/api/upload/:workspaceId` params(workspaceId) [auth, upload, ai]
+- `POST` `/api/upload/:workspaceId/meta` params(workspaceId) [auth, upload, ai]
+- `GET` `/api/audit-traffic/:siteId` params(siteId) [auth, upload, ai]
+- `POST` `/api/smart-name` params() [auth, upload, ai]
+- `POST` `/api/upload/:workspaceId/clipboard` params(workspaceId) [auth, upload, ai]
+- `GET` `/api/outcomes/overview` params() [auth]
+- `GET` `/api/outcomes/:workspaceId/scorecard` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/top-wins` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/timeline` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/learnings` params(workspaceId) [auth]
+- `POST` `/api/outcomes/:workspaceId/actions` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/actions` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/actions/:actionId` params(workspaceId, actionId) [auth]
+- `POST` `/api/outcomes/:workspaceId/actions/:actionId/note` params(workspaceId, actionId) [auth]
+- `GET` `/api/public/outcomes/:workspaceId/summary` params(workspaceId) [auth]
+- `GET` `/api/public/outcomes/:workspaceId/wins` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/playbooks` params(workspaceId) [auth]
+- `GET` `/api/outcomes/:workspaceId/diagnostics` params(workspaceId) [auth]
+- `GET` `/api/public/insights/:workspaceId/narrative` params(workspaceId) [auth, ai]
+- `GET` `/api/public/insights/:workspaceId/digest` params(workspaceId) [auth, ai]
+- `GET` `/api/public/insights/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/search-overview/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/performance-trend/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/search-devices/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/search-countries/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/search-types/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/search-comparison/:workspaceId` params(workspaceId) [auth, ai]
+- `POST` `/api/public/search-chat/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-overview/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-trend/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-top-pages/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-sources/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-devices/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-countries/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-comparison/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-new-vs-returning/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-events/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-event-trend/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-conversions/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-event-explorer/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-landing-pages/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/public/analytics-organic/:workspaceId` params(workspaceId) [auth, ai]
+- `POST` `/api/public/auth/:id` params(id) [auth]
+- `POST` `/api/public/client-login/:id` params(id) [auth]
+- `GET` `/api/public/client-me/:id` params(id) [auth]
+- `POST` `/api/public/client-logout/:id` params(id) [auth]
+- `GET` `/api/public/auth-mode/:id` params(id) [auth]
+- `POST` `/api/public/forgot-password/:id` params(id) [auth]
+- `POST` `/api/public/reset-password` params() [auth]
+- `POST` `/api/public/capture-email/:id` params(id) [auth]
+- `GET` `/api/public/chat-sessions/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/public/chat-sessions/:workspaceId/:sessionId` params(workspaceId, sessionId) [auth, db]
+- `DELETE` `/api/public/chat-sessions/:workspaceId/:sessionId` params(workspaceId, sessionId) [auth, db]
+- `POST` `/api/public/chat-sessions/:workspaceId/:sessionId/summarize` params(workspaceId, sessionId) [auth, db]
+- `GET` `/api/public/chat-usage/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/public/usage/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/public/seo-strategy/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/public/content-requests/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/submit` params(workspaceId) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/:id/decline` params(workspaceId, id) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/:id/approve` params(workspaceId, id) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/:id/request-changes` params(workspaceId, id) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/:id/upgrade` params(workspaceId, id) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/:id/comment` params(workspaceId, id) [auth, db]
+- `GET` `/api/public/content-brief/:workspaceId/:briefId` params(workspaceId, briefId) [auth, db]
+- `GET` `/api/public/content-brief/:workspaceId/:briefId/export` params(workspaceId, briefId) [auth, db]
+- `GET` `/api/public/content-performance/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/api/public/content-performance/:workspaceId/:requestId/trend` params(workspaceId, requestId) [auth, db]
+- `POST` `/api/public/content-request/:workspaceId/from-audit` params(workspaceId) [auth, db]
+- `GET` `/api/public/tracked-keywords/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/public/tracked-keywords/:workspaceId` params(workspaceId) [auth, db]
+- `DELETE` `/api/public/tracked-keywords/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/public/feedback/:workspaceId` params(workspaceId)
+- `GET` `/api/public/feedback/:workspaceId` params(workspaceId)
+- `POST` `/api/public/feedback/:workspaceId/:id/reply` params(workspaceId, id)
+- `GET` `/api/public/workspace/:id` params(id) [auth, cache, queue, payment]
+- `POST` `/api/public/onboarding/:id` params(id) [auth, cache, queue, payment]
+- `GET` `/api/public/tier/:id` params(id) [auth, cache, queue, payment]
+- `GET` `/api/public/pricing/:id` params(id) [auth, cache, queue, payment]
+- `GET` `/api/public/audit-summary/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `GET` `/api/public/audit-detail/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `GET` `/api/public/audit-traffic/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `GET` `/api/public/keyword-feedback/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `POST` `/api/public/keyword-feedback/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `POST` `/api/public/keyword-feedback/:workspaceId/bulk` params(workspaceId) [auth, cache, queue, payment]
+- `GET` `/api/public/business-priorities/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `POST` `/api/public/business-priorities/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `POST` `/api/public/content-gap-vote/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `GET` `/api/public/content-gap-votes/:workspaceId` params(workspaceId) [auth, cache, queue, payment]
+- `POST` `/api/public/requests/:workspaceId` params(workspaceId) [upload]
+- `GET` `/api/public/requests/:workspaceId` params(workspaceId) [upload]
+- `GET` `/api/public/requests/:workspaceId/:requestId` params(workspaceId, requestId) [upload]
+- `POST` `/api/public/requests/:workspaceId/:requestId/notes` params(workspaceId, requestId) [upload]
+- `POST` `/api/public/requests/:workspaceId/:requestId/attachments` params(workspaceId, requestId) [upload]
+- `POST` `/api/public/requests/:workspaceId/:requestId/notes-with-files` params(workspaceId, requestId) [upload]
+- `GET` `/api/rank-tracking/:workspaceId/keywords` params(workspaceId) [auth, db]
+- `POST` `/api/rank-tracking/:workspaceId/keywords` params(workspaceId) [auth, db]
+- `DELETE` `/api/rank-tracking/:workspaceId/keywords/:query` params(workspaceId, query) [auth, db]
+- `PATCH` `/api/rank-tracking/:workspaceId/keywords/:query/pin` params(workspaceId, query) [auth, db]
+- `POST` `/api/rank-tracking/:workspaceId/snapshot` params(workspaceId) [auth, db]
+- `GET` `/api/rank-tracking/:workspaceId/history` params(workspaceId) [auth, db]
+- `GET` `/api/rank-tracking/:workspaceId/latest` params(workspaceId) [auth, db]
+- `GET` `/api/public/rank-tracking/:workspaceId/history` params(workspaceId) [auth, db]
+- `GET` `/api/public/rank-tracking/:workspaceId/latest` params(workspaceId) [auth, db]
+- `POST` `/api/public/recommendations/:workspaceId/generate` params(workspaceId) [auth, db, cache]
+- `GET` `/api/public/recommendations/:workspaceId` params(workspaceId) [auth, db, cache]
+- `PATCH` `/api/public/recommendations/:workspaceId/:recId` params(workspaceId, recId) [auth, db, cache]
+- `DELETE` `/api/public/recommendations/:workspaceId/:recId` params(workspaceId, recId) [auth, db, cache]
+- `POST` `/api/sales-report` params() [auth, db]
+- `GET` `/api/sales-reports` params() [auth, db]
+- `GET` `/api/sales-report/:id` params(id) [auth, db]
+- `GET` `/api/sales-report/:id/html` params(id) [auth, db]
+- `POST` `/api/reports/:siteId/save` params(siteId) [auth, db]
+- `POST` `/api/reports/:siteId/snapshot` params(siteId) [auth, db]
+- `GET` `/api/reports/:siteId/latest` params(siteId) [auth, db]
+- `GET` `/api/reports/:siteId/history` params(siteId) [auth, db]
+- `GET` `/api/reports/snapshot/:id` params(id) [auth, db]
+- `GET` `/api/reports/snapshot/:id/actions` params(id) [auth, db]
+- `POST` `/api/reports/snapshot/:id/actions` params(id) [auth, db]
+- `PATCH` `/api/reports/snapshot/:id/actions/:actionId` params(id, actionId) [auth, db]
+- `DELETE` `/api/reports/snapshot/:id/actions/:actionId` params(id, actionId) [auth, db]
+- `GET` `/report/:id` params(id) [auth, db]
+- `GET` `/api/public/report/:id` params(id) [auth, db]
+- `GET` `/api/public/client/:siteId` params(siteId) [auth, db]
+- `GET` `/report/audit/:siteId` params(siteId) [auth, db]
+- `POST` `/api/monthly-report/:workspaceId` params(workspaceId) [auth, db]
+- `GET` `/report/monthly/:id` params(id) [auth, db]
+- `GET` `/api/public/reports/:workspaceId` params(workspaceId) [auth, db]
+- `POST` `/api/requests` params() [db, upload]
+- `POST` `/api/requests/batch` params() [db, upload]
+- `PATCH` `/api/requests/bulk` params() [db, upload]
+- `GET` `/api/requests` params() [db, upload]
+- `GET` `/api/requests/:id` params(id) [db, upload]
+- `PATCH` `/api/requests/:id` params(id) [db, upload]
+- `POST` `/api/requests/:id/notes` params(id) [db, upload]
+- `DELETE` `/api/requests/:id` params(id) [db, upload]
+- `GET` `/api/request-attachments/:filename` params(filename) [db, upload]
+- `POST` `/api/requests/:id/notes-with-files` params(id) [db, upload]
+- `GET` `/api/revenue/summary` params() [db]
+- `DELETE` `/api/revenue/payments/:id` params(id) [db]
+- `DELETE` `/api/revenue/payments` params() [db]
+- `POST` `/api/rewrite-chat/:workspaceId/load-page` params(workspaceId) [auth, ai]
+- `POST` `/api/rewrite-chat/:workspaceId` params(workspaceId) [auth, ai]
+- `GET` `/api/roadmap` params() [auth]
+- `PUT` `/api/roadmap` params() [auth]
+- `PATCH` `/api/roadmap/item/:id` params(id) [auth]
+- `GET` `/api/roadmap-status` params() [auth]
+- `GET` `/api/semrush/competitive-intel/:workspaceId` params(workspaceId) [db, cache, upload]
+- `GET` `/api/semrush/discover-competitors/:workspaceId` params(workspaceId) [db, cache, upload]
+- `POST` `/api/semrush/competitors/:workspaceId` params(workspaceId) [db, cache, upload]
+- `GET` `/api/semrush/status` params() [db, cache, upload]
+- `GET` `/api/seo-providers/status` params() [db, cache, upload]
+- `POST` `/api/semrush/estimate` params() [db, cache, upload]
+- `DELETE` `/api/semrush/cache/:workspaceId` params(workspaceId) [db, cache, upload]
+- `GET` `/api/semrush/clear-cache/:workspaceId` params(workspaceId) [db, cache, upload]
+- `GET` `/api/semrush/diagnose/:workspaceId` params(workspaceId) [db, cache, upload]
+- `GET` `/api/seo-changes/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/seo-change-impact/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/schema-impact/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/settings` params() [auth, ai]
+- `POST` `/api/settings/webflow-token` params() [auth, ai]
+- `GET` `/api/studio-config` params() [auth, ai]
+- `PATCH` `/api/studio-config` params() [auth, ai]
+- `GET` `/api/site-architecture/:workspaceId` params(workspaceId) [auth, cache, queue]
+- `GET` `/api/site-architecture/:workspaceId/schema-coverage` params(workspaceId) [auth, cache, queue]
+- `GET` `/api/stripe/config` params() [auth, db, payment]
+- `POST` `/api/stripe/config/keys` params() [auth, db, payment]
+- `POST` `/api/stripe/config/products` params() [auth, db, payment]
+- `DELETE` `/api/stripe/config` params() [auth, db, payment]
+- `GET` `/api/stripe/publishable-key` params() [auth, db, payment]
+- `POST` `/api/stripe/create-payment-intent` params() [auth, db, payment]
+- `POST` `/api/stripe/create-checkout` params() [auth, db, payment]
+- `POST` `/api/stripe/cart-checkout` params() [auth, db, payment]
+- `POST` `/api/public/upgrade-checkout/:workspaceId` params(workspaceId) [auth, db, payment]
+- `GET` `/api/stripe/payments/:workspaceId` params(workspaceId) [auth, db, payment]
+- `GET` `/api/public/stripe/status/:workspaceId/:sessionId` params(workspaceId, sessionId) [auth, db, payment]
+- `GET` `/api/stripe/products` params() [auth, db, payment]
+- `GET` `/api/stripe/payments/:workspaceId/:paymentId` params(workspaceId, paymentId) [auth, db, payment]
+- `GET` `/api/public/roi/:workspaceId` params(workspaceId) [auth, db, payment]
+- `POST` `/api/public/billing-portal/:workspaceId` params(workspaceId) [auth, db, payment]
+- `POST` `/api/public/cancel-subscription/:workspaceId` params(workspaceId) [auth, db, payment]
+- `GET` `/api/suggested-briefs/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/suggested-briefs/:workspaceId/:briefId` params(workspaceId, briefId) [auth]
+- `PATCH` `/api/suggested-briefs/:workspaceId/:briefId` params(workspaceId, briefId) [auth]
+- `POST` `/api/suggested-briefs/:workspaceId/:briefId/snooze` params(workspaceId, briefId) [auth]
+- `POST` `/api/suggested-briefs/:workspaceId/:briefId/dismiss` params(workspaceId, briefId) [auth]
+- `GET` `/api/users` params() [auth, db]
+- `GET` `/api/users/:id` params(id) [auth, db]
+- `POST` `/api/users` params() [auth, db]
+- `PATCH` `/api/users/:id` params(id) [auth, db]
+- `POST` `/api/users/:id/password` params(id) [auth, db]
+- `DELETE` `/api/users/:id` params(id) [auth, db]
+- `POST` `/api/webflow/generate-alt/:assetId` params(assetId) [auth, cache, upload]
+- `POST` `/api/webflow/bulk-generate-alt` params() [auth, cache, upload]
+- `POST` `/api/webflow/compress/:assetId` params(assetId) [auth, cache, upload]
+- `POST` `/api/competitor-compare` params() [auth]
+- `GET` `/api/competitor-compare-snapshot` params() [auth]
+- `GET` `/api/competitor-compare-latest` params() [auth]
+- `GET` `/api/webflow/link-check-domains/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/link-check/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/link-check-snapshot/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/redirect-scan/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/redirect-snapshot/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/internal-links/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/internal-links-snapshot/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/audit/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/page-weight/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/page-weight-snapshot/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/cms-images/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/collections/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/collections/:collectionId/schema` params(collectionId) [auth]
+- `GET` `/api/webflow/collections/:collectionId/items` params(collectionId) [auth]
+- `PATCH` `/api/webflow/collections/:collectionId/items/:itemId` params(collectionId, itemId) [auth]
+- `GET` `/api/webflow/cms-seo/:siteId` params(siteId) [auth]
+- `POST` `/api/webflow/collections/:collectionId/publish` params(collectionId) [auth]
+- `POST` `/api/webflow/keyword-analysis` params() [auth, cache, ai]
+- `POST` `/api/webflow/keyword-analysis/persist` params() [auth, cache, ai]
+- `POST` `/api/webflow/content-score` params() [auth, cache, ai]
+- `GET` `/api/webflow/organize-preview/:siteId` params(siteId) [auth]
+- `POST` `/api/webflow/organize-execute/:siteId` params(siteId) [auth]
+- `PATCH` `/api/webflow/rename/:assetId` params(assetId) [auth]
+- `GET` `/api/webflow/pagespeed/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/pagespeed-snapshot/:siteId` params(siteId) [auth]
+- `POST` `/api/webflow/pagespeed-single/:siteId` params(siteId) [auth]
+- `GET` `/api/webflow/schema-suggestions/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-snapshot/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-page-types/:siteId` params(siteId) [auth, db, cache, queue]
+- `PUT` `/api/webflow/schema-page-types/:siteId` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-suggestions/:siteId/page` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-publish/:siteId` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-cms-template/:siteId` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-cms-template/:siteId/publish` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/cms-template-pages/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-template/:siteId` params(siteId) [auth, db, cache, queue]
+- `PUT` `/api/webflow/schema-template/:siteId` params(siteId) [auth, db, cache, queue]
+- `PATCH` `/api/webflow/schema-template/:siteId` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-plan/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-plan/:siteId` params(siteId) [auth, db, cache, queue]
+- `PUT` `/api/webflow/schema-plan/:siteId` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-plan/:siteId/send-to-client` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-plan/:siteId/activate` params(siteId) [auth, db, cache, queue]
+- `DELETE` `/api/webflow/schema-plan/:siteId` params(siteId) [auth, db, cache, queue]
+- `DELETE` `/api/webflow/schema-retract/:siteId/:pageId` params(siteId, pageId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-history/:siteId/:pageId` params(siteId, pageId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-rollback/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/public/schema-snapshot/:workspaceId` params(workspaceId) [auth, db, cache, queue]
+- `GET` `/api/public/schema-plan/:workspaceId` params(workspaceId) [auth, db, cache, queue]
+- `POST` `/api/public/schema-plan/:workspaceId/feedback` params(workspaceId) [auth, db, cache, queue]
+- `GET` `/api/pending-schemas/:workspaceId` params(workspaceId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-validate/:siteId` params(siteId) [auth, db, cache, queue]
+- `POST` `/api/webflow/schema-validate-consistency/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-validation/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/schema-validations/:siteId` params(siteId) [auth, db, cache, queue]
+- `DELETE` `/api/webflow/schema-validation/:siteId` params(siteId) [auth, db, cache, queue]
+- `GET` `/api/webflow/seo-audit/:siteId` params(siteId) [auth, db, ai]
+- `POST` `/api/webflow/seo-rewrite` params() [auth, db, ai]
+- `POST` `/api/webflow/seo-bulk-fix/:siteId` params(siteId) [auth, db, ai]
+- `POST` `/api/webflow/seo-pattern-apply/:siteId` params(siteId) [auth, db, ai]
+- `POST` `/api/webflow/seo-bulk-rewrite/:siteId` params(siteId) [auth, db, ai]
+- `GET` `/api/webflow/seo-suggestions/:workspaceId` params(workspaceId) [auth, db, ai]
+- `PATCH` `/api/webflow/seo-suggestions/:workspaceId/:suggestionId` params(workspaceId, suggestionId) [auth, db, ai]
+- `POST` `/api/webflow/seo-suggestions/:workspaceId/apply` params(workspaceId) [auth, db, ai]
+- `DELETE` `/api/webflow/seo-suggestions/:workspaceId` params(workspaceId) [auth, db, ai]
+- `GET` `/api/webflow/page-html/:siteId` params(siteId) [auth, db, ai]
+- `POST` `/api/webflow/seo-copy` params() [auth, db, ai]
+- `GET` `/api/queue` params() [auth, db, queue, upload]
+- `GET` `/api/webflow/sites` params() [auth, db, queue, upload]
+- `GET` `/api/webflow/assets/:siteId` params(siteId) [auth, db, queue, upload]
+- `PATCH` `/api/webflow/assets/:assetId` params(assetId) [auth, db, queue, upload]
+- `DELETE` `/api/webflow/assets/:assetId` params(assetId) [auth, db, queue, upload]
+- `POST` `/api/webflow/assets/bulk-alt` params() [auth, db, queue, upload]
+- `POST` `/api/webflow/assets/bulk-delete` params() [auth, db, queue, upload]
+- `GET` `/api/webflow/pages/:siteId` params(siteId) [auth, db, queue, upload]
+- `GET` `/api/webflow/all-pages/:siteId` params(siteId) [auth, db, queue, upload]
+- `PUT` `/api/webflow/pages/:pageId/seo` params(pageId) [auth, db, queue, upload]
+- `POST` `/api/webflow/publish/:siteId` params(siteId) [auth, db, queue, upload]
+- `GET` `/api/metadata` params() [auth, db, queue, upload]
+- `GET` `/api/public/fix-orders/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/work-orders/:workspaceId` params(workspaceId) [auth]
+- `PATCH` `/api/work-orders/:workspaceId/:orderId` params(workspaceId, orderId) [auth]
+- `GET` `/api/public/work-orders/:workspaceId` params(workspaceId) [auth]
+- `GET` `/api/workspace-badges/:id` params(id) [auth]
+- `GET` `/api/workspace-home/:id` params(id) [auth, db]
+- `GET` `/api/workspaces` params() [auth, db, cache, ai]
+- `GET` `/api/workspace-overview` params() [auth, db, cache, ai]
+- `GET` `/api/workspaces/:id` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces` params() [auth, db, cache, ai]
+- `PATCH` `/api/workspaces/:id` params(id) [auth, db, cache, ai]
+- `DELETE` `/api/workspaces/:id` params(id) [auth, db, cache, ai]
+- `PUT` `/api/workspaces/:id/business-profile` params(id) [auth, db, cache, ai]
+- `PUT` `/api/workspaces/:id/intelligence-profile` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/intelligence-profile/autofill` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/generate-knowledge-base` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/generate-brand-voice` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/generate-personas` params(id) [auth, db, cache, ai]
+- `GET` `/api/workspaces/:id/audit-suppressions` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/audit-suppressions` params(id) [auth, db, cache, ai]
+- `DELETE` `/api/workspaces/:id/audit-suppressions` params(id) [auth, db, cache, ai]
+- `GET` `/api/workspaces/:id/page-states` params(id) [auth, db, cache, ai]
+- `GET` `/api/workspaces/:id/page-states/:pageId` params(id, pageId) [auth, db, cache, ai]
+- `PATCH` `/api/workspaces/:id/page-states/:pageId` params(id, pageId) [auth, db, cache, ai]
+- `DELETE` `/api/workspaces/:id/page-states/:pageId` params(id, pageId) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/page-states/clear` params(id) [auth, db, cache, ai]
+- `GET` `/api/workspaces/:id/client-users` params(id) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/client-users` params(id) [auth, db, cache, ai]
+- `PATCH` `/api/workspaces/:id/client-users/:userId` params(id, userId) [auth, db, cache, ai]
+- `POST` `/api/workspaces/:id/client-users/:userId/password` params(id, userId) [auth, db, cache, ai]
+- `DELETE` `/api/workspaces/:id/client-users/:userId` params(id, userId) [auth, db, cache, ai]
+
+---
+
+# Components
+
+- **ClientDashboard** — `src/App.tsx`
+- **AdminChat** — props: workspaceId, workspaceName — `src/components/AdminChat.tsx`
+- **AeoReview** — props: workspaceId — `src/components/AeoReview.tsx`
+- **AnalyticsAnnotations** — props: workspaceId — `src/components/AnalyticsAnnotations.tsx`
+- **AnalyticsHub** — props: workspaceId, siteId, gscPropertyUrl, ga4PropertyId — `src/components/AnalyticsHub.tsx`
+- **AnalyticsOverview** — props: workspaceId, siteId, gscPropertyUrl, ga4PropertyId — `src/components/AnalyticsOverview.tsx`
+- **Annotations** — props: workspaceId — `src/components/Annotations.tsx`
+- **AnomalyAlerts** — props: workspaceId, isAdmin, compact — `src/components/AnomalyAlerts.tsx`
+- **ISSUE_LABELS** — props: siteId — `src/components/AssetAudit.tsx`
+- **AssetBrowser** — props: siteId — `src/components/AssetBrowser.tsx`
+- **BrandHub** — props: workspaceId, webflowSiteId — `src/components/BrandHub.tsx`
+- **ChartPointDetail** — props: date, metrics, onClose, xPct — `src/components/ChartPointDetail.tsx`
+- **MetricBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **ChartBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **DataTableBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **SparklineBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **ChatPanel** — props: messages, loading, input, onInputChange, onSend, quickQuestions, placeholder, accent, disabled, inputPrefix — `src/components/ChatPanel.tsx`
+- **ClientDashboard** — props: workspaceId, betaMode, initialTab — `src/components/ClientDashboard.tsx`
+- **CmsEditor** — props: siteId, workspaceId — `src/components/CmsEditor.tsx`
+- **CommandPalette** — props: workspaces, selectedWorkspace, onSelectWorkspace — `src/components/CommandPalette.tsx`
+- **ContentBriefs** — props: workspaceId, onRequestCountChange, fixContext, clearFixContext — `src/components/ContentBriefs.tsx`
+- **ContentCalendar** — props: workspaceId — `src/components/ContentCalendar.tsx`
+- **ContentDecay** — props: workspaceId — `src/components/ContentDecay.tsx`
+- **ContentManager** — props: workspaceId — `src/components/ContentManager.tsx`
+- **ContentPerformance** — props: workspaceId — `src/components/ContentPerformance.tsx`
+- **ContentPipeline** — props: workspaceId, onRequestCountChange, fixContext, clearFixContext — `src/components/ContentPipeline.tsx`
+- **ContentPipelineGuide** — `src/components/ContentPipelineGuide.tsx`
+- **ContentPlanner** — props: workspaceId — `src/components/ContentPlanner.tsx`
+- **ContentSubscriptions** — props: workspaceId — `src/components/ContentSubscriptions.tsx`
+- **DropZone** — props: workspaceId, type, disabled — `src/components/DropZone.tsx`
+- **FeatureFlagSettings** — `src/components/FeatureFlagSettings.tsx`
+- **FeatureLibrary** — `src/components/FeatureLibrary.tsx`
+- **InternalLinks** — props: siteId, workspaceId — `src/components/InternalLinks.tsx`
+- **KeywordAnalysis** — props: siteId, workspaceId — `src/components/KeywordAnalysis.tsx`
+- **KeywordStrategyPanel** — props: workspaceId — `src/components/KeywordStrategy.tsx`
+- **LandingPage** — `src/components/LandingPage.tsx`
+- **LinkChecker** — props: siteId — `src/components/LinkChecker.tsx`
+- **LinksPanel** — props: siteId, workspaceId — `src/components/LinksPanel.tsx`
+- **LlmsTxtGenerator** — props: workspaceId — `src/components/LlmsTxtGenerator.tsx`
+- **LoginScreen** — props: onLogin — `src/components/LoginScreen.tsx`
+- **MediaTab** — props: siteId, workspaceFolder, queue — `src/components/MediaTab.tsx`
+- **MobileGuard** — `src/components/MobileGuard.tsx`
+- **NotificationBell** — props: onSelectWorkspace — `src/components/NotificationBell.tsx`
+- **PageIntelligence** — props: workspaceId, siteId, fixContext — `src/components/PageIntelligence.tsx`
+- **PageRewriteChat** — props: workspaceId, initialPageUrl, onBack — `src/components/PageRewriteChat.tsx`
+- **PageSpeedPanel** — props: siteId — `src/components/PageSpeedPanel.tsx`
+- **PageWeight** — props: siteId — `src/components/PageWeight.tsx`
+- **PendingApprovals** — props: workspaceId, nameFilter, onRetracted, refreshKey, compact — `src/components/PendingApprovals.tsx`
+- **Performance** — props: siteId — `src/components/Performance.tsx`
+- **PostEditor** — props: workspaceId, postId, onClose, onDelete — `src/components/PostEditor.tsx`
+- **ProcessingQueue** — props: items — `src/components/ProcessingQueue.tsx`
+- **PublishSettings** — props: workspaceId, webflowSiteId, publishTarget, onSave, toast — `src/components/PublishSettings.tsx`
+- **RankTracker** — props: workspaceId, hasGsc — `src/components/RankTracker.tsx`
+- **RedirectManager** — props: siteId — `src/components/RedirectManager.tsx`
+- **RequestManager** — props: workspaceId — `src/components/RequestManager.tsx`
+- **RevenueDashboard** — `src/components/RevenueDashboard.tsx`
+- **Roadmap** — `src/components/Roadmap.tsx`
+- **SalesReport** — `src/components/SalesReport.tsx`
+- **SchemaSuggester** — props: siteId, workspaceId, fixContext — `src/components/SchemaSuggester.tsx`
+- **SearchDetail** — props: siteId, workspaceId, gscPropertyUrl — `src/components/SearchDetail.tsx`
+- **SearchableSelect** — props: options, value, onChange, placeholder, emptyLabel, className, size — `src/components/SearchableSelect.tsx`
+- **LinkChecker** — props: siteId, workspaceId, siteName — `src/components/SeoAudit.tsx`
+- **SeoEditor** — props: siteId, workspaceId, fixContext — `src/components/SeoEditor.tsx`
+- **SeoEditorWrapper** — props: siteId, workspaceId, fixContext — `src/components/SeoEditorWrapper.tsx`
+- **SettingsPanel** — `src/components/SettingsPanel.tsx`
+- **SiteArchitecture** — props: workspaceId — `src/components/SiteArchitecture.tsx`
+- **StatusBar** — props: hasOpenAIKey, hasWebflowToken, connected, workspaceCount — `src/components/StatusBar.tsx`
+- **StripePaymentForm** — props: clientSecret, publishableKey, amount, productName, onSuccess, onCancel, accentColor — `src/components/StripePaymentForm.tsx`
+- **StripePaymentModal** — props: clientSecret, publishableKey, amount, productName, topic, targetKeyword, isFull, onSuccess, onClose — `src/components/StripePaymentForm.tsx`
+- **StripeSettings** — `src/components/StripeSettings.tsx`
+- **Styleguide** — `src/components/Styleguide.tsx`
+- **TaskPanel** — `src/components/TaskPanel.tsx`
+- **DeviceIcon** — props: workspaceId, ga4PropertyId — `src/components/TrafficDetail.tsx`
+- **TurnstileWidget** — props: onToken, resetTrigger — `src/components/TurnstileWidget.tsx`
+- **WorkspaceHome** — props: workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId — `src/components/WorkspaceHome.tsx`
+- **WorkspaceOverview** — props: onSelectWorkspace — `src/components/WorkspaceOverview.tsx`
+- **AIUsageSection** — `src/components/WorkspaceOverview.tsx`
+- **WorkspaceSelector** — props: workspaces, selected, onSelect, onCreate, onDelete, onLinkSite, onUnlinkSite — `src/components/WorkspaceSelector.tsx`
+- **WorkspaceSettings** — props: workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate — `src/components/WorkspaceSettings.tsx`
+- **ActionQueue** — props: workspaceId — `src/components/admin/ActionQueue.tsx`
+- **AdminInbox** — props: workspaceId — `src/components/admin/AdminInbox.tsx`
+- **OutcomeActionFeed** — props: workspaceId — `src/components/admin/outcomes/OutcomeActionFeed.tsx`
+- **OutcomeDashboard** — props: workspaceId — `src/components/admin/outcomes/OutcomeDashboard.tsx`
+- **OutcomeLearningsPanel** — props: workspaceId — `src/components/admin/outcomes/OutcomeLearningsPanel.tsx`
+- **OutcomePlaybooks** — props: workspaceId — `src/components/admin/outcomes/OutcomePlaybooks.tsx`
+- **OutcomeScorecard** — props: workspaceId — `src/components/admin/outcomes/OutcomeScorecard.tsx`
+- **OutcomeTopWins** — props: workspaceId — `src/components/admin/outcomes/OutcomeTopWins.tsx`
+- **OutcomesOverview** — `src/components/admin/outcomes/OutcomesOverview.tsx`
+- **AssetCard** — props: asset, selected, editingAlt, altDraft, generatingAlt, compressing, renamingId, renameDraft, renameLoading, unusedFlag — `src/components/assets/AssetCard.tsx`
+- **AssetFilters** — props: search, filter, sort, hasCmsData, onSearchChange, onFilterChange, onSortChange — `src/components/assets/AssetFilters.tsx`
+- **BulkActions** — props: selectedCount, bulkProgress, bulkRenameProgress, bulkCompressProgress, deleting, onBulkGenerateAlt, onBulkRename, onBulkCompress, onBulkDelete, onClearSelection — `src/components/assets/BulkActions.tsx`
+- **CmsFieldSelector** — props: collections, selectedFields, onChange — `src/components/assets/CmsFieldSelector.tsx`
+- **OrganizePreview** — props: organizePreview, organizeExecuting, onExecute, onCancel — `src/components/assets/OrganizePreview.tsx`
+- **ActionItemsPanel** — props: snapshotId — `src/components/audit/ActionItemsPanel.tsx`
+- **AuditBatchActions** — props: effectiveData, filteredPages, workspaceId, severityFilter, categoryFilter, suppressions, batchCreating, batchResult, onBatchCreateTasks, onUnsuppressAll — `src/components/audit/AuditBatchActions.tsx`
+- **AuditToolbar** — props: search, onSearchChange, saving, onSaveAndShare, onOpenExportModal, effectiveData, appliedFixes, bulkApplying, bulkProgress, onAcceptAllSuggestions — `src/components/audit/AuditFilters.tsx`
+- **AuditCategoryFilter** — props: categoryFilter, onSetCategoryFilter — `src/components/audit/AuditFilters.tsx`
+- **AuditHistory** — props: siteId, history, onRefresh — `src/components/audit/AuditHistory.tsx`
+- **AuditIssueRow** — props: page, issue, idx, workspaceId, siteId, applyingFix, appliedFixes, editedSuggestions, editingKey, sentForReview — `src/components/audit/AuditIssueRow.tsx`
+- **ReportModal** — props: onExportHtml, onExportCsv, onClose — `src/components/audit/AuditReportExport.tsx`
+- **ReportViewer** — props: reportView, data, onClose — `src/components/audit/AuditReportExport.tsx`
+- **ScoreTrendChart** — props: history — `src/components/audit/ScoreTrendChart.tsx`
+- **BriefDetail** — props: brief, editingBrief, generatingPostFor, regeneratingBrief, sendingToClient, onSaveBriefField, onSetEditingBrief, onGeneratePost, onRegenerate, onRegenerateOutline — `src/components/briefs/BriefDetail.tsx`
+- **BriefGenerator** — props: workspaceId, keyword, businessCtx, pageType, refUrls, showAdvanced, generating, error, onKeywordChange, onBusinessCtxChange — `src/components/briefs/BriefGenerator.tsx`
+- **BriefList** — props: briefs, clientRequests, expanded, briefSearch, briefSort, editingBrief, generatingPostFor, regeneratingBrief, sendingToClient, onSetExpanded — `src/components/briefs/BriefList.tsx`
+- **RequestList** — props: clientRequests, expandedRequest, generatingBriefFor, loadingBrief, briefError, deliveringReqId, deliveryUrl, deliveryNotes, getBriefById, onToggleRequestBrief — `src/components/briefs/RequestList.tsx`
+- **AnnotatedTrendChart** — props: data, lines, annotations, dateKey, height, onCreateAnnotation, onToggleLine, _maxActiveLines, callouts — `src/components/charts/AnnotatedTrendChart.tsx`
+- **AnalyticsTab** — props: ga4Overview, ga4Comparison, ga4Trend, ga4Devices, ga4Pages, ga4Sources, ga4Organic, ga4LandingPages, ga4NewVsReturning, ga4Conversions — `src/components/client/AnalyticsTab.tsx`
+- **ApprovalsTab** — props: workspaceId, approvalBatches, approvalsLoading, pendingApprovals, effectiveTier, setApprovalBatches, loadApprovals, setToast, pageMap — `src/components/client/ApprovalsTab.tsx`
+- **BetaProvider** — `src/components/client/BetaContext.tsx`
+- **ClientOnboardingQuestionnaire** — props: workspaceName, onComplete, onSkip, saving — `src/components/client/ClientOnboardingQuestionnaire.tsx`
+- **ContentPlanTab** — props: workspaceId, setToast — `src/components/client/ContentPlanTab.tsx`
+- **ContentTab** — props: contentRequests, setContentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming, workspaceId, setToast — `src/components/client/ContentTab.tsx`
+- **SearchSnapshot** — props: overview, trend, comparison, devices, onViewMore — `src/components/client/DataSnapshots.tsx`
+- **AnalyticsSnapshot** — props: overview, trend, topPages, comparison, newVsReturning, onViewMore — `src/components/client/DataSnapshots.tsx`
+- **OrganicInsight** — props: organic, landingPages, newVsReturning — `src/components/client/DataSnapshots.tsx`
+- **FeedbackWidget** — props: workspaceId, currentTab, submittedBy, chatExpanded — `src/components/client/FeedbackWidget.tsx`
+- **FixRecommendations** — props: auditDetail, tier, workspaceId — `src/components/client/FixRecommendations.tsx`
+- **HealthTab** — props: audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested, actionPlanSlot — `src/components/client/HealthTab.tsx`
+- **InboxTab** — props: workspaceId, effectiveTier, approvalBatches, approvalsLoading, pendingApprovals, setApprovalBatches, loadApprovals, requests, requestsLoading, clientUser — `src/components/client/InboxTab.tsx`
+- **SchemaOpportunitiesCard** — props: insights, tier, loading — `src/components/client/InsightCards.tsx`
+- **ContentHealthCard** — props: insights, tier, loading — `src/components/client/InsightCards.tsx`
+- **SiteHealthCard** — props: insights, loading — `src/components/client/InsightCards.tsx`
+- **InsightCards** — props: _workspaceId, insights, tier, loading — `src/components/client/InsightCards.tsx`
+- **InsightsDigest** — props: overview, searchComparison, ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning, audit, auditDetail, strategyData — `src/components/client/InsightsDigest.tsx`
+- **PerformancePulse** — props: overview, searchComparison, ga4Overview, ga4Comparison, audit, strategyData — `src/components/client/InsightsDigest.tsx`
+- **InsightsEngine** — props: workspaceId, tier, compact, onNavigate — `src/components/client/InsightsEngine.tsx`
+- **IntelligenceSummaryCard** — props: workspaceId, tier — `src/components/client/IntelligenceSummaryCard.tsx`
+- **MatrixProgressView** — props: matrix, onCellPreview, onFlagCell, onDownload — `src/components/client/MatrixProgressView.tsx`
+- **MonthlyDigest** — props: workspaceId, tier — `src/components/client/MonthlyDigest.tsx`
+- **OnboardingWizard** — props: workspaceName, tier, isTrial, trialDaysRemaining, hasGSC, hasStrategy, hasAudit, onDismiss, workspaceId — `src/components/client/OnboardingWizard.tsx`
+- **OrderStatus** — props: workspaceId — `src/components/client/OrderStatus.tsx`
+- **OutcomeSummary** — props: workspaceId, tier — `src/components/client/OutcomeSummary.tsx`
+- **OverviewTab** — props: ws, overview, searchComparison, ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning, audit, auditDetail — `src/components/client/OverviewTab.tsx`
+- **PageKeywordMapContent** — props: pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback — `src/components/client/PageKeywordMapContent.tsx`
+- **PerformanceTab** — props: overview, searchComparison, trend, annotations, rankHistory, latestRanks, insights, ga4Overview, ga4Comparison, ga4Trend — `src/components/client/PerformanceTab.tsx`
+- **PlansTab** — props: workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat, pricingData — `src/components/client/PlansTab.tsx`
+- **ROIDashboard** — props: workspaceId, tier — `src/components/client/ROIDashboard.tsx`
+- **RequestsTab** — props: workspaceId, requests, requestsLoading, clientUser, loadRequests, setToast — `src/components/client/RequestsTab.tsx`
+- **SchemaReviewTab** — props: workspaceId, setToast — `src/components/client/SchemaReviewTab.tsx`
+- **SearchTab** — props: overview, searchComparison, trend, annotations, rankHistory, latestRanks, insights — `src/components/client/SearchTab.tsx`
+- **SeoCartButton** — `src/components/client/SeoCart.tsx`
+- **SeoCartDrawer** — props: workspaceId, tier — `src/components/client/SeoCart.tsx`
+- **SeoEducationTip** — props: tab, workspaceId — `src/components/client/SeoEducationTip.tsx`
+- **Explainer** — props: term — `src/components/client/SeoGlossary.tsx`
+- **ServiceInterestCTA** — props: type, workspaceId, onAction, bookingUrl — `src/components/client/ServiceInterestCTA.tsx`
+- **StrategyTab** — props: strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange — `src/components/client/StrategyTab.tsx`
+- **WeCalledIt** — props: workspaceId, tier — `src/components/client/WeCalledIt.tsx`
+- **TrendChart** — props: data, metric, color — `src/components/client/helpers.tsx`
+- **DualTrendChart** — props: data, anns — `src/components/client/helpers.tsx`
+- **ScoreHistoryChart** — props: history — `src/components/client/helpers.tsx`
+- **RenderMarkdown** — props: text — `src/components/client/helpers.tsx`
+- **InsightCard** — props: Icon, color, title, count, desc, items — `src/components/client/helpers.tsx`
+- **CartProvider** — `src/components/client/useCart.tsx`
+- **ApprovalPanel** — props: approvalSelected, sendingApproval, approvalSent, onSendApproval — `src/components/editor/ApprovalPanel.tsx`
+- **BulkOperations** — props: filteredPages, approvalSelected, bulkMode, bulkField, patternAction, patternText, bulkPreview, bulkProgress, bulkSource, pages — `src/components/editor/BulkOperations.tsx`
+- **PageEditRow** — props: page, edit, expanded, isSaving, isSaved, isAiLoading, isDraftSaving, isDraftSaved, isSelected, pageRecs — `src/components/editor/PageEditRow.tsx`
+- **SeoSuggestionsPanel** — props: workspaceId, suggestions, counts, onRefresh, onApplied — `src/components/editor/SeoSuggestionsPanel.tsx`
+- **InsightFeed** — props: feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll — `src/components/insights/InsightFeed.tsx`
+- **InsightFeedItem** — props: insight — `src/components/insights/InsightFeedItem.tsx`
+- **InsightSkeleton** — props: count — `src/components/insights/InsightSkeleton.tsx`
+- **SummaryPills** — props: counts, activeFilter, onFilter, loading — `src/components/insights/SummaryPills.tsx`
+- **Breadcrumbs** — props: workspaces, selected, tab, pendingContentRequests — `src/components/layout/Breadcrumbs.tsx`
+- **CellDetailPanel** — props: cell, onClose, onCellUpdate, onGenerateBrief, onSendReview, onFlag — `src/components/matrix/CellDetailPanel.tsx`
+- **MatrixBuilder** — props: workspaceId, templates, onComplete, onCancel — `src/components/matrix/MatrixBuilder.tsx`
+- **MatrixGrid** — props: matrix, onCellClick, onBulkAction, onCellUpdate — `src/components/matrix/MatrixGrid.tsx`
+- **TemplateEditor** — props: workspaceId, templateId, onSave, onCancel — `src/components/matrix/TemplateEditor.tsx`
+- **AiSuggested** — props: workspaceId, onCreateBrief — `src/components/pipeline/AiSuggested.tsx`
+- **PostPreview** — props: post — `src/components/post-editor/PostPreview.tsx`
+- **ReviewChecklist** — props: postStatus, reviewChecklist, showChecklist, onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview — `src/components/post-editor/ReviewChecklist.tsx`
+- **SectionEditor** — props: section, expanded, editing, editBuffer, regenerating, isGenerating, onToggleExpand, onStartEdit, onSaveEdit, onCancelEdit — `src/components/post-editor/SectionEditor.tsx`
+- **VersionHistory** — props: versions, versionsLoading, reverting, onRevert, onClose — `src/components/post-editor/VersionHistory.tsx`
+- **BulkPublishPanel** — props: unpublishedCount, bulkPublishing, bulkProgress, sendingToClient, sentToClient, loading, onPublishAll, onSendToClient — `src/components/schema/BulkPublishPanel.tsx`
+- **CmsTemplatePanel** — props: showCmsPanel, cmsTemplatePages, generatingCmsTemplate, cmsTemplateResult, publishingCmsTemplate, cmsPublished, cmsCopied, cmsError, onClose, onGenerateCmsTemplate — `src/components/schema/CmsTemplatePanel.tsx`
+- **PagePicker** — props: availablePages, pageSearch, generatingSingle, existingPageIds, onPageSearchChange, onSelectPage, onClose — `src/components/schema/PagePicker.tsx`
+- **InitialPagePicker** — props: availablePages, pageSearch, generatingSingle, onPageSearchChange, onSelectPage, onClose — `src/components/schema/PagePicker.tsx`
+- **SchemaEditor** — props: pageId, schemaJson, parseError, hasEdits, onChange — `src/components/schema/SchemaEditor.tsx`
+- **SchemaHealthDashboard** — props: validations, loading, onRevalidate — `src/components/schema/SchemaHealthDashboard.tsx`
+- **SchemaPageCard** — props: page, isOpen, isRegenLoading, editState, copiedId, published, publishing, publishError, confirmPublish, sentPage — `src/components/schema/SchemaPageCard.tsx`
+- **SchemaPlanPanel** — props: siteId — `src/components/schema/SchemaPlanPanel.tsx`
+- **SchemaVersionHistory** — props: siteId, pageId, workspaceId, onRestore — `src/components/schema/SchemaVersionHistory.tsx`
+- **SchemaWorkflowGuide** — `src/components/schema/SchemaWorkflowGuide.tsx`
+- **BusinessProfileTab** — props: workspaceId, businessProfile, toast, onSave — `src/components/settings/BusinessProfileTab.tsx`
+- **ClientDashboardTab** — props: workspaceId, webflowSiteId, ws, patchWorkspace, toast — `src/components/settings/ClientDashboardTab.tsx`
+- **ConnectionsTab** — props: webflowSiteId, webflowSiteName, googleStatus, gscSites, ga4Properties, loadingGoogle, ws, connectGoogle, disconnectGoogle, saveGscProperty — `src/components/settings/ConnectionsTab.tsx`
+- **FeaturesTab** — props: workspaceId, ws, patchWorkspace, toast — `src/components/settings/FeaturesTab.tsx`
+- **IntelligenceProfileTab** — props: workspaceId, intelligenceProfile, toast, onSave — `src/components/settings/IntelligenceProfileTab.tsx`
+- **RankHistoryChart** — props: rankHistory, maxKeywords, height — `src/components/shared/RankTable.tsx`
+- **RankTable** — props: ranks, limit, showClicks, showImpressions, renderActions — `src/components/shared/RankTable.tsx`
+- **RankChange** — props: change — `src/components/shared/RankTable.tsx`
+- **RankTrackingSection** — props: rankHistory, latestRanks, limit, showClicks, title — `src/components/shared/RankTable.tsx`
+- **BacklinkProfile** — props: workspaceId — `src/components/strategy/BacklinkProfile.tsx`
+- **CannibalizationAlert** — props: items — `src/components/strategy/CannibalizationAlert.tsx`
+- **CompetitiveIntel** — props: workspaceId, competitors, semrushAvailable — `src/components/strategy/CompetitiveIntel.tsx`
+- **ContentGaps** — props: contentGaps, workspaceId, intentColor — `src/components/strategy/ContentGaps.tsx`
+- **IntelligenceSignals** — props: workspaceId — `src/components/strategy/IntelligenceSignals.tsx`
+- **KeywordGaps** — props: keywordGaps, difficultyColor — `src/components/strategy/KeywordGaps.tsx`
+- **LowHangingFruit** — props: pages, positionColor — `src/components/strategy/LowHangingFruit.tsx`
+- **PageKeywordMapPanel** — props: filteredPages, pageMap, expandedPages, editingPage, editDraft, saving, pageSearch, sortBy, sortDir, seoCopyResults — `src/components/strategy/PageKeywordMap.tsx`
+- **QuickWins** — props: quickWins — `src/components/strategy/QuickWins.tsx`
+- **SeoCopyPanel** — props: page, seoCopyResults, generatingCopy, copiedField, onGenerateSeoCopy, onCopyText — `src/components/strategy/SeoCopyPanel.tsx`
+- **StrategyDiff** — props: workspaceId — `src/components/strategy/StrategyDiff.tsx`
+- **TopicClusters** — props: clusters — `src/components/strategy/TopicClusters.tsx`
+- **ActiveRequestsAnnotations** — props: requests, annotations, workspaceId — `src/components/workspace-home/ActiveRequestsAnnotations.tsx`
+- **ActivityFeed** — props: activity, className — `src/components/workspace-home/ActivityFeed.tsx`
+- **RankingsSnapshot** — props: ranks, gscPropertyUrl, workspaceId, className — `src/components/workspace-home/RankingsSnapshot.tsx`
+- **SeoChangeImpact** — props: workspaceId, hasGsc, embedded — `src/components/workspace-home/SeoChangeImpact.tsx`
+- **SeoWorkStatus** — props: seoStatus, workspaceId, embedded — `src/components/workspace-home/SeoWorkStatus.tsx`
+- **WeeklyAccomplishments** — props: summary — `src/components/workspace-home/WeeklyAccomplishments.tsx`
+- **BackgroundTaskProvider** — `src/hooks/useBackgroundTasks.tsx`
+- **SENTRY_DSN** — `src/main.tsx`
+
+---
+
+# Libraries
+
+- `server/activity-log.ts`
+  - function initActivityBroadcast: (fn) => void
+  - function addActivity: (workspaceId, type, title, description?, metadata?, unknown>, actor?) => ActivityEntry
+  - function listActivity: (workspaceId?, limit) => ActivityEntry[]
+  - function listClientActivity: (workspaceId, limit) => ActivityEntry[]
+  - function hasRecentActivity: (workspaceId, withinDays) => boolean
+  - interface ActivityEntry
+  - _...1 more_
+- `server/admin-chat-context.ts`
+  - function classifyQuestion: (question) => Set<ContextCategory>
+  - function extractUrl: (question) => string | null
+  - function buildInsightsContext: (insights) => string
+  - function assembleAdminContext: (workspaceId, question, days) => Promise<AssembledContext>
+  - function buildSystemPrompt: (ws, assembled, days, priorContext) => string
+  - interface AssembledContext
+- `server/aeo-page-review.ts`
+  - function reviewPage: (pageUrl, pageTitle, html, auditIssues, workspaceId) => Promise<AeoPageReview>
+  - function reviewSitePages: (workspaceId, pages, onProgress?, total, current) => void
+  - interface AeoPageChange
+  - interface AeoPageReview
+  - interface AeoSiteReview
+  - type AeoChangeType
+  - _...1 more_
+- `server/ai-context-check.ts`
+  - function checkAIContext: (workspaceId) => ContextCompleteness
+  - interface ContextSource
+  - interface ContextCompleteness
+- `server/ai.ts`
+  - function callAI: (opts) => Promise<AICallResult>
+  - interface AICallOptions
+  - interface AICallResult
+- `server/alttext.ts` — function generateAltText: (filePath, context?) => Promise<string | null>
+- `server/analytics-annotations.ts`
+  - function createAnnotation: (opts) => void
+  - function getAnnotations: (workspaceId, opts?) => Annotation[]
+  - function updateAnnotation: (id, workspaceId, opts) => boolean
+  - function deleteAnnotation: (id, workspaceId) => boolean
+  - interface Annotation
+  - type AnnotationCategory
+- `server/analytics-data.ts`
+  - function fetchSearchOverview: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchPerformanceTrend: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchSearchDevices: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchSearchCountries: (siteId, gscUrl, days, limit, dateRange?) => void
+  - function fetchSearchTypes: (siteId, gscUrl, days, dateRange?) => void
+  - function fetchSearchComparison: (siteId, gscUrl, days, dateRange?) => void
+- `server/analytics-insights-store.ts`
+  - function upsertInsight: (params) => AnalyticsInsight
+  - function getInsights: (workspaceId, insightType?) => AnalyticsInsight[]
+  - function getInsight: (workspaceId, pageId, insightType) => AnalyticsInsight | undefined
+  - function deleteInsightsForWorkspace: (workspaceId) => number
+  - function deleteStaleInsightsByType: (workspaceId, insightType, olderThan) => number
+  - function upsertAnomalyDigestInsight: (params) => AnalyticsInsight
+  - _...5 more_
+- `server/analytics-intelligence.ts`
+  - function isStale: (computedAt, maxAgeMs) => boolean
+  - function computePageHealthScores: (gscPages, ga4Pages) => ComputedInsight<PageHealthData>[]
+  - function computeRankingOpportunities: (queryPageData) => ComputedInsight<QuickWinData>[]
+  - function computeCannibalizationInsights: (queryPageData) => ComputedInsight<CannibalizationData>[]
+  - function computeConversionAttributionInsights: (landingPages) => ComputedInsight<ConversionAttributionData>[]
+  - function computeCompetitorGapInsights: (gapData, ourQueryData) => ComputedInsight<CompetitorGapData>[]
+  - _...5 more_
+- `server/annotations.ts`
+  - function listAnnotations: (workspaceId) => Annotation[]
+  - function addAnnotation: (workspaceId, date, label, description?, color?) => Annotation
+  - function deleteAnnotation: (workspaceId, annotationId) => boolean
+  - interface Annotation
+- `server/anomaly-detection.ts`
+  - function initAnomalyBroadcast: (fn, event, data) => void
+  - function listAnomalies: (workspaceId?, includeDismissed) => Anomaly[]
+  - function dismissAnomaly: (id) => boolean
+  - function acknowledgeAnomaly: (id) => boolean
+  - function clearOldAnomalies: (daysOld) => number
+  - function runAnomalyDetection: (force) => Promise<
+  - _...5 more_
+- `server/anthropic-helpers.ts` — function callAnthropic: (opts) => Promise<AnthropicChatResult>, function isAnthropicConfigured: () => boolean
+- `server/api-cache.ts`
+  - function createApiCache: (options) => ApiCache
+  - interface ApiCacheOptions
+  - interface ApiCache
+  - const apiCache
+- `server/app.ts` — function createApp: () => express.Express
+- `server/approval-reminders.ts` — function startApprovalReminders: () => void, function stopApprovalReminders: () => void
+- `server/approvals.ts`
+  - function createBatch: (workspaceId, siteId, name, items, 'id' | 'status' | 'createdAt' | 'updatedAt'>[]) => ApprovalBatch
+  - function listBatches: (workspaceId) => ApprovalBatch[]
+  - function getBatch: (workspaceId, batchId) => ApprovalBatch | undefined
+  - function updateItem: (workspaceId, batchId, itemId, update, 'status' | 'clientValue' | 'clientNote'>>) => ApprovalBatch | null
+  - function markBatchApplied: (workspaceId, batchId, itemIds) => ApprovalBatch | null
+  - function deleteBatch: (workspaceId, batchId) => boolean
+- `server/audit-page.ts`
+  - function isContentPage: (slug) => boolean
+  - function auditPage: (pageId, pageName, slug, url, meta, html) => PageSeoResult
+  - function isExcludedPage: (slug, title?) => boolean
+  - interface SeoIssue
+  - interface PageSeoResult
+  - type Severity
+  - _...2 more_
+- `server/auth.ts`
+  - function signToken: (payload) => string
+  - function verifyToken: (token) => JwtPayload | null
+  - function requireAuth: (req, res, next) => void
+  - function requireRole: (...roles) => void
+  - function requireWorkspaceAccess: (paramName) => void
+  - function requireWorkspaceAccessFromQuery: (queryParam) => void
+  - _...2 more_
+- `server/backup.ts` — function runBackup: () => Promise<, function startBackupScheduler: () => void
+- `server/bridge-infrastructure.ts`
+  - function executeBridge: (flag, workspaceId, fn, opts?) => Promise<void>
+  - function fireBridge: (flag, workspaceId, fn, opts?) => void
+  - function debounceBridge: (flag, delayMs) => (workspaceId: string, fn: BridgeCallback) => void
+  - function withWorkspaceLock: (workspaceId, fn) => void
+  - function getBridgeFlags: () => Record<string, boolean>
+  - function readSubCache: (workspaceId, key) => T | null
+  - _...9 more_
+- `server/brief-export-html.ts` — function renderBriefHTML: (brief) => string, function renderBriefHTMLForPDF: (brief) => string
+- `server/broadcast.ts`
+  - function setBroadcast: (bc, bcWs) => void
+  - function broadcast: (event, data) => void
+  - function broadcastToWorkspace: (workspaceId, event, data) => void
+- `server/cannibalization-detection.ts`
+  - function detectMatrixCannibalization: (workspaceId, matrixId) => CannibalizationReport
+  - function checkKeywordCannibalization: (workspaceId, keyword) => CannibalizationConflict[]
+  - interface CannibalizationConflict
+  - interface CannibalizationReport
+- `server/chat-memory.ts`
+  - function cleanupOldChatSessions: (maxAgeDays) => number
+  - function getSession: (workspaceId, sessionId) => ChatSession | null
+  - function saveSession: (session) => void
+  - function deleteSession: (workspaceId, sessionId) => boolean
+  - function listSessions: (workspaceId, channel?) => SessionSummary[]
+  - function addMessage: (workspaceId, sessionId, channel, role, content) => ChatSession
+  - _...8 more_
+- `server/churn-signals.ts`
+  - function listChurnSignals: (workspaceId?) => ChurnSignal[]
+  - function dismissSignal: (signalId) => boolean
+  - function startChurnSignalScheduler: () => void
+  - function stopChurnSignalScheduler: () => void
+  - interface ChurnSignal
+  - type SignalType
+  - _...1 more_
+- `server/client-signals-store.ts`
+  - function createClientSignal: (input) => ClientSignal
+  - function listClientSignals: (workspaceId?) => ClientSignal[]
+  - function getSignalById: (id) => ClientSignal | null
+  - function updateSignalStatus: (id, status) => boolean
+  - function countNewSignals: (workspaceId) => number
+  - function countAllSignals: (workspaceId) => number
+  - _...2 more_
+- `server/client-users.ts`
+  - function listClientUsers: (workspaceId) => SafeClientUser[]
+  - function getClientUserById: (id) => ClientUser | null
+  - function getClientUserByEmail: (email, workspaceId) => ClientUser | null
+  - function getSafeClientUser: (id) => SafeClientUser | null
+  - function createClientUser: (email, password, name, workspaceId, role, invitedBy?) => Promise<SafeClientUser>
+  - function updateClientUser: (id, updates, 'name' | 'email' | 'role' | 'avatarUrl'>>) => Promise<SafeClientUser | null>
+  - _...11 more_
+- `server/competitor-schema.ts`
+  - function crawlCompetitorSchemas: (domain, maxPages) => Promise<CompetitorSchemaResult>
+  - function compareSchemas: (ours, theirs) => SchemaComparison
+  - interface CompetitorSchemaResult
+  - interface SchemaComparison
+- `server/content-brief.ts`
+  - function buildBriefIntelligenceBlock: (opts) => string
+  - function listBriefs: (workspaceId) => ContentBrief[]
+  - function getBrief: (workspaceId, briefId) => ContentBrief | undefined
+  - function updateBrief: (workspaceId, briefId, updates, 'id' | 'workspaceId' | 'createdAt'>>) => ContentBrief | null
+  - function deleteBrief: (workspaceId, briefId) => boolean
+  - function buildStrategyCardBlock: (ctx) => string
+  - _...4 more_
+- `server/content-calendar-intelligence.ts` — function suggestPublishDates: (opts) => PublishSuggestion[]
+- `server/content-decay.ts`
+  - function loadDecayAnalysis: (workspaceId) => DecayAnalysis | null
+  - function analyzeContentDecay: (ws) => Promise<DecayAnalysis>
+  - function generateRefreshRecommendation: (ws, page) => Promise<string>
+  - function generateBatchRecommendations: (ws, analysis, maxPages) => Promise<DecayAnalysis>
+  - interface DecayingPage
+  - interface DecayAnalysis
+- `server/content-image.ts` — function generateFeaturedImage: (post, siteId, tokenOverride?) => Promise<ImageResult>
+- `server/content-matrices.ts`
+  - function getSchemaTypesForTemplate: (templatePageType) => string[]
+  - function listMatrices: (workspaceId) => ContentMatrix[]
+  - function getMatrix: (workspaceId, matrixId) => ContentMatrix | undefined
+  - function createMatrix: (workspaceId, data) => ContentMatrix
+  - function updateMatrix: (workspaceId, matrixId, updates, 'name' | 'dimensions' | 'urlPattern' | 'keywordPattern' | 'cells'>>) => ContentMatrix | undefined
+  - function updateMatrixCell: (workspaceId, matrixId, cellId, updates, 'targetKeyword' | 'customKeyword' | 'status' | 'statusHistory' | 'briefId' | 'postId' | 'keywordValidation' | 'keywordCandidates' | 'recommendedKeyword' | 'clientFlag' | 'clientFlaggedAt'>>) => ContentMatrix | undefined
+  - _...1 more_
+- `server/content-posts-ai.ts`
+  - function callCreativeAI: (opts) => Promise<string>
+  - function buildVoiceContext: (workspaceId) => Promise<string>
+  - function buildBriefContextBlock: (brief, siteDomain?) => string
+  - function generateIntroduction: (brief, voiceCtx, workspaceId, siteDomain?) => Promise<string>
+  - function generateSection: (brief, section, sectionIndex, previousSections, voiceCtx, workspaceId, siteDomain?) => Promise<string>
+  - function generateConclusion: (brief, voiceCtx, workspaceId, siteDomain?) => Promise<string>
+  - _...5 more_
+- `server/content-posts-db.ts`
+  - function listPosts: (workspaceId) => GeneratedPost[]
+  - function getPost: (workspaceId, postId) => GeneratedPost | undefined
+  - function savePost: (workspaceId, post) => void
+  - function updatePostField: (workspaceId, postId, updates, 'id' | 'workspaceId' | 'createdAt'>>) => GeneratedPost | null
+  - function deletePost: (workspaceId, postId) => boolean
+  - function snapshotPostVersion: (post, trigger, triggerDetail?) => PostVersion
+  - _...4 more_
+- `server/content-posts.ts`
+  - function generatePost: (workspaceId, brief, existingPostId?) => Promise<GeneratedPost>
+  - function regenerateSection: (workspaceId, postId, sectionIndex, brief) => Promise<GeneratedPost | null>
+  - function exportPostMarkdown: (post) => string
+  - function exportPostHTML: (post) => string
+- `server/content-requests.ts`
+  - function listContentRequests: (workspaceId) => ContentTopicRequest[]
+  - function getContentRequest: (workspaceId, id) => ContentTopicRequest | undefined
+  - function createContentRequest: (workspaceId, data) => ContentTopicRequest
+  - function updateContentRequest: (workspaceId, id, updates, 'status' | 'briefId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>) => ContentTopicRequest | null
+  - function deleteContentRequest: (workspaceId, id) => boolean
+  - function addComment: (workspaceId, requestId, author, content) => ContentTopicRequest | null
+- `server/content-subscriptions.ts`
+  - function createContentSubscription: (workspaceId, data) => ContentSubscription
+  - function getContentSubscription: (id) => ContentSubscription | null
+  - function getContentSubscriptionByStripeId: (stripeSubId) => ContentSubscription | null
+  - function listContentSubscriptions: (workspaceId) => ContentSubscription[]
+  - function listActiveContentSubscriptions: () => ContentSubscription[]
+  - function updateContentSubscription: (id, updates, 'status' | 'stripeSubscriptionId' | 'stripePriceId' | 'plan' | 'postsPerMonth' |
+    'priceUsd' | 'currentPeriodStart' | 'currentPeriodEnd' | 'postsDeliveredThisPeriod' |
+    'topicSource' | 'preferredPageTypes' | 'notes'
+  >>) => ContentSubscription | null
+  - _...3 more_
+- `server/content-templates.ts`
+  - function listTemplates: (workspaceId) => ContentTemplate[]
+  - function getTemplate: (workspaceId, templateId) => ContentTemplate | null
+  - function createTemplate: (workspaceId, data, string>;
+    toneAndStyle?) => ContentTemplate
+  - function updateTemplate: (workspaceId, templateId, updates, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>>) => ContentTemplate | null
+  - function deleteTemplate: (workspaceId, templateId) => boolean
+  - function duplicateTemplate: (workspaceId, templateId, newName?) => ContentTemplate | null
+- `server/data-dir.ts`
+  - function getDataDir: (subdir) => string
+  - function getUploadRoot: () => string
+  - function getOptRoot: () => string
+  - const DATA_BASE: string
+- `server/data-retention.ts` — function startDataRetentionCrons: () => void, function stopDataRetentionCrons: () => void
+- `server/db/index.ts` — function runMigrations: () => void
+- `server/db/json-column.ts` — function parseJsonColumn: (val, fallback) => T, function stringifyJsonColumn: (val) => string | null
+- `server/db/json-validation.ts`
+  - function parseJsonSafe: (raw, schema, fallback, context?) => T | F
+  - function parseJsonSafeArray: (raw, itemSchema, context?) => T[]
+  - function parseJsonFallback: (raw, fallback) => T
+- `server/db/outcome-mappers.ts`
+  - function rowToTrackedAction: (row) => TrackedAction
+  - function rowToActionOutcome: (row) => ActionOutcome
+  - function rowToActionPlaybook: (row) => ActionPlaybook
+  - function rowToWorkspaceLearnings: (row) => WorkspaceLearnings | null
+  - interface TrackedActionRow
+  - interface ActionOutcomeRow
+  - _...2 more_
+- `server/db/stmt-cache.ts` — function createStmtCache: (build) => void
+- `server/email-queue.ts`
+  - function registerSendFn: (fn) => void
+  - function queueEmail: (event) => void
+  - function flushAll: () => void
+  - function restoreQueue: () => void
+  - function getQueueStats: () => void
+- `server/email-templates.ts`
+  - function renderDigest: (type, events) => void
+  - function renderMonthlyReport: (data) => void
+  - function renderApprovalReminder: (data) => void
+  - interface EmailEvent
+  - type EmailEventType
+- `server/email-throttle.ts`
+  - function getThrottleCategory: (type) => ThrottleCategory
+  - function canSend: (recipient, category) => ThrottleResult
+  - function recordSend: (recipient, category, emailType, workspaceId, eventCount) => void
+  - function getLastSendTime: (recipient, category) => Date | null
+  - function cleanupOldSends: () => number
+  - function msUntilMorning: () => number
+  - _...6 more_
+- `server/email.ts`
+  - function isEmailConfigured: () => boolean
+  - function getNotificationEmail: () => string | undefined
+  - function sendEmail: (to, subject, html) => Promise<boolean>
+  - function initEmailQueue: () => void
+  - function notifyTeamNewRequest: (opts) => void
+  - function notifyClientTeamResponse: (opts) => void
+  - _...16 more_
+- `server/external-detection.ts` — function detectExternalExecutions: () => Promise<
+- `server/feature-flags.ts`
+  - function isFeatureEnabled: (flag) => boolean
+  - function getAllFlags: () => Record<FeatureFlagKey, boolean>
+  - function getAllFlagsWithMeta: () => Array<
+  - function setFlagOverride: (key, enabled) => void
+- `server/feedback.ts`
+  - function listFeedback: (workspaceId) => FeedbackItem[]
+  - function getFeedbackItem: (workspaceId, id) => FeedbackItem | undefined
+  - function createFeedback: (workspaceId, data) => FeedbackItem
+  - function updateFeedbackStatus: (workspaceId, id, status) => FeedbackItem | null
+  - function addFeedbackReply: (workspaceId, id, author, content) => FeedbackItem | null
+  - function deleteFeedback: (workspaceId, id) => boolean
+  - _...5 more_
+- `server/google-analytics.ts`
+  - function listGA4Properties: () => Promise<GA4Property[]>
+  - function getGA4Overview: (propertyId, days, dateRange?) => Promise<GA4Overview>
+  - function getGA4DailyTrend: (propertyId, days, dateRange?) => Promise<GA4DailyTrend[]>
+  - function getGA4TopPages: (propertyId, days, limit, dateRange?) => Promise<GA4TopPage[]>
+  - function getGA4TopSources: (propertyId, days, limit, dateRange?) => Promise<GA4TopSource[]>
+  - function getGA4DeviceBreakdown: (propertyId, days, dateRange?) => Promise<GA4DeviceBreakdown[]>
+  - _...25 more_
+- `server/google-auth.ts`
+  - function getGoogleCredentials: () => void
+  - function getAuthUrl: (siteId) => string | null
+  - function getGlobalAuthUrl: () => string | null
+  - function exchangeCode: (code, siteId) => Promise<
+  - function getValidToken: (siteId) => Promise<string | null>
+  - function isConnected: (siteId) => boolean
+  - _...4 more_
+- `server/helpers.ts`
+  - function normalizePath: (p) => string
+  - function matchPagePath: (a, b) => boolean
+  - function findPageMapEntry: (pageMap, path) => T | undefined
+  - function resolvePagePath: (page) => string
+  - function sanitizeString: (val, maxLen) => string
+  - function validateEnum: (val, allowed, fallback) => T
+  - _...10 more_
+- `server/html-to-richtext.ts` — function assemblePostHtml: (post) => string, function generateSlug: (title) => string
+- `server/insight-enrichment.ts`
+  - function cleanSlugToTitle: (urlOrPath) => string
+  - function classifyDomain: (type) => InsightDomain
+  - function computeImpactScore: (severity, data, unknown>) => number
+  - function resolvePageTitle: (pageId, titleMap, string>) => string | null
+  - function checkStrategyAlignment: (pageId, strategyPageMap, PageKeywordMap>, actualKeyword?) => StrategyAlignmentResult
+  - function checkPipelineStatus: (pageId, briefs, posts) => AnalyticsInsight['pipelineStatus']
+  - _...6 more_
+- `server/insight-feedback.ts`
+  - function runFeedbackLoops: (workspaceId) => void
+  - function buildStrategySignals: (insights) => StrategySignal[]
+  - function buildPipelineSignals: (insights) => PipelineSignal[]
+- `server/insight-narrative.ts` — function buildClientInsights: (workspaceId) => ClientInsight[]
+- `server/insight-score-adjustments.ts`
+  - function applyScoreAdjustment: (currentData, unknown>, currentImpactScore, bridgeKey, delta) => ScoreAdjustmentResult
+  - function computeAdjustedScore: (data, unknown>, currentImpactScore) => number
+  - interface ScoreAdjustmentResult
+- `server/intelligence-cache.ts` — function singleFlight: (key, fn) => void, class LRUCache
+- `server/intelligence-crons.ts` — function startIntelligenceCrons: () => void, function stopIntelligenceCrons: () => void
+- `server/internal-links.ts`
+  - function analyzeInternalLinks: (siteId, workspaceId?, tokenOverride?) => Promise<InternalLinkResult>
+  - interface PageContent
+  - interface LinkSuggestion
+  - interface PageLinkHealth
+  - interface InternalLinkResult
+- `server/jobs.ts`
+  - function initJobs: (broadcast) => void
+  - function createJob: (type, opts?) => Job
+  - function updateJob: (id, update, 'id' | 'type' | 'createdAt'>>) => void
+  - function getJob: (id) => Job | undefined
+  - function listJobs: (workspaceId?) => Job[]
+  - function registerAbort: (jobId) => AbortController
+  - _...6 more_
+- `server/keyword-metrics-cache.ts`
+  - function getCachedMetrics: (keyword, database, maxAgeHours) => CachedKeywordMetrics | null
+  - function getCachedMetricsBatch: (keywords, database, maxAgeHours) => Map<string, CachedKeywordMetrics>
+  - function cacheMetrics: (metrics, database) => void
+  - function cacheMetricsBatch: (items, database) => void
+  - function cleanupStaleEntries: (maxAgeDays) => number
+  - interface CachedKeywordMetrics
+- `server/keyword-recommendations.ts` — function getKeywordRecommendations: (workspaceId, seedKeyword, options) => Promise<KeywordRecommendationResult>, interface KeywordRecommendationResult
+- `server/link-checker.ts`
+  - function getSiteDomains: (siteId, token) => Promise<SiteDomainInfo | null>
+  - function checkSiteLinks: (siteId, workspaceId?, domain?) => Promise<LinkCheckResult>
+  - interface DeadLink
+  - interface LinkCheckResult
+  - interface SiteDomainInfo
+- `server/llms-txt-generator.ts`
+  - function upsertSummary: (workspaceId, pageUrl, summary) => void
+  - function getSummary: (workspaceId, pageUrl) => void
+  - function getSummaries: (workspaceId) => void
+  - function deleteSummary: (workspaceId, pageUrl) => boolean
+  - function cleanupOldLlmsTxt: (maxAgeDays) => number
+  - function setLastGenerated: (workspaceId, trigger?) => void
+  - _...8 more_
+- `server/logger.ts` — function createLogger: (module) => pino.Logger
+- `server/middleware/fingerprint.ts` — function fingerprintMiddleware: (req, _res, next) => void
+- `server/middleware/request-logger.ts` — function requestLogger: (req, res, next) => void
+- `server/middleware/turnstile.ts` — function verifyTurnstile: (req, res, next) => void
+- `server/middleware/validate.ts` — function validate: (schema) => RequestHandler
+- `server/middleware.ts`
+  - function rateLimit: (windowMs, maxRequests, keyMode) => void
+  - function checkLoginLockout: (email) => void
+  - function recordLoginFailure: (email) => boolean
+  - function clearLoginFailures: (email) => void
+  - function signClientSession: (workspaceId) => string
+  - function verifyClientSession: (workspaceId, token) => boolean
+  - _...15 more_
+- `server/monthly-digest.ts` — function generateMonthlyDigest: (ws, month?, // "March 2026" — defaults to current month) => Promise<MonthlyDigestData>
+- `server/monthly-report.ts`
+  - function generateReportHTML: (data) => string
+  - function startMonthlyReports: () => void
+  - function stopMonthlyReports: () => void
+  - function triggerMonthlyReport: (workspaceId) => Promise<
+  - function getMonthlyReportHTML: (reportId) => string | null
+  - function listMonthlyReports: (workspaceId) => SavedMonthlyReport[]
+  - _...1 more_
+- `server/openai-helpers.ts`
+  - function flushToDisk: () => void
+  - function logTokenUsage: (usage, 'timestamp'>) => void
+  - function getTokenUsage: (workspaceId?, since?) => void
+  - function getUsageByDay: (workspaceId?, days) => Array<
+  - function getUsageByFeature: (workspaceId?, since?) => Array<
+  - function callOpenAI: (opts) => Promise<OpenAIChatResult>
+  - _...2 more_
+- `server/outcome-backfill.ts`
+  - function backfillPublishedContent: (workspaceId) => number
+  - function backfillResolvedInsights: (workspaceId) => number
+  - function backfillCompletedRecommendations: (workspaceId) => number
+  - function runBackfill: (workspaceId?) => BackfillResult
+  - interface BackfillResult
+- `server/outcome-crons.ts` — function startOutcomeCrons: () => void, function stopOutcomeCrons: () => void
+- `server/outcome-measurement.ts`
+  - function fetchGscSnapshot: (workspaceId, pageUrl, days) => Promise<BaselineSnapshot | null>
+  - function captureBaselineFromGsc: (actionId, workspaceId, pageUrl) => Promise<void>
+  - function isDueForCheckpoint: (action, checkpointDays) => boolean
+  - function computeDelta: (baseline, current, primaryMetric) => DeltaSummary
+  - function scoreOutcome: (actionType, delta, checkpointDays, config) => void
+  - function measurePendingOutcomes: (scoringConfigOverride?) => Promise<
+- `server/outcome-playbooks.ts`
+  - function getPlaybooks: (workspaceId) => ActionPlaybook[]
+  - function detectPlaybookPatterns: (workspaceId) => void
+  - function suggestPlaybook: (workspaceId, trigger) => ActionPlaybook | null
+  - function detectAllWorkspacePlaybooks: () => Promise<void>
+- `server/outcome-scoring-defaults.ts` — function resolveScoringConfig: (override) => ScoringConfig, const DEFAULT_SCORING_CONFIG: ScoringConfig
+- `server/outcome-tracking.ts`
+  - function recordAction: (params) => TrackedAction
+  - function getAction: (id) => TrackedAction | null
+  - function getActionsByWorkspace: (workspaceId) => TrackedAction[]
+  - function getActionsByWorkspaceAndType: (workspaceId, actionType) => TrackedAction[]
+  - function getActionsByPage: (workspaceId, pageUrl) => TrackedAction[]
+  - function getActionBySource: (sourceType, sourceId) => TrackedAction | null
+  - _...13 more_
+- `server/page-keywords.ts`
+  - function listPageKeywords: (workspaceId) => PageKeywordMap[]
+  - function getPageKeyword: (workspaceId, pagePath) => PageKeywordMap | undefined
+  - function upsertPageKeyword: (workspaceId, entry) => void
+  - function upsertPageKeywordsBatch: (workspaceId, entries) => void
+  - function upsertAndCleanPageKeywords: (workspaceId, entries) => void
+  - function replaceAllPageKeywords: (workspaceId, entries) => void
+  - _...7 more_
+- `server/pagespeed.ts`
+  - function extractCwvAssessment: (data, unknown>) => CwvAssessmentResult
+  - function runSinglePageSpeed: (url, strategy, pageTitle) => Promise<PageSpeedResult | null>
+  - function runSiteSpeed: (siteId, strategy, maxPages, workspaceId?) => Promise<SiteSpeedResult>
+  - interface CoreWebVitals
+  - interface PageSpeedResult
+  - interface Opportunity
+  - _...4 more_
+- `server/payments.ts`
+  - function createPayment: (_workspaceId, data, 'id' | 'createdAt'>) => PaymentRecord
+  - function updatePayment: (workspaceId, id, updates) => PaymentRecord | null
+  - function getPayment: (workspaceId, id) => PaymentRecord | undefined
+  - function listPayments: (workspaceId) => PaymentRecord[]
+  - function listAllPayments: () => PaymentRecord[]
+  - function deletePayment: (id) => boolean
+  - _...2 more_
+- `server/performance-store.ts`
+  - function savePageWeight: (siteId, result) => void
+  - function getPageWeight: (siteId) => void
+  - function savePageSpeed: (siteId, result) => void
+  - function getPageSpeed: (siteId) => void
+  - function saveSinglePageSpeed: (siteId, pageKey, result) => void
+  - function getSinglePageSpeed: (siteId, pageKey) => void
+  - _...9 more_
+- `server/post-export-html.ts` — function renderPostHTML: (post) => string
+- `server/processor.ts`
+  - function getMetadata: () => Record<string, AssetMetadata>
+  - function getQueue: () => QueueItem[]
+  - function startWatcher: (broadcast) => void
+  - function triggerOptimize: (filePath) => Promise<void>
+  - interface QueueItem
+- `server/providers/dataforseo-provider.ts`
+  - function flushCreditsToDisk: () => void
+  - function getDataForSeoUsage: (workspaceId?, since?) => void
+  - function getDataForSeoByDay: (workspaceId?, days) => Array<
+  - class DataForSeoProvider
+- `server/providers/semrush-provider.ts` — class SemrushProvider
+- `server/rank-tracking.ts`
+  - function getTrackedKeywords: (workspaceId) => TrackedKeyword[]
+  - function addTrackedKeyword: (workspaceId, query, pinned) => TrackedKeyword[]
+  - function removeTrackedKeyword: (workspaceId, query) => TrackedKeyword[]
+  - function togglePinKeyword: (workspaceId, query) => TrackedKeyword[]
+  - function storeRankSnapshot: (workspaceId, date, queries) => void
+  - function getRankHistory: (workspaceId, queryFilter?, limit) => void
+  - _...4 more_
+- `server/recommendations.ts`
+  - function loadRecommendations: (workspaceId) => RecommendationSet | null
+  - function saveRecommendations: (set) => void
+  - function updateRecommendationStatus: (workspaceId, recId, status) => Recommendation | null
+  - function dismissRecommendation: (workspaceId, recId) => boolean
+  - function generateRecommendations: (workspaceId) => Promise<RecommendationSet>
+- `server/redirect-scanner.ts`
+  - function scanRedirects: (siteId, workspaceId?, liveDomain?, gscGhostUrls?) => Promise<RedirectScanResult>
+  - interface RedirectHop
+  - interface RedirectChain
+  - interface OrphanRedirect
+  - interface PageStatus
+  - interface RedirectScanResult
+  - _...1 more_
+- `server/redirect-store.ts`
+  - function saveRedirectSnapshot: (siteId, result) => RedirectSnapshot
+  - function getRedirectSnapshot: (siteId) => RedirectSnapshot | null
+  - interface RedirectSnapshot
+- `server/reports.ts`
+  - function cleanupOldSnapshots: (maxAgeDays) => number
+  - function saveSnapshot: (siteId, siteName, audit, logoUrl?) => AuditSnapshot
+  - function addActionItem: (snapshotId, item) => ActionItem | null
+  - function updateActionItem: (snapshotId, itemId, updates, 'title' | 'description' | 'status' | 'priority' | 'category'>>) => ActionItem | null
+  - function deleteActionItem: (snapshotId, itemId) => boolean
+  - function getActionItems: (snapshotId) => ActionItem[]
+  - _...11 more_
+- `server/requests.ts`
+  - function listRequests: (workspaceId?) => ClientRequest[]
+  - function getRequest: (id) => ClientRequest | undefined
+  - function createRequest: (workspaceId, data) => ClientRequest
+  - function updateRequest: (id, updates, 'status' | 'priority' | 'category'>>) => ClientRequest | null
+  - function getAttachmentsDir: () => string
+  - function addAttachmentsToRequest: (requestId, attachments) => ClientRequest | null
+  - _...2 more_
+- `server/roi-attribution.ts`
+  - function recordOptimization: (params) => string
+  - function measureOutcome: (attributionId, params) => void
+  - function getROIAttributionsRaw: (workspaceId, limit) => Array<
+  - function getROIHighlights: (workspaceId, limit) => ROIHighlight[]
+  - function getUnmeasuredOptimizations: () => ROIAttributionRow[]
+- `server/roi.ts`
+  - function computeROI: (workspaceId) => ROIData | null
+  - interface ROIData
+  - interface PageROI
+  - interface ContentROIMetrics
+  - interface ContentItemROI
+- `server/sales-audit.ts`
+  - function runSalesAudit: (inputUrl, maxPages) => Promise<SalesAuditResult>
+  - interface SalesIssue
+  - interface SalesPageResult
+  - interface SalesAuditResult
+  - type Severity
+  - type CheckCategory
+- `server/sales-report-html.ts` — function renderSalesReportHTML: (report) => string
+- `server/scheduled-audits.ts`
+  - function getSchedule: (workspaceId) => AuditSchedule | null
+  - function listSchedules: () => AuditSchedule[]
+  - function upsertSchedule: (workspaceId, updates, 'workspaceId'>>) => AuditSchedule
+  - function deleteSchedule: (workspaceId) => boolean
+  - function startScheduler: () => void
+  - function stopScheduler: () => void
+  - _...1 more_
+- `server/schema-plan.ts`
+  - function generateSchemaPlan: (ctx) => Promise<SchemaSitePlan>
+  - function buildPlanContextForPage: (plan, pagePath) => string
+  - interface PlanContext
+- `server/schema-queue.ts`
+  - function generateSchemaSkeleton: (cell, template, siteUrl) => Record<string, unknown>
+  - function queueSchemaPreGeneration: (workspaceId, matrixId, cellId) => Promise<void>
+  - function listPendingSchemas: (workspaceId) => void
+  - function markSchemaApplied: (cellId) => void
+  - function markSchemaStale: (cellId) => void
+- `server/schema-store.ts`
+  - function saveSchemaSnapshot: (siteId, workspaceId, results) => SchemaSnapshot
+  - function getSchemaSnapshot: (siteId) => SchemaSnapshot | null
+  - function updatePageSchemaInSnapshot: (siteId, pageId, updatedSchema, unknown>) => boolean
+  - function saveSiteTemplate: (siteId, workspaceId, organizationNode, unknown>, websiteNode, unknown>) => SchemaSiteTemplate
+  - function getSiteTemplate: (siteId) => SchemaSiteTemplate | null
+  - function getOrSeedSiteTemplate: (siteId, workspaceId?) => SchemaSiteTemplate | null
+  - _...18 more_
+- `server/schema-suggester.ts`
+  - function checkRichResultsEligibility: (schema, unknown>) => RichResultEligibility[]
+  - function extractFaqOpportunities: (queryPageData, pageUrl) => Array<
+  - function buildSchemaIntelligenceBlock: (ctx) => string
+  - function extractEeatFromBrief: (brief) => EeatData | null
+  - function generateSchemaForPage: (siteId, pageId, tokenOverride?, ctx, gscMap?, {...}, ga4Map?, {...}, queryPageData?, insightsMap?, {...}) => Promise<SchemaPageSuggestion | null>
+  - function generateSchemaSuggestions: (siteId, tokenOverride?, ctx, pageKeywordMap?, onProgress?, done, message) => void
+  - _...9 more_
+- `server/schema-validator.ts`
+  - function upsertValidation: (opts) => void
+  - function getValidation: (workspaceId, pageId) => void
+  - function getValidations: (workspaceId) => void
+  - function deleteValidation: (workspaceId, pageId) => boolean
+  - function validateForGoogleRichResults: (schema, unknown>) => ValidationResult
+  - function validateEntityConsistency: (schemas, unknown> }>) => ConsistencyResult
+  - _...2 more_
+- `server/search-console.ts`
+  - function listGscSites: (siteId) => Promise<Array<
+  - function getSearchOverview: (siteId, gscSiteUrl, days, options, dateRange?) => Promise<SearchOverview>
+  - function getQueryPageData: (siteId, gscSiteUrl, days, opts?) => Promise<QueryPageRow[]>
+  - function getAllGscPages: (siteId, gscSiteUrl, days, dateRange?) => Promise<SearchPage[]>
+  - function paginateGscQuery: (fetchPage, rowLimit) => void
+  - function getPerformanceTrend: (siteId, gscSiteUrl, days, dateRange?) => Promise<PerformanceTrend[]>
+  - _...14 more_
+- `server/semrush.ts`
+  - function flushCreditsToDisk: () => void
+  - function getSemrushUsage: (workspaceId?, since?) => void
+  - function getSemrushByDay: (workspaceId?, days) => Array<
+  - function isSemrushConfigured: () => boolean
+  - function getKeywordOverview: (keywords, workspaceId, database) => Promise<KeywordMetrics[]>
+  - function getDomainOrganicKeywords: (domain, workspaceId, limit, database) => Promise<DomainKeyword[]>
+  - _...21 more_
+- `server/sentry.ts`
+  - function initSentry: () => void
+  - function setupSentryErrorHandler: (app) => void
+  - const isSentryEnabled
+- `server/seo-audit-html.ts`
+  - function stripHiddenElements: (html) => string
+  - function extractTag: (html, tag) => string[]
+  - function extractMetaContent: (html, nameOrProp) => string | null
+  - function countWords: (html) => number
+  - function extractLinks: (html) => void
+  - function extractImgTags: (html) => void
+  - _...3 more_
+- `server/seo-audit.ts`
+  - function runSeoAudit: (siteId, tokenOverride?, workspaceId?, skipLinkCheck) => Promise<SeoAuditResult>
+  - interface CwvMetricSummary
+  - interface CwvStrategyResult
+  - interface CwvSummary
+  - interface SeoAuditResult
+- `server/seo-change-tracker.ts`
+  - function recordSeoChange: (workspaceId, pageId, pageSlug, pageTitle, fields, source) => SeoChangeEvent
+  - function getSeoChanges: (workspaceId, limit) => SeoChangeEvent[]
+  - function getSeoChangeImpact: (workspaceId, gscSiteUrl, siteId, limit, sourceFilter?) => Promise<PageImpact[]>
+  - function getSchemaImpactSummary: (workspaceId, gscSiteUrl, siteId, limit) => Promise<SchemaImpactSummary>
+  - interface SeoChangeEvent
+  - interface PageImpact
+  - _...1 more_
+- `server/seo-context.ts`
+  - function clearSeoContextCache: (workspaceId?) => void
+  - function buildSeoContext: (workspaceId?, pagePath?, learningsDomain, internalOpts?) => SeoContext
+  - function getRawBrandVoice: (workspaceId) => string
+  - function getRawKnowledge: (workspaceId) => string
+  - function buildKnowledgeBase: (workspaceId?) => string
+  - function buildPersonasContext: (workspaceId?) => string
+  - _...4 more_
+- `server/seo-data-provider.ts`
+  - function registerProvider: (name, provider) => void
+  - function getProvider: (name) => SeoDataProvider | undefined
+  - function getConfiguredProvider: (preferred?) => SeoDataProvider | null
+  - function markCapabilityDisabled: (providerName, capability, ttlMs) => void
+  - function isCapabilityDisabled: (providerName, capability) => boolean
+  - function clearCapabilityDisabled: (providerName, capability) => void
+  - _...14 more_
+- `server/seo-suggestions.ts`
+  - function saveSuggestion: (opts) => SeoSuggestion
+  - function listSuggestions: (workspaceId, field?) => SeoSuggestion[]
+  - function selectVariation: (suggestionId, selectedIndex) => boolean
+  - function selectVariationByPage: (workspaceId, pageId, field, selectedIndex) => boolean
+  - function getSelectedSuggestions: (workspaceId) => SeoSuggestion[]
+  - function markApplied: (suggestionIds) => void
+  - _...3 more_
+- `server/site-architecture.ts`
+  - function getAncestorChain: (tree, targetPath) => SiteNode[]
+  - function getParentNode: (tree, targetPath) => SiteNode | null
+  - function getSiblingNodes: (tree, targetPath) => SiteNode[]
+  - function getChildNodes: (tree, parentPath) => SiteNode[]
+  - function flattenTree: (tree, includeRoot) => SiteNode[]
+  - function getCachedArchitecture: (workspaceId) => Promise<SiteArchitectureResult>
+  - _...5 more_
+- `server/startup.ts` — function startSchedulers: () => void
+- `server/storage-stats.ts`
+  - function getStorageReport: () => StorageReport
+  - function pruneChatSessions: (maxAgeDays) => PruneResult
+  - function pruneBackups: (retainDays) => PruneResult
+  - function pruneReportSnapshots: (keepPerSite) => PruneResult
+  - function pruneActivityLogs: (maxAgeDays) => PruneResult
+  - interface DirStats
+  - _...2 more_
+- `server/stripe-config.ts`
+  - function getStripeConfig: () => StripeConfig | null
+  - function getStripeConfigSafe: () => void
+  - function saveStripeKeys: (secretKey?, webhookSecret?, publishableKey?) => void
+  - function saveStripeProducts: (products) => void
+  - function clearStripeConfig: () => void
+  - function getStripeSecretKey: () => string
+  - _...5 more_
+- `server/stripe.ts`
+  - function initStripeBroadcast: (fn) => void
+  - function isStripeConfigured: () => boolean
+  - function getProductConfig: (type) => ProductConfig | null
+  - function listProducts: () => ProductConfig[]
+  - function createCheckoutSession: (params) => Promise<
+  - function createCartCheckoutSession: (params) => Promise<
+  - _...10 more_
+- `server/studio-config.ts`
+  - function getStudioConfig: (key) => string | null
+  - function setStudioConfig: (key, value) => void
+  - function deleteStudioConfig: (key) => void
+  - function getBookingUrl: () => string | null
+  - function setBookingUrl: (url) => void
+  - function clearBookingUrl: () => void
+- `server/suggested-briefs-store.ts`
+  - function createSuggestedBrief: (params) => SuggestedBrief
+  - function listSuggestedBriefs: (workspaceId, includeAll) => SuggestedBrief[]
+  - function getSuggestedBrief: (id, workspaceId) => SuggestedBrief | null
+  - function updateSuggestedBrief: (id, workspaceId, status) => SuggestedBrief | null
+  - function dismissSuggestedBrief: (id, workspaceId) => SuggestedBrief | null
+  - function snoozeSuggestedBrief: (id, workspaceId, until) => SuggestedBrief | null
+- `server/trial-reminders.ts` — function startTrialReminders: () => void, function stopTrialReminders: () => void
+- `server/usage-tracking.ts`
+  - function getLimit: (tier, feature) => number
+  - function getUsageCount: (workspaceId, feature) => number
+  - function incrementUsage: (workspaceId, feature) => number
+  - function checkUsageLimit: (workspaceId, tier, feature) => void
+  - function getUsageSummary: (workspaceId, tier) => Record<UsageFeature,
+  - type UsageFeature
+- `server/users.ts`
+  - function listUsers: () => SafeUser[]
+  - function getUserById: (id) => User | null
+  - function getUserByEmail: (email) => User | null
+  - function getSafeUser: (id) => SafeUser | null
+  - function createUser: (email, password, name, role, workspaceIds) => Promise<SafeUser>
+  - function updateUser: (id, updates, 'name' | 'email' | 'role' | 'workspaceIds' | 'avatarUrl'>>) => Promise<SafeUser | null>
+  - _...5 more_
+- `server/web-scraper.ts`
+  - function scrapeUrl: (url) => Promise<ScrapedPage | null>
+  - function scrapeUrls: (urls, concurrency) => Promise<ScrapedPage[]>
+  - function scrapeSerpData: (query) => Promise<SerpData | null>
+  - function buildReferenceContext: (pages) => string
+  - function buildStyleExampleContext: (pages) => string
+  - function buildSerpContext: (serp) => string
+  - _...3 more_
+- `server/webflow-assets.ts`
+  - function listAssets: (siteId, tokenOverride?) => Promise<WebflowAsset[]>
+  - function getAsset: (assetId, tokenOverride?) => Promise<WebflowAsset | null>
+  - function updateAsset: (assetId, updates, tokenOverride?) => Promise<
+  - function listAssetFolders: (siteId, tokenOverride?) => Promise<AssetFolder[]>
+  - function createAssetFolder: (siteId, displayName, parentFolderId?, tokenOverride?) => Promise<
+  - function moveAssetToFolder: (assetId, parentFolderId, tokenOverride?) => Promise<
+  - _...5 more_
+- `server/webflow-client.ts` — function getToken: () => string | null, function webflowFetch: (endpoint, options, tokenOverride?) => Promise<Response>
+- `server/webflow-cms.ts`
+  - function listCollections: (siteId, tokenOverride?) => Promise<Array<
+  - function getCollectionItem: (collectionId, itemId, tokenOverride?) => Promise<Record<string, unknown> | null>
+  - function listCollectionItems: (collectionId, limit, offset, tokenOverride?) => Promise<
+  - function getCollectionSchema: (collectionId, tokenOverride?) => Promise<
+  - function createCollectionItem: (collectionId, fieldData, unknown>, isDraft, tokenOverride?) => Promise<
+  - function updateCollectionItem: (collectionId, itemId, fieldData, unknown>, tokenOverride?) => Promise<
+  - _...1 more_
+- `server/webflow-pages.ts`
+  - function listPages: (siteId, tokenOverride?) => Promise<WebflowPage[]>
+  - function filterPublishedPages: (pages) => WebflowPage[]
+  - function getPageDomNodes: (pageId, tokenOverride?) => Promise<DomNode[]>
+  - function getPageDom: (pageId, tokenOverride?) => Promise<string>
+  - function updatePageSeo: (pageId, fields, tokenOverride?) => Promise<
+  - function getPageMeta: (pageId, tokenOverride?) => Promise<Record<string, unknown> | null>
+  - _...11 more_
+- `server/websocket.ts` — function getPresence: () => Record<string, Array<, function initWebSocket: (server) => WebSocketServer
+- `server/work-orders.ts`
+  - function listWorkOrders: (workspaceId) => WorkOrder[]
+  - function getWorkOrder: (workspaceId, orderId) => WorkOrder | undefined
+  - function createWorkOrder: (workspaceId, data) => WorkOrder
+  - function updateWorkOrder: (workspaceId, orderId, updates, 'status' | 'assignedTo' | 'notes' | 'completedAt'>>) => WorkOrder | null
+- `server/workspace-data.ts`
+  - function getWorkspacePages: (workspaceId, siteId) => Promise<WebflowPageArray>
+  - function getWorkspaceAllPages: (workspaceId, siteId) => Promise<WebflowPageArray>
+  - function invalidatePageCache: (workspaceId) => void
+  - function getPageCacheStats: () => void
+  - function getContentPipelineSummary: (workspaceId) => ContentPipelineSummary
+  - function invalidateContentPipelineCache: (workspaceId) => void
+- `server/workspace-intelligence.ts`
+  - function buildWorkspaceIntelligence: (workspaceId, opts?) => Promise<WorkspaceIntelligence>
+  - function formatForPrompt: (intelligence, opts?) => string
+  - function buildIntelPrompt: (workspaceId, slices, opts?, 'slices'> & Pick<PromptFormatOptions, 'verbosity' | 'tokenBudget' | 'learningsDomain'>) => Promise<string>
+  - function invalidateIntelligenceCache: (workspaceId) => void
+  - function getIntelligenceCacheStats: () => void
+  - function formatBrandVoiceForPrompt: (brandVoice) => string
+  - _...4 more_
+- `server/workspace-learnings.ts`
+  - function computeWorkspaceLearnings: (workspaceId) => WorkspaceLearnings
+  - function getWorkspaceLearnings: (workspaceId, _domain?) => WorkspaceLearnings | null
+  - function formatLearningsForPrompt: (learnings, domain) => string
+  - function getWorkspaceIdsWithOutcomes: () => string[]
+  - function recomputeAllWorkspaceLearnings: () => Promise<void>
+- `server/workspaces.ts`
+  - function getBrandName: (ws, 'name' | 'webflowSiteName'> | null | undefined) => string
+  - function getClientPortalUrl: (ws) => string | undefined
+  - function getTokenForSite: (siteId) => string | null
+  - function listWorkspaces: () => Workspace[]
+  - function createWorkspace: (name, webflowSiteId?, webflowSiteName?) => Workspace
+  - function updateWorkspace: (id, updates, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'siteIntelligenceClientView' | 'businessPriorities'>>) => Workspace | null
+  - _...10 more_
+- `src/api/analytics.ts`
+  - function fetchClientIntelligence: (workspaceId) => Promise<ClientIntelligence>
+  - const gsc
+  - const ga4
+  - const gscAdmin
+- `src/api/client.ts`
+  - function get: (url, signal?) => Promise<T>
+  - function post: (url, body?, signal?) => Promise<T>
+  - function patch: (url, body, signal?) => Promise<T>
+  - function put: (url, body, signal?) => Promise<T>
+  - function del: (url, body?, signal?) => Promise<T>
+  - function postForm: (url, formData, signal?) => Promise<T>
+  - _...3 more_
+- `src/hooks/admin/useActionQueue.ts` — function useActionQueue: (workspaceId) => void
+- `src/hooks/admin/useAdminAssets.ts`
+  - function useWebflowAssets: (siteId) => void
+  - function useAssetAudit: (siteId, enabled) => void
+  - function useCmsImages: (siteId, enabled) => void
+- `src/hooks/admin/useAdminBriefs.ts` — function useAdminBriefsList: (wsId) => void, function useAdminRequestsList: (wsId) => void
+- `src/hooks/admin/useAdminGA4.ts` — function useAdminGA4: (workspaceId, days, enabled) => AdminGA4Data, interface AdminGA4Data
+- `src/hooks/admin/useAdminPosts.ts`
+  - function useAdminPostsList: (wsId) => void
+  - function useAdminPost: (wsId, postId) => void
+  - function useAdminPostVersions: (wsId, postId, enabled) => void
+  - function usePublishTarget: (wsId) => void
+- `src/hooks/admin/useAdminROI.ts` — function useAdminROI: (workspaceId) => void
+- `src/hooks/admin/useAdminSearch.ts` — function useAdminSearch: (siteId, gscSiteUrl, days) => AdminSearchData, interface AdminSearchData
+- `src/hooks/admin/useAdminSeo.ts`
+  - function useAuditTrafficMap: (siteId) => void
+  - function useAuditSuppressions: (workspaceId) => void
+  - function useAuditSchedule: (workspaceId) => void
+  - function useSchemaSnapshot: (siteId) => void
+  - function useWebflowPages: (siteId) => void
+  - interface AuditSchedule
+  - _...1 more_
+- `src/hooks/admin/useAiSuggestedBriefs.ts` — function useAiSuggestedBriefs: (workspaceId) => void
+- `src/hooks/admin/useAnalyticsAnnotations.ts`
+  - function useAnalyticsAnnotations: (workspaceId) => void
+  - function useCreateAnnotation: (workspaceId) => void
+  - function useUpdateAnnotation: (workspaceId) => void
+  - function useDeleteAnnotation: (workspaceId) => void
+  - interface Annotation
+- `src/hooks/admin/useAnalyticsOverview.ts` — function useAnalyticsOverview: (workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days) => AnalyticsOverviewData, interface AnalyticsOverviewData
+- `src/hooks/admin/useAnomalyAlerts.ts` — function useAnomalyAlerts: (workspaceId, isAdmin) => void
+- `src/hooks/admin/useClientSignals.ts`
+  - function useClientSignals: (workspaceId) => void
+  - function useUpdateSignalStatus: (workspaceId) => void
+  - function useCreateClientSignal: (workspaceId) => void
+- `src/hooks/admin/useCmsEditor.ts` — function useCmsEditor: (siteId, workspaceId?) => void, function useCmsCollections: (siteId) => void
+- `src/hooks/admin/useContentCalendar.ts` — function useContentCalendar: (workspaceId) => void
+- `src/hooks/admin/useContentPipeline.ts` — function useContentPipeline: (workspaceId) => void
+- `src/hooks/admin/useHealthCheck.ts` — function useHealthCheck: () => void, const HEALTH_KEY
+- `src/hooks/admin/useInsightFeed.ts`
+  - function cleanSlugToTitle: (url) => string
+  - function transformToFeedInsight: (insight) => FeedInsight
+  - function computeSummaryCounts: (feed) => SummaryCount[]
+  - function useInsightFeed: (workspaceId, enabled) => InsightFeedResult
+- `src/hooks/admin/useIntelligenceSignals.ts` — function useIntelligenceSignals: (workspaceId) => void
+- `src/hooks/admin/useKeywordStrategy.ts` — function useKeywordStrategy: (workspaceId) => void
+- `src/hooks/admin/useNotifications.ts` — function useNotifications: () => void, interface NotificationItem
+- `src/hooks/admin/useOutcomes.ts`
+  - function useOutcomeScorecard: (wsId) => void
+  - function useOutcomeActions: (wsId, type?, score?) => void
+  - function useOutcomeAction: (wsId, actionId) => void
+  - function useOutcomeTopWins: (wsId) => void
+  - function useOutcomeTimeline: (wsId) => void
+  - function useOutcomeLearnings: (wsId) => void
+  - _...3 more_
+- `src/hooks/admin/useQueue.ts` — function useQueue: () => void, const QUEUE_KEY
+- `src/hooks/admin/useSchemaValidation.ts` — function useSchemaValidations: (siteId) => void, function useValidateSchema: (siteId) => void
+- `src/hooks/admin/useSeoEditor.ts` — function useSeoEditor: (siteId, workspaceId?) => void, interface PageMeta
+- `src/hooks/admin/useWorkspaceHome.ts` — function useWorkspaceHomeData: (workspaceId) => void
+- `src/hooks/admin/useWorkspaceIntelligence.ts` — function useWorkspaceIntelligence: (workspaceId, slices?, pagePath?, learningsDomain?) => void
+- `src/hooks/admin/useWorkspaceOverview.ts` — function useWorkspaceOverviewData: () => void, interface WorkspaceOverviewData
+- `src/hooks/admin/useWorkspaces.ts`
+  - function useWorkspaces: () => void
+  - function useCreateWorkspace: () => void
+  - function useDeleteWorkspace: () => void
+  - function useLinkSite: () => void
+  - function useUnlinkSite: () => void
+  - const WORKSPACES_KEY
+- `src/hooks/client/useClientGA4.ts` — function useClientGA4: (wsId, days, dateRange, enabled) => void, interface ClientGA4Data
+- `src/hooks/client/useClientInsights.ts` — function useClientInsights: (workspaceId) => void
+- `src/hooks/client/useClientIntelligence.ts` — function useClientIntelligence: (workspaceId) => void
+- `src/hooks/client/useClientOutcomes.ts` — function useClientOutcomeSummary: (wsId) => void, function useClientOutcomeWins: (wsId) => void
+- `src/hooks/client/useClientQueries.ts`
+  - function useClientActivity: (wsId, enabled) => void
+  - function useClientRankHistory: (wsId, enabled) => void
+  - function useClientLatestRanks: (wsId, enabled) => void
+  - function useClientAnnotations: (wsId, enabled) => void
+  - function useClientAnomalies: (wsId, enabled) => void
+  - function useClientApprovals: (wsId, enabled) => void
+  - _...10 more_
+- `src/hooks/client/useClientSearch.ts` — function useClientSearch: (wsId, days, dateRange, enabled) => void, interface ClientSearchData
+- `src/hooks/client/useMonthlyDigest.ts` — function useMonthlyDigest: (workspaceId) => void
+- `src/hooks/shared/useGA4Base.ts` — function useGA4Base: ({...}, days, dateRange, enabled, keyPrefix, includeEvents, landingOpts, }) => void, interface GA4BaseOptions
+- `src/hooks/useAuditSummary.ts`
+  - function useAuditSummary: (workspaceId) => void
+  - function auditSummaryKey
+  - interface AuditSummaryData
+- `src/hooks/useAuth.ts` — function useAuth: () => void, function authHeaders: () => Record<string, string>
+- `src/hooks/useChat.ts`
+  - function useChat: (deps) => ChatState & ChatActions
+  - interface ChatDeps
+  - interface ChatState
+  - interface ChatActions
+- `src/hooks/useClientAuth.ts`
+  - function useClientAuth: (workspaceId, ws, loadDashboardData) => void
+  - interface ClientUser
+  - interface ClientAuthState
+  - interface ClientAuthActions
+- `src/hooks/useClientData.ts`
+  - function useClientData: (workspaceId) => void
+  - interface ActivityLogItem
+  - interface RankHistoryEntry
+  - interface LatestRank
+  - interface AnnotationItem
+  - interface AnomalyItem
+  - _...1 more_
+- `src/hooks/useContentRequests.ts` — function useContentRequests: ({...}, setContentRequests, setToast }) => void
+- `src/hooks/useFeatureFlag.ts` — function useFeatureFlag: (flag) => boolean
+- `src/hooks/usePageEditStates.ts`
+  - function usePageEditStates: (workspaceId, isPublic) => void
+  - function pageEditStatesKey
+  - interface PageEditState
+  - interface PageEditSummary
+- `src/hooks/usePayments.ts`
+  - function usePayments: (workspaceId, ws, setToast) => void
+  - interface PricingModalData
+  - interface StripePaymentData
+  - interface PricingData
+  - interface PaymentsState
+  - interface PaymentsActions
+- `src/hooks/useRecommendations.ts` — function useRecommendations: (workspaceId?) => void, interface Recommendation
+- `src/hooks/useToast.ts` — function useToast: (duration) => void
+- `src/hooks/useToggleSet.ts` — function useToggleSet: (defaults, {...}, max) => [Set<string>, (key: string) => void]
+- `src/hooks/useWebSocket.ts` — function useWebSocket: (handlers, EventHandler>) => void
+- `src/hooks/useWorkspaceEvents.ts` — function useWorkspaceEvents: (workspaceId, handlers, EventHandler>, identity?) => void, interface WsIdentity
+- `src/hooks/useWsInvalidation.ts` — function useWsInvalidation: (workspaceId) => void
+- `src/lib/character-validation.ts`
+  - function validateCharacterCount: (text, max) => CharacterValidation
+  - function truncateSmart: (text, max) => string
+  - function getColorClass: (percentage) => string
+  - interface CharacterValidation
+- `src/lib/kdFraming.ts` — function kdFraming: (kd) => string | undefined, function kdTooltip: (kd) => string
+- `src/lib/loadingPhrases.ts` — function pickPhrase: (exclude?) => string, const LOADING_PHRASES: readonly string[]
+- `src/lib/pathUtils.ts`
+  - function normalizePath: (p) => string
+  - function matchPagePath: (a, b) => boolean
+  - function resolvePagePath: (page) => string
+- `src/lib/utils.ts` — function cn: (...inputs) => void
+- `src/routes.ts`
+  - function adminPath: (workspaceId, tab) => string
+  - function clientPath: (workspaceId, tab?, betaMode?) => string
+  - type Page
+  - type ClientTab
+- `src/utils/formatNumbers.ts`
+  - function fmtNum: (n) => string
+  - function fmtMoney: (value) => string
+  - function fmtMoneyFull: (value) => string
+
+---
+
+# Config
+
+## Environment Variables
+
+- `ADMIN_URL` **required** — server/email.ts
+- `ALLOW_DB_IMPORT` **required** — server/routes/health.ts
+- `ALLOWED_ORIGINS` (has default) — .env.example
+- `ANTHROPIC_API_KEY` (has default) — .env.example
+- `APP_PASSWORD` (has default) — .env.example
+- `APP_URL` (has default) — .env.example
+- `AWS_ACCESS_KEY_ID` (has default) — .env.example
+- `AWS_SECRET_ACCESS_KEY` **required** — .env.example
+- `BACKUP_DIR` (has default) — .env.example
+- `BACKUP_RETENTION_DAYS` (has default) — .env.example
+- `BACKUP_S3_BUCKET` (has default) — .env.example
+- `BACKUP_S3_PREFIX` (has default) — .env.example
+- `BACKUP_S3_REGION` (has default) — .env.example
+- `CI` **required** — playwright.config.ts
+- `DATA_DIR` (has default) — .env.example
+- `DATAFORSEO_LOGIN` **required** — server/providers/dataforseo-provider.ts
+- `DATAFORSEO_PASSWORD` **required** — server/providers/dataforseo-provider.ts
+- `DISABLE_DEBUG_ENDPOINTS` **required** — server/routes/debug.ts
+- `EMAIL_DIGEST_HOUR` **required** — server/email-throttle.ts
+- `EMAIL_DIGEST_TZ` **required** — server/email-throttle.ts
+- `FEATURE_OUTCOME_TRACKING` **required** — tests/integration/outcome-pipeline.test.ts
+- `GITHUB_BASE_REF` **required** — scripts/pr-check.ts
+- `GOOGLE_API_KEY` **required** — server/pagespeed.ts
+- `GOOGLE_CLIENT_ID` (has default) — .env.example
+- `GOOGLE_CLIENT_SECRET` (has default) — .env.example
+- `GOOGLE_PSI_KEY` (has default) — .env.example
+- `GOOGLE_REDIRECT_URI` (has default) — .env.example
+- `HOME` **required** — server/backup.ts
+- `JWT_SECRET` (has default) — .env.example
+- `LOG_LEVEL` **required** — server/logger.ts
+- `MODE` **required** — src/main.tsx
+- `NODE_ENV` **required** — server/app.ts
+- `NOTIFICATION_EMAIL` (has default) — .env.example
+- `OPENAI_API_KEY` (has default) — .env.example
+- `PORT` (has default) — .env.example
+- `PROD` **required** — src/main.tsx
+- `PROD_URL` **required** — scripts/sync-staging-db.ts
+- `SEMRUSH_API_KEY` (has default) — .env.example
+- `SENTRY_AUTH_TOKEN` (has default) — .env.example
+- `SENTRY_DSN` (has default) — .env.example
+- `SENTRY_ORG` (has default) — .env.example
+- `SENTRY_PROJECT` (has default) — .env.example
+- `SESSION_SECRET` (has default) — .env.example
+- `SMTP_FROM` (has default) — .env.example
+- `SMTP_FROM_NAME` (has default) — .env.example
+- `SMTP_HOST` (has default) — .env.example
+- `SMTP_PASS` (has default) — .env.example
+- `SMTP_PORT` (has default) — .env.example
+- `SMTP_USER` (has default) — .env.example
+- `STAGING_URL` **required** — scripts/sync-staging-db.ts
+- `STRIPE_CONFIG_KEY` **required** — server/stripe-config.ts
+- `STRIPE_PRICE_BRIEF` (has default) — .env.example
+- `STRIPE_PRICE_POST_DRAFT` (has default) — .env.example
+- `STRIPE_PRICE_POST_POLISHED` (has default) — .env.example
+- `STRIPE_PRICE_POST_PREMIUM` (has default) — .env.example
+- `STRIPE_PRICE_SCHEMA_PAGE` (has default) — .env.example
+- `STRIPE_PRICE_SCHEMA_SITE` (has default) — .env.example
+- `STRIPE_PRICE_STRATEGY` (has default) — .env.example
+- `STRIPE_PRICE_STRATEGY_REFRESH` (has default) — .env.example
+- `STRIPE_PRICE_TEST` **required** — tests/unit/stripe-config.test.ts
+- `STRIPE_PUBLISHABLE_KEY` (has default) — .env.example
+- `STRIPE_SECRET_KEY` (has default) — .env.example
+- `STRIPE_WEBHOOK_SECRET` (has default) — .env.example
+- `TURNSTILE_SECRET_KEY` (has default) — .env.example
+- `VITE_SENTRY_DSN` (has default) — .env.example
+- `VITE_TURNSTILE_SITE_KEY` (has default) — .env.example
+- `WEBFLOW_API_TOKEN` (has default) — .env.example
+
+## Config Files
+
+- `.env.example`
+- `render.yaml`
+- `tsconfig.json`
+- `vite.config.ts`
+
+## Key Dependencies
+
+- @anthropic-ai/sdk: ^0.78.0
+- better-sqlite3: ^12.6.2
+- express: ^4.22.1
+- openai: ^6.25.0
+- react: ^19.2.0
+- stripe: ^20.4.1
+- tailwindcss: ^4.2.1
+- zod: ^3.23.0
+
+---
+
+# Middleware
+
+## auth
+- auth — `server/auth.ts`
+- middleware — `server/middleware.ts`
+- auth — `server/routes/auth.ts`
+- debug-auth-guard.test — `tests/debug-auth-guard.test.ts`
+- auth.test — `tests/integration/auth.test.ts`
+- auth.test — `tests/unit/auth.test.ts`
+- middleware.test — `tests/unit/middleware.test.ts`
+
+## custom
+- migrate-json — `server/db/migrate-json.ts`
+- keyword-strategy — `server/routes/keyword-strategy.ts`
+- KeywordStrategy — `src/components/KeywordStrategy.tsx`
+- StrategyTab — `src/components/client/StrategyTab.tsx`
+- StrategyDiff — `src/components/strategy/StrategyDiff.tsx`
+- useKeywordStrategy — `src/hooks/admin/useKeywordStrategy.ts`
+- client-chat-guardrails.test — `tests/client-chat-guardrails.test.ts`
+- kd-framing-strategyTab.test — `tests/unit/kd-framing-strategyTab.test.ts`
+- page-intelligence-strategy-blend.test — `tests/unit/page-intelligence-strategy-blend.test.ts`
+- strategy-intelligence-enrichment.test — `tests/unit/strategy-intelligence-enrichment.test.ts`
+
+## rate-limit
+- fingerprint — `server/middleware/fingerprint.ts`
+- client-signals-rate-limit.test — `tests/integration/client-signals-rate-limit.test.ts`
+
+## logging
+- request-logger — `server/middleware/request-logger.ts`
+
+## validation
+- turnstile — `server/middleware/turnstile.ts`
+- validate — `server/middleware/validate.ts`
+
+## cors
+- cors — `server/app.ts`
+
+---
+
+# Dependency Graph
+
+## Most Imported Files (change these carefully)
+
+- `server/workspace-intelligence.ts` — imported by **139** files
+- `server/logger.ts` — imported by **131** files
+- `server/workspaces.ts` — imported by **127** files
+- `src/api/client.ts` — imported by **88** files
+- `src/components/ui/index.ts` — imported by **86** files
+- `server/db/index.ts` — imported by **75** files
+- `server/auth.ts` — imported by **52** files
+- `src/lib/queryKeys.ts` — imported by **43** files
+- `server/activity-log.ts` — imported by **38** files
+- `server/db/stmt-cache.ts` — imported by **37** files
+- `server/db/json-validation.ts` — imported by **36** files
+- `shared/types/analytics.ts` — imported by **36** files
+- `tests/integration/helpers.ts` — imported by **33** files
+- `server/broadcast.ts` — imported by **31** files
+- `server/data-dir.ts` — imported by **30** files
+- `server/helpers.ts` — imported by **29** files
+- `shared/types/content.ts` — imported by **29** files
+- `server/openai-helpers.ts` — imported by **28** files
+- `server/analytics-insights-store.ts` — imported by **26** files
+- `server/workspace-data.ts` — imported by **26** files
+
+## Import Map (who imports what)
+
+- `server/workspace-intelligence.ts` ← `server/admin-chat-context.ts`, `server/aeo-page-review.ts`, `server/anomaly-detection.ts`, `server/churn-signals.ts`, `server/content-decay.ts` +134 more
+- `server/logger.ts` ← `server/admin-chat-context.ts`, `server/aeo-page-review.ts`, `server/ai-deduplication.ts`, `server/alttext.ts`, `server/analytics-intelligence.ts` +126 more
+- `server/workspaces.ts` ← `server/admin-chat-context.ts`, `server/admin-chat-context.ts`, `server/ai-context-check.ts`, `server/analytics-intelligence.ts`, `server/anomaly-detection.ts` +122 more
+- `src/api/client.ts` ← `src/App.tsx`, `src/api/analytics.ts`, `src/api/content.ts`, `src/api/index.ts`, `src/api/intelligence.ts` +83 more
+- `src/components/ui/index.ts` ← `src/components/AeoReview.tsx`, `src/components/AnalyticsAnnotations.tsx`, `src/components/AnalyticsHub.tsx`, `src/components/AnalyticsOverview.tsx`, `src/components/Annotations.tsx` +81 more
+- `server/db/index.ts` ← `scripts/diagnose-h1.ts`, `server/activity-log.ts`, `server/analytics-annotations.ts`, `server/analytics-insights-store.ts`, `server/analytics-intelligence.ts` +70 more
+- `server/auth.ts` ← `server/app.ts`, `server/middleware.ts`, `server/routes/aeo-review.ts`, `server/routes/annotations.ts`, `server/routes/anomalies.ts` +47 more
+- `src/lib/queryKeys.ts` ← `src/components/AssetBrowser.tsx`, `src/components/ContentPipeline.tsx`, `src/components/KeywordStrategy.tsx`, `src/components/LlmsTxtGenerator.tsx`, `src/components/admin/ActionQueue.tsx` +38 more
+- `server/activity-log.ts` ← `server/anomaly-detection.ts`, `server/churn-signals.ts`, `server/content-subscriptions.ts`, `server/feedback.ts`, `server/intelligence-crons.ts` +33 more
+- `server/db/stmt-cache.ts` ← `server/activity-log.ts`, `server/analytics-annotations.ts`, `server/analytics-insights-store.ts`, `server/annotations.ts`, `server/anomaly-detection.ts` +32 more
+
+---
+
+_Generated by [codesight](https://github.com/Houseofmvps/codesight) — see your codebase clearly_
