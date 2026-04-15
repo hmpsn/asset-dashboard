@@ -7,6 +7,9 @@
  */
 import { type RequestHandler } from 'express';
 import { type ZodType } from 'zod';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('validate');
 
 export { z } from 'zod';
 
@@ -24,6 +27,7 @@ export function validate(schema: ZodType): RequestHandler {
         path: issue.path.join('.'),
         message: issue.message,
       }));
+      log.warn({ path: req.path, issues }, 'Request body validation failed');
       return res.status(400).json({ error: issues[0].message, errors: issues });
     }
     // Replace body with parsed+transformed output (strips unknown keys, applies defaults, etc.)
