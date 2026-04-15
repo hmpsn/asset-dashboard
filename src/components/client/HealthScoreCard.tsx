@@ -8,9 +8,10 @@ interface HealthScoreCardProps {
 
 export function HealthScoreCard({ score }: HealthScoreCardProps) {
   if (score == null) return null;
+  const rounded = Math.round(score);
 
   const label =
-    score >= 80
+    rounded >= 80
       ? 'Your site is performing well across key SEO signals.'
       : score >= 60
         ? 'Your site has room for improvement in some areas.'
@@ -19,11 +20,11 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
   return (
     <SectionCard title="SEO Health Score">
       <div className="flex items-center gap-6">
-        <MetricRing score={score} size={100} />
+        <MetricRing score={rounded} size={100} />
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-baseline gap-2">
-            <span className={`text-3xl font-bold ${scoreColorClass(score)}`}>
-              {score}
+            <span className={`text-3xl font-bold ${scoreColorClass(rounded)}`}>
+              {rounded}
             </span>
             <span className="text-sm text-zinc-500">/ 100</span>
           </div>
