@@ -979,6 +979,35 @@ A comprehensive value assessment of every feature in the platform — **298 feat
 
 ---
 
+### 81. Composite Health Score Dashboard
+
+**Status:** Shipped (PR 2 — Platform Health Sprint)
+**What it does:** Surfaces the composite health score (0-100, weighted: 40% churn risk + 30% ROI trend + 30% engagement) in both admin and client views. Admin: health badge next to workspace name in WorkspaceHome. Client: prominent HealthScoreCard at top of OverviewTab with score, contextual message, and legend.
+**Files:** `src/components/admin/WorkspaceHealthBadge.tsx`, `src/components/client/HealthScoreCard.tsx`, `src/components/WorkspaceHome.tsx` (wiring), `src/components/client/OverviewTab.tsx` (wiring), `shared/types/intelligence.ts` (ClientIntelligence), `server/routes/client-intelligence.ts` (endpoint)
+**Agency value:** At-a-glance workspace health for admin triage. Client-facing "credit score for SEO" builds trust and urgency.
+**Client value:** Clients see a single number representing their SEO health, with plain-language explanation of what it means.
+
+---
+
+### 82. Prediction Showcase Card (weCalledIt)
+
+**Status:** Shipped (PR 2 — Platform Health Sprint)
+**What it does:** Client-facing card that showcases predictions that came true — "We predicted X would happen, and it did." Shows top 5 strongest predictions with outcome text and confirmation date. Empty state encourages patience while building track record.
+**Files:** `src/components/client/PredictionShowcaseCard.tsx`, `src/components/client/OverviewTab.tsx` (wiring), `shared/types/intelligence.ts` (ClientIntelligence.weCalledIt), `server/routes/client-intelligence.ts` (endpoint)
+**Agency value:** Demonstrates strategy accuracy to clients, reducing churn and building trust.
+**Client value:** Clients see concrete proof that recommendations are working — builds confidence in the agency relationship.
+
+---
+
+### 83. Cannibalization Warning Alerts
+
+**Status:** Shipped (PR 2 — Platform Health Sprint)
+**What it does:** Admin-facing alert in ContentPipeline that shows keyword cannibalization warnings — when multiple pages compete for the same keyword. Color-coded by severity (red/amber/blue), tier-gated (Growth+), shows affected keywords and competing page paths.
+**Files:** `src/components/admin/CannibalizationAlert.tsx`, `src/components/ContentPipeline.tsx` (wiring)
+**Agency value:** Proactive detection of keyword competition between client pages, enabling consolidation recommendations.
+
+---
+
 ## Future Additions
 
 Items to revisit as budget/tier upgrades allow or when priorities shift.

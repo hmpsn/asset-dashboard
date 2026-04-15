@@ -4,6 +4,9 @@ import {
 } from 'lucide-react';
 import { MonthlyDigest } from './MonthlyDigest';
 import { IntelligenceSummaryCard } from './IntelligenceSummaryCard';
+import { HealthScoreCard } from './HealthScoreCard';
+import { PredictionShowcaseCard } from './PredictionShowcaseCard';
+import { useClientIntelligence } from '../../hooks/client';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
 import { StatCard, MetricRing } from '../ui';
@@ -84,6 +87,8 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
+  const tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
+  const { data: clientIntel } = useClientIntelligence(workspaceId);
   // Derive a dynamic subtitle from the most significant data signal
   const dynamicSubtitle = (() => {
     if (ga4Comparison) {
@@ -108,6 +113,9 @@ export function OverviewTab({
       <h2 className="text-xl font-semibold text-zinc-100">Welcome back{clientUser ? `, ${clientUser.name.split(' ')[0]}` : ''}</h2>
       <p className="text-sm text-zinc-500 mt-1 leading-relaxed">{dynamicSubtitle}</p>
     </div>
+
+    {/* Headline health score */}
+    <HealthScoreCard score={clientIntel?.compositeHealthScore} tier={tier} />
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
@@ -283,6 +291,9 @@ export function OverviewTab({
       <IntelligenceSummaryCard workspaceId={workspaceId} tier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'} />
     </ErrorBoundary>
     )}
+
+    {/* Predictions that came true */}
+    <PredictionShowcaseCard predictions={clientIntel?.weCalledIt} />
 
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

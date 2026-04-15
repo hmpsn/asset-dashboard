@@ -12,8 +12,10 @@ import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
+import { CannibalizationAlert } from './admin/CannibalizationAlert';
 import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
+import { useWorkspaceIntelligence } from '../hooks/admin';
 import type { FixContext } from '../App';
 
 const ContentPlanner = lazyWithRetry(() => import('./ContentPlanner').then(m => ({ default: m.ContentPlanner })));
@@ -71,6 +73,9 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
   // React Query hook replaces manual data fetching
   const { data: pipelineData } = useContentPipeline(workspaceId);
+
+  // Intelligence layer — cannibalization warnings
+  const { data: intel } = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
 
   // Invalidate AI suggested briefs when intelligence signals update
   useWorkspaceEvents(workspaceId, {
@@ -162,6 +167,12 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
           </button>
         </div>
       )}
+
+      {/* Cannibalization warnings from intelligence */}
+      <CannibalizationAlert
+        warnings={intel?.contentPipeline?.cannibalizationWarnings}
+        tier="premium"
+      />
 
       {/* AI-suggested briefs from insight engine */}
       <AiSuggested workspaceId={workspaceId} onCreateBrief={handleCreateBrief} />

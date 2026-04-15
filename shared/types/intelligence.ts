@@ -302,6 +302,10 @@ export interface ClientIntelligence {
   learningHighlights?: ClientLearningHighlights | null;
   rankTrackingSummary?: RankTrackingSummary | null;
   serpOpportunities?: number | null;
+  /** Composite health score (0-100). Weighted: 40% churn + 30% ROI + 30% engagement. */
+  compositeHealthScore?: number | null;
+  /** Predictions that came true — strongest wins from outcome tracking. */
+  weCalledIt?: WeCalledItEntry[];
 
   // Premium only
   siteHealthSummary?: ClientSiteHealthSummary | null;

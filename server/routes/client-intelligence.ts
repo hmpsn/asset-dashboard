@@ -127,10 +127,10 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
 
   const tier = (ws.tier ?? 'free') as 'free' | 'growth' | 'premium';
 
-  const slices: Array<'insights' | 'contentPipeline' | 'learnings' | 'siteHealth' | 'seoContext'> = [
+  const slices: Array<'insights' | 'contentPipeline' | 'learnings' | 'siteHealth' | 'seoContext' | 'clientSignals'> = [
     'insights',
     'contentPipeline',
-    ...(tier !== 'free' ? (['learnings', 'seoContext'] as const) : []),
+    ...(tier !== 'free' ? (['learnings', 'seoContext', 'clientSignals'] as const) : []),
     ...(tier === 'premium' ? (['siteHealth'] as const) : []),
   ];
 
@@ -147,6 +147,8 @@ router.get('/api/public/intelligence/:workspaceId', async (req, res) => {
         learningHighlights: intel.learnings ? formatLearningsForClient(intel.learnings) : null,
         rankTrackingSummary: intel.seoContext ? formatRankTrackingForClient(intel.seoContext) : null,
         serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
+        compositeHealthScore: intel.clientSignals?.compositeHealthScore ?? null,
+        weCalledIt: intel.learnings?.weCalledIt ?? [],
       }),
       ...(tier === 'premium' && {
         siteHealthSummary: intel.siteHealth ? formatSiteHealthForClient(intel.siteHealth) : null,

@@ -555,6 +555,36 @@
           "priority": "P1",
           "notes": "CmsEditor UI/UX is noticeably rougher than the clean static-page SeoEditor. Redesign to match: consistent card layout, inline field editing, clear save/publish flow, per-collection grouping with search/filter. Consider shared editing primitives between CmsEditor and SeoEditor to prevent future drift.",
           "status": "pending"
+        },
+        {
+          "id": 588,
+          "title": "Composite Health Score Dashboard — admin badge + client card",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "3-5h",
+          "priority": "P1",
+          "notes": "Shipped — compositeHealthScore (0-100, 40% churn + 30% ROI + 30% engagement) surfaced in admin WorkspaceHome (badge next to workspace name) and client OverviewTab (HealthScoreCard with MetricRing, contextual messaging, legend). Wired into ClientIntelligence type + endpoint for Growth+ tiers. Feature #81.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 589,
+          "title": "Prediction Showcase Card (weCalledIt) — client dashboard",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "2-4h",
+          "priority": "P1",
+          "notes": "Shipped — PredictionShowcaseCard shows top 5 predictions that came true from outcome tracking. Wired into ClientIntelligence.weCalledIt for Growth+ tiers. Empty state with Trophy icon when no predictions yet. Feature #82.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
+        },
+        {
+          "id": 590,
+          "title": "Cannibalization Warning Alerts — admin content pipeline",
+          "source": "Platform Health Sprint PR2 (2026-04-14)",
+          "est": "2-3h",
+          "priority": "P1",
+          "notes": "Shipped — CannibalizationAlert component in ContentPipeline with severity-based color coding (red/amber/blue for high/medium/low), TierGate for Growth+. Shows affected keywords and competing page paths. Feature #83.",
+          "status": "done",
+          "shippedAt": "2026-04-14"
         }
       ]
     },
