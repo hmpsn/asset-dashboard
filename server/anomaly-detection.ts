@@ -225,6 +225,9 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * Exported for testing — not intended for direct use outside this module.
  */
 export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
+  // Respect the feature flag — if boost behavior is disabled, skip reversal too
+  if (!isFeatureEnabled('bridge-anomaly-boost')) return 0;
+
   // Only consider anomalies detected within the last 24h — older undismissed anomalies
   // are stale and should not keep boosts alive indefinitely.
   // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL).
@@ -262,6 +265,7 @@ export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
         impactScore: adjustedScore,
         domain: insight.domain,
         bridgeSource: insight.bridgeSource,
+        resolutionSource: insight.resolutionSource,
       });
       reversed++;
     }
