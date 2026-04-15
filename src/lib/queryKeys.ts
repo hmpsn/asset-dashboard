@@ -86,6 +86,12 @@ export const queryKeys = {
     copyBatch: (wsId: string, batchId: string) => ['admin-copy-batch', wsId, batchId] as const,
     copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
 
+    // Diagnostics
+    diagnostics: (wsId: string) => ['admin-diagnostics', wsId] as const,
+    diagnosticDetail: (wsId: string, reportId: string) => ['admin-diagnostics', wsId, reportId] as const,
+    diagnosticForInsight: (wsId: string, insightId: string) => ['admin-diagnostic-for-insight', wsId, insightId] as const,
+    diagnosticForInsightAll: (wsId: string) => ['admin-diagnostic-for-insight', wsId] as const,
+
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
     cmsCollections: (siteId: string) => ['cms-collections', siteId] as const,
