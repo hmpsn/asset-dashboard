@@ -56,7 +56,7 @@ export const addCommentSchema = z.object({
 export const fromAuditSchema = z.object({
   pageSlug: z.string().min(1, 'pageSlug is required').max(200),
   pageName: z.string().min(1, 'pageName is required').max(200),
-  issues: z.array(z.string().max(300)).optional().default([]),
+  issues: z.array(z.string().max(300)).max(50).optional().default([]),
   wordCount: z.number().optional(),
 });
 

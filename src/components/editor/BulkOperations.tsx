@@ -37,6 +37,7 @@ export interface BulkOperationsProps {
   onApplyBulkRewrite: () => void;
   onBulkAiRewrite: (field: 'title' | 'description' | 'both') => void;
   onClearPreview: () => void;
+  onCancelRewrite?: () => void;
 }
 
 export function BulkOperations({
@@ -44,6 +45,7 @@ export function BulkOperations({
   bulkPreview, bulkProgress, bulkSource, pages,
   onSelectAll, onSetBulkField, onSetBulkMode, onSetPatternAction, onSetPatternText,
   onPreviewPattern, onApplyPattern, onApplyBulkRewrite, onBulkAiRewrite, onClearPreview,
+  onCancelRewrite,
 }: BulkOperationsProps) {
   return (
     <>
@@ -173,6 +175,9 @@ export function BulkOperations({
               </div>
             )}
           </div>
+          {onCancelRewrite && (
+            <button onClick={onCancelRewrite} className="text-[11px] text-red-400 hover:text-red-300">Cancel</button>
+          )}
         </div>
       )}
     </>

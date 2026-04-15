@@ -946,6 +946,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         onSetPatternText={setPatternText} onPreviewPattern={previewPattern}
         onApplyPattern={applyPattern} onApplyBulkRewrite={applyBulkRewrite}
         onBulkAiRewrite={bulkAiRewrite}
+        onCancelRewrite={() => { if (bulkRewriteJobId) { cancelJob(bulkRewriteJobId); setBulkRewriteJobId(null); } setBulkMode('idle'); setBulkProgress({ done: 0, total: 0 }); }}
         onClearPreview={() => { setBulkMode('idle'); setBulkPreview([]); }}
       />
 

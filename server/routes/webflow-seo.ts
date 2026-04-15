@@ -1306,6 +1306,17 @@ IMPORTANT: Return ONLY valid JSON.`;
             log.debug({ err, pageId: page.pageId }, 'bulk-analyze: expected error — AI returned invalid JSON, skipping');
             failed++;
             done++;
+            updateJob(job.id, {
+              progress: done,
+              message: `Analyzed ${done}/${pages.length} pages${failed > 0 ? ` (${failed} failed)` : ''}...`,
+            });
+            broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_PROGRESS, {
+              jobId: job.id,
+              operation: 'bulk-analyze',
+              done,
+              total: pages.length,
+              failed,
+            });
             continue;
           }
 
@@ -1439,7 +1450,6 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
       }
 
       const inlineBrandName = getBrandName(ws);
-      const resolvedWsId = workspaceId;
       const isBothMode = field === 'both';
       const maxLen = field === 'description' ? 160 : 60;
       const CONCURRENCY = 3;
@@ -1479,7 +1489,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
       }
 
       // Pre-assemble workspace-level seoContext once
-      const wsIntelRw = await buildWorkspaceIntelligence(resolvedWsId, { slices: ['seoContext'] });
+      const wsIntelRw = await buildWorkspaceIntelligence(workspaceId, { slices: ['seoContext'] });
       const wsRwSeo = wsIntelRw.seoContext;
 
       const suggestions: SeoSuggestion[] = [];
@@ -1565,11 +1575,11 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
             const oldDesc = page.currentDescription || '';
             const prompt = `Write 3 paired SEO title + meta description sets for "${page.title}". Current title: "${oldTitle}". Current description: "${oldDesc}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}\n\nRules:\n- TITLE: 50-60 chars (NEVER exceed 60). Front-load primary keyword.\n- DESCRIPTION: 150-160 chars (NEVER exceed 160).\n- Each pair must take a different angle${locationRule}\n\nReturn ONLY a JSON array of 3 objects with "title" and "description" keys.`;
             const aiText = await callCreativeAI({
-              systemPrompt: buildSystemPrompt(resolvedWsId, 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 objects with "title" and "description" keys.'),
+              systemPrompt: buildSystemPrompt(workspaceId, 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 objects with "title" and "description" keys.'),
               userPrompt: prompt,
               maxTokens: 800,
               feature: 'seo-bulk-rewrite-both',
-              workspaceId: resolvedWsId,
+              workspaceId,
             });
             let pairs: Array<{ title: string; description: string }>;
             try {
@@ -1587,12 +1597,12 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
             if (!pairs.length) return null;
             while (pairs.length < 3) pairs.push(pairs[0]);
             const titleSugg = saveSuggestion({
-              workspaceId: resolvedWsId, siteId, pageId: page.pageId,
+              workspaceId, siteId, pageId: page.pageId,
               pageTitle: page.title, pageSlug: page.slug || '',
               field: 'title', currentValue: oldTitle, variations: pairs.map(p => p.title),
             });
             const descSugg = saveSuggestion({
-              workspaceId: resolvedWsId, siteId, pageId: page.pageId,
+              workspaceId, siteId, pageId: page.pageId,
               pageTitle: page.title, pageSlug: page.slug || '',
               field: 'description', currentValue: oldDesc, variations: pairs.map(p => p.description),
             });
@@ -1605,11 +1615,11 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
             ? `Write 3 meta descriptions (150-160 chars) for "${page.title}". Current: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}${locationRule}\nReturn ONLY a JSON array of 3 strings.`
             : `Write 3 SEO titles (50-60 chars) for "${page.title}". Current: "${oldValue}".${contentSection}${keywordBlock}${bvBlock}${rwExtraContext}${brandNote}${locationRule}\nReturn ONLY a JSON array of 3 strings.`;
           const aiText = await callCreativeAI({
-            systemPrompt: buildSystemPrompt(resolvedWsId, 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 strings.'),
+            systemPrompt: buildSystemPrompt(workspaceId, 'You are an elite SEO copywriter. Return ONLY a valid JSON array of 3 strings.'),
             userPrompt: prompt,
             maxTokens: 400,
             feature: 'seo-bulk-rewrite',
-            workspaceId: resolvedWsId,
+            workspaceId,
           });
           let variations: string[];
           try {
@@ -1625,7 +1635,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
           if (!variations.length) return null;
           while (variations.length < 3) variations.push(variations[0]);
           const suggestion = saveSuggestion({
-            workspaceId: resolvedWsId, siteId, pageId: page.pageId,
+            workspaceId, siteId, pageId: page.pageId,
             pageTitle: page.title, pageSlug: page.slug || '',
             field: field as 'title' | 'description', currentValue: oldValue, variations,
           });
@@ -1661,7 +1671,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
 
       updateJob(job.id, {
         status: 'done',
-        progress: pages.length,
+        progress: done,
         message: `Generated ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
         result: { suggestions: suggestions.length, failed, total: pages.length, field },
       });
@@ -1700,6 +1710,8 @@ const bulkAcceptFixesSchema = z.object({
     check: z.string().min(1),
     suggestedFix: z.string().min(1),
     message: z.string().optional(),
+    pageSlug: z.string().optional(),
+    pageName: z.string().optional(),
   })).min(1).max(500),
 });
 
@@ -1761,12 +1773,14 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesS
                 updatePageState(ws.id, fix.pageId, {
                   status: 'live', source: 'audit', fields: [changedField], updatedBy: 'admin',
                 });
-                recordSeoChange(ws.id, fix.pageId, '', '', [changedField], 'audit-fix');
+                recordSeoChange(ws.id, fix.pageId, fix.pageSlug || '', fix.pageName || '', [changedField], 'audit-fix');
               }
             }
-            done++;
+          } else {
+            // Unrecognized check type — skip Webflow update but still count progress
+            log.debug({ pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: unrecognized check type, skipping');
           }
-          // Unrecognized check types are silently skipped (no Webflow update, not counted as done or failed)
+          done++;
         } catch (err) {
           log.error({ err, pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: fix failed');
           failed++;
@@ -1789,7 +1803,7 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesS
 
       updateJob(job.id, {
         status: 'done',
-        progress: fixes.length,
+        progress: done,
         message: `Applied ${done - failed}/${fixes.length} fixes${failed > 0 ? ` (${failed} failed)` : ''}`,
         result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
       });
