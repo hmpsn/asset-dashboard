@@ -614,8 +614,16 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           const cannibalizationMatch = pageKeyword
             ? cannibalizationWarnings.find(w => w.keyword.toLowerCase().trim() === pageKeyword)
             : undefined;
-          const cannibalizationBlock = cannibalizationMatch
-            ? `\nKEYWORD CANNIBALIZATION WARNING:\nThe primary keyword "${cannibalizationMatch.keyword}" is also targeted by ${cannibalizationMatch.pages.length - 1} other page(s): ${cannibalizationMatch.pages.filter(p => p !== pageResult.url).join(', ')}. Severity: ${cannibalizationMatch.severity}.\nDo NOT suggest optimizing this page to rank harder for the same keyword as its siblings — that worsens cannibalization. Instead, recommend in the meta description that this page targets a differentiated angle or sub-topic, and recommend consolidation if appropriate.\n`
+          // Filter sibling pages: exclude this page's own path (pagePath is a pathname like /about,
+          // matching the format stored in cannibalizationWarnings[].pages) and exclude matrix cell
+          // UUIDs that carry no page identity.
+          const siblingPages = cannibalizationMatch
+            ? cannibalizationMatch.pages.filter(p =>
+                p !== pagePath && !p.match(/^[0-9a-f-]{36}$/)
+              )
+            : [];
+          const cannibalizationBlock = cannibalizationMatch && siblingPages.length > 0
+            ? `\nKEYWORD CANNIBALIZATION WARNING:\nThe primary keyword "${cannibalizationMatch.keyword}" is also targeted by ${siblingPages.length} other page(s): ${siblingPages.join(', ')}. Severity: ${cannibalizationMatch.severity}.\nDo NOT suggest optimizing this page to rank harder for the same keyword as its siblings — that worsens cannibalization. Instead, recommend in the meta description that this page targets a differentiated angle or sub-topic, and recommend consolidation if appropriate.\n`
             : '';
 
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.

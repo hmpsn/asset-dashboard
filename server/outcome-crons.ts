@@ -76,41 +76,54 @@ export function startOutcomeCrons() {
       // Check action backlog thresholds per workspace.
       // Alert when pending count exceeds ACTION_BACKLOG_THRESHOLD or the oldest
       // pending item is older than ACTION_AGE_THRESHOLD_DAYS days.
+      // Groups the already-fetched getPendingActions() data by workspaceId to avoid
+      // redundant per-workspace DB queries (getWorkspaceCounts + getActionsByWorkspace).
       try {
-        const { getWorkspaceCounts, getActionsByWorkspace, getPendingActions: getPending }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
-        const { addActivity }: typeof ActivityLog = await import('./activity-log.js'); // dynamic-import-ok
-        const allPendingWsIds = [...new Set(getPending().map(a => a.workspaceId))];
+        const { getPendingActions }: typeof OutcomeTracking = await import('./outcome-tracking.js'); // dynamic-import-ok
+        const { addActivity, countActivityByType }: typeof ActivityLog = await import('./activity-log.js'); // dynamic-import-ok
+        const allPending = getPendingActions();
         const nowMs = Date.now();
         const ageThresholdMs = ACTION_AGE_THRESHOLD_DAYS * DAILY_MS;
 
-        for (const wsId of allPendingWsIds) {
-          const counts = getWorkspaceCounts(wsId);
-          if (counts.pending === 0) continue;
+        // Group pending actions by workspaceId — single pass, no per-workspace DB queries.
+        const pendingByWs = new Map<string, (typeof allPending)[number][]>();
+        for (const action of allPending) {
+          const group = pendingByWs.get(action.workspaceId) ?? [];
+          group.push(action);
+          pendingByWs.set(action.workspaceId, group);
+        }
 
-          // Find the age of the oldest pending action (measurement_complete = false)
-          const actions = getActionsByWorkspace(wsId);
-          const pendingActions = actions.filter(a => !a.measurementComplete);
+        for (const [wsId, wsPending] of pendingByWs) {
+          const pendingActions = wsPending.filter(a => !a.measurementComplete);
+          const pendingCount = pendingActions.length;
+          if (pendingCount === 0) continue;
+
+          // Find the age of the oldest pending action
           const oldestMs = pendingActions.reduce((min, a) => {
             const t = new Date(a.createdAt).getTime();
             return t < min ? t : min;
           }, Infinity);
           const oldestAgeDays = isFinite(oldestMs) ? Math.floor((nowMs - oldestMs) / DAILY_MS) : 0;
 
-          const countBreached = counts.pending >= ACTION_BACKLOG_THRESHOLD;
+          const countBreached = pendingCount >= ACTION_BACKLOG_THRESHOLD;
           const ageBreached = isFinite(oldestMs) && (nowMs - oldestMs) >= ageThresholdMs;
 
           if (countBreached || ageBreached) {
             log.warn(
-              { workspaceId: wsId, pendingCount: counts.pending, oldestAgeDays, countBreached, ageBreached },
+              { workspaceId: wsId, pendingCount, oldestAgeDays, countBreached, ageBreached },
               'Action backlog threshold exceeded',
             );
-            addActivity(
-              wsId,
-              'action_backlog_alert',
-              'Action backlog threshold exceeded',
-              `${counts.pending} pending action(s); oldest is ${oldestAgeDays} day(s) old.`,
-              { pendingCount: counts.pending, oldestAgeDays, countBreached, ageBreached },
-            );
+            // Deduplicate: only fire the alert if no alert was sent in the last 7 days.
+            const recentAlerts = countActivityByType(wsId, 'action_backlog_alert', 7);
+            if (recentAlerts === 0) {
+              addActivity(
+                wsId,
+                'action_backlog_alert',
+                'Action backlog threshold exceeded',
+                `${pendingCount} pending action(s); oldest is ${oldestAgeDays} day(s) old.`,
+                { pendingCount, oldestAgeDays, countBreached, ageBreached },
+              );
+            }
           }
         }
       } catch (alertErr) {
