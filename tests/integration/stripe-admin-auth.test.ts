@@ -52,6 +52,12 @@ async function startGatedServer(): Promise<void> {
       PORT: String(GATED_PORT),
       NODE_ENV: 'test',
       APP_PASSWORD: TEST_APP_PASSWORD,
+      // Pin SESSION_SECRET so EXPECTED_HMAC_TOKEN derivation stays deterministic
+      // regardless of whether the host env has SESSION_SECRET set. Without this,
+      // signAdminToken() would use whatever SESSION_SECRET is in the host env
+      // (production-like CI, another dev's shell) and the HMAC pass-through test
+      // would fail because the test's local derivation uses TEST_APP_PASSWORD.
+      SESSION_SECRET: TEST_APP_PASSWORD,
       JWT_SECRET: TEST_JWT_SECRET,
     },
     stdio: 'pipe',
