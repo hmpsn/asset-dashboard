@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 
-import { requireWorkspaceAccessFromQuery } from '../auth.js';
+import { requireWorkspaceAccess, requireWorkspaceAccessFromQuery } from '../auth.js';
 const router = Router();
 
 import { callOpenAI } from '../openai-helpers.js';
@@ -896,7 +896,7 @@ router.get('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
 });
 
 // --- SEO Suggestions: Select a variation ---
-router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', async (req, res) => {
+router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId, suggestionId } = req.params;
   const { selectedIndex } = req.body as { selectedIndex: number };
   if (typeof selectedIndex !== 'number' || selectedIndex < 0 || selectedIndex > 2) {
@@ -908,7 +908,7 @@ router.patch('/api/webflow/seo-suggestions/:workspaceId/:suggestionId', async (r
 });
 
 // --- SEO Suggestions: Apply selected suggestions to Webflow ---
-router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) => {
+router.post('/api/webflow/seo-suggestions/:workspaceId/apply', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { suggestionIds } = req.body as { suggestionIds?: string[] };
 
@@ -959,7 +959,7 @@ router.post('/api/webflow/seo-suggestions/:workspaceId/apply', async (req, res) 
 });
 
 // --- SEO Suggestions: Dismiss suggestions ---
-router.delete('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
+router.delete('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const { suggestionIds } = req.body as { suggestionIds?: string[] } || {};
   const dismissed = dismissSuggestions(workspaceId, suggestionIds);
@@ -1174,7 +1174,7 @@ const bulkAnalyzeSchema = z.object({
   })).min(1).max(500),
 });
 
-router.post('/api/seo/:workspaceId/bulk-analyze', validate(bulkAnalyzeSchema), async (req, res) => {
+router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('workspaceId'), validate(bulkAnalyzeSchema), async (req, res) => {
   const workspaceId = req.params.workspaceId;
   const { pages } = req.body;
   const ws = getWorkspace(workspaceId);
@@ -1414,7 +1414,7 @@ const bulkRewriteSchema = z.object({
   field: z.enum(['title', 'description', 'both']),
 });
 
-router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), async (req, res) => {
+router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('workspaceId'), validate(bulkRewriteSchema), async (req, res) => {
   const workspaceId = req.params.workspaceId;
   const { siteId, pages, field } = req.body;
   const ws = getWorkspace(workspaceId);
@@ -1715,7 +1715,7 @@ const bulkAcceptFixesSchema = z.object({
   })).min(1).max(500),
 });
 
-router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesSchema), async (req, res) => {
+router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('workspaceId'), validate(bulkAcceptFixesSchema), async (req, res) => {
   const workspaceId = req.params.workspaceId;
   const { siteId, fixes } = req.body;
   const ws = getWorkspace(workspaceId);
