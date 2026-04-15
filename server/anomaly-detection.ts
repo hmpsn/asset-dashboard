@@ -225,8 +225,11 @@ export function acknowledgeAnomaly(workspaceId: string, id: string): boolean {
  * Exported for testing — not intended for direct use outside this module.
  */
 export function reverseAnomalyBoostIfNoneRemain(workspaceId: string): number {
+  // Only consider anomalies detected within the last 24h — older undismissed anomalies
+  // are stale and should not keep boosts alive indefinitely.
+  // listAnomalies(_, false) already returns only undismissed (dismissed_at IS NULL).
   const recentForWs = listAnomalies(workspaceId, false)
-    .filter(anm => !anm.dismissedAt && Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
+    .filter(anm => Date.now() - new Date(anm.detectedAt).getTime() < 24 * 60 * 60_000);
 
   if (recentForWs.length > 0) return 0; // Still has active recent anomalies — keep boost
 

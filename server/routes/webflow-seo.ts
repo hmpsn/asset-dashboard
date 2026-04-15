@@ -107,7 +107,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         return { modified: resolved };
       });
 
-      // ── Bridge #12: Audit → page_health insights (refresh stale data) ──
+      // ── Bridge: Audit → audit_finding insights for pages with critical/warning issues ──
       fireBridge('bridge-audit-page-health', auditWs.id, async () => {
         const { upsertInsight: upsert, getInsights: fetchInsights }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
         const existing = fetchInsights(auditWs.id);

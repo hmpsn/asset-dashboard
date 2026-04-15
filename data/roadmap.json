@@ -4225,7 +4225,7 @@
           "est": "1-2h",
           "priority": "P2",
           "sprint": "E",
-          "notes": "Shipped — PR 3 Platform Health Sprint. Added bridge-audit-page-health trigger after on-demand audit completion. Upserts new audit_finding insights for pages with critical/warning issues, deduplicating against existing unresolved findings.",
+          "notes": "Shipped — PR 3 Platform Health Sprint. Added bridge-audit-page-health trigger after on-demand audit completion. Creates new audit_finding insights for pages with critical/warning issues. Dedup skips pages with existing unresolved findings (does NOT refresh issue data for already-tracked pages — future enhancement).",
           "status": "done",
           "shippedAt": "2026-04-15"
         },
