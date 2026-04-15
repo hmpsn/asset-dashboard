@@ -63,17 +63,19 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
   const [declineReason, setDeclineReason] = useState<{ keyword: string; source: string } | null>(null);
   const [declineReasonText, setDeclineReasonText] = useState('');
+  const [feedbackLoadError, setFeedbackLoadError] = useState(false);
 
   // Load existing feedback on mount
   useEffect(() => {
     if (!workspaceId) return;
+    setFeedbackLoadError(false);
     kwFeedbackApi.get(workspaceId)
       .then((items) => {
         const map = new Map<string, 'approved' | 'declined' | 'requested'>();
         for (const item of items as KeywordFeedback[]) map.set(item.keyword, item.status);
         setKeywordFeedback(map);
       })
-      .catch(() => { /* silent */ });
+      .catch(() => { setFeedbackLoadError(true); });
   }, [workspaceId]);
 
   const submitFeedback = useCallback(async (keyword: string, status: 'approved' | 'declined', source: string, reason?: string) => {
@@ -145,6 +147,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [trackedKeywords, setTrackedKeywords] = useState<{ query: string; pinned: boolean; addedAt: string }[]>([]);
   const [newTrackedKeyword, setNewTrackedKeyword] = useState('');
   const [addingKeyword, setAddingKeyword] = useState(false);
+  const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
 
   // Load business priorities + tracked keywords on mount
   useEffect(() => {
@@ -156,11 +159,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       })
       .catch(() => setPrioritiesLoaded(true));
 
+    setTrackedKeywordsError(false);
     trackedKwApi.get(workspaceId)
       .then((data) => {
         setTrackedKeywords(data.keywords || []);
       })
-      .catch(() => { /* silent */ });
+      .catch(() => { setTrackedKeywordsError(true); });
   }, [workspaceId]);
 
   const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
@@ -1062,6 +1066,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   </div>
                 ) : null;
               })()}
+              {/* Tracked keywords load error */}
+              {trackedKeywordsError && (
+                <p className="text-[11px] text-red-400/80 mb-2">
+                  Couldn't load your tracked keywords. Try refreshing if they're missing.
+                </p>
+              )}
+
               {/* Add keyword input */}
               {workspaceId && (
                 <form
@@ -1101,6 +1112,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 </form>
               )}
             </div>
+
+            {/* Keyword feedback load error */}
+            {feedbackLoadError && (
+              <p className="text-[11px] text-red-400/80 mb-2">
+                Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly. Try refreshing.
+              </p>
+            )}
 
             {/* Page Performance Map */}
             <PageKeywordMapContent

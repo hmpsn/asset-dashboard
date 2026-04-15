@@ -63,7 +63,9 @@ export function ContentTab({
           setContentPerf(map);
         }
       })
-      .catch((err) => { console.error('ContentTab operation failed:', err); });
+      .catch(() => {
+        setToast({ message: "Couldn't load content performance data. It'll retry on next visit.", type: 'error' });
+      });
   }, [workspaceId, contentRequests]);
 
   // ── Content-specific API functions + interaction state (extracted hook) ──
