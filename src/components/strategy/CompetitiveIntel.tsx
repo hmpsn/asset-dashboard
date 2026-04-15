@@ -56,6 +56,8 @@ interface Props {
   workspaceId: string;
   competitors: string[];
   semrushAvailable: boolean;
+  /** Keyword gaps from the stored strategy — used as fallback when the live API call fails or returns empty */
+  cachedKeywordGaps?: KeywordGap[];
 }
 
 function fmtNum(n: number): string {
@@ -88,7 +90,7 @@ function ComparisonBar({ myVal, theirVal, label }: { myVal: number; theirVal: nu
   );
 }
 
-export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }: Props) {
+export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, cachedKeywordGaps }: Props) {
   const [data, setData] = useState<IntelResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +158,10 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
     );
   }
 
-  if (error) {
+  // When the live API errors or returns no data, fall back to cached keyword gaps from the strategy blob
+  const effectiveGaps = (data?.keywordGaps?.length ? data.keywordGaps : cachedKeywordGaps) ?? [];
+
+  if (error && effectiveGaps.length === 0) {
     return (
       <SectionCard>
         <div className="text-center py-6">
@@ -167,10 +172,10 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
     );
   }
 
-  if (!data) return null;
+  if (!data && effectiveGaps.length === 0) return null;
 
-  const myDomain = data.domains.find(d => d.isOwn);
-  const compDomains = data.domains.filter(d => !d.isOwn);
+  const myDomain = data?.domains.find(d => d.isOwn);
+  const compDomains = data?.domains.filter(d => !d.isOwn) ?? [];
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => {
@@ -265,7 +270,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
       })}
 
       {/* Keyword Gaps */}
-      {data.keywordGaps.length > 0 && (
+      {effectiveGaps.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 overflow-hidden" style={{ borderRadius: '10px 24px 10px 24px' }}>
           <button
             onClick={() => toggleExpand('gaps')}
@@ -274,13 +279,13 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
             {expanded.has('gaps') ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
             <Target className="w-4 h-4 text-amber-400" />
             <span className="text-sm font-medium text-zinc-200 flex-1 text-left">Keyword Gaps</span>
-            <span className="text-[11px] text-zinc-500">{data.keywordGaps.length} opportunities</span>
+            <span className="text-[11px] text-zinc-500">{effectiveGaps.length} opportunities</span>
           </button>
           {expanded.has('gaps') && (
             <div className="px-4 pb-4 border-t border-zinc-800 pt-3">
               <p className="text-[11px] text-zinc-500 mb-3">Keywords your competitors rank for that you don't — sorted by traffic potential.</p>
               <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {data.keywordGaps.map((gap, i) => (
+                {effectiveGaps.map((gap, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-zinc-950/50 rounded-lg">
                     <span className="flex-1 text-zinc-300 truncate">{gap.keyword}</span>
                     <span className="text-zinc-500 font-mono">{fmtNum(gap.volume)}/mo</span>
@@ -295,7 +300,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable }:
       )}
 
       <p className="text-[11px] text-zinc-600 text-right">
-        Data via SEMRush · Cached 48h · {data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : ''}
+        Data via SEMRush · {data ? `Cached 48h · ${data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : ''}` : 'Showing cached strategy data'}
       </p>
     </div>
   );
