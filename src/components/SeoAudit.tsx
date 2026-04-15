@@ -9,6 +9,7 @@ import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../hooks/admin';
 import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
 import { seoBulkJobs } from '../api/seo';
+import { queryKeys } from '../lib/queryKeys';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
 import {
@@ -102,7 +103,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to suppress issue:', err); }
     setActionMenuKey(null);
   };
@@ -111,7 +112,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     if (!workspaceId) return;
     try {
       const { suppressions: updated } = await del<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pageSlug });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to unsuppress issue:', err); }
   };
 
@@ -121,7 +122,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const pattern = `${prefix}/*`;
     try {
       const { suppressions: updated } = await post<{ suppressions: { check: string; pageSlug: string; pagePattern?: string }[] }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check, pagePattern: pattern, reason: `Pattern: ${pattern}` });
-      queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
     } catch (err) { console.error('Failed to suppress pattern:', err); }
     setActionMenuKey(null);
   };
@@ -302,7 +303,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setScheduleSaving(true);
     try {
       const updated = await put<AuditSchedule>(`/api/audit-schedules/${workspaceId}`, { enabled, intervalDays: scheduleInterval, scoreDropThreshold: scheduleThreshold });
-      queryClient.setQueryData(['admin-audit-schedule', workspaceId], updated);
+      queryClient.setQueryData(queryKeys.admin.auditSchedule(workspaceId), updated);
     } catch (err) { console.error('Failed to save schedule:', err); }
     finally { setScheduleSaving(false); }
   };
@@ -1180,7 +1181,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
             if (s.pagePattern) {
               try {
                 const { suppressions: updated } = await del<{ suppressions: typeof suppressions }>(`/api/workspaces/${workspaceId}/audit-suppressions`, { check: s.check, pagePattern: s.pagePattern });
-                queryClient.setQueryData(['admin-audit-suppressions', workspaceId], updated);
+                if (workspaceId) queryClient.setQueryData(queryKeys.admin.auditSuppressions(workspaceId), updated);
               } catch (err) { console.error('Failed to unsuppress:', err); }
             } else {
               await unsuppressIssue(s.check, s.pageSlug);

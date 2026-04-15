@@ -129,7 +129,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       }
       if (d.operation === 'bulk-rewrite' && d.jobId === bulkRewriteJobId) {
         const failed = d.failed || 0;
-        const generated = d.generated || (d.total - failed);
+        const generated = d.generated ?? (d.total - failed);
         const fieldLabel = d.field === 'both' ? 'title + description' : (d.field || 'title');
         setBulkResults(
           failed > 0

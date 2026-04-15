@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react';
 import { LoadingState } from './ui';
-import { useContentPipeline } from '../hooks/admin';
+import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
@@ -73,6 +73,10 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
 
   // React Query hook replaces manual data fetching
   const { data: pipelineData } = useContentPipeline(workspaceId);
+
+  // Workspace tier — from cached workspaces list (no extra fetch)
+  const { data: workspaces = [] } = useWorkspaces();
+  const workspaceTier = (workspaces.find(w => w.id === workspaceId)?.tier ?? 'free') as 'free' | 'growth' | 'premium';
 
   // Intelligence layer — cannibalization warnings
   const { data: intel } = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
@@ -171,7 +175,7 @@ export function ContentPipeline({ workspaceId, onRequestCountChange, fixContext,
       {/* Cannibalization warnings from intelligence */}
       <CannibalizationAlert
         warnings={intel?.contentPipeline?.cannibalizationWarnings}
-        tier="premium"
+        tier={workspaceTier}
       />
 
       {/* AI-suggested briefs from insight engine */}

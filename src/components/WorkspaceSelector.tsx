@@ -12,6 +12,7 @@ export interface Workspace {
   ga4PropertyId?: string;
   folder: string;
   createdAt: string;
+  tier?: 'free' | 'growth' | 'premium';
 }
 
 interface WebflowSite {
