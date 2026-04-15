@@ -35,7 +35,9 @@ beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Bulk Accept Failure Test');
   wsId = ws.id;
-  updateWorkspace(wsId, { webflowSiteId: SITE_ID });
+  // webflowToken must be set so getTokenForSite() passes the token guard on the route.
+  // The mock intercepts updatePageSeo before any real HTTP call is made.
+  updateWorkspace(wsId, { webflowSiteId: SITE_ID, webflowToken: 'test-token-bulk-fail' });
 }, 25_000);
 
 afterAll(() => {
