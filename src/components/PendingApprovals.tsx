@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
 import { approvals } from '../api/misc';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { queryKeys } from '../lib/queryKeys';
 import type { ApprovalBatch } from '../../shared/types/approvals';
 
 interface PendingApprovalsProps {
@@ -28,14 +28,8 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  // Live-update when client approves/rejects/applies items
-  useWorkspaceEvents(workspaceId, {
-    'approval:update': () => queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] }),
-    'approval:applied': () => queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] }),
-  });
-
   const { data: rawBatches = [], isLoading: loading } = useQuery({
-    queryKey: ['admin-approvals', workspaceId, refreshKey],
+    queryKey: [...queryKeys.admin.approvals(workspaceId), refreshKey],
     queryFn: async () => {
       const all = await approvals.list(workspaceId) as ApprovalBatch[];
       return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -51,7 +45,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
       await approvals.remove(workspaceId, batchId);
     },
     onSuccess: (_data, batchId) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-approvals', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
       setConfirmId(null);
       onRetracted?.(batchId);
     },
