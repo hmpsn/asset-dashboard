@@ -315,16 +315,12 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   // ── WebSocket handlers for background bulk accept ──
   useWorkspaceEvents(workspaceId, {
     [WS_EVENTS.BULK_OPERATION_PROGRESS]: (rawData: unknown) => {
-      const d = rawData as { jobId: string; operation: string; done: number; total: number; failed?: number; applied?: string[] };
+      const d = rawData as { jobId: string; operation: string; done: number; total: number; failed?: number; appliedKey?: string | null };
       if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
         setBulkProgress({ done: d.done, total: d.total });
-        // Mark fixes as applied in real-time via WS
-        if (d.applied?.length) {
-          setAppliedFixes(prev => {
-            const next = new Set(prev);
-            for (const key of d.applied!) next.add(key);
-            return next;
-          });
+        // Mark fix as applied in real-time via WS (one key per progress event)
+        if (d.appliedKey) {
+          setAppliedFixes(prev => new Set([...prev, d.appliedKey!]));
         }
       }
     },
@@ -373,7 +369,6 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     setBulkProgress({ done: 0, total: fixes.length });
     try {
       const { jobId } = await seoBulkJobs.bulkAcceptFixes(workspaceId, {
-        workspaceId,
         siteId,
         fixes,
       });

@@ -446,7 +446,6 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setBulkAnalyzeProgress({ done: 0, total: toAnalyze.length });
     try {
       const { jobId } = await seoBulkJobs.bulkAnalyze(workspaceId, {
-        workspaceId,
         pages: toAnalyze.map(p => ({
           pageId: p.id,
           title: p.title,
@@ -571,16 +570,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
     setBulkMode('rewriting');
     setBulkProgress({ done: 0, total: selectedIds.length });
 
-    // Auto-expand all selected pages so users can watch results appear
-    setExpanded(prev => {
-      const next = new Set(prev);
-      for (const id of selectedIds) next.add(id);
-      return next;
-    });
-
     try {
       const { jobId } = await seoBulkJobs.bulkRewrite(workspaceId, {
-        workspaceId,
         siteId,
         pages: selectedIds.map(id => {
           const page = pages.find(p => p.id === id);

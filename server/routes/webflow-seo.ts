@@ -1736,7 +1736,8 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesS
 
           if (Object.keys(fields).length > 0) {
             await updatePageSeo(fix.pageId, fields, token);
-            applied.push(`${fix.pageId}-${fix.check}`);
+            const appliedKey = `${fix.pageId}-${fix.check}`;
+            applied.push(appliedKey);
 
             // Track the change
             if (ws) {
@@ -1746,8 +1747,9 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesS
               });
               recordSeoChange(ws.id, fix.pageId, '', '', [changedField], 'audit-fix');
             }
+            done++;
           }
-          done++;
+          // Unrecognized check types are silently skipped (no Webflow update, not counted as done or failed)
         } catch (err) {
           log.error({ err, pageId: fix.pageId, check: fix.check }, 'bulk-accept-fixes: fix failed');
           failed++;
@@ -1764,7 +1766,7 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesS
           done,
           total: fixes.length,
           failed,
-          applied,
+          appliedKey: applied[applied.length - 1] ?? null,
         });
       }
 
