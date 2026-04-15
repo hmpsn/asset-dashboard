@@ -31,12 +31,14 @@ import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { getInsights } from '../analytics-insights-store.js';
+import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { validate, z } from '../middleware/validate.js';
+import { fireBridge } from '../bridge-infrastructure.js';
 
 const log = createLogger('webflow-seo');
 
@@ -59,6 +61,45 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
           updatePageState(auditWs.id, page.pageId, { status: 'issue-detected', source: 'audit', slug: page.slug, auditIssues: page.issues.map((i: { check: string }) => i.check), updatedBy: 'system' });
         }
       }
+
+      // ── Auto-resolve audit_finding insights for pages that are now clean ──
+      // When an on-demand audit re-runs and a page no longer has critical/warning
+      // issues, resolve its audit_finding insight. Same pattern as scheduled-audits
+      // bridge-audit-auto-resolve.
+      fireBridge('bridge-audit-auto-resolve', auditWs.id, async () => {
+        const { getInsights: fetchAll, resolveInsight: resolve }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
+        const allInsights = fetchAll(auditWs.id);
+        const auditFindings = allInsights.filter(
+          i => i.insightType === 'audit_finding' && i.resolutionStatus !== 'resolved',
+        );
+        if (auditFindings.length === 0) return { modified: 0 };
+
+        // Build set of page IDs that still have critical/warning issues
+        const pagesWithIssues = new Set<string>();
+        for (const page of result.pages) {
+          if (page.issues?.some((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning')) {
+            pagesWithIssues.add(page.pageId);
+          }
+        }
+
+        let resolved = 0;
+        for (const insight of auditFindings) {
+          const data = (insight.data ?? {}) as Record<string, unknown>;
+          if (data.scope === 'page' && insight.pageId && !pagesWithIssues.has(insight.pageId)) {
+            // Page is now clean — auto-resolve
+            resolve(insight.id, auditWs.id, 'resolved', 'Auto-resolved: page passed audit with no critical/warning issues', 'bridge-audit-auto-resolve');
+            resolved++;
+          } else if (data.scope === 'site' && !insight.pageId && result.siteScore >= 70) {
+            // Site score is healthy — auto-resolve site-level insight
+            resolve(insight.id, auditWs.id, 'resolved', `Auto-resolved: site health score improved to ${result.siteScore}/100`, 'bridge-audit-auto-resolve');
+            resolved++;
+          }
+        }
+        if (resolved > 0) {
+          log.info({ workspaceId: auditWs.id, resolved }, 'Auto-resolved audit_finding insights for clean pages/site (on-demand audit)');
+        }
+        return { modified: resolved };
+      });
     }
     res.json(result);
   } catch (err) {
