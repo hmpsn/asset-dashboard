@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { FixContext } from '../App';
 import { seoSuggestions, keywords, seoBulkJobs } from '../api/seo';
-import { workspaces } from '../api';
+import { workspaces, jobs } from '../api';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
 import { WS_EVENTS } from '../lib/wsEvents';
@@ -93,14 +93,54 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
   const [analyzedPages, setAnalyzedPages] = useState<Set<string>>(new Set());
   const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(null);
-  const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(null);
+  const [bulkAnalyzeJobId, setBulkAnalyzeJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-analyze-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
+  const [bulkRewriteJobId, setBulkRewriteJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-rewrite-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
   const { getState, refresh: refreshStates, summary } = usePageEditStates(workspaceId);
 
   // Sync edits/variations/expanded to sessionStorage for persistence across tab switches + refresh
   useEffect(() => { if (Object.keys(edits).length > 0) try { sessionStorage.setItem(`seo-editor-edits-${siteId}`, JSON.stringify(edits)); } catch { /* ignore */ } }, [edits, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-expanded-${siteId}`, JSON.stringify(Array.from(expanded))); } catch { /* ignore */ } }, [expanded, siteId]);
   useEffect(() => { try { sessionStorage.setItem(`seo-editor-vars-${siteId}`, JSON.stringify(variations)); } catch { /* ignore */ } }, [variations, siteId]);
+
+  // Persist active bulk job IDs so they survive remount (nav away + back)
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkAnalyzeJobId ? sessionStorage.setItem(`seo-bulk-analyze-job-${workspaceId}`, bulkAnalyzeJobId) : sessionStorage.removeItem(`seo-bulk-analyze-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkAnalyzeJobId, workspaceId]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkRewriteJobId ? sessionStorage.setItem(`seo-bulk-rewrite-job-${workspaceId}`, bulkRewriteJobId) : sessionStorage.removeItem(`seo-bulk-rewrite-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkRewriteJobId, workspaceId]);
+
+  // On remount, query server to recover progress UI for any restored job IDs
+  const mountAnalyzeJobId = useRef(bulkAnalyzeJobId);
+  const mountRewriteJobId = useRef(bulkRewriteJobId);
+  useEffect(() => {
+    const analyzeId = mountAnalyzeJobId.current;
+    const rewriteId = mountRewriteJobId.current;
+    if (!analyzeId && !rewriteId) return;
+    const TERMINAL = new Set(['done', 'error', 'cancelled']);
+    if (analyzeId) {
+      jobs.get(analyzeId)
+        .then(job => {
+          if (TERMINAL.has(job.status)) { setBulkAnalyzeJobId(null); }
+          else { setBulkAnalyzeProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+        })
+        .catch(() => setBulkAnalyzeJobId(null));
+    }
+    if (rewriteId) {
+      jobs.get(rewriteId)
+        .then(job => {
+          if (TERMINAL.has(job.status)) { setBulkRewriteJobId(null); }
+          else { setBulkMode('rewriting'); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+        })
+        .catch(() => setBulkRewriteJobId(null));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; refs capture initial values
 
   // Clear approval selection when CMS filter toggles — prevents hidden pages from being silently submitted
   useEffect(() => {

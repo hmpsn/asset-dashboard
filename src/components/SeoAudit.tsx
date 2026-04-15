@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { adminPath, type Page } from '../routes';
-import { redirects as redirectsApi } from '../api/misc';
+import { redirects as redirectsApi, jobs as jobsApi } from '../api/misc';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { useQueryClient } from '@tanstack/react-query';
 import { post, put, del, getSafe, getOptional } from '../api/client';
@@ -310,7 +310,9 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
 
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(null);
+  const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(() => {
+    try { return workspaceId ? sessionStorage.getItem(`seo-bulk-accept-job-${workspaceId}`) ?? null : null; } catch { return null; }
+  });
   const [bulkError, setBulkError] = useState<string | null>(null);
 
   // ── WebSocket handlers for background bulk accept ──
@@ -352,6 +354,26 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
       }
     },
   });
+
+  // Persist active bulk accept job ID so it survives remount (nav away + back)
+  useEffect(() => {
+    if (!workspaceId) return;
+    try { bulkAcceptJobId ? sessionStorage.setItem(`seo-bulk-accept-job-${workspaceId}`, bulkAcceptJobId) : sessionStorage.removeItem(`seo-bulk-accept-job-${workspaceId}`); } catch { /* ignore */ }
+  }, [bulkAcceptJobId, workspaceId]);
+
+  // On remount, query server to recover progress UI for any restored job ID
+  const mountAcceptJobId = useRef(bulkAcceptJobId);
+  useEffect(() => {
+    const acceptId = mountAcceptJobId.current;
+    if (!acceptId) return;
+    const TERMINAL = new Set(['done', 'error', 'cancelled']);
+    jobsApi.get(acceptId)
+      .then(job => {
+        if (TERMINAL.has(job.status)) { setBulkAcceptJobId(null); }
+        else { setBulkApplying(true); setBulkProgress({ done: job.progress ?? 0, total: job.total ?? 0 }); }
+      })
+      .catch(() => setBulkAcceptJobId(null));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only recovery; ref captures initial value
 
   const acceptAllSuggestions = async () => {
     if (!data || !workspaceId) return;
