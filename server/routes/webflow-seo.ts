@@ -887,7 +887,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
 });
 
 // --- SEO Suggestions: List pending suggestions ---
-router.get('/api/webflow/seo-suggestions/:workspaceId', async (req, res) => {
+router.get('/api/webflow/seo-suggestions/:workspaceId', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { workspaceId } = req.params;
   const field = req.query.field as 'title' | 'description' | undefined;
   const suggestions = listSuggestions(workspaceId, field);
@@ -1369,6 +1369,21 @@ IMPORTANT: Return ONLY valid JSON.`;
       // Invalidate intelligence cache so UI picks up new data
       invalidateIntelligenceCache(workspaceId);
 
+      if (ac.signal.aborted) {
+        updateJob(job.id, {
+          status: 'cancelled',
+          progress: done,
+          message: `Cancelled after ${done} pages`,
+          result: { analyzed: done - failed, failed, total: pages.length },
+        });
+        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+          jobId: job.id,
+          operation: 'bulk-analyze',
+          error: 'Cancelled',
+        });
+        return;
+      }
+
       updateJob(job.id, {
         status: 'done',
         progress: done,
@@ -1419,6 +1434,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
   const { siteId, pages, field } = req.body;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.webflowSiteId && siteId !== ws.webflowSiteId) return res.status(400).json({ error: 'siteId does not belong to this workspace' });
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
@@ -1668,6 +1684,21 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
 
       log.info(`Bulk rewrite job: ${suggestions.length} suggestions, ${failed} errors for ${pages.length} pages`);
 
+      if (ac.signal.aborted) {
+        updateJob(job.id, {
+          status: 'cancelled',
+          progress: done,
+          message: `Cancelled after ${done} pages`,
+          result: { suggestions: suggestions.length, failed, total: pages.length, field },
+        });
+        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+          jobId: job.id,
+          operation: 'bulk-rewrite',
+          error: 'Cancelled',
+        });
+        return;
+      }
+
       updateJob(job.id, {
         status: 'done',
         progress: done,
@@ -1719,6 +1750,7 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('w
   const { siteId, fixes } = req.body;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  if (ws.webflowSiteId && siteId !== ws.webflowSiteId) return res.status(400).json({ error: 'siteId does not belong to this workspace' });
 
   const existingJob = hasActiveJob('seo-bulk-accept-fixes', workspaceId);
   if (existingJob) return res.status(409).json({ error: 'A bulk accept job is already running', jobId: existingJob.id });
@@ -1798,6 +1830,21 @@ router.post('/api/seo/:workspaceId/bulk-accept-fixes', requireWorkspaceAccess('w
           failed,
           appliedKey: applied[applied.length - 1] ?? null,
         });
+      }
+
+      if (ac.signal.aborted) {
+        updateJob(job.id, {
+          status: 'cancelled',
+          progress: done,
+          message: `Cancelled after ${done} fixes`,
+          result: { applied: applied.length, failed, total: fixes.length, appliedKeys: applied },
+        });
+        broadcastToWorkspace(workspaceId, WS_EVENTS.BULK_OPERATION_FAILED, {
+          jobId: job.id,
+          operation: 'bulk-accept-fixes',
+          error: 'Cancelled',
+        });
+        return;
       }
 
       updateJob(job.id, {

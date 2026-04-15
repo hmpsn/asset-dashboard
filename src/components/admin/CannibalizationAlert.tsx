@@ -5,7 +5,7 @@ import type { CannibalizationWarning } from '../../../shared/types/intelligence'
 
 interface Props {
   warnings: CannibalizationWarning[] | null | undefined;
-  tier: string;
+  tier: 'free' | 'growth' | 'premium';
 }
 
 const SEVERITY_CLASSES: Record<CannibalizationWarning['severity'], string> = {
@@ -35,7 +35,7 @@ export function CannibalizationAlert({ warnings, tier }: Props) {
 
   return (
     <TierGate
-      tier={tier as 'free' | 'growth' | 'premium'}
+      tier={tier}
       required="growth"
       feature="Keyword Cannibalization Alerts"
     >

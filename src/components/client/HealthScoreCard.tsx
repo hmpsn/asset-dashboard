@@ -4,10 +4,9 @@ import { scoreColorClass } from '../ui/constants';
 
 interface HealthScoreCardProps {
   score: number | null | undefined;
-  tier: 'free' | 'growth' | 'premium';
 }
 
-export function HealthScoreCard({ score, tier: _tier }: HealthScoreCardProps) {
+export function HealthScoreCard({ score }: HealthScoreCardProps) {
   if (score == null) return null;
 
   const label =

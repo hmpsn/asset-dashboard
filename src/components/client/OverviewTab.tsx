@@ -87,7 +87,6 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const navigate = useNavigate();
   const betaMode = useBetaMode();
-  const tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
   const { data: clientIntel } = useClientIntelligence(workspaceId);
   // Derive a dynamic subtitle from the most significant data signal
   const dynamicSubtitle = (() => {
@@ -115,7 +114,7 @@ export function OverviewTab({
     </div>
 
     {/* Headline health score */}
-    <HealthScoreCard score={clientIntel?.compositeHealthScore} tier={tier} />
+    <HealthScoreCard score={clientIntel?.compositeHealthScore} />
 
     {/* Key metrics — full-span StatCards */}
     {(() => {
@@ -292,8 +291,8 @@ export function OverviewTab({
     </ErrorBoundary>
     )}
 
-    {/* Predictions that came true */}
-    <PredictionShowcaseCard predictions={clientIntel?.weCalledIt} />
+    {/* Predictions that came true — only render when server has populated the field (gated to growth+) */}
+    {clientIntel?.weCalledIt !== undefined && <PredictionShowcaseCard predictions={clientIntel.weCalledIt} />}
 
     {/* Main content: insights + sidebar */}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

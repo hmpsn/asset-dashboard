@@ -338,6 +338,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         setBulkApplying(false);
         setBulkProgress(null);
         setBulkAcceptJobId(null);
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.auditAll() });
       }
     },
     [WS_EVENTS.BULK_OPERATION_FAILED]: (rawData: unknown) => {

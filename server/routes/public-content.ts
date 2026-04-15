@@ -240,7 +240,7 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upg
 // Client or team adds a comment
 router.post('/api/public/content-request/:workspaceId/:id/comment', validate(addCommentSchema), (req, res) => {
   const content = sanitizeString(req.body.content, 2000);
-  const author = validateEnum(req.body.author, ['client', 'team'], 'client');
+  const author = 'client' as const; // public unauthenticated endpoint — always 'client', never trust req.body
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });

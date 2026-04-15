@@ -98,7 +98,7 @@ function AssetBrowser({ siteId }: Props) {
   }, [cmsImageData]);
 
   const updateAssets = (updater: (prev: Asset[]) => Asset[]) =>
-    queryClient.setQueryData<Asset[]>(['admin-webflow-assets', siteId], old => updater(old ?? []));
+    queryClient.setQueryData<Asset[]>(queryKeys.admin.webflowAssets(siteId), old => updater(old ?? []));
   const updateCmsAssets = (assetId: string, patch: Partial<{ altText: string }>) =>
     queryClient.setQueryData<CmsImageScanResult>(queryKeys.admin.cmsImages(siteId), old => {
       if (!old) return old;
