@@ -55,6 +55,9 @@ export const queryKeys = {
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
+    competitorIntel: (wsId: string, competitorKey: string) =>
+      ['admin-competitive-intel', wsId, competitorKey] as const,
+    competitorIntelAll: (wsId: string) => ['admin-competitive-intel', wsId] as const,
     analyticsAnnotations: (wsId: string) => ['analytics-annotations', wsId] as const,
     insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
