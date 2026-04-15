@@ -37,7 +37,7 @@ class AIRequestDeduplicator {
   private cache = new Map<string, CachedResult<unknown>>();
   
   // Configuration
-  private readonly maxPendingAge = 30 * 1000; // 30 seconds
+  private readonly maxPendingAge = 120 * 1000; // 120 seconds (must exceed API timeout + retry budget)
   private readonly defaultCacheTtl = 5 * 60 * 1000; // 5 minutes
   private readonly maxCacheSize = 1000; // Prevent memory bloat
   
