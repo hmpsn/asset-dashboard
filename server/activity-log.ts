@@ -176,6 +176,15 @@ const stmts = createStmtCache(() => ({
     `SELECT COUNT(*) as count FROM activity_log WHERE workspace_id = ? AND type = ? AND created_at > datetime('now', ? || ' days')`,
   ),
   countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
+  clientActivitySummary: db.prepare(`
+    SELECT
+      COUNT(DISTINCT date(created_at)) AS distinct_days,
+      MAX(created_at) AS last_active
+    FROM activity_log
+    WHERE workspace_id = ?
+      AND type LIKE 'client_%'
+      AND created_at > datetime('now', ? || ' days')
+  `),
   // Global retention policy: prune the N oldest rows across all workspaces
   // to enforce the global activity-log size cap. Scoping to a single workspace
   // here would defeat the purpose of the global cap.
@@ -251,4 +260,21 @@ export function hasRecentActivity(workspaceId: string, withinDays: number = 30):
 export function countActivityByType(workspaceId: string, type: ActivityType, withinDays: number = 30): number {
   const row = stmts().countByType.get(workspaceId, type, `-${withinDays}`) as { count: number };
   return row.count;
+}
+
+/**
+ * Summarise client portal activity (type LIKE 'client_%') within the last N days.
+ * Returns the count of distinct calendar days with activity and the most recent
+ * activity timestamp, or null if no client activity was found in the window.
+ */
+export function getClientActivitySummary(
+  workspaceId: string,
+  withinDays: number = 30,
+): { distinctDays: number; lastActive: string } | null {
+  const row = stmts().clientActivitySummary.get(workspaceId, `-${withinDays}`) as {
+    distinct_days: number;
+    last_active: string | null;
+  };
+  if (!row || !row.last_active || row.distinct_days === 0) return null;
+  return { distinctDays: row.distinct_days, lastActive: row.last_active };
 }

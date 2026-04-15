@@ -1157,17 +1157,21 @@ async function assembleClientSignals(
 
     let portalUsage: EngagementMetrics['portalUsage'] = null;
     try {
-      const { countActivityByType } = await import('./activity-log.js');
-      const sessionCount = countActivityByType(workspaceId, 'portal_session', 30);
-      if (sessionCount > 0) {
-        // pageViews approximated from portal_session login events; featuresUsed derived from client-specific activity
+      const { getClientActivitySummary, countActivityByType } = await import('./activity-log.js');
+      // Use broad client_% activity to compute distinct active days (recentSessions) and
+      // the most recent activity timestamp across all client portal interactions.
+      const clientSummary = getClientActivitySummary(workspaceId, 30);
+      if (clientSummary) {
+        // Map distinct active days to pageViews for the EngagementMetrics type contract
         const featuresUsed: string[] = [];
         if (chatSessionCount > 0) featuresUsed.push('chat');
-        // Check for client-initiated feedback activity (not admin-only types) to detect dashboard usage
+        // Detect dashboard engagement from client-initiated feedback actions
         const feedbackCount = countActivityByType(workspaceId, 'client_keyword_feedback', 30)
           + countActivityByType(workspaceId, 'client_content_gap_vote', 30);
         if (feedbackCount > 0) featuresUsed.push('dashboard');
-        portalUsage = { pageViews: sessionCount, featuresUsed };
+        if (countActivityByType(workspaceId, 'client_priorities_updated', 30) > 0) featuresUsed.push('priorities');
+        if (countActivityByType(workspaceId, 'client_onboarding_submitted', 30) > 0) featuresUsed.push('onboarding');
+        portalUsage = { pageViews: clientSummary.distinctDays, featuresUsed };
       }
     } catch (err) {
       log.debug({ err, workspaceId }, 'assembleClientSignals: portal usage count optional, degrading gracefully');
