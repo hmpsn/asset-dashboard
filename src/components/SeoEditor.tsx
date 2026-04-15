@@ -8,6 +8,7 @@ import type { FixContext } from '../App';
 import { seoSuggestions, keywords, seoBulkJobs } from '../api/seo';
 import { workspaces } from '../api';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../lib/wsEvents';
 import { queryKeys } from '../lib/queryKeys';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { usePageEditStates } from '../hooks/usePageEditStates';
@@ -106,7 +107,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
 
   // ── WebSocket handlers for background bulk operations ──
   useWorkspaceEvents(workspaceId, {
-    'bulk-operation:progress': (data: unknown) => {
+    [WS_EVENTS.BULK_OPERATION_PROGRESS]: (data: unknown) => {
       const d = data as { jobId: string; operation: string; done: number; total: number; failed?: number; field?: string };
       if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
         setBulkAnalyzeProgress({ done: d.done, total: d.total });
@@ -115,7 +116,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         setBulkProgress({ done: d.done, total: d.total });
       }
     },
-    'bulk-operation:complete': (data: unknown) => {
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (data: unknown) => {
       const d = data as { jobId: string; operation: string; analyzed?: number; generated?: number; failed?: number; total: number; field?: string };
       if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
         setBulkAnalyzeProgress(prev => prev ? { ...prev, done: prev.total } : null);
@@ -139,7 +140,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
         setTimeout(() => setBulkResults(null), 8000);
       }
     },
-    'bulk-operation:failed': (data: unknown) => {
+    [WS_EVENTS.BULK_OPERATION_FAILED]: (data: unknown) => {
       const d = data as { jobId: string; operation: string; error: string };
       if (d.operation === 'bulk-analyze' && d.jobId === bulkAnalyzeJobId) {
         setBulkAnalyzeProgress(null);

@@ -10,6 +10,7 @@ import { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule } from '../h
 import type { AuditSchedule } from '../hooks/admin/useAdminSeo';
 import { seoBulkJobs } from '../api/seo';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
+import { WS_EVENTS } from '../lib/wsEvents';
 import {
   ChevronDown, ChevronRight,
   CheckCircle, Globe, FileText,
@@ -309,10 +310,11 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkAcceptJobId, setBulkAcceptJobId] = useState<string | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   // ── WebSocket handlers for background bulk accept ──
   useWorkspaceEvents(workspaceId, {
-    'bulk-operation:progress': (rawData: unknown) => {
+    [WS_EVENTS.BULK_OPERATION_PROGRESS]: (rawData: unknown) => {
       const d = rawData as { jobId: string; operation: string; done: number; total: number; failed?: number; applied?: string[] };
       if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
         setBulkProgress({ done: d.done, total: d.total });
@@ -326,7 +328,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         }
       }
     },
-    'bulk-operation:complete': (rawData: unknown) => {
+    [WS_EVENTS.BULK_OPERATION_COMPLETE]: (rawData: unknown) => {
       const d = rawData as { jobId: string; operation: string; applied: number; failed: number; total: number; appliedKeys?: string[] };
       if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
         if (d.appliedKeys?.length) {
@@ -341,12 +343,14 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         setBulkAcceptJobId(null);
       }
     },
-    'bulk-operation:failed': (rawData: unknown) => {
+    [WS_EVENTS.BULK_OPERATION_FAILED]: (rawData: unknown) => {
       const d = rawData as { jobId: string; operation: string; error: string };
       if (d.operation === 'bulk-accept-fixes' && d.jobId === bulkAcceptJobId) {
         setBulkApplying(false);
         setBulkProgress(null);
         setBulkAcceptJobId(null);
+        setBulkError('Bulk fix application failed: ' + d.error);
+        setTimeout(() => setBulkError(null), 8000);
       }
     },
   });
@@ -1129,6 +1133,17 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         onCancelBulkApply={cancelBulkApply}
         onRunAudit={runAudit}
       />
+
+      {/* Bulk operation error banner */}
+      {bulkError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>{bulkError}</span>
+          <button onClick={() => setBulkError(null)} className="ml-auto p-0.5 rounded hover:bg-white/10">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Share URL banner */}
       {shareUrl && (

@@ -1153,20 +1153,18 @@ Return ONLY valid JSON, no markdown fences.`;
 // ═══════════════════════════════════════════════════════════════════
 
 const bulkAnalyzeSchema = z.object({
-  body: z.object({
-    workspaceId: z.string().min(1),
-    pages: z.array(z.object({
-      pageId: z.string().min(1),
-      title: z.string(),
-      slug: z.string().optional(),
-      seoTitle: z.string().optional(),
-      seoDescription: z.string().optional(),
-    })).min(1),
-  }),
+  pages: z.array(z.object({
+    pageId: z.string().min(1),
+    title: z.string(),
+    slug: z.string().optional(),
+    seoTitle: z.string().optional(),
+    seoDescription: z.string().optional(),
+  })).min(1).max(500),
 });
 
 router.post('/api/seo/:workspaceId/bulk-analyze', validate(bulkAnalyzeSchema), async (req, res) => {
-  const { workspaceId, pages } = req.body;
+  const workspaceId = req.params.workspaceId;
+  const { pages } = req.body;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -1382,22 +1380,20 @@ IMPORTANT: Return ONLY valid JSON.`;
 // ── Bulk AI Rewrite (background job) ──
 
 const bulkRewriteSchema = z.object({
-  body: z.object({
-    workspaceId: z.string().min(1),
-    siteId: z.string().min(1),
-    pages: z.array(z.object({
-      pageId: z.string().min(1),
-      title: z.string(),
-      slug: z.string().optional(),
-      currentSeoTitle: z.string().optional(),
-      currentDescription: z.string().optional(),
-    })).min(1),
-    field: z.enum(['title', 'description', 'both']),
-  }),
+  siteId: z.string().min(1),
+  pages: z.array(z.object({
+    pageId: z.string().min(1),
+    title: z.string(),
+    slug: z.string().optional(),
+    currentSeoTitle: z.string().optional(),
+    currentDescription: z.string().optional(),
+  })).min(1).max(500),
+  field: z.enum(['title', 'description', 'both']),
 });
 
 router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), async (req, res) => {
-  const { workspaceId, siteId, pages, field } = req.body;
+  const workspaceId = req.params.workspaceId;
+  const { siteId, pages, field } = req.body;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
@@ -1629,6 +1625,8 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
             suggestions.push(...r.value);
           } else if (r.status === 'rejected') {
             failed++;
+          } else if (r.status === 'fulfilled' && r.value === null) {
+            failed++;
           }
           done++;
         }
@@ -1663,6 +1661,12 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
         total: pages.length,
         field,
       });
+
+      addActivity(workspaceId, 'seo_updated',
+        `Bulk SEO rewrite: ${suggestions.length} ${field} variations for ${done - failed}/${pages.length} pages`,
+        `Background job completed${failed > 0 ? ` — ${failed} failed` : ''}`,
+        { generated: suggestions.length, failed, total: pages.length, field },
+      );
     } catch (err) {
       log.error({ err }, 'bulk-rewrite: job failed');
       updateJob(job.id, { status: 'error', error: String(err) });
@@ -1678,20 +1682,18 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', validate(bulkRewriteSchema), a
 // ── Bulk Accept Fixes (background job — SeoAudit accept-all) ──
 
 const bulkAcceptFixesSchema = z.object({
-  body: z.object({
-    workspaceId: z.string().min(1),
-    siteId: z.string().min(1),
-    fixes: z.array(z.object({
-      pageId: z.string().min(1),
-      check: z.string().min(1),
-      suggestedFix: z.string().min(1),
-      message: z.string().optional(),
-    })).min(1),
-  }),
+  siteId: z.string().min(1),
+  fixes: z.array(z.object({
+    pageId: z.string().min(1),
+    check: z.string().min(1),
+    suggestedFix: z.string().min(1),
+    message: z.string().optional(),
+  })).min(1).max(500),
 });
 
 router.post('/api/seo/:workspaceId/bulk-accept-fixes', validate(bulkAcceptFixesSchema), async (req, res) => {
-  const { workspaceId, siteId, fixes } = req.body;
+  const workspaceId = req.params.workspaceId;
+  const { siteId, fixes } = req.body;
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
