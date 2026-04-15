@@ -15,8 +15,7 @@ missing Zod schema, or missing frontend renderer — those fail silently at runt
 - [ ] Define a typed `XData` interface for the `data` field in `shared/types/analytics.ts`
 - [ ] Add `type_value: XData` entry to `InsightDataMap` in `shared/types/analytics.ts`
   — **never leave as `Record<string, unknown>`** — that defeats the discriminated union
-- [ ] Add Zod schema `xDataSchema` in `server/schemas/content-schemas.ts` (or a new
-  `server/schemas/insight-schemas.ts`) matching the interface field-for-field
+- [ ] Add Zod schema `xDataSchema` in `server/schemas/insight-schemas.ts` matching the interface field-for-field
 - [ ] Add computation function in `server/analytics-intelligence.ts`
 - [ ] Add domain classification in `server/insight-enrichment.ts` → `classifyDomain()`
 - [ ] Add impact score formula in `server/insight-enrichment.ts` → `computeImpactScore()`
@@ -95,14 +94,14 @@ frontend handler without a server broadcast never fires.
 
 **Required pair for each feedback loop:**
 - Server: call `broadcastToWorkspace(workspaceId, { type: 'EVENT_NAME', ... })`
-- Frontend: `useWebSocket` handler that calls `queryClient.invalidateQueries(['relevant-key'])`
+- Frontend: `useWorkspaceEvents` handler that calls `queryClient.invalidateQueries({ queryKey: queryKeys.admin.X(workspaceId) })`
 
 **Existing broadcast events to reuse where applicable:**
-- `strategy_updated` → invalidates `['admin-keyword-strategy', workspaceId]`
-- `brief_created` → invalidates `['admin-briefs', workspaceId]`
+- `strategy_updated` → invalidates `queryKeys.admin.keywordStrategy(workspaceId)`
+- `brief_created` → invalidates `queryKeys.admin.briefs(workspaceId)`
 
 When adding a new feedback loop event, add it to both the server broadcast call AND the
-`useWebSocket` handler in the relevant frontend component before marking the task done.
+`useWorkspaceEvents` handler in the relevant frontend component before marking the task done.
 
 ---
 
@@ -246,7 +245,7 @@ Before marking Phase 1 complete, verify ALL of the following:
 Before marking Phase 2 complete, verify ALL of the following:
 
 - [ ] Each feedback loop (insights → strategy, insights → pipeline) calls `broadcastToWorkspace()` with correct event (Section 4)
-- [ ] Corresponding `useWebSocket` handlers invalidate correct React Query keys
+- [ ] Corresponding `useWorkspaceEvents` handlers invalidate correct React Query keys
 - [ ] Anomaly deduplication: inserting the same `(workspaceId, anomaly_type, metric)` twice produces one feed entry, not two — verify with a test or manual check (Section 5)
 - [ ] Dedicated `upsertAnomalyDigestInsight()` used for anomaly inserts — standard `upsertInsight()` not used for anomaly type
 - [ ] Admin Chat `buildInsightsContext()` includes `pageTitle`, `strategyAlignment`, `pipelineStatus` in its output
@@ -281,7 +280,7 @@ Before marking Phase 3 complete, verify ALL of the following:
 - [ ] `resolveInsight()` updates `resolution_status` in `analytics_insights` — confirm with a DB query after calling it
 - [ ] `getUnresolvedInsights()` excludes resolved items — confirm it doesn't return rows where `resolution_status = 'resolved'`
 - [ ] `PUT /api/admin/insights/:insightId/resolve` broadcasts `insight_resolved` event via `broadcastToWorkspace`
-- [ ] Frontend `useWebSocket` handler for `insight_resolved` invalidates `actionQueue` React Query key
+- [ ] Frontend `useWorkspaceEvents` handler for `insight_resolved` invalidates `actionQueue` React Query key
 
 **Process Guardrails:**
 - [ ] All new DB statements in `roi-attribution.ts` and `analytics-insights-store.ts` use `stmts()` cache, not bare `db.prepare()` (Section 7.1)

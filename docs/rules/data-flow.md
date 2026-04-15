@@ -67,7 +67,7 @@ type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) 
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
 export function initMyModuleBroadcast(fn: WorkspaceBroadcastFn) { _broadcastFn = fn; }
 
-// In server/index.ts (at startup):
+// In server/websocket.ts (at startup, alongside initActivityBroadcast etc.):
 initMyModuleBroadcast(broadcastToWorkspace);
 ```
 

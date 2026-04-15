@@ -250,7 +250,7 @@ const userPrompt = `...${samplesText}${dnaText}${guardrailsText}...`;
 ```
 
 **Canonical reference:** `generateCalibrationVariations` in `server/voice-calibration.ts`
-(lines ~185–216).
+(line ~277 as of 2026-04).
 
 ### Rules
 
