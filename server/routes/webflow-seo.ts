@@ -34,6 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
+import { applySuppressionsToAudit } from '../helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -62,6 +63,11 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         }
       }
 
+      // Apply suppressions to get effective audit (matches scheduled-audits pattern)
+      const effectiveAudit = auditWs.auditSuppressions?.length
+        ? applySuppressionsToAudit(result, auditWs.auditSuppressions)
+        : result;
+
       // ── Auto-resolve audit_finding insights for pages that are now clean ──
       // When an on-demand audit re-runs and a page no longer has critical/warning
       // issues, resolve its audit_finding insight. Same pattern as scheduled-audits
@@ -76,7 +82,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
 
         // Build set of page IDs that still have critical/warning issues
         const pagesWithIssues = new Set<string>();
-        for (const page of result.pages) {
+        for (const page of effectiveAudit.pages) {
           if (page.issues?.some((i: { severity: string }) => i.severity === 'error' || i.severity === 'warning')) {
             pagesWithIssues.add(page.pageId);
           }
@@ -89,9 +95,9 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
             // Page is now clean — auto-resolve
             resolve(insight.id, auditWs.id, 'resolved', 'Auto-resolved: page passed audit with no critical/warning issues', 'bridge-audit-auto-resolve');
             resolved++;
-          } else if (data.scope === 'site' && !insight.pageId && result.siteScore >= 70) {
+          } else if (data.scope === 'site' && !insight.pageId && effectiveAudit.siteScore >= 70) {
             // Site score is healthy — auto-resolve site-level insight
-            resolve(insight.id, auditWs.id, 'resolved', `Auto-resolved: site health score improved to ${result.siteScore}/100`, 'bridge-audit-auto-resolve');
+            resolve(insight.id, auditWs.id, 'resolved', `Auto-resolved: site health score improved to ${effectiveAudit.siteScore}/100`, 'bridge-audit-auto-resolve');
             resolved++;
           }
         }
@@ -107,7 +113,7 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         const existing = fetchInsights(auditWs.id);
 
         // Map critical/warning audit issues to audit_finding insights
-        const criticalPages = result.pages
+        const criticalPages = effectiveAudit.pages
           .filter((p: { issues?: Array<{ severity: string }> }) => p.issues?.some(i => i.severity === 'error' || i.severity === 'warning'));
 
         let created = 0;
@@ -140,6 +146,32 @@ router.get('/api/webflow/seo-audit/:siteId', requireWorkspaceAccessFromQuery(), 
         }
 
         return { modified: created };
+      });
+
+      // ── Bridge #15: Audit → site-level audit_finding insight ──
+      fireBridge('bridge-audit-site-health', auditWs.id, async () => {
+        const { upsertInsight: upsert }: typeof AnalyticsInsightsStore = await import('../analytics-insights-store.js'); // dynamic-import-ok
+        const totalIssues = effectiveAudit.errors + effectiveAudit.warnings;
+        const score = effectiveAudit.siteScore;
+        if (totalIssues > 0 && score < 70) {
+          upsert({
+            workspaceId: auditWs.id,
+            insightType: 'audit_finding',
+            pageId: null,
+            severity: score < 50 ? 'critical' : 'warning',
+            data: {
+              scope: 'site',
+              issueCount: totalIssues,
+              issueMessages: `Audit found ${totalIssues} total issues across the site. Overall health score: ${score}/100.`,
+              siteScore: score,
+              source: 'bridge_15_audit_site_health',
+            },
+            impactScore: Math.max(0, 100 - score),
+            bridgeSource: 'bridge-audit-site-health',
+          });
+          return { modified: 1 };
+        }
+        return { modified: 0 };
       });
     }
     res.json(result);

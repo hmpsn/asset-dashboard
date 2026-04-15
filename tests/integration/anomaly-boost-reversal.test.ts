@@ -7,7 +7,7 @@
  * 3. Anomaly dismissed via HTTP POST
  * 4. Boost reversed — insight score returns to original value
  *
- * Port: 13321
+ * Port: 13253
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'crypto';
