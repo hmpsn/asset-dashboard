@@ -584,13 +584,21 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     // strategy save doesn't wipe keywordGaps with undefined (data loss bug).
     // Also inject gaps into semrushContext so the AI still sees competitor gap
     // narrative on cache-hit incremental runs.
-    if (!fetchCompetitors && ws.keywordStrategy?.keywordGaps) {
-      keywordGaps = ws.keywordStrategy.keywordGaps;
-      if (keywordGaps.length > 0) {
-        semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
-        semrushContext += keywordGaps.slice(0, 30).map(g =>
-          `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
-        ).join('\n');
+    if (!fetchCompetitors) {
+      // Carry forward cached competitor data so the keyword pool, AI context,
+      // and topic-cluster competitor coverage aren't empty on incremental runs.
+      if (ws.keywordStrategy?.keywordGaps) {
+        keywordGaps = ws.keywordStrategy.keywordGaps;
+        if (keywordGaps.length > 0) {
+          semrushContext += `\n\nCOMPETITOR KEYWORD GAPS (cached — last fetched ${ws.competitorLastFetchedAt ?? 'unknown'}):\n`;
+          semrushContext += keywordGaps.slice(0, 30).map(g =>
+            `- "${g.keyword}" (vol: ${g.volume}/mo, KD: ${g.difficulty}%) — ${g.competitorDomain} ranks #${g.competitorPosition}`
+          ).join('\n');
+        }
+      }
+      if (ws.keywordStrategy?.competitorKeywordData?.length) {
+        competitorKeywordData.push(...ws.keywordStrategy.competitorKeywordData);
+        log.info(`Incremental mode: restored ${competitorKeywordData.length} cached competitor keywords into pool`);
       }
     }
 
@@ -2013,6 +2021,7 @@ Rules:
       ...strategyMeta,
       siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined,
       keywordGaps: keywordGaps.length > 0 ? keywordGaps.slice(0, 30) : undefined,
+      competitorKeywordData: competitorKeywordData.length > 0 ? competitorKeywordData.slice(0, 150) : undefined,
       topicClusters: topicClusters.length > 0 ? topicClusters : undefined,
       cannibalization: cannibalization.length > 0 ? cannibalization.slice(0, 20) : undefined,
       questionKeywords: allQuestionKws.length > 0 ? allQuestionKws : undefined,
