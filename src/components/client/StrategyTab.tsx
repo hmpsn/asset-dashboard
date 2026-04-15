@@ -66,7 +66,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [feedbackLoadError, setFeedbackLoadError] = useState(false);
 
   // Load existing feedback on mount
-  useEffect(() => {
+  const loadFeedback = useCallback(() => {
     if (!workspaceId) return;
     setFeedbackLoadError(false);
     kwFeedbackApi.get(workspaceId)
@@ -77,6 +77,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       })
       .catch(() => { setFeedbackLoadError(true); });
   }, [workspaceId]);
+  useEffect(() => { loadFeedback(); }, [loadFeedback]);
 
   const submitFeedback = useCallback(async (keyword: string, status: 'approved' | 'declined', source: string, reason?: string) => {
     if (!workspaceId) return;
@@ -150,6 +151,15 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const [trackedKeywordsError, setTrackedKeywordsError] = useState(false);
 
   // Load business priorities + tracked keywords on mount
+  const loadTrackedKeywords = useCallback(() => {
+    if (!workspaceId) return;
+    setTrackedKeywordsError(false);
+    trackedKwApi.get(workspaceId)
+      .then((data) => {
+        setTrackedKeywords(data.keywords || []);
+      })
+      .catch(() => { setTrackedKeywordsError(true); });
+  }, [workspaceId]);
   useEffect(() => {
     if (!workspaceId) return;
     bizPrioritiesApi.get(workspaceId)
@@ -158,14 +168,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         setPrioritiesLoaded(true);
       })
       .catch(() => setPrioritiesLoaded(true));
-
-    setTrackedKeywordsError(false);
-    trackedKwApi.get(workspaceId)
-      .then((data) => {
-        setTrackedKeywords(data.keywords || []);
-      })
-      .catch(() => { setTrackedKeywordsError(true); });
-  }, [workspaceId]);
+    loadTrackedKeywords();
+  }, [workspaceId, loadTrackedKeywords]);
 
   const savePriorities = useCallback(async (newList: { text: string; category: string }[]) => {
     if (!workspaceId) return;
@@ -372,12 +376,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
         <div className="space-y-1">
           {feedbackLoadError && (
             <p className="text-[11px] text-red-400/80">
-              Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly. Try refreshing.
+              Couldn't load your previous keyword feedback — your approvals and declines may not reflect correctly.{' '}
+              <button onClick={loadFeedback} className="underline hover:text-red-400">Retry</button>
             </p>
           )}
           {trackedKeywordsError && (
             <p className="text-[11px] text-red-400/80">
-              Couldn't load your tracked keywords. Try refreshing if they're missing.
+              Couldn't load your tracked keywords.{' '}
+              <button onClick={loadTrackedKeywords} className="underline hover:text-red-400">Retry</button>
             </p>
           )}
         </div>

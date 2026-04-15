@@ -20,6 +20,7 @@ import { createTestContext } from './helpers.js';
 // (which can contain tens-of-thousands of files on a dev machine and causes
 // multi-minute timeouts). DATA_DIR is picked up by createTestContext via
 // process.env spread into the spawned server process.
+const ORIGINAL_DATA_DIR = process.env.DATA_DIR;
 const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'health-routes-test-'));
 process.env.DATA_DIR = TEST_DATA_DIR;
 
@@ -34,6 +35,12 @@ afterAll(() => {
   ctx.stopServer();
   // Clean up isolated temp data dir
   try { fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+  // Restore DATA_DIR so other tests sharing this process (if any) see the original value.
+  if (ORIGINAL_DATA_DIR === undefined) {
+    delete process.env.DATA_DIR;
+  } else {
+    process.env.DATA_DIR = ORIGINAL_DATA_DIR;
+  }
 });
 
 describe('Health endpoint', () => {

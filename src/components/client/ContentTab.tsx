@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, FileText, Sparkles, Send, ChevronDown, ChevronUp,
@@ -51,6 +51,7 @@ export function ContentTab({
 
   // ── Content performance data for published items ──
   const [contentPerf, setContentPerf] = useState<Record<string, ContentPerfItem>>({});
+  const perfErrorToastShownRef = useRef(false);
   useEffect(() => {
     const hasPublished = contentRequests.some(r => r.status === 'delivered' || r.status === 'published');
     if (!hasPublished) return;
@@ -64,9 +65,13 @@ export function ContentTab({
         }
       })
       .catch(() => {
+        // Guard against repeated toasts: the effect re-fires whenever contentRequests changes
+        // (e.g. after every approval/decline), but users only need one notice per session.
+        if (perfErrorToastShownRef.current) return;
+        perfErrorToastShownRef.current = true;
         setToast({ message: "Couldn't load content performance data. It'll retry on next visit.", type: 'error' });
       });
-  }, [workspaceId, contentRequests]);
+  }, [workspaceId, contentRequests, setToast]);
 
   // ── Content-specific API functions + interaction state (extracted hook) ──
   const {
@@ -177,7 +182,11 @@ export function ContentTab({
         <FileText className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
         <p className="text-sm font-medium text-zinc-400">Your content pipeline is empty</p>
         <p className="text-xs text-zinc-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-          Ready to grow your traffic? Browse content ideas on the <button onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to kick things off.
+          {effectiveTier === 'free' ? (
+            <>Upgrade to Growth to request content briefs and professionally written blog posts from {STUDIO_NAME}.</>
+          ) : (
+            <>Ready to grow your traffic? Browse content ideas on the <button onClick={() => navigate(clientPath(workspaceId, 'strategy', betaMode))} className="text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors">SEO Strategy</button> tab, or click <strong className="text-zinc-400">Suggest a Topic</strong> above to kick things off.</>
+          )}
         </p>
       </div>
     )}
