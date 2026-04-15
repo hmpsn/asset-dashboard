@@ -165,7 +165,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       if (!res.ok || !res.body) {
         // Non-streaming error response (429, 400, 500, etc.) or no streaming support
         const data = await res.json();
-        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); }
+        if (!res.ok || data.error) { setError(data.message || data.error || 'Request failed'); } else { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); }
         return;
       }
 
@@ -186,7 +186,7 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           try {
             const evt = JSON.parse(line.slice(6));
             if (evt.error) { setError(evt.error); break; }
-            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: ['keyword-strategy', workspaceId] }); setShowNextSteps(true); break; }
+            if (evt.done && evt.strategy) { queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) }); setShowNextSteps(true); break; }
             if (evt.step) { setProgressStep(evt.step); setProgressDetail(evt.detail || ''); setProgressPct(evt.progress || 0); }
           } catch (err) { console.error('KeywordStrategy operation failed:', err); }
         }

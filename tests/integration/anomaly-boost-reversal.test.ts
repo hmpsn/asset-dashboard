@@ -17,7 +17,7 @@ import { upsertInsight, getInsights } from '../../server/analytics-insights-stor
 import { applyScoreAdjustment } from '../../server/insight-score-adjustments.js';
 import db from '../../server/db/index.js';
 
-const ctx = createTestContext(13321);
+const ctx = createTestContext(13253);
 const { postJson } = ctx;
 
 let testWsId = '';
