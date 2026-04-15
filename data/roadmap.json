@@ -646,8 +646,9 @@
           "source": "pr-check-audit-and-backfill plan (2026-04-10)",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Follow-up from the pr-check-audit-and-backfill plan. Walk every file in docs/rules/*.md and (a) verify it references current file paths and type names, (b) cross-check each rule against CLAUDE.md for drift, (c) flag any rule that could be mechanized into a pr-check rule. User explicitly requested this be tracked separately from the main audit plan so the follow-up doesn't get lost. Blocked on the audit plan landing (PRs A/B/C).",
-          "status": "pending"
+          "notes": "Shipped — Platform Health Sprint PR 5a (<pr5a-sha>). Walked all 12 docs/rules/*.md files. Stale refs fixed: ai-dispatch-patterns.md (generateCalibrationVariations line number ~185→~277), analytics-insights.md (useWebSocket→useWorkspaceEvents, schema file location updated, queryKeys refs updated), data-flow.md (init callback location server/index.ts→server/websocket.ts). automated-rules.md regenerated — no diff (already current). bridge-authoring.md, multi-agent-coordination.md, outcome-engine-stubs.md, pr-check-rule-authoring.md, route-removal-checklist.md, ui-ux-consistency.md, verified-clean-rules.md: no stale refs found.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
         },
         {
           "id": 586,
