@@ -160,6 +160,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
 
   // When the live API errors or returns no data, fall back to cached keyword gaps from the strategy blob
   const effectiveGaps = (data?.keywordGaps?.length ? data.keywordGaps : cachedKeywordGaps) ?? [];
+  const usingFallbackGaps = effectiveGaps.length > 0 && !data?.keywordGaps?.length && !!cachedKeywordGaps?.length;
 
   if (error && effectiveGaps.length === 0) {
     return (
@@ -279,6 +280,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
             {expanded.has('gaps') ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
             <Target className="w-4 h-4 text-amber-400" />
             <span className="text-sm font-medium text-zinc-200 flex-1 text-left">Keyword Gaps</span>
+            {usingFallbackGaps && <span className="text-[10px] text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">from strategy</span>}
             <span className="text-[11px] text-zinc-500">{effectiveGaps.length} opportunities</span>
           </button>
           {expanded.has('gaps') && (
@@ -299,9 +301,19 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
         </div>
       )}
 
-      <p className="text-[11px] text-zinc-600 text-right">
-        Data via SEMRush · {data ? `Cached 48h · ${data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : ''}` : 'Showing cached strategy data'}
-      </p>
+      <div className="flex items-center justify-between">
+        {error && effectiveGaps.length > 0 && (
+          <p className="text-[11px] text-amber-500/70">
+            Live fetch failed — showing cached data.{' '}
+            <button onClick={fetchIntel} className="text-teal-400 hover:underline">Retry</button>
+          </p>
+        )}
+        <p className="text-[11px] text-zinc-600 text-right ml-auto">
+          Data via SEMRush · {data
+            ? `Cached 48h · ${data.fetchedAt ? new Date(data.fetchedAt).toLocaleString() : ''}`
+            : usingFallbackGaps ? 'Keyword gaps from last strategy run' : 'Showing cached strategy data'}
+        </p>
+      </div>
     </div>
   );
 }

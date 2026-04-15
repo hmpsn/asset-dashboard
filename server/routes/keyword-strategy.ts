@@ -1578,9 +1578,12 @@ ${competitorDomains.length > 0 ? `- NEVER suggest a keyword that contains a comp
       let poolEnriched = 0;
       for (const cg of strategy.contentGaps) {
         const kwLower = cg.targetKeyword.toLowerCase();
-        // Priority 1: keyword pool (includes competitor gaps, competitor keywords, GSC, related)
+        // Priority 1: keyword pool (competitor gaps, competitor keywords, related keywords).
+        // SKIP GSC-sourced entries — their "volume" is actually GSC impressions, not real
+        // search volume. Using impressions would severely undervalue high-volume keywords
+        // and set difficulty to 0 (hardcoded for GSC entries), misleading downstream sorts.
         const poolHit = keywordPool.get(kwLower);
-        if (poolHit && poolHit.volume > 0) {
+        if (poolHit && poolHit.volume > 0 && poolHit.source !== 'gsc') {
           cg.volume = poolHit.volume;
           cg.difficulty = poolHit.difficulty;
           poolEnriched++;
@@ -1943,10 +1946,9 @@ Rules:
       const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
       const withVolume = strategy.contentGaps
         .filter((cg: { volume?: number; impressions?: number }) =>
-          // Keep: no enrichment data at all, OR positive volume, OR positive impressions.
-          // Items enriched to volume=0 are kept (they may have been sourced from competitor
-          // gaps with known relevance) — only explicitly zero-volume WITH zero-impressions
-          // items that also had enrichment attempted are dropped.
+          // Keep: no enrichment data at all (unenriched), OR positive volume, OR positive impressions.
+          // Items enriched to volume=0 with no impressions ARE dropped — if SEMRush/pool says
+          // volume is 0 and GSC shows no impressions, the keyword has no proven demand.
           (cg.volume == null && cg.impressions == null) ||
           (cg.volume != null && cg.volume > 0) ||
           (cg.impressions != null && cg.impressions > 0)
