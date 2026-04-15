@@ -122,6 +122,7 @@ export interface KeywordStrategy {
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   quickWins?: QuickWin[];        // low-effort, high-impact fixes
   keywordGaps?: KeywordGapItem[]; // keywords competitors rank for but we don't
+  competitorKeywordData?: { keyword: string; volume: number; difficulty: number; domain: string; position: number }[]; // competitor domain keywords used to enrich keyword pool
   topicClusters?: TopicCluster[];         // topical authority clusters
   cannibalization?: CannibalizationItem[]; // keyword cannibalization issues
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
