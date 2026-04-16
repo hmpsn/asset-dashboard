@@ -505,12 +505,15 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (areCreditsExhausted()) return [];
 
     try {
+      // NOTE: `dataforseo_labs/google/ranked_keywords/live` does NOT accept an `item_types`
+      // parameter. Including it returns error 40501 "Invalid Field: 'item_types'". The endpoint
+      // returns all ranked keyword types by default; the SERP feature type is read per-item from
+      // `ranked_serp_element.serp_item.type` in the dedupe loop below.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
         location_code: locationCode(database),
         language_code: 'en',
         limit,
-        item_types: ['organic', 'featured_snippet', 'local_pack', 'people_also_ask', 'videos'],
       }]);
 
       const taskResults = getTaskResult(json);
@@ -574,7 +577,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
-  // ── getDomainOverview → ranked_keywords with limit=0 for aggregate metrics ──
+  // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
   async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
     const cacheKey = `domain_overview_${database}_${target.replace(/\./g, '_')}`;
@@ -587,12 +590,14 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (areCreditsExhausted()) return null;
 
     try {
+      // NOTE: See getDomainKeywords above — `ranked_keywords/live` rejects `item_types`
+      // with error 40501. We only read `resultObj.metrics.organic`, which the endpoint
+      // aggregates across all types regardless of what's returned in `items`.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
         location_code: locationCode(database),
         language_code: 'en',
         limit: 1,
-        item_types: ['organic'],
       }]);
 
       const taskResults = getTaskResult(json);

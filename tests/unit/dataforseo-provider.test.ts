@@ -197,6 +197,58 @@ describe('DataForSeoProvider — SERP features normalization', () => {
   });
 });
 
+describe('DataForSeoProvider — ranked_keywords/live request contract', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // Regression: `dataforseo_labs/google/ranked_keywords/live` rejects the
+  // `item_types` field with error 40501. Including it makes every call throw,
+  // which the outer catch swallows and returns [] (or null for the overview
+  // variant). Both getDomainKeywords and getDomainOverview hit this endpoint,
+  // so both must be kept free of the forbidden field.
+  it('getDomainKeywords does NOT include item_types in the ranked_keywords payload', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getDomainKeywords('example.com', 'ws-contract-kw', 100, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/ranked_keywords/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body[0]).toHaveProperty('target', 'example.com');
+    expect(body[0]).toHaveProperty('location_code');
+    expect(body[0]).toHaveProperty('language_code', 'en');
+    expect(body[0]).toHaveProperty('limit', 100);
+    expect(body[0]).not.toHaveProperty('item_types');
+  });
+
+  it('getDomainOverview does NOT include item_types in the ranked_keywords payload', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{
+        metrics: { organic: { count: 10, etv: 100, estimated_paid_traffic_cost: 5 } },
+      }])),
+    } as Response);
+
+    await provider.getDomainOverview('example.com', 'ws-contract-overview', 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/ranked_keywords/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body[0]).toHaveProperty('target', 'example.com');
+    expect(body[0]).toHaveProperty('limit', 1);
+    expect(body[0]).not.toHaveProperty('item_types');
+  });
+});
+
 describe('DataForSeoProvider — getReferringDomains lastSeen', () => {
   afterEach(() => vi.restoreAllMocks());
 
