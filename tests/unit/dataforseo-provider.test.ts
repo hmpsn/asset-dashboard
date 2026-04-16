@@ -33,7 +33,9 @@ vi.mock('../../server/keyword-metrics-cache.js', () => ({
 process.env.DATAFORSEO_LOGIN = 'test-login';
 process.env.DATAFORSEO_PASSWORD = 'test-password';
 
+import fs from 'fs';
 import { DataForSeoProvider } from '../../server/providers/dataforseo-provider.js';
+import { getCachedMetricsBatch, cacheMetricsBatch } from '../../server/keyword-metrics-cache.js';
 
 function mockFetchOnce(json: unknown): void {
   vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -44,6 +46,19 @@ function mockFetchOnce(json: unknown): void {
 
 function dfsTaskResponse(result: unknown[]): unknown {
   return { tasks: [{ status_code: 20000, cost: 0.001, result }] };
+}
+
+/**
+ * Re-apply fs mock defaults after vi.restoreAllMocks() clears them.
+ * vi.restoreAllMocks() removes spy/mock implementations from vi.fn() instances,
+ * so we must re-spy on the real fs functions before each test that needs them.
+ */
+function reapplyFsMocks(): void {
+  vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+  vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+  vi.spyOn(fs, 'writeFileSync').mockReturnValue(undefined);
+  vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw new Error('ENOENT'); });
+  vi.spyOn(fs, 'readdirSync').mockReturnValue([]);
 }
 
 describe('DataForSeoProvider — SERP features normalization', () => {
@@ -232,61 +247,48 @@ describe('DataForSeoProvider — getReferringDomains lastSeen', () => {
 });
 
 describe('DataForSeoProvider — L1 global SQLite cache', () => {
-  let originalFetch: typeof global.fetch;
-
   beforeEach(() => {
-    originalFetch = global.fetch;
+    // vi.restoreAllMocks() in earlier afterEach calls removes vi.fn() implementations
+    // from module mocks. Re-apply all mock defaults before each test in this block.
+    reapplyFsMocks();
+    vi.mocked(getCachedMetricsBatch).mockReturnValue(new Map());
+    vi.mocked(cacheMetricsBatch).mockReset();
   });
 
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
+  afterEach(() => vi.restoreAllMocks());
 
   it('returns L1-cached metrics without making an API call', async () => {
-    const { getCachedMetricsBatch } = await import('../../server/keyword-metrics-cache.js');
     vi.mocked(getCachedMetricsBatch).mockReturnValueOnce(new Map([
       ['cached keyword', { keyword: 'cached keyword', volume: 9999, difficulty: 42, cpc: 1.5, competition: 0.3, results: 0, trend: [100, 200] }]
     ]));
 
-    let fetchCallCount = 0;
-    global.fetch = async () => {
-      fetchCallCount++;
-      return { ok: true, json: async () => ({ tasks: [] }) } as Response;
-    };
+    const fetchSpy = vi.spyOn(global, 'fetch');
 
     const provider = new DataForSeoProvider();
     const results = await provider.getKeywordMetrics(['cached keyword'], 'ws-workspace-A', 'us');
 
-    expect(fetchCallCount).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(results).toHaveLength(1);
     expect(results[0].volume).toBe(9999);
     expect(results[0].difficulty).toBe(42);
   });
 
   it('writes API results to L1 cache after fetching', async () => {
-    const origFetch = global.fetch;
-    let fetchCalled = false;
-    global.fetch = async () => {
-      fetchCalled = true;
-      return {
-        ok: true,
-        json: async () => ({
-          tasks: [{ status_code: 20000, cost: 0.001, result: [
-            { keyword: 'l1-write-test-kw', search_volume: 5000, competition_index: 30, cpc: 2.0, competition: 0.3, monthly_searches: [] }
-          ]}]
-        }),
-      } as Response;
-    };
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        tasks: [{ status_code: 20000, cost: 0.001, result: [
+          { keyword: 'l1-write-test-kw', search_volume: 5000, competition_index: 30, cpc: 2.0, competition: 0.3, monthly_searches: [] }
+        ]}]
+      }),
+    } as Response);
 
-    const { cacheMetricsBatch } = await import('../../server/keyword-metrics-cache.js');
     const cacheSpy = vi.mocked(cacheMetricsBatch);
 
     const provider = new DataForSeoProvider();
-    await provider.getKeywordMetrics(['l1-write-test-kw'], 'ws-first', 'us');
+    await provider.getKeywordMetrics(['l1-write-test-kw'], 'ws-l1-write-test', 'us');
 
-    global.fetch = origFetch;
-
-    expect(fetchCalled).toBe(true);
+    expect(global.fetch).toHaveBeenCalled();
     expect(cacheSpy).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ keyword: 'l1-write-test-kw', volume: 5000 })]),
       'us'
