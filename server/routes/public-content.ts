@@ -99,6 +99,20 @@ router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   });
 });
 
+// --- Public Page Keywords (approval card context — NOT gated on seoClientView) ---
+// Returns minimal keyword hints used to display targeting info on client approval cards,
+// regardless of whether the full strategy tab is enabled for the workspace.
+router.get('/api/public/page-keywords/:workspaceId', (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const entries = listPageKeywords(ws.id);
+  res.json(entries.map(p => ({
+    pagePath: p.pagePath,
+    primaryKeyword: p.primaryKeyword,
+    secondaryKeywords: p.secondaryKeywords ?? [],
+  })));
+});
+
 // --- Public Content Topic Requests (client picks topics from strategy) ---
 router.post('/api/public/content-request/:workspaceId', validate(createContentRequestSchema), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);

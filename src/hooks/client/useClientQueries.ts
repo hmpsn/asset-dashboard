@@ -119,6 +119,17 @@ export function useClientStrategy(wsId: string, enabled: boolean) {
   });
 }
 
+// ── Page Keywords (approval card context, not gated on seoClientView) ──
+export type ApprovalPageKeyword = { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] };
+
+export function useClientPageKeywords(wsId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.client.pageKeywords(wsId),
+    queryFn: () => getOptional<ApprovalPageKeyword[]>(`/api/public/page-keywords/${wsId}`),
+    enabled,
+  });
+}
+
 // ── Pricing ───────────────────────────────────────────────────────
 export function useClientPricing(wsId: string, enabled: boolean) {
   return useQuery({

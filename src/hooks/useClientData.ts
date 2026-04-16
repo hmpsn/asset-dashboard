@@ -18,7 +18,9 @@ import {
   useClientRequests as useClientRequestsQuery, useClientContentRequests,
   useClientAuditSummary, useClientAuditDetail,
   useClientStrategy, useClientPricing, useClientContentPlan,
+  useClientPageKeywords,
 } from './client/useClientQueries';
+export type { ApprovalPageKeyword } from './client/useClientQueries';
 
 // ── Exported type interfaces (consumed by other modules) ──────────
 export interface ActivityLogItem { id: string; workspaceId?: string; type: string; title: string; description?: string; metadata?: Record<string, unknown>; actorId?: string; actorName?: string; createdAt: string }
@@ -84,6 +86,7 @@ export function useClientData(workspaceId: string) {
   const auditSummaryQ = useClientAuditSummary(workspaceId, dataEnabled);
   const auditDetailQ = useClientAuditDetail(workspaceId, dataEnabled);
   const strategyQ = useClientStrategy(workspaceId, dataEnabled && !!ws?.seoClientView);
+  const pageKeywordsQ = useClientPageKeywords(workspaceId, dataEnabled);
   useClientPricing(workspaceId, dataEnabled); // fires query; data consumed via queryClient.getQueryData in loadDashboardData
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
 
@@ -243,6 +246,7 @@ export function useClientData(workspaceId: string) {
     anomalies: anomaliesQ.data ?? [], setAnomalies: noop as unknown as React.Dispatch<React.SetStateAction<AnomalyItem[]>>,
     approvalBatches: approvalsQ.data ?? [], setApprovalBatches,
     approvalsLoading: approvalsQ.isLoading, setApprovalsLoading: noop as unknown as React.Dispatch<React.SetStateAction<boolean>>,
+    approvalPageKeywords: pageKeywordsQ.data ?? null,
     activityLog: activityQ.data ?? [], setActivityLog: noop as unknown as React.Dispatch<React.SetStateAction<ActivityLogItem[]>>,
     rankHistory: rankHistoryQ.data ?? [], setRankHistory: noop as unknown as React.Dispatch<React.SetStateAction<RankHistoryEntry[]>>,
     latestRanks: latestRanksQ.data ?? [], setLatestRanks: noop as unknown as React.Dispatch<React.SetStateAction<LatestRank[]>>,
