@@ -42,11 +42,12 @@ import {
 
 
 const log = createLogger('public-content');
-// --- Public SEO Strategy (client dashboard, gated behind seoClientView) ---
+// --- Public SEO Strategy (client dashboard) ---
+// seoClientView controls tab visibility in the UI; the data is always safe to return
+// and is needed unconditionally by Overview insights, InsightsDigest, and AI chat context.
 router.get('/api/public/seo-strategy/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!ws.seoClientView) return res.status(403).json({ error: 'SEO strategy view is not enabled' });
   const strategy = ws.keywordStrategy;
   if (!strategy) return res.json(null);
   // Reassemble pageMap from page_keywords table

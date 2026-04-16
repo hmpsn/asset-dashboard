@@ -85,7 +85,9 @@ export function useClientData(workspaceId: string) {
   const contentReqQ = useClientContentRequests(workspaceId, dataEnabled);
   const auditSummaryQ = useClientAuditSummary(workspaceId, dataEnabled);
   const auditDetailQ = useClientAuditDetail(workspaceId, dataEnabled);
-  const strategyQ = useClientStrategy(workspaceId, dataEnabled && !!ws?.seoClientView);
+  // seoClientView gates the Strategy tab in the UI — not this fetch.
+  // strategyData powers Overview insights, InsightsDigest, and AI chat regardless of tab visibility.
+  const strategyQ = useClientStrategy(workspaceId, dataEnabled);
   const pageKeywordsQ = useClientPageKeywords(workspaceId, dataEnabled);
   useClientPricing(workspaceId, dataEnabled); // fires query; data consumed via queryClient.getQueryData in loadDashboardData
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
