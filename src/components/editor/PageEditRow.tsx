@@ -74,6 +74,9 @@ export interface PageEditRowProps {
   onAnalyzePage?: (pageId: string) => void;
   hasAnalysis?: boolean;
   isAnalyzing?: boolean;
+  /** Target keywords for this page — shown in the collapsed row so the editor knows what not to remove */
+  primaryKeyword?: string;
+  secondaryKeywords?: string[];
 }
 
 export function PageEditRow({
@@ -83,6 +86,7 @@ export function PageEditRow({
   onToggleExpand, onToggleApprovalSelect, onUpdateField, onSave, isCmsPage, onSaveDraft,
   onAiRewrite, onSelectVariation, onClearVariations, onClearTracking, errorState,
   showPreview, onTogglePreview, onAnalyzePage, hasAnalysis, isAnalyzing,
+  primaryKeyword, secondaryKeywords,
 }: PageEditRowProps) {
   const hasSeoTitle = !!(page.seo?.title);
   const hasSeoDesc = !!(page.seo?.description);
@@ -109,6 +113,20 @@ export function PageEditRow({
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-zinc-200 truncate">{page.title}</div>
           <div className="text-xs text-zinc-500 truncate">/{page.slug}</div>
+          {(primaryKeyword || (secondaryKeywords?.length ?? 0) > 0) && (
+            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+              {primaryKeyword && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 font-medium" title={primaryKeyword}>
+                  {primaryKeyword}
+                </span>
+              )}
+              {secondaryKeywords?.slice(0, 3).map(kw => (
+                <span key={kw} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/60 border border-zinc-700 text-zinc-400" title={kw}>
+                  {kw}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={pageState?.status as any} size="sm" />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { put, post } from '../api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -430,7 +430,7 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
   // Fetch keyword strategy to know which pages already have persisted analysis
   const { data: strategyData } = useQuery({
     queryKey: queryKeys.admin.keywordStrategy(workspaceId!),
-    queryFn: () => keywords.webflowStrategy(workspaceId!) as Promise<{ pageMap?: Array<{ pagePath: string; analysisGeneratedAt?: string }> }>,
+    queryFn: () => keywords.webflowStrategy(workspaceId!) as Promise<{ pageMap?: Array<{ pagePath: string; analysisGeneratedAt?: string; primaryKeyword?: string; secondaryKeywords?: string[] }> }>,
     enabled: !!workspaceId,
     staleTime: 60_000,
   });
@@ -448,6 +448,24 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
       }
     }
     setAnalyzedPages(analyzed);
+  }, [strategyData, pages]);
+
+  // Map pageId → { primaryKeyword, secondaryKeywords } for displaying targeting context on each page card
+  const pageKeywordMap = useMemo(() => {
+    const map = new Map<string, { primaryKeyword: string; secondaryKeywords: string[] }>();
+    if (!strategyData?.pageMap) return map;
+    for (const entry of strategyData.pageMap) {
+      if (!entry.primaryKeyword) continue;
+      const slug = entry.pagePath.replace(/^\//, '');
+      const match = pages.find(p => p.slug === slug || entry.pagePath.includes(p.slug));
+      if (match) {
+        map.set(match.id, {
+          primaryKeyword: entry.primaryKeyword,
+          secondaryKeywords: entry.secondaryKeywords ?? [],
+        });
+      }
+    }
+    return map;
   }, [strategyData, pages]);
 
   const analyzePage = async (pageId: string) => {
@@ -1054,6 +1072,8 @@ export function SeoEditor({ siteId, workspaceId, fixContext }: Props) {
               onAnalyzePage={workspaceId ? analyzePage : undefined}
               hasAnalysis={analyzedPages.has(page.id)}
               isAnalyzing={analyzing.has(page.id)}
+              primaryKeyword={pageKeywordMap.get(page.id)?.primaryKeyword}
+              secondaryKeywords={pageKeywordMap.get(page.id)?.secondaryKeywords}
             />
           </div>
         ))}
