@@ -82,7 +82,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     ga4Countries, ga4Events, ga4Conversions,
     searchComparison, ga4Comparison, ga4NewVsReturning,
     ga4Organic, ga4LandingPages, anomalies,
-    approvalBatches, setApprovalBatches, approvalsLoading,
+    approvalBatches, setApprovalBatches, approvalsLoading, approvalPageKeywords,
     activityLog, rankHistory, latestRanks, annotations,
     requests, requestsLoading, contentRequests, setContentRequests,
     sectionErrors, contentPlanSummary, contentPlanKeywords, contentPlanReviewCells,
@@ -864,7 +864,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* ════════════ INBOX TAB (Approvals + Requests + Content) ════════════ */}
         {tab === 'inbox' && (
-          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={strategyData?.pageMap} />
+          <InboxTab workspaceId={workspaceId} effectiveTier={effectiveTier} approvalBatches={approvalBatches} approvalsLoading={approvalsLoading} pendingApprovals={pendingApprovals} setApprovalBatches={setApprovalBatches} loadApprovals={loadApprovals} requests={requests} requestsLoading={requestsLoading} clientUser={clientUser} loadRequests={loadRequests} contentRequests={contentRequests} setContentRequests={setContentRequests} briefPrice={briefPrice} fullPostPrice={fullPostPrice} fmtPrice={fmtPrice} setPricingModal={setPricingModal} pricingConfirming={pricingConfirming} setToast={setToast} contentPlanReviewCells={contentPlanReviewCells} pageMap={approvalPageKeywords ?? strategyData?.pageMap} />
         )}
 
 

@@ -17,4 +17,6 @@ export {
   useClientStrategy,
   useClientPricing,
   useClientContentPlan,
+  useClientPageKeywords,
+  type ApprovalPageKeyword,
 } from './useClientQueries';

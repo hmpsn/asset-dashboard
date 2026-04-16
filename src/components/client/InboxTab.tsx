@@ -5,8 +5,8 @@ import { ApprovalsTab } from './ApprovalsTab';
 import { RequestsTab } from './RequestsTab';
 import { ContentTab } from './ContentTab';
 import type { Tier } from '../ui';
-import type { ClientContentRequest, ClientRequest, ApprovalBatch, ClientKeywordStrategy } from './types';
-import type { ContentPlanReviewCell } from '../../hooks/useClientData';
+import type { ClientContentRequest, ClientRequest, ApprovalBatch } from './types';
+import type { ContentPlanReviewCell, ApprovalPageKeyword } from '../../hooks/useClientData';
 import { useBetaMode } from './BetaContext';
 import { STUDIO_NAME } from '../../constants';
 import { post } from '../../api/client';
@@ -52,8 +52,8 @@ interface InboxTabProps {
   contentPlanReviewCells?: ContentPlanReviewCell[];
   // Which section to show initially (for deep-linking from Overview actions)
   initialFilter?: InboxFilter;
-  // Keyword strategy page map for approval card context chips
-  pageMap?: ClientKeywordStrategy['pageMap'];
+  // Page keyword hints for approval card targeting chips (independent of seoClientView)
+  pageMap?: ApprovalPageKeyword[];
 }
 
 export function InboxTab({
