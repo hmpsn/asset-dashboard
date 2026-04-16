@@ -342,11 +342,17 @@ describe('GET /api/public/seo-strategy — happy path', () => {
 // ── GET /api/public/seo-strategy — gate and edge cases ─────────────────────
 
 describe('GET /api/public/seo-strategy — access control and edge cases', () => {
-  it('returns 403 when seoClientView is disabled', async () => {
+  it('returns strategy data even when seoClientView is disabled (UI-only gate)', async () => {
+    // seoClientView is a tab-visibility toggle in the admin UI — it is NOT a data
+    // security gate. The endpoint always returns strategy data because it is needed
+    // by Overview insights, InsightsDigest cards, and AI chat context regardless of
+    // whether the Strategy tab is visible. strategyLocked handles tab hiding instead.
     const res = await api(`/api/public/seo-strategy/${gatedWsId}`);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toMatch(/not enabled/i);
+    // gatedWsId has a strategy seeded in beforeAll, so it should return it
+    expect(body).not.toBeNull();
+    expect(Array.isArray(body.siteKeywords)).toBe(true);
   });
 
   it('returns 404 for nonexistent workspace', async () => {
