@@ -29,8 +29,8 @@ function stripScore(c: ScoredCandidate): KeywordCandidate {
 /**
  * Score a keyword on a 0-100 scale based on volume and difficulty.
  * Higher volume + lower difficulty = higher score.
+ * @internal exported for unit testing
  */
-/** @internal exported for unit testing */
 export function opportunityScore(volume: number, difficulty: number, cpc: number = 0): number {
   if (volume <= 0) return 0;
   // Normalize volume: log scale (0 = 0, 10 = 33, 100 = 50, 1000 = 67, 10000 = 83, 100000 = 100)
