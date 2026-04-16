@@ -105,7 +105,9 @@ export function BacklinkProfile({ workspaceId }: Props) {
         <StatCard label="Total Backlinks" value={fmtNum(overview.totalBacklinks)} icon={Link2} />
         <StatCard label="Referring Domains" value={fmtNum(overview.referringDomains)} icon={Globe} />
         <StatCard label="Follow Links" value={`${followPct}%`} sub={`${fmtNum(overview.followLinks)} follow`} icon={Shield} />
-        <StatCard label="Link Types" value={`${fmtNum(overview.textLinks)} text`} sub={`${fmtNum(overview.imageLinks)} image`} icon={ExternalLink} />
+        {(overview.textLinks > 0 || overview.imageLinks > 0) && (
+          <StatCard label="Link Types" value={`${fmtNum(overview.textLinks)} text`} sub={`${fmtNum(overview.imageLinks)} image`} icon={ExternalLink} />
+        )}
       </div>
 
       {/* Referring domains table */}
