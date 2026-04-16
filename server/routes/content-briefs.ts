@@ -324,7 +324,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
       return res.json({
         keyword,
         valid: true,
-        source: 'semrush' as const,
+        source: kwProvider.name,
         metrics: null,
         message: 'No keyword data found — keyword accepted without metrics',
       });
@@ -338,7 +338,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
     res.json({
       keyword,
       valid: true,
-      source: 'semrush' as const,
+      source: kwProvider.name,
       metrics: {
         volume: kw.volume,
         difficulty: kw.difficulty,
@@ -388,7 +388,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
     const results = keywords.slice(0, 50).map((kw: string) => {
       const m = metricsMap.get(kw.toLowerCase());
       if (!m) {
-        return { keyword: kw, valid: true, source: 'semrush' as const, metrics: null };
+        return { keyword: kw, valid: true, source: bulkProvider.name, metrics: null };
       }
       const warnings: string[] = [];
       if (m.volume < 10) warnings.push(`Very low volume (${m.volume}/mo)`);
@@ -396,7 +396,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
       return {
         keyword: kw,
         valid: true,
-        source: 'semrush' as const,
+        source: bulkProvider.name,
         metrics: {
           volume: m.volume,
           difficulty: m.difficulty,
