@@ -98,6 +98,9 @@ export interface SeoDataProvider {
   /** Check if this provider has valid credentials configured */
   isConfigured(): boolean;
 
+  /** Optional startup probe to detect unavailable capabilities early */
+  init?(): Promise<void>;
+
   // Keyword Intelligence
   getKeywordMetrics(keywords: string[], workspaceId: string, database?: string): Promise<KeywordMetrics[]>;
   getRelatedKeywords(keyword: string, workspaceId: string, limit?: number, database?: string): Promise<RelatedKeyword[]>;

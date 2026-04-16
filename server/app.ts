@@ -114,7 +114,9 @@ import { DataForSeoProvider } from './providers/dataforseo-provider.js';
 
 // ─── Register SEO data providers ───
 registerProvider('semrush', new SemrushProvider());
-registerProvider('dataforseo', new DataForSeoProvider());
+const dfsProv = new DataForSeoProvider();
+registerProvider('dataforseo', dfsProv);
+dfsProv.init().catch((err: unknown) => log.warn({ err }, 'DataForSEO capability probe failed'));
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

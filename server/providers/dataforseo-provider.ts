@@ -224,6 +224,19 @@ export class DataForSeoProvider implements SeoDataProvider {
     return !!getCredentials();
   }
 
+  async init(): Promise<void> {
+    if (!this.isConfigured()) return;
+    try {
+      await apiCall('backlinks/summary/live', [{ target: 'example.com', include_subdomains: false }]);
+    } catch (err) {
+      if (isSubscriptionError(err)) {
+        markBacklinksDisabled();
+        log.info('DataForSEO backlinks subscription not available — proactively falling back to SEMRush');
+      }
+      // Non-subscription errors (network, rate limit) are silently ignored — reactive detection handles them
+    }
+  }
+
   // ── getKeywordMetrics → search_volume ──
   async getKeywordMetrics(keywords: string[], workspaceId: string, database = 'us'): Promise<KeywordMetrics[]> {
     const results: KeywordMetrics[] = [];

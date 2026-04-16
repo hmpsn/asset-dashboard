@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { isCapabilityDisabled, clearCapabilityDisabled } from '../../server/seo-data-provider.js';
 
 // Mock fs so writeCache/readCache don't touch disk
 vi.mock('fs', async (importOriginal) => {
@@ -362,5 +363,56 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
       expect.arrayContaining([expect.objectContaining({ keyword: 'l1-write-test-kw', volume: 5000 })]),
       'us'
     );
+  });
+});
+
+describe('DataForSeoProvider — init() capability probe', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearCapabilityDisabled('dataforseo', 'backlinks');
+  });
+
+  it('marks backlinks disabled when probe returns subscription error', async () => {
+    const provider = new DataForSeoProvider();
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        tasks: [{ status_code: 40204, status_message: 'subscription required — 40204', cost: 0 }],
+      }),
+    } as Response);
+
+    await provider.init();
+
+    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(true);
+  });
+
+  it('does not mark backlinks disabled when probe succeeds', async () => {
+    const provider = new DataForSeoProvider();
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ target: 'example.com', backlinks: 0 }])),
+    } as Response);
+
+    await provider.init();
+
+    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
+  });
+
+  it('is a no-op when provider is not configured', async () => {
+    const savedLogin = process.env.DATAFORSEO_LOGIN;
+    const savedPwd = process.env.DATAFORSEO_PASSWORD;
+    delete process.env.DATAFORSEO_LOGIN;
+    delete process.env.DATAFORSEO_PASSWORD;
+
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    await provider.init();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    process.env.DATAFORSEO_LOGIN = savedLogin;
+    process.env.DATAFORSEO_PASSWORD = savedPwd;
   });
 });
