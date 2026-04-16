@@ -426,7 +426,7 @@ describe('DataForSeoProvider — getDomainKeywords order_by contract', () => {
     const provider = new DataForSeoProvider();
     const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ tasks: [{ result: [{ items: [] }] }] }),
+      json: async () => dfsTaskResponse([{ items: [] }]),
     } as Response);
 
     await provider.getDomainKeywords('example.com', 'ws-order-by', 100, 'us');
