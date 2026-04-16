@@ -955,8 +955,11 @@ export async function generateBrief(
     }
   }
 
+  // Build providerLabel early — used in SERP features block and keyword metrics block below.
+  const providerLabel = context.providerLabel ?? 'SEMRush';
+
   // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
-  // SEMRush flags which SERP features are present for the primary keyword; we translate
+  // Provider flags which SERP features are present for the primary keyword; we translate
   // those signals into concrete structural directives for the brief writer.
   let serpFeaturesDirectiveBlock = '';
   if (matchedPage?.serpFeatures?.length) {
@@ -975,7 +978,7 @@ export async function generateBrief(
       directives.push('LOCAL PACK OPPORTUNITY: Include location-specific content, NAP details, and recommend LocalBusiness schema markup.');
     }
     if (directives.length > 0) {
-      serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (SEMRush data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;
+      serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (${providerLabel} data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;
     }
   }
 
@@ -1000,7 +1003,6 @@ export async function generateBrief(
     : '';
 
   // Build provider metrics block (real metrics replace hallucinated data)
-  const providerLabel = context.providerLabel ?? 'SEMRush';
   let providerMetricsBlock = '';
   if (context.keywordMetrics) {
     const m = context.keywordMetrics;
