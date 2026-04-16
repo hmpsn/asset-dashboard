@@ -418,6 +418,52 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
   });
 });
 
+describe('DataForSeoProvider — getDomainKeywords order_by contract', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('includes explicit search_volume DESC order_by in the ranked_keywords payload', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ tasks: [{ result: [{ items: [] }] }] }),
+    } as Response);
+
+    await provider.getDomainKeywords('example.com', 'ws-order-by', 100, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const call = fetchSpy.mock.calls[0];
+    const body = JSON.parse(call[1]!.body as string);
+    expect(body[0].order_by).toEqual(['keyword_data.keyword_info.search_volume,desc']);
+  });
+});
+
+describe('DataForSeoProvider — getReferringDomains date normalization', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('normalizes first_seen / last_visited via normalizeProviderDate', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => dfsTaskResponse([{
+        items: [
+          {
+            domain: 'example.com',
+            backlinks: 14,
+            first_seen: '1747509061',
+            last_visited: '1776200795',
+          },
+        ],
+      }]),
+    } as Response);
+
+    const result = await provider.getReferringDomains('example.test', 'ws-dfs-date', 15, 'us');
+    expect(result[0].firstSeen).toMatch(/^2025-05-17T/);
+    expect(result[0].lastSeen).toMatch(/^2026-\d{2}-\d{2}T/);
+  });
+});
+
 describe('DataForSeoProvider — init() capability probe', () => {
   afterEach(() => {
     vi.restoreAllMocks();
