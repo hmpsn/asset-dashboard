@@ -418,4 +418,35 @@ describe('DataForSeoProvider — init() capability probe', () => {
       else delete process.env.DATAFORSEO_PASSWORD;
     }
   });
+
+  it('skips API probe when a recent probe result exists on disk', async () => {
+    const provider = new DataForSeoProvider();
+    const fresh = { outcome: 'backlinks-disabled', probedAt: new Date().toISOString() };
+
+    // readFileSync returns a fresh cached probe result → init() must not call fetch.
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(fresh));
+    const fetchSpy = vi.spyOn(global, 'fetch');
+
+    await provider.init();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(true);
+  });
+
+  it('re-probes when the cached probe result is older than the 24h TTL', async () => {
+    const provider = new DataForSeoProvider();
+    const stale = { outcome: 'backlinks-disabled', probedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() };
+
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(stale));
+    vi.spyOn(fs, 'writeFileSync').mockReturnValue(undefined);
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ target: 'example.com', backlinks: 0 }])),
+    } as Response);
+
+    await provider.init();
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(isCapabilityDisabled('dataforseo', 'backlinks')).toBe(false);
+  });
 });

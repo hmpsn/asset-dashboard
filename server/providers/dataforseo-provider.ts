@@ -115,6 +115,40 @@ function markBacklinksDisabled(): void {
   markCapabilityDisabled('dataforseo', 'backlinks', BACKLINK_COOLDOWN_MS);
 }
 
+// ── Probe result persistence (avoids billable probe on every server restart) ──
+// The in-memory registry's 24h capability TTL resets on restart. Frequently-restarting
+// deploys (rolling updates, dev reloads) would otherwise consume a probe credit per restart.
+// Cache the probe outcome to disk with the same 24h TTL; refresh only when stale or absent.
+
+interface ProbeResult {
+  /** 'backlinks-disabled' | 'backlinks-available' */
+  outcome: 'backlinks-disabled' | 'backlinks-available';
+  probedAt: string;
+}
+
+function getProbeCachePath(): string {
+  return path.join(CREDIT_DIR, 'probe-result.json');
+}
+
+function readProbeCache(): ProbeResult | null {
+  try {
+    const raw = fs.readFileSync(getProbeCachePath(), 'utf-8');
+    const parsed = JSON.parse(raw) as ProbeResult;
+    const age = Date.now() - new Date(parsed.probedAt).getTime();
+    if (age > BACKLINK_COOLDOWN_MS) return null;
+    return parsed;
+  } catch (err) { return null; }
+}
+
+function writeProbeCache(outcome: ProbeResult['outcome']): void {
+  try {
+    fs.writeFileSync(
+      getProbeCachePath(),
+      JSON.stringify({ outcome, probedAt: new Date().toISOString() } satisfies ProbeResult, null, 2),
+    );
+  } catch (err) { log.warn({ err }, 'Failed to persist DataForSEO probe result'); }
+}
+
 function isSubscriptionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return msg.includes('40204') || msg.includes('subscription');
@@ -226,16 +260,30 @@ export class DataForSeoProvider implements SeoDataProvider {
 
   async init(): Promise<void> {
     if (!this.isConfigured()) return;
+
+    // Reuse a recent probe result from disk so rolling restarts don't spend a credit per boot.
+    const cached = readProbeCache();
+    if (cached) {
+      if (cached.outcome === 'backlinks-disabled') {
+        markBacklinksDisabled();
+        log.info({ probedAt: cached.probedAt }, 'DataForSEO backlinks disabled (cached probe)');
+      }
+      return;
+    }
+
     try {
       await apiCall('backlinks/summary/live', [{ target: 'example.com', include_subdomains: false }]);
+      writeProbeCache('backlinks-available');
     } catch (err) {
       // Only 40204 is a reliable signal in the cold-start probe context
       const errMsg = err instanceof Error ? err.message : String(err);
       if (errMsg.includes('40204')) {
         markBacklinksDisabled();
+        writeProbeCache('backlinks-disabled');
         log.info('DataForSEO backlinks subscription not available — proactively falling back to SEMRush');
       }
-      // Non-subscription errors (network, rate limit) are silently ignored — reactive detection handles them
+      // Non-subscription errors (network, rate limit) are silently ignored — reactive detection
+      // handles them, and we deliberately don't cache them so transient issues get retried next boot.
     }
   }
 
