@@ -399,7 +399,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit,
-        item_types: ['organic', 'featured_snippet', 'local_pack'],
+        item_types: ['organic', 'featured_snippet', 'local_pack', 'people_also_ask', 'videos'],
       }]);
 
       const taskResults = getTaskResult(json);
@@ -416,7 +416,8 @@ export class DataForSeoProvider implements SeoDataProvider {
         const itemType = (serpItem?.type as string) ?? 'organic';
         if (keyword && itemType !== 'organic') {
           if (!serpFeaturesMap.has(keyword)) serpFeaturesMap.set(keyword, new Set());
-          serpFeaturesMap.get(keyword)!.add(itemType);
+          const normalizedType = itemType === 'videos' ? 'video' : itemType;
+          serpFeaturesMap.get(keyword)!.add(normalizedType);
         }
       }
 
@@ -690,12 +691,16 @@ export class DataForSeoProvider implements SeoDataProvider {
       const cost = getTaskCost(json);
       const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
 
-      const results: ReferringDomain[] = items.map(item => ({
-        domain: (item.domain as string) ?? '',
-        backlinksCount: (item.backlinks as number) ?? 0,
-        firstSeen: (item.first_seen as string) ?? '',
-        lastSeen: (item.lost_date as string) ?? 'N/A',
-      }));
+      const results: ReferringDomain[] = items.map(item => {
+        const lastVisited = item.last_visited as string | undefined;
+        const firstSeen = item.first_seen as string | undefined;
+        return {
+          domain: (item.domain as string) ?? '',
+          backlinksCount: (item.backlinks as number) ?? 0,
+          firstSeen: firstSeen ?? '',
+          lastSeen: lastVisited ?? firstSeen ?? 'N/A',
+        };
+      });
 
       logCreditUsage({ credits: cost, endpoint: 'backlinks_referring_domains', query: target, rowsReturned: results.length, workspaceId, cached: false });
       writeCache(workspaceId, cacheKey, results);

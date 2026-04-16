@@ -835,8 +835,9 @@ export async function generateBrief(
     relatedQueries?: { query: string; position: number; clicks: number; impressions: number }[];
     businessContext?: string;
     existingPages?: string[];
-    semrushMetrics?: KeywordMetrics;
-    semrushRelated?: RelatedKeyword[];
+    keywordMetrics?: KeywordMetrics;
+    relatedKeywords?: RelatedKeyword[];
+    providerLabel?: string;
     pageType?: string;
     ga4PagePerformance?: { landingPage: string; sessions: number; users: number; bounceRate: number; avgEngagementTime: number; conversions: number }[];
     referenceUrls?: string[];
@@ -998,23 +999,26 @@ export async function generateBrief(
     ? buildStyleExampleContext(context.styleExamples)
     : '';
 
-  // Build SEMRush data block (real metrics replace hallucinated data)
-  let semrushBlock = '';
-  if (context.semrushMetrics) {
-    const m = context.semrushMetrics;
-    semrushBlock += `\n\nREAL KEYWORD DATA (from SEMRush — use these exact numbers, do NOT hallucinate different values):
+  // Build provider metrics block (real metrics replace hallucinated data)
+  const providerLabel = context.providerLabel ?? 'SEMRush';
+  let providerMetricsBlock = '';
+  if (context.keywordMetrics) {
+    const m = context.keywordMetrics;
+    providerMetricsBlock += `\n\nREAL KEYWORD DATA (from ${providerLabel} — use these exact numbers, do NOT hallucinate different values):
 - Monthly search volume: ${m.volume.toLocaleString()}
 - Keyword difficulty: ${m.difficulty}/100
 - CPC: $${m.cpc.toFixed(2)}
-- Competition: ${m.competition.toFixed(2)}
-- Total results: ${m.results.toLocaleString()}`;
+- Competition: ${m.competition.toFixed(2)}`;
+    if (m.results > 0) {
+      providerMetricsBlock += `\n- Total results: ${m.results.toLocaleString()}`;
+    }
     if (m.trend?.length) {
-      semrushBlock += `\n- 12-month volume trend: ${m.trend.join(', ')}`;
+      providerMetricsBlock += `\n- 12-month volume trend: ${m.trend.join(', ')}`;
     }
   }
-  if (context.semrushRelated?.length) {
-    semrushBlock += `\n\nRELATED KEYWORDS (from SEMRush — real data, use for secondary keywords and topical entities):\n`;
-    semrushBlock += context.semrushRelated.slice(0, 15)
+  if (context.relatedKeywords?.length) {
+    providerMetricsBlock += `\n\nRELATED KEYWORDS (from ${providerLabel} — real data, use for secondary keywords and topical entities):\n`;
+    providerMetricsBlock += context.relatedKeywords.slice(0, 15)
       .map(r => `"${r.keyword}" (vol: ${r.volume.toLocaleString()}, KD: ${r.difficulty}, CPC: $${r.cpc.toFixed(2)})`)
       .join('\n');
   }
@@ -1105,7 +1109,7 @@ Related search queries from Google Search Console:
 ${relatedStr}
 
 Existing pages on the site:
-${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${semrushBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
+${pagesStr}${keywordBlock}${brandVoiceBlock}${kwMapContext}${knowledgeBlock}${personasBlock}${providerMetricsBlock}${ga4Block}${pageAnalysisBlock}${serpFeaturesDirectiveBlock}${referenceBlock}${serpBlock}${styleBlock}${templateBlock}${strategyCardBlock}${intelligenceBlock}${learningsBlock}
 
 Generate a content brief in the following JSON format:
 {

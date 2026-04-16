@@ -200,17 +200,18 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     }
 
     // Gather SEO keyword data if a provider is configured
-    let semrushMetrics: KeywordMetrics | undefined;
-    let semrushRelated: RelatedKeyword[] | undefined;
+    let keywordMetrics: KeywordMetrics | undefined;
+    let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    const providerLabel = seoProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
     if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([
           seoProvider.getKeywordMetrics([request.targetKeyword], req.params.workspaceId),
           seoProvider.getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
         ]);
-        if (metrics.length > 0) semrushMetrics = metrics[0];
-        if (related.length > 0) semrushRelated = related;
+        if (metrics.length > 0) keywordMetrics = metrics[0];
+        if (related.length > 0) relatedKeywords = related;
       } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
     }
 
@@ -238,8 +239,9 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
       existingPages,
-      semrushMetrics,
-      semrushRelated,
+      keywordMetrics,
+      relatedKeywords,
+      providerLabel,
       pageType: request.pageType || 'blog',
       ga4PagePerformance,
       strategyCardContext,
