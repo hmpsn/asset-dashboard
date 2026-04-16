@@ -19,6 +19,7 @@ import {
   useDeletePattern,
 } from '../../hooks/admin/useCopyPipeline';
 import { copyIntelligence } from '../../api/brand-engine';
+import { queryKeys } from '../../lib/queryKeys';
 import { SectionCard } from '../ui/SectionCard';
 import { Badge } from '../ui/Badge';
 import { SectionCardSkeleton } from '../ui/Skeleton';
@@ -125,8 +126,8 @@ function PatternRow({ pattern, workspaceId }: PatternRowProps) {
     mutationFn: ({ id, text, patternType }: { id: string; text: string; patternType: string }) =>
       copyIntelligence.update(workspaceId, id, { pattern: text, patternType }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-intelligence', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['admin-copy-promotable', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(workspaceId) });
     },
   });
 

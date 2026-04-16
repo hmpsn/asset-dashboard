@@ -70,6 +70,15 @@ export const queryKeys = {
     brandscripts: (wsId: string) => ['admin-brandscripts', wsId] as const,
     brandscriptTemplates: () => ['admin-brandscript-templates'] as const,
 
+    // Brand Engine — Voice & Identity
+    voiceProfile: (wsId: string) => ['admin-voice-profile', wsId] as const,
+    brandIdentity: (wsId: string) => ['admin-brand-identity', wsId] as const,
+
+    // Brand Engine — Discovery
+    discoverySources: (wsId: string) => ['admin-discovery-sources', wsId] as const,
+    discoveryExtractions: (wsId: string, sourceId: string) => ['admin-discovery-extractions', wsId, sourceId] as const,
+    discoveryExtractionsAll: (wsId: string) => ['admin-discovery-extractions', wsId] as const,
+
     // Brand Engine — Page Strategy
     blueprints: (wsId: string) => ['admin-blueprints', wsId] as const,
     blueprint: (wsId: string, blueprintId: string) => ['admin-blueprint', wsId, blueprintId] as const,
