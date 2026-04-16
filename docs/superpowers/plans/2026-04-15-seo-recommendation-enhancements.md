@@ -16,7 +16,7 @@
 |------|--------|
 | `server/recommendations.ts` | All 7 items: imports, new sections, function signature tweak |
 | `shared/types/recommendations.ts` | Add `seasonalTag?` to `RecommendationSet.summary` (Item 3) |
-| `tests/integration/recommendations-enhancements.test.ts` | New test file — port **13320** |
+| `tests/integration/recommendations-enhancements.test.ts` | New test file — no HTTP server (calls `generateRecommendations` directly; port **13320** reserved for registry) |
 
 ---
 
@@ -35,7 +35,7 @@ Before writing any code, read these to get exact field names:
 
 ---
 
-## Task 0: Extend `RecommendationSet` Type for Seasonal Tag
+## Task 0: Extend `RecommendationSet` Type for Seasonal Tag *(Model: sonnet)*
 
 **Files:**
 - Modify: `shared/types/recommendations.ts`
@@ -87,7 +87,7 @@ git commit -m "feat(types): add seasonalTag to RecommendationSet summary"
 
 ---
 
-## Task 1: CTR Gap Recommendations (Item 1)
+## Task 1: CTR Gap Recommendations (Item 1) *(Model: sonnet)*
 
 Pages with high impressions but below-expected CTR get "rewrite your title/meta" recommendations with the gap quantified.
 
@@ -291,7 +291,7 @@ git commit -m "feat(recommendations): add CTR gap recommendations from analytics
 
 ---
 
-## Task 2: Conversion-Weighted Prioritization (Item 2)
+## Task 2: Conversion-Weighted Prioritization (Item 2) *(Model: sonnet)*
 
 High-converting pages get a traffic-score boost so they surface first in recommendations.
 
@@ -350,21 +350,18 @@ In `generateRecommendations()`, directly after the line `const traffic = await f
 ```typescript
   // Build conversion rate map from analytics insights
   // key = page path (e.g. '/blog/post'), value = conversionRate (percentage)
+  // NOTE: computeConversionAttributionInsights() stores the landing page path in
+  // insight.pageId (set to p.landingPage). ConversionAttributionData.data has no
+  // page path field — do NOT look inside data for it.
   const conversionMap = new Map<string, number>();
   for (const insight of getInsights(workspaceId, 'conversion_attribution')) {
     const d = insight.data as InsightDataMap['conversion_attribution'];
-    // The page path is stored as [FIELD] on the insight.
-    // Check computeConversionAttributionInsights() in analytics-intelligence.ts
-    // to confirm: use insight.pageUrl, insight.pagePath, or d.pagePath — whichever applies.
-    const pagePath = (insight as unknown as { pageUrl?: string; pagePath?: string }).pageUrl
-      ?? (insight as unknown as { pageUrl?: string; pagePath?: string }).pagePath;
+    const pagePath = insight.pageId; // landingPage path stored as pageId by computeConversionAttributionInsights
     if (pagePath && d.conversionRate > 0) {
       conversionMap.set(pagePath, d.conversionRate);
     }
   }
 ```
-
-**Note:** Replace the `pagePath` resolution with the exact field you identified in Step 1. Delete the fallback branch you don't need.
 
 - [ ] **Step 5: Update every `getTrafficScore()` call site**
 
@@ -401,7 +398,7 @@ git commit -m "feat(recommendations): weight traffic scores by page conversion r
 
 ---
 
-## Task 3: Seasonal Tagging (Item 3)
+## Task 3: Seasonal Tagging (Item 3) *(Model: sonnet)*
 
 Stamp every generated recommendation set with `{ month, quarter }` for future seasonal analysis.
 
@@ -484,7 +481,7 @@ git commit -m "feat(recommendations): stamp recommendation sets with seasonal co
 
 ---
 
-## Task 4: Authority-Adjusted KD Filtering (Item 4)
+## Task 4: Authority-Adjusted KD Filtering (Item 4) *(Model: sonnet)*
 
 Content gap recommendations for keywords that are too difficult for the domain's authority get penalized; easy-win keywords get boosted.
 
@@ -529,9 +526,10 @@ describe('Item 4: Authority-Adjusted KD Filtering', () => {
       JSON.stringify({
         contentGaps: [
           // KD 60, domainStrength 20 → kdGap 40 > 30 → impactScore * 0.6
-          { keyword: 'hard-keyword', priority: 'high', difficulty: 60, volume: 500 },
+          // topic is used in the rec title; targetKeyword/intent/rationale are required ContentGap fields
+          { topic: 'hard-keyword', targetKeyword: 'hard keyword query', intent: 'informational', rationale: 'test', priority: 'high', difficulty: 60, volume: 500 },
           // KD 10, domainStrength 20 → kdGap -10, not < -20 → no boost (neutral)
-          { keyword: 'easy-keyword', priority: 'high', difficulty: 10, volume: 500 },
+          { topic: 'easy-keyword', targetKeyword: 'easy keyword query', intent: 'informational', rationale: 'test', priority: 'high', difficulty: 10, volume: 500 },
         ],
       }),
       wsId,
@@ -545,20 +543,20 @@ describe('Item 4: Authority-Adjusted KD Filtering', () => {
 
   it('penalizes impactScore for keywords with KD gap > 30', async () => {
     const result = await generateRecommendations(wsId);
+    // titles are "Content Gap: hard-keyword" and "Content Gap: easy-keyword" (from cg.topic)
     const hardRec = result.recommendations.find(r => r.title?.toLowerCase().includes('hard-keyword'));
     const easyRec = result.recommendations.find(r => r.title?.toLowerCase().includes('easy-keyword'));
     // Both are 'high' priority (base impactScore 65). Hard gets * 0.6 = 39; easy is neutral = 65.
-    if (hardRec && easyRec) {
-      expect(hardRec.impactScore).toBeLessThan(easyRec.impactScore);
-    }
+    expect(hardRec).toBeDefined();
+    expect(easyRec).toBeDefined();
+    expect(hardRec!.impactScore).toBeLessThan(easyRec!.impactScore);
   });
 
   it('adds KD context note to estimatedGain when keyword is too hard', async () => {
     const result = await generateRecommendations(wsId);
     const hardRec = result.recommendations.find(r => r.title?.toLowerCase().includes('hard-keyword'));
-    if (hardRec) {
-      expect(hardRec.estimatedGain).toMatch(/challenging|authority/i);
-    }
+    expect(hardRec).toBeDefined();
+    expect(hardRec!.estimatedGain).toMatch(/challenging|authority/i);
   });
 });
 ```
@@ -654,7 +652,7 @@ git commit -m "feat(recommendations): adjust content gap KD scores by inferred d
 
 ---
 
-## Task 5: Search Intent Mismatch Detection (Item 5)
+## Task 5: Search Intent Mismatch Detection (Item 5) *(Model: sonnet)*
 
 Flag service/product pages targeting informational keywords (and vice versa) as strategy recommendations.
 
@@ -832,7 +830,7 @@ git commit -m "feat(recommendations): detect search intent mismatches as strateg
 
 ---
 
-## Task 6: Diagnostic → Recommendation Auto-Creation (Item 6)
+## Task 6: Diagnostic → Recommendation Auto-Creation (Item 6) *(Model: sonnet)*
 
 Completed diagnostic reports surface their remediation actions as recommendations.
 
@@ -860,12 +858,14 @@ describe('Item 6: Diagnostic Recommendations', () => {
 
   beforeAll(() => {
     seedTestWorkspace(wsId);
-    // IMPORTANT: Check server/diagnostic-store.ts for exact table/column names
-    // before running. Adjust column names in this INSERT if they differ.
+    // Schema: diagnostic_reports has anomaly_type TEXT NOT NULL (no default).
+    // completed_at is the completion timestamp column — there is no updated_at.
+    // affected_pages, diagnostic_context, root_causes, admin_report, client_summary
+    // all have DEFAULT values so they can be omitted.
     db.prepare(`
       INSERT OR IGNORE INTO diagnostic_reports
-        (id, workspace_id, status, remediation_actions, created_at, updated_at)
-      VALUES (?, ?, 'completed', ?, datetime('now'), datetime('now'))
+        (id, workspace_id, anomaly_type, status, remediation_actions)
+      VALUES (?, ?, 'test_anomaly', 'completed', ?)
     `).run(
       'diag-rpt-0001',
       wsId,
@@ -998,7 +998,7 @@ git commit -m "feat(recommendations): auto-create recommendations from completed
 
 ---
 
-## Task 7: Outcome-Weighted Recommendation Scoring (Item 7)
+## Task 7: Outcome-Weighted Recommendation Scoring (Item 7) *(Model: sonnet)*
 
 Boost recommendation types that historically produce wins; penalize types with low win rates.
 
@@ -1166,7 +1166,26 @@ git commit -m "feat(recommendations): weight recommendation scores by historical
 
 ---
 
-## Task 8: Quality Gates
+---
+
+## Systemic Improvements
+
+**Shared utilities to extract:**
+- `inferPageType(slug)` (Task 5) is general-purpose. If a second caller appears (e.g. strategy analysis, content briefs), extract to `server/helpers.ts`. One caller today — do not extract prematurely.
+
+**pr-check rules to add:**
+- None required for this feature. All new recommendation sources use unique `source` prefixes that don't collide with existing dedup keys (`audit:`, `strategy:`, `decay:`, `content-gap:`, `ranking:`). No new pattern class is introduced that needs enforcement.
+
+**Test coverage added by this plan:**
+- `tests/integration/recommendations-enhancements.test.ts` — 7 describe blocks, 14+ assertions covering: CTR gap thresholding, top-10 limit, conversion map wiring, seasonal tag month/quarter derivation, KD gap penalty + boost, intent mismatch detection (3 cases), diagnostic P0/P2 promotion, outcome-weighted multipliers.
+- Port 13320 reserved in registry (test uses direct function call, no HTTP server).
+
+**Known silent behavior note (Task 7):**
+- `content_refreshed` is tracked under `CONTENT_ACTION_TYPES` in `workspace-learnings.ts`, not `TECHNICAL_ACTION_TYPES`. It will not appear in `technical.winRateByFixType`. The `fixToRecType` entry for `content_refreshed` is therefore a no-op. Remove it from the mapping to avoid confusion, or move the lookup to `learnings.content` if that category exposes per-action win rates in the future.
+
+---
+
+## Task 8: Quality Gates *(Model: sonnet)*
 
 - [ ] **Step 1: Typecheck**
 
