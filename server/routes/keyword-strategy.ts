@@ -580,7 +580,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
     const relatedKws: RelatedKeyword[] = [];
     const allQuestionKws: { seed: string; questions: { keyword: string; volume: number }[] }[] = [];
     // Competitor keyword data — used to enrich the keyword pool and give competitor proof to content gaps
-    const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number }> = [];
+    const competitorKeywordData: Array<{ keyword: string; volume: number; difficulty: number; domain: string; position: number; serpFeatures?: string }> = [];
 
     const fetchCompetitors = strategyMode !== 'incremental' || shouldFetchCompetitorData(ws);
 
