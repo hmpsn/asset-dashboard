@@ -7,6 +7,7 @@ import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../.
 import { SectionCard, EmptyState, Skeleton } from '../ui';
 import { useToast } from '../Toast';
 import { WS_EVENTS } from '../../lib/wsEvents';
+import { queryKeys } from '../../lib/queryKeys';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -268,18 +269,18 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   const [generatingMission, setGeneratingMission] = useState(false);
 
   const { data: deliverables, isLoading, isError } = useQuery({
-    queryKey: ['admin-brand-identity', workspaceId],
+    queryKey: queryKeys.admin.brandIdentity(workspaceId),
     queryFn: () => identity.list(workspaceId),
   });
 
   useWorkspaceEvents(workspaceId, {
     [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) });
     },
   });
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) });
   }, [queryClient, workspaceId]);
 
   // Build a fast-lookup map: deliverableType → BrandDeliverable
@@ -352,7 +353,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
         Failed to load brand deliverables.{' '}
         <button
           type="button"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-brand-identity', workspaceId] })}
+          onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.admin.brandIdentity(workspaceId) })}
           className="text-teal-400 hover:underline"
         >
           Retry

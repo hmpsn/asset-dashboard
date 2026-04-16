@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
+import { queryKeys } from '../../lib/queryKeys';
 import {
   Upload, FileText, Trash2, Cpu, CheckCircle, XCircle,
   Loader2, ChevronDown, Filter,
@@ -194,7 +195,7 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
   // covers this 3-segment key automatically — all source extractions are refreshed
   // when any discovery update is broadcast.
   const { data: extractions = [], isLoading } = useQuery({
-    queryKey: ['admin-discovery-extractions', workspaceId, source.id],
+    queryKey: queryKeys.admin.discoveryExtractions(workspaceId, source.id),
     queryFn: () => discovery.listExtractionsBySource(workspaceId, source.id),
   });
 
@@ -202,7 +203,7 @@ function ExtractionsPanel({ workspaceId, source, onBack }: ExtractionsPanelProps
     try {
       await discovery.updateExtraction(workspaceId, id, patch);
       // Invalidate both the source-specific and workspace-wide extraction caches
-      queryClient.invalidateQueries({ queryKey: ['admin-discovery-extractions', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoveryExtractionsAll(workspaceId) });
       toast(patch.status === 'accepted' ? 'Extraction accepted' : 'Extraction dismissed');
     } catch {
       toast('Failed to update extraction', 'error');
@@ -674,8 +675,8 @@ function SourcesList({ workspaceId, sources, onViewExtractions }: SourcesListPro
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin-discovery-sources', workspaceId] });
-    queryClient.invalidateQueries({ queryKey: ['admin-discovery-extractions', workspaceId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoverySources(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoveryExtractionsAll(workspaceId) });
   };
 
   const handleUploaded = () => {
@@ -788,15 +789,15 @@ export function DiscoveryTab({ workspaceId }: Props) {
   const [selectedSource, setSelectedSource] = useState<DiscoverySource | null>(null);
 
   const { data: sources = [], isLoading } = useQuery({
-    queryKey: ['admin-discovery-sources', workspaceId],
+    queryKey: queryKeys.admin.discoverySources(workspaceId),
     queryFn: () => discovery.listSources(workspaceId),
   });
 
   // Invalidate on server-pushed discovery events
   useWorkspaceEvents(workspaceId, {
     'discovery:updated': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-discovery-sources', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['admin-discovery-extractions', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoverySources(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.discoveryExtractionsAll(workspaceId) });
     },
   });
 
