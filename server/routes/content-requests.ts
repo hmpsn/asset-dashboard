@@ -8,6 +8,7 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { generateBrief } from '../content-brief.js';
 import { listMatrices } from '../content-matrices.js';
 import {
@@ -110,7 +111,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -118,7 +119,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
 router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Request not found' });
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: req.params.id, deleted: true });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
 
