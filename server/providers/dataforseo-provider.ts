@@ -229,7 +229,9 @@ export class DataForSeoProvider implements SeoDataProvider {
     try {
       await apiCall('backlinks/summary/live', [{ target: 'example.com', include_subdomains: false }]);
     } catch (err) {
-      if (isSubscriptionError(err)) {
+      // Only 40204 is a reliable signal in the cold-start probe context
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('40204')) {
         markBacklinksDisabled();
         log.info('DataForSEO backlinks subscription not available — proactively falling back to SEMRush');
       }

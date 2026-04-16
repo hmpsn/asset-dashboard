@@ -412,7 +412,9 @@ describe('DataForSeoProvider — init() capability probe', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    process.env.DATAFORSEO_LOGIN = savedLogin;
-    process.env.DATAFORSEO_PASSWORD = savedPwd;
+    if (savedLogin !== undefined) process.env.DATAFORSEO_LOGIN = savedLogin;
+    else delete process.env.DATAFORSEO_LOGIN;
+    if (savedPwd !== undefined) process.env.DATAFORSEO_PASSWORD = savedPwd;
+    else delete process.env.DATAFORSEO_PASSWORD;
   });
 });
