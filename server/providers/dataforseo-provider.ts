@@ -761,7 +761,8 @@ export class DataForSeoProvider implements SeoDataProvider {
           domain: (item.domain as string) ?? '',
           backlinksCount: (item.backlinks as number) ?? 0,
           firstSeen: firstSeen ?? '',
-          lastSeen: lastVisited ?? firstSeen ?? 'N/A',
+          // Empty string (not 'N/A') so the frontend falsy-check renders '—' instead of 'Invalid Date'
+          lastSeen: lastVisited ?? firstSeen ?? '',
         };
       });
 
