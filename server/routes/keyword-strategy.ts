@@ -988,7 +988,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         let entry = `- ${p.path}: "${p.title}"`;
         if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
         if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 150)}"`;
-        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 400)}`;
+        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 800)}`;
         const pageGsc = gscByPath.get(p.path);
         if (pageGsc && pageGsc.length > 0) {
           const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
