@@ -1,9 +1,10 @@
 /**
- * keyword-metrics-cache — Global cross-workspace cache for SEMRush keyword metrics.
+ * keyword-metrics-cache — Global cross-workspace cache for keyword metrics.
  *
  * Keyword volume/difficulty/CPC is the same regardless of which workspace asks,
- * so this shared SQLite table eliminates duplicate SEMRush API calls across workspaces.
- * Acts as an L1 cache checked before the per-workspace file cache in semrush.ts.
+ * so this shared SQLite table eliminates duplicate provider API calls across workspaces
+ * (used by both SEMRush and DataForSEO). Acts as an L1 cache checked after the
+ * per-workspace file cache (L2) and before the external API call.
  */
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';

@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
@@ -32,9 +32,10 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
   const kwMapContext = intel ? formatPageMapForPrompt(intel.seoContext) : '';
 
   // Fetch real keyword data for accuracy
-  let semrushBlock = '';
+  let kwBlock = '';
   const kwWs = workspaceId ? getWorkspace(workspaceId) : null;
   const kwProvider = getConfiguredProvider(kwWs?.seoDataProvider);
+  const kwProviderLabel = kwProvider ? getProviderDisplayName(kwProvider.name) : 'SEMRush';
   if (kwProvider && workspaceId) {
     try {
       const seedKeyword = seoTitle || pageTitle;
@@ -47,17 +48,17 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
         ]);
         if (metrics.length > 0) {
           const m = metrics[0];
-          semrushBlock += `\n\nREAL KEYWORD DATA (from SEMRush — use these exact values for difficulty and volume, do NOT estimate):\n`;
-          semrushBlock += `- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}, competition ${m.competition.toFixed(2)}`;
+          kwBlock += `\n\nREAL KEYWORD DATA (from ${kwProviderLabel} — use these exact values for difficulty and volume, do NOT estimate):\n`;
+          kwBlock += `- "${m.keyword}": vol ${m.volume.toLocaleString()}/mo, KD ${m.difficulty}/100, CPC $${m.cpc.toFixed(2)}, competition ${m.competition.toFixed(2)}`;
         }
         if (related.length > 0) {
-          semrushBlock += `\n\nRELATED KEYWORDS WITH REAL METRICS:\n`;
-          semrushBlock += related.slice(0, 10).map(r =>
+          kwBlock += `\n\nRELATED KEYWORDS WITH REAL METRICS:\n`;
+          kwBlock += related.slice(0, 10).map(r =>
             `- "${r.keyword}" (vol: ${r.volume.toLocaleString()}/mo, KD: ${r.difficulty}/100, CPC: $${r.cpc.toFixed(2)})`
           ).join('\n');
         }
       }
-    } catch (e) { log.error({ err: e }, 'SEMRush enrichment error'); }
+    } catch (e) { log.error({ err: e }, 'keyword provider enrichment error'); }
   }
 
   try {
@@ -68,7 +69,7 @@ SEO title: ${seoTitle || '(same as page title)'}
 Meta description: ${metaDescription || '(none)'}
 URL slug: /${slug || ''}
 Site context: ${siteContext || 'N/A'}
-Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapContext}${semrushBlock}
+Page content excerpt: ${pageContent ? pageContent.slice(0, 3000) : 'N/A'}${fullContext}${kwMapContext}${kwBlock}
 
 Provide your analysis as a JSON object with exactly these fields:
 {
@@ -90,7 +91,7 @@ Provide your analysis as a JSON object with exactly these fields:
 }
 
 IMPORTANT:
-- If real keyword data from SEMRush is provided above, use those EXACT numbers for keywordDifficulty and monthlyVolume. Do NOT make up different values.
+- If real keyword data from the keyword provider is provided above, use those EXACT numbers for keywordDifficulty and monthlyVolume. Do NOT make up different values.
 - estimatedDifficulty should be derived from keywordDifficulty: 0-30 = low, 31-60 = medium, 61-100 = high
 - If no real data is available, set keywordDifficulty and monthlyVolume to 0 and estimate based on content analysis
 

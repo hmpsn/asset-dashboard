@@ -8,6 +8,7 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { generateBrief } from '../content-brief.js';
 import { listMatrices } from '../content-matrices.js';
 import {
@@ -19,7 +20,7 @@ import {
 import { notifyClientBriefReady, notifyClientContentPublished } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import type { StrategyCardContext, BriefJourneyStage } from '../../shared/types/content.js';
 import {
@@ -110,7 +111,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
     }
   }
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -118,7 +119,7 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
 router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Request not found' });
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: req.params.id, deleted: true });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: req.params.id, deleted: true });
   res.json({ ok: true });
 });
 
@@ -200,17 +201,18 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     }
 
     // Gather SEO keyword data if a provider is configured
-    let semrushMetrics: KeywordMetrics | undefined;
-    let semrushRelated: RelatedKeyword[] | undefined;
+    let keywordMetrics: KeywordMetrics | undefined;
+    let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([
           seoProvider.getKeywordMetrics([request.targetKeyword], req.params.workspaceId),
           seoProvider.getRelatedKeywords(request.targetKeyword, req.params.workspaceId, 15),
         ]);
-        if (metrics.length > 0) semrushMetrics = metrics[0];
-        if (related.length > 0) semrushRelated = related;
+        if (metrics.length > 0) keywordMetrics = metrics[0];
+        if (related.length > 0) relatedKeywords = related;
       } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
     }
 
@@ -238,8 +240,9 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
       relatedQueries,
       businessContext: ws.keywordStrategy?.businessContext || '',
       existingPages,
-      semrushMetrics,
-      semrushRelated,
+      keywordMetrics,
+      relatedKeywords,
+      providerLabel,
       pageType: request.pageType || 'blog',
       ga4PagePerformance,
       strategyCardContext,
