@@ -54,6 +54,7 @@ export const queryKeys = {
     assetAudit: (siteId: string) => ['admin-asset-audit', siteId] as const,
     seoEditor: (siteId: string) => ['seo-editor', siteId] as const,
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
+    rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
     competitorIntel: (wsId: string, competitorKey: string) =>

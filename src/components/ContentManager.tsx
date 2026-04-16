@@ -9,6 +9,7 @@ import {
 import { PostEditor } from './PostEditor';
 import { contentPosts } from '../api/content';
 import { useAdminPostsList, usePublishTarget } from '../hooks/admin';
+import { queryKeys } from '../lib/queryKeys';
 
 interface PostSummary {
   id: string;
@@ -55,7 +56,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   const [scoringVoice, setScoringVoice] = useState<string | null>(null);
   const [expandedVoice, setExpandedVoice] = useState<string | null>(null);
 
-  const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: ['admin-posts', workspaceId] });
+  const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
 
   const publishPost = async (postId: string) => {
     setPublishingPost(postId);

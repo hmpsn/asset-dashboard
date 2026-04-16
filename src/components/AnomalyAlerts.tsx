@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity, X, Check, RefreshCw, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
-import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useAnomalyAlerts } from '../hooks/admin';
 import { post } from '../api/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../lib/queryKeys';
 
 interface AnomalyAlertsProps {
   workspaceId: string;
@@ -63,28 +63,22 @@ export function AnomalyAlerts({ workspaceId, isAdmin = false, compact = false }:
   // React Query hook replaces manual useEffect fetching
   const { data: anomalies = [], isLoading } = useAnomalyAlerts(workspaceId, isAdmin);
 
-  useWorkspaceEvents(workspaceId, {
-    'anomalies:update': () => {
-      queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
-    },
-  });
-
   const handleDismiss = async (id: string) => {
     try {
       await post(`/api/anomalies/${id}/dismiss`);
-      queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.anomalyAlerts(workspaceId) });
     } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
   };
 
   const handleAcknowledge = async (id: string) => {
     try {
       await post(`/api/anomalies/${id}/acknowledge`);
-      queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.anomalyAlerts(workspaceId) });
     } catch (err) { console.error('AnomalyAlerts operation failed:', err); }
   };
 
   const handleRefresh = async () => {
-    queryClient.invalidateQueries({ queryKey: ['anomaly-alerts', workspaceId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.anomalyAlerts(workspaceId) });
   };
 
   const handleScan = async () => {
