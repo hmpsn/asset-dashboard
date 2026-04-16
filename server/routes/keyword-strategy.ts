@@ -671,6 +671,8 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
             for (const comp of competitorDomains.slice(0, 3)) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
+                // cache-miss-ok: fetchLimit intentionally differs from compLimit for SEMRush overfetch.
+                // SEMRush cache key includes the limit param, so _400 entries don't collide with _200.
                 const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
                 // Sort by volume DESC, then slice to compLimit. For DFS this is a no-op
                 // (already sorted); for SEMRush this is the parity step.
