@@ -590,12 +590,14 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (areCreditsExhausted()) return null;
 
     try {
+      // NOTE: See getDomainKeywords above — `ranked_keywords/live` rejects `item_types`
+      // with error 40501. We only read `resultObj.metrics.organic`, which the endpoint
+      // aggregates across all types regardless of what's returned in `items`.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
         location_code: locationCode(database),
         language_code: 'en',
         limit: 1,
-        item_types: ['organic'],
       }]);
 
       const taskResults = getTaskResult(json);
