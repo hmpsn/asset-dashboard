@@ -8,6 +8,10 @@ describe('brand engine factory entries', () => {
   it('brandIdentity key matches legacy literal', () => {
     expect(queryKeys.admin.brandIdentity('ws-1')).toEqual(['admin-brand-identity', 'ws-1']);
   });
+  it('discoveryExtractions key matches legacy literal', () => {
+    expect(queryKeys.admin.discoveryExtractions('ws-1', 'src-1'))
+      .toEqual(['admin-discovery-extractions', 'ws-1', 'src-1']);
+  });
   it('discoveryExtractionsAll is a prefix of discoveryExtractions', () => {
     expect(queryKeys.admin.discoveryExtractions('ws-1', 'src-1').slice(0, 2))
       .toEqual(queryKeys.admin.discoveryExtractionsAll('ws-1'));
