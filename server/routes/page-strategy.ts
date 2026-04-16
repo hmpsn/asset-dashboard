@@ -61,7 +61,7 @@ const addEntrySchema = z.object({
   isCollection: z.boolean().optional(),
   primaryKeyword: z.string().optional(),
   secondaryKeywords: z.array(z.string()).optional(),
-  keywordSource: z.enum(['manual', 'ai_suggested', 'semrush']).optional(),
+  keywordSource: z.enum(['manual', 'ai_suggested', 'semrush', 'dataforseo']).optional(),
   sectionPlan: z.array(z.object({
     id: z.string().optional(),
     sectionType: z.string().min(1),
@@ -83,7 +83,7 @@ const updateEntrySchema = z.object({
   isCollection: z.boolean().optional(),
   primaryKeyword: z.string().nullable().optional(),
   secondaryKeywords: z.array(z.string()).nullable().optional(),
-  keywordSource: z.enum(['manual', 'ai_suggested', 'semrush']).nullable().optional(),
+  keywordSource: z.enum(['manual', 'ai_suggested', 'semrush', 'dataforseo']).nullable().optional(),
   sectionPlan: z.array(z.object({
     id: z.string().optional(),
     sectionType: z.string().min(1),
