@@ -165,7 +165,7 @@ export async function analyzeContentDecay(ws: Workspace): Promise<DecayAnalysis>
 
   for (const [pagePath, current] of currentMap) {
     const prev = prevMap.get(pagePath);
-    if (!prev || prev.clicks < 5) continue; // Skip pages with no previous data or very low traffic
+    if (!prev || prev.clicks < 25) continue; // Skip pages with no previous data or very low traffic
 
     const clickDecline = prev.clicks > 0 ? ((current.clicks - prev.clicks) / prev.clicks) * 100 : 0;
     const impressionChange = prev.impressions > 0 ? ((current.impressions - prev.impressions) / prev.impressions) * 100 : 0;
@@ -279,7 +279,7 @@ Keep each bullet to 1-2 sentences. Be specific to this page's situation.`;
     model: 'gpt-4.1-mini',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
-    temperature: 0.7,
+    temperature: 0.3,
     feature: 'content-decay',
     workspaceId: ws.id,
   });
