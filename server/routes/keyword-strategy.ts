@@ -655,12 +655,28 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         // Both quick and full: fetch competitor keywords (their top terms become our keyword pool)
         if (fetchCompetitors && competitorDomains.length > 0) {
           try {
-            const compLimit = semrushMode === 'full' ? 100 : 50;
+            // Raised 100 → 200 (full mode) to capture the long tail of high-value
+            // competitor keywords. Cost: ~2× provider credits per competitor, worth it
+            // for gap-analysis quality. PR #218 A-series verification notes.
+            const compLimit = semrushMode === 'full' ? 200 : 50;
+
+            // Provider parity: DFS gets an explicit search_volume,desc order_by
+            // (see dataforseo-provider.ts), so its top-N already IS top-N-by-volume.
+            // SEMRush domain_organic has no URL-level sort knob and returns rank-ordered
+            // by default. To get the same semantics we overfetch 2× and re-sort in-memory.
+            const fetchMultiplier = provider.name === 'semrush' ? 2 : 1;
+            const fetchLimit = compLimit * fetchMultiplier;
+
             sendProgress('semrush', `Fetching competitor keywords (${competitorDomains.length} competitors)...`, 0.58);
             for (const comp of competitorDomains.slice(0, 3)) {
               const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
               try {
-                const compKws = await provider.getDomainKeywords(cleanComp, ws.id, compLimit);
+                const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
+                // Sort by volume DESC, then slice to compLimit. For DFS this is a no-op
+                // (already sorted); for SEMRush this is the parity step.
+                const compKws = [...rawKws]
+                  .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+                  .slice(0, compLimit);
                 for (const ck of compKws) {
                   competitorKeywordData.push({
                     keyword: ck.keyword,
@@ -668,9 +684,13 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                     difficulty: ck.difficulty,
                     domain: cleanComp,
                     position: ck.position,
+                    // serpFeatures carried so downstream SERP-feature chip rendering
+                    // and opportunity scoring can see it. DomainKeyword.serpFeatures
+                    // is populated by both providers (DFS dedupe loop, SEMRush Fk column).
+                    serpFeatures: ck.serpFeatures,
                   });
                 }
-                log.info(`Got ${compKws.length} keywords from competitor ${cleanComp}`);
+                log.info(`Got ${compKws.length} keywords from competitor ${cleanComp} (fetched ${rawKws.length})`);
               } catch (err) {
                 log.warn({ err }, `Failed to fetch keywords for competitor ${cleanComp}`);
               }
