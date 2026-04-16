@@ -8,6 +8,7 @@ import {
   clearCapabilityDisabled,
   getProviderForCapability,
   getBacklinksProvider,
+  _resetRegistryForTest,
   type SeoDataProvider,
   type ProviderName,
 } from '../../server/seo-data-provider.js';
@@ -30,9 +31,7 @@ function makeProvider(name: ProviderName, configured = true): SeoDataProvider {
 
 describe('getProviderForCapability', () => {
   beforeEach(() => {
-    clearCapabilityDisabled('dataforseo', 'backlinks');
-    clearCapabilityDisabled('semrush', 'backlinks');
-    clearCapabilityDisabled('dataforseo', 'serp_features');
+    _resetRegistryForTest();
   });
 
   it('returns primary provider when capability is not disabled', () => {

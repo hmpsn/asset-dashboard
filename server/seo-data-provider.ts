@@ -179,6 +179,12 @@ export function clearCapabilityDisabled(providerName: ProviderName, capability: 
   disabledCapabilities.get(providerName)?.delete(capability);
 }
 
+/** FOR TEST USE ONLY. Clears all registered providers and capability flags. */
+export function _resetRegistryForTest(): void {
+  providers.clear();
+  disabledCapabilities.clear();
+}
+
 /**
  * Generic capability-aware provider resolver.
  * Returns the preferred provider if the capability is available,
