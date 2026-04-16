@@ -180,20 +180,19 @@ export function clearCapabilityDisabled(providerName: ProviderName, capability: 
 }
 
 /**
- * Get a provider that supports backlinks. If the preferred provider's backlinks
- * are unavailable (e.g. DataForSEO without backlinks subscription), falls back
- * to another configured provider that does support them.
+ * Generic capability-aware provider resolver.
+ * Returns the preferred provider if the capability is available,
+ * or falls back to any other configured provider that has it.
  */
-export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
+export function getProviderForCapability(capability: string, preferred?: ProviderName): SeoDataProvider | null {
   const primary = getConfiguredProvider(preferred);
   if (!primary) return null;
 
-  // Check if primary provider has backlinks disabled
   const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
-  if (primaryName && isCapabilityDisabled(primaryName, 'backlinks')) {
-    // Fall back to any other configured provider that supports backlinks
+  if (primaryName && isCapabilityDisabled(primaryName, capability)) {
+    // Primary provider cannot serve this capability — try fallbacks
     for (const [name, p] of providers.entries()) {
-      if (name !== primaryName && p.isConfigured() && !isCapabilityDisabled(name, 'backlinks')) {
+      if (name !== primaryName && p.isConfigured() && !isCapabilityDisabled(name, capability)) {
         return p;
       }
     }
@@ -201,6 +200,15 @@ export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider 
   }
 
   return primary;
+}
+
+/**
+ * Get a provider that supports backlinks. If the preferred provider's backlinks
+ * are unavailable (e.g. DataForSEO without backlinks subscription), falls back
+ * to another configured provider that does support them.
+ */
+export function getBacklinksProvider(preferred?: ProviderName): SeoDataProvider | null {
+  return getProviderForCapability('backlinks', preferred);
 }
 
 export function isAnyProviderConfigured(): boolean {
