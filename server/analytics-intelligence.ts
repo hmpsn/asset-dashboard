@@ -241,12 +241,14 @@ const QUICK_WIN_MIN_IMPRESSIONS = 50;
  */
 export function computeRankingOpportunities(
   queryPageData: QueryPageRow[],
+  brandTokens?: string[],
 ): ComputedInsight<QuickWinData>[] {
   const candidates = queryPageData.filter(
     row =>
       row.position >= QUICK_WIN_MIN_POSITION &&
       row.position <= QUICK_WIN_MAX_POSITION &&
-      row.impressions >= QUICK_WIN_MIN_IMPRESSIONS,
+      row.impressions >= QUICK_WIN_MIN_IMPRESSIONS &&
+      (!brandTokens?.length || !isBrandedQuery(row.query, brandTokens)),
   );
 
   // Group by page URL — keep only the highest-traffic-gain query per page so the
@@ -289,11 +291,13 @@ export function computeRankingOpportunities(
  */
 export function computeCannibalizationInsights(
   queryPageData: QueryPageRow[],
+  brandTokens?: string[],
 ): ComputedInsight<CannibalizationData>[] {
   // Group rows by query, keeping only top-20 results
   const byQuery = new Map<string, QueryPageRow[]>();
   for (const row of queryPageData) {
     if (row.position > 20) continue;
+    if (brandTokens?.length && isBrandedQuery(row.query, brandTokens)) continue;
     const existing = byQuery.get(row.query) ?? [];
     existing.push(row);
     byQuery.set(row.query, existing);
@@ -1166,7 +1170,11 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   }
 
   if (normQueryPageData.length > 0) {
-    const rankingOpps = computeRankingOpportunities(normQueryPageData);
+    const brandTokens = [...new Set(
+      (ws.competitorDomains ?? []).flatMap(domain => extractBrandTokens(domain)),
+    )];
+
+    const rankingOpps = computeRankingOpportunities(normQueryPageData, brandTokens);
     for (const insight of rankingOpps.slice(0, 20)) {
       enrichAndUpsert({
         insightType: 'ranking_opportunity',
@@ -1178,7 +1186,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     deleteStaleInsightsByType(workspaceId, 'ranking_opportunity', cycleStart);
     log.info({ workspaceId, count: Math.min(rankingOpps.length, 20) }, 'Computed ranking opportunities');
 
-    const cannibalization = computeCannibalizationInsights(normQueryPageData);
+    const cannibalization = computeCannibalizationInsights(normQueryPageData, brandTokens);
     for (const insight of cannibalization.slice(0, 15)) {
       enrichAndUpsert({
         insightType: 'cannibalization',

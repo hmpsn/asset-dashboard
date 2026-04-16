@@ -730,16 +730,17 @@ git commit -m "fix: use keyword_difficulty endpoint instead of competition_index
 
 **Files:**
 - Modify: `server/content-brief.ts` (interface, local variables, prompt strings)
+- Modify: `server/routes/content-briefs.ts` (local variables, generateBrief call-site field names)
 - Modify: `server/routes/content-requests.ts` (local variables, generateBrief call-site field names)
 
 **Context for implementer:**
 - `generateBrief()` context interface (line 838) has fields `semrushMetrics?: KeywordMetrics` and `semrushRelated?: RelatedKeyword[]`. Rename them to `keywordMetrics` and `relatedKeywords` respectively. ALL callers must be updated.
-- The only caller that passes these fields is `server/routes/content-requests.ts` (lines 203-214, 237-242). `blueprint-generator.ts` and `copy-generation.ts` call `generateBrief` without these fields — no changes needed there.
+- **Two routes** pass these fields: `server/routes/content-briefs.ts` (lines 100-101 vars, lines 176-177 call-site) AND `server/routes/content-requests.ts` (lines 203-204 vars, lines 241-242 call-site). Both must be updated or TypeScript will fail.
 - Inside `generateBrief()`, the local variable `semrushBlock` conflicts with the existing `keywordBlock` variable (which holds formatted workspace keyword data). Rename `semrushBlock` to `providerMetricsBlock` to avoid the naming collision.
 - Add `providerLabel?: string` to the context interface. Inside the function, derive: `const providerLabel = context.providerLabel ?? 'SEMRush';`
 - The prompt currently hardcodes `"from SEMRush"` on two lines (1005 and 1016). Replace with `providerLabel`.
 - DataForSEO always sets `results: 0`. Conditionally omit the "Total results" line when `m.results === 0`.
-- In `content-requests.ts`: rename local vars `semrushMetrics` → `keywordMetrics` and `semrushRelated` → `relatedKeywords`. Pass `providerLabel: seoProvider?.name ?? 'SEMRush'` in the `generateBrief` call (the provider's `name` property is `'dataforseo'` or `'semrush'`). Display label should be human-readable: derive it as `seoProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'`.
+- In both route files: rename local vars `semrushMetrics` → `keywordMetrics` and `semrushRelated` → `relatedKeywords`. Pass `providerLabel: seoProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush'` in the `generateBrief` call.
 
 - [ ] **Step 1: Write failing test for provider label in prompt**
 
@@ -934,7 +935,65 @@ grep -n 'semrushBlock' server/content-brief.ts
 
 Replace every occurrence of `semrushBlock` with `providerMetricsBlock` (there should be only the one remaining usage in the template literal).
 
-- [ ] **Step 6: Update content-requests.ts — rename local vars and pass providerLabel**
+- [ ] **Step 6: Update content-briefs.ts — rename local vars and pass providerLabel**
+
+In `server/routes/content-briefs.ts`, find and update (around lines 100-112 and 172-185):
+
+```typescript
+// BEFORE (lines 100-101)
+    let semrushMetrics: KeywordMetrics | undefined;
+    let semrushRelated: RelatedKeyword[] | undefined;
+    const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    if (seoProvider) {
+      try {
+        const [metrics, related] = await Promise.all([
+          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId),
+          seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
+        ]);
+        if (metrics.length > 0) semrushMetrics = metrics[0];
+        if (related.length > 0) semrushRelated = related;
+      } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
+    }
+
+// AFTER
+    let keywordMetrics: KeywordMetrics | undefined;
+    let relatedKeywords: RelatedKeyword[] | undefined;
+    const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    const providerLabel = seoProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
+    if (seoProvider) {
+      try {
+        const [metrics, related] = await Promise.all([
+          seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId),
+          seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
+        ]);
+        if (metrics.length > 0) keywordMetrics = metrics[0];
+        if (related.length > 0) relatedKeywords = related;
+      } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
+    }
+```
+
+Then update the `generateBrief` call-site (around line 172):
+
+```typescript
+// BEFORE
+    const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
+      relatedQueries,
+      businessContext: adaptedBusinessContext,
+      existingPages,
+      semrushMetrics,
+      semrushRelated,
+
+// AFTER
+    const brief = await generateBrief(req.params.workspaceId, targetKeyword, {
+      relatedQueries,
+      businessContext: adaptedBusinessContext,
+      existingPages,
+      keywordMetrics,
+      relatedKeywords,
+      providerLabel,
+```
+
+- [ ] **Step 7: Update content-requests.ts — rename local vars and pass providerLabel**
 
 In `server/routes/content-requests.ts`, find and update (around lines 203-214 and 237-242):
 
@@ -992,7 +1051,7 @@ Then update the `generateBrief` call-site (around line 237):
       providerLabel,
 ```
 
-- [ ] **Step 7: Run tests**
+- [ ] **Step 8: Run tests**
 
 ```bash
 npx vitest run tests/unit/content-brief-provider-label.test.ts --reporter=verbose
@@ -1000,7 +1059,7 @@ npx vitest run tests/unit/content-brief-provider-label.test.ts --reporter=verbos
 
 Expected: all 3 tests PASS.
 
-- [ ] **Step 8: Typecheck**
+- [ ] **Step 9: Typecheck**
 
 ```bash
 npm run typecheck
@@ -1008,10 +1067,10 @@ npm run typecheck
 
 Expected: zero errors. If TypeScript reports unused `semrushMetrics`/`semrushRelated` fields anywhere else, update them.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add server/content-brief.ts server/routes/content-requests.ts tests/unit/content-brief-provider-label.test.ts
+git add server/content-brief.ts server/routes/content-briefs.ts server/routes/content-requests.ts tests/unit/content-brief-provider-label.test.ts
 git commit -m "fix: content brief uses dynamic provider label and omits results=0 for DataForSEO"
 ```
 

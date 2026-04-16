@@ -988,7 +988,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         let entry = `- ${p.path}: "${p.title}"`;
         if (p.seoTitle) entry += ` | SEO: "${p.seoTitle}"`;
         if (p.seoDesc) entry += ` | Desc: "${p.seoDesc.slice(0, 150)}"`;
-        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 400)}`;
+        if (p.contentSnippet) entry += `\n  Content: ${p.contentSnippet.slice(0, 800)}`;
         const pageGsc = gscByPath.get(p.path);
         if (pageGsc && pageGsc.length > 0) {
           const topGsc = pageGsc.sort((a, b) => b.impressions - a.impressions).slice(0, 5);
@@ -1042,7 +1042,7 @@ ${hasPool ? `- MANDATORY: primaryKeyword MUST be selected from the KEYWORD POOL 
         const parsed = JSON.parse(raw);
         log.info(`Batch ${batchIdx + 1} returned ${Array.isArray(parsed) ? parsed.length : 0} page mappings`);
         sendProgress('ai', `Batch ${batchIdx + 1}/${batches.length} complete (${Array.isArray(parsed) ? parsed.length : 0} pages)`, 0.55 + ((batchIdx + 1) / batches.length) * 0.20);
-        // Strip AI-hallucinated volume/difficulty — those must come from SEMRush enrichment only
+        // Strip AI-hallucinated volume/difficulty — those must come from keyword-provider enrichment only
         // Also strip "(invented)" suffix and pre-enrich keywords that are already in the pool
         if (Array.isArray(parsed)) {
           let fromPool = 0;
@@ -1373,7 +1373,7 @@ Return JSON with this EXACT structure (do NOT include a pageMap — it's already
   "contentGaps": [
     {
       "topic": "New content piece to create",
-      "targetKeyword": "primary keyword (MUST be from SEMRush/GSC data when available)",
+      "targetKeyword": "primary keyword (MUST be from keyword-provider/GSC data when available)",
       "intent": "informational|commercial|transactional|navigational",
       "priority": "high|medium|low",
       "rationale": "Why and expected impact",

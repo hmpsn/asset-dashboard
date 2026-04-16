@@ -811,6 +811,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                   });
 
                   const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+                  applyBulkKeywordGuards(analysis, semrushBlock);
                   batchResults.push({ page, analysis });
                 } catch (err) {
                   log.warn({ err, page: page.path }, 'Page analysis failed for individual page');
@@ -930,5 +931,20 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
+
+/**
+ * Zero out AI-hallucinated keyword metrics when SEMRush data was not available
+ * during bulk page analysis. Real data is fetched during individual page analysis.
+ * @internal exported for unit testing
+ */
+export function applyBulkKeywordGuards(
+  analysis: Record<string, unknown>,
+  semrushBlock: string,
+): void {
+  if (!semrushBlock) {
+    analysis.keywordDifficulty = 0;
+    analysis.monthlyVolume = 0;
+  }
+}
 
 export default router;

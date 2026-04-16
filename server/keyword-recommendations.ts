@@ -27,16 +27,31 @@ function stripScore(c: ScoredCandidate): KeywordCandidate {
 // ── Opportunity scoring ──
 
 /**
- * Score a keyword on a 0-100 scale based on volume and difficulty.
- * Higher volume + lower difficulty = higher score.
+ * Score a keyword on a 0–110 scale based on volume, difficulty, and commercial intent.
+ * Base score is 0–100 (55% volume + 45% difficulty inversion); CPC adds up to 10 bonus points.
+ * Higher volume + lower difficulty + higher CPC = higher score.
+ * @internal exported for unit testing
  */
-function opportunityScore(volume: number, difficulty: number): number {
+export function opportunityScore(volume: number, difficulty: number, cpc: number = 0): number {
+  if (volume <= 0) return 0;
   // Normalize volume: log scale (0 = 0, 10 = 33, 100 = 50, 1000 = 67, 10000 = 83, 100000 = 100)
-  const volScore = volume <= 0 ? 0 : Math.min(100, (Math.log10(volume) / 5) * 100);
+  const volScore = Math.min(100, (Math.log10(volume) / 5) * 100);
   // Invert difficulty: 0 difficulty = 100 score, 100 difficulty = 0 score
   const diffScore = 100 - difficulty;
-  // Weighted: 40% volume, 60% difficulty (prefer achievable keywords)
-  return Math.round(volScore * 0.4 + diffScore * 0.6);
+  // CPC bonus: up to 10 points for high commercial intent (CPC $5+ = max bonus)
+  const cpcBonus = Math.min(10, cpc * 2);
+  // Weighted: 55% volume, 45% difficulty, plus CPC bonus
+  return Math.round(volScore * 0.55 + diffScore * 0.45 + cpcBonus);
+}
+
+/**
+ * Returns true if a keyword candidate should be included in scoring.
+ * Seed keywords (source === 'pattern') are always kept; related keywords require
+ * at least 10 monthly searches to avoid noise.
+ * @internal exported for unit testing
+ */
+export function shouldIncludeKeywordCandidate(source: string, volume: number): boolean {
+  return source === 'pattern' || volume >= 10;
 }
 
 // ── Core recommendation function ──
@@ -130,7 +145,8 @@ export async function getKeywordRecommendations(
 
   // Score and sort by opportunity
   const scored = candidates
-    .map(c => ({ ...c, _score: opportunityScore(c.volume, c.difficulty) }))
+    .filter(c => shouldIncludeKeywordCandidate(c.source, c.volume)) // Keep seed keyword; filter low-volume related keywords
+    .map(c => ({ ...c, _score: opportunityScore(c.volume, c.difficulty, c.cpc) }))
     .sort((a, b) => b._score - a._score);
 
   // ── Bridge #9: Weight by empirical win rate per KD range ──────────
@@ -226,7 +242,7 @@ Consider:
 5. Specificity (long-tail often converts better than generic)
 
 BUSINESS CONTEXT:
-${businessContext.slice(0, 1000)}
+${businessContext.slice(0, 2500)}
 
 KEYWORD CANDIDATES:
 ${kwList}
@@ -235,7 +251,7 @@ Return a JSON array of the keywords in ranked order (best first). Only return th
 ["best keyword", "second best", ...]`;
 
   const result = await callOpenAI({
-    model: 'gpt-4.1-nano',
+    model: 'gpt-4.1-mini',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.2,

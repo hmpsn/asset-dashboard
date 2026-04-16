@@ -26,6 +26,7 @@ import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../
 import { handleContentPerformance } from './content-requests.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
+import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
 import {
   createContentRequestSchema,
@@ -133,7 +134,7 @@ router.post('/api/public/content-request/:workspaceId', validate(createContentRe
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus, targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:created', { id: request.id, topic });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
   res.json(request);
 });
@@ -174,7 +175,7 @@ router.post('/api/public/content-request/:workspaceId/submit', validate(submitCo
   });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:created', { id: request.id, topic });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
   res.json(request);
 });
@@ -196,7 +197,7 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', validate(dec
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_declined', `${actor?.name || 'Client'} declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -214,7 +215,7 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', validate(app
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -235,7 +236,7 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', vali
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -248,7 +249,7 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', validate(upg
   if (!updated) return res.status(404).json({ error: 'Request not found' });
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -259,7 +260,7 @@ router.post('/api/public/content-request/:workspaceId/:id/comment', validate(add
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:update', { id: updated.id, status: updated.status });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
   res.json(updated);
 });
 
@@ -381,7 +382,7 @@ router.post('/api/public/content-request/:workspaceId/from-audit', validate(from
 
   const actor = getClientActor(req, req.params.workspaceId);
   addActivity(req.params.workspaceId, 'content_requested', `Content improvement requested for "${pageName}" (from audit)`, `Keyword: "${targetKeyword}" · ${issues.length} issues identified`, { requestId: request.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, 'content-request:created', { id: request.id, topic });
+  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
   notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'high', rationale });
 
   res.json({ ...request, topKeywords });

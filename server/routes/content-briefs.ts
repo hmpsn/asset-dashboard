@@ -19,7 +19,7 @@ import {
 import { createContentRequest, updateContentRequest } from '../content-requests.js';
 import { notifyClientBriefReady } from '../email.js';
 import { getSearchOverview } from '../search-console.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
@@ -97,17 +97,18 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     const existingPages = ws ? await getAllSitePages(ws) : [];
 
     // Gather SEO keyword data if a provider is configured
-    let semrushMetrics: KeywordMetrics | undefined;
-    let semrushRelated: RelatedKeyword[] | undefined;
+    let keywordMetrics: KeywordMetrics | undefined;
+    let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
+    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([
           seoProvider.getKeywordMetrics([targetKeyword], req.params.workspaceId),
           seoProvider.getRelatedKeywords(targetKeyword, req.params.workspaceId, 15),
         ]);
-        if (metrics.length > 0) semrushMetrics = metrics[0];
-        if (related.length > 0) semrushRelated = related;
+        if (metrics.length > 0) keywordMetrics = metrics[0];
+        if (related.length > 0) relatedKeywords = related;
       } catch (e) { log.error({ err: e }, 'SEO keyword enrichment error'); }
     }
 
@@ -173,8 +174,9 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       relatedQueries,
       businessContext: adaptedBusinessContext,
       existingPages,
-      semrushMetrics,
-      semrushRelated,
+      keywordMetrics,
+      relatedKeywords,
+      providerLabel,
       pageType: resolvedPageType,
       referenceUrls: refUrlList.length > 0 ? refUrlList : undefined,
       scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
@@ -296,7 +298,7 @@ router.delete('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAcces
   res.json({ ok: true });
 });
 
-// Validate a keyword via SEMRush before locking it for brief generation
+// Validate a keyword via SEO provider before locking it for brief generation
 router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { keyword } = req.body;
   if (!keyword) return res.status(400).json({ error: 'keyword is required' });
@@ -322,9 +324,9 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
       return res.json({
         keyword,
         valid: true,
-        source: 'semrush' as const,
+        source: kwProvider.name,
         metrics: null,
-        message: 'No SEMRush data found — keyword accepted without metrics',
+        message: 'No keyword data found — keyword accepted without metrics',
       });
     }
 
@@ -336,7 +338,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
     res.json({
       keyword,
       valid: true,
-      source: 'semrush' as const,
+      source: kwProvider.name,
       metrics: {
         volume: kw.volume,
         difficulty: kw.difficulty,
@@ -347,13 +349,13 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
     });
   } catch (err) {
     log.error({ err, keyword, workspaceId: req.params.workspaceId }, 'Keyword validation failed');
-    // Don't block workflow on SEMRush failure
+    // Don't block workflow on SEO provider lookup failure
     res.json({
       keyword,
       valid: true,
       source: 'manual' as const,
       metrics: null,
-      message: 'SEMRush lookup failed — keyword accepted without validation',
+      message: 'Keyword data lookup failed — keyword accepted without validation',
     });
   }
 });
@@ -386,7 +388,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
     const results = keywords.slice(0, 50).map((kw: string) => {
       const m = metricsMap.get(kw.toLowerCase());
       if (!m) {
-        return { keyword: kw, valid: true, source: 'semrush' as const, metrics: null };
+        return { keyword: kw, valid: true, source: bulkProvider.name, metrics: null };
       }
       const warnings: string[] = [];
       if (m.volume < 10) warnings.push(`Very low volume (${m.volume}/mo)`);
@@ -394,7 +396,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
       return {
         keyword: kw,
         valid: true,
-        source: 'semrush' as const,
+        source: bulkProvider.name,
         metrics: {
           volume: m.volume,
           difficulty: m.difficulty,
@@ -415,7 +417,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
         source: 'manual' as const,
         metrics: null,
       })),
-      message: 'SEMRush lookup failed — all keywords accepted without validation',
+      message: 'Keyword data lookup failed — all keywords accepted without validation',
     });
   }
 });
