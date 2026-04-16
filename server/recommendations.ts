@@ -603,7 +603,15 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
         // 2C: skip if the target keyword was declined by the client
         if (cg.targetKeyword && declinedKeywords.has(cg.targetKeyword.toLowerCase())) continue;
 
-        const impactScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        const baseScore = cg.priority === 'high' ? 65 : cg.priority === 'medium' ? 45 : 25;
+        // Boost impact score based on actual volume data when available
+        const volumeBoost = cg.volume && cg.volume > 0
+          ? Math.min(25, Math.round((Math.log10(cg.volume) / 5) * 25)) // up to +25 for high-volume gaps
+          : 0;
+        const difficultyPenalty = cg.difficulty && cg.difficulty > 60
+          ? Math.round((cg.difficulty - 60) * 0.25) // -0 to -10 for very hard keywords
+          : 0;
+        const impactScore = Math.max(10, Math.min(100, baseScore + volumeBoost - difficultyPenalty));
         recs.push({
           id: `rec_${crypto.randomBytes(6).toString('hex')}`,
           workspaceId,

@@ -811,6 +811,12 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
                   });
 
                   const analysis = JSON.parse(aiResult.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+                  // SEMRush was skipped for bulk analysis — zero out AI-hallucinated metrics
+                  // to prevent false confidence. Real data is fetched during individual page analysis.
+                  if (!semrushBlock) {
+                    analysis.keywordDifficulty = 0;
+                    analysis.monthlyVolume = 0;
+                  }
                   batchResults.push({ page, analysis });
                 } catch (err) {
                   log.warn({ err, page: page.path }, 'Page analysis failed for individual page');
