@@ -298,7 +298,7 @@ router.delete('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAcces
   res.json({ ok: true });
 });
 
-// Validate a keyword via SEMRush before locking it for brief generation
+// Validate a keyword via SEO provider before locking it for brief generation
 router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   const { keyword } = req.body;
   if (!keyword) return res.status(400).json({ error: 'keyword is required' });
@@ -326,7 +326,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
         valid: true,
         source: 'semrush' as const,
         metrics: null,
-        message: 'No SEMRush data found — keyword accepted without metrics',
+        message: 'No keyword data found — keyword accepted without metrics',
       });
     }
 
@@ -349,13 +349,13 @@ router.post('/api/content-briefs/:workspaceId/validate-keyword', requireWorkspac
     });
   } catch (err) {
     log.error({ err, keyword, workspaceId: req.params.workspaceId }, 'Keyword validation failed');
-    // Don't block workflow on SEMRush failure
+    // Don't block workflow on SEO provider lookup failure
     res.json({
       keyword,
       valid: true,
       source: 'manual' as const,
       metrics: null,
-      message: 'SEMRush lookup failed — keyword accepted without validation',
+      message: 'Keyword data lookup failed — keyword accepted without validation',
     });
   }
 });
@@ -417,7 +417,7 @@ router.post('/api/content-briefs/:workspaceId/validate-keywords', requireWorkspa
         source: 'manual' as const,
         metrics: null,
       })),
-      message: 'SEMRush lookup failed — all keywords accepted without validation',
+      message: 'Keyword data lookup failed — all keywords accepted without validation',
     });
   }
 });

@@ -50,7 +50,7 @@ describe('generateBrief — provider label', () => {
   });
 
   it('uses DataForSEO as provider label when specified', async () => {
-    mockCallOpenAI.mockResolvedValue({ content: MOCK_BRIEF, usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 } });
+    mockCallOpenAI.mockResolvedValue({ text: MOCK_BRIEF, promptTokens: 100, completionTokens: 200, totalTokens: 300 });
 
     await generateBrief(WS_ID, 'test keyword', {
       keywordMetrics: { keyword: 'test keyword', volume: 5000, difficulty: 55, cpc: 2.0, competition: 0.5, results: 0, trend: [] },
@@ -66,7 +66,7 @@ describe('generateBrief — provider label', () => {
   });
 
   it('omits "Total results" line when results = 0', async () => {
-    mockCallOpenAI.mockResolvedValue({ content: MOCK_BRIEF, usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 } });
+    mockCallOpenAI.mockResolvedValue({ text: MOCK_BRIEF, promptTokens: 100, completionTokens: 200, totalTokens: 300 });
 
     await generateBrief(WS_ID, 'zero results kw', {
       keywordMetrics: { keyword: 'zero results kw', volume: 1000, difficulty: 30, cpc: 0.5, competition: 0.3, results: 0, trend: [] },
@@ -78,7 +78,7 @@ describe('generateBrief — provider label', () => {
   });
 
   it('includes "Total results" line when results > 0', async () => {
-    mockCallOpenAI.mockResolvedValue({ content: MOCK_BRIEF, usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 } });
+    mockCallOpenAI.mockResolvedValue({ text: MOCK_BRIEF, promptTokens: 100, completionTokens: 200, totalTokens: 300 });
 
     await generateBrief(WS_ID, 'has results kw', {
       keywordMetrics: { keyword: 'has results kw', volume: 1000, difficulty: 30, cpc: 0.5, competition: 0.3, results: 4500000, trend: [] },
