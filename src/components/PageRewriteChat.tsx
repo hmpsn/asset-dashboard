@@ -7,6 +7,7 @@ import {
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { post, get } from '../api/client';
 import { RenderMarkdown } from './client/helpers';
+import { queryKeys } from '../lib/queryKeys';
 
 interface SeoIssue {
   check: string;
@@ -90,7 +91,7 @@ export function PageRewriteChat({ workspaceId, initialPageUrl, focusMode, onFocu
 
   // Sitemap combobox
   const { data: sitemapPages = [] } = useQuery<SitemapPage[]>({
-    queryKey: ['admin-rewrite-pages', workspaceId],
+    queryKey: queryKeys.admin.rewritePages(workspaceId),
     queryFn: () => get<SitemapPage[]>(`/api/rewrite-chat/${workspaceId}/pages`),
     staleTime: 5 * 60 * 1000,
   });

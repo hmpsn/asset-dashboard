@@ -11,6 +11,7 @@ import { SectionEditor } from './post-editor/SectionEditor';
 import { PostPreview } from './post-editor/PostPreview';
 import { VersionHistory } from './post-editor/VersionHistory';
 import { ReviewChecklist } from './post-editor/ReviewChecklist';
+import { queryKeys } from '../lib/queryKeys';
 
 interface PostSection {
   index: number;
@@ -108,8 +109,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [showChecklist, setShowChecklist] = useState(false);
   const [reverting, setReverting] = useState<string | null>(null);
 
-  const invalidatePost = () => queryClient.invalidateQueries({ queryKey: ['admin-post', workspaceId, postId] });
-  const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: ['admin-post-versions', workspaceId, postId] });
+  const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
+  const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
 
   // Auto-expand all done sections on first load
   const postLoaded = !!post;
@@ -144,7 +145,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     if (!post) return;
     try {
       const updated = await contentPosts.update(workspaceId, postId, updates) as GeneratedPost;
-      queryClient.setQueryData(['admin-post', workspaceId, postId], updated);
+      queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
   };
 
@@ -152,7 +153,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setRegenerating(sectionIndex);
     try {
       const updated = await contentPosts.regenerateSection(workspaceId, postId, { sectionIndex }) as GeneratedPost;
-      queryClient.setQueryData(['admin-post', workspaceId, postId], updated);
+      queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setRegenerating(null);
   };
@@ -223,7 +224,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setReverting(versionId);
     try {
       const reverted = await contentPosts.revertVersion(workspaceId, postId, versionId) as GeneratedPost;
-      queryClient.setQueryData(['admin-post', workspaceId, postId], reverted);
+      queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), reverted);
       invalidateVersions();
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setReverting(null);
