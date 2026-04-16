@@ -1170,10 +1170,9 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
   }
 
   if (normQueryPageData.length > 0) {
-    const brandTokens: string[] = [];
-    for (const domain of (ws.competitorDomains ?? [])) {
-      brandTokens.push(...extractBrandTokens(domain));
-    }
+    const brandTokens = [...new Set(
+      (ws.competitorDomains ?? []).flatMap(domain => extractBrandTokens(domain)),
+    )];
 
     const rankingOpps = computeRankingOpportunities(normQueryPageData, brandTokens);
     for (const insight of rankingOpps.slice(0, 20)) {

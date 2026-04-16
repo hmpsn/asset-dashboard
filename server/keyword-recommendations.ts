@@ -27,8 +27,9 @@ function stripScore(c: ScoredCandidate): KeywordCandidate {
 // ── Opportunity scoring ──
 
 /**
- * Score a keyword on a 0-100 scale based on volume and difficulty.
- * Higher volume + lower difficulty = higher score.
+ * Score a keyword on a 0–110 scale based on volume, difficulty, and commercial intent.
+ * Base score is 0–100 (55% volume + 45% difficulty inversion); CPC adds up to 10 bonus points.
+ * Higher volume + lower difficulty + higher CPC = higher score.
  * @internal exported for unit testing
  */
 export function opportunityScore(volume: number, difficulty: number, cpc: number = 0): number {
@@ -41,6 +42,16 @@ export function opportunityScore(volume: number, difficulty: number, cpc: number
   const cpcBonus = Math.min(10, cpc * 2);
   // Weighted: 55% volume, 45% difficulty, plus CPC bonus
   return Math.round(volScore * 0.55 + diffScore * 0.45 + cpcBonus);
+}
+
+/**
+ * Returns true if a keyword candidate should be included in scoring.
+ * Seed keywords (source === 'pattern') are always kept; related keywords require
+ * at least 10 monthly searches to avoid noise.
+ * @internal exported for unit testing
+ */
+export function shouldIncludeKeywordCandidate(source: string, volume: number): boolean {
+  return source === 'pattern' || volume >= 10;
 }
 
 // ── Core recommendation function ──
@@ -134,7 +145,7 @@ export async function getKeywordRecommendations(
 
   // Score and sort by opportunity
   const scored = candidates
-    .filter(c => c.source === 'pattern' || c.volume >= 10) // Keep seed keyword; filter low-volume related keywords
+    .filter(c => shouldIncludeKeywordCandidate(c.source, c.volume)) // Keep seed keyword; filter low-volume related keywords
     .map(c => ({ ...c, _score: opportunityScore(c.volume, c.difficulty, c.cpc) }))
     .sort((a, b) => b._score - a._score);
 

@@ -3,7 +3,7 @@
  * Verifies the 55/45 volume/difficulty weighting and CPC bonus behavior.
  */
 import { describe, it, expect } from 'vitest';
-import { opportunityScore } from '../../server/keyword-recommendations.js';
+import { opportunityScore, shouldIncludeKeywordCandidate } from '../../server/keyword-recommendations.js';
 
 describe('opportunityScore', () => {
   it('returns 0 for zero-volume keywords', () => {
@@ -57,5 +57,30 @@ describe('opportunityScore', () => {
     const maxScore = opportunityScore(100000, 0, 10);
     expect(maxScore).toBeLessThanOrEqual(110);
     expect(maxScore).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('shouldIncludeKeywordCandidate', () => {
+  it('always includes seed keywords (source === pattern) regardless of volume', () => {
+    expect(shouldIncludeKeywordCandidate('pattern', 0)).toBe(true);
+    expect(shouldIncludeKeywordCandidate('pattern', 1)).toBe(true);
+    expect(shouldIncludeKeywordCandidate('pattern', 9)).toBe(true);
+  });
+
+  it('includes related keywords with volume >= 10', () => {
+    expect(shouldIncludeKeywordCandidate('semrush_related', 10)).toBe(true);
+    expect(shouldIncludeKeywordCandidate('semrush_related', 100)).toBe(true);
+    expect(shouldIncludeKeywordCandidate('semrush_related', 1000)).toBe(true);
+  });
+
+  it('excludes related keywords with volume < 10', () => {
+    expect(shouldIncludeKeywordCandidate('semrush_related', 0)).toBe(false);
+    expect(shouldIncludeKeywordCandidate('semrush_related', 1)).toBe(false);
+    expect(shouldIncludeKeywordCandidate('semrush_related', 9)).toBe(false);
+  });
+
+  it('volume = 10 is the exact inclusion boundary', () => {
+    expect(shouldIncludeKeywordCandidate('semrush_related', 9)).toBe(false);
+    expect(shouldIncludeKeywordCandidate('semrush_related', 10)).toBe(true);
   });
 });
