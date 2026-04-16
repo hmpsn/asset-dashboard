@@ -5,6 +5,7 @@ import { getUploadRoot, getDataDir } from './data-dir.js';
 import { getCachedMetricsBatch, cacheMetrics } from './keyword-metrics-cache.js';
 import { createLogger } from './logger.js';
 import { isProgrammingError } from './errors.js';
+import { normalizeProviderDate } from './seo-data-provider.js';
 
 const log = createLogger('semrush');
 
@@ -820,8 +821,8 @@ export async function getTopReferringDomains(
   const results: ReferringDomain[] = rows.map(row => ({
     domain: row['domain'] || '',
     backlinksCount: parseInt(row['backlinks_num'] || '0', 10),
-    firstSeen: row['first_seen'] || '',
-    lastSeen: row['last_seen'] || '',
+    firstSeen: normalizeProviderDate(row['first_seen'] || ''),
+    lastSeen: normalizeProviderDate(row['last_seen'] || ''),
   }));
 
   logCreditUsage({ credits: results.length * 10, endpoint: 'backlinks_refdomains', query: cleanDomain, rowsReturned: results.length, workspaceId, cached: false });
