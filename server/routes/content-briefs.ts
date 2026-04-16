@@ -19,7 +19,7 @@ import {
 import { createContentRequest, updateContentRequest } from '../content-requests.js';
 import { notifyClientBriefReady } from '../email.js';
 import { getSearchOverview } from '../search-console.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
 import { getAllSitePages } from './content-requests.js';
@@ -100,7 +100,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
     let keywordMetrics: KeywordMetrics | undefined;
     let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
-    const providerLabel = seoProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
+    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([

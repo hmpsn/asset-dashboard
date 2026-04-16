@@ -181,8 +181,16 @@ export function clearCapabilityDisabled(providerName: ProviderName, capability: 
 
 /** FOR TEST USE ONLY. Clears all registered providers and capability flags. */
 export function _resetRegistryForTest(): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('_resetRegistryForTest must not be called in production');
+  }
   providers.clear();
   disabledCapabilities.clear();
+}
+
+/** Returns the human-readable display name for a provider. */
+export function getProviderDisplayName(providerName: string): string {
+  return providerName === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
 }
 
 /**

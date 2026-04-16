@@ -20,7 +20,7 @@ import {
 import { notifyClientBriefReady, notifyClientContentPublished } from '../email.js';
 import { getGA4LandingPages } from '../google-analytics.js';
 import { getQueryPageData, getAllGscPages, getPageTrend } from '../search-console.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import type { KeywordMetrics, RelatedKeyword } from '../seo-data-provider.js';
 import type { StrategyCardContext, BriefJourneyStage } from '../../shared/types/content.js';
 import {
@@ -204,7 +204,7 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
     let keywordMetrics: KeywordMetrics | undefined;
     let relatedKeywords: RelatedKeyword[] | undefined;
     const seoProvider = getConfiguredProvider(ws?.seoDataProvider);
-    const providerLabel = seoProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
+    const providerLabel = seoProvider ? getProviderDisplayName(seoProvider.name) : 'SEMRush';
     if (seoProvider) {
       try {
         const [metrics, related] = await Promise.all([

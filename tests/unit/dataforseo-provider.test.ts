@@ -406,15 +406,16 @@ describe('DataForSeoProvider — init() capability probe', () => {
     delete process.env.DATAFORSEO_LOGIN;
     delete process.env.DATAFORSEO_PASSWORD;
 
-    const provider = new DataForSeoProvider();
-    const fetchSpy = vi.spyOn(global, 'fetch');
-    await provider.init();
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-
-    if (savedLogin !== undefined) process.env.DATAFORSEO_LOGIN = savedLogin;
-    else delete process.env.DATAFORSEO_LOGIN;
-    if (savedPwd !== undefined) process.env.DATAFORSEO_PASSWORD = savedPwd;
-    else delete process.env.DATAFORSEO_PASSWORD;
+    try {
+      const provider = new DataForSeoProvider();
+      const fetchSpy = vi.spyOn(global, 'fetch');
+      await provider.init();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      if (savedLogin !== undefined) process.env.DATAFORSEO_LOGIN = savedLogin;
+      else delete process.env.DATAFORSEO_LOGIN;
+      if (savedPwd !== undefined) process.env.DATAFORSEO_PASSWORD = savedPwd;
+      else delete process.env.DATAFORSEO_PASSWORD;
+    }
   });
 });

@@ -256,22 +256,29 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
     }
 
-    if (uncached.length === 0 || areCreditsExhausted()) return results;
+    if (uncached.length === 0) return results;
 
     // L1: Check global SQLite cache for keywords that missed L2
-    const globalHits = getCachedMetricsBatch(uncached, database, CACHE_TTL_KEYWORD);
+    let globalHits: Map<string, KeywordMetrics>;
+    try {
+      const rawHits = getCachedMetricsBatch(uncached, database, CACHE_TTL_KEYWORD);
+      globalHits = rawHits as Map<string, KeywordMetrics>;
+    } catch (err) {
+      log.warn({ err }, 'DataForSEO L1 cache lookup failed — falling through to API');
+      globalHits = new Map();
+    }
     const stillUncached: string[] = [];
     for (const kw of uncached) {
       const hit = globalHits.get(kw.toLowerCase());
       if (hit) {
-        results.push(hit as KeywordMetrics);
+        results.push(hit);
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
       } else {
         stillUncached.push(kw);
       }
     }
 
-    if (stillUncached.length === 0) return results;
+    if (stillUncached.length === 0 || areCreditsExhausted()) return results;
 
     // Batch up to 1000 per request
     const batches: string[][] = [];

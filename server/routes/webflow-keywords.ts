@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 import { callOpenAI } from '../openai-helpers.js';
-import { getConfiguredProvider } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import { clearSeoContextCache } from '../seo-context.js';
 import { getWorkspace } from '../workspaces.js';
 import { getPageKeyword, upsertPageKeyword } from '../page-keywords.js';
@@ -35,7 +35,7 @@ router.post('/api/webflow/keyword-analysis', async (req, res) => {
   let kwBlock = '';
   const kwWs = workspaceId ? getWorkspace(workspaceId) : null;
   const kwProvider = getConfiguredProvider(kwWs?.seoDataProvider);
-  const kwProviderLabel = kwProvider?.name === 'dataforseo' ? 'DataForSEO' : 'SEMRush';
+  const kwProviderLabel = kwProvider ? getProviderDisplayName(kwProvider.name) : 'SEMRush';
   if (kwProvider && workspaceId) {
     try {
       const seedKeyword = seoTitle || pageTitle;
