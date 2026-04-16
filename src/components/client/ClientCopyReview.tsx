@@ -17,6 +17,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { COPY_STATUS_BADGE } from '../../lib/copyStatusConfig';
+import { queryKeys } from '../../lib/queryKeys';
 import { get, post } from '../../api/client';
 import type { CopySectionStatus, ClientSuggestion } from '../../../shared/types/copy-pipeline';
 
@@ -132,8 +133,8 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
   // serve stale section data from before the WS event arrived.
   const wsHandlers = useMemo(() => ({
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
-      queryClient.invalidateQueries({ queryKey: ['client-copy-entries', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySectionsAll(workspaceId) });
     },
   }), [queryClient, workspaceId]);
 
@@ -146,7 +147,7 @@ function ClientCopyReviewInner({ workspaceId }: ClientCopyReviewProps) {
     error: entriesError,
     refetch: refetchEntries,
   } = useQuery({
-    queryKey: ['client-copy-entries', workspaceId],
+    queryKey: queryKeys.client.copyEntries(workspaceId),
     queryFn: () => fetchCopyEntries(workspaceId),
     enabled: !!workspaceId,
   });
@@ -330,7 +331,7 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
     error,
     refetch,
   } = useQuery({
-    queryKey: ['client-copy-sections', workspaceId, entryId],
+    queryKey: queryKeys.client.copySections(workspaceId, entryId),
     queryFn: () => fetchCopySections(workspaceId, entryId),
     enabled: !!(workspaceId && entryId),
   });
@@ -344,8 +345,8 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
     mutationFn: (sectionId: string) => approveSection(workspaceId, sectionId),
     onSuccess: () => {
       setMutationError(null);
-      queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId, entryId] });
-      queryClient.invalidateQueries({ queryKey: ['client-copy-entries', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
     },
     onError: () => {
       setMutationError('Could not approve this section. Please try again.');
@@ -361,8 +362,8 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
       }),
     onSuccess: () => {
       setMutationError(null);
-      queryClient.invalidateQueries({ queryKey: ['client-copy-sections', workspaceId, entryId] });
-      queryClient.invalidateQueries({ queryKey: ['client-copy-entries', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
     },
     onError: () => {
       setMutationError('Could not submit your suggestion. Please try again.');
