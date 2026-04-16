@@ -266,14 +266,36 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     for (const batch of batches) {
       try {
-        const json = await apiCall('keywords_data/google_ads/search_volume/live', [{
-          keywords: batch,
-          location_code: locationCode(database),
-          language_code: 'en',
-        }]);
+        const [volumeJson, kdJson] = await Promise.all([
+          apiCall('keywords_data/google_ads/search_volume/live', [{
+            keywords: batch,
+            location_code: locationCode(database),
+            language_code: 'en',
+          }]),
+          apiCall('dataforseo_labs/google/keyword_difficulty/live', [{
+            keywords: batch,
+            location_code: locationCode(database),
+            language_code: 'en',
+          }]).catch(() => null),   // graceful fallback if KD endpoint unavailable
+        ]);
 
-        const taskResults = getTaskResult(json);
-        const cost = getTaskCost(json);
+        // Build KD lookup map
+        const kdMap = new Map<string, number>();
+        if (kdJson) {
+          const kdResults = getTaskResult(kdJson);
+          for (const item of kdResults) {
+            const kw = item.keyword as string;
+            const kd = item.keyword_difficulty as number;
+            if (kw && typeof kd === 'number') kdMap.set(kw.toLowerCase(), kd);
+          }
+          const kdCost = getTaskCost(kdJson);
+          if (kdCost > 0) {
+            logCreditUsage({ credits: kdCost, endpoint: 'keyword_difficulty', query: batch.join(',').slice(0, 100), rowsReturned: kdResults.length, workspaceId, cached: false });
+          }
+        }
+
+        const taskResults = getTaskResult(volumeJson);
+        const cost = getTaskCost(volumeJson);
         const batchResults: KeywordMetrics[] = [];
 
         for (const item of taskResults) {
@@ -288,7 +310,7 @@ export class DataForSeoProvider implements SeoDataProvider {
           const metrics: KeywordMetrics = {
             keyword,
             volume: searchVolume,
-            difficulty: competitionIndex,
+            difficulty: kdMap.get(keyword.toLowerCase()) ?? competitionIndex,
             cpc,
             competition: typeof competition === 'number' ? competition : 0,
             results: 0, // DataForSEO doesn't provide this in this endpoint
@@ -342,7 +364,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         return {
           keyword: (kwData?.keyword as string) ?? '',
           volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
           cpc: (kwInfo?.cpc as number) ?? 0,
         };
       });
@@ -386,7 +408,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         return {
           keyword: (kwData?.keyword as string) ?? '',
           volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
           cpc: (kwInfo?.cpc as number) ?? 0,
         };
       });
@@ -463,7 +485,7 @@ export class DataForSeoProvider implements SeoDataProvider {
           keyword,
           position: (serpItem?.rank_group as number) ?? 0,
           volume: (kwInfo?.search_volume as number) ?? 0,
-          difficulty: Math.round(((kwInfo?.competition as number) ?? 0) * 100),
+          difficulty: (kwInfo?.keyword_difficulty as number) ?? Math.round(((kwInfo?.competition as number) ?? 0) * 100),
           cpc: (kwInfo?.cpc as number) ?? 0,
           url: (serpItem?.url as string) ?? '',
           traffic: (serpItem?.etv as number) ?? 0,

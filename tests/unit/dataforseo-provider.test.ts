@@ -246,6 +246,75 @@ describe('DataForSeoProvider — getReferringDomains lastSeen', () => {
   });
 });
 
+describe('DataForSeoProvider — keyword difficulty endpoint', () => {
+  beforeEach(() => {
+    reapplyFsMocks();
+    vi.mocked(getCachedMetricsBatch).mockReturnValue(new Map());
+    vi.mocked(cacheMetricsBatch).mockReset();
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('uses keyword_difficulty from KD endpoint instead of competition_index', async () => {
+    const provider = new DataForSeoProvider();
+
+    // First call = volume endpoint, second = KD endpoint
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.001, result: [
+          { keyword: 'buy shoes online', search_volume: 8000, competition_index: 20, cpc: 1.5, competition: 0.2, monthly_searches: [] },
+        ]}] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.0005, result: [
+          { keyword: 'buy shoes online', keyword_difficulty: 73 },
+        ]}] }),
+      } as Response);
+
+    const results = await provider.getKeywordMetrics(['buy shoes online'], 'ws-kd-test', 'us');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].difficulty).toBe(73); // from KD endpoint, not competition_index (20)
+  });
+
+  it('falls back to competition_index when KD endpoint fails', async () => {
+    const provider = new DataForSeoProvider();
+
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.001, result: [
+          { keyword: 'some keyword', search_volume: 1000, competition_index: 45, cpc: 0.5, competition: 0.45, monthly_searches: [] },
+        ]}] }),
+      } as Response)
+      .mockRejectedValueOnce(new Error('KD endpoint unavailable'));
+
+    const results = await provider.getKeywordMetrics(['some keyword'], 'ws-kd-fallback', 'us');
+    expect(results[0].difficulty).toBe(45); // falls back to competition_index
+  });
+
+  it('uses keyword_difficulty from keyword_info in getRelatedKeywords', async () => {
+    const provider = new DataForSeoProvider();
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ tasks: [{ status_code: 20000, cost: 0.001, result: [{
+        items: [{
+          keyword_data: {
+            keyword: 'related seo',
+            keyword_info: { search_volume: 2000, competition: 0.5, cpc: 1.0, keyword_difficulty: 61 },
+          },
+        }],
+      }] }] }),
+    } as Response);
+
+    const results = await provider.getRelatedKeywords('seo', 'ws-related', 5, 'us');
+    expect(results[0].difficulty).toBe(61);
+  });
+});
+
 describe('DataForSeoProvider — L1 global SQLite cache', () => {
   beforeEach(() => {
     // vi.restoreAllMocks() in earlier afterEach calls removes vi.fn() implementations
