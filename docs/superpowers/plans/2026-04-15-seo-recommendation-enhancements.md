@@ -20,6 +20,36 @@
 
 ---
 
+## Task Dependencies
+
+All tasks are **strictly sequential** — every task modifies `server/recommendations.ts` and the shared test file. No parallelism is possible.
+
+```
+Task 0 (shared/types/recommendations.ts — seasonalTag type)
+  ↓ must land before Task 3 reads the new type
+Task 1 (CTR gap section + test scaffold)
+  ↓ test file created here; all later tasks append to it
+Task 2 (conversion map + getTrafficScore signature)
+  ↓ conversionMap variable must exist before Task 4 can reference it
+Task 3 (seasonal tag in summary — requires Task 0 type)
+  ↓
+Task 4 (domainStrength fetch + KD adjustment in content-gap loop)
+  ↓
+Task 5 (intent mismatch section — adds inferPageType/isIntentMismatch helpers)
+  ↓
+Task 6 (diagnostic section — adds listDiagnosticReports import)
+  ↓
+Task 7 (learningsBoost fetch + post-processing pass — must come after all recs are built)
+  ↓
+Task 8 (quality gates — typecheck, build, full test suite, pr-check, docs)
+```
+
+**Why Task 2 before Task 4:** Task 4's KD logic uses `domainStrength`, which is declared in Task 4. But Task 2 modifies `getTrafficScore()` — if Task 4 were run first, its call sites would reference the old signature. Sequential order avoids a merge conflict on that function.
+
+**Why Task 7 last among implementation tasks:** The outcome-weighted multiplier is a post-processing pass over all `recs`. It must run after every rec-building section (Tasks 1–6) has pushed to the array.
+
+---
+
 ## Pre-flight: Read Before You Start
 
 Before writing any code, read these to get exact field names:
