@@ -7,6 +7,7 @@ import path from 'path';
 
 import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
+import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
 import type {
   SeoDataProvider,
   KeywordMetrics,
@@ -242,10 +243,25 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     if (uncached.length === 0 || areCreditsExhausted()) return results;
 
+    // L1: Check global SQLite cache for keywords that missed L2
+    const globalHits = getCachedMetricsBatch(uncached, database, CACHE_TTL_KEYWORD);
+    const stillUncached: string[] = [];
+    for (const kw of uncached) {
+      const hit = globalHits.get(kw.toLowerCase());
+      if (hit) {
+        results.push(hit as KeywordMetrics);
+        logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
+      } else {
+        stillUncached.push(kw);
+      }
+    }
+
+    if (stillUncached.length === 0) return results;
+
     // Batch up to 1000 per request
     const batches: string[][] = [];
-    for (let i = 0; i < uncached.length; i += 1000) {
-      batches.push(uncached.slice(i, i + 1000));
+    for (let i = 0; i < stillUncached.length; i += 1000) {
+      batches.push(stillUncached.slice(i, i + 1000));
     }
 
     for (const batch of batches) {
@@ -258,6 +274,7 @@ export class DataForSeoProvider implements SeoDataProvider {
 
         const taskResults = getTaskResult(json);
         const cost = getTaskCost(json);
+        const batchResults: KeywordMetrics[] = [];
 
         for (const item of taskResults) {
           const keyword = item.keyword as string;
@@ -279,10 +296,12 @@ export class DataForSeoProvider implements SeoDataProvider {
           };
 
           results.push(metrics);
+          batchResults.push(metrics);
           const cacheKey = `kw_${database}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
           writeCache(workspaceId, cacheKey, metrics);
         }
 
+        cacheMetricsBatch(batchResults, database);
         logCreditUsage({ credits: cost, endpoint: 'search_volume', query: batch.join(',').slice(0, 100), rowsReturned: taskResults.length, workspaceId, cached: false });
       } catch (err) {
         log.error({ err }, 'DataForSEO search_volume error');

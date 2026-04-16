@@ -1,5 +1,5 @@
 /**
- * keyword-metrics-cache — Global cross-workspace cache for SEMRush keyword metrics.
+ * keyword-metrics-cache — Global cross-workspace cache for keyword metrics.
  *
  * Keyword volume/difficulty/CPC is the same regardless of which workspace asks,
  * so this shared SQLite table eliminates duplicate SEMRush API calls across workspaces.
