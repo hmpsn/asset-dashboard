@@ -235,3 +235,36 @@ export function isAnyProviderConfigured(): boolean {
 export function listProviders(): { name: ProviderName; configured: boolean }[] {
   return [...providers.entries()].map(([name, p]) => ({ name, configured: p.isConfigured() }));
 }
+
+/**
+ * Normalize a provider-supplied date string to ISO-8601.
+ *
+ * Handles the three formats our providers return:
+ *   - SEMRush Unix epoch seconds as a string: "1747509061"
+ *   - Unix epoch milliseconds: "1747509061000"
+ *   - DataForSEO "YYYY-MM-DD HH:mm:ss +00:00" (ISO-parseable)
+ *   - ISO-8601 pass-through: "2025-05-17T00:00:00.000Z"
+ *
+ * Returns '' for empty, zero/negative epochs, and unparseable input. The empty
+ * return is intentional — the frontend falsy-check renders '—' instead of
+ * "Invalid Date", which is the whole reason this helper exists.
+ *
+ * See docs/rules/automated-rules.md → "Raw provider date passed to new Date()".
+ */
+export function normalizeProviderDate(raw: string): string {
+  if (!raw) return '';
+
+  // Numeric string → Unix epoch (sec vs ms discriminated by magnitude)
+  if (/^-?\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const ms = n > 1e12 ? n : n * 1000;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+  }
+
+  // Otherwise try Date.parse (handles ISO-8601 and DFS "YYYY-MM-DD HH:mm:ss +00:00")
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) return '';
+  return new Date(parsed).toISOString();
+}
