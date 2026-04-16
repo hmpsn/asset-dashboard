@@ -577,7 +577,7 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
   }
 
-  // ── getDomainOverview → ranked_keywords with limit=0 for aggregate metrics ──
+  // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
   async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
     const cacheKey = `domain_overview_${database}_${target.replace(/\./g, '_')}`;
