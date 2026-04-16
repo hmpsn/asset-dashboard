@@ -44,6 +44,15 @@ interface StrategyTabProps {
 
 const kdColor = (kd?: number) => !kd ? 'text-zinc-500' : kd <= 30 ? 'text-green-400' : kd <= 60 ? 'text-amber-400' : kd <= 80 ? 'text-orange-400' : 'text-red-400';
 const fmtNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+const intentColor = (intent?: string) => {
+  switch (intent) {
+    case 'commercial': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+    case 'informational': return 'text-green-400 bg-green-500/10 border-green-500/20';
+    case 'transactional': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+    case 'navigational': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+    default: return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+  }
+};
 
 
 export interface KeywordFeedback {
@@ -591,137 +600,129 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                 <span className="text-xs font-medium text-zinc-300">Content Gaps</span>
                 <span className="text-[10px] text-zinc-600">({strategyData.contentGaps.length})</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
                 {[...strategyData.contentGaps]
-                  // 3B: Sort data-backed gaps above AI-only suggestions
+                  // Sort data-backed gaps above AI-only suggestions
                   .sort((a, b) => {
                     const aData = (a.volume != null && a.volume > 0) || (a.impressions != null && a.impressions > 0) ? 1 : 0;
                     const bData = (b.volume != null && b.volume > 0) || (b.impressions != null && b.impressions > 0) ? 1 : 0;
                     return bData - aData;
                   })
-                  .slice(0, expandedSections.has('new-content-gaps-all') ? undefined : 4).map((gap, i) => {
+                  .slice(0, expandedSections.has('new-content-gaps-all') ? undefined : 6).map((gap, i) => {
                   const matchingReq = contentRequests?.find(r => r.targetKeyword === gap.targetKeyword && r.status !== 'declined');
                   const alreadyRequested = matchingReq != null || requestedTopics.has(gap.targetKeyword);
                   const planStatus = contentPlanKeywords?.get(gap.targetKeyword.toLowerCase());
                   const pageType = gap.suggestedPageType || 'blog';
-                  const pageTypeLabel = ({ blog: 'Blog Post', landing: 'Landing Page', service: 'Service Page', location: 'Location Page', product: 'Product Page', pillar: 'Pillar Page', resource: 'Resource Guide' } as Record<string, string>)[pageType] || 'Blog Post';
-                  const keywordDiffers = gap.targetKeyword.toLowerCase().replace(/[^a-z0-9]/g, '') !== gap.topic.toLowerCase().replace(/[^a-z0-9]/g, '');
                   const isDataValidated = (gap.volume != null && gap.volume > 0) || (gap.impressions != null && gap.impressions > 0);
+                  const hasTrendOrSerp = gap.trendDirection || (Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0) || gap.competitorProof;
                   return (
-                    <div key={i} className="px-3.5 py-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/80 hover:border-teal-500/30 transition-all group flex flex-col">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 mr-2">
-                          <span className="text-xs font-semibold text-zinc-100 truncate">{gap.topic}</span>
-                        </div>
+                    <div key={i} className="px-3 py-2.5 bg-zinc-800/40 rounded-lg border border-zinc-800 hover:border-teal-500/20 transition-colors">
+                      {/* Row 1: topic title + intent/page-type badges */}
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="text-xs font-semibold text-zinc-100">{gap.topic}</span>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">{pageTypeLabel}</span>
-                          {isDataValidated
-                            ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Data-validated</span>
-                            : <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 border border-zinc-700/50 font-medium">AI suggestion</span>
-                          }
-                          <span className="text-[10px] text-zinc-600 tracking-wider">{gap.intent}</span>
+                          {gap.intent && (
+                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full border font-medium ${intentColor(gap.intent)}`}>{gap.intent}</span>
+                          )}
+                          {pageType !== 'blog' && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium capitalize">{pageType}</span>
+                          )}
                         </div>
                       </div>
-                      {((gap.volume != null && gap.volume > 0) || (gap.difficulty != null && gap.difficulty > 0) || (gap.impressions != null && gap.impressions > 0)) && (
-                        <div className="flex items-center gap-3 mb-1.5">
-                          {gap.volume != null && gap.volume > 0 && <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>}
-                          {gap.difficulty != null && gap.difficulty > 0 && (
-                            <span
-                              className={`text-[10px] font-medium ${kdColor(gap.difficulty)} cursor-help`}
-                              title={kdTooltip(gap.difficulty)}
-                            >
-                              KD {gap.difficulty}
-                            </span>
+                      {/* Row 2: target keyword + metrics */}
+                      <div className="flex items-center gap-3 flex-wrap mb-1.5">
+                        <span className="text-[11px] text-teal-400">&ldquo;{gap.targetKeyword}&rdquo;</span>
+                        {gap.volume != null && gap.volume > 0 && (
+                          <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><BarChart3 className="w-3 h-3" />{fmtNum(gap.volume)}/mo</span>
+                        )}
+                        {gap.difficulty != null && gap.difficulty > 0 && (
+                          <>
+                            <span className={`text-[10px] font-medium ${kdColor(gap.difficulty)} cursor-help`} title={kdTooltip(gap.difficulty)}>KD {gap.difficulty}</span>
+                            {kdFraming(gap.difficulty) && (
+                              <span className="text-[10px] text-zinc-500">{kdFraming(gap.difficulty)}</span>
+                            )}
+                          </>
+                        )}
+                        {gap.impressions != null && gap.impressions > 0 && (
+                          <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} impr</span>
+                        )}
+                        {isDataValidated && (
+                          <span className="text-[10px] text-emerald-400/70">✓ data-backed</span>
+                        )}
+                      </div>
+                      {/* Trend + SERP + Competitor badges */}
+                      {hasTrendOrSerp && (
+                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                          {gap.trendDirection === 'rising' && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
                           )}
-                          {gap.difficulty != null && gap.difficulty > 0 && kdFraming(gap.difficulty) && (
-                            <span className="text-[10px] text-zinc-500 leading-none">
-                              {kdFraming(gap.difficulty)}
-                            </span>
+                          {gap.trendDirection === 'declining' && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-red-400 font-medium"><TrendingDown className="w-3 h-3" />Declining</span>
                           )}
-                          {gap.impressions != null && gap.impressions > 0 && <span className="text-[10px] text-blue-400 flex items-center gap-0.5"><Eye className="w-3 h-3" />{fmtNum(gap.impressions)} existing impr</span>}
-                          {gap.volume != null && gap.volume > 0 && (() => {
-                            const impact = Math.round(gap.volume * 0.103); // position-3 CTR floor (10.3%)
-                            if (impact < 10) return null;
+                          {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
+                          )}
+                          {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => {
+                            const labels: Record<string, string> = {
+                              featured_snippet: '⬜ Snippet',
+                              people_also_ask: '❓ PAA',
+                              video: '▶ Video',
+                              local_pack: '📍 Local',
+                            };
                             return (
-                              <span className="text-[10px] text-blue-400/70 flex items-center gap-0.5">
-                                <TrendingUp className="w-2.5 h-2.5" />
-                                ~{fmtNum(impact)}/mo est. clicks at rank #3
+                              <span key={feat} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                {labels[feat] ?? feat}
                               </span>
                             );
-                          })()}
+                          })}
+                          {gap.competitorProof && (
+                            <span className="text-[10px] text-orange-400 font-medium">{gap.competitorProof}</span>
+                          )}
                         </div>
                       )}
-                      {/* Trend + SERP + Competitor badges */}
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {gap.trendDirection === 'rising' && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium"><TrendingUp className="w-3 h-3" />Rising</span>
-                        )}
-                        {gap.trendDirection === 'declining' && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-red-400 font-medium"><TrendingDown className="w-3 h-3" />Declining</span>
-                        )}
-                        {gap.trendDirection === 'stable' && gap.volume && gap.volume > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-zinc-400 font-medium"><Minus className="w-3 h-3" />Stable</span>
-                        )}
-                        {Array.isArray(gap.serpFeatures) && gap.serpFeatures.length > 0 && gap.serpFeatures.map(feat => {
-                          const labels: Record<string, string> = {
-                            featured_snippet: '⬜ Snippet',
-                            people_also_ask: '❓ PAA',
-                            video: '▶ Video',
-                            local_pack: '📍 Local',
-                          };
-                          return (
-                            <span key={feat} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                              {labels[feat] ?? feat}
-                            </span>
-                          );
-                        })}
-                        {gap.competitorProof && (
-                          <span className="text-[10px] text-orange-400 font-medium">{gap.competitorProof}</span>
-                        )}
-                      </div>
+                      {/* Rationale */}
                       <div className="text-[11px] text-zinc-500 leading-snug mb-2">{gap.rationale}</div>
-                      {/* Keyword feedback controls */}
-                      {workspaceId && (() => {
-                        const fbStatus = getFeedbackStatus(gap.targetKeyword);
-                        const loading = isLoadingFeedback(gap.targetKeyword);
-                        if (fbStatus === 'declined') return (
-                          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-red-500/5 border border-red-500/20">
-                            <Ban className="w-3 h-3 text-red-400 flex-shrink-0" />
-                            <span className="text-[10px] text-red-400 flex-1">Keyword declined — won't appear in future strategies</span>
-                            <button onClick={() => undoFeedback(gap.targetKeyword)} disabled={loading} className="text-[10px] text-zinc-400 hover:text-zinc-200 flex items-center gap-0.5 transition-colors">
-                              <Undo2 className="w-3 h-3" /> Undo
-                            </button>
-                          </div>
-                        );
-                        if (fbStatus === 'approved') return (
-                          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                            <ThumbsUp className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-                            <span className="text-[10px] text-emerald-400">Keyword approved — prioritized in strategy</span>
-                          </div>
-                        );
-                        return (
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <button
-                              onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
-                              disabled={loading}
-                              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-                            >
-                              <ThumbsUp className="w-3 h-3" /> Relevant
-                            </button>
-                            <button
-                              onClick={() => { setDeclineReason({ keyword: gap.targetKeyword, source: 'content_gap' }); setDeclineReasonText(''); }}
-                              disabled={loading}
-                              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                            >
-                              <ThumbsDown className="w-3 h-3" /> Not relevant
-                            </button>
-                          </div>
-                        );
-                      })()}
-                      <div className="flex items-center justify-between mt-auto">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {keywordDiffers && <span className="text-[10px] text-teal-400/70 truncate max-w-[140px]">&ldquo;{gap.targetKeyword}&rdquo;</span>}
-                        </div>
+                      {/* Footer: keyword feedback + action buttons */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        {/* Keyword feedback */}
+                        {workspaceId && (() => {
+                          const fbStatus = getFeedbackStatus(gap.targetKeyword);
+                          const loading = isLoadingFeedback(gap.targetKeyword);
+                          if (fbStatus === 'declined') return (
+                            <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-red-500/5 border border-red-500/20">
+                              <Ban className="w-3 h-3 text-red-400 flex-shrink-0" />
+                              <span className="text-[10px] text-red-400">Declined</span>
+                              <button onClick={() => undoFeedback(gap.targetKeyword)} disabled={loading} className="text-[10px] text-zinc-400 hover:text-zinc-200 flex items-center gap-0.5 transition-colors disabled:opacity-50">
+                                <Undo2 className="w-3 h-3" /> Undo
+                              </button>
+                            </div>
+                          );
+                          if (fbStatus === 'approved') return (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                              <ThumbsUp className="w-3 h-3 text-emerald-400" />
+                              <span className="text-[10px] text-emerald-400">Approved</span>
+                            </div>
+                          );
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => submitFeedback(gap.targetKeyword, 'approved', 'content_gap')}
+                                disabled={loading}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                              >
+                                <ThumbsUp className="w-3 h-3" /> Relevant
+                              </button>
+                              <button
+                                onClick={() => { setDeclineReason({ keyword: gap.targetKeyword, source: 'content_gap' }); setDeclineReasonText(''); }}
+                                disabled={loading}
+                                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                              >
+                                <ThumbsDown className="w-3 h-3" /> Not relevant
+                              </button>
+                            </div>
+                          );
+                        })()}
+                        {/* Action buttons */}
                         {!betaMode && (alreadyRequested ? (
                           (() => {
                             const s = matchingReq?.status;
@@ -785,7 +786,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
                   );
                 })}
               </div>
-              {strategyData.contentGaps.length > 4 && (
+              {strategyData.contentGaps.length > 6 && (
                 <button
                   onClick={() => toggleSection('new-content-gaps-all')}
                   className="w-full mt-3 text-center py-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors border border-dashed border-zinc-800 rounded-lg hover:border-zinc-700"
