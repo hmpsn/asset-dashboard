@@ -32,6 +32,7 @@ export const queryKeys = {
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
     requests: (wsId: string) => ['admin-requests', wsId] as const,
+    approvals: (wsId: string) => ['admin-approvals', wsId] as const,
     posts: (wsId: string) => ['admin-posts', wsId] as const,
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
     postVersions: (wsId: string, postId: string) => ['admin-post-versions', wsId, postId] as const,
@@ -53,8 +54,12 @@ export const queryKeys = {
     assetAudit: (siteId: string) => ['admin-asset-audit', siteId] as const,
     seoEditor: (siteId: string) => ['seo-editor', siteId] as const,
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
+    rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
+    competitorIntel: (wsId: string, competitorKey: string) =>
+      ['admin-competitive-intel', wsId, competitorKey] as const,
+    competitorIntelAll: (wsId: string) => ['admin-competitive-intel', wsId] as const,
     analyticsAnnotations: (wsId: string) => ['analytics-annotations', wsId] as const,
     insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
@@ -66,10 +71,37 @@ export const queryKeys = {
     brandscripts: (wsId: string) => ['admin-brandscripts', wsId] as const,
     brandscriptTemplates: () => ['admin-brandscript-templates'] as const,
 
+    // Brand Engine — Voice & Identity
+    voiceProfile: (wsId: string) => ['admin-voice-profile', wsId] as const,
+    brandIdentity: (wsId: string) => ['admin-brand-identity', wsId] as const,
+
+    // Brand Engine — Discovery
+    discoverySources: (wsId: string) => ['admin-discovery-sources', wsId] as const,
+    discoveryExtractions: (wsId: string, sourceId: string) => ['admin-discovery-extractions', wsId, sourceId] as const,
+    discoveryExtractionsAll: (wsId: string) => ['admin-discovery-extractions', wsId] as const,
+
     // Brand Engine — Page Strategy
     blueprints: (wsId: string) => ['admin-blueprints', wsId] as const,
     blueprint: (wsId: string, blueprintId: string) => ['admin-blueprint', wsId, blueprintId] as const,
     blueprintVersions: (wsId: string, blueprintId: string) => ['admin-blueprint-versions', wsId, blueprintId] as const,
+
+    // Copy Pipeline
+    copySections: (wsId: string, entryId: string) => ['admin-copy-sections', wsId, entryId] as const,
+    copySectionsAll: (wsId: string) => ['admin-copy-sections', wsId] as const,
+    copyStatus: (wsId: string, entryId: string) => ['admin-copy-status', wsId, entryId] as const,
+    copyStatusAll: (wsId: string) => ['admin-copy-status', wsId] as const,
+    copyMetadata: (wsId: string, entryId: string) => ['admin-copy-metadata', wsId, entryId] as const,
+    copyMetadataAll: (wsId: string) => ['admin-copy-metadata', wsId] as const,
+    copyIntelligence: (wsId: string) => ['admin-copy-intelligence', wsId] as const,
+    copyPromotable: (wsId: string) => ['admin-copy-promotable', wsId] as const,
+    copyBatch: (wsId: string, batchId: string) => ['admin-copy-batch', wsId, batchId] as const,
+    copyBatchAll: (wsId: string) => ['admin-copy-batch', wsId] as const,
+
+    // Diagnostics
+    diagnostics: (wsId: string) => ['admin-diagnostics', wsId] as const,
+    diagnosticDetail: (wsId: string, reportId: string) => ['admin-diagnostics', wsId, reportId] as const,
+    diagnosticForInsight: (wsId: string, insightId: string) => ['admin-diagnostic-for-insight', wsId, insightId] as const,
+    diagnosticForInsightAll: (wsId: string) => ['admin-diagnostic-for-insight', wsId] as const,
 
     // CMS
     cmsEditor: (siteId: string, wsId?: string) => ['cms-editor', siteId, wsId] as const,
@@ -98,8 +130,6 @@ export const queryKeys = {
     clientSignals: (wsId: string) => ['admin-client-signals', wsId] as const,
     notifications: () => ['admin-notifications'] as const,
     featureFlags: () => ['admin-feature-flags'] as const,
-    competitiveIntel: (wsId: string, competitorKey?: string) =>
-      competitorKey ? ['admin-competitive-intel', wsId, competitorKey] as const : ['admin-competitive-intel', wsId] as const,
   },
 
   // ── Client ────────────────────────────────────────────────────────
@@ -134,6 +164,11 @@ export const queryKeys = {
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
     intelligence: (wsId: string) => ['client-intelligence', wsId] as const,
+
+    // Client Copy Review
+    copyEntries: (wsId: string) => ['client-copy-entries', wsId] as const,
+    copySections: (wsId: string, entryId: string) => ['client-copy-sections', wsId, entryId] as const,
+    copySectionsAll: (wsId: string) => ['client-copy-sections', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────
@@ -142,6 +177,7 @@ export const queryKeys = {
     recommendations: (wsId: string) => ['recommendations', wsId] as const,
     pageEditStates: (wsId: string, isPublic: boolean) =>
       ['page-edit-states', wsId, isPublic ? 'public' : 'admin'] as const,
+    features: () => ['features'] as const,
     featureFlags: () => ['feature-flags'] as const,
   },
 } as const;

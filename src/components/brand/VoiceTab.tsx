@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { Mic, Plus, Trash2, Sparkles, Loader2, Save } from 'lucide-react';
+import { queryKeys } from '../../lib/queryKeys';
 import { voice } from '../../api/brand-engine';
 import type {
   VoiceSample,
@@ -990,18 +991,18 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
   const [activeSection, setActiveSection] = useState<VoiceSection>('samples');
 
   const { data: profile, isLoading } = useQuery({
-    queryKey: ['admin-voice-profile', workspaceId],
+    queryKey: queryKeys.admin.voiceProfile(workspaceId),
     queryFn: () => voice.getProfile(workspaceId),
   });
 
   useWorkspaceEvents(workspaceId, {
     'voice:updated': () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-voice-profile', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
     },
   });
 
   const invalidateProfile = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin-voice-profile', workspaceId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.voiceProfile(workspaceId) });
   };
 
   const sections: { id: string; label: string }[] = [

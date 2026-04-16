@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 import {
   Loader2, TrendingUp, Globe, Search, Link2,
   DollarSign, Target, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { SectionCard, StatCard } from '../ui';
-import { queryKeys } from '../../lib/queryKeys';
 
 interface DomainOverview {
   domain: string;
@@ -98,7 +98,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
   const competitorKey = competitors.join(',');
 
   const { data, isLoading, error, refetch } = useQuery<IntelResponse>({
-    queryKey: queryKeys.admin.competitiveIntel(workspaceId, competitorKey),
+    queryKey: queryKeys.admin.competitorIntel(workspaceId, competitorKey),
     queryFn: () => get<IntelResponse>(`/api/semrush/competitive-intel/${workspaceId}?competitors=${encodeURIComponent(competitorKey)}`),
     enabled: competitors.length > 0 && semrushAvailable,
     staleTime: 48 * 60 * 60 * 1000, // 48h — matches server-side cache
@@ -183,7 +183,7 @@ export function CompetitiveIntel({ workspaceId, competitors, semrushAvailable, c
           <Target className="w-4 h-4 text-teal-400" />
           <h3 className="text-sm font-semibold text-zinc-200">Competitive Intelligence</h3>
         </div>
-        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitiveIntel(workspaceId) }); }} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+        <button onClick={() => { queryClient.invalidateQueries({ queryKey: queryKeys.admin.competitorIntelAll(workspaceId) }); }} className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
           Refresh
         </button>
       </div>

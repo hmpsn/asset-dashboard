@@ -3298,9 +3298,9 @@ When the user asks to update this document with recent features, follow this pro
 | Platform & UX | 25+ | Design system, command center, UX overhaul, navigation, cross-linking, roadmap, Recharts, mobile guard |
 | Architecture & Infrastructure | 30+ | Server refactor, React Query migration (5 phases), React Router, typed API client, Pino logging, Sentry, CI/CD, SQLite optimization |
 
-**298 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
+**299 features** across the platform. The core thesis: **every feature either saves the agency time or gives the client transparency — and the best features do both.**
 
-Current feature count: **298**. Last updated: April 2026.
+Current feature count: **299**. Last updated: April 2026.
 
 ---
 
@@ -3510,3 +3510,12 @@ Current feature count: **298**. Last updated: April 2026.
 **Files:** `server/diagnostic-orchestrator.ts`, `server/diagnostic-store.ts`, `server/diagnostic-probe.ts`, `server/routes/diagnostics.ts`, `server/routes/jobs.ts` (deep-diagnostic case), `src/api/diagnostics.ts`, `src/hooks/admin/useDiagnostics.ts`, `src/components/admin/DiagnosticReport/` (4 components), `shared/types/diagnostics.ts`, `server/db/migrations/059-diagnostic-reports.sql`
 
 **Agency value:** Turns anomaly alerts into actionable root cause reports in minutes. Admin sees ranked root causes with evidence, remediation plan with priority/effort/impact labels. Growth+ clients see an enriched narrative instead of the generic 'monitoring' message. Dark-launched behind `deep-diagnostics` feature flag.
+
+---
+
+### 299. Stripe Config Admin Auth Guard
+**What it does:** Applies `requireAdminAuth` middleware to all Stripe configuration endpoints (`GET /api/stripe/config`, `POST /api/stripe/config`, `DELETE /api/stripe/config`). Prevents JWT-authenticated client users from reading or modifying Stripe secret keys, webhook secrets, and publishable keys via the admin API. Previously these endpoints were protected only by the global HMAC token gate — a JWT user token (issued to client portal users) could bypass that gate and access payment configuration.
+
+**Files:** `server/routes/stripe.ts` (middleware applied to 3 config endpoints), `server/middleware/admin-auth.ts` (requireAdminAuth implementation)
+
+**Agency value:** Closes a privilege-escalation vector where a client JWT token could be used to read Stripe secret keys or alter payment configuration. Stripe config is admin-only by design; this enforces that at the route level.

@@ -571,7 +571,9 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     // Pre-assemble workspace-level slices once — learnings and seoContext base data are identical
     // for every page. pageKeywords (the only page-specific seoContext field) is a find() on the
     // pre-built pageMap, derived inline per page. pageProfile remains per-page (requires pagePath).
-    const wsIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['learnings', 'seoContext'] as const });
+    // contentPipeline carries cannibalizationWarnings so the AI can recommend consolidation when
+    // a page's primary keyword is also targeted by other pages.
+    const wsIntel = await buildWorkspaceIntelligence(wsId ?? '', { slices: ['learnings', 'seoContext', 'contentPipeline'] as const });
 
     const aiBatch = 15;
     for (let i = 0; i < pagesNeedingFixes.length; i += aiBatch) {
@@ -606,6 +608,24 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
           const intel = { ...wsIntel, seoContext: seoCtx, pageProfile: pageProfileIntel.pageProfile };
           const fullContext = formatForPrompt(intel, { verbosity: 'detailed', sections: ['seoContext', 'learnings', 'pageProfile'] }); // bip-ok: slices is a superset
 
+          // Build cannibalization context block if this page's primary keyword is flagged
+          const pageKeyword = seoCtx?.pageKeywords?.primaryKeyword?.toLowerCase().trim();
+          const cannibalizationWarnings = wsIntel.contentPipeline?.cannibalizationWarnings ?? [];
+          const cannibalizationMatch = pageKeyword
+            ? cannibalizationWarnings.find(w => w.keyword.toLowerCase().trim() === pageKeyword)
+            : undefined;
+          // Filter sibling pages: exclude this page's own path (pagePath is a pathname like /about,
+          // matching the format stored in cannibalizationWarnings[].pages) and exclude matrix cell
+          // UUIDs that carry no page identity.
+          const siblingPages = cannibalizationMatch
+            ? cannibalizationMatch.pages.filter(p =>
+                p !== pagePath && !p.match(/^[0-9a-f-]{36}$/)
+              )
+            : [];
+          const cannibalizationBlock = cannibalizationMatch && siblingPages.length > 0
+            ? `\nKEYWORD CANNIBALIZATION WARNING:\nThe primary keyword "${cannibalizationMatch.keyword}" is also targeted by ${siblingPages.length} other page(s): ${siblingPages.join(', ')}. Severity: ${cannibalizationMatch.severity}.\nDo NOT suggest optimizing this page to rank harder for the same keyword as its siblings — that worsens cannibalization. Instead, recommend in the meta description that this page targets a differentiated angle or sub-topic, and recommend consolidation if appropriate.\n`
+            : '';
+
           const prompt = `You are an expert SEO copywriter. Generate optimized meta tags for this webpage that match the brand voice and target the right keywords.
 
 PAGE: ${pageResult.page}
@@ -613,7 +633,7 @@ URL: ${pageResult.url}
 CURRENT TITLE: ${currentTitle || '(missing)'}
 CURRENT META DESCRIPTION: ${currentDesc || '(missing)'}
 
-${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}
+${pageContent ? `PAGE CONTENT:\n${pageContent}\n` : ''}${fullContext}${cannibalizationBlock}
 ISSUES TO FIX:
 ${titleIssue ? `- Title: ${titleIssue.message}` : ''}
 ${descIssue ? `- Meta Description: ${descIssue.message}` : ''}

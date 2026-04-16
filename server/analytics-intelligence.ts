@@ -1140,7 +1140,7 @@ async function computeAndPersistInsights(workspaceId: string): Promise<void> {
     // `enrichment` is Partial<AnalyticsInsight> so spreading it can introduce
     // an untyped `data` field; strip it so the narrowly-typed `insight.data` wins.
     const { data: _enrichedData, ...enrichmentRest } = enrichment;
-    upsertInsight({
+    upsertInsight({ // clone-ok: fresh computed insert from live analytics + enrichment; `insight` is computed input, not a stored row
       workspaceId,
       pageId: insight.pageId,
       insightType: insight.insightType,

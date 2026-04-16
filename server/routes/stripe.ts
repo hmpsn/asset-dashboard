@@ -7,6 +7,7 @@ const router = Router();
 
 import { sanitizeString } from '../helpers.js';
 import { checkoutLimiter } from '../middleware.js';
+import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { listPayments, getPayment } from '../payments.js';
 import { computeROI } from '../roi.js';
 import {
@@ -38,12 +39,14 @@ const log = createLogger('stripe');
 // --- Stripe Config (admin) ---
 
 // Get current Stripe config (keys masked)
-router.get('/api/stripe/config', (_req, res) => {
+// Admin-only: rejects JWT user tokens (client-portal users). See middleware/admin-auth.ts.
+router.get('/api/stripe/config', requireAdminAuth, (_req, res) => {
   res.json(getStripeConfigSafe());
 });
 
 // Save Stripe API keys
-router.post('/api/stripe/config/keys', (req, res) => {
+// Admin-only: these write SYSTEM-level Stripe secrets. JWT user tokens must not pass.
+router.post('/api/stripe/config/keys', requireAdminAuth, (req, res) => {
   const { secretKey, webhookSecret, publishableKey } = req.body;
   if (!secretKey && !webhookSecret && !publishableKey) return res.status(400).json({ error: 'Provide secretKey, webhookSecret, and/or publishableKey' });
   saveStripeKeys(secretKey, webhookSecret, publishableKey);
@@ -51,7 +54,8 @@ router.post('/api/stripe/config/keys', (req, res) => {
 });
 
 // Save product price mappings
-router.post('/api/stripe/config/products', (req, res) => {
+// Admin-only: product/price configuration is system-level.
+router.post('/api/stripe/config/products', requireAdminAuth, (req, res) => {
   const { products } = req.body;
   if (!Array.isArray(products)) return res.status(400).json({ error: 'products must be an array' });
   saveStripeProducts(products as StripeProductPrice[]);
@@ -59,7 +63,8 @@ router.post('/api/stripe/config/products', (req, res) => {
 });
 
 // Clear all Stripe config
-router.delete('/api/stripe/config', (_req, res) => {
+// Admin-only: nukes SYSTEM-level Stripe secrets.
+router.delete('/api/stripe/config', requireAdminAuth, (_req, res) => {
   clearStripeConfig();
   res.json({ ok: true });
 });

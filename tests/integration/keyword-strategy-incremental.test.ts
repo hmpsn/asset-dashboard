@@ -333,4 +333,43 @@ describe('DB-layer: competitorLastFetchedAt stamped after fetch', () => {
     expect(shouldFetchCompetitorData(reloaded)).toBe(true); // no timestamp = always fetch
     deleteWorkspace(ws.id);
   });
+
+  it('shouldFetchCompetitorData returns true when domains changed since last fetch', () => {
+    const ws = createWorkspace('Competitor Domain Change Test');
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+    updateWorkspace(ws.id, {
+      competitorLastFetchedAt: recent,
+      competitorDomains: ['a.com', 'b.com', 'c.com'], // current: 3 domains
+      competitorDomainsAtLastFetch: ['a.com', 'b.com'], // last fetch: only 2
+    });
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(true); // domains differ = re-fetch immediately
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns false when domains unchanged and fetch is fresh', () => {
+    const ws = createWorkspace('Competitor No Change Test');
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+    updateWorkspace(ws.id, {
+      competitorLastFetchedAt: recent,
+      competitorDomains: ['a.com', 'b.com'],
+      competitorDomainsAtLastFetch: ['b.com', 'a.com'], // same domains, different order
+    });
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(false); // same domains (order-insensitive) + fresh = skip
+    deleteWorkspace(ws.id);
+  });
+
+  it('shouldFetchCompetitorData returns true when a domain is removed', () => {
+    const ws = createWorkspace('Competitor Domain Remove Test');
+    const recent = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(); // 1 day ago
+    updateWorkspace(ws.id, {
+      competitorLastFetchedAt: recent,
+      competitorDomains: ['a.com'], // current: 1 domain
+      competitorDomainsAtLastFetch: ['a.com', 'b.com'], // last fetch: 2 domains
+    });
+    const reloaded = getWorkspace(ws.id)!;
+    expect(shouldFetchCompetitorData(reloaded)).toBe(true); // domain removed = re-fetch
+    deleteWorkspace(ws.id);
+  });
 });

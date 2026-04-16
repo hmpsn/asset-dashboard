@@ -57,9 +57,24 @@ const MIGRATION_RENAMES: Array<[oldName: string, newName: string]> = [
 /**
  * Run all pending SQL migrations from server/db/migrations/.
  * Tracks applied migrations in a `_migrations` table.
+ *
+ * Concurrency safety: the entire check + apply loop runs inside a single
+ * IMMEDIATE transaction, serialising concurrent server starts against the same
+ * database file (common in the test suite where multiple servers share
+ * ~/.asset-dashboard/dashboard.db). Only one process holds the write lock at a
+ * time; others block (up to busy_timeout = 5 s), then see all migrations
+ * already applied and exit immediately. This prevents the TOCTOU window where
+ * two processes both read the applied set, both see the same migration as
+ * pending, and race to apply it.
+ *
+ * Note: PRAGMA foreign_keys cannot be used inside a transaction (SQLite
+ * restriction). We disable it before entering the IMMEDIATE transaction and
+ * restore it in a finally block.
  */
 export function runMigrations(): void {
-  // Create the migrations tracking table if it doesn't exist
+  // Create the migrations tracking table if it doesn't exist.
+  // Safe to run outside the main transaction: CREATE TABLE IF NOT EXISTS is
+  // idempotent and concurrent executions do not conflict.
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT PRIMARY KEY,
@@ -77,73 +92,80 @@ export function runMigrations(): void {
     return;
   }
 
-  // Apply filename aliases BEFORE loading the applied set — this is the ONLY
-  // place the rename bridge can run, because the main loop compares candidate
-  // filenames against a snapshot of the applied set taken on the next line.
-  const aliasInsert = db.prepare(
-    `INSERT OR IGNORE INTO _migrations (name, applied_at)
-     SELECT ?, applied_at FROM _migrations WHERE name = ?`,
-  );
-  for (const [oldName, newName] of MIGRATION_RENAMES) {
-    aliasInsert.run(newName, oldName);
-  }
-
-  const applied = new Set(
-    (db.prepare('SELECT name FROM _migrations').all() as Array<{ name: string }>).map(r => r.name),
-  );
-
   const files = fs.readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
     .sort(); // lexicographic order ensures 001 < 002 < ...
 
+  // Prepare statements outside the transaction to avoid re-preparing on
+  // every call and to satisfy better-sqlite3's statement caching expectations.
+  const aliasInsert = db.prepare(
+    `INSERT OR IGNORE INTO _migrations (name, applied_at)
+     SELECT ?, applied_at FROM _migrations WHERE name = ?`,
+  );
+  const selectApplied = db.prepare('SELECT name FROM _migrations');
   const insert = db.prepare('INSERT OR IGNORE INTO _migrations (name, applied_at) VALUES (?, ?)');
 
-  const applyMigration = db.transaction((file: string) => {
-    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
-    log.info(`Applying migration: ${file}`);
-    // For migrations containing ALTER TABLE ADD COLUMN or RENAME COLUMN,
-    // execute each statement individually so idempotency errors don't abort
-    // the entire migration:
-    //   ADD COLUMN  → "duplicate column name" if column already exists
-    //   RENAME COLUMN → "no such column" if column was already renamed
-    const needsPerStatement =
-      /ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN/i.test(sql) ||
-      /ALTER\s+TABLE\s+\S+\s+RENAME\s+COLUMN/i.test(sql);
-    if (needsPerStatement) {
-      // Strip comment lines, then split on semicolons
-      const stripped = sql.replace(/^--.*$/gm, '');
-      const statements = stripped
-        .split(';')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-      for (const stmt of statements) {
-        try {
-          db.exec(stmt);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : '';
-          if (msg.includes('duplicate column name')) {
-            log.info(`Skipping (column already exists): ${stmt.slice(0, 60)}…`);
-          } else if (msg.includes('no such column')) {
-            // RENAME COLUMN: target column doesn't exist — already renamed on this DB
-            log.info(`Skipping (column already renamed or absent): ${stmt.slice(0, 60)}…`);
-          } else {
-            throw err;
-          }
-        }
+  // PRAGMA foreign_keys cannot be set inside a transaction.
+  // Disable FK enforcement before acquiring the write lock; restore it after.
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      // Apply filename aliases BEFORE loading the applied set — this is the ONLY
+      // place the rename bridge can run, because the main loop compares candidate
+      // filenames against a snapshot of the applied set taken on the next line.
+      for (const [oldName, newName] of MIGRATION_RENAMES) {
+        aliasInsert.run(newName, oldName);
       }
-    } else {
-      db.exec(sql);
-    }
-    insert.run(file, new Date().toISOString());
-  });
 
-  for (const file of files) {
-    if (applied.has(file)) continue;
-    // Temporarily disable FK checks so migrations that recreate tables with
-    // new FK constraints can copy existing data (which may include orphaned
-    // workspace_id refs). PRAGMA foreign_keys must be set OUTSIDE transactions.
-    db.pragma('foreign_keys = OFF');
-    applyMigration(file);
+      const applied = new Set(
+        (selectApplied.all() as Array<{ name: string }>).map(r => r.name),
+      );
+
+      for (const file of files) {
+        if (applied.has(file)) continue;
+
+        const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
+        log.info(`Applying migration: ${file}`);
+
+        // For migrations containing ALTER TABLE ADD COLUMN or RENAME COLUMN,
+        // execute each statement individually so idempotency errors don't abort
+        // the entire migration:
+        //   ADD COLUMN  → "duplicate column name" if column already exists
+        //   RENAME COLUMN → "no such column" if column was already renamed
+        const needsPerStatement =
+          /ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN/i.test(sql) ||
+          /ALTER\s+TABLE\s+\S+\s+RENAME\s+COLUMN/i.test(sql);
+
+        if (needsPerStatement) {
+          // Strip comment lines, then split on semicolons
+          const stripped = sql.replace(/^--.*$/gm, '');
+          const statements = stripped
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+          for (const stmt of statements) {
+            try {
+              db.exec(stmt);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : '';
+              if (msg.includes('duplicate column name')) {
+                log.info(`Skipping (column already exists): ${stmt.slice(0, 60)}…`);
+              } else if (msg.includes('no such column')) {
+                // RENAME COLUMN: target column doesn't exist — already renamed on this DB
+                log.info(`Skipping (column already renamed or absent): ${stmt.slice(0, 60)}…`);
+              } else {
+                throw err;
+              }
+            }
+          }
+        } else {
+          db.exec(sql);
+        }
+
+        insert.run(file, new Date().toISOString());
+      }
+    }).immediate();
+  } finally {
     db.pragma('foreign_keys = ON');
   }
 }

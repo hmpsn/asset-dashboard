@@ -21,11 +21,13 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.APPROVAL_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.APPROVAL_APPLIED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.REQUEST_CREATED]: () => {
@@ -150,6 +152,44 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.MEETING_BRIEF_GENERATED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.admin.meetingBrief(workspaceId) });
+    },
+    [WS_EVENTS.COPY_SECTION_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_METADATA_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyMetadataAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_BATCH_PROGRESS]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_BATCH_COMPLETE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyBatchAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(workspaceId) });
+    },
+    [WS_EVENTS.COPY_INTELLIGENCE_UPDATED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyIntelligence(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.copyPromotable(workspaceId) });
+    },
+    [WS_EVENTS.DIAGNOSTIC_COMPLETE]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
+      // BUG FIX: prior code invalidated ['admin-insights', workspaceId] which matches no
+      // registered query. The real insight feed key is queryKeys.admin.insightFeed(),
+      // so diagnostic completion now correctly refreshes the feed.
+      qc.invalidateQueries({ queryKey: queryKeys.admin.insightFeed(workspaceId) });
+    },
+    [WS_EVENTS.DIAGNOSTIC_FAILED]: () => {
+      if (!workspaceId) return;
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnosticForInsightAll(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.diagnostics(workspaceId) });
     },
   });
 }

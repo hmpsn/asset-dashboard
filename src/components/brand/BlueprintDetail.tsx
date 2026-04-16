@@ -27,7 +27,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { TabBar } from '../ui/TabBar';
-import { useCopyStatus, useCopyPipelineEvents, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
+import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
 import { CopyExportPanel } from './CopyExportPanel';
@@ -379,9 +379,6 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
       });
     },
   });
-
-  // Copy pipeline WS events (no-op when flag is off — hook only subscribes)
-  useCopyPipelineEvents(workspaceId);
 
   // Copy generation mutation (safe to call unconditionally — only mutates on user click)
   const generateCopyMutation = useGenerateCopy(workspaceId, blueprintId);

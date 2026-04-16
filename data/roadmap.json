@@ -646,8 +646,19 @@
           "source": "pr-check-audit-and-backfill plan (2026-04-10)",
           "est": "2-3h",
           "priority": "P2",
-          "notes": "Follow-up from the pr-check-audit-and-backfill plan. Walk every file in docs/rules/*.md and (a) verify it references current file paths and type names, (b) cross-check each rule against CLAUDE.md for drift, (c) flag any rule that could be mechanized into a pr-check rule. User explicitly requested this be tracked separately from the main audit plan so the follow-up doesn't get lost. Blocked on the audit plan landing (PRs A/B/C).",
-          "status": "pending"
+          "notes": "Shipped — Platform Health Sprint PR 5a (bf92a95). Walked all 12 docs/rules/*.md files. Stale refs fixed: ai-dispatch-patterns.md (generateCalibrationVariations line number ~185→~277), analytics-insights.md (useWebSocket→useWorkspaceEvents, schema file location updated, queryKeys refs updated), data-flow.md (init callback location server/index.ts→server/websocket.ts). automated-rules.md regenerated — no diff (already current). bridge-authoring.md, multi-agent-coordination.md, outcome-engine-stubs.md, pr-check-rule-authoring.md, route-removal-checklist.md, ui-ux-consistency.md, verified-clean-rules.md: no stale refs found.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
+        },
+        {
+          "id": 591,
+          "title": "Platform Health Sprint PR 5b — unskip health-routes tests, EmptyState CTA sweep, client-portal silent-catch fixes, archive shipped audits",
+          "source": "Platform Health Sprint PR 5b plan",
+          "est": "3-4h",
+          "priority": "P2",
+          "notes": "Shipped — commits on feature/platform-health-pr5b. Task 6.1 (558172e): unskipped 4 health-routes tests (storage-stats + 3 prune endpoints) by allocating an isolated temp DATA_DIR via fs.mkdtempSync before createTestContext(13217) spawns the server, so getStorageReport/pruneChatSessions/pruneBackups run against an empty dir; 7/7 pass in 2.59s. Task 6.3 (498e7a4): added action-oriented CTAs to 4 dead-end EmptyState instances — OutcomeScorecard (Retry on error → refetch), RankTracker (Take First Snapshot in keywords-but-no-ranks branch, distinct from header to avoid selector collision), ActionItemsPanel (Add Item opens inline form, replaced 'Click Add to track work' prose), ContentCalendar (Create a Brief → navigate to seo-briefs tab via adminPath). All teal per Three Laws. Task 6.4 (b101da4): replaced 4 silent .catch() handlers in client portal with user-facing errors (ContentTab setToast on export failure, FixRecommendations serverRecsError banner, StrategyTab feedbackLoadError + trackedKeywordsError, InboxTab error state); added 2 EmptyState CTAs (removed 2 duplicates). Code-review fixes (94837d3): moved StrategyTab's feedbackLoadError + trackedKeywordsError banners to top of component (were hidden inside collapsed page-keyword-map section); RankTracker.load() sets error state on failure (was console.error only); ActionItemsPanel.load() surfaces loadError with Retry button (was silent). Task 6.5: archived 6 shipped audit docs to docs/superpowers/audits/archive/ (light-mode-and-polish, intelligence-phase2-bridge, page-strategy-engine, admin-ux-restructure, copy-pipeline, deep-diagnostics). Specs + plans were already archived in prior work. Full test suite: 4210/4210 pass, typecheck clean, build clean.",
+          "status": "done",
+          "shippedAt": "2026-04-15"
         },
         {
           "id": 586,

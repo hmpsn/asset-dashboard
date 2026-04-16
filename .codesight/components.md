@@ -1,0 +1,213 @@
+# Components
+
+- **ClientDashboard** — `src/App.tsx`
+- **AdminChat** — props: workspaceId, workspaceName — `src/components/AdminChat.tsx`
+- **AeoReview** — props: workspaceId — `src/components/AeoReview.tsx`
+- **AnalyticsAnnotations** — props: workspaceId — `src/components/AnalyticsAnnotations.tsx`
+- **AnalyticsHub** — props: workspaceId, siteId, gscPropertyUrl, ga4PropertyId — `src/components/AnalyticsHub.tsx`
+- **AnalyticsOverview** — props: workspaceId, siteId, gscPropertyUrl, ga4PropertyId — `src/components/AnalyticsOverview.tsx`
+- **Annotations** — props: workspaceId — `src/components/Annotations.tsx`
+- **AnomalyAlerts** — props: workspaceId, isAdmin, compact — `src/components/AnomalyAlerts.tsx`
+- **ISSUE_LABELS** — props: siteId — `src/components/AssetAudit.tsx`
+- **AssetBrowser** — props: siteId — `src/components/AssetBrowser.tsx`
+- **BrandHub** — props: workspaceId, webflowSiteId — `src/components/BrandHub.tsx`
+- **ChartPointDetail** — props: date, metrics, onClose, xPct — `src/components/ChartPointDetail.tsx`
+- **MetricBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **ChartBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **DataTableBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **SparklineBlock** — props: data — `src/components/ChatBlocks.tsx`
+- **ChatPanel** — props: messages, loading, input, onInputChange, onSend, quickQuestions, placeholder, accent, disabled, inputPrefix — `src/components/ChatPanel.tsx`
+- **ClientDashboard** — props: workspaceId, betaMode, initialTab — `src/components/ClientDashboard.tsx`
+- **CmsEditor** — props: siteId, workspaceId — `src/components/CmsEditor.tsx`
+- **CommandPalette** — props: workspaces, selectedWorkspace, onSelectWorkspace — `src/components/CommandPalette.tsx`
+- **ContentBriefs** — props: workspaceId, onRequestCountChange, fixContext, clearFixContext — `src/components/ContentBriefs.tsx`
+- **ContentCalendar** — props: workspaceId — `src/components/ContentCalendar.tsx`
+- **ContentDecay** — props: workspaceId — `src/components/ContentDecay.tsx`
+- **ContentManager** — props: workspaceId — `src/components/ContentManager.tsx`
+- **ContentPerformance** — props: workspaceId — `src/components/ContentPerformance.tsx`
+- **ContentPipeline** — props: workspaceId, onRequestCountChange, fixContext, clearFixContext — `src/components/ContentPipeline.tsx`
+- **ContentPipelineGuide** — `src/components/ContentPipelineGuide.tsx`
+- **ContentPlanner** — props: workspaceId — `src/components/ContentPlanner.tsx`
+- **ContentSubscriptions** — props: workspaceId — `src/components/ContentSubscriptions.tsx`
+- **DropZone** — props: workspaceId, type, disabled — `src/components/DropZone.tsx`
+- **FeatureFlagSettings** — `src/components/FeatureFlagSettings.tsx`
+- **FeatureLibrary** — `src/components/FeatureLibrary.tsx`
+- **InternalLinks** — props: siteId, workspaceId — `src/components/InternalLinks.tsx`
+- **KeywordAnalysis** — props: siteId, workspaceId — `src/components/KeywordAnalysis.tsx`
+- **KeywordStrategyPanel** — props: workspaceId — `src/components/KeywordStrategy.tsx`
+- **LandingPage** — `src/components/LandingPage.tsx`
+- **LinkChecker** — props: siteId — `src/components/LinkChecker.tsx`
+- **LinksPanel** — props: siteId, workspaceId — `src/components/LinksPanel.tsx`
+- **LlmsTxtGenerator** — props: workspaceId — `src/components/LlmsTxtGenerator.tsx`
+- **LoginScreen** — props: onLogin — `src/components/LoginScreen.tsx`
+- **MediaTab** — props: siteId, workspaceFolder, queue — `src/components/MediaTab.tsx`
+- **MobileGuard** — `src/components/MobileGuard.tsx`
+- **NotificationBell** — props: onSelectWorkspace — `src/components/NotificationBell.tsx`
+- **PageIntelligence** — props: workspaceId, siteId, fixContext — `src/components/PageIntelligence.tsx`
+- **PageRewriteChat** — props: workspaceId, initialPageUrl, onBack — `src/components/PageRewriteChat.tsx`
+- **PageSpeedPanel** — props: siteId — `src/components/PageSpeedPanel.tsx`
+- **PageWeight** — props: siteId — `src/components/PageWeight.tsx`
+- **PendingApprovals** — props: workspaceId, nameFilter, onRetracted, refreshKey, compact — `src/components/PendingApprovals.tsx`
+- **Performance** — props: siteId — `src/components/Performance.tsx`
+- **PostEditor** — props: workspaceId, postId, onClose, onDelete — `src/components/PostEditor.tsx`
+- **ProcessingQueue** — props: items — `src/components/ProcessingQueue.tsx`
+- **PublishSettings** — props: workspaceId, webflowSiteId, publishTarget, onSave, toast — `src/components/PublishSettings.tsx`
+- **RankTracker** — props: workspaceId, hasGsc — `src/components/RankTracker.tsx`
+- **RedirectManager** — props: siteId — `src/components/RedirectManager.tsx`
+- **RequestManager** — props: workspaceId — `src/components/RequestManager.tsx`
+- **RevenueDashboard** — `src/components/RevenueDashboard.tsx`
+- **Roadmap** — `src/components/Roadmap.tsx`
+- **SalesReport** — `src/components/SalesReport.tsx`
+- **SchemaSuggester** — props: siteId, workspaceId, fixContext — `src/components/SchemaSuggester.tsx`
+- **SearchDetail** — props: siteId, workspaceId, gscPropertyUrl — `src/components/SearchDetail.tsx`
+- **SearchableSelect** — props: options, value, onChange, placeholder, emptyLabel, className, size — `src/components/SearchableSelect.tsx`
+- **LinkChecker** — props: siteId, workspaceId, siteName — `src/components/SeoAudit.tsx`
+- **SeoEditor** — props: siteId, workspaceId, fixContext — `src/components/SeoEditor.tsx`
+- **SeoEditorWrapper** — props: siteId, workspaceId, fixContext — `src/components/SeoEditorWrapper.tsx`
+- **SettingsPanel** — `src/components/SettingsPanel.tsx`
+- **SiteArchitecture** — props: workspaceId — `src/components/SiteArchitecture.tsx`
+- **StatusBar** — props: hasOpenAIKey, hasWebflowToken, connected, workspaceCount — `src/components/StatusBar.tsx`
+- **StripePaymentForm** — props: clientSecret, publishableKey, amount, productName, onSuccess, onCancel, accentColor — `src/components/StripePaymentForm.tsx`
+- **StripePaymentModal** — props: clientSecret, publishableKey, amount, productName, topic, targetKeyword, isFull, onSuccess, onClose — `src/components/StripePaymentForm.tsx`
+- **StripeSettings** — `src/components/StripeSettings.tsx`
+- **Styleguide** — `src/components/Styleguide.tsx`
+- **TaskPanel** — `src/components/TaskPanel.tsx`
+- **DeviceIcon** — props: workspaceId, ga4PropertyId — `src/components/TrafficDetail.tsx`
+- **TurnstileWidget** — props: onToken, resetTrigger — `src/components/TurnstileWidget.tsx`
+- **WorkspaceHome** — props: workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId — `src/components/WorkspaceHome.tsx`
+- **WorkspaceOverview** — props: onSelectWorkspace — `src/components/WorkspaceOverview.tsx`
+- **AIUsageSection** — `src/components/WorkspaceOverview.tsx`
+- **WorkspaceSelector** — props: workspaces, selected, onSelect, onCreate, onDelete, onLinkSite, onUnlinkSite — `src/components/WorkspaceSelector.tsx`
+- **WorkspaceSettings** — props: workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate — `src/components/WorkspaceSettings.tsx`
+- **ActionQueue** — props: workspaceId — `src/components/admin/ActionQueue.tsx`
+- **AdminInbox** — props: workspaceId — `src/components/admin/AdminInbox.tsx`
+- **OutcomeActionFeed** — props: workspaceId — `src/components/admin/outcomes/OutcomeActionFeed.tsx`
+- **OutcomeDashboard** — props: workspaceId — `src/components/admin/outcomes/OutcomeDashboard.tsx`
+- **OutcomeLearningsPanel** — props: workspaceId — `src/components/admin/outcomes/OutcomeLearningsPanel.tsx`
+- **OutcomePlaybooks** — props: workspaceId — `src/components/admin/outcomes/OutcomePlaybooks.tsx`
+- **OutcomeScorecard** — props: workspaceId — `src/components/admin/outcomes/OutcomeScorecard.tsx`
+- **OutcomeTopWins** — props: workspaceId — `src/components/admin/outcomes/OutcomeTopWins.tsx`
+- **OutcomesOverview** — `src/components/admin/outcomes/OutcomesOverview.tsx`
+- **AssetCard** — props: asset, selected, editingAlt, altDraft, generatingAlt, compressing, renamingId, renameDraft, renameLoading, unusedFlag — `src/components/assets/AssetCard.tsx`
+- **AssetFilters** — props: search, filter, sort, hasCmsData, onSearchChange, onFilterChange, onSortChange — `src/components/assets/AssetFilters.tsx`
+- **BulkActions** — props: selectedCount, bulkProgress, bulkRenameProgress, bulkCompressProgress, deleting, onBulkGenerateAlt, onBulkRename, onBulkCompress, onBulkDelete, onClearSelection — `src/components/assets/BulkActions.tsx`
+- **CmsFieldSelector** — props: collections, selectedFields, onChange — `src/components/assets/CmsFieldSelector.tsx`
+- **OrganizePreview** — props: organizePreview, organizeExecuting, onExecute, onCancel — `src/components/assets/OrganizePreview.tsx`
+- **ActionItemsPanel** — props: snapshotId — `src/components/audit/ActionItemsPanel.tsx`
+- **AuditBatchActions** — props: effectiveData, filteredPages, workspaceId, severityFilter, categoryFilter, suppressions, batchCreating, batchResult, onBatchCreateTasks, onUnsuppressAll — `src/components/audit/AuditBatchActions.tsx`
+- **AuditToolbar** — props: search, onSearchChange, saving, onSaveAndShare, onOpenExportModal, effectiveData, appliedFixes, bulkApplying, bulkProgress, onAcceptAllSuggestions — `src/components/audit/AuditFilters.tsx`
+- **AuditCategoryFilter** — props: categoryFilter, onSetCategoryFilter — `src/components/audit/AuditFilters.tsx`
+- **AuditHistory** — props: siteId, history, onRefresh — `src/components/audit/AuditHistory.tsx`
+- **AuditIssueRow** — props: page, issue, idx, workspaceId, siteId, applyingFix, appliedFixes, editedSuggestions, editingKey, sentForReview — `src/components/audit/AuditIssueRow.tsx`
+- **ReportModal** — props: onExportHtml, onExportCsv, onClose — `src/components/audit/AuditReportExport.tsx`
+- **ReportViewer** — props: reportView, data, onClose — `src/components/audit/AuditReportExport.tsx`
+- **ScoreTrendChart** — props: history — `src/components/audit/ScoreTrendChart.tsx`
+- **BriefDetail** — props: brief, editingBrief, generatingPostFor, regeneratingBrief, sendingToClient, onSaveBriefField, onSetEditingBrief, onGeneratePost, onRegenerate, onRegenerateOutline — `src/components/briefs/BriefDetail.tsx`
+- **BriefGenerator** — props: workspaceId, keyword, businessCtx, pageType, refUrls, showAdvanced, generating, error, onKeywordChange, onBusinessCtxChange — `src/components/briefs/BriefGenerator.tsx`
+- **BriefList** — props: briefs, clientRequests, expanded, briefSearch, briefSort, editingBrief, generatingPostFor, regeneratingBrief, sendingToClient, onSetExpanded — `src/components/briefs/BriefList.tsx`
+- **RequestList** — props: clientRequests, expandedRequest, generatingBriefFor, loadingBrief, briefError, deliveringReqId, deliveryUrl, deliveryNotes, getBriefById, onToggleRequestBrief — `src/components/briefs/RequestList.tsx`
+- **AnnotatedTrendChart** — props: data, lines, annotations, dateKey, height, onCreateAnnotation, onToggleLine, _maxActiveLines, callouts — `src/components/charts/AnnotatedTrendChart.tsx`
+- **AnalyticsTab** — props: ga4Overview, ga4Comparison, ga4Trend, ga4Devices, ga4Pages, ga4Sources, ga4Organic, ga4LandingPages, ga4NewVsReturning, ga4Conversions — `src/components/client/AnalyticsTab.tsx`
+- **ApprovalsTab** — props: workspaceId, approvalBatches, approvalsLoading, pendingApprovals, effectiveTier, setApprovalBatches, loadApprovals, setToast, pageMap — `src/components/client/ApprovalsTab.tsx`
+- **BetaProvider** — `src/components/client/BetaContext.tsx`
+- **ClientOnboardingQuestionnaire** — props: workspaceName, onComplete, onSkip, saving — `src/components/client/ClientOnboardingQuestionnaire.tsx`
+- **ContentPlanTab** — props: workspaceId, setToast — `src/components/client/ContentPlanTab.tsx`
+- **ContentTab** — props: contentRequests, setContentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, pricingConfirming, workspaceId, setToast — `src/components/client/ContentTab.tsx`
+- **SearchSnapshot** — props: overview, trend, comparison, devices, onViewMore — `src/components/client/DataSnapshots.tsx`
+- **AnalyticsSnapshot** — props: overview, trend, topPages, comparison, newVsReturning, onViewMore — `src/components/client/DataSnapshots.tsx`
+- **OrganicInsight** — props: organic, landingPages, newVsReturning — `src/components/client/DataSnapshots.tsx`
+- **FeedbackWidget** — props: workspaceId, currentTab, submittedBy, chatExpanded — `src/components/client/FeedbackWidget.tsx`
+- **FixRecommendations** — props: auditDetail, tier, workspaceId — `src/components/client/FixRecommendations.tsx`
+- **HealthTab** — props: audit, auditDetail, liveDomain, initialSeverity, workspaceId, onContentRequested, actionPlanSlot — `src/components/client/HealthTab.tsx`
+- **InboxTab** — props: workspaceId, effectiveTier, approvalBatches, approvalsLoading, pendingApprovals, setApprovalBatches, loadApprovals, requests, requestsLoading, clientUser — `src/components/client/InboxTab.tsx`
+- **SchemaOpportunitiesCard** — props: insights, tier, loading — `src/components/client/InsightCards.tsx`
+- **ContentHealthCard** — props: insights, tier, loading — `src/components/client/InsightCards.tsx`
+- **SiteHealthCard** — props: insights, loading — `src/components/client/InsightCards.tsx`
+- **InsightCards** — props: _workspaceId, insights, tier, loading — `src/components/client/InsightCards.tsx`
+- **InsightsDigest** — props: overview, searchComparison, ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning, audit, auditDetail, strategyData — `src/components/client/InsightsDigest.tsx`
+- **PerformancePulse** — props: overview, searchComparison, ga4Overview, ga4Comparison, audit, strategyData — `src/components/client/InsightsDigest.tsx`
+- **InsightsEngine** — props: workspaceId, tier, compact, onNavigate — `src/components/client/InsightsEngine.tsx`
+- **IntelligenceSummaryCard** — props: workspaceId, tier — `src/components/client/IntelligenceSummaryCard.tsx`
+- **MatrixProgressView** — props: matrix, onCellPreview, onFlagCell, onDownload — `src/components/client/MatrixProgressView.tsx`
+- **MonthlyDigest** — props: workspaceId, tier — `src/components/client/MonthlyDigest.tsx`
+- **OnboardingWizard** — props: workspaceName, tier, isTrial, trialDaysRemaining, hasGSC, hasStrategy, hasAudit, onDismiss, workspaceId — `src/components/client/OnboardingWizard.tsx`
+- **OrderStatus** — props: workspaceId — `src/components/client/OrderStatus.tsx`
+- **OutcomeSummary** — props: workspaceId, tier — `src/components/client/OutcomeSummary.tsx`
+- **OverviewTab** — props: ws, overview, searchComparison, ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning, audit, auditDetail — `src/components/client/OverviewTab.tsx`
+- **PageKeywordMapContent** — props: pageMap, workspaceId, setToast, onContentRequested, keywordFeedback, onApproveKeyword, onDeclineKeyword, onUndoFeedback, isLoadingFeedback — `src/components/client/PageKeywordMapContent.tsx`
+- **PerformanceTab** — props: overview, searchComparison, trend, annotations, rankHistory, latestRanks, insights, ga4Overview, ga4Comparison, ga4Trend — `src/components/client/PerformanceTab.tsx`
+- **PlansTab** — props: workspaceId, ws, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setToast, onOpenChat, pricingData — `src/components/client/PlansTab.tsx`
+- **ROIDashboard** — props: workspaceId, tier — `src/components/client/ROIDashboard.tsx`
+- **RequestsTab** — props: workspaceId, requests, requestsLoading, clientUser, loadRequests, setToast — `src/components/client/RequestsTab.tsx`
+- **SchemaReviewTab** — props: workspaceId, setToast — `src/components/client/SchemaReviewTab.tsx`
+- **SearchTab** — props: overview, searchComparison, trend, annotations, rankHistory, latestRanks, insights — `src/components/client/SearchTab.tsx`
+- **SeoCartButton** — `src/components/client/SeoCart.tsx`
+- **SeoCartDrawer** — props: workspaceId, tier — `src/components/client/SeoCart.tsx`
+- **SeoEducationTip** — props: tab, workspaceId — `src/components/client/SeoEducationTip.tsx`
+- **Explainer** — props: term — `src/components/client/SeoGlossary.tsx`
+- **ServiceInterestCTA** — props: type, workspaceId, onAction, bookingUrl — `src/components/client/ServiceInterestCTA.tsx`
+- **StrategyTab** — props: strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange — `src/components/client/StrategyTab.tsx`
+- **WeCalledIt** — props: workspaceId, tier — `src/components/client/WeCalledIt.tsx`
+- **TrendChart** — props: data, metric, color — `src/components/client/helpers.tsx`
+- **DualTrendChart** — props: data, anns — `src/components/client/helpers.tsx`
+- **ScoreHistoryChart** — props: history — `src/components/client/helpers.tsx`
+- **RenderMarkdown** — props: text — `src/components/client/helpers.tsx`
+- **InsightCard** — props: Icon, color, title, count, desc, items — `src/components/client/helpers.tsx`
+- **CartProvider** — `src/components/client/useCart.tsx`
+- **ApprovalPanel** — props: approvalSelected, sendingApproval, approvalSent, onSendApproval — `src/components/editor/ApprovalPanel.tsx`
+- **BulkOperations** — props: filteredPages, approvalSelected, bulkMode, bulkField, patternAction, patternText, bulkPreview, bulkProgress, bulkSource, pages — `src/components/editor/BulkOperations.tsx`
+- **PageEditRow** — props: page, edit, expanded, isSaving, isSaved, isAiLoading, isDraftSaving, isDraftSaved, isSelected, pageRecs — `src/components/editor/PageEditRow.tsx`
+- **SeoSuggestionsPanel** — props: workspaceId, suggestions, counts, onRefresh, onApplied — `src/components/editor/SeoSuggestionsPanel.tsx`
+- **InsightFeed** — props: feed, summary, loading, domain, limit, showPills, showFilterChips, onViewAll — `src/components/insights/InsightFeed.tsx`
+- **InsightFeedItem** — props: insight — `src/components/insights/InsightFeedItem.tsx`
+- **InsightSkeleton** — props: count — `src/components/insights/InsightSkeleton.tsx`
+- **SummaryPills** — props: counts, activeFilter, onFilter, loading — `src/components/insights/SummaryPills.tsx`
+- **Breadcrumbs** — props: workspaces, selected, tab, pendingContentRequests — `src/components/layout/Breadcrumbs.tsx`
+- **CellDetailPanel** — props: cell, onClose, onCellUpdate, onGenerateBrief, onSendReview, onFlag — `src/components/matrix/CellDetailPanel.tsx`
+- **MatrixBuilder** — props: workspaceId, templates, onComplete, onCancel — `src/components/matrix/MatrixBuilder.tsx`
+- **MatrixGrid** — props: matrix, onCellClick, onBulkAction, onCellUpdate — `src/components/matrix/MatrixGrid.tsx`
+- **TemplateEditor** — props: workspaceId, templateId, onSave, onCancel — `src/components/matrix/TemplateEditor.tsx`
+- **AiSuggested** — props: workspaceId, onCreateBrief — `src/components/pipeline/AiSuggested.tsx`
+- **PostPreview** — props: post — `src/components/post-editor/PostPreview.tsx`
+- **ReviewChecklist** — props: postStatus, reviewChecklist, showChecklist, onToggleShowChecklist, onToggleItem, onChangeStatus, onRunAIReview — `src/components/post-editor/ReviewChecklist.tsx`
+- **SectionEditor** — props: section, expanded, editing, editBuffer, regenerating, isGenerating, onToggleExpand, onStartEdit, onSaveEdit, onCancelEdit — `src/components/post-editor/SectionEditor.tsx`
+- **VersionHistory** — props: versions, versionsLoading, reverting, onRevert, onClose — `src/components/post-editor/VersionHistory.tsx`
+- **BulkPublishPanel** — props: unpublishedCount, bulkPublishing, bulkProgress, sendingToClient, sentToClient, loading, onPublishAll, onSendToClient — `src/components/schema/BulkPublishPanel.tsx`
+- **CmsTemplatePanel** — props: showCmsPanel, cmsTemplatePages, generatingCmsTemplate, cmsTemplateResult, publishingCmsTemplate, cmsPublished, cmsCopied, cmsError, onClose, onGenerateCmsTemplate — `src/components/schema/CmsTemplatePanel.tsx`
+- **PagePicker** — props: availablePages, pageSearch, generatingSingle, existingPageIds, onPageSearchChange, onSelectPage, onClose — `src/components/schema/PagePicker.tsx`
+- **InitialPagePicker** — props: availablePages, pageSearch, generatingSingle, onPageSearchChange, onSelectPage, onClose — `src/components/schema/PagePicker.tsx`
+- **SchemaEditor** — props: pageId, schemaJson, parseError, hasEdits, onChange — `src/components/schema/SchemaEditor.tsx`
+- **SchemaHealthDashboard** — props: validations, loading, onRevalidate — `src/components/schema/SchemaHealthDashboard.tsx`
+- **SchemaPageCard** — props: page, isOpen, isRegenLoading, editState, copiedId, published, publishing, publishError, confirmPublish, sentPage — `src/components/schema/SchemaPageCard.tsx`
+- **SchemaPlanPanel** — props: siteId — `src/components/schema/SchemaPlanPanel.tsx`
+- **SchemaVersionHistory** — props: siteId, pageId, workspaceId, onRestore — `src/components/schema/SchemaVersionHistory.tsx`
+- **SchemaWorkflowGuide** — `src/components/schema/SchemaWorkflowGuide.tsx`
+- **BusinessProfileTab** — props: workspaceId, businessProfile, toast, onSave — `src/components/settings/BusinessProfileTab.tsx`
+- **ClientDashboardTab** — props: workspaceId, webflowSiteId, ws, patchWorkspace, toast — `src/components/settings/ClientDashboardTab.tsx`
+- **ConnectionsTab** — props: webflowSiteId, webflowSiteName, googleStatus, gscSites, ga4Properties, loadingGoogle, ws, connectGoogle, disconnectGoogle, saveGscProperty — `src/components/settings/ConnectionsTab.tsx`
+- **FeaturesTab** — props: workspaceId, ws, patchWorkspace, toast — `src/components/settings/FeaturesTab.tsx`
+- **IntelligenceProfileTab** — props: workspaceId, intelligenceProfile, toast, onSave — `src/components/settings/IntelligenceProfileTab.tsx`
+- **RankHistoryChart** — props: rankHistory, maxKeywords, height — `src/components/shared/RankTable.tsx`
+- **RankTable** — props: ranks, limit, showClicks, showImpressions, renderActions — `src/components/shared/RankTable.tsx`
+- **RankChange** — props: change — `src/components/shared/RankTable.tsx`
+- **RankTrackingSection** — props: rankHistory, latestRanks, limit, showClicks, title — `src/components/shared/RankTable.tsx`
+- **BacklinkProfile** — props: workspaceId — `src/components/strategy/BacklinkProfile.tsx`
+- **CannibalizationAlert** — props: items — `src/components/strategy/CannibalizationAlert.tsx`
+- **CompetitiveIntel** — props: workspaceId, competitors, semrushAvailable — `src/components/strategy/CompetitiveIntel.tsx`
+- **ContentGaps** — props: contentGaps, workspaceId, intentColor — `src/components/strategy/ContentGaps.tsx`
+- **IntelligenceSignals** — props: workspaceId — `src/components/strategy/IntelligenceSignals.tsx`
+- **KeywordGaps** — props: keywordGaps, difficultyColor — `src/components/strategy/KeywordGaps.tsx`
+- **LowHangingFruit** — props: pages, positionColor — `src/components/strategy/LowHangingFruit.tsx`
+- **PageKeywordMapPanel** — props: filteredPages, pageMap, expandedPages, editingPage, editDraft, saving, pageSearch, sortBy, sortDir, seoCopyResults — `src/components/strategy/PageKeywordMap.tsx`
+- **QuickWins** — props: quickWins — `src/components/strategy/QuickWins.tsx`
+- **SeoCopyPanel** — props: page, seoCopyResults, generatingCopy, copiedField, onGenerateSeoCopy, onCopyText — `src/components/strategy/SeoCopyPanel.tsx`
+- **StrategyDiff** — props: workspaceId — `src/components/strategy/StrategyDiff.tsx`
+- **TopicClusters** — props: clusters — `src/components/strategy/TopicClusters.tsx`
+- **ActiveRequestsAnnotations** — props: requests, annotations, workspaceId — `src/components/workspace-home/ActiveRequestsAnnotations.tsx`
+- **ActivityFeed** — props: activity, className — `src/components/workspace-home/ActivityFeed.tsx`
+- **RankingsSnapshot** — props: ranks, gscPropertyUrl, workspaceId, className — `src/components/workspace-home/RankingsSnapshot.tsx`
+- **SeoChangeImpact** — props: workspaceId, hasGsc, embedded — `src/components/workspace-home/SeoChangeImpact.tsx`
+- **SeoWorkStatus** — props: seoStatus, workspaceId, embedded — `src/components/workspace-home/SeoWorkStatus.tsx`
+- **WeeklyAccomplishments** — props: summary — `src/components/workspace-home/WeeklyAccomplishments.tsx`
+- **BackgroundTaskProvider** — `src/hooks/useBackgroundTasks.tsx`
+- **SENTRY_DSN** — `src/main.tsx`
