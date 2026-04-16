@@ -197,6 +197,38 @@ describe('DataForSeoProvider — SERP features normalization', () => {
   });
 });
 
+describe('DataForSeoProvider — getDomainKeywords request contract', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // Regression: `dataforseo_labs/google/ranked_keywords/live` rejects the
+  // `item_types` field with error 40501. Including it makes every call throw,
+  // which the outer catch in getDomainKeywords swallows and returns []. The
+  // keyword-strategy flow then silently loses all competitor keyword data.
+  // See commit history for the full postmortem.
+  it('does NOT include item_types in the ranked_keywords payload', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(dfsTaskResponse([{ items: [] }])),
+    } as Response);
+
+    await provider.getDomainKeywords('example.com', 'ws-contract-test', 100, 'us');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toContain('dataforseo_labs/google/ranked_keywords/live');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body[0]).toHaveProperty('target', 'example.com');
+    expect(body[0]).toHaveProperty('location_code');
+    expect(body[0]).toHaveProperty('language_code', 'en');
+    expect(body[0]).toHaveProperty('limit', 100);
+    // The regression: item_types must NOT be present on this endpoint.
+    expect(body[0]).not.toHaveProperty('item_types');
+  });
+});
+
 describe('DataForSeoProvider — getReferringDomains lastSeen', () => {
   afterEach(() => vi.restoreAllMocks());
 

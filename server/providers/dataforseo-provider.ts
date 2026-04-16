@@ -505,12 +505,15 @@ export class DataForSeoProvider implements SeoDataProvider {
     if (areCreditsExhausted()) return [];
 
     try {
+      // NOTE: `dataforseo_labs/google/ranked_keywords/live` does NOT accept an `item_types`
+      // parameter. Including it returns error 40501 "Invalid Field: 'item_types'". The endpoint
+      // returns all ranked keyword types by default; the SERP feature type is read per-item from
+      // `ranked_serp_element.serp_item.type` in the dedupe loop below.
       const json = await apiCall('dataforseo_labs/google/ranked_keywords/live', [{
         target,
         location_code: locationCode(database),
         language_code: 'en',
         limit,
-        item_types: ['organic', 'featured_snippet', 'local_pack', 'people_also_ask', 'videos'],
       }]);
 
       const taskResults = getTaskResult(json);
