@@ -64,12 +64,12 @@ export function BacklinkProfile({ workspaceId }: Props) {
   }
 
   if (error) {
-    if (error.includes('SEMRush is not configured')) {
+    if (error.includes('No SEO data provider configured')) {
       return (
         <SectionCard>
           <div className="px-4 py-4 flex items-center gap-2 text-zinc-500 text-xs">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>Backlink data requires SEMRush. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> in environment to enable.</span>
+            <span>Backlink data requires an SEO provider. Set <code className="text-zinc-400">SEMRUSH_API_KEY</code> or <code className="text-zinc-400">DATAFORSEO_LOGIN</code> in environment to enable.</span>
           </div>
         </SectionCard>
       );
