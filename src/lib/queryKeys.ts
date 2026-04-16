@@ -32,6 +32,7 @@ export const queryKeys = {
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
     requests: (wsId: string) => ['admin-requests', wsId] as const,
+    approvals: (wsId: string) => ['admin-approvals', wsId] as const,
     posts: (wsId: string) => ['admin-posts', wsId] as const,
     post: (wsId: string, postId: string) => ['admin-post', wsId, postId] as const,
     postVersions: (wsId: string, postId: string) => ['admin-post-versions', wsId, postId] as const,
@@ -161,6 +162,7 @@ export const queryKeys = {
     recommendations: (wsId: string) => ['recommendations', wsId] as const,
     pageEditStates: (wsId: string, isPublic: boolean) =>
       ['page-edit-states', wsId, isPublic ? 'public' : 'admin'] as const,
+    features: () => ['features'] as const,
     featureFlags: () => ['feature-flags'] as const,
   },
 } as const;

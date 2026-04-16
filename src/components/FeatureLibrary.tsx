@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, Layers, Eye } from 'lucide-react';
 import { PageHeader, EmptyState } from './ui';
 import { features as featuresApi } from '../api/misc';
+import { queryKeys } from '../lib/queryKeys';
 import type { Feature, FeatureCategory, PainPoint, FeatureTier } from '../../shared/types/features';
 import { CATEGORY_LABELS as catLabels, PAIN_POINT_LABELS as ppLabels } from '../../shared/types/features';
 
@@ -56,7 +57,7 @@ export default function FeatureLibrary() {
   const [view, setView] = useState<ViewMode>('painPoint');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['features'],
+    queryKey: queryKeys.shared.features(),
     queryFn: featuresApi.get,
     staleTime: 5 * 60 * 1000,
   });

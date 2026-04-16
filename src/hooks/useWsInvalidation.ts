@@ -21,11 +21,13 @@ export function useWsInvalidation(workspaceId: string | undefined) {
     [WS_EVENTS.APPROVAL_UPDATE]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.APPROVAL_APPLIED]: () => {
       if (!workspaceId) return;
       qc.invalidateQueries({ queryKey: queryKeys.client.approvals(workspaceId) });
+      qc.invalidateQueries({ queryKey: queryKeys.admin.approvals(workspaceId) });
       qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
     },
     [WS_EVENTS.REQUEST_CREATED]: () => {
