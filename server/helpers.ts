@@ -374,3 +374,45 @@ export async function fetchPublishedHtml(url: string): Promise<string | null> {
     return await res.text();
   } catch { return null; }
 }
+
+// ── HTML / AI-response string utilities ──────────────────────────────────────
+
+/**
+ * Extract readable text from an HTML document.
+ * Strips script, style, nav, footer, and optionally header. Collapses whitespace.
+ * NOTE: Not safe for untrusted external HTML. Use only on internal Webflow-fetched pages.
+ */
+export function stripHtmlToText(
+  html: string,
+  opts?: { maxLength?: number; stripHeader?: boolean },
+): string {
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const body = bodyMatch ? bodyMatch[1] : html;
+  let cleaned = body
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '');
+  if (opts?.stripHeader) {
+    cleaned = cleaned.replace(/<header[\s\S]*?<\/header>/gi, '');
+  }
+  cleaned = cleaned
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return opts?.maxLength ? cleaned.slice(0, opts.maxLength) : cleaned;
+}
+
+/**
+ * Strip Markdown code fences from AI responses.
+ * Handles leading ```json, ```html, ```xml, or plain ``` fences.
+ * Only strips the trailing fence when a leading fence was present.
+ */
+export function stripCodeFences(text: string): string {
+  if (!/^```(?:json|html|xml)?\s*/i.test(text)) return text;
+  return text
+    .replace(/^```(?:json|html|xml)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '');
+}
+}
