@@ -11,7 +11,7 @@ import {
   getGA4LandingPages,
   getGA4OrganicOverview,
 } from '../google-analytics.js';
-import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath } from '../helpers.js';
+import { applySuppressionsToAudit, getAuditTrafficForWorkspace, resolvePagePath, stripHtmlToText, stripCodeFences } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { callOpenAI } from '../openai-helpers.js';
 import { getLatestSnapshot } from '../reports.js';
@@ -451,19 +451,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
                   || html.match(/<meta\s+content=["']([^"']+)["']\s+name=["']description["']/i);
                 if (descMatch) htmlMetaDesc = descMatch[1].trim();
               }
-              const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-              const body = bodyMatch ? bodyMatch[1] : html;
-              contentSnippet = body
-                .replace(/<script[\s\S]*?<\/script>/gi, '')
-                .replace(/<style[\s\S]*?<\/style>/gi, '')
-                .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                .replace(/<header[\s\S]*?<\/header>/gi, '')
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/&[a-z]+;/gi, ' ')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .slice(0, SNIPPET_LIMIT);
+              contentSnippet = stripHtmlToText(html, { stripHeader: true, maxLength: SNIPPET_LIMIT });
             }
           } catch (err) {
             if (isProgrammingError(err)) log.warn({ err }, 'keyword-strategy: programming error');
@@ -817,7 +805,7 @@ router.post('/api/webflow/keyword-strategy/:workspaceId', async (req, res) => {
         maxRetries: 3,
         timeoutMs: 90_000,
       });
-      return result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+      return stripCodeFences(result.text);
     };
 
     // Start keepalive now that we're entering the long-running AI phase
