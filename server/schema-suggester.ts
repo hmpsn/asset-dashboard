@@ -1865,7 +1865,8 @@ export async function generateSchemaForPage(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion | null> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, tokenOverride); } catch { /* no token configured */ }
   const liveDomain = ctx.liveDomain;
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
@@ -1973,7 +1974,8 @@ export async function generateSchemaSuggestions(
   queryPageData?: Array<{ query: string; page: string; impressions: number; position: number }>,
   insightsMap?: Map<string, { healthScore?: number; healthTrend?: string; isQuickWin?: boolean }>,
 ): Promise<SchemaPageSuggestion[]> {
-  const subdomain = await getSiteSubdomain(siteId, tokenOverride);
+  let subdomain: string | null = null;
+  try { subdomain = await getSiteSubdomain(siteId, tokenOverride); } catch { /* no token configured */ }
   const liveDomain = ctx.liveDomain;
   const baseUrl = liveDomain
     ? (liveDomain.startsWith('http') ? liveDomain : `https://${liveDomain}`)
