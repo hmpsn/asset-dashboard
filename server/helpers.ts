@@ -42,6 +42,22 @@ export function resolvePagePath(page: { publishedPath?: string | null; slug?: st
   return page.publishedPath || (page.slug ? `/${page.slug}` : '/');
 }
 
+/**
+ * Normalize a URL or path for cross-referencing.
+ * Accepts full URLs (https://...) or bare paths. Strips origin, query,
+ * and hash; normalizes trailing slash via normalizePath.
+ * Used for reliable ROI page_url ↔ insight page_id matching.
+ */
+export function normalizePageUrl(url: string): string {
+  try {
+    if (url.startsWith('http')) {
+      return normalizePath(new URL(url).pathname);
+    }
+  } catch { // catch-ok: malformed URL string — fall through to path-only normalization
+  }
+  return normalizePath(url);
+}
+
 // ── Input Validation ──
 
 /** Sanitize a string field: trim, limit length, strip control characters */
