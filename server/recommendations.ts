@@ -22,7 +22,7 @@ import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
-import { getDeclinedKeywords } from './routes/keyword-strategy.js';
+import { getDeclinedKeywords } from './keyword-feedback.js';
 import { listPageKeywords } from './page-keywords.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';

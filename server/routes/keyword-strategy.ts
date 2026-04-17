@@ -55,6 +55,7 @@ import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } f
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
 import { generateRecommendations } from '../recommendations.js';
+import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -2293,18 +2294,6 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
 });
 
 // ── Keyword Feedback (approve/decline) ──────────────────────────
-
-/** Get all declined keywords for a workspace (used by strategy generator to exclude) */
-export function getDeclinedKeywords(workspaceId: string): string[] {
-  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'declined') as { keyword: string }[];
-  return rows.map(r => r.keyword);
-}
-
-/** Get all client-requested keywords for a workspace (used by strategy generator to prioritize) */
-export function getRequestedKeywords(workspaceId: string): string[] {
-  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'requested') as { keyword: string }[];
-  return rows.map(r => r.keyword);
-}
 
 /** Get all keyword feedback for a workspace */
 function getAllFeedback(workspaceId: string) {

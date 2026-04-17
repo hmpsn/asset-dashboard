@@ -15,6 +15,8 @@ import { get, post, patch, del } from '../../api/client';
 // ─── Props ────────────────────────────────────────────────────────
 
 interface InsightsEngineProps {
+  /** Increment to trigger a background re-fetch (e.g. on RECOMMENDATIONS_UPDATED WS event) */
+  refetchToken?: number;
   workspaceId: string;
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
@@ -102,7 +104,7 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────
 
-export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
+export function InsightsEngine({ workspaceId, tier, compact, onNavigate, refetchToken }: InsightsEngineProps) {
   const cart = useCart();
   const [data, setData] = useState<RecommendationSet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,12 +115,13 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: Insig
 
   const isPremium = tier === 'premium';
 
-  // Fetch recommendations
+  // Fetch recommendations (re-runs when refetchToken increments, e.g. on RECOMMENDATIONS_UPDATED WS event)
   useEffect(() => {
     get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`)
       .then(set => { setData(set); setLoading(false); })
       .catch(err => { setError(typeof err === 'string' ? err : 'Failed to load recommendations'); setLoading(false); });
-  }, [workspaceId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, refetchToken]);
 
   // Re-generate
   const handleRegenerate = async () => {
