@@ -11,7 +11,8 @@ import { buildPlanContextForPage } from './schema-plan.js';
 import { getAncestorChain, getParentNode, getSiblingNodes, getChildNodes } from './site-architecture.js';
 import { isProgrammingError } from './errors.js';
 import { getSiteSubdomain } from './webflow-pages.js';
-import { fetchPageMeta, fetchPublishedHtml } from './seo-audit.js';
+import { fetchPageMeta } from './seo-audit.js';
+import { fetchPublishedHtml } from './helpers.js';
 
 const log = createLogger('schema');
 
