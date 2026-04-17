@@ -415,4 +415,3 @@ export function stripCodeFences(text: string): string {
     .replace(/^```(?:json|html|xml)?\s*/i, '')
     .replace(/\s*```\s*$/i, '');
 }
-}

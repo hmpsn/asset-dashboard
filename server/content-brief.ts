@@ -16,6 +16,7 @@ import type { CannibalizationData, ContentDecayData, QuickWinData, PageHealthDat
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getWorkspaceLearnings, formatLearningsForPrompt } from './workspace-learnings.js';
 import { isFeatureEnabled } from './feature-flags.js';
+import { stripCodeFences } from './helpers.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief, StrategyCardContext } from '../shared/types/content.ts';
@@ -32,7 +33,7 @@ import { createLogger } from './logger.js';
 const log = createLogger('content-brief');
 /** Strip markdown code fences and parse JSON from AI responses. Throws on invalid JSON. */
 function parseAiJson<T = Record<string, unknown>>(raw: string, context: string): T {
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  const cleaned = stripCodeFences(raw);
   try {
     return JSON.parse(cleaned) as T;
   } catch (err) {

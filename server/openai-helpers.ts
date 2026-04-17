@@ -8,6 +8,7 @@ import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
+import { stripCodeFences } from './helpers.js';
 
 const log = createLogger('openai');
 
@@ -425,6 +426,5 @@ export function getTimeSaved(workspaceId?: string, since?: string): {
  * Parse JSON from an AI response, stripping markdown fences if present.
  */
 export function parseAIJson<T = Record<string, unknown>>(raw: string): T {
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(stripCodeFences(raw).trim());
 }

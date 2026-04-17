@@ -2,6 +2,7 @@
 // 8-layer context assembly and AI copy generation engine for the Copy Pipeline.
 
 import { createLogger } from './logger.js';
+import { stripCodeFences } from './helpers.js';
 import { callAnthropic } from './anthropic-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
@@ -111,7 +112,7 @@ ${context}`;
   });
 
   // Parse response — callAnthropic returns { text, ... }
-  const cleaned = response.text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const cleaned = stripCodeFences(response.text).trim();
   const generated = parseJsonFallback<GeneratedPageCopy | null>(cleaned, null);
   if (!generated || !Array.isArray(generated.sections)) {
     log.error({ entryId, blueprintId }, 'Failed to parse generation response');
@@ -210,7 +211,7 @@ ${context}`;
     workspaceId: wsId,
   });
 
-  const regenCleaned = response.text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const regenCleaned = stripCodeFences(response.text).trim();
   const result = parseJsonFallback<{ copy: string; annotation: string; reasoning: string } | null>(
     regenCleaned,
     null,
