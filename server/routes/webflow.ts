@@ -13,7 +13,6 @@ import {
   deleteAsset,
   updatePageSeo,
   publishSite,
-  getSiteSubdomain,
   discoverCmsUrls,
   buildStaticPathSet,
 } from '../webflow.js';
@@ -29,6 +28,7 @@ const log = createLogger('webflow');
 
 import { requireWorkspaceAccessFromQuery } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
+import { resolveBaseUrl } from '../url-helpers.js';
 const router = Router();
 
 // Processing queue
@@ -142,13 +142,7 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceAccessFromQuery(), 
     // Discover CMS pages from sitemap
     try {
       // Reuse outer `ws` — same lookup, no need to re-query listWorkspaces()
-      let baseUrl = '';
-      if (ws?.liveDomain) {
-        baseUrl = ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
-      } else {
-        const sub = await getSiteSubdomain(siteId, token);
-        if (sub) baseUrl = `https://${sub}.webflow.io`;
-      }
+      const baseUrl = await resolveBaseUrl({ liveDomain: ws?.liveDomain, webflowSiteId: siteId }, token);
 
       if (baseUrl) {
         const staticPaths = buildStaticPathSet(published);
