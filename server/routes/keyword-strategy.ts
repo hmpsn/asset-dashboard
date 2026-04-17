@@ -54,6 +54,7 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
+import { generateRecommendations } from '../recommendations.js';
 
 const log = createLogger('keyword-strategy');
 
@@ -2163,6 +2164,12 @@ Rules:
 
     // Trigger background llms.txt regeneration after strategy update
     queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
+
+    // Refresh recommendations so quick wins / content gaps / ranking opportunities
+    // reflect the new strategy immediately, without waiting for the next manual audit.
+    generateRecommendations(ws.id).catch(err =>
+      log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'),
+    );
     return;
   } catch (err) {
     if (keepalive) clearInterval(keepalive);
