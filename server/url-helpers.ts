@@ -4,6 +4,9 @@
  * (webflow-pages.ts already imports resolvePagePath from helpers.ts).
  */
 import { getSiteSubdomain } from './webflow-pages.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('url-helpers');
 
 /**
  * Resolve the base URL for a workspace — either its custom live domain or
@@ -21,7 +24,15 @@ export async function resolveBaseUrl(
     try {
       const sub = await getSiteSubdomain(ws.webflowSiteId, tokenOverride);
       if (sub) return `https://${sub}.webflow.io`;
-    } catch { /* token missing or network failure — fall through to empty string */ }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Expected when no token is configured — log at debug only
+      if (msg.includes('not configured')) {
+        log.debug({ siteId: ws.webflowSiteId }, 'resolveBaseUrl: no Webflow token, returning empty');
+      } else {
+        log.warn({ siteId: ws.webflowSiteId, err: msg }, 'resolveBaseUrl: subdomain lookup failed, returning empty');
+      }
+    }
   }
   return '';
 }
