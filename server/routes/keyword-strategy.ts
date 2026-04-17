@@ -54,8 +54,15 @@ import { isFeatureEnabled } from '../feature-flags.js';
 import { filterBrandedKeywords, filterBrandedContentGaps, extractBrandTokens } from '../competitor-brand-filter.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { isProgrammingError } from '../errors.js';
+import { generateRecommendations } from '../recommendations.js';
+import { getDeclinedKeywords, getRequestedKeywords } from '../keyword-feedback.js';
 
 const log = createLogger('keyword-strategy');
+
+// Dedup guard: prevents concurrent background recommendation runs for the same workspace
+// (e.g. rapid strategy re-generations). Final write wins via SQLite upsert; this just
+// avoids wasted work and redundant broadcasts.
+const recsInFlight = new Set<string>();
 
 // ── Incremental mode helpers ─────────────────────────────────────
 
@@ -2163,6 +2170,15 @@ Rules:
 
     // Trigger background llms.txt regeneration after strategy update
     queueLlmsTxtRegeneration(ws.id, 'keyword_strategy_updated');
+
+    // Refresh recommendations so quick wins / content gaps / ranking opportunities
+    // reflect the new strategy immediately, without waiting for the next manual audit.
+    if (!recsInFlight.has(ws.id)) {
+      recsInFlight.add(ws.id);
+      generateRecommendations(ws.id)
+        .catch(err => log.warn({ err, workspaceId: ws.id }, 'Failed to refresh recommendations after strategy update'))
+        .finally(() => recsInFlight.delete(ws.id));
+    }
     return;
   } catch (err) {
     if (keepalive) clearInterval(keepalive);
@@ -2286,18 +2302,6 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', validate(patchStrateg
 });
 
 // ── Keyword Feedback (approve/decline) ──────────────────────────
-
-/** Get all declined keywords for a workspace (used by strategy generator to exclude) */
-export function getDeclinedKeywords(workspaceId: string): string[] {
-  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'declined') as { keyword: string }[];
-  return rows.map(r => r.keyword);
-}
-
-/** Get all client-requested keywords for a workspace (used by strategy generator to prioritize) */
-export function getRequestedKeywords(workspaceId: string): string[] {
-  const rows = db.prepare('SELECT keyword FROM keyword_feedback WHERE workspace_id = ? AND status = ?').all(workspaceId, 'requested') as { keyword: string }[];
-  return rows.map(r => r.keyword);
-}
 
 /** Get all keyword feedback for a workspace */
 function getAllFeedback(workspaceId: string) {

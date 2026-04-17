@@ -64,6 +64,9 @@ export const WS_EVENTS = {
   COPY_BATCH_COMPLETE: 'copy:batch_complete',
   COPY_INTELLIGENCE_UPDATED: 'copy:intelligence_updated',
   COPY_EXPORT_COMPLETE: 'copy:export_complete',
+
+  // Recommendations
+  RECOMMENDATIONS_UPDATED: 'recommendations:updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

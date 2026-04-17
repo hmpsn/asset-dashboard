@@ -100,6 +100,9 @@ export const WS_EVENTS = {
   BULK_OPERATION_PROGRESS: 'bulk-operation:progress',
   BULK_OPERATION_COMPLETE: 'bulk-operation:complete',
   BULK_OPERATION_FAILED: 'bulk-operation:failed',
+
+  // Recommendations
+  RECOMMENDATIONS_UPDATED: 'recommendations:updated',
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];

@@ -22,7 +22,10 @@ import { getAllGscPages } from './search-console.js';
 import { getGA4TopPages } from './google-analytics.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import type { DecayingPage } from './content-decay.js';
-import { getDeclinedKeywords } from './routes/keyword-strategy.js';
+import { getDeclinedKeywords } from './keyword-feedback.js';
+import { listPageKeywords } from './page-keywords.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -637,9 +640,11 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       }
     }
 
-    // Pages with declining positions (from page map)
-    if (strategy.pageMap) {
-      for (const pm of strategy.pageMap) {
+    // Pages with ranking opportunities (from page_keywords table — pageMap is stripped
+    // from the strategy blob before saving, so always read from the dedicated table).
+    const pageKeywords = listPageKeywords(workspaceId);
+    if (pageKeywords.length > 0) {
+      for (const pm of pageKeywords) {
         // 2C: skip if the primary keyword was declined
         if (pm.primaryKeyword && declinedKeywords.has(pm.primaryKeyword.toLowerCase())) continue;
 
@@ -863,6 +868,8 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
 
   saveRecommendations(set);
   log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
+
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { count: recs.length });
 
   return set;
 }
