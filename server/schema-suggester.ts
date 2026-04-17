@@ -2,7 +2,7 @@ import { discoverCmsUrls, buildStaticPathSet, getCollectionSchema, listCollectio
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath, stripHtmlToText } from './helpers.js';
 import { createLogger } from './logger.js';
 import { saveSiteTemplate, getOrSeedSiteTemplate, getSchemaPlan } from './schema-store.js';
 import { getBrief } from './content-brief.js';
@@ -1022,18 +1022,7 @@ function extractExistingSchemas(html: string): { types: string[]; json: Record<s
 // --- AI-Powered Unified Schema Generation ---
 
 function extractPageContent(html: string): string {
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  const body = bodyMatch ? bodyMatch[1] : html;
-  return body
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 4000);
+  return stripHtmlToText(html, { stripHeader: true, maxLength: 4000 });
 }
 
 function extractStructuredInfo(html: string) {

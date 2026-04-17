@@ -13,6 +13,7 @@ import { callOpenAI } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatKeywordsForPrompt, formatKnowledgeBaseForPrompt, formatPersonasForPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
+import { stripHtmlToText, stripCodeFences } from './helpers.js';
 
 const log = createLogger('aeo-review');
 
@@ -92,15 +93,7 @@ function extractPageStructure(html: string): string {
   if (headings.length > 0) parts.push(`\nPAGE STRUCTURE (headings):\n${headings.join('\n')}`);
 
   // Extract visible body text (first ~4000 chars for prompt budget)
-  const bodyText = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const bodyText = stripHtmlToText(html, { stripHeader: true });
   parts.push(`\nPAGE CONTENT (first ~4000 chars):\n${bodyText.slice(0, 4000)}`);
 
   // Detect existing schema types
@@ -226,7 +219,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   const raw = aiResult.text || '{}';
   let parsed: Record<string, unknown>;
   try {
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+    const cleaned = stripCodeFences(raw);
     parsed = JSON.parse(cleaned);
   } catch (err) {
     log.error({ err, detail: raw.slice(0, 200) }, 'Failed to parse AI response');

@@ -34,7 +34,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import type * as AnalyticsInsightsStore from '../analytics-insights-store.js';
 import { buildKeywordMapContext } from '../seo-context.js';
 import { isProgrammingError } from '../errors.js';
-import { applySuppressionsToAudit } from '../helpers.js';
+import { applySuppressionsToAudit, stripHtmlToText, stripCodeFences } from '../helpers.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { createJob, updateJob, isJobCancelled, hasActiveJob, registerAbort } from '../jobs.js';
 import { broadcastToWorkspace } from '../broadcast.js';
@@ -317,15 +317,7 @@ router.post('/api/webflow/seo-rewrite', async (req, res) => {
             headingsBlock = `\nPage heading structure:\n${headings.join('\n')}`;
           }
 
-          resolvedPageContent = body
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 1500);
+          resolvedPageContent = stripHtmlToText(html, { maxLength: 1500 });
         }
       }
     } catch { /* best-effort — fetch on external URL, continue without content */ } // url-fetch-ok
@@ -425,7 +417,7 @@ Return ONLY a JSON array of 3 objects, each with "title" and "description" keys.
 
       let pairs: Array<{ title: string; description: string }>;
       try {
-        const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+        const parsed = JSON.parse(stripCodeFences(aiText));
         pairs = Array.isArray(parsed)
           ? parsed.map((p: { title?: string; description?: string }) => ({
               title: enforceLimit(String(p.title || ''), 60),
@@ -521,7 +513,7 @@ Return ONLY a JSON array of 3 strings. No explanation.`;
     // Parse the 3 variations
     let variations: string[];
     try {
-      const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+      const parsed = JSON.parse(stripCodeFences(aiText));
       variations = Array.isArray(parsed) ? parsed.map((v: string) => enforceLimit(String(v), maxLen)) : [enforceLimit(String(parsed), maxLen)];
     } catch (err) {
       log.debug({ err }, 'webflow-seo: expected error — degrading gracefully');
@@ -586,17 +578,7 @@ router.post('/api/webflow/seo-bulk-fix/:siteId', requireWorkspaceAccessFromQuery
           const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
-            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const body = bodyMatch ? bodyMatch[1] : html;
-            contentExcerpt = body
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-              .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 800);
+            contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
           }
         } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
       }
@@ -806,17 +788,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
           const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
-            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const body = bodyMatch ? bodyMatch[1] : html;
-            contentExcerpt = body
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-              .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 800);
+            contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
           }
         } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
       }
@@ -881,7 +853,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
 
         let pairs: Array<{ title: string; description: string }>;
         try {
-          const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+          const parsed = JSON.parse(stripCodeFences(aiText));
           pairs = Array.isArray(parsed)
             ? parsed.map((p: { title?: string; description?: string }) => ({
                 title: enforceLimit(String(p.title || ''), 60),
@@ -929,7 +901,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceAccessFromQ
       // Parse 3 variations
       let variations: string[];
       try {
-        const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+        const parsed = JSON.parse(stripCodeFences(aiText));
         variations = Array.isArray(parsed)
           ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
           : [enforceLimit(String(parsed), maxLen)];
@@ -1089,18 +1061,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceAccessFromQuery(), 
     const metaDescription = metaDescMatch ? metaDescMatch[1].trim() : undefined;
 
     // Extract body text: strip tags, scripts, styles
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const body = bodyMatch ? bodyMatch[1] : html;
-    const text = body
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&[a-z]+;/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 8000);
+    const text = stripHtmlToText(html, { maxLength: 8000 });
     res.json({ text, seoTitle, metaDescription });
   } catch (e) {
     log.error({ err: e }, 'Page HTML fetch error');
@@ -1136,17 +1097,7 @@ router.post('/api/webflow/seo-copy', async (req, res) => {
         const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000) });
         if (r.ok) {
           const html = await r.text();
-          const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-          const body = bodyMatch ? bodyMatch[1] : html;
-          content = body
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 4000);
+          content = stripHtmlToText(html, { maxLength: 4000 });
         }
       } catch { /* non-critical — proceed without content */ }
     }
@@ -1211,7 +1162,7 @@ Return ONLY valid JSON, no markdown fences.`;
     });
 
     const raw = aiResult.text || '{}';
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+    const cleaned = stripCodeFences(raw);
 
     let parsed;
     try {
@@ -1309,18 +1260,7 @@ router.post('/api/seo/:workspaceId/bulk-analyze', requireWorkspaceAccess('worksp
               });
               if (htmlRes.ok) {
                 const html = await htmlRes.text();
-                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                const body = bodyMatch ? bodyMatch[1] : html;
-                pageContent = body
-                  .replace(/<script[\s\S]*?<\/script>/gi, '')
-                  .replace(/<style[\s\S]*?<\/style>/gi, '')
-                  .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                  .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                  .replace(/<[^>]+>/g, ' ')
-                  .replace(/&[a-z]+;/gi, ' ')
-                  .replace(/\s+/g, ' ')
-                  .trim()
-                  .slice(0, 3000);
+                pageContent = stripHtmlToText(html, { maxLength: 3000 });
               }
             } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
           }
@@ -1370,7 +1310,7 @@ IMPORTANT: Return ONLY valid JSON.`;
           });
 
           const raw = aiResult.text || '{}';
-          const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const cleaned = stripCodeFences(raw);
           let analysis: Record<string, unknown>;
           try {
             analysis = JSON.parse(cleaned);
@@ -1591,17 +1531,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
               const htmlRes = await fetch(`${baseUrl}/${page.slug}`, { redirect: 'follow', signal: AbortSignal.timeout(5000) });
               if (htmlRes.ok) {
                 const html = await htmlRes.text();
-                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                const body = bodyMatch ? bodyMatch[1] : html;
-                contentExcerpt = body
-                  .replace(/<script[\s\S]*?<\/script>/gi, '')
-                  .replace(/<style[\s\S]*?<\/style>/gi, '')
-                  .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-                  .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-                  .replace(/<[^>]+>/g, ' ')
-                  .replace(/\s+/g, ' ')
-                  .trim()
-                  .slice(0, 800);
+                contentExcerpt = stripHtmlToText(html, { maxLength: 800 });
               }
             } catch { /* best-effort — fetch on external URL */ } // url-fetch-ok
           }
@@ -1654,7 +1584,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
             });
             let pairs: Array<{ title: string; description: string }>;
             try {
-              const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+              const parsed = JSON.parse(stripCodeFences(aiText));
               pairs = Array.isArray(parsed)
                 ? parsed.map((p: { title?: string; description?: string }) => ({
                     title: enforceLimit(String(p.title || ''), 60),
@@ -1694,7 +1624,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
           });
           let variations: string[];
           try {
-            const parsed = JSON.parse(aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+            const parsed = JSON.parse(stripCodeFences(aiText));
             variations = Array.isArray(parsed)
               ? parsed.map((v: string) => enforceLimit(String(v), maxLen)).filter(Boolean)
               : [enforceLimit(String(parsed), maxLen)];

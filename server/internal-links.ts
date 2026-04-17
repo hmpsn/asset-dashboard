@@ -12,7 +12,7 @@ import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
 import { callOpenAI } from './openai-helpers.js';
 import { buildWorkspaceIntelligence, formatPersonasForPrompt, formatKnowledgeBaseForPrompt } from './workspace-intelligence.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath, stripHtmlToText, stripCodeFences } from './helpers.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import { linkSuggestionSchema } from './schemas/internal-links-schemas.js';
@@ -117,11 +117,7 @@ async function fetchPageContent(url: string): Promise<{ content: string; interna
       .replace(/<nav[\s\S]*?<\/nav>/gi, '')
       .replace(/<header[\s\S]*?<\/header>/gi, '')
       .replace(/<footer[\s\S]*?<\/footer>/gi, '');
-    const content = contentHtml
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&[a-z]+;/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const content = stripHtmlToText(contentHtml, { stripHeader: false });
 
     // Extract internal links from CONTENT ONLY (not nav/header/footer)
     // Nav links make every page appear to link to every other page,
@@ -379,7 +375,7 @@ Return ONLY valid JSON array, no markdown fences, no explanation.`;
     });
 
     let raw = aiResult.text || '[]';
-    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    raw = stripCodeFences(raw);
 
     let suggestions: LinkSuggestion[] = parseJsonSafeArray(
       raw,
