@@ -4,7 +4,7 @@
 > Run `npm run rules:generate` to update. CI fails if the committed file drifts
 > from the generator output.
 
-Total rules: **63** — 34 error, 29 warn.
+Total rules: **65** — 34 error, 31 warn.
 
 Every rule below is enforced automatically by `npx tsx scripts/pr-check.ts`.
 Rules in the **error** tier block merges; rules in the **warn** tier are
@@ -86,6 +86,8 @@ advisory but tracked.
 | 27 | Missing broadcastToWorkspace after DB write in route handler | warn | custom | `server/routes/` | `// broadcast-ok` | Route handlers that write to the DB without broadcasting leave connected clients with stale data until they manually refresh. |
 | 28 | Admin route mutation without addActivity | warn | custom | `server/routes/*.ts (excluding public-* and infrastructure routes)` | `// activity-ok` | Significant admin operations that skip addActivity() leave gaps in the workspace activity feed, making it impossible for team members to audit what changed and when. |
 | 29 | addActivity type not in CLIENT_VISIBLE_TYPES (public route) | warn | custom | `server/routes/` | `client-visibility-ok` | Public-portal mutations that log activity with a type absent from CLIENT_VISIBLE_TYPES create invisible entries — the activity is recorded but never shown to client-portal users. This is sometimes intentional (admin-only bookkeeping) but often an oversight when adding new activity types. |
+| 30 | Raw provider date passed to new Date() | warn | pattern | `server/` | `// provider-date-ok` | Prevents Invalid Date regressions after PR #218 A4 finding: SEMRush emits Unix epoch strings that new Date() cannot parse. |
+| 31 | Competitor keyword push missing serpFeatures | warn | custom | `server/` | `// compkw-serp-ok` | Prevents regression of PR #218 A3 finding: DomainKeyword.serpFeatures was silently dropped in the inline mapping. |
 
 ---
 

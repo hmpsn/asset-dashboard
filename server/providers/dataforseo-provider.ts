@@ -20,7 +20,7 @@ import type {
   BacklinksOverview,
   ReferringDomain,
 } from '../seo-data-provider.js';
-import { markCapabilityDisabled } from '../seo-data-provider.js';
+import { markCapabilityDisabled, normalizeProviderDate } from '../seo-data-provider.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -495,7 +495,7 @@ export class DataForSeoProvider implements SeoDataProvider {
   // ── getDomainKeywords → ranked_keywords ──
   async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}`;
+    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}_vol`;
     const cached = readCache<DomainKeyword[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
     if (cached) {
       logCreditUsage({ credits: 0, endpoint: 'ranked_keywords', query: target, rowsReturned: cached.length, workspaceId, cached: true });
@@ -514,6 +514,7 @@ export class DataForSeoProvider implements SeoDataProvider {
         location_code: locationCode(database),
         language_code: 'en',
         limit,
+        order_by: ['keyword_data.keyword_info.search_volume,desc'],
       }]);
 
       const taskResults = getTaskResult(json);
@@ -813,9 +814,9 @@ export class DataForSeoProvider implements SeoDataProvider {
         return {
           domain: (item.domain as string) ?? '',
           backlinksCount: (item.backlinks as number) ?? 0,
-          firstSeen: firstSeen ?? '',
+          firstSeen: normalizeProviderDate(firstSeen ?? ''),
           // Empty string (not 'N/A') so the frontend falsy-check renders '—' instead of 'Invalid Date'
-          lastSeen: lastVisited ?? firstSeen ?? '',
+          lastSeen: normalizeProviderDate(lastVisited ?? firstSeen ?? ''),
         };
       });
 
