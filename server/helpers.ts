@@ -53,8 +53,7 @@ export function normalizePageUrl(url: string): string {
     if (url.startsWith('http')) {
       return normalizePath(new URL(url).pathname);
     }
-  } catch {
-    // fall through to path-only normalization
+  } catch { // catch-ok: malformed URL string — fall through to path-only normalization
   }
   return normalizePath(url);
 }
