@@ -15,6 +15,7 @@ import { getInsights } from './analytics-insights-store.js';
 import type { PageHealthData } from '../shared/types/analytics.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
 
 
 const log = createLogger('helpers');
@@ -89,16 +90,9 @@ function globToRegex(pattern: string): RegExp {
 
 // ── Audit Suppression Helpers ──
 
-// Scoring weights must mirror seo-audit.ts auditPage() exactly
-export const CRITICAL_CHECKS_SET = new Set([
-  'title', 'meta-description', 'canonical', 'h1', 'robots',
-  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
-]);
-export const MODERATE_CHECKS_SET = new Set([
-  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
-  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
-  'duplicate-description', 'img-filesize', 'html-size',
-]);
+// Re-export from shared/scoring.ts (single source of truth — copies to prevent external mutation)
+export const CRITICAL_CHECKS_SET = new Set(CRITICAL_CHECKS);
+export const MODERATE_CHECKS_SET = new Set(MODERATE_CHECKS);
 
 export interface AuditSuppression { check: string; pageSlug: string; pagePattern?: string; reason?: string; createdAt: string }
 
@@ -133,19 +127,7 @@ export function applySuppressionsToAudit(
     });
 
     // Recalculate page score with remaining issues
-    // Weights must mirror audit-page.ts: info=0, softer warning/error deductions
-    let score = 100;
-    for (const issue of filteredIssues) {
-      const isCritical = CRITICAL_CHECKS_SET.has(issue.check);
-      const isModerate = MODERATE_CHECKS_SET.has(issue.check);
-      if (issue.severity === 'error') {
-        score -= isCritical ? 15 : 10;
-      } else if (issue.severity === 'warning') {
-        score -= isCritical ? 5 : isModerate ? 3 : 2;
-      }
-      // info severity: no score impact (industry standard)
-    }
-    score = Math.max(0, Math.min(100, score));
+    const score = computePageScore(filteredIssues);
 
     for (const i of filteredIssues) {
       if (i.severity === 'error') totalErrors++;

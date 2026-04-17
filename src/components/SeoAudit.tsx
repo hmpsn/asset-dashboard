@@ -29,8 +29,9 @@ import { SeoAuditGuide } from './audit/SeoAuditGuide';
 import {
   type Severity, type CheckCategory, type SeoIssue, type PageSeoResult,
   type SeoAuditResult, type SnapshotSummary, type CwvStrategyResult,
-  SEVERITY_CONFIG, CRITICAL_CHECKS, MODERATE_CHECKS,
+  SEVERITY_CONFIG,
 } from './audit/types';
+import { computePageScore } from '../../shared/scoring';
 import { ReportModal, ReportViewer } from './audit/AuditReportExport';
 import { AuditIssueRow } from './audit/AuditIssueRow';
 import { AuditBatchActions } from './audit/AuditBatchActions';
@@ -599,15 +600,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
         return true;
       });
       if (filtered.length === page.issues.length) return page;
-      let score = 100;
-      for (const issue of filtered) {
-        const isCritical = CRITICAL_CHECKS.has(issue.check);
-        const isModerate = MODERATE_CHECKS.has(issue.check);
-        if (issue.severity === 'error') score -= isCritical ? 15 : 10;
-        else if (issue.severity === 'warning') score -= isCritical ? 5 : isModerate ? 3 : 2;
-        // info: no score impact (industry standard)
-      }
-      score = Math.max(0, Math.min(100, score));
+      const score = computePageScore(filtered);
       return { ...page, issues: filtered, score };
     });
 
@@ -616,7 +609,7 @@ function SeoAudit({ siteId, workspaceId, siteName }: Props) {
     const infos = pages.reduce((sum, p) => sum + p.issues.filter(i => i.severity === 'info').length, 0);
     // Exclude noindex pages from site score — they don't affect search rankings
     const indexedPages = pages.filter(p => !p.noindex);
-    const siteScore = indexedPages.length > 0 ? Math.round(indexedPages.reduce((sum, p) => sum + p.score, 0) / indexedPages.length) : 0;
+    const siteScore = indexedPages.length > 0 ? Math.round(indexedPages.reduce((sum, p) => sum + p.score, 0) / indexedPages.length) : 100;
 
     return { ...data, pages, errors, warnings, infos, siteScore };
   }, [data, suppressions]);

@@ -3,6 +3,7 @@ import {
   extractImgTags, extractStyleBlocks, extractInlineScripts, countExternalResources,
   stripHiddenElements,
 } from './seo-audit-html.js';
+import { computePageScore } from '../shared/scoring.js';
 export type Severity = 'error' | 'warning' | 'info';
 
 export type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
@@ -65,15 +66,7 @@ export const CHECK_CATEGORY: Record<string, CheckCategory> = {
   'aeo-trust-pages': 'content',
 };
 
-const CRITICAL_CHECKS = new Set([
-  'title', 'meta-description', 'canonical', 'h1', 'robots',
-  'duplicate-title', 'mixed-content', 'ssl', 'robots-txt',
-]);
-const MODERATE_CHECKS = new Set([
-  'content-length', 'heading-hierarchy', 'internal-links', 'img-alt',
-  'og-tags', 'og-image', 'link-text', 'url', 'lang', 'viewport',
-  'duplicate-description', 'img-filesize', 'html-size',
-]);
+
 
 // Slug patterns that indicate a content/article page where AEO editorial checks apply
 const CONTENT_PAGE_PATTERNS = /(?:^|\/)(?:blog|articles?|resources?|news|posts?|guides?|learn|insights?|case-stud(?:y|ies)|whitepapers?|reports?)(?:\/|$)/i;
@@ -474,23 +467,8 @@ export function auditPage(
     issue.category = CHECK_CATEGORY[issue.check] || 'technical';
   }
 
-  // Score: start at 100, deduct per issue with weighted severity.
-  // Weights calibrated to match industry tools (SEMRush, Ahrefs):
-  //   - Errors are meaningful deductions (broken fundamentals)
-  //   - Warnings are mild deductions (improvement opportunities)
-  //   - Info/notices have zero score impact (aspirational recommendations)
-  let score = 100;
-  for (const issue of issues) {
-    const isCritical = CRITICAL_CHECKS.has(issue.check);
-    const isModerate = MODERATE_CHECKS.has(issue.check);
-    if (issue.severity === 'error') {
-      score -= isCritical ? 15 : 10;
-    } else if (issue.severity === 'warning') {
-      score -= isCritical ? 5 : isModerate ? 3 : 2;
-    }
-    // info severity: no score impact (industry standard)
-  }
-  score = Math.max(0, Math.min(100, score));
+  // Score: computed from issues via shared/scoring.ts (single source of truth)
+  const score = computePageScore(issues);
 
   return { pageId, page: pageName, slug, url, score, issues, ...(isNoindex ? { noindex: true } : {}) };
 }
