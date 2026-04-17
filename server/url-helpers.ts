@@ -18,8 +18,10 @@ export async function resolveBaseUrl(
     return ws.liveDomain.startsWith('http') ? ws.liveDomain : `https://${ws.liveDomain}`;
   }
   if (ws.webflowSiteId) {
-    const sub = await getSiteSubdomain(ws.webflowSiteId, tokenOverride);
-    if (sub) return `https://${sub}.webflow.io`;
+    try {
+      const sub = await getSiteSubdomain(ws.webflowSiteId, tokenOverride);
+      if (sub) return `https://${sub}.webflow.io`;
+    } catch { /* token missing or network failure — fall through to empty string */ }
   }
   return '';
 }
