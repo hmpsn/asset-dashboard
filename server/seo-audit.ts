@@ -9,7 +9,7 @@ import { listWorkspaces, getBrandName } from './workspaces.js';
 import { callOpenAI } from './openai-helpers.js';
 import { extractMetaContent, extractLinks } from './seo-audit-html.js';
 import { auditPage, isExcludedPage, CHECK_CATEGORY } from './audit-page.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath, fetchPublishedHtml } from './helpers.js';
 export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-page.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import { createLogger } from './logger.js';
@@ -69,13 +69,8 @@ export async function fetchPageMeta(pageId: string, tokenOverride?: string): Pro
   } catch (err) { /* network failure — expected */ return null; }
 }
 
-export async function fetchPublishedHtml(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { redirect: 'follow' });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch (err) { /* network failure — expected */ return null; }
-}
+// Re-export so existing callers that import from seo-audit continue to work
+export { fetchPublishedHtml } from './helpers.js';
 
 interface SiteInfo {
   subdomain: string | null;

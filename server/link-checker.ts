@@ -4,7 +4,7 @@ import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { listWorkspaces, getWorkspace } from './workspaces.js';
 import { webflowFetch } from './webflow-client.js';
-import { fetchPublishedHtml } from './seo-audit.js';
+import { fetchPublishedHtml } from './helpers.js';
 
 const log = createLogger('link-checker');
 
