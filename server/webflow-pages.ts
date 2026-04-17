@@ -137,7 +137,7 @@ export async function getSiteSubdomain(siteId: string, tokenOverride?: string): 
     if (!res.ok) return null;
     const data = await res.json() as { shortName?: string };
     return data.shortName || null;
-  } catch {
+  } catch { // catch-ok: network failure or missing token → callers treat null as "no subdomain"
     return null;
   }
 }
