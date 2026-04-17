@@ -3851,6 +3851,43 @@ describe('Rule: Competitor keyword push missing serpFeatures', () => {
   });
 });
 
+describe('Rule: Raw provider date passed to new Date()', () => {
+  const RULE = CHECKS.find(c => c.name === 'Raw provider date passed to new Date()')!;
+
+  it('flags new Date() receiving a first_seen field in server/', () => {
+    const dir = path.join(TMPDIR, 'provider-date-trigger/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'semrush.ts'), "const d = new Date(item.first_seen);\n");
+    const hits = checkDirectory(path.join(TMPDIR, 'provider-date-trigger'), RULE);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.some(h => h.includes('semrush.ts'))).toBe(true);
+  });
+
+  it('flags new Date() receiving a lastSeen field in server/', () => {
+    const dir = path.join(TMPDIR, 'provider-date-trigger2/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'dfs.ts'), "return new Date(row.lastSeen);\n");
+    const hits = checkDirectory(path.join(TMPDIR, 'provider-date-trigger2'), RULE);
+    expect(hits.length).toBeGreaterThan(0);
+  });
+
+  it('suppresses with // provider-date-ok hatch', () => {
+    const dir = path.join(TMPDIR, 'provider-date-hatch/server');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'custom.ts'), "const d = new Date(item.first_seen); // provider-date-ok\n");
+    const hits = checkDirectory(path.join(TMPDIR, 'provider-date-hatch'), RULE);
+    expect(hits.length).toBe(0);
+  });
+
+  it('has pathFilter configured to server/', () => {
+    expect(RULE.pathFilter).toBe('server/');
+  });
+
+  it('excludes server/seo-data-provider.ts (the normalizer definition site)', () => {
+    expect(RULE.exclude).toContain('server/seo-data-provider.ts');
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
