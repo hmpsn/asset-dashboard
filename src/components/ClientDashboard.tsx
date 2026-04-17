@@ -104,7 +104,6 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   // ── Turnstile state (declared before useClientAuth which references them) ──
   const turnstileTokenRef = useRef<string | undefined>(undefined);
   const [turnstileReset, setTurnstileReset] = useState(0);
-  const [recommendationsVersion, setRecommendationsVersion] = useState(0);
 
   // ── Auth hook ──
   const {
@@ -223,7 +222,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     'workspace:updated': () => {
       getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
     },
-    'recommendations:updated': () => setRecommendationsVersion(v => v + 1),
+    'recommendations:updated': () => refetchClient('recommendations', ''),
   }, wsIdentity);
 
   // ── Load workspace info first (includes requiresPassword flag) ──
@@ -852,7 +851,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
           <ErrorBoundary label="Site Health">
             <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error','warning','info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check the Content tab to track progress.', type: 'success' })} actionPlanSlot={workspaceId && auditDetail ? (
               <ErrorBoundary label="Action Plan">
-                <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} refetchToken={recommendationsVersion} />
+                <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} />
               </ErrorBoundary>
             ) : undefined} />
           </ErrorBoundary>

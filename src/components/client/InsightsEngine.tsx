@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Lightbulb, Zap, Clock, CalendarClock, RefreshCw,
   TrendingUp, TrendingDown, ShoppingCart, Crown, ChevronDown, ChevronRight,
@@ -11,12 +12,11 @@ import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { STUDIO_NAME } from '../../constants';
 import { get, post, patch, del } from '../../api/client';
+import { queryKeys } from '../../lib/queryKeys';
 
 // ─── Props ────────────────────────────────────────────────────────
 
 interface InsightsEngineProps {
-  /** Increment to trigger a background re-fetch (e.g. on RECOMMENDATIONS_UPDATED WS event) */
-  refetchToken?: number;
   workspaceId: string;
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
@@ -104,63 +104,49 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 
 // ─── Component ────────────────────────────────────────────────────
 
-export function InsightsEngine({ workspaceId, tier, compact, onNavigate, refetchToken }: InsightsEngineProps) {
+export function InsightsEngine({ workspaceId, tier, compact, onNavigate }: InsightsEngineProps) {
   const cart = useCart();
-  const [data, setData] = useState<RecommendationSet | null>(null);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [expandedPriorities, setExpandedPriorities] = useState<Set<RecPriority>>(new Set(['fix_now']));
   const [expandedRecs, setExpandedRecs] = useState<Set<string>>(new Set());
 
   const isPremium = tier === 'premium';
 
-  // Fetch recommendations (re-runs when refetchToken increments, e.g. on RECOMMENDATIONS_UPDATED WS event)
-  useEffect(() => {
-    get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`)
-      .then(set => { setData(set); setLoading(false); })
-      .catch(err => { setError(typeof err === 'string' ? err : 'Failed to load recommendations'); setLoading(false); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId, refetchToken]);
+  const { data, isLoading, isError } = useQuery<RecommendationSet>({
+    queryKey: queryKeys.shared.recommendations(workspaceId),
+    queryFn: () => get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
+    staleTime: 60_000,
+  });
 
   // Re-generate
   const handleRegenerate = async () => {
     setRegenerating(true);
     try {
       const set = await post<RecommendationSet>(`/api/public/recommendations/${workspaceId}/generate`);
-      setData(set);
-    } catch { setError('Failed to regenerate'); }
+      qc.setQueryData(queryKeys.shared.recommendations(workspaceId), set);
+    } catch { /* error shown via isError */ }
     setRegenerating(false);
   };
 
-  // Update status
+  // Update status (optimistic)
   const handleStatusUpdate = async (recId: string, status: RecStatus) => {
     try {
       await patch(`/api/public/recommendations/${workspaceId}/${recId}`, { status });
-      setData(prev => {
+      qc.setQueryData<RecommendationSet>(queryKeys.shared.recommendations(workspaceId), prev => {
         if (!prev) return prev;
-        return {
-          ...prev,
-          recommendations: prev.recommendations.map(r =>
-            r.id === recId ? { ...r, status, updatedAt: new Date().toISOString() } : r
-          ),
-        };
+        return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status, updatedAt: new Date().toISOString() } : r) };
       });
     } catch (err) { console.error('InsightsEngine operation failed:', err); }
   };
 
-  // Dismiss
+  // Dismiss (optimistic)
   const handleDismiss = async (recId: string) => {
     try {
       await del(`/api/public/recommendations/${workspaceId}/${recId}`);
-      setData(prev => {
+      qc.setQueryData<RecommendationSet>(queryKeys.shared.recommendations(workspaceId), prev => {
         if (!prev) return prev;
-        return {
-          ...prev,
-          recommendations: prev.recommendations.map(r =>
-            r.id === recId ? { ...r, status: 'dismissed' as RecStatus } : r
-          ),
-        };
+        return { ...prev, recommendations: prev.recommendations.map(r => r.id === recId ? { ...r, status: 'dismissed' as RecStatus } : r) };
       });
     } catch (err) { console.error('InsightsEngine operation failed:', err); }
   };
@@ -188,7 +174,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, refetch
   const activeCount = data ? data.recommendations.filter(r => r.status !== 'dismissed' && r.status !== 'completed').length : 0;
   const completedCount = data ? data.recommendations.filter(r => r.status === 'completed').length : 0;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 p-8 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <Loader2 className="w-6 h-6 text-teal-400 animate-spin mx-auto mb-2" />
@@ -197,11 +183,11 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, refetch
     );
   }
 
-  if (error && !data) {
+  if (isError && !data) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 p-6 text-center" style={{ borderRadius: '10px 24px 10px 24px' }}>
         <XCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
-        <p className="text-xs text-zinc-400">{error}</p>
+        <p className="text-xs text-zinc-400">Failed to load recommendations</p>
         <button onClick={handleRegenerate} className="mt-2 text-xs text-teal-400 hover:text-teal-300">
           Try again
         </button>

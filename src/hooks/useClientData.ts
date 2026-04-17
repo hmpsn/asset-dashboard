@@ -207,6 +207,7 @@ export function useClientData(workspaceId: string) {
       content: queryKeys.client.contentRequests(workspaceId),
       audit: queryKeys.client.auditSummary(workspaceId),
       'audit-detail': queryKeys.client.auditDetail(workspaceId),
+      recommendations: queryKeys.shared.recommendations(workspaceId),
     };
     const qk = keyFns[key];
     if (qk) queryClient.invalidateQueries({ queryKey: qk });
